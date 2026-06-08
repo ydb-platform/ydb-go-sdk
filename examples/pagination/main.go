@@ -74,12 +74,12 @@ func main() {
 
 	prefix = path.Join(db.Name(), prefix)
 
-	err = createTable(ctx, db.Table(), path.Join(prefix, "schools"))
+	err = createTable(ctx, db.Query(), path.Join(prefix, "schools"))
 	if err != nil {
 		panic(fmt.Errorf("create tables error: %w", err))
 	}
 
-	err = fillTableWithData(ctx, db.Table(), prefix)
+	err = fillTableWithData(ctx, db.Query(), prefix)
 	if err != nil {
 		panic(fmt.Errorf("fill tables with data error: %w", err))
 	}
@@ -90,7 +90,7 @@ func main() {
 	maxPages := 10
 	for i, empty := 0, false; i < maxPages && !empty; i++ {
 		fmt.Printf("> Page %v:\n", i+1)
-		empty, err = selectPaging(ctx, db.Table(), prefix, limit, &lastNum, &lastCity)
+		empty, err = selectPaging(ctx, db.Query(), prefix, limit, &lastNum, &lastCity)
 		if err != nil {
 			panic(fmt.Errorf("get page %v error: %w", i, err))
 		}

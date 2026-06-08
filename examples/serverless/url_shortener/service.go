@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"embed"
 	"encoding/hex"
@@ -23,10 +22,7 @@ import (
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydbMetrics "github.com/ydb-platform/ydb-go-sdk-prometheus/v2"
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -54,19 +50,6 @@ func isShortCorrect(link string) bool {
 
 func isLongCorrect(link string) bool {
 	return long.FindStringIndex(link) != nil
-}
-
-func render(t *template.Template, data any) string {
-	var buf bytes.Buffer
-	if err := t.Execute(&buf, data); err != nil {
-		panic(err)
-	}
-
-	return buf.String()
-}
-
-type templateConfig struct {
-	TablePathPrefix string
 }
 
 type service struct {
@@ -181,28 +164,14 @@ func (s *service) Close(ctx context.Context) {
 }
 
 func (s *service) createTable(ctx context.Context) (err error) {
-	query := render(
-		template.Must(template.New("").Parse(`
-			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-
-			CREATE TABLE urls (
+	return s.db.Query().Exec(ctx,
+		fmt.Sprintf(`
+			CREATE TABLE IF NOT EXISTS `+"`%s`"+` (
 				src Text,
 				hash Text,
-
 				PRIMARY KEY (hash)
-			);
-		`)),
-		templateConfig{
-			TablePathPrefix: path.Join(s.db.Name(), prefix),
-		},
-	)
-
-	return s.db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) error {
-			err := s.ExecuteSchemeQuery(ctx, query)
-
-			return err
-		},
+			)`, path.Join(s.db.Name(), prefix, "urls")),
+		query.WithTxControl(query.ImplicitTxControl()),
 	)
 }
 
@@ -211,9 +180,9 @@ func (s *service) insertShort(ctx context.Context, url string) (h string, err er
 	if err != nil {
 		return "", err
 	}
-	query := render(
-		template.Must(template.New("").Parse(`
-			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
+	err = s.db.Query().Exec(ctx,
+		fmt.Sprintf(`
+			PRAGMA TablePathPrefix("%s");
 
 			DECLARE $hash as Text;
 			DECLARE $src as Text;
@@ -222,38 +191,23 @@ func (s *service) insertShort(ctx context.Context, url string) (h string, err er
 				urls (hash, src)
 			VALUES
 				($hash, $src);
-		`)),
-		templateConfig{
-			TablePathPrefix: path.Join(s.db.Name(), prefix),
-		},
-	)
-	writeTx := table.TxControl(
-		table.BeginTx(
-			table.WithSerializableReadWrite(),
+		`, path.Join(s.db.Name(), prefix)),
+		query.WithTxControl(query.SerializableReadWriteTxControl(query.CommitTx())),
+		query.WithParameters(
+			ydb.ParamsBuilder().
+				Param("$hash").Any(types.TextValue(h)).
+				Param("$src").Any(types.TextValue(url)).
+				Build(),
 		),
-		table.CommitTx(),
-	)
-	err = s.db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(ctx, writeTx, query,
-				table.NewQueryParameters(
-					table.ValueParam("$hash", types.TextValue(h)),
-					table.ValueParam("$src", types.TextValue(url)),
-				),
-				options.WithCollectStatsModeBasic(),
-			)
-
-			return
-		},
 	)
 
 	return h, err
 }
 
 func (s *service) selectLong(ctx context.Context, hash string) (url string, err error) {
-	query := render(
-		template.Must(template.New("").Parse(`
-			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
+	row, err := s.db.Query().QueryRow(ctx,
+		fmt.Sprintf(`
+			PRAGMA TablePathPrefix("%s");
 
 			DECLARE $hash as Text;
 
@@ -263,48 +217,21 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 				urls
 			WHERE
 				hash = $hash;
-		`)),
-		templateConfig{
-			TablePathPrefix: path.Join(s.db.Name(), prefix),
-		},
-	)
-	readTx := table.TxControl(
-		table.BeginTx(
-			table.WithSnapshotReadOnly(),
+		`, path.Join(s.db.Name(), prefix)),
+		query.WithTxControl(query.SnapshotReadOnlyTxControl()),
+		query.WithParameters(
+			ydb.ParamsBuilder().
+				Param("$hash").Any(types.TextValue(hash)).
+				Build(),
 		),
-		table.CommitTx(),
-	)
-	var res result.Result
-	err = s.db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, res, err = s.Execute(ctx, readTx, query,
-				table.NewQueryParameters(
-					table.ValueParam("$hash", types.TextValue(hash)),
-				),
-				options.WithCollectStatsModeBasic(),
-			)
-
-			return err
-		},
 	)
 	if err != nil {
 		return "", err
 	}
-	defer func() {
-		_ = res.Close()
-	}()
-	var src string
-	for res.NextResultSet(ctx) {
-		for res.NextRow() {
-			err = res.ScanNamed(
-				named.OptionalWithDefault("src", &src),
-			)
 
-			return src, err
-		}
-	}
+	err = row.ScanNamed(query.Named("src", &url))
 
-	return "", fmt.Errorf("hash '%s' is not found", hash)
+	return url, err
 }
 
 func writeResponse(w http.ResponseWriter, statusCode int, body string) {
