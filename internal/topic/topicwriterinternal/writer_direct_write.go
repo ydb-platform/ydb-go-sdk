@@ -9,9 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
@@ -23,15 +21,26 @@ var (
 	)
 )
 
-// directWrite holds partition resolution and proxy→direct rebind state for a
-// topic writer. resolved is shared by pointer so connect closures and the
-// reconnector see the same value even if WriterReconnectorConfig is copied.
+// directWrite holds partition resolution and proxy→direct rebind state for a topic writer.
 type directWrite struct {
+	// enabled turns on direct StreamWrite to the node that hosts the target partition.
 	enabled bool
 
-	resolved     *atomic.Int64
+	// resolved holds the partition used for node lookup and connect routing.
+	// -1 means unknown (connect via proxy until InitResponse); >= 0 is a concrete partition ID.
+	// Shared by pointer so connect closures and the reconnector see the same value
+	// even if WriterReconnectorConfig is copied.
+	resolved *atomic.Int64
+
+	// pinnedByUser is true when the caller set an explicit partition ID via WithPartitioning.
+	// A pinned partition is never cleared after a session failure.
 	pinnedByUser bool
-	original     rawtopicwriter.Partitioning
+
+	// original is defaultPartitioning before a server-learned partition is applied.
+	// Restored when a learned partition must be dropped after a failed direct session.
+	original rawtopicwriter.Partitioning
+
+	// partitioning points at cfg.defaultPartitioning; updated when the partition is pinned or learned.
 	partitioning *rawtopicwriter.Partitioning
 
 	// retryResetPending is set after a successful proxy probe; the next connect must not count as a failed retry.
@@ -61,18 +70,6 @@ func (dw *directWrite) validate(partitioning rawtopicwriter.Partitioning, produc
 	}
 
 	return xerrors.WithStackTrace(errDirectWriteRequiresPartitionOrProducer)
-}
-
-func newWriterConnectFunc(cfg *WriterReconnectorConfig) ConnectFunc {
-	return func(ctx context.Context, tracer *trace.Topic) (RawTopicWriterStream, error) {
-		mergedCtx := xcontext.MergeContexts(ctx, cfg.LogContext)
-		resolvedCtx, err := cfg.directWrite.bindConnectContext(mergedCtx, cfg.rawTopicClient, cfg.topic)
-		if err != nil {
-			return nil, err
-		}
-
-		return cfg.rawTopicClient.StreamWrite(resolvedCtx, tracer)
-	}
 }
 
 // handleProbeInit records partition from a proxy InitResponse. Must be called with the writer mutex held.

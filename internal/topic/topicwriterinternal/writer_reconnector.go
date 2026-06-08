@@ -90,6 +90,18 @@ func (cfg *WriterReconnectorConfig) validate() error {
 	return cfg.directWrite.validate(cfg.defaultPartitioning, cfg.producerID)
 }
 
+func newWriterConnectFunc(cfg *WriterReconnectorConfig) ConnectFunc {
+	return func(ctx context.Context, tracer *trace.Topic) (RawTopicWriterStream, error) {
+		mergedCtx := xcontext.MergeContexts(ctx, cfg.LogContext)
+		resolvedCtx, err := cfg.directWrite.bindConnectContext(mergedCtx, cfg.rawTopicClient, cfg.topic)
+		if err != nil {
+			return nil, err
+		}
+
+		return cfg.rawTopicClient.StreamWrite(resolvedCtx, tracer)
+	}
+}
+
 func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnectorConfig {
 	cfg := WriterReconnectorConfig{
 		WritersCommonConfig: WritersCommonConfig{
