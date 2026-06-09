@@ -36,9 +36,10 @@ func TestDirectWriteStreamInitUsesPartitionHostNodeID(t *testing.T) {
 	const (
 		partitionID = int64(7)
 		hostNodeID  = int32(2)
+		generation  = int64(5)
 	)
 
-	mock := newDirectWriteHostNodeTopicService(t, hostNodeID)
+	mock := newDirectWriteHostNodeTopicService(t, hostNodeID, generation)
 	connString := topicmock.GrpcMockTopicConnStringWithNodeIDs(e, mock, []uint32{1, 2})
 
 	var streamWriteNodeID atomic.Uint32
@@ -88,12 +89,18 @@ type directWriteHostNodeTopicService struct {
 
 	t          testing.TB
 	hostNodeID int32
+	generation int64
 }
 
-func newDirectWriteHostNodeTopicService(t testing.TB, hostNodeID int32) *directWriteHostNodeTopicService {
+func newDirectWriteHostNodeTopicService(
+	t testing.TB,
+	hostNodeID int32,
+	generation int64,
+) *directWriteHostNodeTopicService {
 	return &directWriteHostNodeTopicService{
 		t:          t,
 		hostNodeID: hostNodeID,
+		generation: generation,
 	}
 }
 
@@ -107,7 +114,13 @@ func (s *directWriteHostNodeTopicService) DescribeTopic(
 
 	return describeTopicResponseForDirectWriteNode(s.t, []*Ydb_Topic.DescribeTopicResult_PartitionInfo{
 		{PartitionId: 0, PartitionLocation: &Ydb_Topic.PartitionLocation{NodeId: 1}},
-		{PartitionId: 7, PartitionLocation: &Ydb_Topic.PartitionLocation{NodeId: s.hostNodeID}},
+		{
+			PartitionId: 7,
+			PartitionLocation: &Ydb_Topic.PartitionLocation{
+				NodeId:     s.hostNodeID,
+				Generation: s.generation,
+			},
+		},
 	}), nil
 }
 
@@ -116,8 +129,19 @@ func (s *directWriteHostNodeTopicService) StreamWrite(server Ydb_Topic_V1.TopicS
 	if err != nil {
 		return fmt.Errorf("failed read init message: %w", err)
 	}
-	if initMsg.GetInitRequest() == nil {
+	initReq := initMsg.GetInitRequest()
+	if initReq == nil {
 		return errors.New("first message must be init message")
+	}
+	partitionWithGeneration := initReq.GetPartitionWithGeneration()
+	if partitionWithGeneration == nil {
+		return errors.New("init request must include partition with generation")
+	}
+	if partitionWithGeneration.GetPartitionId() != 7 {
+		return fmt.Errorf("unexpected partition id: %d", partitionWithGeneration.GetPartitionId())
+	}
+	if partitionWithGeneration.GetGeneration() != s.generation {
+		return fmt.Errorf("unexpected generation: %d", partitionWithGeneration.GetGeneration())
 	}
 
 	err = server.Send(&Ydb_Topic.StreamWriteMessage_FromServer{

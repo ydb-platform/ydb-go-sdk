@@ -35,11 +35,13 @@ func (c *WritersCommonConfig) Topic() string {
 }
 
 func (c *WritersCommonConfig) PartitionID() (int64, bool) {
-	if c.defaultPartitioning.Type == rawtopicwriter.PartitioningPartitionID {
+	switch c.defaultPartitioning.Type {
+	case rawtopicwriter.PartitioningPartitionID,
+		rawtopicwriter.PartitioningPartitionWithGeneration:
 		return c.defaultPartitioning.PartitionID, true
+	default:
+		return 0, false
 	}
-
-	return 0, false
 }
 
 func (c *WritersCommonConfig) ProducerID() string {

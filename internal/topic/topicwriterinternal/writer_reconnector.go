@@ -598,6 +598,8 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 		return nil, err
 	}
 
+	w.cfg.directWrite.applyResolvedToPartitioning(&w.cfg.defaultPartitioning)
+
 	w.queue.ResetSentProgress()
 
 	return NewSingleStreamWriter(connectCtx, w.createWriterStreamConfig(stream))

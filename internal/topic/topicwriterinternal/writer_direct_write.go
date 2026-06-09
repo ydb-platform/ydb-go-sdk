@@ -21,16 +21,69 @@ var (
 	)
 )
 
+// resolvedPartition holds direct-write partition resolution state shared across
+// WriterReconnectorConfig copies via pointer.
+type resolvedPartition struct {
+	// partitionID is the target partition for direct write.
+	// -1 means unknown (connect via proxy until InitResponse).
+	partitionID atomic.Int64
+	// generation is from the latest DescribeTopic when partitionID >= 0.
+	// -1 means not yet resolved.
+	generation atomic.Int64
+}
+
+func newResolvedPartition() *resolvedPartition {
+	rp := &resolvedPartition{}
+	rp.clear()
+
+	return rp
+}
+
+func (rp *resolvedPartition) clear() {
+	rp.partitionID.Store(-1)
+	rp.generation.Store(-1)
+}
+
+func (rp *resolvedPartition) setPartitionID(partitionID int64) {
+	rp.partitionID.Store(partitionID)
+	rp.generation.Store(-1)
+}
+
+func (rp *resolvedPartition) partitionIDValue() int64 {
+	return rp.partitionID.Load()
+}
+
+func (rp *resolvedPartition) setLocation(generation int64) {
+	rp.generation.Store(generation)
+}
+
+func (rp *resolvedPartition) generationValue() int64 {
+	return rp.generation.Load()
+}
+
+func (rp *resolvedPartition) unknown() bool {
+	return rp.partitionID.Load() < 0
+}
+
+func (rp *resolvedPartition) initPartitioning() (rawtopicwriter.Partitioning, bool) {
+	partitionID := rp.partitionID.Load()
+	generation := rp.generation.Load()
+	if partitionID < 0 || generation < 0 {
+		return rawtopicwriter.Partitioning{}, false
+	}
+
+	return rawtopicwriter.NewPartitioningPartitionWithGeneration(partitionID, generation), true
+}
+
 // directWrite holds partition resolution and proxy→direct rebind state for a topic writer.
 type directWrite struct {
 	// enabled turns on direct StreamWrite to the node that hosts the target partition.
 	enabled bool
 
-	// resolved holds the partition used for node lookup and connect routing.
-	// -1 means unknown (connect via proxy until InitResponse); >= 0 is a concrete partition ID.
+	// resolved holds partition ID and generation used for node lookup and InitRequest.
 	// Shared by pointer so connect closures and the reconnector see the same value
 	// even if WriterReconnectorConfig is copied.
-	resolved *atomic.Int64
+	resolved *resolvedPartition
 
 	// pinnedByUser is true when the caller set an explicit partition ID via WithPartitioning.
 	// A pinned partition is never cleared after a session failure.
@@ -50,16 +103,14 @@ type directWrite struct {
 func (dw *directWrite) finishInit(partitioning *rawtopicwriter.Partitioning) {
 	dw.original = *partitioning
 	dw.partitioning = partitioning
-	dw.resolved = &atomic.Int64{}
+	dw.resolved = newResolvedPartition()
 
 	if dw.enabled && partitioning.Type == rawtopicwriter.PartitioningPartitionID {
-		dw.resolved.Store(partitioning.PartitionID)
+		dw.resolved.setPartitionID(partitioning.PartitionID)
 		dw.pinnedByUser = true
 
 		return
 	}
-
-	dw.resolved.Store(-1)
 }
 
 func (dw *directWrite) validate(partitioning rawtopicwriter.Partitioning, producerID string) error {
@@ -99,12 +150,19 @@ func (dw *directWrite) bindConnectContext(
 		return ctx, nil
 	}
 
-	partitionID := dw.resolved.Load()
+	partitionID := dw.resolved.partitionIDValue()
 	if partitionID < 0 {
 		return ctx, nil
 	}
 
-	return resolvePartitionNode(ctx, rawClient, topicPath, partitionID)
+	streamCtx, location, err := resolvePartitionNode(ctx, rawClient, topicPath, partitionID)
+	if err != nil {
+		return nil, err
+	}
+
+	dw.resolved.setLocation(location.Generation)
+
+	return streamCtx, nil
 }
 
 func (dw *directWrite) completeProbe(streamCtx context.Context, writer *SingleStreamWriter) {
@@ -124,25 +182,37 @@ func (dw *directWrite) consumeRetryReset() bool {
 // dropLearnedPartitionIfNeeded clears a server-learned partition after a
 // session failure so the next connect re-discovers via the proxy.
 func (dw *directWrite) dropLearnedPartitionIfNeeded(reason error, withLock func(func())) {
-	if reason == nil || !dw.enabled || dw.pinnedByUser || dw.resolved.Load() < 0 {
+	if reason == nil || !dw.enabled || dw.pinnedByUser || dw.resolved.unknown() {
 		return
 	}
 
-	dw.resolved.Store(-1)
+	dw.resolved.clear()
 	withLock(func() {
 		*dw.partitioning = dw.original
 	})
 }
 
 func (dw *directWrite) awaitingPartition() bool {
-	return dw.enabled && dw.resolved.Load() < 0
+	return dw.enabled && dw.resolved.unknown()
 }
 
 // pinPartitionFromInit records the partition from InitResponse for the rebound
 // connect. Must be called with the writer mutex held.
 func (dw *directWrite) pinPartitionFromInit(partitionID int64) {
-	dw.resolved.Store(partitionID)
+	dw.resolved.setPartitionID(partitionID)
 	*dw.partitioning = rawtopicwriter.NewPartitioningPartitionID(partitionID)
+}
+
+// applyResolvedToPartitioning updates init partitioning with partition ID and generation
+// resolved by the latest DescribeTopic during direct connect.
+func (dw *directWrite) applyResolvedToPartitioning(partitioning *rawtopicwriter.Partitioning) {
+	if !dw.enabled {
+		return
+	}
+
+	if resolved, ok := dw.resolved.initPartitioning(); ok {
+		*partitioning = resolved
+	}
 }
 
 // resolvePartitionNode looks up which node currently hosts the given partition
@@ -152,26 +222,28 @@ func resolvePartitionNode(
 	rawClient *rawtopic.Client,
 	topicPath string,
 	partitionID int64,
-) (context.Context, error) {
+) (context.Context, rawtopic.PartitionLocation, error) {
 	res, err := rawClient.DescribeTopic(ctx, rawtopic.DescribeTopicRequest{
 		Path:            topicPath,
 		IncludeLocation: true,
 	})
 	if err != nil {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: direct write: describe topic failed: %w", err))
+		return nil, rawtopic.PartitionLocation{}, xerrors.WithStackTrace(
+			fmt.Errorf("ydb: direct write: describe topic failed: %w", err),
+		)
 	}
 
-	for i := range res.Partitions {
-		p := &res.Partitions[i]
-		if p.PartitionID == partitionID {
-			nodeID := uint32(p.PartitionLocation.NodeID)
-
-			return endpoint.WithNodeID(ctx, nodeID, endpoint.WithDisableFallback()), nil
-		}
+	location, ok := res.LocationOf(partitionID)
+	if !ok {
+		return nil, rawtopic.PartitionLocation{}, xerrors.WithStackTrace(fmt.Errorf(
+			"%w: topic=%q partition_id=%d",
+			errDirectWritePartitionNotFound, topicPath, partitionID,
+		))
 	}
 
-	return nil, xerrors.WithStackTrace(fmt.Errorf(
-		"%w: topic=%q partition_id=%d",
-		errDirectWritePartitionNotFound, topicPath, partitionID,
-	))
+	return endpoint.WithNodeID(
+		ctx,
+		location.NodeIDUint32(),
+		endpoint.WithDisableFallback(),
+	), location, nil
 }
