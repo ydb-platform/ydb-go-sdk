@@ -1,28 +1,21 @@
 # Active Context
 
-> **Volatile file** — update at the end of a work session or before closing a PR.
->
-> **Merge conflicts:** with many parallel PRs this file conflicts often. On conflict, keep the union of recent decisions or reset to a short generic focus — do not block the feature PR on agent housekeeping.
+> **Branch-only scratch pad** — not merge material for `main`/`master`.
+
+## Policy
+
+- **Green master:** `main`/`master` holds only completed, merged work. Half-done tasks do not land in the default branch.
+- **This file must have no diff at PR merge time.** While iterating on a feature branch you may edit it freely; **before merge, revert this file** so the PR does not change it relative to the target branch.
+- On `main`/`master` this file stays exactly this placeholder — no session notes, no current-PR focus, no “recent changes”.
 
 ## Current focus
 
-_No active task recorded._ Check open PRs and GitHub Issues for ongoing work.
+_(empty on master — use only on a local/feature branch; do not commit branch notes here when opening a merge-ready PR)_
 
-## Recent changes
+## Where to put durable knowledge
 
-- `.agents/` workspace added for AI coding agents (see `systemPatterns.md` for driver architecture).
-
-## Open questions
-
-- Whether to add nested `AGENTS.md` per major package as the SDK grows.
-- Whether to add `.agents/skills/` shared across YDB SDK repos.
-
-## Next steps
-
-- Update this file when starting or finishing significant work.
-
-## Working conventions (reminder)
-
-- Read this file every session; other context files only when relevant.
-- Coding rules: `AGENTS.md` → `.agents/rules/` (on demand).
-- Run `golangci-lint run ./...` and `go test -race ./...` before requesting review.
+| What | Where |
+|------|-------|
+| Architecture, tooling, scope | stable files: `systemPatterns.md`, `techContext.md`, `projectBrief.md`, … |
+| Completed milestones | `progress.md` — update in the same PR that delivers the work |
+| Coding rules | `AGENTS.md` → `.agents/rules/` |

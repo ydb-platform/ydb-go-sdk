@@ -10,15 +10,14 @@ Project knowledge lives in [`.agents/context/`](.agents/context/). Coding rules 
 
 **Before coding** — read selectively:
 
-1. [`.agents/context/activeContext.md`](.agents/context/activeContext.md) — always (volatile; may conflict across parallel PRs — see file header)
-2. One stable file if needed:
+1. One stable file as needed:
    - architecture / module layout → [`systemPatterns.md`](.agents/context/systemPatterns.md)
    - toolchain / CI / local dev → [`techContext.md`](.agents/context/techContext.md)
    - API surface / users → [`productContext.md`](.agents/context/productContext.md)
    - scope / goals → [`projectBrief.md`](.agents/context/projectBrief.md)
 3. Quick lookup: [`README.md`](README.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), [pkg.go.dev](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3)
 
-**After significant work** — update `.agents/context/activeContext.md` and `.agents/context/progress.md`. Update stable context files only when architecture, tooling, or scope changed.
+**After significant work** — update `progress.md` and stable context files when the work itself merges. Do **not** merge changes to `activeContext.md` (branch-only scratch pad — see file header).
 
 On **"update memory bank"** — review all core files in [`.agents/context/README.md`](.agents/context/README.md).
 
@@ -49,6 +48,6 @@ golangci-lint run ./...
 go test -race ./...
 ```
 
-Also: `.agents/context/` volatile files updated before PR.
+Also: update `progress.md` only when the delivered work merges.
 
 Ask the user before dependency upgrades, public API design choices, or touching `trace/` codegen.

@@ -31,8 +31,10 @@ Agent: "Method M failed, so I implemented alternative N instead."
 2. Follow existing `Do`/`DoTx`, retry, and error-mapping patterns in `internal/table/`, `internal/query/`.
 3. Extend shared helpers in `internal/` rather than duplicating logic in public packages.
 
-## Memory bank updates
+## Context updates
 
-After significant work, update `.agents/context/activeContext.md` and `progress.md` before closing a PR.
+- **`activeContext.md`** — branch-only scratch pad. Revert to the placeholder before merge; never land session notes on `master`.
+- **`progress.md`** — update in the PR that delivers completed work.
+- Stable files (`systemPatterns.md`, …) — only when architecture, tooling, or scope actually changed.
 
 Add rules to `AGENTS.md` only after repeated agent mistakes — incremental, not upfront.

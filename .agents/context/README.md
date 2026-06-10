@@ -14,8 +14,8 @@ ydb-go-sdk/
 │   ├── README.md                   layout of context / rules
 │   ├── context/                    ← you are here
 │   │   ├── README.md               entry point, reading/update strategy
-│   │   ├── activeContext.md        volatile: current focus, decisions, next steps
-│   │   ├── progress.md             volatile: status, milestones, open work
+│   │   ├── activeContext.md        branch-only scratch pad (policy placeholder on master)
+│   │   ├── progress.md             evolving: completed milestones
 │   │   ├── projectBrief.md         stable: scope, goals, constraints
 │   │   ├── productContext.md       stable: users, API surface, feature parity
 │   │   ├── systemPatterns.md       evolving: package layout, Do/DoTx, retry, pools
@@ -36,8 +36,8 @@ ydb-go-sdk/
 
 | File | Stability | Read when |
 |------|-----------|-----------|
-| [`activeContext.md`](activeContext.md) | **Volatile** | **Every session** — current focus (may conflict across parallel PRs; see file header) |
-| [`progress.md`](progress.md) | **Volatile** | Resuming work, closing a PR, status checks |
+| [`activeContext.md`](activeContext.md) | **Branch-only** | Policy placeholder on `master`; optional scratch pad on a feature branch — **never merge edits** |
+| [`progress.md`](progress.md) | Evolving | Completed milestones — update in the PR that delivers the work |
 | [`systemPatterns.md`](systemPatterns.md) | Evolving | Architecture, new modules, Do/DoTx patterns |
 | [`techContext.md`](techContext.md) | Evolving | CI, Go versions, local YDB, lint/test commands |
 | [`productContext.md`](productContext.md) | Stable | Public API, users, feature parity |
@@ -46,8 +46,7 @@ ydb-go-sdk/
 ## Reading strategy
 
 ```
-Every session:  activeContext.md
-If needed:      one stable file matching the task
+If needed:      one stable file matching the task (see table)
 Code patterns:  .agents/rules/ via AGENTS.md router (on demand)
 Full review:    all files (on "update memory bank" or major onboarding)
 ```
@@ -56,7 +55,7 @@ Avoid loading all six core files at session start — it wastes context tokens w
 
 ## Update triggers
 
-1. Feature/fix ready for PR → `activeContext.md` + `progress.md`
+1. Feature/fix ready for PR → `progress.md` (if milestone); revert `activeContext.md` to placeholder
 2. Architecture or CI changed → `systemPatterns.md` or `techContext.md`
 3. Scope changed → `projectBrief.md` or `productContext.md`
 4. User says **"update memory bank"** → review every core file
