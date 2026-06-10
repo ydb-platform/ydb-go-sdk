@@ -659,20 +659,12 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) (re
 	}
 
 	if isFirstInit {
-		// Snapshot lastSeqNo/sessionID under the lock so the init callback can
-		// read consistent values: once firstInitResponseProcessedChan closes
-		// (deferred in the WithLock above), user.Write begins to mutate
-		// w.lastSeqNo concurrently under the same mutex.
-		var callbackLastSeqNo int64
-		var callbackSessionID string
 		w.m.WithLock(func() {
 			w.initDone = true
 			w.initInfo = InitialInfo{LastSeqNum: w.lastSeqNo}
 			close(w.initDoneCh)
-			callbackLastSeqNo = w.lastSeqNo
-			callbackSessionID = w.sessionID
 		})
-		w.onWriterInitCallbackHandler(writerStream, callbackLastSeqNo, callbackSessionID)
+		w.onWriterInitCallbackHandler(writerStream)
 	}
 
 	return false
@@ -703,15 +695,9 @@ func (w *WriterReconnector) WaitInitInfo(ctx context.Context) (info InitialInfo,
 	return w.waitInit(ctx)
 }
 
-func (w *WriterReconnector) onWriterInitCallbackHandler(
-	writerStream *SingleStreamWriter,
-	lastSeqNo int64,
-	sessionID string,
-) {
+func (w *WriterReconnector) onWriterInitCallbackHandler(writerStream *SingleStreamWriter) {
 	if w.cfg.OnWriterInitResponseCallback != nil {
 		info := PublicWithOnWriterConnectedInfo{
-			LastSeqNo:        lastSeqNo,
-			SessionID:        sessionID,
 			PartitionID:      writerStream.PartitionID,
 			CodecsFromServer: createPublicCodecsFromRaw(writerStream.CodecsFromServer),
 		}
