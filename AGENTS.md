@@ -1,48 +1,54 @@
-# Agent Guidelines
+# Agent Guidelines — ydb-go-sdk
 
-This document contains guidelines for AI agents working on this codebase.
+Canonical agent entry point. Tool configs (`CLAUDE.md`, Cursor rules) start here and route to [`.agents/`](.agents/).
 
-## Code Comments
+Keep this file **lean** (~60 lines) — it routes to detailed sources. Loading a large AGENTS.md on every session wastes context tokens; industry practice is a thin navigation file plus on-demand docs ([agents.md convention](https://agents.md/)).
 
-**All code comments must be written in English.**
+## Project context
 
-- Inline comments, function documentation, and package documentation should use English
-- Variable names and function names should follow Go naming conventions
-- Error messages and log messages should be in English
-- This ensures consistency and maintainability across the codebase
+Project knowledge lives in [`.agents/context/`](.agents/context/). Coding rules live in [`.agents/rules/`](.agents/rules/) (below). See [`.agents/README.md`](.agents/README.md) for the full layout.
 
-## Linting
+**Before coding** — read selectively:
 
-**The linter is run with `golangci-lint run` from the project root.**
+1. [`.agents/context/activeContext.md`](.agents/context/activeContext.md) — always
+2. One stable file if needed:
+   - architecture / module layout → [`systemPatterns.md`](.agents/context/systemPatterns.md)
+   - toolchain / CI / local dev → [`techContext.md`](.agents/context/techContext.md)
+   - API surface / users → [`productContext.md`](.agents/context/productContext.md)
+   - scope / goals → [`projectBrief.md`](.agents/context/projectBrief.md)
+3. Quick lookup: [`README.md`](README.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), [pkg.go.dev](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3)
 
-If `golangci-lint` is not installed, it can be installed using:
+**After significant work** — update `.agents/context/activeContext.md` and `.agents/context/progress.md`. Update stable context files only when architecture, tooling, or scope changed.
+
+On **"update memory bank"** — review all core files in [`.agents/context/README.md`](.agents/context/README.md).
+
+## Coding rules (load on demand)
+
+| Topic | File |
+|-------|------|
+| Style, API boundaries, dependencies | [`.agents/rules/coding-standards.md`](.agents/rules/coding-standards.md) |
+| Unit vs integration tests, local YDB | [`.agents/rules/testing.md`](.agents/rules/testing.md) |
+| Changelog requirements | [`.agents/rules/changelog.md`](.agents/rules/changelog.md) |
+| Issue-first workflow, user boundaries | [`.agents/rules/workflow.md`](.agents/rules/workflow.md) |
+| Local dev, devcontainer, CI commands | [`.agents/rules/environment.md`](.agents/rules/environment.md) |
+
+## Non-obvious rules (always on)
+
+- Comments, godoc, error messages, logs: **English**.
+- Match style in the touched package; do not reformat unrelated code.
+- Do **not** change `go.mod` / `go.sum` unless the task requires it.
+- User-facing PRs need a `CHANGELOG.md` entry at the top (or `no changelog` label) — see `changelog.md`.
+- Non-trivial changes: discuss in a GitHub issue first ([`CONTRIBUTING.md`](CONTRIBUTING.md)).
+
+## Done when
+
+From repo root:
+
 ```bash
-curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.4.0
-```
-(The version `v2.4.0` is specified in [`.github/workflows/lint.yml`](.github/workflows/lint.yml#L10). This installation command is taken from the official documentation)
-
-## Changelog
-
-**Every pull request must include a changelog entry in [`CHANGELOG.md`](CHANGELOG.md).**
-
-Rules for adding a changelog entry:
-
-1. **Only include user-facing changes**: API changes (additions, renames, deletions, deprecations) or behavior changes. Internal refactoring or non-observable changes do not require an entry.
-2. **Use past tense verbs** (e.g., "Added", "Fixed", "Changed", "Removed", "Deprecated").
-3. **Insert the new line(s) at the very beginning of `CHANGELOG.md`**, before any existing entries.
-4. **Do not include a version number** — version numbers are assigned by the maintainer at release time (see [`.github/workflows/publish.yml`](.github/workflows/publish.yml)).
-
-Example entry format:
-```markdown
-* Added `query.WithLazyTx(bool)` option for `query.Client.DoTx` calls to enable/disable lazy transactions per operation
+golangci-lint run ./...
+go test -race ./...
 ```
 
-If the pull request contains no user-facing changes, add the label `no changelog` to the PR to skip the changelog check.
+Also: `.agents/context/` volatile files updated before PR.
 
-## Dependencies
-
-**Do not update `go.mod` or `go.sum` unless the task explicitly requires it.**
-
-- Do not add, remove, or upgrade dependencies as a side effect of making code changes.
-- If a dependency change is truly necessary to complete the task, document it clearly in the PR description.
-- Never run `go mod tidy` or `go get` unless the task requires a dependency change.
+Ask the user before dependency upgrades, public API design choices, or touching `trace/` codegen.
