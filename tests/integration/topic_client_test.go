@@ -366,7 +366,7 @@ func TestTopicDirectWrite(t *testing.T) {
 		require.NoError(t, err)
 
 		routing := newDirectWriteStreamChecker()
-		writer, err := routing.Driver(scope).Topic().StartWriter(
+		writer, err := routing.Driver(scope, "direct-write-pinned").Topic().StartWriter(
 			topicPath,
 			topicoptions.WithWriterPartitionID(partitionID),
 			topicoptions.WithWriterDirectWrite(true),
@@ -400,7 +400,7 @@ func TestTopicDirectWrite(t *testing.T) {
 
 	t.Run("WithoutDirectWrite", func(t *testing.T) {
 		routing := newDirectWriteStreamChecker()
-		writer, err := routing.Driver(scope).Topic().StartWriter(
+		writer, err := routing.Driver(scope, "proxy-write-pinned").Topic().StartWriter(
 			topicPath,
 			topicoptions.WithWriterPartitionID(partitionID),
 			topicoptions.WithWriterWaitServerAck(true),

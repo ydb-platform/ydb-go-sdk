@@ -44,8 +44,10 @@ func newDirectWriteStreamChecker() *directWriteStreamChecker {
 // Driver opens a dedicated cached driver instance that includes the StreamWrite interceptor.
 // Do not pass the option to [scopeT.Driver]: fixenv caches drivers by name only, so opts
 // on the default driver are ignored after the first connect.
-func (c *directWriteStreamChecker) Driver(scope *scopeT) *ydb.Driver {
-	return scope.driverNamed("direct-write-routing", ydb.With(config.WithGrpcOptions(
+// Each subtest must pass a unique driverName: the interceptor is bound to this checker
+// instance and a reused driver name would record sessions into another checker.
+func (c *directWriteStreamChecker) Driver(scope *scopeT, driverName string) *ydb.Driver {
+	return scope.driverNamed(driverName, ydb.With(config.WithGrpcOptions(
 		grpc.WithChainStreamInterceptor(c.streamInterceptor),
 	)))
 }
