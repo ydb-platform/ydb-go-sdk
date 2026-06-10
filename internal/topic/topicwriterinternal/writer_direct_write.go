@@ -57,10 +57,6 @@ func (rp *resolvedPartition) setLocation(generation int64) {
 	rp.generation.Store(generation)
 }
 
-func (rp *resolvedPartition) generationValue() int64 {
-	return rp.generation.Load()
-}
-
 func (rp *resolvedPartition) unknown() bool {
 	return rp.partitionID.Load() < 0
 }

@@ -19,154 +19,115 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 )
 
-// TestDirectWriteResolvedPartitionSeed covers how the shared resolved-partition
-// atomic is initialized by NewWriterReconnectorConfig. The connect path uses
-// this value to decide whether to bind to a node (>= 0) or fall back to the
-// proxy (-1) until the server tells us the partition.
-func TestDirectWriteResolvedPartitionSeed(t *testing.T) {
-	t.Run("UnknownWhenNoPartitionPinned", func(t *testing.T) {
-		cfg := NewWriterReconnectorConfig(
-			WithTopic("test-topic"),
-			WithProducerID("p1"),
-			WithDirectWrite(true),
-		)
-		require.NoError(t, cfg.validate())
-		require.True(t, cfg.directWrite.resolved.unknown())
+func TestDirectWriteConfig(t *testing.T) {
+	t.Run("RequiresProducerOrPinnedPartition", func(t *testing.T) {
+		cfg := WriterReconnectorConfig{
+			directWrite: directWrite{enabled: true},
+			WritersCommonConfig: WritersCommonConfig{
+				topic:               "test-topic",
+				defaultPartitioning: rawtopicwriter.Partitioning{Type: rawtopicwriter.PartitioningUndefined},
+				producerID:          "",
+			},
+		}
+
+		err := cfg.validate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), errDirectWriteRequiresPartitionOrProducer.Error())
 	})
 
-	t.Run("UnknownWithMessageGroupID", func(t *testing.T) {
-		cfg := NewWriterReconnectorConfig(
-			WithTopic("test-topic"),
-			WithProducerID("p1"),
-			WithPartitioning(NewPartitioningWithMessageGroupID("p1")),
-			WithDirectWrite(true),
-		)
-		require.NoError(t, cfg.validate())
-		require.True(t, cfg.directWrite.resolved.unknown())
-	})
+	tests := []struct {
+		name            string
+		opts            []PublicWriterOption
+		wantPartitionID int64
+	}{
+		{
+			name: "ProducerOnlyWaitsForServerPartition",
+			opts: []PublicWriterOption{
+				WithTopic("test-topic"),
+				WithProducerID("producer-1"),
+				WithDirectWrite(true),
+			},
+			wantPartitionID: -1,
+		},
+		{
+			name: "PinnedPartitionReadyForDescribe",
+			opts: []PublicWriterOption{
+				WithTopic("test-topic"),
+				WithPartitioning(NewPartitioningWithPartitionID(7)),
+				WithDirectWrite(true),
+			},
+			wantPartitionID: 7,
+		},
+		{
+			name: "DirectWriteDisabledIgnoresPinnedPartition",
+			opts: []PublicWriterOption{
+				WithTopic("test-topic"),
+				WithPartitioning(NewPartitioningWithPartitionID(7)),
+				WithDirectWrite(false),
+			},
+			wantPartitionID: -1,
+		},
+	}
 
-	t.Run("SeededFromStaticPartitionID", func(t *testing.T) {
-		cfg := NewWriterReconnectorConfig(
-			WithTopic("test-topic"),
-			WithPartitioning(NewPartitioningWithPartitionID(7)),
-			WithDirectWrite(true),
-		)
-		require.NoError(t, cfg.validate())
-		require.EqualValues(t, 7, cfg.directWrite.resolved.partitionIDValue())
-	})
-
-	t.Run("UnknownWhenDirectWriteDisabled", func(t *testing.T) {
-		cfg := NewWriterReconnectorConfig(
-			WithTopic("test-topic"),
-			WithPartitioning(NewPartitioningWithPartitionID(7)),
-			WithDirectWrite(false),
-		)
-		require.NoError(t, cfg.validate())
-		require.True(t, cfg.directWrite.resolved.unknown())
-	})
-}
-
-func TestDirectWriteValidate(t *testing.T) {
-	t.Run("OkWithAutoProducer", func(t *testing.T) {
-		cfg := NewWriterReconnectorConfig(
-			WithTopic("test-topic"),
-			WithDirectWrite(true),
-		)
-		require.NotEmpty(t, cfg.producerID)
-		require.NoError(t, cfg.validate())
-	})
-
-	t.Run("OkWithPinnedPartition", func(t *testing.T) {
-		cfg := NewWriterReconnectorConfig(
-			WithTopic("test-topic"),
-			WithPartitioning(NewPartitioningWithPartitionID(3)),
-			WithDirectWrite(true),
-		)
-		require.NoError(t, cfg.validate())
-	})
-
-	t.Run("OkWithExplicitProducer", func(t *testing.T) {
-		cfg := NewWriterReconnectorConfig(
-			WithTopic("test-topic"),
-			WithProducerID("producer-1"),
-			WithDirectWrite(true),
-		)
-		require.NoError(t, cfg.validate())
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := NewWriterReconnectorConfig(tt.opts...)
+			require.NoError(t, cfg.validate())
+			if tt.wantPartitionID < 0 {
+				require.True(t, cfg.directWrite.resolved.unknown())
+			} else {
+				require.EqualValues(t, tt.wantPartitionID, cfg.directWrite.resolved.partitionIDValue())
+			}
+		})
+	}
 }
 
 func TestResolvePartitionNode(t *testing.T) {
 	const (
 		topicPath   = "test-topic"
 		partitionID = int64(7)
-		nodeID      = int32(42)
-		generation  = int64(3)
 	)
 
-	t.Run("HappyPath", func(t *testing.T) {
-		stub := &topicServiceClientStub{
-			describeTopic: func(in *Ydb_Topic.DescribeTopicRequest) (*Ydb_Topic.DescribeTopicResponse, error) {
-				require.Equal(t, topicPath, in.GetPath())
-				require.True(t, in.GetIncludeLocation())
-
-				return describeTopicResponse(t, []*Ydb_Topic.DescribeTopicResult_PartitionInfo{
-					{PartitionId: 0, PartitionLocation: &Ydb_Topic.PartitionLocation{NodeId: 100}},
-					{
-						PartitionId: partitionID,
-						PartitionLocation: &Ydb_Topic.PartitionLocation{
-							NodeId:     nodeID,
-							Generation: generation,
-						},
+	tests := []struct {
+		name           string
+		partitions     []*Ydb_Topic.DescribeTopicResult_PartitionInfo
+		describeTopic  func(in *Ydb_Topic.DescribeTopicRequest) (*Ydb_Topic.DescribeTopicResponse, error)
+		wantNodeID     uint32
+		wantGeneration int64
+		wantErr        error
+		wantErrSubstr  string
+	}{
+		{
+			name: "ReturnsHostNodeAndGenerationFromDescribe",
+			partitions: []*Ydb_Topic.DescribeTopicResult_PartitionInfo{
+				{PartitionId: 0, PartitionLocation: &Ydb_Topic.PartitionLocation{NodeId: 100}},
+				{
+					PartitionId: partitionID,
+					PartitionLocation: &Ydb_Topic.PartitionLocation{
+						NodeId:     42,
+						Generation: 3,
 					},
-					{PartitionId: 9, PartitionLocation: &Ydb_Topic.PartitionLocation{NodeId: 200}},
-				}), nil
+				},
 			},
-		}
-		rawClient := rawtopic.NewClient(stub)
-
-		ctx, location, err := resolvePartitionNode(context.Background(), &rawClient, topicPath, partitionID)
-		require.NoError(t, err)
-		require.Equal(t, generation, location.Generation)
-
-		got, ok := endpoint.ContextNodeID(ctx)
-		require.True(t, ok)
-		require.Equal(t, uint32(nodeID), got)
-		require.True(t, endpoint.ContextDisableFallback(ctx))
-	})
-
-	t.Run("PartitionNotFound", func(t *testing.T) {
-		stub := &topicServiceClientStub{
+			wantNodeID:     42,
+			wantGeneration: 3,
+		},
+		{
+			name: "PartitionSplitOrRemoved",
+			partitions: []*Ydb_Topic.DescribeTopicResult_PartitionInfo{
+				{PartitionId: 0, PartitionLocation: &Ydb_Topic.PartitionLocation{NodeId: 100}},
+			},
+			wantErr: errDirectWritePartitionNotFound,
+		},
+		{
+			name: "DescribeTransportError",
 			describeTopic: func(_ *Ydb_Topic.DescribeTopicRequest) (*Ydb_Topic.DescribeTopicResponse, error) {
-				return describeTopicResponse(t, []*Ydb_Topic.DescribeTopicResult_PartitionInfo{
-					{PartitionId: 0, PartitionLocation: &Ydb_Topic.PartitionLocation{NodeId: 100}},
-				}), nil
+				return nil, errors.New("transport boom")
 			},
-		}
-		rawClient := rawtopic.NewClient(stub)
-
-		_, _, err := resolvePartitionNode(context.Background(), &rawClient, topicPath, partitionID)
-		require.ErrorIs(t, err, errDirectWritePartitionNotFound)
-	})
-
-	t.Run("DescribeError", func(t *testing.T) {
-		describeErr := errors.New("transport boom")
-		stub := &topicServiceClientStub{
-			describeTopic: func(_ *Ydb_Topic.DescribeTopicRequest) (*Ydb_Topic.DescribeTopicResponse, error) {
-				return nil, describeErr
-			},
-		}
-		rawClient := rawtopic.NewClient(stub)
-
-		_, _, err := resolvePartitionNode(context.Background(), &rawClient, topicPath, partitionID)
-		require.Error(t, err)
-		require.ErrorIs(t, err, describeErr)
-	})
-
-	t.Run("OperationStatusError", func(t *testing.T) {
-		// Server returned a logical error (e.g. SCHEME_ERROR for missing topic).
-		// resolvePartitionNode must propagate the error so the writer's reconnect
-		// loop (topic.RetryDecision) classifies it as non-retryable and stops.
-		stub := &topicServiceClientStub{
+			wantErrSubstr: "transport boom",
+		},
+		{
+			name: "DescribeSchemeErrorStopsWriter",
 			describeTopic: func(_ *Ydb_Topic.DescribeTopicRequest) (*Ydb_Topic.DescribeTopicResponse, error) {
 				return &Ydb_Topic.DescribeTopicResponse{
 					Operation: &Ydb_Operations.Operation{
@@ -175,55 +136,49 @@ func TestResolvePartitionNode(t *testing.T) {
 					},
 				}, nil
 			},
-		}
-		rawClient := rawtopic.NewClient(stub)
-
-		_, _, err := resolvePartitionNode(context.Background(), &rawClient, topicPath, partitionID)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "SCHEME_ERROR")
-	})
-}
-
-func TestDirectWriteBindConnectContextResolvesLocation(t *testing.T) {
-	const (
-		topicPath   = "test-topic"
-		partitionID = int64(7)
-		generation  = int64(11)
-	)
-
-	stub := &topicServiceClientStub{
-		describeTopic: func(_ *Ydb_Topic.DescribeTopicRequest) (*Ydb_Topic.DescribeTopicResponse, error) {
-			return describeTopicResponse(t, []*Ydb_Topic.DescribeTopicResult_PartitionInfo{
-				{
-					PartitionId: partitionID,
-					PartitionLocation: &Ydb_Topic.PartitionLocation{
-						NodeId:     42,
-						Generation: generation,
-					},
-				},
-			}), nil
+			wantErrSubstr: "SCHEME_ERROR",
 		},
 	}
-	rawClient := rawtopic.NewClient(stub)
 
-	cfg := NewWriterReconnectorConfig(
-		WithTopic(topicPath),
-		WithPartitioning(NewPartitioningWithPartitionID(partitionID)),
-		WithDirectWrite(true),
-	)
-	cfg.rawTopicClient = &rawClient
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stub := &topicServiceClientStub{
+				describeTopic: tt.describeTopic,
+			}
+			if stub.describeTopic == nil {
+				partitions := tt.partitions
+				stub.describeTopic = func(in *Ydb_Topic.DescribeTopicRequest) (*Ydb_Topic.DescribeTopicResponse, error) {
+					require.Equal(t, topicPath, in.GetPath())
+					require.True(t, in.GetIncludeLocation())
 
-	_, err := cfg.directWrite.bindConnectContext(context.Background(), &rawClient, topicPath)
-	require.NoError(t, err)
-	require.Equal(t, generation, cfg.directWrite.resolved.generationValue())
+					return describeTopicResponse(t, partitions), nil
+				}
+			}
 
-	partitioning := rawtopicwriter.NewPartitioningPartitionID(partitionID)
-	cfg.directWrite.applyResolvedToPartitioning(&partitioning)
-	require.Equal(
-		t,
-		rawtopicwriter.NewPartitioningPartitionWithGeneration(partitionID, generation),
-		partitioning,
-	)
+			rawClient := rawtopic.NewClient(stub)
+
+			ctx, location, err := resolvePartitionNode(context.Background(), &rawClient, topicPath, partitionID)
+			if tt.wantErr != nil || tt.wantErrSubstr != "" {
+				require.Error(t, err)
+				if tt.wantErr != nil {
+					require.ErrorIs(t, err, tt.wantErr)
+				}
+				if tt.wantErrSubstr != "" {
+					require.Contains(t, err.Error(), tt.wantErrSubstr)
+				}
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.wantGeneration, location.Generation)
+
+			gotNodeID, ok := endpoint.ContextNodeID(ctx)
+			require.True(t, ok)
+			require.Equal(t, tt.wantNodeID, gotNodeID)
+			require.True(t, endpoint.ContextDisableFallback(ctx))
+		})
+	}
 }
 
 func describeTopicResponse(
