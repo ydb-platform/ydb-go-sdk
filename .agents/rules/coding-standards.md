@@ -28,6 +28,9 @@ Read when touching public API, package layout, dependencies, or error handling.
 
 ## Architecture anti-patterns
 
-- Bypassing connection pool or session pool for production paths.
+See [`.agents/context/systemPatterns.md`](../context/systemPatterns.md) for driver layout. In short:
+
+- Bypassing `balancerWithMeta` / `conn.Pool` for production RPC paths.
 - Returning from `Do`/`DoTx` without closing streams and result sets.
 - Unbounded retry loops without idempotency consideration on mutating operations.
+- Hand-editing `*_gtrace.go` instead of `go generate ./trace`.

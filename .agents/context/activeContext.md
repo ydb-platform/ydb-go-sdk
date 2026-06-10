@@ -1,29 +1,28 @@
 # Active Context
 
-> **Volatile file** — update after every significant work session.
+> **Volatile file** — update at the end of a work session or before closing a PR.
+>
+> **Merge conflicts:** with many parallel PRs this file conflicts often. On conflict, keep the union of recent decisions or reset to a short generic focus — do not block the feature PR on agent housekeeping.
 
 ## Current focus
 
-Introduce `.agents/` workspace for AI coding agents — aligned with [ydb-rs-sdk #430](https://github.com/ydb-platform/ydb-rs-sdk/pull/430) and [ydb-pg-extension #257](https://github.com/ydb-platform/ydb-pg-extension/pull/257).
+_No active task recorded._ Check open PRs and GitHub Issues for ongoing work.
 
 ## Recent changes
 
-- Added `.agents/context/` for project knowledge and `.agents/rules/` for coding standards.
-- Slimmed `AGENTS.md` to a lean router; migrated changelog, lint, and dependency rules to `.agents/rules/`.
+- `.agents/` workspace added for AI coding agents (see `systemPatterns.md` for driver architecture).
 
 ## Open questions
 
-- Whether to add nested `AGENTS.md` per major package (`table/`, `query/`, …) as the SDK grows.
-- Whether to add `.agents/skills/` (e.g. PR review) shared across YDB SDK repos via `ai-dev-kit`.
+- Whether to add nested `AGENTS.md` per major package as the SDK grows.
+- Whether to add `.agents/skills/` shared across YDB SDK repos.
 
 ## Next steps
 
-- Keep this file and `progress.md` updated as features land.
-- Add rules to `AGENTS.md` only after repeated agent mistakes (incremental, not upfront).
+- Update this file when starting or finishing significant work.
 
 ## Working conventions (reminder)
 
-- Read `activeContext.md` every session; other context files only when relevant.
+- Read this file every session; other context files only when relevant.
 - Coding rules: `AGENTS.md` → `.agents/rules/` (on demand).
-- Update this file and `progress.md` before closing a PR.
 - Run `golangci-lint run ./...` and `go test -race ./...` before requesting review.

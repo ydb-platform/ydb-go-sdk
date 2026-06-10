@@ -36,7 +36,7 @@ ydb-go-sdk/
 
 | File | Stability | Read when |
 |------|-----------|-----------|
-| [`activeContext.md`](activeContext.md) | **Volatile** | **Every session** — current focus, decisions, next steps |
+| [`activeContext.md`](activeContext.md) | **Volatile** | **Every session** — current focus (may conflict across parallel PRs; see file header) |
 | [`progress.md`](progress.md) | **Volatile** | Resuming work, closing a PR, status checks |
 | [`systemPatterns.md`](systemPatterns.md) | Evolving | Architecture, new modules, Do/DoTx patterns |
 | [`techContext.md`](techContext.md) | Evolving | CI, Go versions, local YDB, lint/test commands |

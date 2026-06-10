@@ -2,9 +2,11 @@
 
 ## Users
 
-- Go application developers connecting to YDB for OLTP, streaming (topics), and metadata (scheme).
+- Go application developers connecting to YDB for OLTP and OLAP workloads, streaming (topics), and metadata (scheme).
 - Maintainers integrating Go into YDB platform services.
 - Contributors extending SDK coverage to match Java, Rust, and other language SDKs.
+
+YDB targets OLTP primarily; the SDK also supports OLAP-oriented scenarios (analytics queries, column tables) where the server exposes them — see [README.md](../../README.md).
 
 ## Problems solved
 
@@ -15,9 +17,13 @@
 | Browse database directory / schema | `db.Scheme()` |
 | Produce/consume topic messages | `db.Topic()` — reader/writer/listener APIs |
 | Distributed locks / semaphores | `db.Coordination()` |
+| Run YQL scripts (legacy service) | `db.Scripting()` |
+| Long-running operations | `db.Operation()` (experimental) |
+| Request rate limiting / quotas | `db.Ratelimiter()` |
+| Cluster endpoint discovery | `db.Discovery()` + balancers |
 | Auth (static token, metadata, OAuth) | `credentials` options on `ydb.Open` |
-| Multi-node clusters | Discovery + balancers (`RandomChoice`, `PreferNearestDC`, …) |
-| Observability | `trace/` callbacks + `log/`, `metrics/`, `spans/` adapters |
+| Multi-node clusters | `config.WithBalancer(balancers.*)` |
+| Observability | `trace/` + `log/`, `metrics/`, `spans/` adapters |
 
 ## Developer experience goals
 

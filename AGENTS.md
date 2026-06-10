@@ -2,7 +2,7 @@
 
 Canonical agent entry point. Tool configs (`CLAUDE.md`, Cursor rules) start here and route to [`.agents/`](.agents/).
 
-Keep this file **lean** (~60 lines) — it routes to detailed sources. Loading a large AGENTS.md on every session wastes context tokens; industry practice is a thin navigation file plus on-demand docs ([agents.md convention](https://agents.md/)).
+Keep this file **lean** (~60 lines) — it routes to detailed sources. Loading a large AGENTS.md on every session wastes context tokens; use a thin navigation file plus on-demand docs (see [agentsmd/agents.md](https://github.com/agentsmd/agents.md)).
 
 ## Project context
 
@@ -10,7 +10,7 @@ Project knowledge lives in [`.agents/context/`](.agents/context/). Coding rules 
 
 **Before coding** — read selectively:
 
-1. [`.agents/context/activeContext.md`](.agents/context/activeContext.md) — always
+1. [`.agents/context/activeContext.md`](.agents/context/activeContext.md) — always (volatile; may conflict across parallel PRs — see file header)
 2. One stable file if needed:
    - architecture / module layout → [`systemPatterns.md`](.agents/context/systemPatterns.md)
    - toolchain / CI / local dev → [`techContext.md`](.agents/context/techContext.md)

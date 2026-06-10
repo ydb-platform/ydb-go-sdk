@@ -1,86 +1,175 @@
 # System Patterns
 
-## Repository structure
+## Repository layout
 
 ```
 ydb-go-sdk/
-├── driver.go, sql.go, with.go     # ydb.Open, Driver, options
-├── table/, query/, scheme/, topic/ # public service client packages
+├── driver.go, with.go, sql.go    # ydb.Open, Driver, ydb.Option, database/sql driver
+├── table/, query/, scheme/, topic/ # public service client packages (+ types/options/result)
 ├── coordination/, discovery/, scripting/, operation/, ratelimiter/
-├── config/, balancers/, credentials/, retry/, sugar/
-├── trace/, log/, metrics/, spans/ # observability
-├── internal/                      # implementations (unstable)
-│   ├── table/, query/, scheme/, topic/, conn/, balancer/, pool/, ...
-│   └── cmd/gtrace/, cmd/gstack/   # codegen tools
-├── tests/integration/             # //go:build integration
-├── examples/                      # separate go.mod
-└── .agents/                       # agent workspace
+├── config/, balancers/, credentials/, retry/, sugar/, trace/
+├── log/, metrics/, spans/        # trace adapters
+├── internal/                     # implementations (unstable; do not expose in public API)
+├── tests/integration/            # //go:build integration
+├── examples/                     # separate go.mod
+└── .agents/                      # agent workspace
 ```
 
-## Layered architecture
+Public packages define interfaces and option types. Implementations live under `internal/<service>/` and are wired in `driver.go`.
+
+## Driver lifecycle
+
+### Entry points
+
+| API | File | Role |
+|-----|------|------|
+| `ydb.Open(ctx, dsn, opts...)` | `driver.go` | Parse DSN, apply `ydb.Option`s, connect, return `*Driver` |
+| `ydb.New(ctx, opts...)` | `driver.go` | Same without DSN in args (endpoint/database from options) |
+| `sql.Open("ydb", dsn)` | `sql.go` | Registers `database/sql` driver; uses same `Driver` underneath |
+| `ydb.Connector(driver)` | `internal/xsql` | Wrap native driver for `sql.OpenDB` |
+
+`ydb.Option` functions (`with.go`) mutate `*Driver` before connect: credentials, balancer, trace, timeouts, table/query config, etc.
+
+### `connect()` sequence (`driver.go`)
 
 ```
-ydb.Open(ctx, dsn, opts...)
-    └── Driver
-            ├── Table()      → table.Client      → internal/table/
-            ├── Query()      → query.Client      → internal/query/
-            ├── Scheme()     → scheme.Client     → internal/scheme/
-            ├── Topic()      → topic.Client      → internal/topic/
-            └── ...
+driverFromOptions()
+  → apply env defaults (YDB_SSL_ROOT_CERTIFICATES_FILE, YDB_LOG_SEVERITY_LEVEL)
+  → apply user opts
+  → build config.Config
 
-Driver
-    └── internal/balancer/     # discovery, endpoint selection, ban/pessimization
-            └── internal/conn/ # gRPC connection pool per endpoint
-
-table.Client / query.Client
-    └── internal/pool/         # YDB session pool
-            └── internal/grpcwrapper/
+connect(ctx)
+  1. conn.NewPool(ctx, config)           # gRPC connection pool (if not preset)
+  2. balancer.New(ctx, config, pool)     # discovery + endpoint selection
+  3. metaBalancer.meta = config.Meta()   # request metadata (database, credentials hints)
+  4. xsync.OnceValue per service client  # lazy init on first Table()/Query()/...
 ```
 
-## Key patterns
+Service clients are **lazy**: `d.Table()` calls `d.table.Must()` which runs the `OnceValue` factory only once.
 
-### Do / DoTx
+### `balancerWithMeta` — shared RPC transport
 
-Canonical user API for table and query services:
+All service clients receive the same `*balancerWithMeta` (implements `grpc.ClientConnInterface`):
+
+- `Invoke()` / `NewStream()` inject `meta.Meta` into context, then delegate to `internal/balancer.Balancer`.
+- `Balancer` picks an endpoint, gets `conn.Pool.Get(endpoint)`, executes RPC.
+- On stream/call errors that indicate a bad connection, the endpoint may be **banned** (pessimization) and rediscovered.
+
+This is the single production path for gRPC — do not dial around the balancer.
+
+## Two pool layers
+
+### 1. gRPC connection pool (`internal/conn/pool.go`)
+
+- One `*conn` per `endpoint.Endpoint` (host:port + node metadata).
+- Created on demand via `pool.Get(endpoint)`; tracks TTL, dial options, trace.
+- Used by balancer to obtain `grpc.ClientConn` for a chosen node.
+
+### 2. YDB session pool (`internal/pool/pool.go`)
+
+- Generic pool used by **table** and **query** clients for YDB `Session` objects.
+- Configurable: limit, warm-up size, idle TTL, usage limit/TTL, create/delete timeouts.
+- `MustDelete` predicate drops sessions on `xerrors.MustDeleteTableOrQuerySession(err)`.
+
+Table and query each maintain their own session pool instance inside `internal/table.Client` / `internal/query.Client`.
+
+Query additionally has **implicit** session pool for server-side session management (see `internal/query/client.go`).
+
+## Balancer and discovery (`internal/balancer/`)
+
+```
+Balancer
+  ├── clusterDiscovery()     # periodic / on-init endpoint list refresh
+  ├── discover endpoints     # via Discovery gRPC (or static single endpoint)
+  ├── localDCDetector        # for PreferNearestDC balancers
+  ├── filter by balancerConfig (RandomChoice, PreferNearestDC, location filters)
+  └── wrapCall / wrapStream  # ban endpoint on retriable connection failures
+```
+
+User-facing presets: `balancers/RandomChoice`, `SingleConn`, `PreferNearestDC`, `PreferNearestDCWithFallBack`.
+
+Configured via `config.WithBalancer(...)` or `ydb.WithBalancer(...)`.
+
+`Driver.Discovery()` exposes a separate discovery client (uses bootstrap connection from pool, not the main balancer loop).
+
+## Service client map
+
+| `Driver` accessor | Public package | Internal impl | Session pool? | Notes |
+|-------------------|----------------|---------------|---------------|-------|
+| `Table()` | `table/` | `internal/table/` | Yes | `Do`/`DoTx`, bulk ops |
+| `Query()` | `query/` | `internal/query/` | Yes (+ implicit) | Streaming `ResultSets`, `Do`/`DoTx` |
+| `Scheme()` | `scheme/` | `internal/scheme/` | No | Directory, describe path |
+| `Topic()` | `topic/` | `internal/topic/` | No | Reader/writer/listener; own connection semantics |
+| `Coordination()` | `coordination/` | `internal/coordination/` | No | Semaphores, distributed locks |
+| `Scripting()` | `scripting/` | `internal/scripting/` | No | YQL scripts (legacy path) |
+| `Ratelimiter()` | `ratelimiter/` | `internal/ratelimiter/` | No | Quota control |
+| `Discovery()` | `discovery/` | `internal/discovery/` | No | Endpoint discovery API |
+| `Operation()` | `operation/` | `operation/` | No | Long-running ops (experimental) |
+
+`database/sql` path: `internal/xsql` connector acquires table sessions via the same table client stack.
+
+## Do / DoTx pattern
+
+Canonical pattern for **table** and **query** (public API mirrors internal):
 
 ```go
 err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
-    // return err to retry; return nil on success
+    rs, err := s.Query(ctx, "SELECT 1")
+    if err != nil { return err }
+    defer func() { _ = rs.Close(ctx) }()
+    // ...
+    return nil  // success → exit retry loop
 }, query.WithIdempotent())
 ```
 
-- `DoTx` — auto begin/commit/rollback.
-- Non-nil callback error triggers retry with backoff (`retry/` package).
-- Always close result sets/streams (`defer result.Close(ctx)`).
+Internal flow (`internal/table/client.go`, `internal/query/client.go`):
 
-### Balancers
+```
+Do(ctx, op, opts)
+  → merge retry options (label, idempotent, backoff, trace)
+  → retry loop (retry.Retry / do+backoff)
+      → sessionPool.Get(ctx)     # acquire Session
+      → op(ctx, session)         # user callback
+      → on error: classify retryable, maybe delete session, retry
+      → on success: return nil
+```
 
-Configure via `config.WithBalancer(balancers.PreferNearestDC(balancers.RandomChoice()))`.
+`DoTx`: acquire session → `BeginTransaction` → user op → `Commit` (rollback on error). Retries whole transaction when safe.
 
-Presets in `balancers/`: `RandomChoice`, `SingleConn`, `PreferNearestDC`, location filters.
+**Rules for agents:**
 
-### Trace codegen
+- Return non-nil error from callback to trigger retry; nil means success.
+- Use `WithIdempotent()` for operations safe to repeat.
+- Always `Close()` result sets / streams in callback.
+- Unbounded `context.Context` can retry indefinitely — use deadlines.
 
-- Callback types in `trace/`; generated wrappers `*_gtrace.go` via `go generate ./trace`.
-- CI `check-codegen.yml` fails on dirty generated files.
+## Retry package (`retry/`)
 
-### Public vs internal
+- `retry.Retry()` — core loop with fast/slow backoff (`internal/backoff`).
+- `xerrors.Retryable(err)` — mark errors for retry.
+- `retry/budget/` — optional retry budget from driver config.
+- Wired into `Do`/`DoTx` and balancer discovery.
 
-- Edit public interfaces in `table/`, `query/`, etc.
-- Implement in matching `internal/<service>/` package.
-- Do not expose `internal/` types in public API without stable wrappers.
+## Trace and codegen
 
-## Adding a new API
+- Callback structs in `trace/` (per service).
+- `go generate ./trace` → `*_gtrace.go` wrappers in public and internal packages.
+- `internal/cmd/gstack/` — `stack.FunctionID` for trace spans.
+- CI `check-codegen.yml` enforces clean generated diff.
 
-1. Confirm protobuf support in `ydb-go-genproto`.
-2. Add methods in `internal/<service>/` + `internal/grpcwrapper/`.
-3. Expose through public `*/client.go` with `Do`/`DoTx` or direct methods + retry.
-4. Add `trace/` callbacks if needed; run `go generate`.
-5. Unit tests co-located; integration test in `tests/integration/` if server needed.
+## `database/sql` integration
 
-## Anti-patterns
+- Driver registered as `"ydb"` in `sql.go`.
+- `internal/xsql/connector.go` — `CreateSession` uses native table client; balancing happens at session creation.
+- See `SQL.md` for DSN params, balancing, and connector options.
 
-- Bypassing session pool or connection pool for production RPC paths.
-- Returning from `Do` callback without closing streams/results.
-- Adding dependencies without explicit task requirement.
-- Editing `*_gtrace.go` by hand instead of regenerating.
+## Adding a new RPC surface
+
+1. Confirm protobuf in `ydb-go-genproto`.
+2. Add `internal/grpcwrapper/` or service-specific raw client methods.
+3. Implement `internal/<service>/client.go` using `balancerWithMeta` as `grpc.ClientConnInterface`.
+4. Expose public package with stable types; add `trace/` callbacks + regenerate.
+5. Wire lazy `xsync.OnceValue` factory in `driver.go` `connect()`.
+6. Unit tests co-located; `tests/integration/` if server interaction needed.
+
+Checklist and coding anti-patterns: [`.agents/rules/coding-standards.md`](../rules/coding-standards.md).

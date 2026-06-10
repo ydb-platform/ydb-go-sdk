@@ -20,8 +20,8 @@ Requires running YDB and environment variables (see `environment.md`):
 
 | Variable | Purpose |
 |----------|---------|
-| `YDB_CONNECTION_STRING` | Insecure gRPC DSN |
-| `YDB_CONNECTION_STRING_SECURE` | TLS gRPC DSN |
+| `YDB_CONNECTION_STRING` | Insecure gRPC DSN (default: `grpc://localhost:2136/local`) |
+| `YDB_CONNECTION_STRING_SECURE` | TLS gRPC DSN (`grpcs://localhost:2135/local`) |
 | `YDB_SSL_ROOT_CERTIFICATES_FILE` | CA for TLS tests |
 | `YDB_SESSIONS_SHUTDOWN_URLS` | Rolling-restart / session shutdown tests |
 
