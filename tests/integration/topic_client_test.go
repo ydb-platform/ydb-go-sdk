@@ -354,19 +354,21 @@ func TestDescribePartitionSettings(t *testing.T) {
 func TestTopicDirectWrite(t *testing.T) {
 	scope := newScope(t)
 	ctx := scope.Ctx
+	const partitionID = int64(0)
+
 	topicPath := scope.TopicPath(
 		topicoptions.CreateWithMinActivePartitions(2),
 		topicoptions.CreateWithMaxActivePartitions(2),
 	)
 
 	t.Run("WriteAndRead", func(t *testing.T) {
-		hostNode, err := topicPartitionHostNodeID(ctx, scope.Driver().Topic(), topicPath, 0)
+		hostNode, generation, err := topicPartitionLocation(ctx, scope.Driver().Topic(), topicPath, partitionID)
 		require.NoError(t, err)
 
 		routing := newDirectWriteStreamChecker()
 		writer, err := routing.Driver(scope).Topic().StartWriter(
 			topicPath,
-			topicoptions.WithWriterPartitionID(0),
+			topicoptions.WithWriterPartitionID(partitionID),
 			topicoptions.WithWriterDirectWrite(true),
 			topicoptions.WithWriterWaitServerAck(true),
 		)
@@ -375,12 +377,13 @@ func TestTopicDirectWrite(t *testing.T) {
 		payload := []byte("direct-write-payload")
 		require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: bytes.NewReader(payload)}))
 		routing.RequireRoutedToNode(t, hostNode)
+		routing.RequireInitGeneration(t, partitionID, generation)
 		require.NoError(t, writer.Close(ctx))
 
 		reader, err := scope.Driver().Topic().StartReader(
 			scope.TopicConsumerName(),
 			topicoptions.ReadSelectors{
-				{Path: topicPath, Partitions: []int64{0}},
+				{Path: topicPath, Partitions: []int64{partitionID}},
 			},
 		)
 		require.NoError(t, err)
@@ -388,11 +391,27 @@ func TestTopicDirectWrite(t *testing.T) {
 
 		msg, err := reader.ReadMessage(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(0), msg.PartitionID())
+		require.Equal(t, partitionID, msg.PartitionID())
 
 		got, err := io.ReadAll(msg)
 		require.NoError(t, err)
 		require.Equal(t, payload, got)
+	})
+
+	t.Run("WithoutDirectWrite", func(t *testing.T) {
+		routing := newDirectWriteStreamChecker()
+		writer, err := routing.Driver(scope).Topic().StartWriter(
+			topicPath,
+			topicoptions.WithWriterPartitionID(partitionID),
+			topicoptions.WithWriterWaitServerAck(true),
+		)
+		require.NoError(t, err)
+		defer func() { _ = writer.Close(ctx) }()
+
+		require.NoError(t, writer.Write(ctx, topicwriter.Message{
+			Data: bytes.NewReader([]byte("proxy-write")),
+		}))
+		routing.RequireInitPartitionWithoutGeneration(t, partitionID)
 	})
 
 	t.Run("WithAutoProducer", func(t *testing.T) {
