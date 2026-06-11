@@ -76,6 +76,8 @@ type WriterReconnectorConfig struct {
 	MultiWriterConfig any
 	RetrySettings     topic.RetrySettings
 
+	directWrite directWrite
+
 	connectTimeout time.Duration
 }
 
@@ -85,9 +87,10 @@ func (cfg *WriterReconnectorConfig) validate() error {
 		return xerrors.WithStackTrace(errProducerIDNotEqualMessageGroupID)
 	}
 
-	return nil
+	return cfg.directWrite.validate(cfg.defaultPartitioning, cfg.producerID)
 }
 
+//nolint:funlen // config constructor: defaults, options, and default Connect closure
 func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnectorConfig {
 	cfg := WriterReconnectorConfig{
 		WritersCommonConfig: WritersCommonConfig{
@@ -130,12 +133,23 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		WithProducerID(uuid.NewString())(&cfg)
 	}
 
+	cfg.directWrite.finishInit(&cfg.defaultPartitioning)
+
 	if cfg.Connect == nil {
 		var connector ConnectFunc = func(ctx context.Context, tracer *trace.Topic) (
 			RawTopicWriterStream,
 			error,
 		) {
-			return cfg.rawTopicClient.StreamWrite(xcontext.MergeContexts(ctx, cfg.LogContext), tracer)
+			streamCtx, err := cfg.directWrite.bindConnectContext(
+				xcontext.MergeContexts(ctx, cfg.LogContext),
+				cfg.rawTopicClient,
+				cfg.topic,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			return cfg.rawTopicClient.StreamWrite(streamCtx, tracer)
 		}
 
 		cfg.Connect = connector
@@ -465,6 +479,7 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 	return resErr
 }
 
+//nolint:funlen // reconnect state machine; direct-write adds probe/rebind on top of the existing loop
 func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	attempt := 0
 	createStreamContext := func() (context.Context, context.CancelFunc) {
@@ -489,8 +504,12 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtxCancel()
 		streamCtx, streamCtxCancel = createStreamContext()
 
+		w.cfg.directWrite.dropLearnedPartitionIfNeeded(reconnectReason, w.m.WithLock)
+
 		now := time.Now()
-		if startOfRetries.IsZero() || topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
+		if w.cfg.directWrite.consumeRetryReset() ||
+			startOfRetries.IsZero() ||
+			topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
 			attempt = 0
 			startOfRetries = w.cfg.clock.Now()
 		} else {
@@ -515,13 +534,16 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		)
 
 		writer, err := w.startWriteStream(streamCtx)
-		w.onWriterChange(writer)
+		rebind := w.onWriterChange(writer)
 		onStreamError := onWriterStarted(err)
-		if err == nil {
+		if err != nil {
+			reconnectReason = err
+		} else if rebind {
+			reconnectReason = nil
+			w.cfg.directWrite.completeProbe(streamCtx, writer)
+		} else {
 			reconnectReason = writer.WaitClose(ctx)
 			startOfRetries = time.Now()
-		} else {
-			reconnectReason = err
 		}
 		onStreamError(reconnectReason)
 	}
@@ -576,6 +598,8 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 		return nil, err
 	}
 
+	w.cfg.directWrite.applyResolvedToPartitioning(&w.cfg.defaultPartitioning)
+
 	w.queue.ResetSentProgress()
 
 	return NewSingleStreamWriter(connectCtx, w.createWriterStreamConfig(stream))
@@ -603,7 +627,7 @@ func (w *WriterReconnector) onAckReceived(count int) {
 	w.semaphore.Release(int64(count))
 }
 
-func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
+func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) (rebindRequested bool) {
 	isFirstInit := false
 	w.m.WithLock(func() {
 		if writerStream == nil {
@@ -612,6 +636,12 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 			return
 		}
 		w.sessionID = writerStream.SessionID
+
+		if w.cfg.directWrite.handleProbeInit(writerStream, func(seqNo int64) { w.lastSeqNo = seqNo }) {
+			rebindRequested = true
+
+			return
+		}
 
 		if !w.firstConnectionHandled.CompareAndSwap(false, true) {
 			return
@@ -624,6 +654,10 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 		}
 	})
 
+	if rebindRequested {
+		return true
+	}
+
 	if isFirstInit {
 		w.m.WithLock(func() {
 			w.initDone = true
@@ -632,6 +666,8 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 		})
 		w.onWriterInitCallbackHandler(writerStream)
 	}
+
+	return false
 }
 
 func (w *WriterReconnector) waitInit(ctx context.Context) (info InitialInfo, err error) {
@@ -662,8 +698,6 @@ func (w *WriterReconnector) WaitInitInfo(ctx context.Context) (info InitialInfo,
 func (w *WriterReconnector) onWriterInitCallbackHandler(writerStream *SingleStreamWriter) {
 	if w.cfg.OnWriterInitResponseCallback != nil {
 		info := PublicWithOnWriterConnectedInfo{
-			LastSeqNo:        w.lastSeqNo,
-			SessionID:        w.sessionID,
 			PartitionID:      writerStream.PartitionID,
 			CodecsFromServer: createPublicCodecsFromRaw(writerStream.CodecsFromServer),
 		}

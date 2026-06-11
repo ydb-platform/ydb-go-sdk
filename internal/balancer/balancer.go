@@ -9,7 +9,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"google.golang.org/grpc"
+	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
+	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
@@ -488,6 +490,18 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 
 	c, failedCount = state.GetConnection(ctx)
 	if c == nil {
+		if endpoint.ContextDisableFallback(ctx) {
+			nodeID, _ := endpoint.ContextNodeID(ctx)
+
+			return nil, xerrors.WithStackTrace(
+				xerrors.Transport(grpcStatus.Errorf(
+					grpcCodes.Unavailable,
+					"ydb: direct mode: node %d not found",
+					nodeID,
+				)),
+			)
+		}
+
 		return nil, xerrors.WithStackTrace(
 			fmt.Errorf("%w: cannot get connection from Balancer after %d attempts", ErrNoEndpoints, failedCount),
 		)

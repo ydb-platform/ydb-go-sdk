@@ -351,6 +351,129 @@ func TestDescribePartitionSettings(t *testing.T) {
 	require.Equal(t, expected, topicDesc)
 }
 
+func TestTopicDirectWrite(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	const partitionID = int64(0)
+
+	topicPath := scope.TopicPath(
+		topicoptions.CreateWithMinActivePartitions(2),
+		topicoptions.CreateWithMaxActivePartitions(2),
+	)
+
+	t.Run("WriteAndRead", func(t *testing.T) {
+		hostNode, generation, err := topicPartitionLocation(ctx, scope.Driver().Topic(), topicPath, partitionID)
+		require.NoError(t, err)
+
+		routing := newDirectWriteStreamChecker()
+		writer, err := routing.Driver(scope, "direct-write-pinned").Topic().StartWriter(
+			topicPath,
+			topicoptions.WithWriterPartitionID(partitionID),
+			topicoptions.WithWriterDirectWrite(true),
+			topicoptions.WithWriterWaitServerAck(true),
+		)
+		require.NoError(t, err)
+
+		payload := []byte("direct-write-payload")
+		require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: bytes.NewReader(payload)}))
+		routing.RequireRoutedToNode(t, hostNode)
+		routing.RequireInitGeneration(t, partitionID, generation)
+		require.NoError(t, writer.Close(ctx))
+
+		reader, err := scope.Driver().Topic().StartReader(
+			scope.TopicConsumerName(),
+			topicoptions.ReadSelectors{
+				{Path: topicPath, Partitions: []int64{partitionID}},
+			},
+		)
+		require.NoError(t, err)
+		defer func() { _ = reader.Close(ctx) }()
+
+		msg, err := reader.ReadMessage(ctx)
+		require.NoError(t, err)
+		require.Equal(t, partitionID, msg.PartitionID())
+
+		got, err := io.ReadAll(msg)
+		require.NoError(t, err)
+		require.Equal(t, payload, got)
+	})
+
+	t.Run("WithoutDirectWrite", func(t *testing.T) {
+		routing := newDirectWriteStreamChecker()
+		writer, err := routing.Driver(scope, "proxy-write-pinned").Topic().StartWriter(
+			topicPath,
+			topicoptions.WithWriterPartitionID(partitionID),
+			topicoptions.WithWriterWaitServerAck(true),
+		)
+		require.NoError(t, err)
+		defer func() { _ = writer.Close(ctx) }()
+
+		require.NoError(t, writer.Write(ctx, topicwriter.Message{
+			Data: bytes.NewReader([]byte("proxy-write")),
+		}))
+		routing.RequireInitPartitionWithoutGeneration(t, partitionID)
+	})
+
+	t.Run("WithAutoProducer", func(t *testing.T) {
+		writer, err := scope.Driver().Topic().StartWriter(
+			topicPath,
+			topicoptions.WithWriterDirectWrite(true),
+			topicoptions.WithWriterWaitServerAck(true),
+		)
+		require.NoError(t, err)
+		defer func() { _ = writer.Close(ctx) }()
+
+		require.NoError(t, writer.WaitInit(ctx))
+		require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: bytes.NewReader([]byte("direct-write-auto-producer"))}))
+	})
+}
+
+func TestTopicMultiWriterDirectWrite(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	topicPath := scope.TopicPath(
+		topicoptions.CreateWithMinActivePartitions(2),
+		topicoptions.CreateWithMaxActivePartitions(2),
+	)
+
+	writer, err := scope.Driver().Topic().StartWriter(
+		topicPath,
+		topicoptions.WithWriterWaitServerAck(true),
+		topicoptions.WithWriteToManyPartitions(
+			topicoptions.WithWriterPartitionByPartitionID(),
+			topicoptions.WithMultiWriterDirectWrite(true),
+		),
+	)
+	require.NoError(t, err)
+
+	const messageText = "multi-writer-direct"
+	require.NoError(t, writer.Write(ctx,
+		topicwriter.Message{PartitionID: 0, Data: strings.NewReader(messageText + "-0")},
+		topicwriter.Message{PartitionID: 1, Data: strings.NewReader(messageText + "-1")},
+	))
+	require.NoError(t, writer.Close(ctx))
+
+	reader, err := scope.Driver().Topic().StartReader(
+		scope.TopicConsumerName(),
+		topicoptions.ReadSelectors{
+			{Path: topicPath, Partitions: []int64{0, 1}},
+		},
+	)
+	require.NoError(t, err)
+	defer func() { _ = reader.Close(ctx) }()
+
+	gotByPartition := map[int64]string{}
+	for range 2 {
+		msg, err := reader.ReadMessage(ctx)
+		require.NoError(t, err)
+		body, err := io.ReadAll(msg)
+		require.NoError(t, err)
+		gotByPartition[msg.PartitionID()] = string(body)
+	}
+	require.Equal(t, messageText+"-0", gotByPartition[0])
+	require.Equal(t, messageText+"-1", gotByPartition[1])
+}
+
 func TestDescribeTopicConsumer(t *testing.T) {
 	ctx := xtest.Context(t)
 	db := connect(t)
