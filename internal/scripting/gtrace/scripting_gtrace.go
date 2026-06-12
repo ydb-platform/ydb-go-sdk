@@ -268,6 +268,7 @@ func onClose(t *trace.Scripting, s trace.ScriptingCloseStartInfo) func(trace.Scr
 	}
 	return res
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func ScriptingOnExecute(t *trace.Scripting, c *context.Context, c1 trace.Call, query string, parameters trace.ScriptingQueryParameters) func(result trace.ScriptingResult, _ error) {
 	var p trace.ScriptingExecuteStartInfo
@@ -283,6 +284,7 @@ func ScriptingOnExecute(t *trace.Scripting, c *context.Context, c1 trace.Call, q
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func ScriptingOnStreamExecute(t *trace.Scripting, c *context.Context, c1 trace.Call, query string, parameters trace.ScriptingQueryParameters) func(error) func(error) {
 	var p trace.ScriptingStreamExecuteStartInfo
@@ -302,6 +304,7 @@ func ScriptingOnStreamExecute(t *trace.Scripting, c *context.Context, c1 trace.C
 		}
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func ScriptingOnExplain(t *trace.Scripting, c *context.Context, c1 trace.Call, query string) func(plan string, _ error) {
 	var p trace.ScriptingExplainStartInfo
@@ -316,6 +319,7 @@ func ScriptingOnExplain(t *trace.Scripting, c *context.Context, c1 trace.Call, q
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func ScriptingOnClose(t *trace.Scripting, c *context.Context, c1 trace.Call) func(error) {
 	var p trace.ScriptingCloseStartInfo

@@ -2,6 +2,7 @@ package scheme
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
+	"google.golang.org/protobuf/proto"
 )
 
 func permissions(p Permissions) *Ydb_Scheme.Permissions {
@@ -26,40 +27,32 @@ func WithClearPermissions() PermissionsOption {
 
 func WithGrantPermissions(p Permissions) PermissionsOption {
 	return func(d permissionsDesc) {
-		d.AppendAction(&Ydb_Scheme.PermissionsAction{
-			Action: &Ydb_Scheme.PermissionsAction_Grant{
-				Grant: permissions(p),
-			},
-		})
+		d.AppendAction(Ydb_Scheme.PermissionsAction_builder{
+			Grant: proto.ValueOrDefault(permissions(p)),
+		}.Build())
 	}
 }
 
 func WithRevokePermissions(p Permissions) PermissionsOption {
 	return func(d permissionsDesc) {
-		d.AppendAction(&Ydb_Scheme.PermissionsAction{
-			Action: &Ydb_Scheme.PermissionsAction_Revoke{
-				Revoke: permissions(p),
-			},
-		})
+		d.AppendAction(Ydb_Scheme.PermissionsAction_builder{
+			Revoke: proto.ValueOrDefault(permissions(p)),
+		}.Build())
 	}
 }
 
 func WithSetPermissions(p Permissions) PermissionsOption {
 	return func(d permissionsDesc) {
-		d.AppendAction(&Ydb_Scheme.PermissionsAction{
-			Action: &Ydb_Scheme.PermissionsAction_Set{
-				Set: permissions(p),
-			},
-		})
+		d.AppendAction(Ydb_Scheme.PermissionsAction_builder{
+			Set: proto.ValueOrDefault(permissions(p)),
+		}.Build())
 	}
 }
 
 func WithChangeOwner(owner string) PermissionsOption {
 	return func(d permissionsDesc) {
-		d.AppendAction(&Ydb_Scheme.PermissionsAction{
-			Action: &Ydb_Scheme.PermissionsAction_ChangeOwner{
-				ChangeOwner: owner,
-			},
-		})
+		d.AppendAction(Ydb_Scheme.PermissionsAction_builder{
+			ChangeOwner: proto.String(owner),
+		}.Build())
 	}
 }

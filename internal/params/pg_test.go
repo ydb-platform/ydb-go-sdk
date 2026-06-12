@@ -8,6 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pg"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestPg(t *testing.T) {
@@ -27,16 +28,14 @@ func TestPg(t *testing.T) {
 			args:   []any{"123"},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_PgType{
-						PgType: &Ydb.PgType{
-							Oid: pg.OIDUnknown,
-						},
-					},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_TextValue{TextValue: "123"},
-				},
+				Type: Ydb.Type_builder{
+					PgType: Ydb.PgType_builder{
+						Oid: pg.OIDUnknown,
+					}.Build(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					TextValue: proto.String("123"),
+				}.Build(),
 			},
 		},
 		{
@@ -44,16 +43,14 @@ func TestPg(t *testing.T) {
 			args:   []any{int32(123)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_PgType{
-						PgType: &Ydb.PgType{
-							Oid: pg.OIDInt4,
-						},
-					},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_TextValue{TextValue: "123"},
-				},
+				Type: Ydb.Type_builder{
+					PgType: Ydb.PgType_builder{
+						Oid: pg.OIDInt4,
+					}.Build(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					TextValue: proto.String("123"),
+				}.Build(),
 			},
 		},
 		{
@@ -61,16 +58,14 @@ func TestPg(t *testing.T) {
 			args:   []any{int64(123)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_PgType{
-						PgType: &Ydb.PgType{
-							Oid: pg.OIDInt8,
-						},
-					},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_TextValue{TextValue: "123"},
-				},
+				Type: Ydb.Type_builder{
+					PgType: Ydb.PgType_builder{
+						Oid: pg.OIDInt8,
+					}.Build(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					TextValue: proto.String("123"),
+				}.Build(),
 			},
 		},
 	}
@@ -86,10 +81,10 @@ func TestPg(t *testing.T) {
 
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
-					"$x": {
+					"$x": Ydb.TypedValue_builder{
 						Type:  tc.expected.Type,
 						Value: tc.expected.Value,
-					},
+					}.Build(),
 				}), xtest.ToJSON(params))
 		})
 	}

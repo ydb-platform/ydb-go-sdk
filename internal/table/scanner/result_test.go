@@ -143,18 +143,22 @@ type ResultSetOption func(*resultSetDesc)
 
 func WithColumns(cs ...options.Column) ResultSetOption {
 	return func(r *resultSetDesc) {
+		rs := (*Ydb.ResultSet)(r)
+		cols := make([]*Ydb.Column, 0, len(cs))
 		for _, c := range cs {
-			r.Columns = append(r.Columns, &Ydb.Column{
+			cols = append(cols, Ydb.Column_builder{
 				Name: c.Name,
 				Type: types.TypeToYDB(c.Type),
-			})
+			}.Build())
 		}
+		rs.SetColumns(cols)
 	}
 }
 
 func WithValues(vs ...value.Value) ResultSetOption {
 	return func(r *resultSetDesc) {
-		n := len(r.Columns)
+		rs := (*Ydb.ResultSet)(r)
+		n := len(rs.GetColumns())
 		if n == 0 {
 			panic("empty columns")
 		}
@@ -165,26 +169,26 @@ func WithValues(vs ...value.Value) ResultSetOption {
 		for i, v := range vs {
 			j := i % n
 			if j == 0 && i > 0 {
-				r.Rows = append(r.Rows, row)
+				rs.SetRows(append(rs.GetRows(), row))
 			}
 			if j == 0 {
-				row = &Ydb.Value{
+				row = Ydb.Value_builder{
 					Items: make([]*Ydb.Value, n),
-				}
+				}.Build()
 			}
 			tv := value.ToYDB(v)
 			act := types.TypeFromYDB(tv.GetType())
-			exp := types.TypeFromYDB(r.Columns[j].GetType())
+			exp := types.TypeFromYDB(rs.GetColumns()[j].GetType())
 			if !types.Equal(act, exp) {
 				panic(fmt.Sprintf(
 					"unexpected types for #%d column: %s; want %s",
 					j, act, exp,
 				))
 			}
-			row.Items[j] = tv.GetValue()
+			row.GetItems()[j] = tv.GetValue()
 		}
 		if row != nil {
-			r.Rows = append(r.Rows, row)
+			rs.SetRows(append(rs.GetRows(), row))
 		}
 	}
 }

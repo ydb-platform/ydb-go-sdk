@@ -26,11 +26,11 @@ func TestStreamResultNextResultSet_CtxErrorDoesNotCancelExecuteStream(t *testing
 		ctrl := gomock.NewController(t)
 
 		stream := newExecuteQueryStreamMock(ctrl)
-		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
 			ResultSet:      &Ydb.ResultSet{},
-		}, nil)
+		}.Build(), nil)
 
 		var onCloseCalls atomic.Uint64
 
@@ -112,16 +112,16 @@ func TestClientCloseCancelsInflightDoTx(t *testing.T) {
 
 		queryService := NewMockQueryServiceClient(ctrl)
 		queryService.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(
-			&Ydb_Query.BeginTransactionResponse{
+			Ydb_Query.BeginTransactionResponse_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-				TxMeta: &Ydb_Query.TransactionMeta{Id: "tx-1"},
-			}, nil,
+				TxMeta: Ydb_Query.TransactionMeta_builder{Id: "tx-1"}.Build(),
+			}.Build(), nil,
 		).AnyTimes()
 		queryService.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(
-			&Ydb_Query.RollbackTransactionResponse{Status: Ydb.StatusIds_SUCCESS}, nil,
+			Ydb_Query.RollbackTransactionResponse_builder{Status: Ydb.StatusIds_SUCCESS}.Build(), nil,
 		).AnyTimes()
 		queryService.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(
-			&Ydb_Query.CommitTransactionResponse{Status: Ydb.StatusIds_SUCCESS}, nil,
+			Ydb_Query.CommitTransactionResponse_builder{Status: Ydb.StatusIds_SUCCESS}.Build(), nil,
 		).AnyTimes()
 
 		opStarted := make(chan struct{})

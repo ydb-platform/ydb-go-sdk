@@ -32,11 +32,11 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 						}
 						begin++
 
-						return &Ydb_Table.BeginTransactionResult{
-							TxMeta: &Ydb_Table.TransactionMeta{
+						return Ydb_Table.BeginTransactionResult_builder{
+							TxMeta: Ydb_Table.TransactionMeta_builder{
 								Id: "",
-							},
-						}, nil
+							}.Build(),
+						}.Build(), nil
 					},
 					testutil.TableCommitTransaction: func(request any) (proto.Message, error) {
 						_, ok := request.(*Ydb_Table.CommitTransactionRequest)
@@ -54,17 +54,17 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 						}
 						rollback++
 
-						return &Ydb_Table.RollbackTransactionResponse{
-							Operation: &Ydb_Operations.Operation{
+						return Ydb_Table.RollbackTransactionResponse_builder{
+							Operation: Ydb_Operations.Operation_builder{
 								Ready:  true,
 								Status: Ydb.StatusIds_SUCCESS,
-							},
-						}, nil
+							}.Build(),
+						}.Build(), nil
 					},
 					testutil.TableCreateSession: func(any) (proto.Message, error) {
-						return &Ydb_Table.CreateSessionResult{
+						return Ydb_Table.CreateSessionResult_builder{
 							SessionId: testutil.SessionID(),
-						}, nil
+						}.Build(), nil
 					},
 				},
 			),

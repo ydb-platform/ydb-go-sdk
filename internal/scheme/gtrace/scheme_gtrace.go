@@ -290,6 +290,7 @@ func onModifyPermissions(t *trace.Scheme, s trace.SchemeModifyPermissionsStartIn
 	}
 	return res
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func SchemeOnListDirectory(t *trace.Scheme, c *context.Context, c1 trace.Call) func(error) {
 	var p trace.SchemeListDirectoryStartInfo
@@ -302,6 +303,7 @@ func SchemeOnListDirectory(t *trace.Scheme, c *context.Context, c1 trace.Call) f
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func SchemeOnDescribePath(t *trace.Scheme, c *context.Context, c1 trace.Call, path string) func(entryType string, _ error) {
 	var p trace.SchemeDescribePathStartInfo
@@ -316,6 +318,7 @@ func SchemeOnDescribePath(t *trace.Scheme, c *context.Context, c1 trace.Call, pa
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func SchemeOnMakeDirectory(t *trace.Scheme, c *context.Context, c1 trace.Call, path string) func(error) {
 	var p trace.SchemeMakeDirectoryStartInfo
@@ -329,6 +332,7 @@ func SchemeOnMakeDirectory(t *trace.Scheme, c *context.Context, c1 trace.Call, p
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func SchemeOnRemoveDirectory(t *trace.Scheme, c *context.Context, c1 trace.Call, path string) func(error) {
 	var p trace.SchemeRemoveDirectoryStartInfo
@@ -342,6 +346,7 @@ func SchemeOnRemoveDirectory(t *trace.Scheme, c *context.Context, c1 trace.Call,
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func SchemeOnModifyPermissions(t *trace.Scheme, c *context.Context, c1 trace.Call, path string) func(error) {
 	var p trace.SchemeModifyPermissionsStartInfo

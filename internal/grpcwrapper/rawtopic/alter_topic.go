@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawoptional"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"google.golang.org/protobuf/proto"
 )
 
 type AlterTopicRequest struct {
@@ -31,7 +32,7 @@ type AlterTopicRequest struct {
 }
 
 func (req *AlterTopicRequest) ToProto() *Ydb_Topic.AlterTopicRequest {
-	res := &Ydb_Topic.AlterTopicRequest{
+	res := Ydb_Topic.AlterTopicRequest_builder{
 		OperationParams:                      req.OperationParams.ToProto(),
 		Path:                                 req.Path,
 		AlterPartitioningSettings:            req.AlterPartitionSettings.ToProto(),
@@ -41,34 +42,32 @@ func (req *AlterTopicRequest) ToProto() *Ydb_Topic.AlterTopicRequest {
 		SetPartitionWriteBurstBytes:          req.SetPartitionWriteBurstBytes.ToProto(),
 		AlterAttributes:                      req.AlterAttributes,
 		SetMeteringMode:                      Ydb_Topic.MeteringMode(req.SetMeteringMode),
-	}
+	}.Build()
 
 	if req.SetSupportedCodecs {
-		res.SetSupportedCodecs = req.SetSupportedCodecsValue.ToProto()
+		res.SetSetSupportedCodecs(req.SetSupportedCodecsValue.ToProto())
 	}
 
 	if req.SetMetricsLevel.HasValue {
-		res.MetricsLevel = &Ydb_Topic.AlterTopicRequest_SetMetricsLevel{
-			SetMetricsLevel: req.SetMetricsLevel.Value,
-		}
+		res.SetSetMetricsLevel(req.SetMetricsLevel.Value)
 	}
 	if req.ResetMetricsLevel {
-		res.MetricsLevel = &Ydb_Topic.AlterTopicRequest_ResetMetricsLevel{
-			ResetMetricsLevel: &emptypb.Empty{},
-		}
+		res.SetResetMetricsLevel(&emptypb.Empty{})
 	}
 
-	res.AddConsumers = make([]*Ydb_Topic.Consumer, len(req.AddConsumers))
+	consumers := make([]*Ydb_Topic.Consumer, len(req.AddConsumers))
 	for i := range req.AddConsumers {
-		res.AddConsumers[i] = req.AddConsumers[i].ToProto()
+		consumers[i] = req.AddConsumers[i].ToProto()
 	}
+	res.SetAddConsumers(consumers)
 
-	res.DropConsumers = req.DropConsumers
+	res.SetDropConsumers(req.DropConsumers)
 
-	res.AlterConsumers = make([]*Ydb_Topic.AlterConsumer, len(req.AlterConsumers))
+	alterConsumers := make([]*Ydb_Topic.AlterConsumer, len(req.AlterConsumers))
 	for i := range req.AlterConsumers {
-		res.AlterConsumers[i] = req.AlterConsumers[i].ToProto()
+		alterConsumers[i] = req.AlterConsumers[i].ToProto()
 	}
+	res.SetAlterConsumers(alterConsumers)
 
 	return res
 }
@@ -92,23 +91,19 @@ type AlterConsumer struct {
 }
 
 func (c *AlterConsumer) ToProto() *Ydb_Topic.AlterConsumer {
-	res := &Ydb_Topic.AlterConsumer{
+	res := Ydb_Topic.AlterConsumer_builder{
 		Name:               c.Name,
 		SetImportant:       c.SetImportant.ToProto(),
 		SetReadFrom:        c.SetReadFrom.ToProto(),
 		SetSupportedCodecs: c.SetSupportedCodecs.ToProto(),
 		AlterAttributes:    c.AlterAttributes,
-	}
+	}.Build()
 
 	if c.SetAvailabilityPeriod.HasValue {
-		res.AvailabilityPeriodAction = &Ydb_Topic.AlterConsumer_SetAvailabilityPeriod{
-			SetAvailabilityPeriod: c.SetAvailabilityPeriod.ToProto(),
-		}
+		res.SetSetAvailabilityPeriod(proto.ValueOrDefault(c.SetAvailabilityPeriod.ToProto()))
 	}
 	if c.ResetAvailabilityPeriod {
-		res.AvailabilityPeriodAction = &Ydb_Topic.AlterConsumer_ResetAvailabilityPeriod{
-			ResetAvailabilityPeriod: &emptypb.Empty{},
-		}
+		res.SetResetAvailabilityPeriod(&emptypb.Empty{})
 	}
 
 	return res

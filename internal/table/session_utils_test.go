@@ -61,23 +61,23 @@ func TestProcessTableStats(t *testing.T) {
 	})
 
 	t.Run("stats with partitions", func(t *testing.T) {
-		stats := &Ydb_Table.TableStats{
+		stats := Ydb_Table.TableStats_builder{
 			PartitionStats: []*Ydb_Table.PartitionStats{
-				{
+				Ydb_Table.PartitionStats_builder{
 					RowsEstimate: 100,
 					StoreSize:    1024,
 					LeaderNodeId: 1,
-				},
-				{
+				}.Build(),
+				Ydb_Table.PartitionStats_builder{
 					RowsEstimate: 200,
 					StoreSize:    2048,
 					LeaderNodeId: 2,
-				},
+				}.Build(),
 			},
 			RowsEstimate: 300,
 			StoreSize:    3072,
 			Partitions:   2,
-		}
+		}.Build()
 		result := processTableStats(stats)
 		require.NotNil(t, result)
 		require.Len(t, result.PartitionStats, 2)
@@ -95,10 +95,10 @@ func TestProcessTableStats(t *testing.T) {
 	t.Run("stats with timestamps", func(t *testing.T) {
 		creationTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 		modificationTime := time.Date(2024, 1, 2, 12, 0, 0, 0, time.UTC)
-		stats := &Ydb_Table.TableStats{
+		stats := Ydb_Table.TableStats_builder{
 			CreationTime:     timestamppb.New(creationTime),
 			ModificationTime: timestamppb.New(modificationTime),
-		}
+		}.Build()
 		result := processTableStats(stats)
 		require.NotNil(t, result)
 		require.Equal(t, creationTime.Unix(), result.CreationTime.Unix())
@@ -114,8 +114,8 @@ func TestProcessColumnFamilies(t *testing.T) {
 
 	t.Run("with families", func(t *testing.T) {
 		families := []*Ydb_Table.ColumnFamily{
-			{Name: "family1"},
-			{Name: "family2"},
+			Ydb_Table.ColumnFamily_builder{Name: "family1"}.Build(),
+			Ydb_Table.ColumnFamily_builder{Name: "family2"}.Build(),
 		}
 		result := processColumnFamilies(families)
 		require.Len(t, result, 2)
@@ -156,15 +156,13 @@ func TestProcessIndexes(t *testing.T) {
 
 	t.Run("global index", func(t *testing.T) {
 		indexes := []*Ydb_Table.TableIndexDescription{
-			{
+			Ydb_Table.TableIndexDescription_builder{
 				Name:         "idx1",
 				IndexColumns: []string{"col1", "col2"},
 				DataColumns:  []string{"col3"},
 				Status:       Ydb_Table.TableIndexDescription_STATUS_READY,
-				Type: &Ydb_Table.TableIndexDescription_GlobalIndex{
-					GlobalIndex: &Ydb_Table.GlobalIndex{},
-				},
-			},
+				GlobalIndex:  &Ydb_Table.GlobalIndex{},
+			}.Build(),
 		}
 		result := processIndexes(indexes)
 		require.Len(t, result, 1)
@@ -177,14 +175,12 @@ func TestProcessIndexes(t *testing.T) {
 
 	t.Run("global async index", func(t *testing.T) {
 		indexes := []*Ydb_Table.TableIndexDescription{
-			{
-				Name:         "idx2",
-				IndexColumns: []string{"col1"},
-				Status:       Ydb_Table.TableIndexDescription_STATUS_READY,
-				Type: &Ydb_Table.TableIndexDescription_GlobalAsyncIndex{
-					GlobalAsyncIndex: &Ydb_Table.GlobalAsyncIndex{},
-				},
-			},
+			Ydb_Table.TableIndexDescription_builder{
+				Name:             "idx2",
+				IndexColumns:     []string{"col1"},
+				Status:           Ydb_Table.TableIndexDescription_STATUS_READY,
+				GlobalAsyncIndex: &Ydb_Table.GlobalAsyncIndex{},
+			}.Build(),
 		}
 		result := processIndexes(indexes)
 		require.Len(t, result, 1)
@@ -194,14 +190,12 @@ func TestProcessIndexes(t *testing.T) {
 
 	t.Run("global unique index", func(t *testing.T) {
 		indexes := []*Ydb_Table.TableIndexDescription{
-			{
-				Name:         "idx2",
-				IndexColumns: []string{"col1"},
-				Status:       Ydb_Table.TableIndexDescription_STATUS_READY,
-				Type: &Ydb_Table.TableIndexDescription_GlobalUniqueIndex{
-					GlobalUniqueIndex: &Ydb_Table.GlobalUniqueIndex{},
-				},
-			},
+			Ydb_Table.TableIndexDescription_builder{
+				Name:              "idx2",
+				IndexColumns:      []string{"col1"},
+				Status:            Ydb_Table.TableIndexDescription_STATUS_READY,
+				GlobalUniqueIndex: &Ydb_Table.GlobalUniqueIndex{},
+			}.Build(),
 		}
 		result := processIndexes(indexes)
 		require.Len(t, result, 1)
@@ -211,24 +205,18 @@ func TestProcessIndexes(t *testing.T) {
 
 	t.Run("multiple indexes", func(t *testing.T) {
 		indexes := []*Ydb_Table.TableIndexDescription{
-			{
-				Name: "idx1",
-				Type: &Ydb_Table.TableIndexDescription_GlobalIndex{
-					GlobalIndex: &Ydb_Table.GlobalIndex{},
-				},
-			},
-			{
-				Name: "idx2",
-				Type: &Ydb_Table.TableIndexDescription_GlobalAsyncIndex{
-					GlobalAsyncIndex: &Ydb_Table.GlobalAsyncIndex{},
-				},
-			},
-			{
-				Name: "idx3",
-				Type: &Ydb_Table.TableIndexDescription_GlobalUniqueIndex{
-					GlobalUniqueIndex: &Ydb_Table.GlobalUniqueIndex{},
-				},
-			},
+			Ydb_Table.TableIndexDescription_builder{
+				Name:        "idx1",
+				GlobalIndex: &Ydb_Table.GlobalIndex{},
+			}.Build(),
+			Ydb_Table.TableIndexDescription_builder{
+				Name:             "idx2",
+				GlobalAsyncIndex: &Ydb_Table.GlobalAsyncIndex{},
+			}.Build(),
+			Ydb_Table.TableIndexDescription_builder{
+				Name:              "idx3",
+				GlobalUniqueIndex: &Ydb_Table.GlobalUniqueIndex{},
+			}.Build(),
 		}
 		result := processIndexes(indexes)
 		require.Len(t, result, 3)
@@ -246,8 +234,8 @@ func TestProcessChangefeeds(t *testing.T) {
 
 	t.Run("with changefeeds", func(t *testing.T) {
 		changefeeds := []*Ydb_Table.ChangefeedDescription{
-			{Name: "feed1"},
-			{Name: "feed2"},
+			Ydb_Table.ChangefeedDescription_builder{Name: "feed1"}.Build(),
+			Ydb_Table.ChangefeedDescription_builder{Name: "feed2"}.Build(),
 		}
 		result := processChangefeeds(changefeeds)
 		require.Len(t, result, 2)

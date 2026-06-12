@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestStruct(t *testing.T) {
@@ -21,697 +22,571 @@ func TestStruct(t *testing.T) {
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Uint64(123).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_UINT64,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_UINT64.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 123,
-								},
-							},
+							Ydb.Value_builder{
+								Uint64Value: proto.Uint64(123),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Int64(123).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_INT64,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_INT64.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Int64Value{
-									Int64Value: 123,
-								},
-							},
+							Ydb.Value_builder{
+								Int64Value: proto.Int64(123),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Uint32(123).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_UINT32,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_UINT32.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Uint32Value{
-									Uint32Value: 123,
-								},
-							},
+							Ydb.Value_builder{
+								Uint32Value: proto.Uint32(123),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Int32(123).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_INT32,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_INT32.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Int32Value{
-									Int32Value: 123,
-								},
-							},
+							Ydb.Value_builder{
+								Int32Value: proto.Int32(123),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Uint16(123).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_UINT16,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_UINT16.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Uint32Value{
-									Uint32Value: 123,
-								},
-							},
+							Ydb.Value_builder{
+								Uint32Value: proto.Uint32(123),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Int16(123).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_INT16,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_INT16.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Int32Value{
-									Int32Value: 123,
-								},
-							},
+							Ydb.Value_builder{
+								Int32Value: proto.Int32(123),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Uint8(123).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_UINT8,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_UINT8.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Uint32Value{
-									Uint32Value: 123,
-								},
-							},
+							Ydb.Value_builder{
+								Uint32Value: proto.Uint32(123),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Int8(123).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_INT8,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_INT8.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Int32Value{
-									Int32Value: 123,
-								},
-							},
+							Ydb.Value_builder{
+								Int32Value: proto.Int32(123),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Bool(true).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_BOOL,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_BOOL.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_BoolValue{
-									BoolValue: true,
-								},
-							},
+							Ydb.Value_builder{
+								BoolValue: proto.Bool(true),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Text("test").EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_UTF8,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_UTF8.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_TextValue{
-									TextValue: "test",
-								},
-							},
+							Ydb.Value_builder{
+								TextValue: proto.String("test"),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Bytes([]byte("test")).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_STRING,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_STRING.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_BytesValue{
-									BytesValue: []byte("test"),
-								},
-							},
+							Ydb.Value_builder{
+								BytesValue: []byte("test"),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Float(123).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_FLOAT,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_FLOAT.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_FloatValue{
-									FloatValue: 123,
-								},
-							},
+							Ydb.Value_builder{
+								FloatValue: proto.Float32(123),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Double(123).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_DOUBLE,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_DOUBLE.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_DoubleValue{
-									DoubleValue: 123,
-								},
-							},
+							Ydb.Value_builder{
+								DoubleValue: proto.Float64(123),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Interval(time.Second).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_INTERVAL,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_INTERVAL.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Int64Value{
-									Int64Value: 1000000,
-								},
-							},
+							Ydb.Value_builder{
+								Int64Value: proto.Int64(1000000),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Datetime(time.Unix(123456789, 456)).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_DATETIME,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_DATETIME.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Uint32Value{
-									Uint32Value: 123456789,
-								},
-							},
+							Ydb.Value_builder{
+								Uint32Value: proto.Uint32(123456789),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Date(time.Unix(123456789, 456)).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_DATE,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_DATE.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Uint32Value{
-									Uint32Value: 1428,
-								},
-							},
+							Ydb.Value_builder{
+								Uint32Value: proto.Uint32(1428),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Timestamp(time.Unix(123456789, 456)).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_TIMESTAMP,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_TIMESTAMP.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 123456789000000,
-								},
-							},
+							Ydb.Value_builder{
+								Uint64Value: proto.Uint64(123456789000000),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").Decimal([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9).EndStruct(), //nolint:lll
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_DecimalType{
-												DecimalType: &Ydb.DecimalType{
-													Precision: 22,
-													Scale:     9,
-												},
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										DecimalType: Ydb.DecimalType_builder{
+											Precision: 22,
+											Scale:     9,
+										}.Build(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
+							Ydb.Value_builder{
 								High_128: 72623859790382856,
-								Value: &Ydb.Value_Low_128{
-									Low_128: 648519454493508870,
-								},
-							},
+								Low_128:  proto.Uint64(648519454493508870),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").JSON(`{"a": 1,"b": "B"}`).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_JSON,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_JSON.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_TextValue{
-									TextValue: `{"a": 1,"b": "B"}`,
-								},
-							},
+							Ydb.Value_builder{
+								TextValue: proto.String(`{"a": 1,"b": "B"}`),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").JSONFromBytes([]byte(`{"a": 1,"b": "B"}`)).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_JSON,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_JSON.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_TextValue{
-									TextValue: `{"a": 1,"b": "B"}`,
-								},
-							},
+							Ydb.Value_builder{
+								TextValue: proto.String(`{"a": 1,"b": "B"}`),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").JSONDocument(`{"a": 1,"b": "B"}`).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_JSON_DOCUMENT,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_JSON_DOCUMENT.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_TextValue{
-									TextValue: `{"a": 1,"b": "B"}`,
-								},
-							},
+							Ydb.Value_builder{
+								TextValue: proto.String(`{"a": 1,"b": "B"}`),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
@@ -722,66 +597,54 @@ func TestStruct(t *testing.T) {
 				JSONDocumentFromBytes([]byte(`{"a": 1,"b": "B"}`)).
 				EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_JSON_DOCUMENT,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_JSON_DOCUMENT.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_TextValue{
-									TextValue: `{"a": 1,"b": "B"}`,
-								},
-							},
+							Ydb.Value_builder{
+								TextValue: proto.String(`{"a": 1,"b": "B"}`),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").YSON([]byte(`[ 1; 2; 3; 4; 5 ]`)).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_YSON,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_YSON.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_BytesValue{
-									BytesValue: []byte(`[ 1; 2; 3; 4; 5 ]`),
-								},
-							},
+							Ydb.Value_builder{
+								BytesValue: []byte(`[ 1; 2; 3; 4; 5 ]`),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
@@ -789,34 +652,28 @@ func TestStruct(t *testing.T) {
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").
 				UUIDWithIssue1501Value([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_UUID,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_UUID.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Low_128{
-									Low_128: 651345242494996240,
-								},
+							Ydb.Value_builder{
+								Low_128:  proto.Uint64(651345242494996240),
 								High_128: 72623859790382856,
-							},
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
@@ -824,34 +681,28 @@ func TestStruct(t *testing.T) {
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").
 				Uuid(uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_UUID,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_UUID.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Low_128{
-									Low_128: 506660481424032516,
-								},
+							Ydb.Value_builder{
+								Low_128:  proto.Uint64(506660481424032516),
 								High_128: 1157159078456920585,
-							},
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
@@ -862,158 +713,126 @@ func TestStruct(t *testing.T) {
 				Field("col3").Int64(456).
 				EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_UTF8,
-											},
-										},
-									},
-									{
-										Name: "col2",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_UINT32,
-											},
-										},
-									},
-									{
-										Name: "col3",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_INT64,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_UTF8.Enum(),
+									}.Build(),
+								}.Build(),
+								Ydb.StructMember_builder{
+									Name: "col2",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_UINT32.Enum(),
+									}.Build(),
+								}.Build(),
+								Ydb.StructMember_builder{
+									Name: "col3",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_INT64.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_TextValue{
-									TextValue: "text",
-								},
-							},
-							{
-								Value: &Ydb.Value_Uint32Value{
-									Uint32Value: 123,
-								},
-							},
-							{
-								Value: &Ydb.Value_Int64Value{
-									Int64Value: 456,
-								},
-							},
+							Ydb.Value_builder{
+								TextValue: proto.String("text"),
+							}.Build(),
+							Ydb.Value_builder{
+								Uint32Value: proto.Uint32(123),
+							}.Build(),
+							Ydb.Value_builder{
+								Int64Value: proto.Int64(456),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").TzDatetime(time.Unix(123456789, 456).UTC()).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_TZ_DATETIME,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_TZ_DATETIME.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_TextValue{
-									TextValue: "1973-11-29T21:33:09,UTC",
-								},
-							},
+							Ydb.Value_builder{
+								TextValue: proto.String("1973-11-29T21:33:09,UTC"),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").TzDate(time.Unix(123456789, 456).UTC()).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_TZ_DATE,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_TZ_DATE.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_TextValue{
-									TextValue: "1973-11-29,UTC",
-								},
-							},
+							Ydb.Value_builder{
+								TextValue: proto.String("1973-11-29,UTC"),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginStruct().Field("col1").TzTimestamp(time.Unix(123456789, 456).UTC()).EndStruct(),
 			params: map[string]*Ydb.TypedValue{
-				"$x": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_StructType{
-							StructType: &Ydb.StructType{
-								Members: []*Ydb.StructMember{
-									{
-										Name: "col1",
-										Type: &Ydb.Type{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_TZ_TIMESTAMP,
-											},
-										},
-									},
-								},
+				"$x": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						StructType: Ydb.StructType_builder{
+							Members: []*Ydb.StructMember{
+								Ydb.StructMember_builder{
+									Name: "col1",
+									Type: Ydb.Type_builder{
+										TypeId: Ydb.Type_TZ_TIMESTAMP.Enum(),
+									}.Build(),
+								}.Build(),
 							},
-						},
-					},
-					Value: &Ydb.Value{
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_TextValue{
-									TextValue: "1973-11-29T21:33:09.000000,UTC",
-								},
-							},
+							Ydb.Value_builder{
+								TextValue: proto.String("1973-11-29T21:33:09.000000,UTC"),
+							}.Build(),
 						},
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 		},
 	} {

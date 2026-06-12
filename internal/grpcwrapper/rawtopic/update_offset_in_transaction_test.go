@@ -81,65 +81,65 @@ func TestUpdateOffsetsInTransactionRequestToProto(t *testing.T) {
 		Consumer: "test-consumer",
 	}).ToProto()
 
-	expected := &Ydb_Topic.UpdateOffsetsInTransactionRequest{
-		OperationParams: &Ydb_Operations.OperationParams{
+	expected := Ydb_Topic.UpdateOffsetsInTransactionRequest_builder{
+		OperationParams: Ydb_Operations.OperationParams_builder{
 			OperationMode:    Ydb_Operations.OperationParams_SYNC,
 			OperationTimeout: durationpb.New(time.Second),
 			CancelAfter:      durationpb.New(time.Minute),
-		},
-		Tx: &Ydb_Topic.TransactionIdentity{
+		}.Build(),
+		Tx: Ydb_Topic.TransactionIdentity_builder{
 			Id:      "tx-id",
 			Session: "session-id",
-		},
+		}.Build(),
 		Topics: []*Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets{
-			{
+			Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets_builder{
 				Path: "test-topic",
 				Partitions: []*Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets_PartitionOffsets{
-					{
+					Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets_PartitionOffsets_builder{
 						PartitionId: 1,
 						PartitionOffsets: []*Ydb_Topic.OffsetsRange{
-							{
+							Ydb_Topic.OffsetsRange_builder{
 								Start: 1,
 								End:   2,
-							},
-							{
+							}.Build(),
+							Ydb_Topic.OffsetsRange_builder{
 								Start: 10,
 								End:   20,
-							},
+							}.Build(),
 						},
-					},
-					{
+					}.Build(),
+					Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets_PartitionOffsets_builder{
 						PartitionId: 5,
 						PartitionOffsets: []*Ydb_Topic.OffsetsRange{
-							{
+							Ydb_Topic.OffsetsRange_builder{
 								Start: 15,
 								End:   25,
-							},
-							{
+							}.Build(),
+							Ydb_Topic.OffsetsRange_builder{
 								Start: 35,
 								End:   55,
-							},
+							}.Build(),
 						},
-					},
+					}.Build(),
 				},
-			},
-			{
+			}.Build(),
+			Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets_builder{
 				Path: "test-topic-2",
 				Partitions: []*Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets_PartitionOffsets{
-					{
+					Ydb_Topic.UpdateOffsetsInTransactionRequest_TopicOffsets_PartitionOffsets_builder{
 						PartitionId: 56,
 						PartitionOffsets: []*Ydb_Topic.OffsetsRange{
-							{
+							Ydb_Topic.OffsetsRange_builder{
 								Start: 11,
 								End:   52,
-							},
+							}.Build(),
 						},
-					},
+					}.Build(),
 				},
-			},
+			}.Build(),
 		},
 		Consumer: "test-consumer",
-	}
+	}.Build()
 
 	require.Equal(t, expected, res)
 }

@@ -21,9 +21,9 @@ func TestSessionPoolWarmUp(t *testing.T) {
 			testutil.TableCreateSession: func(any) (proto.Message, error) {
 				createCalls.Add(1)
 
-				return &Ydb_Table.CreateSessionResult{
+				return Ydb_Table.CreateSessionResult_builder{
 					SessionId: testutil.SessionID(),
-				}, nil
+				}.Build(), nil
 			},
 		}))
 
@@ -44,9 +44,9 @@ func TestSessionPoolWarmUp(t *testing.T) {
 			testutil.TableCreateSession: func(any) (proto.Message, error) {
 				createCalls.Add(1)
 
-				return &Ydb_Table.CreateSessionResult{
+				return Ydb_Table.CreateSessionResult_builder{
 					SessionId: testutil.SessionID(),
-				}, nil
+				}.Build(), nil
 			},
 			testutil.TableDeleteSession: func(any) (proto.Message, error) {
 				return &Ydb_Table.DeleteSessionResponse{}, nil
@@ -76,9 +76,9 @@ func TestSessionPoolWarmUp(t *testing.T) {
 			testutil.TableCreateSession: func(any) (proto.Message, error) {
 				createCalls.Add(1)
 
-				return &Ydb_Table.CreateSessionResult{
+				return Ydb_Table.CreateSessionResult_builder{
 					SessionId: testutil.SessionID(),
-				}, nil
+				}.Build(), nil
 			},
 			testutil.TableDeleteSession: func(any) (proto.Message, error) {
 				return &Ydb_Table.DeleteSessionResponse{}, nil

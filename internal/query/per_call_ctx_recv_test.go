@@ -11,33 +11,42 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func testEmptyStreamPart() *Ydb_Query.ExecuteQueryResponsePart {
-	return &Ydb_Query.ExecuteQueryResponsePart{
+	return Ydb_Query.ExecuteQueryResponsePart_builder{
 		Status:         Ydb.StatusIds_SUCCESS,
 		ResultSetIndex: 0,
-		ResultSet:      &Ydb.ResultSet{},
-	}
+		ResultSet:      Ydb.ResultSet_builder{}.Build(),
+	}.Build()
 }
 
 func testSingleRowStreamPart() *Ydb_Query.ExecuteQueryResponsePart {
-	return &Ydb_Query.ExecuteQueryResponsePart{
+	return Ydb_Query.ExecuteQueryResponsePart_builder{
 		Status:         Ydb.StatusIds_SUCCESS,
 		ResultSetIndex: 0,
-		ResultSet: &Ydb.ResultSet{
-			Columns: []*Ydb.Column{{
-				Name: "id",
-				Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64}},
-			}},
-			Rows: []*Ydb.Value{
-				{Items: []*Ydb.Value{{Value: &Ydb.Value_Int64Value{Int64Value: 10}}}},
+		ResultSet: Ydb.ResultSet_builder{
+			Columns: []*Ydb.Column{
+				Ydb.Column_builder{
+					Name: "id",
+					Type: Ydb.Type_builder{TypeId: Ydb.Type_INT64.Enum()}.Build(),
+				}.Build(),
 			},
-		},
-	}
+			Rows: []*Ydb.Value{
+				Ydb.Value_builder{
+					Items: []*Ydb.Value{
+						Ydb.Value_builder{
+							Int64Value: proto.Int64(10),
+						}.Build(),
+					},
+				}.Build(),
+			},
+		}.Build(),
+	}.Build()
 }
 
 // Per-call ctx cancellation is checked only before stream.Recv(). Once Recv blocks,
@@ -284,10 +293,10 @@ func TestPerCallCtx_CloseDrainsAfterBlockedIterationCanceled(t *testing.T) {
 
 				return nil, executeCtx.Err()
 			}),
-			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:    Ydb.StatusIds_SUCCESS,
 				ExecStats: commitExecStatsForTest(),
-			}, nil),
+			}.Build(), nil),
 			stream.EXPECT().Recv().Return(nil, io.EOF),
 		)
 
@@ -322,16 +331,19 @@ func TestPerCallCtx_CloseDrainsAfterBlockedIterationCanceled(t *testing.T) {
 
 // commitExecStatsForTest mirrors mock stats shape used in commit regressions.
 func commitExecStatsForTest() *Ydb_TableStats.QueryStats {
-	return &Ydb_TableStats.QueryStats{
+	return Ydb_TableStats.QueryStats_builder{
 		QueryPhases: []*Ydb_TableStats.QueryPhaseStats{
-			{
+			Ydb_TableStats.QueryPhaseStats_builder{
 				TableAccess: []*Ydb_TableStats.TableAccessStats{
-					{
-						Name:    "table",
-						Deletes: &Ydb_TableStats.OperationStats{Rows: 1, Bytes: 1},
-					},
+					Ydb_TableStats.TableAccessStats_builder{
+						Name: "table",
+						Deletes: Ydb_TableStats.OperationStats_builder{
+							Rows:  1,
+							Bytes: 1,
+						}.Build(),
+					}.Build(),
 				},
-			},
+			}.Build(),
 		},
-	}
+	}.Build()
 }

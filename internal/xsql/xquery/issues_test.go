@@ -19,8 +19,8 @@ func TestIssueHandlerContext(t *testing.T) {
 	t.Run("non-nil", func(t *testing.T) {
 		var got []*Ydb_Issue.IssueMessage
 		expected := []*Ydb_Issue.IssueMessage{
-			{Message: "first"},
-			{Message: "second"},
+			Ydb_Issue.IssueMessage_builder{Message: "first"}.Build(),
+			Ydb_Issue.IssueMessage_builder{Message: "second"}.Build(),
 		}
 		ctx := WithIssuesHandler(context.Background(), func(issues []*Ydb_Issue.IssueMessage) {
 			got = issues

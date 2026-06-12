@@ -27,8 +27,8 @@ func (r *OffsetRange) FromProto(p *Ydb_Topic.OffsetsRange) error {
 }
 
 func (r *OffsetRange) ToProto() *Ydb_Topic.OffsetsRange {
-	return &Ydb_Topic.OffsetsRange{
+	return Ydb_Topic.OffsetsRange_builder{
 		Start: r.Start.ToInt64(),
 		End:   r.End.ToInt64(),
-	}
+	}.Build()
 }

@@ -18,6 +18,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 //nolint:gocyclo
@@ -26,11 +28,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 	switch c.typeID {
 	case Ydb.Type_BOOL:
 		v := rv%2 == 1
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_BoolValue{
-				BoolValue: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			BoolValue: proto.Bool(v),
+		}.Build()
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -40,11 +40,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &v
 	case Ydb.Type_INT8:
 		v := int8(rv)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: int32(v),
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			Int32Value: proto.Int32(int32(v)),
+		}.Build()
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -54,9 +52,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &v
 	case Ydb.Type_UINT8:
 		if c.nilValue {
-			ydbval := &Ydb.Value{
-				Value: &Ydb.Value_NullFlagValue{},
-			}
+			ydbval := Ydb.Value_builder{
+				NullFlagValue: structpb.NullValue_NULL_VALUE.Enum(),
+			}.Build()
 			if c.testDefault {
 				var dv uint8
 
@@ -67,11 +65,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 			return ydbval, &dv
 		}
 		v := uint8(rv)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: uint32(v),
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			Uint32Value: proto.Uint32(uint32(v)),
+		}.Build()
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -81,11 +77,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &v
 	case Ydb.Type_INT16:
 		v := int16(rv)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: int32(v),
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			Int32Value: proto.Int32(int32(v)),
+		}.Build()
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -95,11 +89,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &v
 	case Ydb.Type_UINT16:
 		v := uint16(rv)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: uint32(v),
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			Uint32Value: proto.Uint32(uint32(v)),
+		}.Build()
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -109,9 +101,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &v
 	case Ydb.Type_INT32:
 		if c.nilValue {
-			ydbval := &Ydb.Value{
-				Value: &Ydb.Value_NullFlagValue{},
-			}
+			ydbval := Ydb.Value_builder{
+				NullFlagValue: structpb.NullValue_NULL_VALUE.Enum(),
+			}.Build()
 			if c.testDefault {
 				var dv int32
 
@@ -122,11 +114,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 			return ydbval, &dv
 		}
 		v := int32(rv)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			Int32Value: proto.Int32(v),
+		}.Build()
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -136,11 +126,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &v
 	case Ydb.Type_UINT32:
 		v := uint32(rv)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			Uint32Value: proto.Uint32(v),
+		}.Build()
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -150,11 +138,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &v
 	case Ydb.Type_INT64:
 		v := rv
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_Int64Value{
-				Int64Value: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			Int64Value: proto.Int64(v),
+		}.Build()
 		if c.ydbvalue {
 			vp := types.Int64Value(v)
 
@@ -174,11 +160,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &v
 	case Ydb.Type_UINT64:
 		v := uint64(rv)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_Uint64Value{
-				Uint64Value: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			Uint64Value: proto.Uint64(v),
+		}.Build()
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -188,11 +172,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &v
 	case Ydb.Type_FLOAT:
 		v := float32(rv)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_FloatValue{
-				FloatValue: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			FloatValue: proto.Float32(v),
+		}.Build()
 		if c.ydbvalue {
 			vp := types.FloatValue(v)
 
@@ -207,11 +189,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &v
 	case Ydb.Type_DOUBLE:
 		v := float64(rv)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_DoubleValue{
-				DoubleValue: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			DoubleValue: proto.Float64(v),
+		}.Build()
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -221,11 +201,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &v
 	case Ydb.Type_DATE:
 		v := uint32(rv)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			Uint32Value: proto.Uint32(v),
+		}.Build()
 		src := value.DateToTime(v)
 		if c.scanner {
 			s := dateScanner(src)
@@ -241,11 +219,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &src
 	case Ydb.Type_DATETIME:
 		v := uint32(rv)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			Uint32Value: proto.Uint32(v),
+		}.Build()
 		src := value.DatetimeToTime(v)
 		if c.optional && !c.testDefault {
 			vp := &src
@@ -256,11 +232,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &src
 	case Ydb.Type_TIMESTAMP:
 		v := uint64(rv)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_Uint64Value{
-				Uint64Value: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			Uint64Value: proto.Uint64(v),
+		}.Build()
 		src := value.TimestampToTime(v)
 		if c.optional && !c.testDefault {
 			vp := &src
@@ -271,9 +245,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &src
 	case Ydb.Type_INTERVAL:
 		if c.nilValue {
-			ydbval := &Ydb.Value{
-				Value: &Ydb.Value_NullFlagValue{},
-			}
+			ydbval := Ydb.Value_builder{
+				NullFlagValue: structpb.NullValue_NULL_VALUE.Enum(),
+			}.Build()
 			if c.testDefault {
 				var dv time.Duration
 
@@ -285,11 +259,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		}
 		rv %= time.Now().Unix()
 		v := rv
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_Int64Value{
-				Int64Value: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			Int64Value: proto.Int64(v),
+		}.Build()
 		src := value.IntervalToDuration(v)
 		if c.optional && !c.testDefault {
 			vp := &src
@@ -300,11 +272,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &src
 	case Ydb.Type_TZ_DATE:
 		v := time.Now().Format(value.LayoutDate) + ",Europe/Berlin"
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			TextValue: proto.String(v),
+		}.Build()
 		src, _ := value.TzDateToTime(v)
 		if c.optional && !c.testDefault {
 			vp := &src
@@ -315,9 +285,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &src
 	case Ydb.Type_TZ_DATETIME:
 		if c.nilValue {
-			ydbval := &Ydb.Value{
-				Value: &Ydb.Value_NullFlagValue{},
-			}
+			ydbval := Ydb.Value_builder{
+				NullFlagValue: structpb.NullValue_NULL_VALUE.Enum(),
+			}.Build()
 			if c.testDefault {
 				var dv time.Time
 
@@ -329,11 +299,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		}
 		rv %= time.Now().Unix()
 		v := value.DatetimeToTime(uint32(rv)).Format(value.LayoutTzDatetime) + ",Europe/Berlin"
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			TextValue: proto.String(v),
+		}.Build()
 		src, _ := value.TzDatetimeToTime(v)
 		if c.optional && !c.testDefault {
 			vp := &src
@@ -345,11 +313,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 	case Ydb.Type_TZ_TIMESTAMP:
 		rv %= time.Now().Unix()
 		v := value.TimestampToTime(uint64(rv)).Format(value.LayoutTzTimestamp) + ",Europe/Berlin"
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			TextValue: proto.String(v),
+		}.Build()
 		src, _ := value.TzTimestampToTime(v)
 		if c.optional && !c.testDefault {
 			vp := &src
@@ -360,9 +326,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &src
 	case Ydb.Type_STRING:
 		if c.nilValue {
-			ydbval := &Ydb.Value{
-				Value: &Ydb.Value_NullFlagValue{},
-			}
+			ydbval := Ydb.Value_builder{
+				NullFlagValue: structpb.NullValue_NULL_VALUE.Enum(),
+			}.Build()
 			if c.testDefault {
 				var dv []byte
 
@@ -375,11 +341,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		v := make([]byte, 16)
 		binary.BigEndian.PutUint64(v[0:8], uint64(rv))
 		binary.BigEndian.PutUint64(v[8:16], uint64(rv))
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_BytesValue{
-				BytesValue: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			BytesValue: proto.ValueOrDefaultBytes(v),
+		}.Build()
 		src := v
 		if c.optional && !c.testDefault {
 			vp := &src
@@ -390,11 +354,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &src
 	case Ydb.Type_UTF8:
 		v := strconv.FormatUint(uint64(rv), 10)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			TextValue: proto.String(v),
+		}.Build()
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -404,9 +366,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &v
 	case Ydb.Type_YSON:
 		if c.nilValue {
-			ydbval := &Ydb.Value{
-				Value: &Ydb.Value_NullFlagValue{},
-			}
+			ydbval := Ydb.Value_builder{
+				NullFlagValue: structpb.NullValue_NULL_VALUE.Enum(),
+			}.Build()
 			if c.testDefault {
 				var dv []byte
 
@@ -417,11 +379,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 			return ydbval, &dv
 		}
 		v := strconv.FormatUint(uint64(rv), 10)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			TextValue: proto.String(v),
+		}.Build()
 		src := []byte(v)
 		if c.optional && !c.testDefault {
 			vp := &src
@@ -432,11 +392,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &src
 	case Ydb.Type_JSON:
 		v := strconv.FormatUint(uint64(rv), 10)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			TextValue: proto.String(v),
+		}.Build()
 		if c.ydbvalue {
 			vp := types.JSONValue(v)
 
@@ -452,9 +410,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &src
 	case Ydb.Type_UUID:
 		if c.nilValue {
-			ydbval := &Ydb.Value{
-				Value: &Ydb.Value_NullFlagValue{},
-			}
+			ydbval := Ydb.Value_builder{
+				NullFlagValue: structpb.NullValue_NULL_VALUE.Enum(),
+			}.Build()
 			if c.testDefault {
 				var dv uuid.UUID
 
@@ -469,12 +427,10 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		binary.LittleEndian.PutUint64(v[0:8], uint64(rv))
 		binary.LittleEndian.PutUint64(v[8:16], uint64(rv))
 		low, high := value.UUIDToHiLoPair(v)
-		ydbval := &Ydb.Value{
+		ydbval := Ydb.Value_builder{
 			High_128: high,
-			Value: &Ydb.Value_Low_128{
-				Low_128: low,
-			},
-		}
+			Low_128:  proto.Uint64(low),
+		}.Build()
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -484,11 +440,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &v
 	case Ydb.Type_JSON_DOCUMENT:
 		v := strconv.FormatUint(uint64(rv), 10)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			TextValue: proto.String(v),
+		}.Build()
 		src := []byte(v)
 		if c.optional && !c.testDefault {
 			vp := &src
@@ -499,11 +453,9 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 		return ydbval, &src
 	case Ydb.Type_DYNUMBER:
 		v := strconv.FormatUint(uint64(rv), 10)
-		ydbval := &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		}
+		ydbval := Ydb.Value_builder{
+			TextValue: proto.String(v),
+		}.Build()
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -519,27 +471,23 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, any) {
 func getResultSet(count int, col []*column) (result *Ydb.ResultSet, testValues [][]indexed.RequiredOrOptional) {
 	result = &Ydb.ResultSet{}
 	for _, c := range col {
-		t := &Ydb.Type{
-			Type: &Ydb.Type_TypeId{
-				TypeId: c.typeID,
-			},
-		}
+		t := Ydb.Type_builder{
+			TypeId: c.typeID.Enum(),
+		}.Build()
 		if c.optional {
-			t = &Ydb.Type{
-				Type: &Ydb.Type_OptionalType{
-					OptionalType: &Ydb.OptionalType{
-						Item: t,
-					},
-				},
-			}
+			t = Ydb.Type_builder{
+				OptionalType: Ydb.OptionalType_builder{
+					Item: t,
+				}.Build(),
+			}.Build()
 		}
-		result.Columns = append(
+		result.SetColumns(append(
 			result.GetColumns(),
-			&Ydb.Column{
+			Ydb.Column_builder{
 				Name: c.name,
 				Type: t,
-			},
-		)
+			}.Build(),
+		))
 	}
 
 	r := xrand.New(xrand.WithLock())
@@ -552,9 +500,9 @@ func getResultSet(count int, col []*column) (result *Ydb.ResultSet, testValues [
 			vals = append(vals, val)
 			items = append(items, v)
 		}
-		result.Rows = append(result.GetRows(), &Ydb.Value{
+		result.SetRows(append(result.GetRows(), Ydb.Value_builder{
 			Items: items,
-		})
+		}.Build()))
 		testValues[i] = vals
 	}
 

@@ -105,9 +105,9 @@ func (m mockDiscoveryService) ListEndpoints(
 	ctx context.Context,
 	request *Ydb_Discovery.ListEndpointsRequest,
 ) (*Ydb_Discovery.ListEndpointsResponse, error) {
-	res := &Ydb_Discovery.ListEndpointsResult{
+	res := Ydb_Discovery.ListEndpointsResult_builder{
 		Endpoints: []*Ydb_Discovery.EndpointInfo{
-			{
+			Ydb_Discovery.EndpointInfo_builder{
 				Address:    m.host,
 				Port:       m.port,
 				LoadFactor: 0,
@@ -116,18 +116,18 @@ func (m mockDiscoveryService) ListEndpoints(
 				Location:   "",
 				NodeId:     1,
 				IpV4:       []string{"127.0.0.1"},
-			},
+			}.Build(),
 		},
 		SelfLocation: "",
-	}
-	resp := &Ydb_Discovery.ListEndpointsResponse{
-		Operation: &Ydb_Operations.Operation{
+	}.Build()
+	resp := Ydb_Discovery.ListEndpointsResponse_builder{
+		Operation: Ydb_Operations.Operation_builder{
 			Id:     "test-list-operation",
 			Ready:  true,
 			Status: Ydb.StatusIds_SUCCESS,
 			Result: &anypb.Any{},
-		},
-	}
+		}.Build(),
+	}.Build()
 	err := resp.GetOperation().GetResult().MarshalFrom(res)
 
 	return resp, err

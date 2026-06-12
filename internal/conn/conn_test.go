@@ -53,18 +53,19 @@ func TestConn(t *testing.T) {
 			cc.EXPECT().Invoke(
 				gomock.Any(),
 				Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
-				&Ydb_Discovery.WhoAmIRequest{},
-				&Ydb_Discovery.WhoAmIResponse{},
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
 			).DoAndReturn(func(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
 				res, ok := reply.(*Ydb_Discovery.WhoAmIResponse)
 				if !ok {
 					return fmt.Errorf("reply is not *Ydb_Discovery.WhoAmIResponse: %T", reply)
 				}
 
-				res.Operation = &Ydb_Operations.Operation{
+				res.SetOperation(Ydb_Operations.Operation_builder{
 					Ready:  true,
 					Status: Ydb.StatusIds_SUCCESS,
-				}
+				}.Build())
 
 				return nil
 			})
@@ -83,8 +84,9 @@ func TestConn(t *testing.T) {
 			cc.EXPECT().Invoke(
 				gomock.Any(),
 				Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
-				&Ydb_Discovery.WhoAmIRequest{},
-				&Ydb_Discovery.WhoAmIResponse{},
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
 			).Return(expectedErr)
 			client := Ydb_Discovery_V1.NewDiscoveryServiceClient(&connMock{
 				cc,
@@ -103,8 +105,9 @@ func TestConn(t *testing.T) {
 			cc.EXPECT().Invoke(
 				gomock.Any(),
 				Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
-				&Ydb_Discovery.WhoAmIRequest{},
-				&Ydb_Discovery.WhoAmIResponse{},
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
 			).Return(grpcStatus.Error(grpcCodes.Canceled, "rpc canceled"))
 
 			client := Ydb_Discovery_V1.NewDiscoveryServiceClient(&connMock{
@@ -124,18 +127,19 @@ func TestConn(t *testing.T) {
 				cc.EXPECT().Invoke(
 					gomock.Any(),
 					Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
-					&Ydb_Discovery.WhoAmIRequest{},
-					&Ydb_Discovery.WhoAmIResponse{},
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
 				).DoAndReturn(func(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
 					res, ok := reply.(*Ydb_Discovery.WhoAmIResponse)
 					if !ok {
 						return fmt.Errorf("reply is not *Ydb_Discovery.WhoAmIResponse: %T", reply)
 					}
 
-					res.Operation = &Ydb_Operations.Operation{
+					res.SetOperation(Ydb_Operations.Operation_builder{
 						Ready:  true,
 						Status: Ydb.StatusIds_UNAVAILABLE,
-					}
+					}.Build())
 
 					return nil
 				})
@@ -152,15 +156,16 @@ func TestConn(t *testing.T) {
 				cc.EXPECT().Invoke(
 					gomock.Any(),
 					Ydb_Query_V1.QueryService_BeginTransaction_FullMethodName,
-					&Ydb_Query.BeginTransactionRequest{},
-					&Ydb_Query.BeginTransactionResponse{},
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
 				).DoAndReturn(func(ctx context.Context, method string, args any, reply any, opts ...grpc.CallOption) error {
 					res, ok := reply.(*Ydb_Query.BeginTransactionResponse)
 					if !ok {
 						return fmt.Errorf("reply is not *Ydb_Query.BeginTransactionResponse: %T", reply)
 					}
 
-					res.Status = Ydb.StatusIds_UNAVAILABLE
+					res.SetStatus(Ydb.StatusIds_UNAVAILABLE)
 
 					return nil
 				})
@@ -231,13 +236,13 @@ func TestMarkContext(t *testing.T) {
 
 func TestReplyWrapper(t *testing.T) {
 	t.Run("OperationResponse", func(t *testing.T) {
-		resp := &Ydb_Discovery.WhoAmIResponse{
-			Operation: &Ydb_Operations.Operation{
+		resp := Ydb_Discovery.WhoAmIResponse_builder{
+			Operation: Ydb_Operations.Operation_builder{
 				Id:     "test-op-id",
 				Ready:  true,
 				Status: Ydb.StatusIds_SUCCESS,
-			},
-		}
+			}.Build(),
+		}.Build()
 
 		opID, issues := replyWrapper(resp)
 		require.Equal(t, "test-op-id", opID)
@@ -245,9 +250,9 @@ func TestReplyWrapper(t *testing.T) {
 	})
 
 	t.Run("StatusResponse", func(t *testing.T) {
-		resp := &Ydb_Query.BeginTransactionResponse{
+		resp := Ydb_Query.BeginTransactionResponse_builder{
 			Status: Ydb.StatusIds_SUCCESS,
-		}
+		}.Build()
 
 		opID, issues := replyWrapper(resp)
 		require.Empty(t, opID)

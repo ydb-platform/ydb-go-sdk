@@ -34,12 +34,12 @@ func TestBegin(t *testing.T) {
 		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
-		client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.BeginTransactionResponse{
+		client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(Ydb_Query.BeginTransactionResponse_builder{
 			Status: Ydb.StatusIds_SUCCESS,
-			TxMeta: &Ydb_Query.TransactionMeta{
+			TxMeta: Ydb_Query.TransactionMeta_builder{
 				Id: "123",
-			},
-		}, nil)
+			}.Build(),
+		}.Build(), nil)
 		t.Log("begin")
 		txID, err := begin(ctx, newTestSessionWithClient("123", client, false), query.TxSettings())
 		require.NoError(t, err)
@@ -75,9 +75,9 @@ func TestCommitTx(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
 		service.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(
-			&Ydb_Query.CommitTransactionResponse{
+			Ydb_Query.CommitTransactionResponse_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil,
+			}.Build(), nil,
 		)
 		t.Log("commit")
 		err := commitTx(ctx, service, "123", "456")
@@ -114,9 +114,9 @@ func TestTxOnCompleted(t *testing.T) {
 		e := fixenv.New(t)
 
 		QueryGrpcMock(e).EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(
-			&Ydb_Query.CommitTransactionResponse{
+			Ydb_Query.CommitTransactionResponse_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil,
+			}.Build(), nil,
 		)
 
 		tx := TransactionOverGrpcMock(e)
@@ -164,9 +164,9 @@ func TestTxOnCompleted(t *testing.T) {
 			) {
 				rollbackCalled = true
 
-				return &Ydb_Query.RollbackTransactionResponse{
+				return Ydb_Query.RollbackTransactionResponse_builder{
 					Status: Ydb.StatusIds_SUCCESS,
-				}, nil
+				}.Build(), nil
 			})
 
 		tx := TransactionOverGrpcMock(e)
@@ -185,9 +185,9 @@ func TestTxOnCompleted(t *testing.T) {
 		e := fixenv.New(t)
 
 		responseStream := newExecuteQueryStreamMock(MockController(e))
-		responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		responseStream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status: Ydb.StatusIds_SUCCESS,
-		}, nil)
+		}.Build(), nil)
 		responseStream.EXPECT().Recv().Return(nil, io.EOF)
 
 		QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
@@ -207,9 +207,9 @@ func TestTxOnCompleted(t *testing.T) {
 		e := fixenv.New(t)
 
 		responseStream := newExecuteQueryStreamMock(MockController(e))
-		responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		responseStream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status: Ydb.StatusIds_SUCCESS,
-		}, nil)
+		}.Build(), nil)
 
 		QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
 
@@ -229,9 +229,9 @@ func TestTxOnCompleted(t *testing.T) {
 			e := fixenv.New(t)
 
 			responseStream := newExecuteQueryStreamMock(MockController(e))
-			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			responseStream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil)
+			}.Build(), nil)
 			responseStream.EXPECT().Recv().Return(nil, io.EOF)
 
 			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
@@ -256,9 +256,9 @@ func TestTxOnCompleted(t *testing.T) {
 			e := fixenv.New(t)
 
 			responseStream := newExecuteQueryStreamMock(MockController(e))
-			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			responseStream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil)
+			}.Build(), nil)
 			responseStream.EXPECT().Recv().Return(nil, io.EOF)
 
 			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
@@ -289,9 +289,9 @@ func TestTxOnCompleted(t *testing.T) {
 			e := fixenv.New(t)
 
 			responseStream := newExecuteQueryStreamMock(MockController(e))
-			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			responseStream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil)
+			}.Build(), nil)
 			responseStream.EXPECT().Recv().Return(nil, io.EOF)
 
 			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
@@ -319,9 +319,9 @@ func TestTxOnCompleted(t *testing.T) {
 			e := fixenv.New(t)
 
 			responseStream := newExecuteQueryStreamMock(MockController(e))
-			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			responseStream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil)
+			}.Build(), nil)
 			responseStream.EXPECT().Recv().Return(nil, io.EOF)
 
 			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
@@ -355,15 +355,15 @@ func TestTxOnCompleted(t *testing.T) {
 			e := fixenv.New(t)
 
 			responseStream := newExecuteQueryStreamMock(MockController(e))
-			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			responseStream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				ResultSetIndex: 0,
 				ResultSet:      &Ydb.ResultSet{},
-			}, nil)
-			responseStream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			}.Build(), nil)
+			responseStream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 1,
 				ResultSet:      &Ydb.ResultSet{},
-			}, nil)
+			}.Build(), nil)
 			responseStream.EXPECT().Recv().Return(nil, io.EOF)
 
 			QueryGrpcMock(e).EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(responseStream, nil)
@@ -470,9 +470,9 @@ func TestRollback(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
 		service.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(
-			&Ydb_Query.RollbackTransactionResponse{
+			Ydb_Query.RollbackTransactionResponse_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil,
+			}.Build(), nil,
 		)
 		t.Log("rollback")
 		err := rollback(ctx, service, "123", "456")
@@ -531,9 +531,9 @@ func TestTransactionOnBeforeCommit(t *testing.T) {
 
 	// Setup commit expectation
 	client := QueryGrpcMock(e)
-	client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
+	client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(Ydb_Query.CommitTransactionResponse_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-	}, nil)
+	}.Build(), nil)
 
 	err := tx.CommitTx(ctx)
 	require.NoError(t, err)

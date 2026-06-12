@@ -67,7 +67,7 @@ func (c *Client) execute(ctx context.Context, sql string, parameters *params.Par
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).execute"),
 			sql, parameters,
 		)
-		request = &Ydb_Scripting.ExecuteYqlRequest{
+		request = Ydb_Scripting.ExecuteYqlRequest_builder{
 			Script: sql,
 			OperationParams: operation.Params(
 				ctx,
@@ -75,7 +75,7 @@ func (c *Client) execute(ctx context.Context, sql string, parameters *params.Par
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
-		}
+		}.Build()
 		result   = Ydb_Scripting.ExecuteYqlResult{}
 		response *Ydb_Scripting.ExecuteYqlResponse
 	)
@@ -88,7 +88,7 @@ func (c *Client) execute(ctx context.Context, sql string, parameters *params.Par
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	request.Parameters = params
+	request.SetParameters(params)
 
 	response, err = c.service.ExecuteYql(ctx, request)
 	if err != nil {
@@ -148,7 +148,7 @@ func (c *Client) explain(ctx context.Context, sql string, mode scripting.Explain
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).explain"),
 			sql,
 		)
-		request = &Ydb_Scripting.ExplainYqlRequest{
+		request = Ydb_Scripting.ExplainYqlRequest_builder{
 			Script: sql,
 			Mode:   mode2mode(mode),
 			OperationParams: operation.Params(
@@ -157,7 +157,7 @@ func (c *Client) explain(ctx context.Context, sql string, mode scripting.Explain
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
-		}
+		}.Build()
 		response *Ydb_Scripting.ExplainYqlResponse
 		result   = Ydb_Scripting.ExplainYqlResult{}
 	)
@@ -220,7 +220,7 @@ func (c *Client) streamExecute(ctx context.Context, sql string, parameters *para
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting.(*Client).streamExecute"),
 			sql, parameters,
 		)
-		request = &Ydb_Scripting.ExecuteYqlRequest{
+		request = Ydb_Scripting.ExecuteYqlRequest_builder{
 			Script: sql,
 			OperationParams: operation.Params(
 				ctx,
@@ -228,7 +228,7 @@ func (c *Client) streamExecute(ctx context.Context, sql string, parameters *para
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
-		}
+		}.Build()
 	)
 	defer func() {
 		if err != nil {
@@ -241,7 +241,7 @@ func (c *Client) streamExecute(ctx context.Context, sql string, parameters *para
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	request.Parameters = params
+	request.SetParameters(params)
 
 	ctx, cancel := xcontext.WithCancel(ctx)
 

@@ -81,11 +81,11 @@ func (c *SupportedCodecs) IsEqualsTo(other SupportedCodecs) bool {
 
 func (c *SupportedCodecs) ToProto() *Ydb_Topic.SupportedCodecs {
 	codecs := *c
-	proto := &Ydb_Topic.SupportedCodecs{
+	proto := Ydb_Topic.SupportedCodecs_builder{
 		Codecs: make([]int32, len(codecs)),
-	}
+	}.Build()
 	for i := range codecs {
-		proto.Codecs[i] = int32(codecs[i].ToProto().Number())
+		proto.GetCodecs()[i] = int32(codecs[i].ToProto().Number())
 	}
 
 	return proto
