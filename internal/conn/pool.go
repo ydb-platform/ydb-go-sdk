@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -89,7 +90,7 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		return
 	}
 
-	trace.DriverOnConnBan(
+	gtrace.DriverOnConnBan(
 		p.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Ban"),
 		cc.Endpoint().Copy(), cc.GetState(), cause,
@@ -108,7 +109,7 @@ func (p *Pool) Allow(ctx context.Context, cc Conn) {
 		return
 	}
 
-	trace.DriverOnConnAllow(
+	gtrace.DriverOnConnAllow(
 		p.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Allow"),
 		e, cc.GetState(),
@@ -122,7 +123,7 @@ func (p *Pool) Take(context.Context) error {
 }
 
 func (p *Pool) Release(ctx context.Context) (finalErr error) {
-	onDone := trace.DriverOnPoolRelease(p.config.Trace(), &ctx,
+	onDone := gtrace.DriverOnPoolRelease(p.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Release"),
 	)
 	defer func() {
@@ -193,7 +194,7 @@ func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 type poolOption func(p *Pool)
 
 func NewPool(ctx context.Context, config Config, opts ...poolOption) *Pool {
-	onDone := trace.DriverOnPoolNew(config.Trace(), &ctx,
+	onDone := gtrace.DriverOnPoolNew(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.NewPool"),
 	)
 	defer onDone()
@@ -212,7 +213,7 @@ func NewPool(ctx context.Context, config Config, opts ...poolOption) *Pool {
 
 	p.dialOptions = append(p.dialOptions,
 		grpc.WithResolvers(
-			xresolver.New("", config.Trace().Compose(&trace.Driver{
+			xresolver.New("", gtrace.Compose(config.Trace(), &trace.Driver{
 				OnResolve: func(info trace.DriverResolveStartInfo) func(trace.DriverResolveDoneInfo) {
 					target := info.Target
 					resolved := info.Resolved

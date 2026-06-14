@@ -21,6 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -401,7 +402,7 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 		sessionID = w.sessionID
 	})
 	logCtx := w.cfg.LogContext
-	onCompressDone := trace.TopicOnWriterCompressMessages(
+	onCompressDone := gtrace.TopicOnWriterCompressMessages(
 		w.cfg.Tracer,
 		&logCtx,
 		w.writerInstanceID,
@@ -447,7 +448,7 @@ func (w *WriterReconnector) Close(ctx context.Context) error {
 func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr error) {
 	defer func() {
 		logCtx := w.cfg.LogContext
-		trace.TopicOnWriterClose(w.cfg.Tracer, &logCtx, w.writerInstanceID, reason)
+		gtrace.TopicOnWriterClose(w.cfg.Tracer, &logCtx, w.writerInstanceID, reason)
 	}()
 
 	// stop background work and single stream writer
@@ -504,7 +505,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		}
 
 		logCtx := w.cfg.LogContext
-		onWriterStarted := trace.TopicOnWriterReconnect(
+		onWriterStarted := gtrace.TopicOnWriterReconnect(
 			w.cfg.Tracer,
 			&logCtx,
 			w.writerInstanceID,

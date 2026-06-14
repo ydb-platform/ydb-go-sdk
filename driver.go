@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
@@ -148,7 +149,7 @@ func (b *balancerWithMeta) Close(ctx context.Context) error {
 //
 //nolint:nonamedreturns
 func (d *Driver) Close(ctx context.Context) (finalErr error) {
-	onDone := trace.DriverOnClose(d.config.Trace(), &ctx,
+	onDone := gtrace.DriverOnClose(d.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/ydb.(*Driver).Close"),
 	)
 	defer func() {
@@ -302,7 +303,7 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	onDone := trace.DriverOnInit(
+	onDone := gtrace.DriverOnInit(
 		d.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/ydb.Open"),
 		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
@@ -344,7 +345,7 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	onDone := trace.DriverOnInit(
+	onDone := gtrace.DriverOnInit(
 		d.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/ydb.New"),
 		d.config.Endpoint(), d.config.Database(), d.config.Secure(),

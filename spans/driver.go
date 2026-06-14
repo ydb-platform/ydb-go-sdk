@@ -5,9 +5,13 @@ import (
 	"context"
 	"fmt"
 	"hash/crc32"
+	"net"
+	"strconv"
+	"strings"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -36,7 +40,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
 			return func(info trace.DriverRepeaterWakeUpDoneInfo) {
@@ -47,96 +51,93 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			}
 		},
 		OnConnDial: func(info trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
+			// We don't create a child span for the gRPC dial — it would
+			// pollute the user-facing span tree. We only inject the W3C
+			// `traceparent` header so server-side YDB spans link to the
+			// caller's trace.
 			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			if traceID, valid := adapter.SpanFromContext(*info.Context).TraceID(); valid {
-				*info.Context = meta.WithTraceParent(*info.Context, traceID)
+			if traceID, valid := adapter.SpanFromContext(safeContextPtr(info.Context)).TraceID(); valid {
+				withContextPtr(info.Context, func(c context.Context) context.Context {
+					return meta.WithTraceParent(c, traceID)
+				})
 			}
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
-			)
 
-			return func(info trace.DriverConnDialDoneInfo) {
-				finish(
-					start,
-					info.Error,
-				)
-			}
+			return nil
 		},
 		OnConnInvoke: func(info trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
+			// The QueryService unary RPC. Instead of a child span, attach
+			// network.peer.address / network.peer.port to the surrounding
+			// client span (e.g. ydb.CreateSession, ydb.Commit) and inject
+			// traceparent so the server sees this RPC as a child of that
+			// span.
 			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
-				kv.String("address", safeAddress(info.Endpoint)),
-				kv.String("method", string(info.Method)),
-			)
-
-			if id, valid := start.ID(); valid {
-				if traceID, valid := start.TraceID(); valid {
-					*info.Context = meta.WithTraceParent(*info.Context, traceparent(traceID, id))
+			parent := adapter.SpanFromContext(safeContextPtr(info.Context))
+			annotateNetworkPeer(parent, info.Endpoint)
+			// Also propagate the same peer/node attributes up to the
+			// surrounding top-level CLIENT span (e.g. the outer
+			// ydb.ExecuteQuery span emitted by OnExec/OnQuery/...) so that
+			// every ydb.* CLIENT span carries ydb.node.id / ydb.node.dc
+			// alongside network.peer.* — see the documentation block at
+			// the top of spans/query.go.
+			if clientSpan := clientSpanFromContext(safeContextPtr(info.Context)); clientSpan != nil {
+				annotateNetworkPeer(clientSpan, info.Endpoint)
+			}
+			if id, valid := parent.ID(); valid {
+				if traceID, valid := parent.TraceID(); valid {
+					withContextPtr(info.Context, func(c context.Context) context.Context {
+						return meta.WithTraceParent(c, traceparent(traceID, id))
+					})
 				}
 			}
 
 			return func(info trace.DriverConnInvokeDoneInfo) {
-				fields := []KeyValue{
-					kv.String("opID", info.OpID),
-					kv.String("state", safeStringer(info.State)),
-				}
-				if len(info.Issues) > 0 {
+				if info.Error != nil {
+					logError(parent, info.Error)
+				} else if len(info.Issues) > 0 {
 					issues := make([]string, len(info.Issues))
 					for i, issue := range info.Issues {
 						issues[i] = fmt.Sprintf("%+v", issue)
 					}
-					fields = append(fields,
-						kv.Strings("issues", issues),
-					)
+					parent.Log("conn.Invoke issues", kv.Strings("issues", issues))
 				}
-				finish(
-					start,
-					info.Error,
-					fields...,
-				)
 			}
 		},
 		OnConnNewStream: func(info trace.DriverConnNewStreamStartInfo) func(trace.DriverConnNewStreamDoneInfo) {
+			// The QueryService streaming RPC. Same treatment as Invoke:
+			// no child span, just augment the parent client span.
 			if adapter.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
-			*info.Context = withGrpcStreamMsgCounters(*info.Context)
-			start := childSpanWithReplaceCtx(
-				adapter,
-				info.Context,
-				info.Call.String(),
-				kv.String("address", safeAddress(info.Endpoint)),
-				kv.String("method", string(info.Method)),
-			)
-
-			if id, valid := start.ID(); valid {
-				if traceID, valid := start.TraceID(); valid {
-					*info.Context = meta.WithTraceParent(*info.Context, traceparent(traceID, id))
+			withContextPtr(info.Context, withGrpcStreamMsgCounters)
+			parent := adapter.SpanFromContext(safeContextPtr(info.Context))
+			annotateNetworkPeer(parent, info.Endpoint)
+			if clientSpan := clientSpanFromContext(safeContextPtr(info.Context)); clientSpan != nil {
+				annotateNetworkPeer(clientSpan, info.Endpoint)
+			}
+			if id, valid := parent.ID(); valid {
+				if traceID, valid := parent.TraceID(); valid {
+					withContextPtr(info.Context, func(c context.Context) context.Context {
+						return meta.WithTraceParent(c, traceparent(traceID, id))
+					})
 				}
 			}
 
 			return func(info trace.DriverConnNewStreamDoneInfo) {
-				finish(start, info.Error,
-					kv.String("state", safeStringer(info.State)),
-				)
+				if info.Error != nil {
+					logError(parent, info.Error)
+				}
 			}
 		},
 		OnConnStreamRecvMsg: func(info trace.DriverConnStreamRecvMsgStartInfo) func(trace.DriverConnStreamRecvMsgDoneInfo) {
 			if adapter.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
-			start := adapter.SpanFromContext(*info.Context)
-			counters := grpcStreamMsgCountersFromContext(*info.Context)
+			start := adapter.SpanFromContext(safeContextPtr(info.Context))
+			counters := grpcStreamMsgCountersFromContext(safeContextPtr(info.Context))
 			if counters != nil {
 				counters.updateReceivedMessages()
 			}
@@ -151,8 +152,8 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			if adapter.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
-			start := adapter.SpanFromContext(*info.Context)
-			counters := grpcStreamMsgCountersFromContext(*info.Context)
+			start := adapter.SpanFromContext(safeContextPtr(info.Context))
+			counters := grpcStreamMsgCountersFromContext(safeContextPtr(info.Context))
 			if counters != nil {
 				counters.updateSentMessages()
 			}
@@ -172,12 +173,12 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 
 			var (
 				call  = info.Call
-				start = adapter.SpanFromContext(*info.Context)
+				start = adapter.SpanFromContext(safeContextPtr(info.Context))
 			)
 
 			return func(info trace.DriverConnStreamCloseSendDoneInfo) {
 				if info.Error != nil {
-					start.Log(call.String(), kv.Error(info.Error))
+					start.Log(safeCall(call), kv.Error(info.Error))
 				}
 			}
 		},
@@ -188,8 +189,9 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 
 			var (
 				call     = info.Call
-				start    = adapter.SpanFromContext(info.Context)
-				counters = grpcStreamMsgCountersFromContext(info.Context)
+				ctx      = safeContext(info.Context)
+				start    = adapter.SpanFromContext(ctx)
+				counters = grpcStreamMsgCountersFromContext(ctx)
 			)
 
 			attributes := make([]kv.KeyValue, 0, 2)
@@ -204,7 +206,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 				attributes = append(attributes, kv.Error(info.Error))
 			}
 
-			start.Log(call.String(), attributes...)
+			start.Log(safeCall(call), attributes...)
 		},
 		OnConnPark: func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
 			if adapter.Details()&trace.DriverConnEvents == 0 {
@@ -213,14 +215,14 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 
 			var (
 				call  = info.Call
-				start = adapter.SpanFromContext(*info.Context)
+				start = adapter.SpanFromContext(safeContextPtr(info.Context))
 			)
 
 			return func(info trace.DriverConnParkDoneInfo) {
 				if info.Error != nil {
-					start.Log(call.String(), kv.Error(info.Error))
+					start.Log(safeCall(call), kv.Error(info.Error))
 				} else {
-					start.Log(call.String())
+					start.Log(safeCall(call))
 				}
 			}
 		},
@@ -231,14 +233,14 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 
 			var (
 				call  = info.Call
-				start = adapter.SpanFromContext(*info.Context)
+				start = adapter.SpanFromContext(safeContextPtr(info.Context))
 			)
 
 			return func(info trace.DriverConnCloseDoneInfo) {
 				if info.Error != nil {
-					start.Log(call.String(), kv.Error(info.Error))
+					start.Log(safeCall(call), kv.Error(info.Error))
 				} else {
-					start.Log(call.String())
+					start.Log(safeCall(call))
 				}
 			}
 		},
@@ -246,8 +248,8 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			s := adapter.SpanFromContext(*info.Context)
-			s.Log(info.Call.String(),
+			s := adapter.SpanFromContext(safeContextPtr(info.Context))
+			s.Log(safeCall(info.Call),
 				kv.String("cause", safeError(info.Cause)),
 			)
 
@@ -257,9 +259,9 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			if adapter.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
-			s := adapter.SpanFromContext(*info.Context)
+			s := adapter.SpanFromContext(safeContextPtr(info.Context))
 			oldState := safeStringer(info.State)
-			functionID := info.Call.String()
+			functionID := safeCall(info.Call)
 
 			return func(info trace.DriverConnStateChangeDoneInfo) {
 				s.Log(functionID,
@@ -275,7 +277,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.String("name", info.Name),
 			)
 
@@ -289,10 +291,23 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			if adapter.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
+			// Driver bootstrap fires the trace event from two places:
+			//   - clusterDiscoveryAttemptWithDial (outer, also responsible
+			//     for opening the gRPC connection)
+			//   - clusterDiscoveryAttempt (inner, called from the outer one)
+			// We only want a single ydb.Driver.Initialize span, and only on
+			// the very first init — periodic discovery refreshes triggered
+			// by the repeater come with EventTick / EventForce and must not
+			// produce a span.
+			isOuter := strings.HasSuffix(safeCall(info.Call), "clusterDiscoveryAttemptWithDial")
+			isInit := repeater.EventType(safeContextPtr(info.Context)) == repeater.EventInit
+			if !isOuter || !isInit {
+				return nil
+			}
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
+				SpanNameDriverInitialize,
 				kv.String("address", info.Address),
 			)
 
@@ -305,25 +320,32 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 				return nil
 			}
 			start := childSpanWithReplaceCtx(adapter, info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.String("database", info.Database),
 				kv.Bool("need_local_dc", info.NeedLocalDC),
 			)
 
 			return func(info trace.DriverBalancerUpdateDoneInfo) {
-				var (
-					endpoints = make([]string, len(info.Endpoints))
-					added     = make([]string, len(info.Added))
-					dropped   = make([]string, len(info.Dropped))
-				)
-				for i, e := range info.Endpoints {
-					endpoints[i] = e.String()
+				endpoints := make([]string, 0, len(info.Endpoints))
+				added := make([]string, 0, len(info.Added))
+				dropped := make([]string, 0, len(info.Dropped))
+				for _, e := range info.Endpoints {
+					if isNil(e) {
+						continue
+					}
+					endpoints = append(endpoints, e.String())
 				}
-				for i, e := range info.Added {
-					added[i] = e.String()
+				for _, e := range info.Added {
+					if isNil(e) {
+						continue
+					}
+					added = append(added, e.String())
 				}
-				for i, e := range info.Dropped {
-					dropped[i] = e.String()
+				for _, e := range info.Dropped {
+					if isNil(e) {
+						continue
+					}
+					dropped = append(dropped, e.String())
 				}
 				start.Log(fmt.Sprintf("endpoints=%v", endpoints))
 				start.Log(fmt.Sprintf("added=%v", added))
@@ -341,8 +363,8 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			if adapter.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
-			parent := adapter.SpanFromContext(*info.Context)
-			functionID := info.Call.String()
+			parent := adapter.SpanFromContext(safeContextPtr(info.Context))
+			functionID := safeCall(info.Call)
 
 			return func(info trace.DriverBalancerChooseEndpointDoneInfo) {
 				if info.Error != nil {
@@ -359,8 +381,8 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			if adapter.Details()&trace.DriverCredentialsEvents == 0 {
 				return nil
 			}
-			parent := adapter.SpanFromContext(*info.Context)
-			functionID := info.Call.String()
+			parent := adapter.SpanFromContext(safeContextPtr(info.Context))
+			functionID := safeCall(info.Call)
 
 			return func(info trace.DriverGetCredentialsDoneInfo) {
 				if info.Error != nil {
@@ -388,7 +410,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.String("endpoint", info.Endpoint),
 				kv.String("database", info.Database),
 				kv.Bool("secure", info.Secure),
@@ -405,7 +427,7 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
 			return func(info trace.DriverCloseDoneInfo) {
@@ -419,13 +441,54 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
 			return func(info trace.DriverConnPoolNewDoneInfo) {
 				start.End()
 			}
 		},
+	}
+}
+
+// annotateNetworkPeer attaches network.peer.address / network.peer.port to
+// the given span based on the actual endpoint chosen for the RPC. The
+// address comes in `host:port` form (e.g. "8e5d46f58bc6:2136"); we split
+// it so the span has both attributes per OTel semantic conventions.
+//
+// Additionally, endpoint metadata is attached as YDB-specific attributes.
+func annotateNetworkPeer(s Span, endpoint trace.EndpointInfo) {
+	if isNil(endpoint) {
+		return
+	}
+	addr := endpoint.Address()
+	if addr == "" {
+		return
+	}
+	attrs := make([]KeyValue, 0, 4)
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		attrs = append(attrs, kv.String(AttrNetworkPeerAddress, addr))
+	} else {
+		attrs = append(attrs, kv.String(AttrNetworkPeerAddress, host))
+		if port, err := strconv.Atoi(portStr); err == nil {
+			attrs = append(attrs, kv.Int(AttrNetworkPeerPort, port))
+		}
+	}
+	attrs = append(attrs,
+		kv.String(AttrYDBNodeDC, endpoint.Location()),
+		kv.Int64(AttrYDBNodeID, int64(endpoint.NodeID())),
+	)
+	setSpanAttributes(s, attrs...)
+}
+
+type spanAttributesSetter interface {
+	SetAttributes(attributes ...KeyValue)
+}
+
+func setSpanAttributes(s Span, attrs ...KeyValue) {
+	if setter, ok := s.(spanAttributesSetter); ok {
+		setter.SetAttributes(attrs...)
 	}
 }
 

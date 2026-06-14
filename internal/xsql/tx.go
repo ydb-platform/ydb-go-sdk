@@ -8,7 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/gtrace"
 )
 
 type Tx struct {
@@ -38,7 +38,7 @@ func (tx *Tx) Commit() (finalErr error) {
 
 	var (
 		ctx    = tx.ctx
-		onDone = trace.DatabaseSQLOnTxCommit(tx.conn.connector.Trace(), &ctx,
+		onDone = gtrace.DatabaseSQLOnTxCommit(tx.conn.connector.Trace(), &ctx,
 			stack.FunctionID("database/sql.(*Tx).Commit" /*stack.Package("database/sql")*/),
 			tx,
 		)
@@ -61,7 +61,7 @@ func (tx *Tx) Rollback() (finalErr error) {
 
 	var (
 		ctx    = tx.ctx
-		onDone = trace.DatabaseSQLOnTxRollback(tx.conn.connector.Trace(), &ctx,
+		onDone = gtrace.DatabaseSQLOnTxRollback(tx.conn.connector.Trace(), &ctx,
 			stack.FunctionID("database/sql.(*Tx).Rollback" /*stack.Package("database/sql")*/),
 			tx,
 		)
@@ -81,7 +81,7 @@ func (tx *Tx) Rollback() (finalErr error) {
 func (tx *Tx) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (
 	_ driver.Rows, finalErr error,
 ) {
-	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.connector.Trace(), &ctx,
+	onDone := gtrace.DatabaseSQLOnTxQuery(tx.conn.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Tx).QueryContext" /*stack.Package("database/sql")*/),
 		tx.ctx, tx, sql,
 	)
@@ -114,7 +114,7 @@ func (tx *Tx) QueryContext(ctx context.Context, sql string, args []driver.NamedV
 func (tx *Tx) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (
 	_ driver.Result, finalErr error,
 ) {
-	onDone := trace.DatabaseSQLOnTxExec(tx.conn.connector.Trace(), &ctx,
+	onDone := gtrace.DatabaseSQLOnTxExec(tx.conn.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Tx).ExecContext" /*stack.Package("database/sql")*/),
 		tx.ctx, tx, sql,
 	)
@@ -136,7 +136,7 @@ func (tx *Tx) ExecContext(ctx context.Context, sql string, args []driver.NamedVa
 }
 
 func (tx *Tx) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, finalErr error) {
-	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.connector.Trace(), &ctx,
+	onDone := gtrace.DatabaseSQLOnTxPrepare(tx.conn.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Tx).PrepareContext" /*stack.Package("database/sql")*/),
 		tx.ctx, tx, sql,
 	)

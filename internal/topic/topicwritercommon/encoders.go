@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -198,7 +199,7 @@ func (s *EncoderSelector) CompressMessages(messages []MessageWithDataContent) (r
 	codec, err := s.selectCodec(messages)
 	if err == nil {
 		logCtx := s.logContext
-		onCompressDone := trace.TopicOnWriterCompressMessages(
+		onCompressDone := gtrace.TopicOnWriterCompressMessages(
 			s.tracer,
 			&logCtx,
 			s.writerReconnectorID,
@@ -270,7 +271,7 @@ func (s *EncoderSelector) measureCodecs(messages []MessageWithDataContent) (rawt
 			firstSeqNo = messages[0].SeqNo
 		}
 		logCtx := s.logContext
-		onCompressDone := trace.TopicOnWriterCompressMessages(
+		onCompressDone := gtrace.TopicOnWriterCompressMessages(
 			s.tracer,
 			&logCtx,
 			s.writerReconnectorID,

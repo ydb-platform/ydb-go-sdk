@@ -6,6 +6,7 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -107,9 +108,13 @@ func WithDeleteTimeout(deleteTimeout time.Duration) Option {
 }
 
 // WithTrace appends table trace to early defined traces
-func WithTrace(trace *trace.Table, opts ...trace.TableComposeOption) Option {
+func WithTrace(t *trace.Table) Option {
 	return func(c *Config) {
-		c.trace = c.trace.Compose(trace, opts...)
+		var opts []gtrace.TableComposeOption
+		if cb := c.PanicCallback(); cb != nil {
+			opts = append(opts, gtrace.WithTablePanicCallback(cb))
+		}
+		c.trace = gtrace.Compose(c.trace, t, opts...)
 	}
 }
 
