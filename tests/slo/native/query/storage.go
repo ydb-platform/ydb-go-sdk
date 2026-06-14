@@ -74,7 +74,7 @@ func NewStorage(ctx context.Context, fw *framework.Framework) (framework.Workloa
 	driver, err := ydb.Open(connectCtx,
 		fw.Config.Endpoint+fw.Config.Database,
 		ydb.WithRetryBudget(params.RetryBudget),
-		ydb.WithSessionPoolSizeLimit(100),
+		ydb.WithSessionPoolSizeLimit(12),
 	)
 	if err != nil {
 		return nil, err
