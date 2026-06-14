@@ -99,8 +99,8 @@ func NewStorage(ctx context.Context, fw *framework.Framework) (framework.Workloa
 	}
 
 	sqlDB := sql.OpenDB(connector)
-	sqlDB.SetMaxOpenConns(params.PoolSize())
-	sqlDB.SetMaxIdleConns(params.PoolSize())
+	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetMaxIdleConns(100)
 	sqlDB.SetConnMaxIdleTime(time.Second)
 
 	return kv.New(fw, params, &db{
