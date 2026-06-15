@@ -96,8 +96,8 @@ type directWrite struct {
 	// partitioning points at cfg.defaultPartitioning; updated when pinned by user or set from InitResponse.
 	partitioning *rawtopicwriter.Partitioning
 
-	// retryResetPending is set after a successful proxy probe; the next connect must not count as a failed retry.
-	retryResetPending bool
+	// retryResetAfterProbe is set after a successful proxy probe; the next connect must not count as a failed retry.
+	retryResetAfterProbe bool
 }
 
 func (dw *directWrite) finishInit(partitioning *rawtopicwriter.Partitioning) {
@@ -166,14 +166,16 @@ func (dw *directWrite) withPartitionNodeIDContext(
 
 func (dw *directWrite) completeProbe(streamCtx context.Context, writer *SingleStreamWriter) {
 	_ = writer.close(streamCtx, nil)
-	dw.retryResetPending = true
+	dw.retryResetAfterProbe = true
 }
 
-func (dw *directWrite) consumeRetryReset() bool {
-	if !dw.retryResetPending {
+// IsRetryResetAfterProbe reports whether reconnection attempt counters should be
+// reset after a successful proxy probe. The one-shot flag is cleared when read.
+func (dw *directWrite) IsRetryResetAfterProbe() bool {
+	if !dw.retryResetAfterProbe {
 		return false
 	}
-	dw.retryResetPending = false
+	dw.retryResetAfterProbe = false
 
 	return true
 }

@@ -46,7 +46,9 @@ var (
 	PublicRetryDecisionStop    = PublicCheckRetryResult{val: 2} //nolint:mnd
 )
 
-func CheckResetReconnectionCounters(lastTry, now time.Time, connectionTimeout time.Duration) bool {
+// IsReconnectionBackoffExpired reports whether enough time has passed since lastTry
+// to reset the reconnection attempt counter.
+func IsReconnectionBackoffExpired(lastTry, now time.Time, connectionTimeout time.Duration) bool {
 	const resetAttemptEmpiricalCoefficient = 10
 	if connectionTimeout == value.InfiniteDuration {
 		return now.Sub(lastTry) > connectionEstablishedTimeout

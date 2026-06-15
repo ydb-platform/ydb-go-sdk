@@ -506,9 +506,9 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		w.cfg.directWrite.resetPartitionFromInitOnFailure(reconnectReason, w.m.WithLock)
 
 		now := time.Now()
-		if w.cfg.directWrite.consumeRetryReset() ||
+		if w.cfg.directWrite.IsRetryResetAfterProbe() ||
 			startOfRetries.IsZero() ||
-			topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
+			topic.IsReconnectionBackoffExpired(prevAttemptTime, now, w.cfg.connectTimeout) {
 			attempt = 0
 			startOfRetries = w.cfg.clock.Now()
 		} else {
