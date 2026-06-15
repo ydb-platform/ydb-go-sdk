@@ -16,16 +16,13 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmock"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritetest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
@@ -45,7 +42,7 @@ const (
 // generation in InitRequest.
 func TestDirectWritePinnedPartitionConnectsToDescribeHost(t *testing.T) {
 	cluster := newDirectWriteCluster(testPartitionID, testHostNodeID, testInitialGen)
-	recorder := newStreamWriteRecorder()
+	recorder := topicwritetest.NewStreamWriteRecorder()
 
 	writer, ctx := startDirectWriteWriter(t, cluster, recorder,
 		topicoptions.WithWriterPartitionID(testPartitionID),
@@ -55,17 +52,18 @@ func TestDirectWritePinnedPartitionConnectsToDescribeHost(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, 1, cluster.describeCalls())
-	require.Equal(t, 1, recorder.sessionsCount())
-	require.Equal(t, uint32(testHostNodeID), recorder.lastSession().nodeID)
-	require.True(t, recorder.lastSession().disableFallback)
-	requireDirectInit(t, recorder.lastSession().initRequest, testPartitionID, testInitialGen)
+	require.Equal(t, 1, recorder.SessionsCount())
+	last := recorder.LastSession()
+	require.Equal(t, uint32(testHostNodeID), last.NodeID)
+	require.True(t, last.DisableFallback)
+	topicwritetest.RequireDirectInit(t, last.InitRequest, testPartitionID, testInitialGen)
 }
 
 // TestDirectWriteProducerProbeRebind discovers the partition through the proxy,
 // then reconnects directly to the partition host with generation from Describe.
 func TestDirectWriteProducerProbeRebind(t *testing.T) {
 	cluster := newDirectWriteCluster(testPartitionID, testHostNodeID, testInitialGen)
-	recorder := newStreamWriteRecorder()
+	recorder := topicwritetest.NewStreamWriteRecorder()
 
 	writer, ctx := startDirectWriteWriter(t, cluster, recorder,
 		topicoptions.WithWriterProducerID("producer-1"),
@@ -74,18 +72,18 @@ func TestDirectWriteProducerProbeRebind(t *testing.T) {
 	err := writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("payload")})
 	require.NoError(t, err)
 
-	require.Equal(t, 2, recorder.sessionsCount())
+	require.Equal(t, 2, recorder.SessionsCount())
 	require.Equal(t, 1, cluster.describeCalls())
 
-	probe := recorder.session(0)
-	require.False(t, probe.disableFallback, "first connect must go through proxy")
-	require.Nil(t, probe.initRequest.GetPartitionWithGeneration())
-	require.NotEmpty(t, probe.initRequest.GetMessageGroupId())
+	probe := recorder.Session(0)
+	require.False(t, probe.DisableFallback, "first connect must go through proxy")
+	require.Nil(t, probe.InitRequest.GetPartitionWithGeneration())
+	require.NotEmpty(t, probe.InitRequest.GetMessageGroupId())
 
-	direct := recorder.session(1)
-	require.True(t, direct.disableFallback)
-	require.Equal(t, uint32(testHostNodeID), direct.nodeID)
-	requireDirectInit(t, direct.initRequest, testPartitionID, testInitialGen)
+	direct := recorder.Session(1)
+	require.True(t, direct.DisableFallback)
+	require.Equal(t, uint32(testHostNodeID), direct.NodeID)
+	topicwritetest.RequireDirectInit(t, direct.InitRequest, testPartitionID, testInitialGen)
 }
 
 // TestDirectWriteStaleGenerationReconnect models a partition move between Describe
@@ -99,7 +97,7 @@ func TestDirectWriteStaleGenerationReconnect(t *testing.T) {
 			cluster.setPartitionLocation(testPartitionID, testMovedNodeID, testMovedGen)
 		}
 	})
-	recorder := newStreamWriteRecorder()
+	recorder := topicwritetest.NewStreamWriteRecorder()
 
 	writer, ctx := startDirectWriteWriter(t, cluster, recorder,
 		topicoptions.WithWriterPartitionID(testPartitionID),
@@ -109,21 +107,21 @@ func TestDirectWriteStaleGenerationReconnect(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, 2, cluster.describeCalls())
-	require.Equal(t, 2, recorder.sessionsCount())
+	require.Equal(t, 2, recorder.SessionsCount())
 
-	stale := recorder.session(0)
-	requireDirectInit(t, stale.initRequest, testPartitionID, testInitialGen)
+	stale := recorder.Session(0)
+	topicwritetest.RequireDirectInit(t, stale.InitRequest, testPartitionID, testInitialGen)
 
-	fresh := recorder.session(1)
-	require.Equal(t, uint32(testMovedNodeID), fresh.nodeID)
-	requireDirectInit(t, fresh.initRequest, testPartitionID, testMovedGen)
+	fresh := recorder.Session(1)
+	require.Equal(t, uint32(testMovedNodeID), fresh.NodeID)
+	topicwritetest.RequireDirectInit(t, fresh.InitRequest, testPartitionID, testMovedGen)
 }
 
 // TestDirectWriteMissingPartitionFailsWrite covers a pinned partition that no
 // longer exists in topic metadata after split/merge.
 func TestDirectWriteMissingPartitionFailsWrite(t *testing.T) {
 	cluster := newDirectWriteCluster(testPartitionID, testHostNodeID, testInitialGen)
-	recorder := newStreamWriteRecorder()
+	recorder := topicwritetest.NewStreamWriteRecorder()
 
 	writer, ctx := startDirectWriteWriter(t, cluster, recorder,
 		topicoptions.WithWriterPartitionID(99),
@@ -132,7 +130,7 @@ func TestDirectWriteMissingPartitionFailsWrite(t *testing.T) {
 	err := writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("payload")})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "target partition not found")
-	require.Zero(t, recorder.sessionsCount())
+	require.Zero(t, recorder.SessionsCount())
 }
 
 type directWriteCluster struct {
@@ -211,7 +209,9 @@ func (c *directWriteCluster) DescribeTopic(
 	}
 	c.mu.Unlock()
 
-	return describeTopicResult(partitions), nil
+	resp, _ := topicwritetest.DescribeTopicResponse(testTopicPath, partitions)
+
+	return resp, nil
 }
 
 func (c *directWriteCluster) StreamWrite(server Ydb_Topic_V1.TopicService_StreamWriteServer) error {
@@ -313,107 +313,10 @@ func (c *directWriteCluster) sendInitResponse(
 	})
 }
 
-type streamWriteSession struct {
-	nodeID          uint32
-	disableFallback bool
-	initRequest     *Ydb_Topic.StreamWriteMessage_InitRequest
-}
-
-type streamWriteRecorder struct {
-	mu       sync.Mutex
-	sessions []streamWriteSession
-}
-
-func newStreamWriteRecorder() *streamWriteRecorder {
-	return &streamWriteRecorder{}
-}
-
-func (r *streamWriteRecorder) interceptor() grpc.StreamClientInterceptor {
-	return func(
-		ctx context.Context,
-		desc *grpc.StreamDesc,
-		cc *grpc.ClientConn,
-		method string,
-		streamer grpc.Streamer,
-		opts ...grpc.CallOption,
-	) (grpc.ClientStream, error) {
-		if strings.Contains(method, "StreamWrite") {
-			session := streamWriteSession{
-				disableFallback: endpoint.ContextDisableFallback(ctx),
-			}
-			if nodeID, ok := endpoint.ContextNodeID(ctx); ok {
-				session.nodeID = nodeID
-			}
-
-			r.mu.Lock()
-			r.sessions = append(r.sessions, session)
-			sessionIndex := len(r.sessions) - 1
-			r.mu.Unlock()
-
-			stream, err := streamer(ctx, desc, cc, method, opts...)
-			if err != nil {
-				return nil, err
-			}
-
-			return &streamWriteInitRecorder{
-				ClientStream: stream,
-				recordInitReq: func(req *Ydb_Topic.StreamWriteMessage_InitRequest) {
-					r.mu.Lock()
-					defer r.mu.Unlock()
-					r.sessions[sessionIndex].initRequest = req
-				},
-			}, nil
-		}
-
-		return streamer(ctx, desc, cc, method, opts...)
-	}
-}
-
-func (r *streamWriteRecorder) sessionsCount() int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return len(r.sessions)
-}
-
-func (r *streamWriteRecorder) session(index int) streamWriteSession {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return r.sessions[index]
-}
-
-func (r *streamWriteRecorder) lastSession() streamWriteSession {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return r.sessions[len(r.sessions)-1]
-}
-
-type streamWriteInitRecorder struct {
-	grpc.ClientStream
-
-	recordInitReq func(req *Ydb_Topic.StreamWriteMessage_InitRequest)
-	recorded      bool
-}
-
-func (s *streamWriteInitRecorder) SendMsg(m any) error {
-	if !s.recorded {
-		if msg, ok := m.(*Ydb_Topic.StreamWriteMessage_FromClient); ok {
-			if initReq := msg.GetInitRequest(); initReq != nil {
-				s.recordInitReq(initReq)
-				s.recorded = true
-			}
-		}
-	}
-
-	return s.ClientStream.SendMsg(m)
-}
-
 func startDirectWriteWriter(
 	t *testing.T,
 	cluster *directWriteCluster,
-	recorder *streamWriteRecorder,
+	recorder *topicwritetest.StreamWriteRecorder,
 	opts ...topicoptions.WriterOption,
 ) (*topicwriter.Writer, context.Context) {
 	t.Helper()
@@ -427,7 +330,7 @@ func startDirectWriteWriter(
 
 	db, err := ydb.Open(sf.Context(e), connString,
 		ydb.With(config.WithGrpcOptions(
-			grpc.WithChainStreamInterceptor(recorder.interceptor()),
+			grpc.WithChainStreamInterceptor(recorder.Interceptor()),
 		)),
 	)
 	require.NoError(t, err)
@@ -442,45 +345,4 @@ func startDirectWriteWriter(
 	require.NoError(t, err)
 
 	return writer, sf.Context(e)
-}
-
-func requireDirectInit(
-	t *testing.T,
-	initReq *Ydb_Topic.StreamWriteMessage_InitRequest,
-	partitionID int64,
-	generation int64,
-) {
-	t.Helper()
-
-	require.NotNil(t, initReq)
-	pwg := initReq.GetPartitionWithGeneration()
-	require.NotNilf(t, pwg, "init request must use partition_with_generation")
-	require.Equal(t, partitionID, pwg.GetPartitionId())
-	require.Equal(t, generation, pwg.GetGeneration())
-}
-
-func describeTopicResult(
-	partitions []*Ydb_Topic.DescribeTopicResult_PartitionInfo,
-) *Ydb_Topic.DescribeTopicResponse {
-	result := &Ydb_Topic.DescribeTopicResult{
-		Self: &Ydb_Scheme.Entry{
-			Name: testTopicPath,
-			Type: Ydb_Scheme.Entry_TOPIC,
-		},
-		PartitioningSettings: &Ydb_Topic.PartitioningSettings{
-			MinActivePartitions:      int64(len(partitions)),
-			AutoPartitioningSettings: &Ydb_Topic.AutoPartitioningSettings{},
-		},
-		Partitions: partitions,
-	}
-	resp := &Ydb_Topic.DescribeTopicResponse{
-		Operation: &Ydb_Operations.Operation{
-			Ready:  true,
-			Status: Ydb.StatusIds_SUCCESS,
-			Result: &anypb.Any{},
-		},
-	}
-	_ = resp.GetOperation().GetResult().MarshalFrom(result)
-
-	return resp
 }

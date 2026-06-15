@@ -9,14 +9,13 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritetest"
 )
 
 func TestDirectWriteConfig(t *testing.T) {
@@ -151,7 +150,10 @@ func TestResolvePartitionNode(t *testing.T) {
 					require.Equal(t, topicPath, in.GetPath())
 					require.True(t, in.GetIncludeLocation())
 
-					return describeTopicResponse(t, partitions), nil
+					resp, err := topicwritetest.DescribeTopicResponse(topicPath, partitions)
+					require.NoError(t, err)
+
+					return resp, nil
 				}
 			}
 
@@ -179,35 +181,6 @@ func TestResolvePartitionNode(t *testing.T) {
 			require.True(t, endpoint.ContextDisableFallback(ctx))
 		})
 	}
-}
-
-func describeTopicResponse(
-	t *testing.T,
-	partitions []*Ydb_Topic.DescribeTopicResult_PartitionInfo,
-) *Ydb_Topic.DescribeTopicResponse {
-	t.Helper()
-
-	result := &Ydb_Topic.DescribeTopicResult{
-		Self: &Ydb_Scheme.Entry{
-			Name: "test-topic",
-			Type: Ydb_Scheme.Entry_TOPIC,
-		},
-		PartitioningSettings: &Ydb_Topic.PartitioningSettings{
-			MinActivePartitions:      int64(len(partitions)),
-			AutoPartitioningSettings: &Ydb_Topic.AutoPartitioningSettings{},
-		},
-		Partitions: partitions,
-	}
-	resp := &Ydb_Topic.DescribeTopicResponse{
-		Operation: &Ydb_Operations.Operation{
-			Ready:  true,
-			Status: Ydb.StatusIds_SUCCESS,
-			Result: &anypb.Any{},
-		},
-	}
-	require.NoError(t, resp.GetOperation().GetResult().MarshalFrom(result))
-
-	return resp
 }
 
 // topicServiceClientStub is a minimal hand-rolled stub of Ydb_Topic_V1.TopicServiceClient.
