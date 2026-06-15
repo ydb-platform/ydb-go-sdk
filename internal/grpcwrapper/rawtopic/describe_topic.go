@@ -135,21 +135,16 @@ type PartitionLocation struct {
 	Generation int64
 }
 
-// PartitionLocationFromProto converts proto location. Nil proto yields zero value.
-func PartitionLocationFromProto(proto *Ydb_Topic.PartitionLocation) PartitionLocation {
-	if proto == nil {
-		return PartitionLocation{}
-	}
-
-	return PartitionLocation{
-		NodeID:     proto.GetNodeId(),
-		Generation: proto.GetGeneration(),
-	}
-}
-
 // FromProto fills location from proto. Accepts nil (location info not requested).
 func (pl *PartitionLocation) FromProto(proto *Ydb_Topic.PartitionLocation) {
-	*pl = PartitionLocationFromProto(proto)
+	if proto == nil {
+		*pl = PartitionLocation{}
+
+		return
+	}
+
+	pl.NodeID = proto.GetNodeId()
+	pl.Generation = proto.GetGeneration()
 }
 
 // NodeIDUint32 returns the node ID as uint32 for endpoint routing.

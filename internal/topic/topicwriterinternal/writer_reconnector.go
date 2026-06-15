@@ -479,7 +479,6 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 	return resErr
 }
 
-//nolint:funlen // reconnect state machine; direct-write adds probe/rebind on top of the existing loop
 func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	attempt := 0
 	createStreamContext := func() (context.Context, context.CancelFunc) {
@@ -534,17 +533,12 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		)
 
 		writer, err := w.startWriteStream(streamCtx)
-		rebind := w.onWriterChange(writer)
 		onStreamError := onWriterStarted(err)
-		if err != nil {
-			reconnectReason = err
-		} else if rebind {
-			reconnectReason = nil
-			w.cfg.directWrite.completeProbe(streamCtx, writer)
-		} else {
-			reconnectReason = writer.WaitClose(ctx)
+		connectResult := w.finishStreamConnect(ctx, streamCtx, writer, err)
+		if connectResult.resetRetryStart {
 			startOfRetries = time.Now()
 		}
+		reconnectReason = connectResult.reconnectReason
 		onStreamError(reconnectReason)
 	}
 }
@@ -579,6 +573,35 @@ func (w *WriterReconnector) handleReconnectRetry(
 	}
 
 	return false
+}
+
+type streamConnectResult struct {
+	reconnectReason error
+	resetRetryStart bool
+}
+
+func (w *WriterReconnector) finishStreamConnect(
+	waitCloseCtx context.Context,
+	streamCtx context.Context,
+	writer *SingleStreamWriter,
+	connectErr error,
+) streamConnectResult {
+	if connectErr != nil {
+		w.onWriterChange(writer)
+
+		return streamConnectResult{reconnectReason: connectErr}
+	}
+
+	if rebind := w.onWriterChange(writer); rebind {
+		w.cfg.directWrite.completeProbe(streamCtx, writer)
+
+		return streamConnectResult{}
+	}
+
+	return streamConnectResult{
+		reconnectReason: writer.WaitClose(waitCloseCtx),
+		resetRetryStart: true,
+	}
 }
 
 func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *SingleStreamWriter, err error) {

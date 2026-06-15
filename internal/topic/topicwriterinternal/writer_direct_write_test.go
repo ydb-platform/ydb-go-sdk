@@ -6,11 +6,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
-	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
@@ -81,6 +79,20 @@ func TestDirectWriteConfig(t *testing.T) {
 	}
 }
 
+func TestReapplyDirectWritePartitionState(t *testing.T) {
+	cfg := NewWriterReconnectorConfig(
+		WithTopic("test"),
+		WithDirectWrite(true),
+	)
+	require.True(t, cfg.directWrite.resolved.unknown())
+
+	WithPartitioning(NewPartitioningWithPartitionID(7))(&cfg)
+	cfg.ReapplyDirectWritePartitionState()
+
+	require.EqualValues(t, 7, cfg.directWrite.resolved.partitionIDValue())
+	require.True(t, cfg.directWrite.pinnedByUser)
+}
+
 func TestResolvePartitionNode(t *testing.T) {
 	const (
 		topicPath   = "test-topic"
@@ -141,12 +153,10 @@ func TestResolvePartitionNode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stub := &topicServiceClientStub{
-				describeTopic: tt.describeTopic,
-			}
-			if stub.describeTopic == nil {
+			describe := tt.describeTopic
+			if describe == nil {
 				partitions := tt.partitions
-				stub.describeTopic = func(in *Ydb_Topic.DescribeTopicRequest) (*Ydb_Topic.DescribeTopicResponse, error) {
+				describe = func(in *Ydb_Topic.DescribeTopicRequest) (*Ydb_Topic.DescribeTopicResponse, error) {
 					require.Equal(t, topicPath, in.GetPath())
 					require.True(t, in.GetIncludeLocation())
 
@@ -157,7 +167,7 @@ func TestResolvePartitionNode(t *testing.T) {
 				}
 			}
 
-			rawClient := rawtopic.NewClient(stub)
+			rawClient := rawtopic.NewClient(topicwritetest.TopicServiceClientDescribeOnly(describe))
 
 			ctx, location, err := resolvePartitionNode(context.Background(), &rawClient, topicPath, partitionID)
 			if tt.wantErr != nil || tt.wantErrSubstr != "" {
@@ -181,66 +191,4 @@ func TestResolvePartitionNode(t *testing.T) {
 			require.True(t, endpoint.ContextDisableFallback(ctx))
 		})
 	}
-}
-
-// topicServiceClientStub is a minimal hand-rolled stub of Ydb_Topic_V1.TopicServiceClient.
-// It only implements DescribeTopic; other methods panic to make accidental use obvious.
-type topicServiceClientStub struct {
-	describeTopic func(in *Ydb_Topic.DescribeTopicRequest) (*Ydb_Topic.DescribeTopicResponse, error)
-}
-
-var _ Ydb_Topic_V1.TopicServiceClient = (*topicServiceClientStub)(nil)
-
-func (s *topicServiceClientStub) StreamWrite(
-	_ context.Context, _ ...grpc.CallOption,
-) (Ydb_Topic_V1.TopicService_StreamWriteClient, error) {
-	panic("StreamWrite not stubbed")
-}
-
-func (s *topicServiceClientStub) StreamRead(
-	_ context.Context, _ ...grpc.CallOption,
-) (Ydb_Topic_V1.TopicService_StreamReadClient, error) {
-	panic("StreamRead not stubbed")
-}
-
-func (s *topicServiceClientStub) CommitOffset(
-	_ context.Context, _ *Ydb_Topic.CommitOffsetRequest, _ ...grpc.CallOption,
-) (*Ydb_Topic.CommitOffsetResponse, error) {
-	panic("CommitOffset not stubbed")
-}
-
-func (s *topicServiceClientStub) UpdateOffsetsInTransaction(
-	_ context.Context, _ *Ydb_Topic.UpdateOffsetsInTransactionRequest, _ ...grpc.CallOption,
-) (*Ydb_Topic.UpdateOffsetsInTransactionResponse, error) {
-	panic("UpdateOffsetsInTransaction not stubbed")
-}
-
-func (s *topicServiceClientStub) CreateTopic(
-	_ context.Context, _ *Ydb_Topic.CreateTopicRequest, _ ...grpc.CallOption,
-) (*Ydb_Topic.CreateTopicResponse, error) {
-	panic("CreateTopic not stubbed")
-}
-
-func (s *topicServiceClientStub) DescribeTopic(
-	_ context.Context, in *Ydb_Topic.DescribeTopicRequest, _ ...grpc.CallOption,
-) (*Ydb_Topic.DescribeTopicResponse, error) {
-	return s.describeTopic(in)
-}
-
-func (s *topicServiceClientStub) DescribeConsumer(
-	_ context.Context, _ *Ydb_Topic.DescribeConsumerRequest, _ ...grpc.CallOption,
-) (*Ydb_Topic.DescribeConsumerResponse, error) {
-	panic("DescribeConsumer not stubbed")
-}
-
-func (s *topicServiceClientStub) AlterTopic(
-	_ context.Context, _ *Ydb_Topic.AlterTopicRequest, _ ...grpc.CallOption,
-) (*Ydb_Topic.AlterTopicResponse, error) {
-	panic("AlterTopic not stubbed")
-}
-
-func (s *topicServiceClientStub) DropTopic(
-	_ context.Context, _ *Ydb_Topic.DropTopicRequest, _ ...grpc.CallOption,
-) (*Ydb_Topic.DropTopicResponse, error) {
-	panic("DropTopic not stubbed")
 }
