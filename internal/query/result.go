@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
@@ -40,7 +41,7 @@ type (
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
 		lastErr        error
-		shutdownHooks  []func()
+		onClose        func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
 		resultSetIndex int64
 		trace          *trace.Query
@@ -54,7 +55,6 @@ type (
 		// invoked on demand from nextPart so that a Recv blocked on the wire
 		// can be unblocked when the caller's ctx is cancelled mid-flight.
 		streamCancel context.CancelFunc
-		closed       atomic.Bool
 	}
 	resultOption func(s *streamResult)
 )
@@ -120,7 +120,14 @@ func withStreamResultStatsCallback(callback func(queryStats stats.QueryStats)) r
 
 func withStreamResultOnClose(onClose func()) resultOption {
 	return func(s *streamResult) {
-		s.shutdownHooks = append(s.shutdownHooks, onClose)
+		if prevOnClose := s.onClose; prevOnClose != nil {
+			s.onClose = func() {
+				prevOnClose()
+				onClose()
+			}
+		} else {
+			s.onClose = onClose
+		}
 	}
 }
 
@@ -152,6 +159,8 @@ func withStreamCancel(cancel context.CancelFunc) resultOption {
 	}
 }
 
+var nopFunc = func() {}
+
 func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
@@ -168,8 +177,15 @@ func newResult(
 		}
 	}
 
+	if r.onClose != nil {
+		// replace all hooks to once func
+		r.onClose = sync.OnceFunc(r.onClose)
+	} else {
+		r.onClose = nopFunc
+	}
+
 	if r.trace != nil {
-		onDone := trace.QueryOnResultNew(r.trace, &ctx,
+		onDone := gtrace.QueryOnResultNew(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.newResult"),
 		)
 		defer func() {
@@ -195,18 +211,17 @@ func newResult(
 	return &r, nil
 }
 
-//nolint:funlen
 func (r *streamResult) nextPart(ctx context.Context) (
 	part *Ydb_Query.ExecuteQueryResponsePart, finishErr error,
 ) {
 	defer func() {
-		if finishErr != nil {
+		if finishErr != nil && ctx.Err() == nil {
 			r.lastErr = finishErr
 		}
 	}()
 
 	if r.trace != nil {
-		onDone := trace.QueryOnResultNextPart(r.trace, &ctx,
+		onDone := gtrace.QueryOnResultNextPart(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).nextPart"),
 		)
 		defer func() {
@@ -214,12 +229,8 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		}()
 	}
 
-	if err := ctx.Err(); err != nil {
-		if r.streamCancel != nil {
-			r.streamCancel()
-		}
-
-		return nil, xerrors.WithStackTrace(err)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, ctxErr
 	}
 
 	if r.lastErr != nil {
@@ -287,15 +298,13 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 }
 
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
-	if !r.closed.CompareAndSwap(false, true) {
+	defer r.onClose()
+
+	if r.stream != nil && r.stream.Context().Err() != nil {
+		// Stream already torn down (EOF, per-call ctx cancel, or prior Close).
+		// onClose runs via defer; nothing left to drain.
 		return nil
 	}
-
-	defer func() {
-		for _, f := range r.shutdownHooks {
-			f()
-		}
-	}()
 
 	if r.closeTimeout > 0 {
 		var cancel context.CancelFunc
@@ -303,8 +312,11 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 		defer cancel()
 	}
 
+	stop := context.AfterFunc(ctx, r.onClose)
+	defer stop()
+
 	if r.trace != nil {
-		onDone := trace.QueryOnResultClose(r.trace, &ctx,
+		onDone := gtrace.QueryOnResultClose(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).Close"),
 		)
 		defer func() {
@@ -313,14 +325,18 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	}
 
 	for {
-		if err := ctx.Err(); err != nil {
-			return xerrors.WithStackTrace(err)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
 		}
 
 		_, err := r.nextPart(ctx)
 		if err != nil {
 			if xerrors.Is(err, io.EOF) {
 				return nil
+			}
+
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return ctxErr
 			}
 
 			return xerrors.WithStackTrace(err)
@@ -330,7 +346,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 
 func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishErr error) {
 	defer func() {
-		if finishErr != nil {
+		if finishErr != nil && ctx.Err() == nil {
 			r.lastErr = finishErr
 		}
 	}()
@@ -338,19 +354,6 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishE
 	nextResultSetIndex := r.resultSetIndex + 1
 	for {
 		if err := ctx.Err(); err != nil {
-			// Mirror nextPart: cancel the gRPC stream context on per-call ctx
-			// error so the underlying stream is torn down consistently with
-			// lastErr being poisoned by the deferred func above. Without this,
-			// nextResultSet would leave the stream half-alive: lastErr is set
-			// (so subsequent nextPart/Close(freshCtx) bail out at the lastErr
-			// check before ever calling Recv), while the gRPC stream itself
-			// keeps holding resources until the server eventually ends it.
-			// streamCancel is idempotent, so calling it here is safe even if
-			// nextPart later cancels it again.
-			if r.streamCancel != nil {
-				r.streamCancel()
-			}
-
 			return nil, xerrors.WithStackTrace(err)
 		}
 
@@ -419,7 +422,7 @@ func (r *streamResult) nextPartFunc(
 
 func (r *streamResult) NextResultSet(ctx context.Context) (_ result.Set, err error) {
 	if r.trace != nil {
-		onDone := trace.QueryOnResultNextResultSet(r.trace, &ctx,
+		onDone := gtrace.QueryOnResultNextResultSet(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).NextResultSet"),
 		)
 		defer func() {

@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -170,7 +171,7 @@ func (c *Committer) Flush() error {
 	commits.Optimize()
 
 	ctx := c.backgroundWorker.Context()
-	onDone := trace.TopicOnReaderSendCommitMessage(
+	onDone := gtrace.TopicOnReaderSendCommitMessage(
 		c.tracer,
 		&ctx,
 		&commits,

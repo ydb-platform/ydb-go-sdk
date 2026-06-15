@@ -24,6 +24,7 @@ type Config struct {
 	sessionCreateTimeout   time.Duration
 	sessionDeleteTimeout   time.Duration
 	sessionIddleTimeToLive time.Duration
+	poolWarmUpSize         int
 
 	allowImplicitSessions bool
 
@@ -46,6 +47,7 @@ func New(opts ...Option) *Config {
 func defaults() *Config {
 	return &Config{
 		poolLimit:            DefaultPoolMaxSize,
+		poolWarmUpSize:       0,
 		sessionCreateTimeout: DefaultSessionCreateTimeout,
 		sessionDeleteTimeout: DefaultSessionDeleteTimeout,
 		trace:                &trace.Query{},
@@ -96,4 +98,14 @@ func (c *Config) SessionIdleTimeToLive() time.Duration {
 
 func (c *Config) LazyTx() bool {
 	return c.lazyTx
+}
+
+// PoolWarmUpSize is the number of sessions to pre-create in the explicit session pool at client initialization.
+// If PoolWarmUpSize is less than or equal to zero, pool warm-up is disabled.
+func (c *Config) PoolWarmUpSize() int {
+	if c.poolWarmUpSize <= 0 {
+		return 0
+	}
+
+	return c.poolWarmUpSize
 }

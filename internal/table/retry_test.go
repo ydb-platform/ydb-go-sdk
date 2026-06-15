@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
@@ -85,7 +86,7 @@ func TestDoBadSession(t *testing.T) {
 	ctx := xtest.Context(t)
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		closed := make(map[table.Session]bool)
-		p := pool.New[*Session, Session](ctx,
+		p, poolErr := pool.New[*Session, Session](ctx,
 			pool.WithMustDeleteItemFunc[*Session, Session](func(session *Session, err error) bool {
 				if !session.IsAlive() {
 					return true
@@ -104,6 +105,7 @@ func TestDoBadSession(t *testing.T) {
 				return s, nil
 			}),
 		)
+		require.NoError(t, poolErr)
 		var (
 			i          int
 			maxRetryes = 100
@@ -144,11 +146,12 @@ func TestDoCreateSessionError(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx, cancel := xcontext.WithTimeout(rootCtx, 30*time.Millisecond)
 		defer cancel()
-		p := pool.New[*Session, Session](ctx,
+		p, poolErr := pool.New[*Session, Session](ctx,
 			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 				return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
 			}),
 		)
+		require.NoError(t, poolErr)
 		err := do(ctx, p, config.New(),
 			func(ctx context.Context, s *Session) error {
 				return nil
@@ -312,11 +315,12 @@ func TestDoContextDeadline(t *testing.T) {
 		cc: testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	ctx := xtest.Context(t)
-	p := pool.New[*Session, Session](ctx,
+	p, err := pool.New[*Session, Session](ctx,
 		pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 			return newTableSession(ctx, client.cc, config.New())
 		}),
 	)
+	require.NoError(t, err)
 	r := xrand.New(xrand.WithLock())
 	for i := range timeouts {
 		for j := range sleeps {
@@ -357,23 +361,23 @@ func (e *CustomError) Unwrap() error {
 }
 
 func TestDoWithCustomErrors(t *testing.T) {
-	var (
-		limit = 10
-		ctx   = context.Background()
-		p     = pool.New[*Session, Session](ctx,
-			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
-				return simpleSession(t), nil
-			}),
-			pool.WithMustDeleteItemFunc[*Session, Session](func(session *Session, err error) bool {
-				if !session.IsAlive() {
-					return true
-				}
+	const limit = 10
 
-				return xerrors.MustDeleteTableOrQuerySession(err)
-			}),
-			pool.WithLimit[*Session, Session](limit),
-		)
+	ctx := context.Background()
+	p, poolErr := pool.New[*Session, Session](ctx,
+		pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
+			return simpleSession(t), nil
+		}),
+		pool.WithMustDeleteItemFunc[*Session, Session](func(session *Session, err error) bool {
+			if !session.IsAlive() {
+				return true
+			}
+
+			return xerrors.MustDeleteTableOrQuerySession(err)
+		}),
+		pool.WithLimit[*Session, Session](limit),
 	)
+	require.NoError(t, poolErr)
 	for _, test := range []struct {
 		error         error
 		retriable     bool
@@ -486,7 +490,6 @@ func (s *singleSession) Close(ctx context.Context) error {
 func (s *singleSession) Stats() pool.Stats {
 	return pool.Stats{
 		Limit: 1,
-		Index: 1,
 	}
 }
 

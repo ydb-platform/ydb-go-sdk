@@ -29,53 +29,53 @@ func DatabaseSQL(config Config) trace.DatabaseSQL {
 		OnConnectorConnect: func(info trace.DatabaseSQLConnectorConnectStartInfo) func(
 			trace.DatabaseSQLConnectorConnectDoneInfo,
 		) {
-			if config.Details()&trace.DatabaseSQLConnectorEvents != 0 {
-				return func(info trace.DatabaseSQLConnectorConnectDoneInfo) {
-					if info.Error == nil {
-						conns.With(nil).Add(1)
-					}
-				}
+			if config.Details()&trace.DatabaseSQLConnectorEvents == 0 {
+				return nil
 			}
 
-			return nil
+			return func(info trace.DatabaseSQLConnectorConnectDoneInfo) {
+				if info.Error == nil {
+					conns.With(nil).Add(1)
+				}
+			}
 		},
 		OnConnClose: func(info trace.DatabaseSQLConnCloseStartInfo) func(trace.DatabaseSQLConnCloseDoneInfo) {
-			if config.Details()&trace.DatabaseSQLConnectorEvents != 0 {
-				return func(info trace.DatabaseSQLConnCloseDoneInfo) {
-					conns.With(nil).Add(-1)
-				}
+			if config.Details()&trace.DatabaseSQLConnectorEvents == 0 {
+				return nil
 			}
 
-			return nil
+			return func(info trace.DatabaseSQLConnCloseDoneInfo) {
+				conns.With(nil).Add(-1)
+			}
 		},
 		OnConnBegin: func(info trace.DatabaseSQLConnBeginStartInfo) func(trace.DatabaseSQLConnBeginDoneInfo) {
-			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
-				return func(info trace.DatabaseSQLConnBeginDoneInfo) {
-					if info.Error == nil {
-						txs.With(nil).Add(1)
-						txStart.Set(info.Tx.ID(), time.Now())
-					}
-				}
+			if config.Details()&trace.DatabaseSQLTxEvents == 0 {
+				return nil
 			}
 
-			return nil
+			return func(info trace.DatabaseSQLConnBeginDoneInfo) {
+				if info.Error == nil && !isNil(info.Tx) {
+					txs.With(nil).Add(1)
+					txStart.Set(safeTxID(info.Tx), time.Now())
+				}
+			}
 		},
 		OnConnBeginTx: func(info trace.DatabaseSQLConnBeginTxStartInfo) func(trace.DatabaseSQLConnBeginTxDoneInfo) {
-			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
-				return func(info trace.DatabaseSQLConnBeginTxDoneInfo) {
-					if info.Error == nil {
-						txs.With(nil).Add(1)
-						txStart.Set(info.Tx.ID(), time.Now())
-					}
-				}
+			if config.Details()&trace.DatabaseSQLTxEvents == 0 {
+				return nil
 			}
 
-			return nil
+			return func(info trace.DatabaseSQLConnBeginTxDoneInfo) {
+				if info.Error == nil && !isNil(info.Tx) {
+					txs.With(nil).Add(1)
+					txStart.Set(safeTxID(info.Tx), time.Now())
+				}
+			}
 		},
 		OnTxCommit: func(info trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
 			txs.With(nil).Add(-1)
 
-			if start, has := txStart.Extract(info.Tx.ID()); has {
+			if start, has := txStart.Extract(safeTxID(info.Tx)); has {
 				txLatency.With(nil).Record(time.Since(start))
 			}
 
@@ -84,7 +84,7 @@ func DatabaseSQL(config Config) trace.DatabaseSQL {
 		OnTxRollback: func(info trace.DatabaseSQLTxRollbackStartInfo) func(trace.DatabaseSQLTxRollbackDoneInfo) {
 			txs.With(nil).Add(-1)
 
-			if start, has := txStart.Extract(info.Tx.ID()); has {
+			if start, has := txStart.Extract(safeTxID(info.Tx)); has {
 				txLatency.With(nil).Record(time.Since(start))
 			}
 
@@ -97,16 +97,18 @@ func DatabaseSQL(config Config) trace.DatabaseSQL {
 			)
 
 			return func(info trace.DatabaseSQLConnExecDoneInfo) {
-				if config.Details()&trace.DatabaseSQLConnEvents != 0 {
-					status := errorBrief(info.Error)
-					exec.With(map[string]string{
-						"status":     status,
-						"query_mode": mode,
-					}).Inc()
-					execLatency.With(map[string]string{
-						"query_mode": mode,
-					}).Record(time.Since(start))
+				if config.Details()&trace.DatabaseSQLConnEvents == 0 {
+					return
 				}
+
+				status := errorBrief(info.Error)
+				exec.With(map[string]string{
+					"status":     status,
+					"query_mode": mode,
+				}).Inc()
+				execLatency.With(map[string]string{
+					"query_mode": mode,
+				}).Record(time.Since(start))
 			}
 		},
 		OnConnQuery: func(info trace.DatabaseSQLConnQueryStartInfo) func(trace.DatabaseSQLConnQueryDoneInfo) {
@@ -116,16 +118,18 @@ func DatabaseSQL(config Config) trace.DatabaseSQL {
 			)
 
 			return func(info trace.DatabaseSQLConnQueryDoneInfo) {
-				if config.Details()&trace.DatabaseSQLConnEvents != 0 {
-					status := errorBrief(info.Error)
-					query.With(map[string]string{
-						"status":     status,
-						"query_mode": mode,
-					}).Inc()
-					queryLatency.With(map[string]string{
-						"query_mode": mode,
-					}).Record(time.Since(start))
+				if config.Details()&trace.DatabaseSQLConnEvents == 0 {
+					return
 				}
+
+				status := errorBrief(info.Error)
+				query.With(map[string]string{
+					"status":     status,
+					"query_mode": mode,
+				}).Inc()
+				queryLatency.With(map[string]string{
+					"query_mode": mode,
+				}).Record(time.Since(start))
 			}
 		},
 		OnConnPing:            nil,

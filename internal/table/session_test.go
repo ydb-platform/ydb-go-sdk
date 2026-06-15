@@ -370,7 +370,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			func(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
-						client := New(context.Background(), testutil.NewBalancer(
+						client, newErr := New(context.Background(), testutil.NewBalancer(
 							testutil.WithInvokeHandlers(
 								testutil.InvokeHandlers{
 									testutil.TableExecuteDataQuery: func(any) (proto.Message, error) {
@@ -413,6 +413,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 								},
 							),
 						), config.New())
+						require.NoError(t, newErr)
 						ctx, cancel := xcontext.WithTimeout(
 							context.Background(),
 							time.Second,
@@ -427,7 +428,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 }
 
 func TestCreateTableRegression(t *testing.T) {
-	client := New(context.Background(), testutil.NewBalancer(
+	client, newErr := New(context.Background(), testutil.NewBalancer(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request any) (proto.Message, error) {
@@ -503,6 +504,7 @@ func TestCreateTableRegression(t *testing.T) {
 			},
 		),
 	), config.New(config.UseQuerySession(false)))
+	require.NoError(t, newErr)
 
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
@@ -526,7 +528,7 @@ func TestCreateTableRegression(t *testing.T) {
 }
 
 func TestDescribeTableRegression(t *testing.T) {
-	client := New(context.Background(), testutil.NewBalancer(
+	client, newErr := New(context.Background(), testutil.NewBalancer(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request any) (proto.Message, error) {
@@ -594,6 +596,7 @@ func TestDescribeTableRegression(t *testing.T) {
 			},
 		),
 	), config.New(config.UseQuerySession(false)))
+	require.NoError(t, newErr)
 
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),

@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/gtrace"
 )
 
 type Stmt struct {
@@ -29,7 +29,7 @@ var (
 )
 
 func (stmt *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtQuery(stmt.conn.connector.Trace(), &ctx,
+	onDone := gtrace.DatabaseSQLOnStmtQuery(stmt.conn.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Stmt).QueryContext" /*stack.Package("database/sql")*/),
 		stmt.ctx, stmt.sql,
 	)
@@ -59,7 +59,7 @@ func (stmt *Stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_
 }
 
 func (stmt *Stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtExec(stmt.conn.connector.Trace(), &ctx,
+	onDone := gtrace.DatabaseSQLOnStmtExec(stmt.conn.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Stmt).ExecContext" /*stack.Package("database/sql")*/),
 		stmt.ctx, stmt.sql,
 	)
@@ -95,7 +95,7 @@ func (stmt *Stmt) NumInput() int {
 func (stmt *Stmt) Close() (finalErr error) {
 	var (
 		ctx    = stmt.ctx
-		onDone = trace.DatabaseSQLOnStmtClose(stmt.conn.connector.Trace(), &ctx,
+		onDone = gtrace.DatabaseSQLOnStmtClose(stmt.conn.connector.Trace(), &ctx,
 			stack.FunctionID("database/sql.(*Stmt).Close" /*stack.Package("database/sql")*/),
 		)
 	)

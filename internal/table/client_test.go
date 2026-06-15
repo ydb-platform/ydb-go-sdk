@@ -47,12 +47,12 @@ func TestRaceWgClosed(t *testing.T) {
 		}()
 		ctx, cancel := xcontext.WithTimeout(context.Background(),
 			//nolint:gosec
-			time.Duration(rand.Int31n(int32(100*time.Millisecond))),
+			100*time.Millisecond+time.Duration(rand.Int31n(int32(100*time.Millisecond))),
 		)
 		defer cancel()
 
 		wg := sync.WaitGroup{}
-		p := New(ctx,
+		p, err := New(ctx,
 			testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(any) (proto.Message, error) {
 					return &Ydb_Table.CreateSessionResult{
@@ -62,6 +62,11 @@ func TestRaceWgClosed(t *testing.T) {
 			})),
 			config.New(config.WithSizeLimit(limit)),
 		)
+		if err != nil && xerrors.Is(err, context.DeadlineExceeded) {
+			return
+		}
+
+		require.NoError(t, err)
 		for j := 0; j < limit*10; j++ {
 			wg.Add(1)
 			go func() {

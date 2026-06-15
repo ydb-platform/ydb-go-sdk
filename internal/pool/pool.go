@@ -2,7 +2,6 @@ package pool
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -16,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -34,7 +32,7 @@ type (
 		Item
 	}
 	Config[PT ItemConstraint[T], T any] struct {
-		trace              *Trace
+		trace              *Trace[PT, T]
 		clock              clockwork.Clock
 		limit              int
 		createTimeout      time.Duration
@@ -45,28 +43,21 @@ type (
 		idleTimeToLive     time.Duration
 		itemUsageLimit     uint64
 		itemUsageTTL       time.Duration
+		warmUpItems        int
 	}
 	itemInfo[PT ItemConstraint[T], T any] struct {
-		idle       *xlist.Element[PT]
+		item       PT
 		created    time.Time
 		lastUsage  time.Time
-		useCounter *uint64
-	}
-	waitChPool[PT ItemConstraint[T], T any] interface {
-		GetOrNew() *chan PT
-		Put(t *chan PT)
+		useCounter uint64
 	}
 	Pool[PT ItemConstraint[T], T any] struct {
-		config Config[PT, T]
+		config *Config[PT, T]
 
-		createItemFunc func(ctx context.Context, withReservedSpace bool) (PT, error)
+		stats *xsync.Value[dynamicStats]
 
-		mu               xsync.RWMutex
-		createInProgress int // KIKIMR-9163: in-create-process counter
-		index            map[PT]itemInfo[PT, T]
-		idle             xlist.List[PT]
-		waitQ            xlist.List[*chan PT]
-		waitChPool       waitChPool[PT, T]
+		sema chan struct{}
+		idle *sliceContainer[PT, T] // see BenchmarkContainers in container_test.go
 
 		done chan struct{}
 	}
@@ -85,14 +76,6 @@ func WithMustDeleteItemFunc[PT ItemConstraint[T], T any](f func(item PT, err err
 	}
 }
 
-func WithSyncCloseItem[PT ItemConstraint[T], T any]() Option[PT, T] {
-	return func(c *Config[PT, T]) {
-		//c.closeItemFunc = func(ctx context.Context, item PT) {
-		//	_ = item.Close(ctx)
-		//}
-	}
-}
-
 func WithCreateItemTimeout[PT ItemConstraint[T], T any](t time.Duration) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.createTimeout = t
@@ -105,9 +88,15 @@ func WithCloseItemTimeout[PT ItemConstraint[T], T any](t time.Duration) Option[P
 	}
 }
 
-func WithLimit[PT ItemConstraint[T], T any](size int) Option[PT, T] {
+func WithLimit[PT ItemConstraint[T], T any](limit int) Option[PT, T] {
 	return func(c *Config[PT, T]) {
-		c.limit = size
+		if limit <= 0 {
+			// Panic is unreachable for table/query clients: pool size is taken from
+			// config only after validation (SizeLimit/PoolLimit > 0). Direct pool.New
+			// with WithLimit(<=0) is a programmer error.
+			panic(fmt.Errorf("wrong limit value: %d", limit))
+		}
+		c.limit = limit
 	}
 }
 
@@ -123,7 +112,7 @@ func WithItemUsageTTL[PT ItemConstraint[T], T any](ttl time.Duration) Option[PT,
 	}
 }
 
-func WithTrace[PT ItemConstraint[T], T any](t *Trace) Option[PT, T] {
+func WithTrace[PT ItemConstraint[T], T any](t *Trace[PT, T]) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.trace = t
 	}
@@ -141,13 +130,22 @@ func WithClock[PT ItemConstraint[T], T any](clock clockwork.Clock) Option[PT, T]
 	}
 }
 
+func WithWarmUpItems[PT ItemConstraint[T], T any](size int) Option[PT, T] {
+	return func(c *Config[PT, T]) {
+		if size > 0 {
+			c.warmUpItems = size
+		}
+	}
+}
+
+//nolint:funlen
 func New[PT ItemConstraint[T], T any](
 	ctx context.Context,
 	opts ...Option[PT, T],
-) *Pool[PT, T] {
+) (_ *Pool[PT, T], err error) {
 	p := &Pool[PT, T]{
-		config: Config[PT, T]{
-			trace: &Trace{},
+		config: &Config[PT, T]{
+			trace: &Trace[PT, T]{},
 			clock: clockwork.NewRealClock(),
 			limit: DefaultLimit,
 			createItemFunc: func(ctx context.Context) (PT, error) {
@@ -164,24 +162,17 @@ func New[PT ItemConstraint[T], T any](
 				return !item.IsAlive()
 			},
 		},
-		index: make(map[PT]itemInfo[PT, T]),
-		idle:  xlist.New[PT](),
-		waitQ: xlist.New[*chan PT](),
-		waitChPool: &xsync.Pool[chan PT]{
-			New: func() *chan PT {
-				ch := make(chan PT)
-
-				return &ch
-			},
-		},
+		idle: &sliceContainer[PT, T]{},
 		done: make(chan struct{}),
 	}
 
 	for _, opt := range opts {
 		if opt != nil {
-			opt(&p.config)
+			opt(p.config)
 		}
 	}
+
+	p.stats = xsync.NewValue(dynamicStats{})
 
 	if onNew := p.config.trace.OnNew; onNew != nil {
 		onDone := onNew(&ctx,
@@ -194,241 +185,185 @@ func New[PT ItemConstraint[T], T any](
 		}
 	}
 
-	p.createItemFunc = makeAsyncCreateItemFunc(p)
+	p.sema = make(chan struct{}, p.config.limit)
 
-	return p
+	for range p.config.limit {
+		p.sema <- struct{}{}
+	}
+
+	var batchChanges dynamicStats
+	err = p.warmUp(ctx, &batchChanges)
+	p.applyBatchStats(&batchChanges)
+	if err != nil {
+		_ = p.Close(ctx)
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return p, nil
 }
 
-// makeAsyncCreateItemFunc wraps the createItem function with timeout handling
-func makeAsyncCreateItemFunc[PT ItemConstraint[T], T any]( //nolint:funlen
-	p *Pool[PT, T],
-) func(ctx context.Context, withReservedSpace bool) (PT, error) {
-	return func(ctx context.Context, withReservedSpace bool) (PT, error) {
-		if !xsync.WithLock(&p.mu, func() bool {
-			if withReservedSpace {
-				return true
-			}
-			if len(p.index)+p.createInProgress < p.config.limit {
-				p.createInProgress++
+func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) error { //nolint:funlen
+	if err := ctx.Err(); err != nil {
+		return xerrors.WithStackTrace(err)
+	}
 
-				return true
-			}
+	n := p.config.warmUpItems
+	if n <= 0 {
+		return nil
+	}
+	if n > p.config.limit {
+		n = p.config.limit
+	}
 
-			return false
-		}) {
-			return nil, xerrors.WithStackTrace(errPoolIsOverflow)
-		}
-		// NOTE: createInProgress is decremented by the goroutine below,
-		// not by a defer on the outer function. This keeps the slot reserved
-		// until the item is actually added to the index (or creation fails),
-		// preventing pool overflow when the caller's context is canceled while
-		// the creation goroutine is still running.
-		var (
-			ch = make(chan struct {
-				item PT
-				err  error
-			})
-			done = make(chan struct{})
-		)
-
-		defer close(done)
-
-		go func() {
-			defer close(ch)
-
-			// decrementDone tracks whether createInProgress has already been
-			// decremented (atomically with adding the item to the index).
-			// If item creation fails (nil item), the defer below handles it.
-			decrementDone := false
-			defer func() {
-				if !decrementDone {
-					p.mu.WithLock(func() {
-						p.createInProgress--
-					})
-				}
-			}()
-
-			createCtx, cancelCreate := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
-			defer cancelCreate()
+	var (
+		wg    sync.WaitGroup
+		errs  = make(chan error, n)
+		items = make(chan *itemInfo[PT, T], n)
+	)
+	for range n {
+		wg.Add(1)
+		go func(ctx context.Context) {
+			defer wg.Done()
 
 			if d := p.config.createTimeout; d > 0 {
-				createCtx, cancelCreate = xcontext.WithTimeout(createCtx, d)
-				defer cancelCreate()
-			}
-
-			newItem, err := p.config.createItemFunc(createCtx)
-			if newItem != nil {
-				p.mu.WithLock(func() {
-					var (
-						useCounter uint64
-						now        = p.config.clock.Now()
-					)
-					p.index[newItem] = itemInfo[PT, T]{
-						created:    now,
-						lastUsage:  now,
-						useCounter: &useCounter,
-					}
-					// Decrement atomically with adding the item to the index so
-					// the slot is never visible as free while the item is in flight.
-					p.createInProgress--
-					decrementDone = true
-				})
-			}
-
-			select {
-			case ch <- struct {
-				item PT
-				err  error
-			}{
-				item: newItem,
-				err:  xerrors.WithStackTrace(err),
-			}:
-			case <-done:
-				if newItem == nil {
-					return
-				}
-
-				_ = p.putItem(createCtx, newItem)
-			}
-		}()
-
-		select {
-		case <-p.done:
-			return nil, xerrors.WithStackTrace(errClosedPool)
-		case <-ctx.Done():
-			// Try non-blocking read from ch to check if goroutine has already completed
-			select {
-			case result, has := <-ch:
-				if has {
-					if result.err != nil {
-						// Goroutine completed with an error, join it with context error
-						return nil, xerrors.WithStackTrace(xerrors.Join(result.err, ctx.Err()))
-					}
-					// Goroutine completed successfully, return the item
-					return result.item, nil
-				}
-			default:
-			}
-
-			return nil, xerrors.WithStackTrace(ctx.Err())
-		case result, has := <-ch:
-			if !has {
-				return nil, xerrors.WithStackTrace(xerrors.Retryable(errNoProgress))
-			}
-
-			if result.err != nil {
-				if xerrors.IsContextError(result.err) {
-					return nil, xerrors.WithStackTrace(xerrors.Retryable(result.err))
-				}
-
-				return nil, xerrors.WithStackTrace(result.err)
-			}
-
-			return result.item, nil
-		}
-	}
-}
-
-type (
-	closeItemOptions struct {
-		withLock           bool
-		withDeleteFromPool bool
-		withNotifyStats    bool
-		wg                 *sync.WaitGroup
-	}
-	closeItemOption func(*closeItemOptions)
-)
-
-func closeItemWithLock() closeItemOption {
-	return func(o *closeItemOptions) {
-		o.withLock = true
-	}
-}
-
-func closeItemWithDeleteFromPool() closeItemOption {
-	return func(o *closeItemOptions) {
-		o.withDeleteFromPool = true
-	}
-}
-
-func closeItemNotifyStats() closeItemOption {
-	return func(o *closeItemOptions) {
-		o.withNotifyStats = true
-	}
-}
-
-func closeItemWithWaitGroup(wg *sync.WaitGroup) closeItemOption {
-	return func(o *closeItemOptions) {
-		o.wg = wg
-	}
-}
-
-func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT, opts ...closeItemOption) {
-	options := closeItemOptions{}
-	for _, opt := range opts {
-		opt(&options)
-	}
-	if options.withLock {
-		p.mu.Lock()
-		defer p.mu.Unlock()
-	}
-
-	if options.withDeleteFromPool {
-		if options.withNotifyStats {
-			p.changeState(func() Stats {
-				delete(p.index, item)
-
-				return p.stats()
-			})
-		} else {
-			delete(p.index, item)
-		}
-	}
-
-	if options.wg != nil {
-		options.wg.Add(1)
-		go func() {
-			defer options.wg.Done()
-
-			if t := p.config.closeTimeout; t > 0 {
 				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(xcontext.ValueOnly(ctx), t)
+				ctx, cancel = context.WithTimeout(xcontext.ValueOnly(ctx), d)
+				defer cancel()
+			} else {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(xcontext.ValueOnly(ctx))
 				defer cancel()
 			}
 
-			p.config.closeItemFunc(ctx, item)
-		}()
-	} else {
-		if t := p.config.closeTimeout; t > 0 {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, t)
-			defer cancel()
+			p.stats.Change(func(old dynamicStats) dynamicStats {
+				old.CreateInProgress++
+
+				return old
+			})
+			defer p.stats.Change(func(old dynamicStats) dynamicStats {
+				old.CreateInProgress--
+
+				return old
+			})
+
+			item, err := p.config.createItemFunc(ctx)
+			if err != nil {
+				errs <- err
+
+				return
+			}
+
+			if item == nil {
+				errs <- errNilItem
+
+				return
+			}
+
+			now := p.config.clock.Now()
+			items <- &itemInfo[PT, T]{
+				item:       item,
+				created:    now,
+				lastUsage:  now,
+				useCounter: 0,
+			}
+		}(ctx)
+	}
+
+	wg.Wait()
+
+	close(errs)
+	close(items)
+
+	for info := range items {
+		if err := p.idle.Put(info); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+		batchChanges.Idle++
+		batchChanges.Size++
+	}
+
+	if len(errs) > 0 {
+		joinErrs := make([]error, 0, len(errs))
+		for err := range errs {
+			joinErrs = append(joinErrs, err)
 		}
 
-		p.config.closeItemFunc(ctx, item)
+		return xerrors.WithStackTrace(xerrors.Join(joinErrs...))
 	}
+
+	return nil
 }
 
-func (p *Pool[PT, T]) stats() Stats {
-	return Stats{
-		Limit:            p.config.limit,
-		Index:            len(p.index),
-		Idle:             p.idle.Len(),
-		Wait:             p.waitQ.Len(),
-		CreateInProgress: p.createInProgress,
+// createItem wraps Config.createItemFunc with pool-controlled context handling.
+// createItem called only under p.sema lock
+//
+// Caller context values are preserved, but caller cancellation and deadlines are
+// not propagated. Creation is canceled when the pool is done, and
+// Config.createTimeout is applied when configured.
+func (p *Pool[PT, T]) createItem(ctx context.Context, batchChanges *dynamicStats) (PT, error) {
+	p.stats.Change(func(old dynamicStats) dynamicStats {
+		old.CreateInProgress++
+
+		return old
+	})
+	defer p.stats.Change(func(old dynamicStats) dynamicStats {
+		old.CreateInProgress--
+
+		return old
+	})
+
+	createCtx, cancelCreate := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
+	defer cancelCreate()
+
+	if d := p.config.createTimeout; d > 0 {
+		createCtx, cancelCreate = context.WithTimeout(createCtx, d)
+		defer cancelCreate()
 	}
+
+	start := p.config.clock.Now()
+	item, err := p.config.createItemFunc(createCtx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create item for %0.2f seconds: %w",
+			p.config.clock.Since(start).Seconds(),
+			err,
+		)
+	}
+
+	if item == nil {
+		return nil, errNilItem
+	}
+
+	batchChanges.Size++
+
+	return item, nil
+}
+
+// closeItem wraps the Config.closeItemFunc function with timeout handling
+// closeItem called only under p.sema lock
+func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT, batchChanges *dynamicStats) {
+	defer func() {
+		if batchChanges != nil {
+			batchChanges.Size--
+		}
+	}()
+
+	closeCtx, cancelClose := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
+	defer cancelClose()
+
+	if d := p.config.closeTimeout; d > 0 {
+		closeCtx, cancelClose = context.WithTimeout(closeCtx, d)
+		defer cancelClose()
+	}
+
+	p.config.closeItemFunc(closeCtx, item)
 }
 
 func (p *Pool[PT, T]) Stats() Stats {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	return p.stats()
-}
-
-func (p *Pool[PT, T]) changeState(changeState func() Stats) {
-	if stats, onChange := changeState(), p.config.trace.OnChange; onChange != nil {
-		onChange(stats)
+	return Stats{
+		dynamicStats: p.stats.Get(),
+		Limit:        p.config.limit,
+		WarmUp:       p.config.warmUpItems,
 	}
 }
 
@@ -452,7 +387,10 @@ func (p *Pool[PT, T]) checkItemAndError(item PT, err error) error {
 	return nil
 }
 
-func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item PT) error) (finalErr error) {
+//nolint:funlen
+func (p *Pool[PT, T]) try(ctx context.Context,
+	f func(ctx context.Context, item PT) error, batchChanges *dynamicStats,
+) (finalErr error) {
 	if onTry := p.config.trace.OnTry; onTry != nil {
 		onDone := onTry(&ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).try"),
@@ -465,42 +403,55 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 	}
 
 	select {
-	case <-p.done:
-		return xerrors.WithStackTrace(errClosedPool)
 	case <-ctx.Done():
 		return xerrors.WithStackTrace(ctx.Err())
-	default:
+	case <-p.done:
+		return xerrors.WithStackTrace(errClosedPool)
+	case _, ok := <-p.sema:
+		if !ok {
+			return xerrors.WithStackTrace(errClosedPool)
+		}
+
+		// We intentionally do not re-check p.done after acquiring sema: select may
+		// pick this case while Close() has already closed p.done but tokens remain.
+		// try() may then run until user callback returns; Close() waits for sema drain.
+		defer func() {
+			p.sema <- struct{}{}
+		}()
 	}
 
-	item, err := p.getItem(ctx)
+	info, err := p.getItem(ctx, batchChanges)
 	if err != nil {
-		if xerrors.IsYdb(err) {
-			switch {
-			case xerrors.IsOperationError(err, Ydb.StatusIds_UNAUTHORIZED):
-				// https://github.com/ydb-platform/ydb-go-sdk/issues/1550
-				// Avoid retrying UNAUTHORIZED errors.
-				return xerrors.WithStackTrace(xerrors.Unretryable(err))
-			default:
-				return xerrors.WithStackTrace(xerrors.Retryable(err))
-			}
+		if isRetriable(err) {
+			return xerrors.WithStackTrace(xerrors.Retryable(err))
+		}
+
+		if xerrors.IsContextError(err) && ctx.Err() == nil {
+			return xerrors.WithStackTrace(xerrors.Retryable(err))
+		}
+
+		if xerrors.IsYdb(err) && !xerrors.IsOperationError(err, Ydb.StatusIds_UNAUTHORIZED) {
+			return xerrors.WithStackTrace(xerrors.Retryable(err))
 		}
 
 		return xerrors.WithStackTrace(err)
 	}
 
+	batchChanges.InUse++
+
 	defer func() {
-		if err := p.checkItemAndError(item, finalErr); err != nil {
-			p.closeItem(ctx, item,
-				closeItemWithLock(),
-				closeItemNotifyStats(),
-				closeItemWithDeleteFromPool(),
-			)
-		} else {
-			_ = p.putItem(ctx, item)
+		batchChanges.InUse--
+
+		if err := p.checkItemAndError(info.item, finalErr); err != nil {
+			p.closeItem(ctx, info.item, batchChanges)
+
+			return
 		}
+
+		_ = p.putItem(ctx, info, batchChanges)
 	}()
 
-	err = f(ctx, item)
+	err = f(ctx, info.item)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -508,11 +459,49 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 	return nil
 }
 
+func (p *Pool[PT, T]) applyBatchStats(batch *dynamicStats) {
+	onChange := p.config.trace.OnChange
+
+	var stats dynamicStats
+	p.stats.Change(func(old dynamicStats) dynamicStats {
+		stats = old
+
+		stats.Concurrency += batch.Concurrency
+		stats.CreateInProgress += batch.CreateInProgress
+		stats.InUse += batch.InUse
+		stats.Idle += batch.Idle
+		stats.Size += batch.Size
+
+		return stats
+	})
+
+	if onChange != nil {
+		onChange(Stats{
+			dynamicStats: stats,
+			Limit:        p.config.limit,
+			WarmUp:       p.config.warmUpItems,
+		})
+	}
+}
+
 func (p *Pool[PT, T]) With(
 	ctx context.Context,
 	f func(ctx context.Context, item PT) error,
 	opts ...retry.Option,
 ) (finalErr error) {
+	p.stats.Change(func(old dynamicStats) dynamicStats {
+		old.Concurrency++
+
+		return old
+	})
+
+	var batchChanges dynamicStats
+	defer func() {
+		batchChanges.Concurrency--
+
+		p.applyBatchStats(&batchChanges)
+	}()
+
 	var attempts int
 
 	if onWith := p.config.trace.OnWith; onWith != nil {
@@ -528,7 +517,7 @@ func (p *Pool[PT, T]) With(
 
 	err := retry.Retry(ctx, func(ctx context.Context) error {
 		attempts++
-		err := p.try(ctx, f)
+		err := p.try(ctx, f, &batchChanges)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -557,208 +546,65 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 	select {
 	case <-p.done:
 		return xerrors.WithStackTrace(errClosedPool)
-
 	default:
 		close(p.done)
 
-		p.mu.Lock()
-		defer p.mu.Unlock()
+		var (
+			closes       sync.WaitGroup
+			locks        sync.WaitGroup
+			batchChanges dynamicStats
+		)
 
-		p.changeState(func() Stats {
-			p.config.limit = 0
+		defer p.applyBatchStats(&batchChanges)
 
-			for el := p.waitQ.Front(); el != nil; el = el.Next() {
-				close(*el.Value)
-			}
+		// Drain sema with one goroutine per slot (not a single loop) so all tokens are
+		// acquired in parallel: faster occupancy of the semaphore and shorter Close().
+		locks.Add(p.config.limit)
+		for range p.config.limit {
+			go func() {
+				defer locks.Done()
+				<-p.sema
+			}()
+		}
+		locks.Wait()
+		close(p.sema)
 
-			p.waitQ.Clear()
+		data := p.idle.Clear()
+		batchChanges.Idle -= len(data)
 
-			var wg sync.WaitGroup
+		closes.Add(len(data))
+		for _, info := range data {
+			go func(ctx context.Context, info *itemInfo[PT, T]) {
+				defer closes.Done()
 
-			for el := p.idle.Front(); el != nil; el = el.Next() {
-				delete(p.index, el.Value)
+				if d := p.config.closeTimeout; d > 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, d)
+					defer cancel()
+				}
 
-				p.closeItem(ctx, el.Value,
-					closeItemWithWaitGroup(&wg),
-				)
-			}
-
-			wg.Wait()
-
-			p.idle.Clear()
-
-			return p.stats()
-		})
+				p.config.closeItemFunc(ctx, info.item)
+			}(ctx, info)
+		}
+		closes.Wait()
+		batchChanges.Size -= len(data)
 
 		return nil
 	}
 }
 
-// getWaitCh returns pointer to a channel of items.
-//
-// Note that returning a pointer reduces allocations on sync.Pool usage –
-// sync.Client.Get() returns empty interface, which leads to allocation for
-// non-pointer values.
-func (p *Pool[PT, T]) getWaitCh() *chan PT { //nolint:gocritic
-	return p.waitChPool.GetOrNew()
-}
-
-// putWaitCh receives pointer to a channel and makes it available for further
-// use.
-// Note that ch MUST NOT be owned by any goroutine at the call moment and ch
-// MUST NOT contain any value.
-func (p *Pool[PT, T]) putWaitCh(ch *chan PT) { //nolint:gocritic
-	p.waitChPool.Put(ch)
-}
-
-// p.mu must be held.
-func (p *Pool[PT, T]) peekFirstIdle() (item PT, touched time.Time) {
-	el := p.idle.Front()
-	if el == nil {
-		return
-	}
-	item = el.Value
-	info, has := p.index[item]
-	if !has || el != info.idle {
-		panic(fmt.Sprintf("inconsistent index: (%v, %+v, %+v)", has, el, info.idle))
-	}
-
-	return item, info.lastUsage
-}
-
-// p.mu must be held.
-func (p *Pool[PT, T]) peekFirstIdleByNodeID(nodeID uint32) (item PT, touched time.Time) {
-	el := p.idle.Front()
-	for el != nil && el.Value.NodeID() != nodeID {
-		el = el.Next()
-	}
-	if el == nil {
-		return
-	}
-	item = el.Value
-	info, has := p.index[item]
-	if !has || el != info.idle {
-		panic(fmt.Sprintf("inconsistent index: (%v, %+v, %+v)", has, el, info.idle))
-	}
-
-	return item, info.lastUsage
-}
-
-// removes first item from idle to use only in outgoing functions that make item busy.
-// p.mu must be held.
-func (p *Pool[PT, T]) removeFirstIdle() PT {
-	idle, _ := p.peekFirstIdle()
-	if idle != nil {
-		info := p.removeIdle(idle)
-		p.index[idle] = info
-	}
-
-	return idle
-}
-
-// removes first item with preferred nodeID from idle to use only in outgoing functions that make item busy.
-// p.mu must be held.
-func (p *Pool[PT, T]) removeIdleByNodeID(nodeID uint32) PT {
-	idle, _ := p.peekFirstIdleByNodeID(nodeID)
-	if idle != nil {
-		info := p.removeIdle(idle)
-		p.index[idle] = info
-	}
-
-	return idle
-}
-
-// p.mu must be held.
-func (p *Pool[PT, T]) notifyAboutIdle(idle PT) (notified bool) {
-	for el := p.waitQ.Front(); el != nil; el = p.waitQ.Front() {
-		// Some goroutine is waiting for a item.
-		//
-		// It could be in this states:
-		//   1) Reached the select code and awaiting for a value in channel.
-		//   2) Reached the select code but already in branch of deadline
-		//   cancellation. In this case it is locked on p.mu.Lock().
-		//   3) Not reached the select code and thus not reading yet from the
-		//   channel.
-		//
-		// For cases (2) and (3) we close the channel to signal that goroutine
-		// missed something and may want to retry (especially for case (3)).
-		//
-		// After that we taking a next waiter and repeat the same.
-		var ch *chan PT
-		p.changeState(func() Stats {
-			ch = p.waitQ.Remove(el)
-
-			return p.stats()
-		})
-		select {
-		case *ch <- idle:
-			// Case (1).
-			return true
-
-		case <-p.done:
-			// Case (2) or (3).
-			close(*ch)
-
-		default:
-			// Case (2) or (3).
-			close(*ch)
-		}
-	}
-
-	return false
-}
-
-// p.mu must be held.
-func (p *Pool[PT, T]) removeIdle(item PT) itemInfo[PT, T] {
-	info, has := p.index[item]
-	if !has || info.idle == nil {
-		panic("inconsistent item client index")
-	}
-
-	p.changeState(func() Stats {
-		p.idle.Remove(info.idle)
-		info.idle = nil
-		p.index[item] = info
-
-		return p.stats()
-	})
-
-	return info
-}
-
-// p.mu must be held.
-func (p *Pool[PT, T]) pushIdle(item PT, now time.Time) {
-	info, has := p.index[item]
-	if !has {
-		panic("trying to store item created outside of the client")
-	}
-	if info.idle != nil {
-		panic("inconsistent item client index")
-	}
-
-	p.changeState(func() Stats {
-		info.lastUsage = now
-		info.idle = p.idle.PushBack(item)
-		p.index[item] = info
-
-		return p.stats()
-	})
-}
-
-const maxAttempts = 100
-
-func needCloseItemByMaxUsage[PT ItemConstraint[T], T any](c *Config[PT, T], info itemInfo[PT, T]) bool {
+func needCloseItemByMaxUsage[PT ItemConstraint[T], T any](c *Config[PT, T], info *itemInfo[PT, T]) bool {
 	if c.itemUsageLimit <= 0 {
 		return false
 	}
-	if *info.useCounter < c.itemUsageLimit {
+	if info.useCounter < c.itemUsageLimit {
 		return false
 	}
 
 	return true
 }
 
-func needCloseItemByTTL[PT ItemConstraint[T], T any](c *Config[PT, T], info itemInfo[PT, T]) bool {
+func needCloseItemByTTL[PT ItemConstraint[T], T any](c *Config[PT, T], info *itemInfo[PT, T]) bool {
 	if c.itemUsageTTL <= 0 {
 		return false
 	}
@@ -769,10 +615,11 @@ func needCloseItemByTTL[PT ItemConstraint[T], T any](c *Config[PT, T], info item
 	return true
 }
 
-func needCloseItemByIdleTTL[PT ItemConstraint[T], T any](c *Config[PT, T], info itemInfo[PT, T]) bool {
+func needCloseItemByIdleTTL[PT ItemConstraint[T], T any](c *Config[PT, T], info *itemInfo[PT, T]) bool {
 	if c.idleTimeToLive <= 0 {
 		return false
 	}
+
 	if c.clock.Since(info.lastUsage) < c.idleTimeToLive {
 		return false
 	}
@@ -780,7 +627,10 @@ func needCloseItemByIdleTTL[PT ItemConstraint[T], T any](c *Config[PT, T], info 
 	return true
 }
 
-func needCloseItem[PT ItemConstraint[T], T any](c *Config[PT, T], info itemInfo[PT, T]) bool {
+func needCloseItem[PT ItemConstraint[T], T any](c *Config[PT, T], info *itemInfo[PT, T]) bool {
+	if !info.item.IsAlive() {
+		return true
+	}
 	if needCloseItemByMaxUsage(c, info) {
 		return true
 	}
@@ -813,14 +663,29 @@ func getNodeHintInfo[PT ItemConstraint[T], T any](
 	return res
 }
 
-func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { //nolint:funlen
-	var (
-		start   = p.config.clock.Now()
-		attempt int
-		lastErr error
-	)
+func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID bool, batchChanges *dynamicStats) (
+	info *itemInfo[PT, T], _ error,
+) {
+	defer func() {
+		if info != nil {
+			batchChanges.Idle--
+		}
+	}()
 
-	preferredNodeID, hasPreferredNodeID := endpoint.ContextNodeID(ctx)
+	if useNodeID {
+		return p.idle.PopByNodeID(nodeID)
+	}
+
+	return p.idle.Pop()
+}
+
+// getItem called only under p.sema lock
+//
+//nolint:funlen
+func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (info *itemInfo[PT, T], finalErr error) {
+	nodeID, hasPreferredNodeID := endpoint.ContextNodeID(ctx)
+
+	var attempts int
 
 	if onGet := p.config.trace.OnGet; onGet != nil {
 		onDone := onGet(&ctx,
@@ -828,219 +693,80 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (item PT, finalErr error) { /
 		)
 		if onDone != nil {
 			defer func() {
-				onDone(item, attempt, getNodeHintInfo(item, preferredNodeID, hasPreferredNodeID, finalErr), finalErr)
+				if info != nil && info.item != nil {
+					onDone(info.item,
+						getNodeHintInfo(info.item, nodeID, hasPreferredNodeID, finalErr),
+						attempts, finalErr,
+					)
+				} else {
+					onDone(nil, nil, attempts, finalErr)
+				}
 			}()
 		}
 	}
 
-	for ; attempt < maxAttempts; attempt++ {
-		select {
-		case <-p.done:
-			return nil, xerrors.WithStackTrace(errClosedPool)
+	for range 2 {
+		attempts++
+
+		info, err := p.popItem(nodeID, hasPreferredNodeID, batchChanges)
+		if err != nil {
+			break
+		}
+
+		switch {
+		case needCloseItem(p.config, info):
+			p.closeItem(ctx, info.item, batchChanges)
 		default:
-		}
-		reservedSpace := false
-		if item := xsync.WithLock(&p.mu, func() PT { //nolint:nestif
-			if hasPreferredNodeID {
-				item := p.removeIdleByNodeID(preferredNodeID)
-				if item != nil {
-					return item
-				}
-
-				if len(p.index)+p.createInProgress < p.config.limit {
-					// for create item with preferred nodeID
-					return nil
-				}
-			}
-
-			idle := p.removeFirstIdle()
-			if hasPreferredNodeID {
-				if idle != nil {
-					// reserve slot in session pool
-					p.createInProgress++
-					reservedSpace = true
-					// close most idle item to make space for new one with preferred node id
-					p.closeItem(ctx, idle,
-						closeItemNotifyStats(),
-						closeItemWithDeleteFromPool(),
-					)
-
-					return nil
-				}
-			}
-
-			return idle
-		}); item != nil {
-			if item.IsAlive() {
-				info := xsync.WithLock(&p.mu, func() itemInfo[PT, T] {
-					info, has := p.index[item]
-					if !has {
-						panic("no index for item")
-					}
-
-					*info.useCounter++
-
-					return info
-				})
-
-				if needCloseItem(&p.config, info) {
-					p.closeItem(ctx, item,
-						closeItemWithLock(),
-						closeItemNotifyStats(),
-						closeItemWithDeleteFromPool(),
-					)
-
-					continue
-				}
-
-				return item, nil
-			}
-
-			p.closeItem(ctx, item,
-				closeItemWithLock(),
-				closeItemNotifyStats(),
-				closeItemWithDeleteFromPool(),
-			)
-		}
-
-		item, err := p.createItemFunc(ctx, reservedSpace)
-		if item != nil {
-			return item, nil
-		}
-
-		if !isRetriable(err) {
-			return nil, xerrors.WithStackTrace(xerrors.Join(err, lastErr))
-		}
-
-		if err != nil {
-			lastErr = err
-		}
-
-		item, err = p.waitFromCh(ctx)
-		if item != nil {
-			return item, nil
-		}
-
-		if err != nil && !isRetriable(err) {
-			return nil, xerrors.WithStackTrace(xerrors.Join(err, lastErr))
-		}
-
-		if err != nil {
-			lastErr = err
+			return info, nil
 		}
 	}
 
-	if lastErr == nil {
-		lastErr = errNoProgress
+	if hasPreferredNodeID {
+		st := p.stats.Get()
+		size := st.Size + batchChanges.Size
+		if st.Concurrency == p.config.limit || size >= p.config.limit {
+			// Free a slot before createItem: full concurrent load or pool already at limit.
+			info, err := p.popItem(0, false, batchChanges)
+			if err != nil {
+				return nil, errNothingIdleItems
+			}
+
+			p.closeItem(ctx, info.item, batchChanges)
+		}
 	}
 
-	p.mu.RLock()
-	defer p.mu.RUnlock()
+	attempts++
 
-	errMsg := fmt.Sprintf(
-		"failed to get item from pool after %d attempts and %v, pool has %d items (%d busy, %d idle, %d create_in_progress)", //nolint:lll
-		attempt, p.config.clock.Since(start), len(p.index),
-		len(p.index)-p.idle.Len(), p.idle.Len(), p.createInProgress,
-	)
+	// create item after two fails
+	item, err := p.createItem(ctx, batchChanges)
+	if err != nil {
+		if isRetriable(err) {
+			return nil, xerrors.Retryable(err)
+		}
 
-	if lastErr != nil {
-		return nil, xerrors.WithStackTrace(fmt.Errorf(errMsg+": %w", lastErr))
+		return nil, err
 	}
 
-	return nil, xerrors.WithStackTrace(errors.New(errMsg))
+	if item == nil {
+		return nil, errNilItem
+	}
+
+	now := p.config.clock.Now()
+
+	return &itemInfo[PT, T]{
+		item:       item,
+		created:    now,
+		lastUsage:  now,
+		useCounter: 0,
+	}, nil
 }
 
-//nolint:funlen
-func (p *Pool[PT, T]) waitFromCh(ctx context.Context) (item PT, finalErr error) {
-	var (
-		ch *chan PT
-		el *xlist.Element[*chan PT]
-	)
-
-	p.mu.WithLock(func() {
-		p.changeState(func() Stats {
-			ch = p.getWaitCh()
-			el = p.waitQ.PushBack(ch)
-
-			return p.stats()
-		})
-	})
-
-	if onWait := p.config.trace.onWait; onWait != nil {
-		onDone := onWait()
-		if onDone != nil {
-			defer func() {
-				onDone(item, finalErr)
-			}()
-		}
-	}
-
-	var deadliine <-chan time.Time
-	if timeout := p.config.createTimeout; timeout > 0 {
-		t := p.config.clock.NewTimer(timeout)
-		defer t.Stop()
-
-		deadliine = t.Chan()
-	}
-
-	select {
-	case <-p.done:
-		p.mu.WithLock(func() {
-			p.changeState(func() Stats {
-				p.waitQ.Remove(el)
-
-				return p.stats()
-			})
-		})
-
-		return nil, xerrors.WithStackTrace(errClosedPool)
-
-	case item, ok := <-*ch:
-		// Note that race may occur and some goroutine may try to write
-		// item into channel after it was enqueued but before it being
-		// read here. In that case we will receive nil here and will retry.
-		//
-		// The same way will work when some item become deleted - the
-		// nil value will be sent into the channel.
-		if ok {
-			// Put only filled and not closed channel back to the Client.
-			// That is, we need to avoid races on filling reused channel
-			// for the next waiter – item could be lost for a long time.
-			p.putWaitCh(ch)
-		}
-
-		return item, nil
-
-	case <-deadliine:
-		p.mu.WithLock(func() {
-			p.changeState(func() Stats {
-				p.waitQ.Remove(el)
-
-				return p.stats()
-			})
-		})
-
-		return nil, nil
-
-	case <-ctx.Done():
-		p.mu.WithLock(func() {
-			p.changeState(func() Stats {
-				p.waitQ.Remove(el)
-
-				return p.stats()
-			})
-		})
-
-		return nil, xerrors.WithStackTrace(ctx.Err())
-	}
-}
-
-// p.mu must be free.
-func (p *Pool[PT, T]) putItem(ctx context.Context, item PT) (finalErr error) {
+// putItem called only under p.sema lock
+func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T], batchChanges *dynamicStats) (finalErr error) {
 	if onPut := p.config.trace.OnPut; onPut != nil {
 		onDone := onPut(&ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/pool.(*Pool).putItem"),
-			item,
+			info.item,
 		)
 		if onDone != nil {
 			defer func() {
@@ -1048,40 +774,23 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, item PT) (finalErr error) {
 			}()
 		}
 	}
+
 	select {
 	case <-p.done:
-		p.closeItem(ctx, item,
-			closeItemWithLock(),
-			closeItemNotifyStats(),
-			closeItemWithDeleteFromPool(),
-		)
+		p.closeItem(ctx, info.item, batchChanges)
 
 		return xerrors.WithStackTrace(errClosedPool)
 	default:
-		p.mu.Lock()
-		defer p.mu.Unlock()
+		info.useCounter++
+		info.lastUsage = p.config.clock.Now()
 
-		if !item.IsAlive() {
-			p.closeItem(ctx, item,
-				closeItemNotifyStats(),
-				closeItemWithDeleteFromPool(),
-			)
+		if err := p.idle.PutWithCheckLimit(info, p.config.limit); err != nil {
+			p.closeItem(ctx, info.item, batchChanges)
 
-			return xerrors.WithStackTrace(errItemIsNotAlive)
+			return err
 		}
 
-		if p.idle.Len() >= p.config.limit {
-			p.closeItem(ctx, item,
-				closeItemNotifyStats(),
-				closeItemWithDeleteFromPool(),
-			)
-
-			return xerrors.WithStackTrace(errPoolIsOverflow)
-		}
-
-		if !p.notifyAboutIdle(item) {
-			p.pushIdle(item, p.config.clock.Now())
-		}
+		batchChanges.Idle++
 
 		return nil
 	}

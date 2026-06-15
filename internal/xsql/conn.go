@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/gtrace"
 )
 
 type Conn struct {
@@ -31,7 +31,7 @@ func (c *Conn) NodeID() uint32 {
 }
 
 func (c *Conn) Ping(ctx context.Context) (finalErr error) {
-	onDone := trace.DatabaseSQLOnConnPing(c.connector.trace, &c.ctx,
+	onDone := gtrace.DatabaseSQLOnConnPing(c.connector.trace, &c.ctx,
 		stack.FunctionID("database/sql.(*Conn).Ping" /*stack.Package("database/sql")*/),
 	)
 	defer func() {
@@ -46,7 +46,7 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 }
 
 func (c *Conn) CheckNamedValue(value *driver.NamedValue) (finalErr error) {
-	onDone := trace.DatabaseSQLOnConnCheckNamedValue(c.connector.trace, &c.ctx,
+	onDone := gtrace.DatabaseSQLOnConnCheckNamedValue(c.connector.trace, &c.ctx,
 		stack.FunctionID("database/sql.(*Conn).CheckNamedValue" /*stack.Package("database/sql")*/),
 		value,
 	)
@@ -59,7 +59,7 @@ func (c *Conn) CheckNamedValue(value *driver.NamedValue) (finalErr error) {
 }
 
 func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (_ driver.Tx, finalErr error) {
-	onDone := trace.DatabaseSQLOnConnBeginTx(c.connector.trace, &ctx,
+	onDone := gtrace.DatabaseSQLOnConnBeginTx(c.connector.trace, &ctx,
 		stack.FunctionID("database/sql.(*Conn).BeginTx" /*stack.Package("database/sql")*/),
 	)
 	defer func() {
@@ -89,7 +89,7 @@ func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (_ driver.Tx,
 }
 
 func (c *Conn) Close() (finalErr error) {
-	onDone := trace.DatabaseSQLOnConnClose(c.connector.Trace(), &c.ctx,
+	onDone := gtrace.DatabaseSQLOnConnClose(c.connector.Trace(), &c.ctx,
 		stack.FunctionID("database/sql.(*Conn).Close" /*stack.Package("database/sql")*/),
 	)
 	defer func() {
@@ -112,7 +112,7 @@ func (c *Conn) IsValid() bool {
 }
 
 func (c *Conn) Begin() (_ driver.Tx, finalErr error) {
-	onDone := trace.DatabaseSQLOnConnBegin(c.connector.trace, &c.ctx,
+	onDone := gtrace.DatabaseSQLOnConnBegin(c.connector.trace, &c.ctx,
 		stack.FunctionID("database/sql.(*Conn).Begin" /*stack.Package("database/sql")*/),
 	)
 	defer func() {
@@ -135,7 +135,7 @@ func (c *Conn) Prepare(string) (driver.Stmt, error) {
 }
 
 func (c *Conn) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, finalErr error) {
-	onDone := trace.DatabaseSQLOnConnPrepare(c.connector.Trace(), &ctx,
+	onDone := gtrace.DatabaseSQLOnConnPrepare(c.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Conn).PrepareContext" /*stack.Package("database/sql")*/),
 		sql,
 	)
@@ -161,9 +161,9 @@ func (c *Conn) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, f
 func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.NamedValue) (
 	_ driver.Rows, finalErr error,
 ) {
-	onDone := trace.DatabaseSQLOnConnQuery(c.connector.Trace(), &ctx,
+	onDone := gtrace.DatabaseSQLOnConnQuery(c.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Conn).QueryContext" /*stack.Package("database/sql")*/),
-		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), 0,
+		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -203,9 +203,9 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedValue) (
 	_ driver.Result, finalErr error,
 ) {
-	onDone := trace.DatabaseSQLOnConnExec(c.connector.Trace(), &ctx,
+	onDone := gtrace.DatabaseSQLOnConnExec(c.connector.Trace(), &ctx,
 		stack.FunctionID("database/sql.(*Conn).ExecContext" /*stack.Package("database/sql")*/),
-		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx), 0,
+		sql, c.connector.processor.String(), xcontext.IsIdempotent(ctx),
 	)
 	defer func() {
 		onDone(finalErr)

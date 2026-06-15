@@ -7,6 +7,7 @@ import (
 type (
 	// Table specified trace of table client activity.
 	// gtrace:gen
+	// gtrace:out internal/table/gtrace
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	Table struct {
 		// Client events
@@ -89,19 +90,23 @@ type (
 )
 
 type (
-	tableQueryParameters interface {
+	// TableQueryParameters contains query parameters metadata for trace hooks.
+	TableQueryParameters interface {
 		String() string
 	}
-	tableDataQuery interface {
+	// TableDataQuery contains data query metadata for trace hooks.
+	TableDataQuery interface {
 		String() string
 		ID() string
 		YQL() string
 	}
-	tableResultErr interface {
+	// TableResultErr contains result error metadata for trace hooks.
+	TableResultErr interface {
 		Err() error
 	}
-	tableResult interface {
-		tableResultErr
+	// TableResult contains result metadata for trace hooks.
+	TableResult interface {
+		TableResultErr
 		ResultSetCount() int
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -111,11 +116,11 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionNewDoneInfo struct {
-		Session sessionInfo
+		Session SessionInfo
 		Error   error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -125,8 +130,8 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
-		Session sessionInfo
+		Call    Call
+		Session SessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableKeepAliveDoneInfo struct {
@@ -139,7 +144,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableBulkUpsertDoneInfo struct {
@@ -153,9 +158,9 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 
-		Session sessionInfo
+		Session SessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionBulkUpsertDoneInfo struct {
@@ -168,8 +173,8 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
-		Session sessionInfo
+		Call    Call
+		Session SessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionDeleteDoneInfo struct {
@@ -182,13 +187,13 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
-		Session sessionInfo
+		Call    Call
+		Session SessionInfo
 		Query   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePrepareDataQueryDoneInfo struct {
-		Result tableDataQuery
+		Result TableDataQuery
 		Error  error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -198,10 +203,10 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context     *context.Context
-		Call        call
-		Session     sessionInfo
-		Query       tableDataQuery
-		Parameters  tableQueryParameters
+		Call        Call
+		Session     SessionInfo
+		Query       TableDataQuery
+		Parameters  TableQueryParameters
 		KeepInCache bool
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -211,11 +216,11 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
-		Call       call
-		Session    sessionInfo
-		Tx         txInfo
-		Query      tableDataQuery
-		Parameters tableQueryParameters
+		Call       Call
+		Session    SessionInfo
+		Tx         TxInfo
+		Query      TableDataQuery
+		Parameters TableQueryParameters
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTransactionExecuteStatementStartInfo struct {
@@ -224,11 +229,11 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context        *context.Context
-		Call           call
-		Session        sessionInfo
-		Tx             txInfo
-		StatementQuery tableDataQuery
-		Parameters     tableQueryParameters
+		Call           Call
+		Session        SessionInfo
+		Tx             TxInfo
+		StatementQuery TableDataQuery
+		Parameters     TableQueryParameters
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableExplainQueryStartInfo struct {
@@ -237,8 +242,8 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
-		Session sessionInfo
+		Call    Call
+		Session SessionInfo
 		Query   string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -249,19 +254,19 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableExecuteDataQueryDoneInfo struct {
-		Tx       txInfo
+		Tx       TxInfo
 		Prepared bool
-		Result   tableResult
+		Result   TableResult
 		Error    error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTransactionExecuteDoneInfo struct {
-		Result tableResult
+		Result TableResult
 		Error  error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTransactionExecuteStatementDoneInfo struct {
-		Result tableResult
+		Result TableResult
 		Error  error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -271,8 +276,8 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
-		Session sessionInfo
+		Call    Call
+		Session SessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionQueryStreamReadDoneInfo struct {
@@ -285,10 +290,10 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
-		Call       call
-		Session    sessionInfo
-		Query      tableDataQuery
-		Parameters tableQueryParameters
+		Call       Call
+		Session    SessionInfo
+		Query      TableDataQuery
+		Parameters TableQueryParameters
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionQueryStreamExecuteDoneInfo struct {
@@ -301,12 +306,12 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
-		Session sessionInfo
+		Call    Call
+		Session SessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTxBeginDoneInfo struct {
-		Tx    txInfo
+		Tx    TxInfo
 		Error error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -316,9 +321,9 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
-		Session sessionInfo
-		Tx      txInfo
+		Call    Call
+		Session SessionInfo
+		Tx      TxInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTxCommitDoneInfo struct {
@@ -331,9 +336,9 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
-		Session sessionInfo
-		Tx      txInfo
+		Call    Call
+		Session SessionInfo
+		Tx      TxInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTxRollbackDoneInfo struct {
@@ -346,7 +351,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableInitDoneInfo struct {
@@ -355,15 +360,17 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolStateChangeInfo struct {
 		Limit            int
-		Index            int
 		Idle             int
-		Wait             int
 		CreateInProgress int
+		Concurrency      int
+		Size             int
 
-		// Deprecated: use Index field instead.
-		// Will be removed after March 2025.
+		// Deprecated: will be removed after November 2026.
 		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-		Size int
+		Index int
+		// Deprecated: will be removed after November 2026.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		Wait int
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionNewStartInfo struct {
@@ -372,11 +379,11 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionNewDoneInfo struct {
-		Session sessionInfo
+		Session SessionInfo
 		Error   error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -386,11 +393,11 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolGetDoneInfo struct {
-		Session      sessionInfo
+		Session      SessionInfo
 		Attempts     int
 		NodeHintInfo *NodeHintInfo
 		Error        error
@@ -404,13 +411,13 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Deprecated
 	// Will be removed after March 2025.
 	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	TablePoolWaitDoneInfo struct {
-		Session sessionInfo
+		Session SessionInfo
 		Error   error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -420,7 +427,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolWithDoneInfo struct {
@@ -434,8 +441,8 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
-		Session sessionInfo
+		Call    Call
+		Session SessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolPutDoneInfo struct {
@@ -448,8 +455,8 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
-		Session sessionInfo
+		Call    Call
+		Session SessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionCloseDoneInfo struct{}
@@ -457,13 +464,13 @@ type (
 	// Will be removed after March 2025.
 	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	TablePoolSessionAddInfo struct {
-		Session sessionInfo
+		Session SessionInfo
 	}
 	// Deprecated
 	// Will be removed after March 2025.
 	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	TablePoolSessionRemoveInfo struct {
-		Session sessionInfo
+		Session SessionInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableCloseStartInfo struct {
@@ -472,7 +479,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableCloseDoneInfo struct {
@@ -485,7 +492,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 
 		Label      string
 		Idempotent bool
@@ -503,7 +510,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 
 		Label      string
 		Idempotent bool
@@ -521,11 +528,11 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableCreateSessionDoneInfo struct {
-		Session  sessionInfo
+		Session  SessionInfo
 		Attempts int
 		Error    error
 	}

@@ -2,6 +2,7 @@ package trace
 
 import "fmt"
 
-type call interface {
+// Call contains Call metadata for trace hooks.
+type Call interface {
 	fmt.Stringer
 }

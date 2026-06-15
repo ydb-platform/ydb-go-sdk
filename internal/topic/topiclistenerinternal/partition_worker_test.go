@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -582,14 +583,13 @@ func TestPartitionWorkerImpl_QueueClosureHandling(t *testing.T) {
 	errPtr := stoppedErr.Load()
 	require.NotNil(t, errPtr)
 	if *errPtr != nil {
-		// When Close() is called, there's a race between queue closure and context cancellation
-		// Both are valid shutdown reasons, so accept either one
-		errorMsg := (*errPtr).Error()
-		isQueueClosed := strings.Contains(errorMsg, "partition worker message queue closed")
-		isContextCanceled := strings.Contains(errorMsg, "partition worker message queue context error") &&
-			strings.Contains(errorMsg, "context canceled")
+		// When Close() is called, there's a race between queue closure and context cancellation.
+		// Both are valid shutdown reasons, so accept either one.
+		isQueueClosed := xerrors.Is(*errPtr, errPartitionQueueClosed)
+		isContextCanceled := strings.Contains((*errPtr).Error(), "partition worker message queue context error") &&
+			strings.Contains((*errPtr).Error(), "context canceled")
 		require.True(t, isQueueClosed || isContextCanceled,
-			"Expected either queue closure or context cancellation error, got: %s", errorMsg)
+			"Expected either queue closure or context cancellation error, got: %v", *errPtr)
 	}
 }
 

@@ -1,6 +1,7 @@
 package log
 
 import (
+	"context"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
@@ -23,7 +24,7 @@ func internalQuery(
 			if d.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "new")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "new")
 			l.Log(ctx, "create new query client starting...")
 			start := time.Now()
 
@@ -37,7 +38,7 @@ func internalQuery(
 			if d.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "close")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "close")
 			l.Log(ctx, "query client close starting...")
 			start := time.Now()
 
@@ -63,7 +64,7 @@ func internalQuery(
 			if d.Details()&trace.QueryPoolEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "new")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "pool", "new")
 			l.Log(ctx, "query service create pool starting...")
 			start := time.Now()
 
@@ -78,7 +79,7 @@ func internalQuery(
 			if d.Details()&trace.QueryPoolEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "close")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "pool", "close")
 			l.Log(ctx, "query service close pool starting...")
 			start := time.Now()
 
@@ -104,7 +105,7 @@ func internalQuery(
 			if d.Details()&trace.QueryPoolEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "try")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "pool", "try")
 			l.Log(ctx, "query service pool try attempt starting...")
 			start := time.Now()
 
@@ -130,7 +131,7 @@ func internalQuery(
 			if d.Details()&trace.QueryPoolEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, DEBUG, "ydb", "query", "pool", "with")
+			ctx := withFromPtr(info.Context, DEBUG, "ydb", "query", "pool", "with")
 			l.Log(ctx, "ydb query pool with starting...")
 			start := time.Now()
 
@@ -158,7 +159,7 @@ func internalQuery(
 			if d.Details()&trace.QueryPoolEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "put")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "pool", "put")
 			l.Log(ctx, "ydb query pool put starting...")
 			start := time.Now()
 
@@ -184,13 +185,14 @@ func internalQuery(
 			if d.Details()&trace.QueryPoolEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "get")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "pool", "get")
 			l.Log(ctx, "ydb query pool get starting...")
 			start := time.Now()
 
 			return func(info trace.QueryPoolGetDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "query pool get done",
+						kv.Int("attempts", info.Attempts),
 						kv.Latency(start),
 					)
 				} else {
@@ -200,17 +202,37 @@ func internalQuery(
 					}
 					l.Log(WithLevel(ctx, lvl), "query pool get failed",
 						kv.Latency(start),
+						kv.Int("attempts", info.Attempts),
 						kv.Error(info.Error),
 						kv.Version(),
 					)
 				}
 			}
 		},
+		OnPoolChange: func(info trace.QueryPoolChange) {
+			if d.Details()&trace.QueryPoolEvents == 0 {
+				return
+			}
+			ctx := with(context.Background(), TRACE, "ydb", "query", "pool", "state", "change")
+			l.Log(WithLevel(ctx, DEBUG), "query session pool state changed",
+				kv.Int("limit", info.Limit),
+				kv.Int("idle", info.Idle),
+				kv.Int("wait", func() int {
+					if info.Concurrency > info.Limit {
+						return info.Concurrency - info.Limit
+					}
+
+					return 0
+				}()),
+				kv.Int("concurrency", info.Concurrency),
+				kv.Int("create_in_progress", info.CreateInProgress),
+			)
+		},
 		OnDo: func(info trace.QueryDoStartInfo) func(trace.QueryDoDoneInfo) {
 			if d.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "do")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "do")
 			l.Log(ctx, "ydb query do starting...")
 			start := time.Now()
 
@@ -238,7 +260,7 @@ func internalQuery(
 			if d.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "do", "tx")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "do", "tx")
 			l.Log(ctx, "ydb query doTx starting...")
 			start := time.Now()
 
@@ -266,7 +288,7 @@ func internalQuery(
 			if d.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "exec")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "exec")
 			l.Log(ctx, "ydb query exec starting...")
 			start := time.Now()
 
@@ -292,7 +314,7 @@ func internalQuery(
 			if d.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "query")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "query")
 			l.Log(ctx, "ydb query starting...")
 			start := time.Now()
 
@@ -318,7 +340,7 @@ func internalQuery(
 			if d.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "query", "row")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "query", "row")
 			l.Log(ctx, "ydb query row done starting...")
 			start := time.Now()
 
@@ -344,7 +366,7 @@ func internalQuery(
 			if d.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "query", "result", "set")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "query", "result", "set")
 			l.Log(ctx, "ydb query result set starting...")
 			start := time.Now()
 
@@ -370,16 +392,20 @@ func internalQuery(
 			if d.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "create")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "session", "create")
 			l.Log(ctx, "ydb query session create starting...")
 			start := time.Now()
 
 			return func(info trace.QuerySessionCreateDoneInfo) {
-				if info.Error == nil {
+				if info.Error == nil && !isNil(info.Session) {
 					l.Log(ctx, "query session create done",
 						kv.Latency(start),
-						kv.String("session_id", info.Session.ID()),
-						kv.String("session_status", info.Session.Status()),
+						kv.String("session_id", safeSessionID(info.Session)),
+						kv.String("session_status", safeSessionStatus(info.Session)),
+					)
+				} else if info.Error == nil {
+					l.Log(ctx, "query session create done",
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -398,10 +424,10 @@ func internalQuery(
 			if d.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "attach")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "session", "attach")
 			l.Log(ctx, "ydb query session attach starting...",
-				kv.String("session_id", info.Session.ID()),
-				kv.String("session_status", info.Session.Status()),
+				kv.String("session_id", safeSessionID(info.Session)),
+				kv.String("session_status", safeSessionStatus(info.Session)),
 			)
 			start := time.Now()
 
@@ -427,10 +453,10 @@ func internalQuery(
 			if d.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "delete")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "session", "delete")
 			l.Log(ctx, "ydb query session delete starting...",
-				kv.String("session_id", info.Session.ID()),
-				kv.String("session_status", info.Session.Status()),
+				kv.String("session_id", safeSessionID(info.Session)),
+				kv.String("session_status", safeSessionStatus(info.Session)),
 			)
 			start := time.Now()
 
@@ -456,10 +482,10 @@ func internalQuery(
 			if d.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "exec")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "session", "exec")
 			l.Log(ctx, "ydb query session exec starting...",
-				kv.String("SessionID", info.Session.ID()),
-				kv.String("SessionStatus", info.Session.Status()),
+				kv.String("SessionID", safeSessionID(info.Session)),
+				kv.String("SessionStatus", safeSessionStatus(info.Session)),
 				kv.String("Query", info.Query),
 			)
 			start := time.Now()
@@ -486,10 +512,10 @@ func internalQuery(
 			if d.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "query")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "session", "query")
 			l.Log(ctx, "ydb query session query starting...",
-				kv.String("SessionID", info.Session.ID()),
-				kv.String("SessionStatus", info.Session.Status()),
+				kv.String("SessionID", safeSessionID(info.Session)),
+				kv.String("SessionStatus", safeSessionStatus(info.Session)),
 				kv.String("Query", info.Query),
 			)
 			start := time.Now()
@@ -516,18 +542,22 @@ func internalQuery(
 			if d.Details()&trace.QuerySessionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "begin")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "session", "begin")
 			l.Log(ctx, "ydb query session begin starting...",
-				kv.String("SessionID", info.Session.ID()),
-				kv.String("SessionStatus", info.Session.Status()),
+				kv.String("SessionID", safeSessionID(info.Session)),
+				kv.String("SessionStatus", safeSessionStatus(info.Session)),
 			)
 			start := time.Now()
 
 			return func(info trace.QuerySessionBeginDoneInfo) {
-				if info.Error == nil {
+				if info.Error == nil && !isNil(info.Tx) {
 					l.Log(WithLevel(ctx, DEBUG), "query session begin done",
 						kv.Latency(start),
-						kv.String("TransactionID", info.Tx.ID()),
+						kv.String("TransactionID", safeTxID(info.Tx)),
+					)
+				} else if info.Error == nil {
+					l.Log(WithLevel(ctx, DEBUG), "query session begin done",
+						kv.Latency(start),
 					)
 				} else {
 					lvl := WARN
@@ -546,11 +576,12 @@ func internalQuery(
 			if d.Details()&trace.QueryTransactionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "transaction", "exec")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "transaction", "exec")
 			l.Log(ctx, "ydb query transaction exec starting...",
-				kv.String("SessionID", info.Session.ID()),
-				kv.String("TransactionID", info.Tx.ID()),
-				kv.String("SessionStatus", info.Session.Status()),
+				kv.String("SessionID", safeSessionID(info.Session)),
+				kv.String("TransactionID", safeTxID(info.Tx)),
+				kv.String("SessionStatus", safeSessionStatus(info.Session)),
+				kv.Bool("WithCommit", info.WithCommit),
 			)
 			start := time.Now()
 
@@ -576,11 +607,12 @@ func internalQuery(
 			if d.Details()&trace.QueryTransactionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "transaction", "query")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "transaction", "query")
 			l.Log(ctx, "ydb query transaction query starting...",
-				kv.String("SessionID", info.Session.ID()),
-				kv.String("TransactionID", info.Tx.ID()),
-				kv.String("SessionStatus", info.Session.Status()),
+				kv.String("SessionID", safeSessionID(info.Session)),
+				kv.String("TransactionID", safeTxID(info.Tx)),
+				kv.String("SessionStatus", safeSessionStatus(info.Session)),
+				kv.Bool("WithCommit", info.WithCommit),
 			)
 			start := time.Now()
 
@@ -602,11 +634,69 @@ func internalQuery(
 				}
 			}
 		},
+		OnTxQueryResultSet: func(info trace.QueryTxQueryResultSetStartInfo) func(trace.QueryTxQueryResultSetDoneInfo) {
+			if d.Details()&trace.QueryTransactionEvents == 0 {
+				return nil
+			}
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "transaction", "query", "result", "set")
+			l.Log(ctx, "ydb query transaction query result set starting...",
+				kv.String("TransactionID", safeTxID(info.Tx)),
+				kv.Bool("WithCommit", info.WithCommit),
+			)
+			start := time.Now()
+
+			return func(info trace.QueryTxQueryResultSetDoneInfo) {
+				if info.Error == nil {
+					l.Log(WithLevel(ctx, DEBUG), "query transaction query result set done",
+						kv.Latency(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "query transaction query result set failed",
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
+					)
+				}
+			}
+		},
+		OnTxQueryRow: func(info trace.QueryTxQueryRowStartInfo) func(trace.QueryTxQueryRowDoneInfo) {
+			if d.Details()&trace.QueryTransactionEvents == 0 {
+				return nil
+			}
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "transaction", "query", "row")
+			l.Log(ctx, "ydb query transaction query row starting...",
+				kv.String("TransactionID", safeTxID(info.Tx)),
+				kv.Bool("WithCommit", info.WithCommit),
+			)
+			start := time.Now()
+
+			return func(info trace.QueryTxQueryRowDoneInfo) {
+				if info.Error == nil {
+					l.Log(WithLevel(ctx, DEBUG), "query transaction query row done",
+						kv.Latency(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "query transaction query row failed",
+						kv.Latency(start),
+						kv.Error(info.Error),
+						kv.Version(),
+					)
+				}
+			}
+		},
 		OnResultNew: func(info trace.QueryResultNewStartInfo) func(info trace.QueryResultNewDoneInfo) {
 			if d.Details()&trace.QueryResultEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "result", "new")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "result", "new")
 			l.Log(ctx, "ydb query result new starting...")
 			start := time.Now()
 
@@ -632,7 +722,7 @@ func internalQuery(
 			if d.Details()&trace.QueryResultEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "result", "next", "part")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "result", "next", "part")
 			l.Log(ctx, "ydb query result next part starting...")
 			start := time.Now()
 
@@ -663,7 +753,7 @@ func internalQuery(
 			if d.Details()&trace.QueryResultEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "result", "next", "result", "set")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "result", "next", "result", "set")
 			l.Log(ctx, "ydb query result next set starting...")
 			start := time.Now()
 
@@ -689,7 +779,7 @@ func internalQuery(
 			if d.Details()&trace.QueryResultEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "result", "close")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "query", "result", "close")
 			l.Log(ctx, "ydb query result close starting...")
 			start := time.Now()
 

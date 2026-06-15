@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -17,9 +18,13 @@ func With(config config.Common) Option {
 }
 
 // WithTrace appends table trace to early defined traces
-func WithTrace(trace *trace.Query, opts ...trace.QueryComposeOption) Option {
+func WithTrace(t *trace.Query) Option {
 	return func(c *Config) {
-		c.trace = c.trace.Compose(trace, opts...)
+		var opts []gtrace.QueryComposeOption
+		if cb := c.PanicCallback(); cb != nil {
+			opts = append(opts, gtrace.WithQueryPanicCallback(cb))
+		}
+		c.trace = gtrace.Compose(c.trace, t, opts...)
 	}
 }
 
@@ -91,5 +96,14 @@ func WithLazyTx(lazyTx bool) Option {
 func WithDisableSessionBalancer() Option {
 	return func(c *Config) {
 		c.SetDisableSessionBalancer()
+	}
+}
+
+// WithSessionPoolWarmUpSessions sets the number of sessions to pre-create in the explicit session pool
+// at client initialization.
+// If poolWarmUpSize is less than or equal to zero, pool warm-up is disabled.
+func WithSessionPoolWarmUpSessions(poolWarmUpSize int) Option {
+	return func(c *Config) {
+		c.poolWarmUpSize = poolWarmUpSize
 	}
 }

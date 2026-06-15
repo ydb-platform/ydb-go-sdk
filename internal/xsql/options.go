@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
+	retrygtrace "github.com/ydb-platform/ydb-go-sdk/v3/internal/retry/gtrace"
+	xsqlgtrace "github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
@@ -26,12 +28,10 @@ type (
 		queryOpts []xquery.Option
 	}
 	traceDatabaseSQLOption struct {
-		t    *trace.DatabaseSQL
-		opts []trace.DatabaseSQLComposeOption
+		t *trace.DatabaseSQL
 	}
 	traceRetryOption struct {
-		t    *trace.Retry
-		opts []trace.RetryComposeOption
+		t *trace.Retry
 	}
 	disableServerBalancerOption struct{}
 	onCloseOption               func(*Connector)
@@ -70,9 +70,37 @@ func (opt retryBudgetOption) Apply(c *Connector) error {
 }
 
 func (opt traceRetryOption) Apply(c *Connector) error {
-	c.traceRetry = c.traceRetry.Compose(opt.t, opt.opts...)
+	var opts []retrygtrace.RetryComposeOption
+	if cb := c.composePanicCallback; cb != nil {
+		opts = append(opts, retrygtrace.WithRetryPanicCallback(cb))
+	}
+	c.traceRetry = retrygtrace.Compose(c.traceRetry, opt.t, opts...)
 
 	return nil
+}
+
+func (opt traceDatabaseSQLOption) Apply(c *Connector) error {
+	var opts []xsqlgtrace.DatabaseSQLComposeOption
+	if cb := c.composePanicCallback; cb != nil {
+		opts = append(opts, xsqlgtrace.WithDatabaseSQLPanicCallback(cb))
+	}
+	c.trace = xsqlgtrace.Compose(c.trace, opt.t, opts...)
+
+	return nil
+}
+
+type composePanicCallbackOption struct {
+	fn func(e any)
+}
+
+func (opt composePanicCallbackOption) Apply(c *Connector) error {
+	c.composePanicCallback = opt.fn
+
+	return nil
+}
+
+func WithComposePanicCallback(fn func(e any)) Option {
+	return composePanicCallbackOption{fn: fn}
 }
 
 func (onClose onCloseOption) Apply(c *Connector) error {
@@ -87,12 +115,6 @@ func (disableServerBalancerOption) Apply(c *Connector) error {
 	return nil
 }
 
-func (opt traceDatabaseSQLOption) Apply(c *Connector) error {
-	c.trace = c.trace.Compose(opt.t, opt.opts...)
-
-	return nil
-}
-
 func (opt processorOptionsOption) Apply(c *Connector) error {
 	c.QueryOpts = append(c.QueryOpts, opt.queryOpts...)
 	c.TableOpts = append(c.TableOpts, opt.tableOpts...)
@@ -102,11 +124,9 @@ func (opt processorOptionsOption) Apply(c *Connector) error {
 
 func WithTrace(
 	t *trace.DatabaseSQL, //nolint:gocritic
-	opts ...trace.DatabaseSQLComposeOption,
 ) Option {
 	return traceDatabaseSQLOption{
-		t:    t,
-		opts: opts,
+		t: t,
 	}
 }
 
@@ -120,11 +140,9 @@ func WithOnClose(onClose func(*Connector)) Option {
 
 func WithTraceRetry(
 	t *trace.Retry,
-	opts ...trace.RetryComposeOption,
 ) Option {
 	return traceRetryOption{
-		t:    t,
-		opts: opts,
+		t: t,
 	}
 }
 

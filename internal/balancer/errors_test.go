@@ -44,7 +44,7 @@ func TestIsBadConn(t *testing.T) {
 		},
 		{
 			err:     xerrors.Transport(grpcStatus.Error(grpcCodes.Canceled, "")),
-			badConn: true,
+			badConn: false,
 		},
 		{
 			err:     xerrors.Transport(grpcStatus.Error(grpcCodes.Unknown, "")),

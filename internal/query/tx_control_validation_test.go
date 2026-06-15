@@ -12,7 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
@@ -77,7 +76,7 @@ func TestValidateTxControl(t *testing.T) {
 }
 
 func TestClientExecWithInvalidTxControl(t *testing.T) {
-	ctx := xtest.Context(t)
+	ctx := t.Context()
 	ctrl := gomock.NewController(t)
 	client := NewMockQueryServiceClient(ctrl)
 
@@ -99,7 +98,7 @@ func TestClientExecWithInvalidTxControl(t *testing.T) {
 }
 
 func TestClientQueryWithInvalidTxControl(t *testing.T) {
-	ctx := xtest.Context(t)
+	ctx := t.Context()
 	ctrl := gomock.NewController(t)
 	client := NewMockQueryServiceClient(ctrl)
 
@@ -121,7 +120,7 @@ func TestClientQueryWithInvalidTxControl(t *testing.T) {
 }
 
 func TestClientQueryResultSetWithInvalidTxControl(t *testing.T) {
-	ctx := xtest.Context(t)
+	ctx := t.Context()
 	ctrl := gomock.NewController(t)
 	client := NewMockQueryServiceClient(ctrl)
 
@@ -143,7 +142,7 @@ func TestClientQueryResultSetWithInvalidTxControl(t *testing.T) {
 }
 
 func TestClientQueryRowWithInvalidTxControl(t *testing.T) {
-	ctx := xtest.Context(t)
+	ctx := t.Context()
 	ctrl := gomock.NewController(t)
 	client := NewMockQueryServiceClient(ctrl)
 

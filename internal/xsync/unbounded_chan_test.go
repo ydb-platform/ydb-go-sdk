@@ -3,6 +3,7 @@ package xsync
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -112,6 +113,34 @@ func TestUnboundedChanClose(t *testing.T) {
 	}
 }
 
+func TestUnboundedChanSendAfterClose(t *testing.T) {
+	ch := NewUnboundedChan[int]()
+
+	ch.Close()
+
+	// Must not panic when sending after close (e.g. race with partition worker shutdown).
+	ch.Send(1)
+	ch.SendWithMerge(2, func(last, new int) (int, bool) { return last + new, true })
+}
+
+func TestUnboundedChanSendCloseConcurrent(t *testing.T) {
+	ch := NewUnboundedChan[int]()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for range 10000 {
+			ch.Send(1)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		ch.Close()
+	}()
+	wg.Wait()
+}
+
 func TestUnboundedChanReceiveAfterClose(t *testing.T) {
 	ctx := context.Background()
 	ch := NewUnboundedChan[int]()
@@ -145,16 +174,15 @@ func TestUnboundedChanMultipleMessages(t *testing.T) {
 	}
 }
 
-func TestUnboundedChanSignalChannelBehavior(t *testing.T) {
+func TestUnboundedChanManyMessagesInOrder(t *testing.T) {
 	ctx := context.Background()
 	ch := NewUnboundedChan[int]()
 
-	// Send multiple messages rapidly
 	for i := range 100 {
 		ch.Send(i)
 	}
 
-	// Should receive all messages despite signal channel being buffered
+	// Should receive all messages in order
 	for i := range 100 {
 		msg, ok, err := ch.Receive(ctx)
 		if err != nil || !ok || msg != i {
