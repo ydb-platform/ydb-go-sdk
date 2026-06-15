@@ -82,14 +82,18 @@ type directWrite struct {
 	resolved *resolvedPartition
 
 	// pinnedByUser is true when the caller set an explicit partition ID via WithPartitioning.
-	// A pinned partition is never cleared after a session failure.
+	// A user-pinned partition is never cleared after a session failure.
 	pinnedByUser bool
 
-	// original is defaultPartitioning before a server-learned partition is applied.
-	// Restored when a learned partition must be dropped after a failed direct session.
+	// partitionFromInit is true when partition ID was taken from InitResponse on a proxy probe.
+	// Cleared on session failure so the next connect re-probes via the proxy.
+	partitionFromInit bool
+
+	// original is defaultPartitioning before partitionFromInit updated partitioning.
+	// Restored when partitionFromInit is reset after a failed direct session.
 	original rawtopicwriter.Partitioning
 
-	// partitioning points at cfg.defaultPartitioning; updated when the partition is pinned or learned.
+	// partitioning points at cfg.defaultPartitioning; updated when pinned by user or set from InitResponse.
 	partitioning *rawtopicwriter.Partitioning
 
 	// retryResetPending is set after a successful proxy probe; the next connect must not count as a failed retry.
@@ -134,10 +138,9 @@ func (dw *directWrite) handleProbeInit(writer *SingleStreamWriter, setLastSeqNo 
 	return true
 }
 
-// bindConnectContext resolves the node for a known partition and binds the
-// gRPC call via endpoint.WithNodeID(..., endpoint.WithDisableFallback()). When the partition is still unknown (-1)
-// the context is returned unchanged (proxy connect).
-func (dw *directWrite) bindConnectContext(
+// withPartitionNodeIDContext returns ctx with the partition host node ID when direct
+// write is enabled and the partition is already resolved; otherwise ctx is unchanged.
+func (dw *directWrite) withPartitionNodeIDContext(
 	ctx context.Context,
 	rawClient *rawtopic.Client,
 	topicPath string,
@@ -175,13 +178,14 @@ func (dw *directWrite) consumeRetryReset() bool {
 	return true
 }
 
-// dropLearnedPartitionIfNeeded clears a server-learned partition after a
-// session failure so the next connect re-discovers via the proxy.
-func (dw *directWrite) dropLearnedPartitionIfNeeded(reason error, withLock func(func())) {
-	if reason == nil || !dw.enabled || dw.pinnedByUser || dw.resolved.unknown() {
+// resetPartitionFromInitOnFailure clears a partition taken from InitResponse after a
+// failed session so the next connect goes through the proxy probe again.
+func (dw *directWrite) resetPartitionFromInitOnFailure(reason error, withLock func(func())) {
+	if reason == nil || !dw.enabled || !dw.partitionFromInit {
 		return
 	}
 
+	dw.partitionFromInit = false
 	dw.resolved.clear()
 	withLock(func() {
 		*dw.partitioning = dw.original
@@ -195,6 +199,7 @@ func (dw *directWrite) awaitingPartition() bool {
 // pinPartitionFromInit records the partition from InitResponse for the rebound
 // connect. Must be called with the writer mutex held.
 func (dw *directWrite) pinPartitionFromInit(partitionID int64) {
+	dw.partitionFromInit = true
 	dw.resolved.setPartitionID(partitionID)
 	*dw.partitioning = rawtopicwriter.NewPartitioningPartitionID(partitionID)
 }

@@ -156,7 +156,7 @@ func WithWriterPartitionID(partitionID int64) WriterOption {
 // the SDK side until the rebound session is ready, so messages never leak to
 // the proxy node.
 //
-// On any session failure after the partition was learned from the server (i.e.
+// On any session failure after the partition was taken from InitResponse (i.e.
 // not pinned by the caller) the resolved partition is dropped and the next
 // reconnect goes back through the proxy to re-discover. This handles topics
 // with auto-partitioning (split / merge invalidates the old partition) and

@@ -140,7 +140,7 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 			RawTopicWriterStream,
 			error,
 		) {
-			streamCtx, err := cfg.directWrite.bindConnectContext(
+			streamCtx, err := cfg.directWrite.withPartitionNodeIDContext(
 				xcontext.MergeContexts(ctx, cfg.LogContext),
 				cfg.rawTopicClient,
 				cfg.topic,
@@ -503,7 +503,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtxCancel()
 		streamCtx, streamCtxCancel = createStreamContext()
 
-		w.cfg.directWrite.dropLearnedPartitionIfNeeded(reconnectReason, w.m.WithLock)
+		w.cfg.directWrite.resetPartitionFromInitOnFailure(reconnectReason, w.m.WithLock)
 
 		now := time.Now()
 		if w.cfg.directWrite.consumeRetryReset() ||
