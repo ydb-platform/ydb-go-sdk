@@ -68,33 +68,33 @@ func probeWriterPartition(
 	rawClient *rawtopic.Client,
 	tracer *trace.Topic,
 	req rawtopicwriter.InitRequest,
-) (partitionID int64, lastSeqNo int64, err error) {
+) (int64, error) {
 	stream, err := rawClient.StreamWrite(ctx, tracer)
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
 	defer func() {
 		_ = stream.CloseSend()
 	}()
 
 	if err = stream.Send(&req); err != nil {
-		return 0, 0, err
+		return 0, err
 	}
 
 	recvMessage, err := stream.Recv()
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
 
 	result, ok := recvMessage.(*rawtopicwriter.InitResult)
 	if !ok {
-		return 0, 0, xerrors.WithStackTrace(fmt.Errorf(
+		return 0, xerrors.WithStackTrace(fmt.Errorf(
 			"ydb: direct write: probe init response has unexpected type: %T",
 			recvMessage,
 		))
 	}
 
-	return result.PartitionID, result.LastSeqNo, nil
+	return result.PartitionID, nil
 }
 
 func (w *WriterReconnector) resolveDirectWritePartition(ctx context.Context) (int64, error) {
@@ -103,8 +103,7 @@ func (w *WriterReconnector) resolveDirectWritePartition(ctx context.Context) (in
 		return partitionID, nil
 	}
 
-	getLastSeqNo := w.needReceiveLastSeqNo()
-	partitionID, lastSeqNo, err := probeWriterPartition(
+	return probeWriterPartition(
 		xcontext.MergeContexts(ctx, w.cfg.LogContext),
 		w.cfg.rawTopicClient,
 		w.cfg.Tracer,
@@ -113,18 +112,6 @@ func (w *WriterReconnector) resolveDirectWritePartition(ctx context.Context) (in
 			ProducerID:       w.cfg.producerID,
 			WriteSessionMeta: w.cfg.writerMeta,
 			Partitioning:     w.cfg.defaultPartitioning,
-			GetLastSeqNo:     getLastSeqNo,
 		},
 	)
-	if err != nil {
-		return 0, err
-	}
-
-	if getLastSeqNo {
-		w.m.WithLock(func() {
-			w.lastSeqNo = lastSeqNo
-		})
-	}
-
-	return partitionID, nil
 }
