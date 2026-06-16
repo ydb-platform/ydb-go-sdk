@@ -494,7 +494,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 
 		now := time.Now()
 		if startOfRetries.IsZero() ||
-			topic.IsReconnectionBackoffExpired(prevAttemptTime, now, w.cfg.connectTimeout) {
+			topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
 			attempt = 0
 			startOfRetries = w.cfg.clock.Now()
 		} else {

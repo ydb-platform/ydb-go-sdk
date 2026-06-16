@@ -234,7 +234,7 @@ func TestCheckRetryMode(t *testing.T) {
 	}
 }
 
-func TestIsReconnectionBackoffExpired(t *testing.T) {
+func TestCheckResetReconnectionCounters(t *testing.T) {
 	now := time.Now()
 	table := []struct {
 		name              string
@@ -270,7 +270,7 @@ func TestIsReconnectionBackoffExpired(t *testing.T) {
 
 	for _, test := range table {
 		t.Run(test.name, func(t *testing.T) {
-			shouldReset := IsReconnectionBackoffExpired(test.lastTry, now, test.connectionTimeout)
+			shouldReset := CheckResetReconnectionCounters(test.lastTry, now, test.connectionTimeout)
 			require.Equal(t, test.shouldReset, shouldReset)
 		})
 	}
