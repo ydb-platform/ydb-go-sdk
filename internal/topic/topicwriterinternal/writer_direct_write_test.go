@@ -79,7 +79,7 @@ func TestDirectWriteConfig(t *testing.T) {
 	}
 }
 
-func TestReapplyDirectWritePartitionState(t *testing.T) {
+func TestWithPartitioningRefreshesDirectWritePartitionState(t *testing.T) {
 	cfg := NewWriterReconnectorConfig(
 		WithTopic("test"),
 		WithDirectWrite(true),
@@ -87,7 +87,6 @@ func TestReapplyDirectWritePartitionState(t *testing.T) {
 	require.True(t, cfg.directWrite.resolved.unknown())
 
 	WithPartitioning(NewPartitioningWithPartitionID(7))(&cfg)
-	cfg.ReapplyDirectWritePartitionState()
 
 	require.EqualValues(t, 7, cfg.directWrite.resolved.partitionIDValue())
 	require.True(t, cfg.directWrite.pinnedByUser)

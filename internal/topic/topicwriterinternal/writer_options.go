@@ -141,6 +141,9 @@ func WithErrOnQueueFull(enable bool) PublicWriterOption {
 func WithPartitioning(partitioning PublicFuturePartitioning) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.defaultPartitioning = partitioning.ToRaw()
+		if cfg.directWrite.enabled {
+			cfg.directWrite.finishInit(&cfg.defaultPartitioning)
+		}
 	}
 }
 
@@ -153,14 +156,10 @@ func WithPartitioning(partitioning PublicFuturePartitioning) PublicWriterOption 
 func WithDirectWrite(enable bool) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.directWrite.enabled = enable
+		if enable {
+			cfg.directWrite.finishInit(&cfg.defaultPartitioning)
+		}
 	}
-}
-
-// ReapplyDirectWritePartitionState refreshes direct-write partition resolution after
-// defaultPartitioning was changed on a WriterReconnectorConfig copy (for example,
-// when a multi-writer spawns a per-partition child writer).
-func (cfg *WriterReconnectorConfig) ReapplyDirectWritePartitionState() {
-	cfg.directWrite.finishInit(&cfg.defaultPartitioning)
 }
 
 func WithProducerID(producerID string) PublicWriterOption {
