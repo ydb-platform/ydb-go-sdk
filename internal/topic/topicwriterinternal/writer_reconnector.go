@@ -18,6 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
@@ -90,7 +91,6 @@ func (cfg *WriterReconnectorConfig) validate() error {
 	return cfg.directWrite.validate(cfg.defaultPartitioning, cfg.producerID)
 }
 
-//nolint:funlen // config constructor: defaults, options, and default Connect closure
 func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnectorConfig {
 	cfg := WriterReconnectorConfig{
 		WritersCommonConfig: WritersCommonConfig{
@@ -140,16 +140,10 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 			RawTopicWriterStream,
 			error,
 		) {
-			streamCtx, err := cfg.directWrite.withPartitionNodeIDContext(
+			return cfg.rawTopicClient.StreamWrite(
 				xcontext.MergeContexts(ctx, cfg.LogContext),
-				cfg.rawTopicClient,
-				cfg.topic,
+				tracer,
 			)
-			if err != nil {
-				return nil, err
-			}
-
-			return cfg.rawTopicClient.StreamWrite(streamCtx, tracer)
 		}
 
 		cfg.Connect = connector
@@ -503,44 +497,115 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtxCancel()
 		streamCtx, streamCtxCancel = createStreamContext()
 
-		w.cfg.directWrite.resetPartitionFromInitOnFailure(reconnectReason, w.m.WithLock)
-
-		now := time.Now()
-		if w.cfg.directWrite.IsRetryResetAfterProbe() ||
-			startOfRetries.IsZero() ||
-			topic.IsReconnectionBackoffExpired(prevAttemptTime, now, w.cfg.connectTimeout) {
-			attempt = 0
-			startOfRetries = w.cfg.clock.Now()
-		} else {
-			attempt++
-		}
-		prevAttemptTime = now
-
-		if reconnectReason != nil {
-			if w.handleReconnectRetry(ctx, reconnectReason, attempt, startOfRetries) {
-				return
-			}
-		}
-
-		logCtx := w.cfg.LogContext
-		onWriterStarted := gtrace.TopicOnWriterReconnect(
-			w.cfg.Tracer,
-			&logCtx,
-			w.writerInstanceID,
-			w.cfg.topic,
-			w.cfg.producerID,
-			attempt,
+		stop, resetRetryStart := w.runConnectionLoopIteration(
+			ctx,
+			streamCtx,
+			reconnectReason,
+			&attempt,
+			&prevAttemptTime,
+			&startOfRetries,
+			&reconnectReason,
 		)
-
-		writer, err := w.startWriteStream(streamCtx)
-		onStreamError := onWriterStarted(err)
-		connectResult := w.finishStreamConnect(ctx, streamCtx, writer, err)
-		if connectResult.resetRetryStart {
+		if resetRetryStart {
 			startOfRetries = time.Now()
 		}
-		reconnectReason = connectResult.reconnectReason
-		onStreamError(reconnectReason)
+		if stop {
+			return
+		}
 	}
+}
+
+func (w *WriterReconnector) runConnectionLoopIteration(
+	ctx context.Context,
+	streamCtx context.Context,
+	reconnectReason error,
+	attempt *int,
+	prevAttemptTime *time.Time,
+	startOfRetries *time.Time,
+	nextReconnectReason *error,
+) (stop bool, resetRetryStart bool) {
+	w.m.WithLock(func() {
+		w.cfg.directWrite.resetAutoResolvedPartitionOnFailure(reconnectReason)
+	})
+
+	now := time.Now()
+	if startOfRetries.IsZero() ||
+		topic.IsReconnectionBackoffExpired(*prevAttemptTime, now, w.cfg.connectTimeout) {
+		*attempt = 0
+		*startOfRetries = w.cfg.clock.Now()
+	} else {
+		*attempt++
+	}
+	*prevAttemptTime = now
+
+	if reconnectReason != nil {
+		if w.handleReconnectRetry(ctx, reconnectReason, *attempt, *startOfRetries) {
+			return true, false
+		}
+	}
+
+	logCtx := w.cfg.LogContext
+	onWriterStarted := gtrace.TopicOnWriterReconnect(
+		w.cfg.Tracer,
+		&logCtx,
+		w.writerInstanceID,
+		w.cfg.topic,
+		w.cfg.producerID,
+		*attempt,
+	)
+
+	resolveCtx, stopResolveCtx := xcontext.WithStoppableTimeoutCause(
+		streamCtx,
+		w.cfg.connectTimeout,
+		errConnTimeout,
+	)
+
+	connectStreamCtx, connectErr := w.prepareDirectWriteStreamContext(streamCtx, resolveCtx, stopResolveCtx)
+
+	var writer *SingleStreamWriter
+	if connectErr != nil {
+		writer = nil
+	} else {
+		writer, connectErr = w.startWriteStream(connectStreamCtx)
+	}
+
+	onStreamError := onWriterStarted(connectErr)
+	connectResult := w.finishStreamConnect(ctx, writer, connectErr)
+	*nextReconnectReason = connectResult.reconnectReason
+	onStreamError(connectResult.reconnectReason)
+
+	return false, connectResult.resetRetryStart
+}
+
+func (w *WriterReconnector) prepareDirectWriteStreamContext(
+	streamCtx context.Context,
+	resolveCtx context.Context,
+	stopResolveCtx func() bool,
+) (context.Context, error) {
+	if !w.cfg.directWrite.enabled {
+		return streamCtx, nil
+	}
+
+	var connectErr error
+	var partitionID int64
+	var hostNodeID uint32
+
+	partitionID, connectErr = w.resolveDirectWritePartition(resolveCtx)
+	if connectErr == nil {
+		hostNodeID, connectErr = w.resolveDirectWriteHost(resolveCtx, partitionID)
+		if connectErr == nil {
+			return endpoint.WithNodeID(
+				xcontext.MergeContexts(streamCtx, w.cfg.LogContext),
+				hostNodeID,
+				endpoint.WithDisableFallback(),
+			), nil
+		}
+	}
+	if !stopResolveCtx() && connectErr == nil {
+		connectErr = context.Cause(resolveCtx)
+	}
+
+	return streamCtx, connectErr
 }
 
 func (w *WriterReconnector) handleReconnectRetry(
@@ -582,7 +647,6 @@ type streamConnectResult struct {
 
 func (w *WriterReconnector) finishStreamConnect(
 	waitCloseCtx context.Context,
-	streamCtx context.Context,
 	writer *SingleStreamWriter,
 	connectErr error,
 ) streamConnectResult {
@@ -592,11 +656,7 @@ func (w *WriterReconnector) finishStreamConnect(
 		return streamConnectResult{reconnectReason: connectErr}
 	}
 
-	if rebind := w.onWriterChange(writer); rebind {
-		w.cfg.directWrite.completeProbe(streamCtx, writer)
-
-		return streamConnectResult{}
-	}
+	w.onWriterChange(writer)
 
 	return streamConnectResult{
 		reconnectReason: writer.WaitClose(waitCloseCtx),
@@ -621,11 +681,63 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 		return nil, err
 	}
 
-	w.cfg.directWrite.applyResolvedToPartitioning(&w.cfg.defaultPartitioning)
-
 	w.queue.ResetSentProgress()
 
 	return NewSingleStreamWriter(connectCtx, w.createWriterStreamConfig(stream))
+}
+
+func (w *WriterReconnector) resolveDirectWritePartition(ctx context.Context) (int64, error) {
+	if !w.cfg.directWrite.resolved.unknown() {
+		return w.cfg.directWrite.resolved.partitionIDValue(), nil
+	}
+
+	getLastSeqNo := w.needReceiveLastSeqNo()
+	partitionID, lastSeqNo, err := probeWriterPartition(
+		xcontext.MergeContexts(ctx, w.cfg.LogContext),
+		w.cfg.rawTopicClient,
+		w.cfg.Tracer,
+		rawtopicwriter.InitRequest{
+			Path:             w.cfg.topic,
+			ProducerID:       w.cfg.producerID,
+			WriteSessionMeta: w.cfg.writerMeta,
+			Partitioning:     w.cfg.directWrite.original,
+			GetLastSeqNo:     getLastSeqNo,
+		},
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	w.m.WithLock(func() {
+		w.cfg.directWrite.recordProbedPartition(partitionID)
+		if getLastSeqNo {
+			w.lastSeqNo = lastSeqNo
+		}
+	})
+
+	return partitionID, nil
+}
+
+func (w *WriterReconnector) resolveDirectWriteHost(
+	ctx context.Context,
+	partitionID int64,
+) (uint32, error) {
+	location, err := lookupPartitionLocation(
+		xcontext.MergeContexts(ctx, w.cfg.LogContext),
+		w.cfg.rawTopicClient,
+		w.cfg.topic,
+		partitionID,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	w.cfg.directWrite.resolved.setLocation(location.Generation)
+	w.m.WithLock(func() {
+		w.cfg.directWrite.applyResolvedToPartitioning(&w.cfg.defaultPartitioning)
+	})
+
+	return location.NodeIDUint32(), nil
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
@@ -650,7 +762,7 @@ func (w *WriterReconnector) onAckReceived(count int) {
 	w.semaphore.Release(int64(count))
 }
 
-func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) (rebindRequested bool) {
+func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 	isFirstInit := false
 	w.m.WithLock(func() {
 		if writerStream == nil {
@@ -659,12 +771,6 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) (re
 			return
 		}
 		w.sessionID = writerStream.SessionID
-
-		if w.cfg.directWrite.handleProbeInit(writerStream, func(seqNo int64) { w.lastSeqNo = seqNo }) {
-			rebindRequested = true
-
-			return
-		}
 
 		if !w.firstConnectionHandled.CompareAndSwap(false, true) {
 			return
@@ -677,10 +783,6 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) (re
 		}
 	})
 
-	if rebindRequested {
-		return true
-	}
-
 	if isFirstInit {
 		w.m.WithLock(func() {
 			w.initDone = true
@@ -689,8 +791,6 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) (re
 		})
 		w.onWriterInitCallbackHandler(writerStream)
 	}
-
-	return false
 }
 
 func (w *WriterReconnector) waitInit(ctx context.Context) (info InitialInfo, err error) {

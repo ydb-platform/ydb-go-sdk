@@ -52,8 +52,8 @@ func TestDirectWritePinnedPartitionConnectsToDescribeHost(t *testing.T) {
 	topicwritetest.RequireDirectInit(t, last.InitRequest, testPartitionID, testInitialGen)
 }
 
-// TestDirectWriteProducerProbeRebind discovers the partition through the proxy,
-// then reconnects directly to the partition host with generation from Describe.
+// TestDirectWriteProducerProbeRebind discovers the partition through a synchronous
+// proxy probe, then connects directly to the partition host with generation from Describe.
 func TestDirectWriteProducerProbeRebind(t *testing.T) {
 	cluster := topicwritetest.NewDirectWriteCluster(testTopicPath, testPartitionID, testHostNodeID, testInitialGen)
 	recorder := topicwritetest.NewStreamWriteRecorder()

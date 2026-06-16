@@ -93,7 +93,7 @@ func TestReapplyDirectWritePartitionState(t *testing.T) {
 	require.True(t, cfg.directWrite.pinnedByUser)
 }
 
-func TestResolvePartitionNode(t *testing.T) {
+func TestLookupPartitionLocation(t *testing.T) {
 	const (
 		topicPath   = "test-topic"
 		partitionID = int64(7)
@@ -169,7 +169,7 @@ func TestResolvePartitionNode(t *testing.T) {
 
 			rawClient := rawtopic.NewClient(topicwritetest.TopicServiceClientDescribeOnly(describe))
 
-			ctx, location, err := resolvePartitionNode(context.Background(), &rawClient, topicPath, partitionID)
+			location, err := lookupPartitionLocation(context.Background(), &rawClient, topicPath, partitionID)
 			if tt.wantErr != nil || tt.wantErrSubstr != "" {
 				require.Error(t, err)
 				if tt.wantErr != nil {
@@ -185,6 +185,11 @@ func TestResolvePartitionNode(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tt.wantGeneration, location.Generation)
 
+			ctx := endpoint.WithNodeID(
+				context.Background(),
+				location.NodeIDUint32(),
+				endpoint.WithDisableFallback(),
+			)
 			gotNodeID, ok := endpoint.ContextNodeID(ctx)
 			require.True(t, ok)
 			require.Equal(t, tt.wantNodeID, gotNodeID)

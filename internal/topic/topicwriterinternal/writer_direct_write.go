@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync/atomic"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
@@ -21,15 +20,15 @@ var (
 	)
 )
 
-// resolvedPartition holds direct-write partition resolution state shared across
-// WriterReconnectorConfig copies via pointer.
+// resolvedPartition holds direct-write partition resolution state.
+// Access is owned by the writer connection loop and methods that require its mutex.
 type resolvedPartition struct {
 	// partitionID is the target partition for direct write.
-	// -1 means unknown (connect via proxy until InitResponse).
-	partitionID atomic.Int64
+	// -1 means unknown until resolved by a proxy probe.
+	partitionID int64
 	// generation is from the latest DescribeTopic when partitionID >= 0.
 	// -1 means not yet resolved.
-	generation atomic.Int64
+	generation int64
 }
 
 func newResolvedPartition() *resolvedPartition {
@@ -40,64 +39,53 @@ func newResolvedPartition() *resolvedPartition {
 }
 
 func (rp *resolvedPartition) clear() {
-	rp.partitionID.Store(-1)
-	rp.generation.Store(-1)
+	rp.partitionID = -1
+	rp.generation = -1
 }
 
 func (rp *resolvedPartition) setPartitionID(partitionID int64) {
-	rp.partitionID.Store(partitionID)
-	rp.generation.Store(-1)
+	rp.partitionID = partitionID
+	rp.generation = -1
 }
 
 func (rp *resolvedPartition) partitionIDValue() int64 {
-	return rp.partitionID.Load()
+	return rp.partitionID
 }
 
 func (rp *resolvedPartition) setLocation(generation int64) {
-	rp.generation.Store(generation)
+	rp.generation = generation
 }
 
 func (rp *resolvedPartition) unknown() bool {
-	return rp.partitionID.Load() < 0
+	return rp.partitionID < 0
 }
 
 func (rp *resolvedPartition) initPartitioning() (rawtopicwriter.Partitioning, bool) {
-	partitionID := rp.partitionID.Load()
-	generation := rp.generation.Load()
-	if partitionID < 0 || generation < 0 {
+	if rp.partitionID < 0 || rp.generation < 0 {
 		return rawtopicwriter.Partitioning{}, false
 	}
 
-	return rawtopicwriter.NewPartitioningPartitionWithGeneration(partitionID, generation), true
+	return rawtopicwriter.NewPartitioningPartitionWithGeneration(rp.partitionID, rp.generation), true
 }
 
-// directWrite holds partition resolution and proxy→direct rebind state for a topic writer.
+// directWrite holds partition resolution state for a topic writer.
 type directWrite struct {
 	// enabled turns on direct StreamWrite to the node that hosts the target partition.
 	enabled bool
 
 	// resolved holds partition ID and generation used for node lookup and InitRequest.
-	// Shared by pointer so connect closures and the reconnector see the same value
-	// even if WriterReconnectorConfig is copied.
 	resolved *resolvedPartition
 
 	// pinnedByUser is true when the caller set an explicit partition ID via WithPartitioning.
 	// A user-pinned partition is never cleared after a session failure.
 	pinnedByUser bool
 
-	// partitionFromInit is true when partition ID was taken from InitResponse on a proxy probe.
-	// Cleared on session failure so the next connect re-probes via the proxy.
-	partitionFromInit bool
-
-	// original is defaultPartitioning before partitionFromInit updated partitioning.
-	// Restored when partitionFromInit is reset after a failed direct session.
+	// original is defaultPartitioning before a proxy probe updated partitioning.
+	// Restored when auto-resolved partition state is reset after a failed direct session.
 	original rawtopicwriter.Partitioning
 
 	// partitioning points at cfg.defaultPartitioning; updated when pinned by user or set from InitResponse.
 	partitioning *rawtopicwriter.Partitioning
-
-	// retryResetAfterProbe is set after a successful proxy probe; the next connect must not count as a failed retry.
-	retryResetAfterProbe bool
 }
 
 func (dw *directWrite) finishInit(partitioning *rawtopicwriter.Partitioning) {
@@ -111,6 +99,8 @@ func (dw *directWrite) finishInit(partitioning *rawtopicwriter.Partitioning) {
 
 		return
 	}
+
+	dw.pinnedByUser = false
 }
 
 func (dw *directWrite) validate(partitioning rawtopicwriter.Partitioning, producerID string) error {
@@ -123,85 +113,28 @@ func (dw *directWrite) validate(partitioning rawtopicwriter.Partitioning, produc
 	return xerrors.WithStackTrace(errDirectWriteRequiresPartitionOrProducer)
 }
 
-// handleProbeInit records partition from a proxy InitResponse. Must be called with the writer mutex held.
-// It returns true when the connection loop must rebind to the partition host node.
-func (dw *directWrite) handleProbeInit(writer *SingleStreamWriter, setLastSeqNo func(int64)) bool {
-	if !dw.awaitingPartition() {
-		return false
-	}
-
-	dw.pinPartitionFromInit(writer.PartitionID)
-	if writer.LastSeqNumRequested {
-		setLastSeqNo(writer.ReceivedLastSeqNum)
-	}
-
-	return true
-}
-
-// withPartitionNodeIDContext returns ctx with the partition host node ID when direct
-// write is enabled and the partition is already resolved; otherwise ctx is unchanged.
-func (dw *directWrite) withPartitionNodeIDContext(
-	ctx context.Context,
-	rawClient *rawtopic.Client,
-	topicPath string,
-) (context.Context, error) {
-	if !dw.enabled {
-		return ctx, nil
-	}
-
-	partitionID := dw.resolved.partitionIDValue()
-	if partitionID < 0 {
-		return ctx, nil
-	}
-
-	streamCtx, location, err := resolvePartitionNode(ctx, rawClient, topicPath, partitionID)
-	if err != nil {
-		return nil, err
-	}
-
-	dw.resolved.setLocation(location.Generation)
-
-	return streamCtx, nil
-}
-
-func (dw *directWrite) completeProbe(streamCtx context.Context, writer *SingleStreamWriter) {
-	_ = writer.close(streamCtx, nil)
-	dw.retryResetAfterProbe = true
-}
-
-// IsRetryResetAfterProbe reports whether reconnection attempt counters should be
-// reset after a successful proxy probe. The one-shot flag is cleared when read.
-func (dw *directWrite) IsRetryResetAfterProbe() bool {
-	if !dw.retryResetAfterProbe {
-		return false
-	}
-	dw.retryResetAfterProbe = false
-
-	return true
-}
-
-// resetPartitionFromInitOnFailure clears a partition taken from InitResponse after a
-// failed session so the next connect goes through the proxy probe again.
-func (dw *directWrite) resetPartitionFromInitOnFailure(reason error, withLock func(func())) {
-	if reason == nil || !dw.enabled || !dw.partitionFromInit {
+// resetAutoResolvedPartitionOnFailure clears an auto-resolved partition after a failed
+// session and rolls back defaultPartitioning changed by a proxy probe.
+// User-pinned partitions are left unchanged.
+// Must be called with the writer mutex held.
+func (dw *directWrite) resetAutoResolvedPartitionOnFailure(reason error) {
+	if reason == nil || !dw.enabled || dw.pinnedByUser || dw.resolved.unknown() {
 		return
 	}
 
-	dw.partitionFromInit = false
 	dw.resolved.clear()
-	withLock(func() {
-		*dw.partitioning = dw.original
-	})
+	dw.restoreOriginalPartitioning()
 }
 
-func (dw *directWrite) awaitingPartition() bool {
-	return dw.enabled && dw.resolved.unknown()
+// restoreOriginalPartitioning rolls back defaultPartitioning changed by a proxy probe.
+// Must be called with the writer mutex held.
+func (dw *directWrite) restoreOriginalPartitioning() {
+	*dw.partitioning = dw.original
 }
 
-// pinPartitionFromInit records the partition from InitResponse for the rebound
-// connect. Must be called with the writer mutex held.
-func (dw *directWrite) pinPartitionFromInit(partitionID int64) {
-	dw.partitionFromInit = true
+// recordProbedPartition stores partition ID discovered by a synchronous proxy probe.
+// Must be called with the writer mutex held.
+func (dw *directWrite) recordProbedPartition(partitionID int64) {
 	dw.resolved.setPartitionID(partitionID)
 	*dw.partitioning = rawtopicwriter.NewPartitioningPartitionID(partitionID)
 }
@@ -218,35 +151,66 @@ func (dw *directWrite) applyResolvedToPartitioning(partitioning *rawtopicwriter.
 	}
 }
 
-// resolvePartitionNode looks up which node currently hosts the given partition
-// of the topic and returns a context bound to that node with disableFallback enabled.
-func resolvePartitionNode(
+// lookupPartitionLocation looks up which node currently hosts the given partition.
+func lookupPartitionLocation(
 	ctx context.Context,
 	rawClient *rawtopic.Client,
 	topicPath string,
 	partitionID int64,
-) (context.Context, rawtopic.PartitionLocation, error) {
+) (rawtopic.PartitionLocation, error) {
 	res, err := rawClient.DescribeTopic(ctx, rawtopic.DescribeTopicRequest{
 		Path:            topicPath,
 		IncludeLocation: true,
 	})
 	if err != nil {
-		return nil, rawtopic.PartitionLocation{}, xerrors.WithStackTrace(
+		return rawtopic.PartitionLocation{}, xerrors.WithStackTrace(
 			fmt.Errorf("ydb: direct write: describe topic failed: %w", err),
 		)
 	}
 
 	location, ok := res.LocationOf(partitionID)
 	if !ok {
-		return nil, rawtopic.PartitionLocation{}, xerrors.WithStackTrace(fmt.Errorf(
+		return rawtopic.PartitionLocation{}, xerrors.WithStackTrace(fmt.Errorf(
 			"%w: topic=%q partition_id=%d",
 			errDirectWritePartitionNotFound, topicPath, partitionID,
 		))
 	}
 
-	return endpoint.WithNodeID(
-		ctx,
-		location.NodeIDUint32(),
-		endpoint.WithDisableFallback(),
-	), location, nil
+	return location, nil
+}
+
+// probeWriterPartition opens a short-lived proxy StreamWrite session, sends InitRequest,
+// reads InitResponse, and returns the assigned partition ID.
+func probeWriterPartition(
+	ctx context.Context,
+	rawClient *rawtopic.Client,
+	tracer *trace.Topic,
+	req rawtopicwriter.InitRequest,
+) (partitionID int64, lastSeqNo int64, err error) {
+	stream, err := rawClient.StreamWrite(ctx, tracer)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() {
+		_ = stream.CloseSend()
+	}()
+
+	if err = stream.Send(&req); err != nil {
+		return 0, 0, err
+	}
+
+	recvMessage, err := stream.Recv()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	result, ok := recvMessage.(*rawtopicwriter.InitResult)
+	if !ok {
+		return 0, 0, xerrors.WithStackTrace(fmt.Errorf(
+			"ydb: direct write: probe init response has unexpected type: %T",
+			recvMessage,
+		))
+	}
+
+	return result.PartitionID, result.LastSeqNo, nil
 }
