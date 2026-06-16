@@ -517,14 +517,15 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			attempt,
 		)
 
-		writer, connectErr := w.startWriteStream(streamCtx)
-
-		onStreamError := onWriterStarted(connectErr)
-		connectResult := w.finishStreamConnect(ctx, writer, connectErr)
-		if connectResult.resetRetryStart {
+		writer, err := w.startWriteStream(streamCtx)
+		w.onWriterChange(writer)
+		onStreamError := onWriterStarted(err)
+		if err == nil {
+			reconnectReason = writer.WaitClose(ctx)
 			startOfRetries = time.Now()
+		} else {
+			reconnectReason = err
 		}
-		reconnectReason = connectResult.reconnectReason
 		onStreamError(reconnectReason)
 	}
 }
@@ -559,30 +560,6 @@ func (w *WriterReconnector) handleReconnectRetry(
 	}
 
 	return false
-}
-
-type streamConnectResult struct {
-	reconnectReason error
-	resetRetryStart bool
-}
-
-func (w *WriterReconnector) finishStreamConnect(
-	waitCloseCtx context.Context,
-	writer *SingleStreamWriter,
-	connectErr error,
-) streamConnectResult {
-	if connectErr != nil {
-		w.onWriterChange(writer)
-
-		return streamConnectResult{reconnectReason: connectErr}
-	}
-
-	w.onWriterChange(writer)
-
-	return streamConnectResult{
-		reconnectReason: writer.WaitClose(waitCloseCtx),
-		resetRetryStart: true,
-	}
 }
 
 func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *SingleStreamWriter, err error) {
