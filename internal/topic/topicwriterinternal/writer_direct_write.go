@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -213,4 +215,89 @@ func probeWriterPartition(
 	}
 
 	return result.PartitionID, result.LastSeqNo, nil
+}
+
+func (w *WriterReconnector) prepareDirectWriteStreamContext(
+	streamCtx context.Context,
+	resolveCtx context.Context,
+	stopResolveCtx func() bool,
+) (context.Context, error) {
+	if !w.cfg.directWrite.enabled {
+		return streamCtx, nil
+	}
+
+	var connectErr error
+	var partitionID int64
+	var hostNodeID uint32
+
+	partitionID, connectErr = w.resolveDirectWritePartition(resolveCtx)
+	if connectErr == nil {
+		hostNodeID, connectErr = w.resolveDirectWriteHost(resolveCtx, partitionID)
+		if connectErr == nil {
+			return endpoint.WithNodeID(
+				xcontext.MergeContexts(streamCtx, w.cfg.LogContext),
+				hostNodeID,
+				endpoint.WithDisableFallback(),
+			), nil
+		}
+	}
+	if !stopResolveCtx() && connectErr == nil {
+		connectErr = context.Cause(resolveCtx)
+	}
+
+	return streamCtx, connectErr
+}
+
+func (w *WriterReconnector) resolveDirectWritePartition(ctx context.Context) (int64, error) {
+	if !w.cfg.directWrite.resolved.unknown() {
+		return w.cfg.directWrite.resolved.partitionIDValue(), nil
+	}
+
+	getLastSeqNo := w.needReceiveLastSeqNo()
+	partitionID, lastSeqNo, err := probeWriterPartition(
+		xcontext.MergeContexts(ctx, w.cfg.LogContext),
+		w.cfg.rawTopicClient,
+		w.cfg.Tracer,
+		rawtopicwriter.InitRequest{
+			Path:             w.cfg.topic,
+			ProducerID:       w.cfg.producerID,
+			WriteSessionMeta: w.cfg.writerMeta,
+			Partitioning:     w.cfg.directWrite.original,
+			GetLastSeqNo:     getLastSeqNo,
+		},
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	w.m.WithLock(func() {
+		w.cfg.directWrite.recordProbedPartition(partitionID)
+		if getLastSeqNo {
+			w.lastSeqNo = lastSeqNo
+		}
+	})
+
+	return partitionID, nil
+}
+
+func (w *WriterReconnector) resolveDirectWriteHost(
+	ctx context.Context,
+	partitionID int64,
+) (uint32, error) {
+	location, err := lookupPartitionLocation(
+		xcontext.MergeContexts(ctx, w.cfg.LogContext),
+		w.cfg.rawTopicClient,
+		w.cfg.topic,
+		partitionID,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	w.cfg.directWrite.resolved.setLocation(location.Generation)
+	w.m.WithLock(func() {
+		w.cfg.directWrite.applyResolvedToPartitioning(&w.cfg.defaultPartitioning)
+	})
+
+	return location.NodeIDUint32(), nil
 }
