@@ -18,6 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
@@ -467,7 +468,6 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 	return resErr
 }
 
-//nolint:funlen // direct-write adds partition/host resolve before connect
 func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	attempt := 0
 	createStreamContext := func() (context.Context, context.CancelFunc) {
@@ -517,20 +517,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			attempt,
 		)
 
-		resolveCtx, stopResolveCtx := xcontext.WithStoppableTimeoutCause(
-			streamCtx,
-			w.cfg.connectTimeout,
-			errConnTimeout,
-		)
-
-		connectStreamCtx, connectErr := w.prepareDirectWriteStreamContext(streamCtx, resolveCtx, stopResolveCtx)
-
-		var writer *SingleStreamWriter
-		if connectErr != nil {
-			writer = nil
-		} else {
-			writer, connectErr = w.startWriteStream(connectStreamCtx)
-		}
+		writer, connectErr := w.startWriteStream(streamCtx)
 
 		onStreamError := onWriterStarted(connectErr)
 		connectResult := w.finishStreamConnect(ctx, writer, connectErr)
@@ -609,6 +596,26 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 			err = context.Cause(connectCtx)
 		}
 	}()
+
+	if w.cfg.directWrite.enabled {
+		w.cfg.directWrite.clearConnectState()
+
+		partitionID, err := w.resolveDirectWritePartition(connectCtx)
+		if err != nil {
+			return nil, err
+		}
+
+		nodeID, err := w.resolveDirectWriteHost(connectCtx, partitionID)
+		if err != nil {
+			return nil, err
+		}
+
+		connectCtx = endpoint.WithNodeID(
+			connectCtx,
+			nodeID,
+			endpoint.WithDisableFallback(),
+		)
+	}
 
 	stream, err := w.connectWithTimeout(connectCtx)
 	if err != nil {

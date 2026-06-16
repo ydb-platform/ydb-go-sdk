@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -125,39 +124,6 @@ func probeWriterPartition(
 	}
 
 	return result.PartitionID, result.LastSeqNo, nil
-}
-
-func (w *WriterReconnector) prepareDirectWriteStreamContext(
-	streamCtx context.Context,
-	resolveCtx context.Context,
-	stopResolveCtx func() bool,
-) (context.Context, error) {
-	if !w.cfg.directWrite.enabled {
-		return streamCtx, nil
-	}
-
-	w.cfg.directWrite.clearConnectState()
-
-	var connectErr error
-	var partitionID int64
-	var hostNodeID uint32
-
-	partitionID, connectErr = w.resolveDirectWritePartition(resolveCtx)
-	if connectErr == nil {
-		hostNodeID, connectErr = w.resolveDirectWriteHost(resolveCtx, partitionID)
-		if connectErr == nil {
-			return endpoint.WithNodeID(
-				xcontext.MergeContexts(streamCtx, w.cfg.LogContext),
-				hostNodeID,
-				endpoint.WithDisableFallback(),
-			), nil
-		}
-	}
-	if !stopResolveCtx() && connectErr == nil {
-		connectErr = context.Cause(resolveCtx)
-	}
-
-	return streamCtx, connectErr
 }
 
 func (w *WriterReconnector) resolveDirectWritePartition(ctx context.Context) (int64, error) {
