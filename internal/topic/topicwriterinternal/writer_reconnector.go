@@ -137,10 +137,7 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 			RawTopicWriterStream,
 			error,
 		) {
-			return cfg.rawTopicClient.StreamWrite(
-				xcontext.MergeContexts(ctx, cfg.LogContext),
-				tracer,
-			)
+			return cfg.rawTopicClient.StreamWrite(xcontext.MergeContexts(ctx, cfg.LogContext), tracer)
 		}
 
 		cfg.Connect = connector
