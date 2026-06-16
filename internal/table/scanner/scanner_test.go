@@ -782,6 +782,120 @@ func TestScanToJsonUnmarshaller(t *testing.T) {
 	}
 }
 
+func TestScanYSON(t *testing.T) {
+	s := initScanner()
+
+	expected := []byte("<a=1>[3;%false]")
+	for _, test := range []struct {
+		name  string
+		value *Ydb.Value
+	}{
+		{
+			name: "TextValue",
+			value: &Ydb.Value{
+				Value: &Ydb.Value_TextValue{
+					TextValue: string(expected),
+				},
+			},
+		},
+		{
+			name: "BytesValue",
+			value: &Ydb.Value{
+				Value: &Ydb.Value_BytesValue{
+					BytesValue: expected,
+				},
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			set := &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "yson",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_YSON,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{
+							test.value,
+						},
+					},
+				},
+			}
+
+			s.reset(set)
+			require.True(t, s.NextRow())
+
+			var got []byte
+			err := s.Scan(&got)
+			require.NoError(t, err)
+			require.Equal(t, expected, got)
+		})
+	}
+}
+
+func TestScanYSONAny(t *testing.T) {
+	s := initScanner()
+
+	expected := []byte("<a=1>[3;%false]")
+	for _, test := range []struct {
+		name  string
+		value *Ydb.Value
+	}{
+		{
+			name: "TextValue",
+			value: &Ydb.Value{
+				Value: &Ydb.Value_TextValue{
+					TextValue: string(expected),
+				},
+			},
+		},
+		{
+			name: "BytesValue",
+			value: &Ydb.Value{
+				Value: &Ydb.Value_BytesValue{
+					BytesValue: expected,
+				},
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			set := &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "yson",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_YSON,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{
+							test.value,
+						},
+					},
+				},
+			}
+
+			s.reset(set)
+			require.True(t, s.NextRow())
+
+			var got any
+			err := s.Scan(&got)
+			require.NoError(t, err)
+			require.Equal(t, expected, got)
+		})
+	}
+}
+
 // jsonSQLScanner is a struct with a private json.RawMessage field that
 // implements sql.Scanner and json.Marshaler without inheriting driver.Valuer.
 // This mirrors the user-side pattern described in the fix for json.RawMessage binding.
