@@ -19,7 +19,7 @@ import (
 func TestDirectWriteConfig(t *testing.T) {
 	t.Run("RequiresProducerOrPinnedPartition", func(t *testing.T) {
 		cfg := WriterReconnectorConfig{
-			directWrite: directWrite{enabled: true},
+			directWriteEnabled: true,
 			WritersCommonConfig: WritersCommonConfig{
 				topic:               "test-topic",
 				defaultPartitioning: rawtopicwriter.Partitioning{Type: rawtopicwriter.PartitioningUndefined},
@@ -177,8 +177,16 @@ func TestLookupPartitionLocation(t *testing.T) {
 			}
 
 			rawClient := rawtopic.NewClient(topicwritetest.TopicServiceClientDescribeOnly(describe))
+			writer := &WriterReconnector{
+				cfg: WriterReconnectorConfig{
+					WritersCommonConfig: WritersCommonConfig{
+						topic:          topicPath,
+						rawTopicClient: &rawClient,
+					},
+				},
+			}
 
-			location, err := lookupPartitionLocation(context.Background(), &rawClient, topicPath, partitionID)
+			location, err := writer.lookupPartitionLocation(context.Background(), partitionID)
 			if tt.wantErr != nil || tt.wantErrSubstr != "" {
 				require.Error(t, err)
 				if tt.wantErr != nil {
@@ -205,15 +213,4 @@ func TestLookupPartitionLocation(t *testing.T) {
 			require.True(t, endpoint.ContextDisableFallback(ctx))
 		})
 	}
-}
-
-func TestDirectWriteConnectInitPartitioning(t *testing.T) {
-	initPartitioning := rawtopicwriter.NewPartitioningPartitionWithGeneration(7, 3)
-	dw := directWrite{
-		enabled:          true,
-		initPartitioning: initPartitioning,
-	}
-
-	got := dw.connectInitPartitioning(rawtopicwriter.NewPartitioningMessageGroup("producer"))
-	require.Equal(t, initPartitioning, got)
 }

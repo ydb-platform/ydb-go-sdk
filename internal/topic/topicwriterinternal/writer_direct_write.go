@@ -21,17 +21,12 @@ var (
 	)
 )
 
-// directWrite holds direct-write settings for a topic writer.
-type directWrite struct {
-	// enabled turns on direct StreamWrite to the node that hosts the target partition.
-	enabled bool
-
-	// initPartitioning is set for the current connect attempt after DescribeTopic.
-	initPartitioning rawtopicwriter.Partitioning
-}
-
-func (dw *directWrite) validate(partitioning rawtopicwriter.Partitioning, producerID string) error {
-	if !dw.enabled ||
+func validateDirectWrite(
+	enabled bool,
+	partitioning rawtopicwriter.Partitioning,
+	producerID string,
+) error {
+	if !enabled ||
 		partitioning.Type == rawtopicwriter.PartitioningPartitionID ||
 		producerID != "" {
 		return nil
@@ -40,37 +35,13 @@ func (dw *directWrite) validate(partitioning rawtopicwriter.Partitioning, produc
 	return xerrors.WithStackTrace(errDirectWriteRequiresPartitionOrProducer)
 }
 
-func (dw *directWrite) clearConnectState() {
-	dw.initPartitioning = rawtopicwriter.Partitioning{}
-}
-
-func (dw *directWrite) connectInitPartitioning(
-	defaultPartitioning rawtopicwriter.Partitioning,
-) rawtopicwriter.Partitioning {
-	if dw.initPartitioning.Type == rawtopicwriter.PartitioningPartitionWithGeneration {
-		return dw.initPartitioning
-	}
-
-	return defaultPartitioning
-}
-
-func pinnedPartitionID(partitioning rawtopicwriter.Partitioning) (int64, bool) {
-	if partitioning.Type == rawtopicwriter.PartitioningPartitionID {
-		return partitioning.PartitionID, true
-	}
-
-	return 0, false
-}
-
 // lookupPartitionLocation looks up which node currently hosts the given partition.
-func lookupPartitionLocation(
+func (w *WriterReconnector) lookupPartitionLocation(
 	ctx context.Context,
-	rawClient *rawtopic.Client,
-	topicPath string,
 	partitionID int64,
 ) (rawtopic.PartitionLocation, error) {
-	res, err := rawClient.DescribeTopic(ctx, rawtopic.DescribeTopicRequest{
-		Path:            topicPath,
+	res, err := w.cfg.rawTopicClient.DescribeTopic(ctx, rawtopic.DescribeTopicRequest{
+		Path:            w.cfg.topic,
 		IncludeLocation: true,
 	})
 	if err != nil {
@@ -83,7 +54,7 @@ func lookupPartitionLocation(
 	if !ok {
 		return rawtopic.PartitionLocation{}, xerrors.WithStackTrace(fmt.Errorf(
 			"%w: topic=%q partition_id=%d",
-			errDirectWritePartitionNotFound, topicPath, partitionID,
+			errDirectWritePartitionNotFound, w.cfg.topic, partitionID,
 		))
 	}
 
@@ -126,8 +97,25 @@ func probeWriterPartition(
 	return result.PartitionID, result.LastSeqNo, nil
 }
 
+func (w *WriterReconnector) resolveDirectWrite(
+	ctx context.Context,
+) (partitionID int64, location rawtopic.PartitionLocation, err error) {
+	partitionID, err = w.resolveDirectWritePartition(ctx)
+	if err != nil {
+		return 0, rawtopic.PartitionLocation{}, err
+	}
+
+	location, err = w.lookupPartitionLocation(ctx, partitionID)
+	if err != nil {
+		return 0, rawtopic.PartitionLocation{}, err
+	}
+
+	return partitionID, location, nil
+}
+
 func (w *WriterReconnector) resolveDirectWritePartition(ctx context.Context) (int64, error) {
-	if partitionID, ok := pinnedPartitionID(w.cfg.defaultPartitioning); ok {
+	if partitionID, ok := w.cfg.PartitionID(); ok &&
+		w.cfg.defaultPartitioning.Type == rawtopicwriter.PartitioningPartitionID {
 		return partitionID, nil
 	}
 
@@ -155,26 +143,4 @@ func (w *WriterReconnector) resolveDirectWritePartition(ctx context.Context) (in
 	}
 
 	return partitionID, nil
-}
-
-func (w *WriterReconnector) resolveDirectWriteHost(
-	ctx context.Context,
-	partitionID int64,
-) (uint32, error) {
-	location, err := lookupPartitionLocation(
-		xcontext.MergeContexts(ctx, w.cfg.LogContext),
-		w.cfg.rawTopicClient,
-		w.cfg.topic,
-		partitionID,
-	)
-	if err != nil {
-		return 0, err
-	}
-
-	w.cfg.directWrite.initPartitioning = rawtopicwriter.NewPartitioningPartitionWithGeneration(
-		partitionID,
-		location.Generation,
-	)
-
-	return location.NodeIDUint32(), nil
 }
