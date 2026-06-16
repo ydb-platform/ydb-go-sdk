@@ -18,7 +18,6 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
@@ -1307,7 +1306,15 @@ type sendFromServerResponse struct {
 }
 
 func testCreateInitRequest(w *WriterReconnector) rawtopicwriter.InitRequest {
-	cfg := w.createWriterStreamConfig(nil, 0, rawtopic.PartitionLocation{})
+	cfg := newSingleStreamWriterConfig(
+		w.cfg.WritersCommonConfig,
+		nil,
+		&w.queue,
+		w.encodersMap,
+		w.needReceiveLastSeqNo(),
+		w.writerInstanceID,
+		nil,
+	)
 
 	return newSingleStreamWriterStopped(context.Background(), cfg).createInitRequest()
 }

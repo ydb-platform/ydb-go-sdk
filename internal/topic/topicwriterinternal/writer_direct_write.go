@@ -97,22 +97,6 @@ func probeWriterPartition(
 	return result.PartitionID, result.LastSeqNo, nil
 }
 
-func (w *WriterReconnector) resolveDirectWrite(
-	ctx context.Context,
-) (partitionID int64, location rawtopic.PartitionLocation, err error) {
-	partitionID, err = w.resolveDirectWritePartition(ctx)
-	if err != nil {
-		return 0, rawtopic.PartitionLocation{}, err
-	}
-
-	location, err = w.lookupPartitionLocation(ctx, partitionID)
-	if err != nil {
-		return 0, rawtopic.PartitionLocation{}, err
-	}
-
-	return partitionID, location, nil
-}
-
 func (w *WriterReconnector) resolveDirectWritePartition(ctx context.Context) (int64, error) {
 	if partitionID, ok := w.cfg.PartitionID(); ok &&
 		w.cfg.defaultPartitioning.Type == rawtopicwriter.PartitioningPartitionID {

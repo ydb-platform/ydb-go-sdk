@@ -19,7 +19,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
@@ -575,10 +574,14 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 		}
 	}()
 
-	var partitionID int64
-	var location rawtopic.PartitionLocation
+	common := w.cfg.WritersCommonConfig
 	if w.cfg.directWriteEnabled {
-		partitionID, location, err = w.resolveDirectWrite(connectCtx)
+		partitionID, err := w.resolveDirectWritePartition(connectCtx)
+		if err != nil {
+			return nil, err
+		}
+
+		location, err := w.lookupPartitionLocation(connectCtx, partitionID)
 		if err != nil {
 			return nil, err
 		}
@@ -587,6 +590,11 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 			connectCtx,
 			location.NodeIDUint32(),
 			endpoint.WithDisableFallback(),
+		)
+
+		common.defaultPartitioning = rawtopicwriter.NewPartitioningPartitionWithGeneration(
+			partitionID,
+			location.Generation,
 		)
 	}
 
@@ -597,7 +605,22 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 
 	w.queue.ResetSentProgress()
 
-	return NewSingleStreamWriter(connectCtx, w.createWriterStreamConfig(stream, partitionID, location))
+	var ep trace.EndpointInfo
+	if stream != nil {
+		ep = stream.Endpoint() // endpoint.Endpoint implements trace.EndpointInfo
+	}
+
+	streamCfg := newSingleStreamWriterConfig(
+		common,
+		stream,
+		&w.queue,
+		w.encodersMap,
+		w.needReceiveLastSeqNo(),
+		w.writerInstanceID,
+		ep,
+	)
+
+	return NewSingleStreamWriter(connectCtx, streamCfg)
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
@@ -710,37 +733,6 @@ func (w *WriterReconnector) waitFirstInitResponse(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-}
-
-func (w *WriterReconnector) createWriterStreamConfig(
-	stream RawTopicWriterStream,
-	partitionID int64,
-	location rawtopic.PartitionLocation,
-) SingleStreamWriterConfig {
-	var ep trace.EndpointInfo
-	if stream != nil {
-		ep = stream.Endpoint() // endpoint.Endpoint implements trace.EndpointInfo
-	}
-
-	common := w.cfg.WritersCommonConfig
-	if w.cfg.directWriteEnabled {
-		common.defaultPartitioning = rawtopicwriter.NewPartitioningPartitionWithGeneration(
-			partitionID,
-			location.Generation,
-		)
-	}
-
-	cfg := newSingleStreamWriterConfig(
-		common,
-		stream,
-		&w.queue,
-		w.encodersMap,
-		w.needReceiveLastSeqNo(),
-		w.writerInstanceID,
-		ep,
-	)
-
-	return cfg
 }
 
 func (w *WriterReconnector) GetSessionID() (sessionID string) {
