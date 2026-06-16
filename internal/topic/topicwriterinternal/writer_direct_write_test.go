@@ -36,6 +36,7 @@ func TestDirectWriteConfig(t *testing.T) {
 		name            string
 		opts            []PublicWriterOption
 		wantPartitionID int64
+		wantPinned      bool
 	}{
 		{
 			name: "ProducerOnlyWaitsForServerPartition",
@@ -54,15 +55,17 @@ func TestDirectWriteConfig(t *testing.T) {
 				WithDirectWrite(true),
 			},
 			wantPartitionID: 7,
+			wantPinned:      true,
 		},
 		{
-			name: "DirectWriteDisabledIgnoresPinnedPartition",
+			name: "DirectWriteDisabledKeepsPinnedPartitionInConfig",
 			opts: []PublicWriterOption{
 				WithTopic("test-topic"),
 				WithPartitioning(NewPartitioningWithPartitionID(7)),
 				WithDirectWrite(false),
 			},
-			wantPartitionID: -1,
+			wantPartitionID: 7,
+			wantPinned:      true,
 		},
 	}
 
@@ -70,26 +73,33 @@ func TestDirectWriteConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := NewWriterReconnectorConfig(tt.opts...)
 			require.NoError(t, cfg.validate())
-			if tt.wantPartitionID < 0 {
-				require.True(t, cfg.directWrite.resolved.unknown())
+
+			partitionID, ok := cfg.PartitionID()
+			if tt.wantPinned {
+				require.True(t, ok)
+				require.EqualValues(t, tt.wantPartitionID, partitionID)
 			} else {
-				require.EqualValues(t, tt.wantPartitionID, cfg.directWrite.resolved.partitionIDValue())
+				require.False(t, ok)
 			}
 		})
 	}
 }
 
-func TestWithPartitioningRefreshesDirectWritePartitionState(t *testing.T) {
+func TestWithPartitioningSetsPinnedPartitionID(t *testing.T) {
 	cfg := NewWriterReconnectorConfig(
 		WithTopic("test"),
 		WithDirectWrite(true),
 	)
-	require.True(t, cfg.directWrite.resolved.unknown())
+
+	partitionID, ok := cfg.PartitionID()
+	require.False(t, ok)
+	require.Zero(t, partitionID)
 
 	WithPartitioning(NewPartitioningWithPartitionID(7))(&cfg)
 
-	require.EqualValues(t, 7, cfg.directWrite.resolved.partitionIDValue())
-	require.True(t, cfg.directWrite.pinnedByUser)
+	partitionID, ok = cfg.PartitionID()
+	require.True(t, ok)
+	require.EqualValues(t, 7, partitionID)
 }
 
 func TestLookupPartitionLocation(t *testing.T) {
@@ -195,4 +205,15 @@ func TestLookupPartitionLocation(t *testing.T) {
 			require.True(t, endpoint.ContextDisableFallback(ctx))
 		})
 	}
+}
+
+func TestDirectWriteConnectInitPartitioning(t *testing.T) {
+	initPartitioning := rawtopicwriter.NewPartitioningPartitionWithGeneration(7, 3)
+	dw := directWrite{
+		enabled:          true,
+		initPartitioning: initPartitioning,
+	}
+
+	got := dw.connectInitPartitioning(rawtopicwriter.NewPartitioningMessageGroup("producer"))
+	require.Equal(t, initPartitioning, got)
 }

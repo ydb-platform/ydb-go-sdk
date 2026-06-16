@@ -132,8 +132,6 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		WithProducerID(uuid.NewString())(&cfg)
 	}
 
-	cfg.directWrite.finishInit(&cfg.defaultPartitioning)
-
 	if cfg.Connect == nil {
 		var connector ConnectFunc = func(ctx context.Context, tracer *trace.Topic) (
 			RawTopicWriterStream,
@@ -497,10 +495,6 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtxCancel()
 		streamCtx, streamCtxCancel = createStreamContext()
 
-		w.m.WithLock(func() {
-			w.cfg.directWrite.resetAutoResolvedPartitionOnFailure(reconnectReason)
-		})
-
 		now := time.Now()
 		if startOfRetries.IsZero() ||
 			topic.IsReconnectionBackoffExpired(prevAttemptTime, now, w.cfg.connectTimeout) {
@@ -746,8 +740,11 @@ func (w *WriterReconnector) createWriterStreamConfig(stream RawTopicWriterStream
 		ep = stream.Endpoint() // endpoint.Endpoint implements trace.EndpointInfo
 	}
 
+	common := w.cfg.WritersCommonConfig
+	common.defaultPartitioning = w.cfg.directWrite.connectInitPartitioning(common.defaultPartitioning)
+
 	cfg := newSingleStreamWriterConfig(
-		w.cfg.WritersCommonConfig,
+		common,
 		stream,
 		&w.queue,
 		w.encodersMap,

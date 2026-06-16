@@ -22,87 +22,13 @@ var (
 	)
 )
 
-// resolvedPartition holds direct-write partition resolution state.
-// Access is owned by the writer connection loop and methods that require its mutex.
-type resolvedPartition struct {
-	// partitionID is the target partition for direct write.
-	// -1 means unknown until resolved by a proxy probe.
-	partitionID int64
-	// generation is from the latest DescribeTopic when partitionID >= 0.
-	// -1 means not yet resolved.
-	generation int64
-}
-
-func newResolvedPartition() *resolvedPartition {
-	rp := &resolvedPartition{}
-	rp.clear()
-
-	return rp
-}
-
-func (rp *resolvedPartition) clear() {
-	rp.partitionID = -1
-	rp.generation = -1
-}
-
-func (rp *resolvedPartition) setPartitionID(partitionID int64) {
-	rp.partitionID = partitionID
-	rp.generation = -1
-}
-
-func (rp *resolvedPartition) partitionIDValue() int64 {
-	return rp.partitionID
-}
-
-func (rp *resolvedPartition) setLocation(generation int64) {
-	rp.generation = generation
-}
-
-func (rp *resolvedPartition) unknown() bool {
-	return rp.partitionID < 0
-}
-
-func (rp *resolvedPartition) initPartitioning() (rawtopicwriter.Partitioning, bool) {
-	if rp.partitionID < 0 || rp.generation < 0 {
-		return rawtopicwriter.Partitioning{}, false
-	}
-
-	return rawtopicwriter.NewPartitioningPartitionWithGeneration(rp.partitionID, rp.generation), true
-}
-
-// directWrite holds partition resolution state for a topic writer.
+// directWrite holds direct-write settings for a topic writer.
 type directWrite struct {
 	// enabled turns on direct StreamWrite to the node that hosts the target partition.
 	enabled bool
 
-	// resolved holds partition ID and generation used for node lookup and InitRequest.
-	resolved *resolvedPartition
-
-	// pinnedByUser is true when the caller set an explicit partition ID via WithPartitioning.
-	// A user-pinned partition is never cleared after a session failure.
-	pinnedByUser bool
-
-	// original is defaultPartitioning before a proxy probe updated partitioning.
-	// Restored when auto-resolved partition state is reset after a failed direct session.
-	original rawtopicwriter.Partitioning
-
-	// partitioning points at cfg.defaultPartitioning; updated when pinned by user or set from InitResponse.
-	partitioning *rawtopicwriter.Partitioning
-}
-
-func (dw *directWrite) finishInit(partitioning *rawtopicwriter.Partitioning) {
-	dw.original = *partitioning
-	dw.partitioning = partitioning
-	dw.resolved = newResolvedPartition()
-
-	if dw.enabled && partitioning.Type == rawtopicwriter.PartitioningPartitionID {
-		dw.resolved.setPartitionID(partitioning.PartitionID)
-		dw.pinnedByUser = true
-
-		return
-	}
-
-	dw.pinnedByUser = false
+	// initPartitioning is set for the current connect attempt after DescribeTopic.
+	initPartitioning rawtopicwriter.Partitioning
 }
 
 func (dw *directWrite) validate(partitioning rawtopicwriter.Partitioning, producerID string) error {
@@ -115,42 +41,26 @@ func (dw *directWrite) validate(partitioning rawtopicwriter.Partitioning, produc
 	return xerrors.WithStackTrace(errDirectWriteRequiresPartitionOrProducer)
 }
 
-// resetAutoResolvedPartitionOnFailure clears an auto-resolved partition after a failed
-// session and rolls back defaultPartitioning changed by a proxy probe.
-// User-pinned partitions are left unchanged.
-// Must be called with the writer mutex held.
-func (dw *directWrite) resetAutoResolvedPartitionOnFailure(reason error) {
-	if reason == nil || !dw.enabled || dw.pinnedByUser || dw.resolved.unknown() {
-		return
-	}
-
-	dw.resolved.clear()
-	dw.restoreOriginalPartitioning()
+func (dw *directWrite) clearConnectState() {
+	dw.initPartitioning = rawtopicwriter.Partitioning{}
 }
 
-// restoreOriginalPartitioning rolls back defaultPartitioning changed by a proxy probe.
-// Must be called with the writer mutex held.
-func (dw *directWrite) restoreOriginalPartitioning() {
-	*dw.partitioning = dw.original
-}
-
-// recordProbedPartition stores partition ID discovered by a synchronous proxy probe.
-// Must be called with the writer mutex held.
-func (dw *directWrite) recordProbedPartition(partitionID int64) {
-	dw.resolved.setPartitionID(partitionID)
-	*dw.partitioning = rawtopicwriter.NewPartitioningPartitionID(partitionID)
-}
-
-// applyResolvedToPartitioning updates init partitioning with partition ID and generation
-// resolved by the latest DescribeTopic during direct connect.
-func (dw *directWrite) applyResolvedToPartitioning(partitioning *rawtopicwriter.Partitioning) {
-	if !dw.enabled {
-		return
+func (dw *directWrite) connectInitPartitioning(
+	defaultPartitioning rawtopicwriter.Partitioning,
+) rawtopicwriter.Partitioning {
+	if dw.initPartitioning.Type == rawtopicwriter.PartitioningPartitionWithGeneration {
+		return dw.initPartitioning
 	}
 
-	if resolved, ok := dw.resolved.initPartitioning(); ok {
-		*partitioning = resolved
+	return defaultPartitioning
+}
+
+func pinnedPartitionID(partitioning rawtopicwriter.Partitioning) (int64, bool) {
+	if partitioning.Type == rawtopicwriter.PartitioningPartitionID {
+		return partitioning.PartitionID, true
 	}
+
+	return 0, false
 }
 
 // lookupPartitionLocation looks up which node currently hosts the given partition.
@@ -226,6 +136,8 @@ func (w *WriterReconnector) prepareDirectWriteStreamContext(
 		return streamCtx, nil
 	}
 
+	w.cfg.directWrite.clearConnectState()
+
 	var connectErr error
 	var partitionID int64
 	var hostNodeID uint32
@@ -249,8 +161,8 @@ func (w *WriterReconnector) prepareDirectWriteStreamContext(
 }
 
 func (w *WriterReconnector) resolveDirectWritePartition(ctx context.Context) (int64, error) {
-	if !w.cfg.directWrite.resolved.unknown() {
-		return w.cfg.directWrite.resolved.partitionIDValue(), nil
+	if partitionID, ok := pinnedPartitionID(w.cfg.defaultPartitioning); ok {
+		return partitionID, nil
 	}
 
 	getLastSeqNo := w.needReceiveLastSeqNo()
@@ -262,7 +174,7 @@ func (w *WriterReconnector) resolveDirectWritePartition(ctx context.Context) (in
 			Path:             w.cfg.topic,
 			ProducerID:       w.cfg.producerID,
 			WriteSessionMeta: w.cfg.writerMeta,
-			Partitioning:     w.cfg.directWrite.original,
+			Partitioning:     w.cfg.defaultPartitioning,
 			GetLastSeqNo:     getLastSeqNo,
 		},
 	)
@@ -270,12 +182,11 @@ func (w *WriterReconnector) resolveDirectWritePartition(ctx context.Context) (in
 		return 0, err
 	}
 
-	w.m.WithLock(func() {
-		w.cfg.directWrite.recordProbedPartition(partitionID)
-		if getLastSeqNo {
+	if getLastSeqNo {
+		w.m.WithLock(func() {
 			w.lastSeqNo = lastSeqNo
-		}
-	})
+		})
+	}
 
 	return partitionID, nil
 }
@@ -294,10 +205,10 @@ func (w *WriterReconnector) resolveDirectWriteHost(
 		return 0, err
 	}
 
-	w.cfg.directWrite.resolved.setLocation(location.Generation)
-	w.m.WithLock(func() {
-		w.cfg.directWrite.applyResolvedToPartitioning(&w.cfg.defaultPartitioning)
-	})
+	w.cfg.directWrite.initPartitioning = rawtopicwriter.NewPartitioningPartitionWithGeneration(
+		partitionID,
+		location.Generation,
+	)
 
 	return location.NodeIDUint32(), nil
 }
