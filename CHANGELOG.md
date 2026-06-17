@@ -8,7 +8,6 @@
 
 ## v3.139.7
 * Fixed YSON scanning in `TableService` to support both underlying `TextValue` and `BytesValue` wire representations
-
 * Fixed inverted success/error handling in the `ExampleWriter_Write` doc example for `topicwriter`, which printed `OK` on failure and aborted on success
 * Fixed nil pointer dereference panic in `topicsugar.ProtobufIterator` on the first received message by allocating a concrete protobuf message before unmarshaling
 
