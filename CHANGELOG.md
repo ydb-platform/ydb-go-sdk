@@ -1,4 +1,6 @@
 * Fixed a race in topic multi-writer initialization where partition split handling could close writers still used by `initSeqNo`, causing `WaitInit` to fail with `ydb: stop writer reconnector`; message pipeline workers now start only after init completes
+
+## v3.140.2
 * Added `topicwriter.ErrWriterClosed` sentinel error returned by `Writer.Write` when the writer has been closed due to a terminal error or an explicit `Close` call; use `errors.Is` to detect this condition and recreate the writer if needed
 
 ## v3.140.1
