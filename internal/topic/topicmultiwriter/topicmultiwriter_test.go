@@ -1196,3 +1196,94 @@ func TestMultiWriter_Write_SmallIdleSessionTimeout(t *testing.T) {
 	require.NoError(t, multiWriter.Write(ctx, messages))
 	require.NoError(t, multiWriter.Close(ctx))
 }
+
+type blockingInitWriter struct {
+	releaseInit <-chan struct{}
+	closeCalled chan struct{}
+}
+
+func (w *blockingInitWriter) Close(_ context.Context) error {
+	select {
+	case w.closeCalled <- struct{}{}:
+	default:
+	}
+
+	return errors.New("ydb: stop writer reconnector")
+}
+
+func (w *blockingInitWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+	select {
+	case <-ctx.Done():
+		return topicwriterinternal.InitialInfo{}, ctx.Err()
+	case <-w.closeCalled:
+		return topicwriterinternal.InitialInfo{}, errors.New("ydb: stop writer reconnector")
+	case <-w.releaseInit:
+	}
+
+	return topicwriterinternal.InitialInfo{}, nil
+}
+
+func (w *blockingInitWriter) WriteInternal(
+	_ context.Context,
+	_ []topicwritercommon.MessageWithDataContent,
+) error {
+	return nil
+}
+
+type blockingInitWritersFactory struct {
+	releaseInit <-chan struct{}
+}
+
+func (f *blockingInitWritersFactory) Create(_ topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	return &blockingInitWriter{
+		releaseInit: f.releaseInit,
+		closeCalled: make(chan struct{}, 1),
+	}, nil
+}
+
+func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	releaseInit := make(chan struct{})
+
+	baseDesc := stubs.DefaultStubTopicDescription(t)
+	state := stubs.NewDescribeWithSplitsState(t, baseDesc, 6)
+	stubClient := stubs.NewStubTopicClientWithSplits(t, state)
+
+	multiWriter := newTestMultiWriterWithCustomWritersFactory(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+		&blockingInitWritersFactory{releaseInit: releaseInit},
+	)
+
+	waitResult := make(chan error, 1)
+	go func() {
+		waitResult <- multiWriter.WaitInit(ctx)
+	}()
+
+	require.Eventually(t, func() bool {
+		return multiWriter.getWritersCount() > 0
+	}, time.Second, 10*time.Millisecond, "initSeqNo should create partition writers")
+
+	// Simulate a partition split event while initSeqNo is still waiting for writer init.
+	// The split is queued but must not be processed until init completes and workers start.
+	state.RecordSplit(1)
+	multiWriter.orchestrator.partitionSplitReceiver.push(1)
+
+	// Allow time for a running partition splitter to pick up the event (old behaviour).
+	time.Sleep(200 * time.Millisecond)
+
+	close(releaseInit)
+
+	select {
+	case err := <-waitResult:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("WaitInit timed out")
+	}
+
+	require.NoError(t, multiWriter.Close(ctx))
+}
