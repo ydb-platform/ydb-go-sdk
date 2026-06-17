@@ -163,6 +163,14 @@ jobs:
             --src-path "${{ matrix.sdk.path }}" \
             --fallback-image "ydb-app-current"
 
+          BASELINE_STORAGE="$GITHUB_WORKSPACE/baseline/tests/slo/${{ matrix.sdk.path }}/storage.go"
+          if [[ -f "$BASELINE_STORAGE" ]] && \
+             grep -q 'nodehints.RunUpdates' "$BASELINE_STORAGE" && \
+             ! grep -q 'func (s \*Storage) initNodeSelector' "$BASELINE_STORAGE"; then
+            echo "Baseline workload uses legacy node selector init; reusing current image for baseline"
+            docker tag ydb-app-current ydb-app-baseline
+          fi
+
       - name: Run SLO Tests
         uses: ydb-platform/ydb-slo-action/init@v2
         timeout-minutes: 30
