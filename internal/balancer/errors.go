@@ -10,6 +10,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 )
 
+// Session-create RPC status codes that indicate the target node should be pessimized.
+var sessionCreateBanOperationCodes = []Ydb.StatusIds_StatusCode{
+	Ydb.StatusIds_OVERLOADED,
+	Ydb.StatusIds_UNAVAILABLE,
+}
+
 var (
 	allCodes = map[grpcCodes.Code]struct{}{
 		grpcCodes.OK:                 {},
@@ -40,8 +46,9 @@ var (
 )
 
 type (
-	ctxBanOnOperationError  struct{}
-	operationErrorCodesType []Ydb.StatusIds_StatusCode
+	ctxBanOnOperationError            struct{}
+	ctxBanOnContextDeadlineExceeded   struct{}
+	operationErrorCodesType           []Ydb.StatusIds_StatusCode
 )
 
 func BanOnOperationError(ctx context.Context, codes ...Ydb.StatusIds_StatusCode) context.Context {
@@ -55,6 +62,20 @@ func BanOnOperationError(ctx context.Context, codes ...Ydb.StatusIds_StatusCode)
 	return context.WithValue(ctx, ctxBanOnOperationError{}, allCodes)
 }
 
+// BanOnContextDeadlineExceeded marks ctx so that context.DeadlineExceeded on the RPC
+// pessimizes the connection. Intended for driver-level probes (CreateSession, AttachSession),
+// not for query execution timeouts on otherwise healthy nodes.
+func BanOnContextDeadlineExceeded(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxBanOnContextDeadlineExceeded{}, true)
+}
+
+// BanOnSessionCreate marks ctx for CreateSession/AttachSession RPCs: ban the connection on
+// overload, unavailability, or client-side deadline exceeded.
+func BanOnSessionCreate(ctx context.Context) context.Context {
+	ctx = BanOnOperationError(ctx, sessionCreateBanOperationCodes...)
+	return BanOnContextDeadlineExceeded(ctx)
+}
+
 func IsBadConn(ctx context.Context, err error, ignoreCodes ...grpcCodes.Code) bool {
 	if xerrors.IsTransportError(err, xslices.Subtract(badCodes, ignoreCodes)...) {
 		return true
@@ -64,6 +85,12 @@ func IsBadConn(ctx context.Context, err error, ignoreCodes ...grpcCodes.Code) bo
 
 	if len(operationErrorCodes) > 0 && xerrors.IsOperationError(err, operationErrorCodes...) {
 		return true
+	}
+
+	if banOnContextDeadlineExceeded, _ := ctx.Value(ctxBanOnContextDeadlineExceeded{}).(bool); banOnContextDeadlineExceeded {
+		if xerrors.Is(err, context.DeadlineExceeded) {
+			return true
+		}
 	}
 
 	return false
