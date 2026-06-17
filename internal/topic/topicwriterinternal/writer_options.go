@@ -140,14 +140,26 @@ func WithErrOnQueueFull(enable bool) PublicWriterOption {
 
 func WithPartitioning(partitioning PublicFuturePartitioning) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
-		cfg.defaultPartitioning = partitioning.ToRaw()
+		cfg.partitioning = partitioning.ToRaw()
+	}
+}
+
+// WithDirectWrite enables direct connection to the node hosting the target
+// partition. The partition may be pinned by the caller via WithPartitioning(
+// NewPartitioningWithPartitionID(...)) — in which case the first connect goes
+// direct — or discovered via a synchronous proxy probe before connect.
+// See the public option topicoptions.WithWriterDirectWrite for the full
+// behavior contract.
+func WithDirectWrite(enable bool) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.directWriteEnabled = enable
 	}
 }
 
 func WithProducerID(producerID string) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.producerID = producerID
-		oldPartitioningType := cfg.defaultPartitioning.Type
+		oldPartitioningType := cfg.partitioning.Type
 		if oldPartitioningType == rawtopicwriter.PartitioningUndefined ||
 			oldPartitioningType == rawtopicwriter.PartitioningMessageGroupID {
 			WithPartitioning(NewPartitioningWithMessageGroupID(producerID))(cfg)

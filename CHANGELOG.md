@@ -1,3 +1,14 @@
+## v3.140.1
+* Fixed `Topic().Alter()` consumer alters (`AlterConsumerWithImportant`, `AlterConsumerWithReadFrom`, `AlterConsumerWithAttributes`, `AlterConsumerWithAvailabilityPeriod`) silently resetting the consumer's supported-codecs restriction: `set_supported_codecs` is now sent only when `AlterConsumerWithSupportedCodecs` is used
+
+## v3.140.0
+* Added `topicoptions.WithWriterDirectWrite(bool)` and `topicoptions.WithMultiWriterDirectWrite(bool)` options to send topic writes to the node that hosts the target partition, bypassing the topic proxy
+
+## v3.139.8
+* Masked access tokens in topic gRPC debug logs for `UpdateTokenRequest` messages
+
+## v3.139.7
+* Fixed YSON scanning in `TableService` to support both underlying `TextValue` and `BytesValue` wire representations
 * Fixed inverted success/error handling in the `ExampleWriter_Write` doc example for `topicwriter`, which printed `OK` on failure and aborted on success
 * Fixed nil pointer dereference panic in `topicsugar.ProtobufIterator` on the first received message by allocating a concrete protobuf message before unmarshaling
 

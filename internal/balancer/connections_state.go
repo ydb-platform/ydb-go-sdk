@@ -66,6 +66,9 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 	if c := s.preferConnection(ctx); c != nil {
 		return c, 0
 	}
+	if _, hasNode := endpoint.ContextNodeID(ctx); hasNode && !endpoint.ContextFallback(ctx) {
+		return nil, 0
+	}
 
 	try := func(conns []conn.Conn) conn.Conn {
 		c, tryFailed := s.selectRandomConnection(conns, false)
