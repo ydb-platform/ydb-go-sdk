@@ -200,9 +200,10 @@ func (consumerCodecs withConsumerWithSupportedCodecs) ApplyAlterOption(req *rawt
 	req.AlterConsumers, index = ensureAlterConsumer(req.AlterConsumers, consumerCodecs.name)
 
 	consumer := &req.AlterConsumers[index]
-	consumer.SetSupportedCodecs = make(rawtopiccommon.SupportedCodecs, len(consumerCodecs.codecs))
+	consumer.SetSupportedCodecs = true
+	consumer.SetSupportedCodecsValue = make(rawtopiccommon.SupportedCodecs, len(consumerCodecs.codecs))
 	for i, codec := range consumerCodecs.codecs {
-		consumer.SetSupportedCodecs[i] = rawtopiccommon.Codec(codec)
+		consumer.SetSupportedCodecsValue[i] = rawtopiccommon.Codec(codec)
 	}
 }
 
