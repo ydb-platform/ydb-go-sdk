@@ -165,4 +165,5 @@ func TestBanOnSessionCreate(t *testing.T) {
 		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_NOT_FOUND))),
 	))
 	require.True(t, IsBadConn(ctx, context.DeadlineExceeded))
+	require.False(t, IsBadConn(ctx, context.Canceled))
 }
