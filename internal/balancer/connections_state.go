@@ -63,11 +63,10 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 		return nil, 0
 	}
 
-	c, allowFallback := s.preferConnection(ctx)
-	if c != nil {
+	if c := s.preferConnection(ctx); c != nil {
 		return c, 0
 	}
-	if !allowFallback {
+	if _, hasNode := endpoint.ContextNodeID(ctx); hasNode && !endpoint.ContextFallback(ctx) {
 		return nil, 0
 	}
 
@@ -86,25 +85,23 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 		return c, failedCount
 	}
 
-	c, _ = s.selectRandomConnection(s.all, true)
+	c, _ := s.selectRandomConnection(s.all, true)
 
 	return c, failedCount
 }
 
-func (s *connectionsState) preferConnection(ctx context.Context) (c conn.Conn, allowFallback bool) {
+func (s *connectionsState) preferConnection(ctx context.Context) conn.Conn {
 	nodeID, hasNode := endpoint.ContextNodeID(ctx)
 	if !hasNode {
-		return nil, true
+		return nil
 	}
 
-	allowFallback = endpoint.ContextFallback(ctx)
-
-	c = s.connByNodeID[nodeID]
+	c := s.connByNodeID[nodeID]
 	if c != nil && isOkConnection(c, false) {
-		return c, allowFallback
+		return c
 	}
 
-	return nil, allowFallback
+	return nil
 }
 
 func (s *connectionsState) selectRandomConnection(conns []conn.Conn, allowBanned bool) (c conn.Conn, failedConns int) {
