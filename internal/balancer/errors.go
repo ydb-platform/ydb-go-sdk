@@ -46,9 +46,9 @@ var (
 )
 
 type (
-	ctxBanOnOperationError            struct{}
-	ctxBanOnContextDeadlineExceeded   struct{}
-	operationErrorCodesType           []Ydb.StatusIds_StatusCode
+	ctxBanOnOperationError          struct{}
+	ctxBanOnContextDeadlineExceeded struct{}
+	operationErrorCodesType         []Ydb.StatusIds_StatusCode
 )
 
 func BanOnOperationError(ctx context.Context, codes ...Ydb.StatusIds_StatusCode) context.Context {
@@ -73,6 +73,7 @@ func BanOnContextDeadlineExceeded(ctx context.Context) context.Context {
 // overload, unavailability, or client-side deadline exceeded.
 func BanOnSessionCreate(ctx context.Context) context.Context {
 	ctx = BanOnOperationError(ctx, sessionCreateBanOperationCodes...)
+
 	return BanOnContextDeadlineExceeded(ctx)
 }
 
@@ -87,7 +88,8 @@ func IsBadConn(ctx context.Context, err error, ignoreCodes ...grpcCodes.Code) bo
 		return true
 	}
 
-	if banOnContextDeadlineExceeded, _ := ctx.Value(ctxBanOnContextDeadlineExceeded{}).(bool); banOnContextDeadlineExceeded {
+	banOnContextDeadlineExceeded, _ := ctx.Value(ctxBanOnContextDeadlineExceeded{}).(bool)
+	if banOnContextDeadlineExceeded {
 		if xerrors.Is(err, context.DeadlineExceeded) {
 			return true
 		}
