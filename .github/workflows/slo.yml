@@ -192,14 +192,18 @@ jobs:
         run: |
           chmod +x "$GITHUB_WORKSPACE/current/.github/scripts/collect-slo-flamegraphs.sh"
           bash "$GITHUB_WORKSPACE/current/.github/scripts/collect-slo-flamegraphs.sh" \
-            --output-dir "$GITHUB_WORKSPACE/flamegraphs" \
+            --output-dir "$GITHUB_WORKSPACE/.slo" \
             --workload "${{ matrix.sdk.name }}"
 
-      - name: Upload flamegraphs
+      - name: Upload flamegraphs to job artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.sdk.name }}-flamegraphs
-          path: flamegraphs/*.svg
+          name: ${{ matrix.sdk.name }}
+          path: |
+            .slo/${{ matrix.sdk.name }}-current-cpu.html
+            .slo/${{ matrix.sdk.name }}-current-heap.html
+            .slo/${{ matrix.sdk.name }}-baseline-cpu.html
+            .slo/${{ matrix.sdk.name }}-baseline-heap.html
           if-no-files-found: ignore
           retention-days: 7
