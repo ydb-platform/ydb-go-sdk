@@ -105,13 +105,13 @@ func NewStorage(ctx context.Context, fw *framework.Framework) (*Storage, error) 
 	}
 
 	s := &Storage{
-		fw:     fw,
-		db:     db,
-		params: params,
-		misses: misses,
-		gen:    generator.NewSeeded(120394832798), //nolint:mnd
-		createSQL:    fmt.Sprintf(createTableQuery, params.TablePath, params.MinPartitionCount),
-		dropSQL:      fmt.Sprintf(dropTableQuery, params.TablePath),
+		fw:        fw,
+		db:        db,
+		params:    params,
+		misses:    misses,
+		gen:       generator.NewSeeded(120394832798), //nolint:mnd
+		createSQL: fmt.Sprintf(createTableQuery, params.TablePath, params.MinPartitionCount),
+		dropSQL:   fmt.Sprintf(dropTableQuery, params.TablePath),
 	}
 
 	if fw.Metrics.Meter() != nil {
