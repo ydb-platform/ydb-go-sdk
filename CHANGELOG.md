@@ -1,4 +1,6 @@
 * Added `topicoptions.WithWriterDirectWrite(bool)` and `topicoptions.WithMultiWriterDirectWrite(bool)` options to send topic writes to the node that hosts the target partition, bypassing the topic proxy
+
+## v3.139.8
 * Masked access tokens in topic gRPC debug logs for `UpdateTokenRequest` messages
 
 ## v3.139.7
