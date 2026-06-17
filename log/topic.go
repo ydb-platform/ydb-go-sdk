@@ -8,6 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -1316,9 +1317,14 @@ func (s lazyProtoStringifer) String() string {
 				}
 			}()
 		}
+		if updateToken, ok := writeRequest.GetClientMessage().(*Ydb_Topic.StreamWriteMessage_FromClient_UpdateTokenRequest); ok {
+			token := updateToken.UpdateTokenRequest.GetToken()
+			updateToken.UpdateTokenRequest.Token = secret.Token(token)
+			defer func() {
+				updateToken.UpdateTokenRequest.Token = token
+			}()
+		}
 	}
 
-	res := protojson.MarshalOptions{AllowPartial: true}.Format(s.message)
-
-	return res
+	return protojson.MarshalOptions{AllowPartial: true}.Format(s.message)
 }
