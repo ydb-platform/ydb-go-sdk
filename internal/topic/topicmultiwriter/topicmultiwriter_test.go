@@ -1197,6 +1197,8 @@ func TestMultiWriter_Write_SmallIdleSessionTimeout(t *testing.T) {
 	require.NoError(t, multiWriter.Close(ctx))
 }
 
+var errTestStopWriterReconnector = errors.New("ydb: stop writer reconnector")
+
 type blockingInitWriter struct {
 	releaseInit <-chan struct{}
 	closeCalled chan struct{}
@@ -1208,7 +1210,7 @@ func (w *blockingInitWriter) Close(_ context.Context) error {
 	default:
 	}
 
-	return errors.New("ydb: stop writer reconnector")
+	return errTestStopWriterReconnector
 }
 
 func (w *blockingInitWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
@@ -1216,7 +1218,7 @@ func (w *blockingInitWriter) WaitInitInfo(ctx context.Context) (topicwriterinter
 	case <-ctx.Done():
 		return topicwriterinternal.InitialInfo{}, ctx.Err()
 	case <-w.closeCalled:
-		return topicwriterinternal.InitialInfo{}, errors.New("ydb: stop writer reconnector")
+		return topicwriterinternal.InitialInfo{}, errTestStopWriterReconnector
 	case <-w.releaseInit:
 	}
 
@@ -1239,6 +1241,13 @@ func (f *blockingInitWritersFactory) Create(_ topicwriterinternal.WriterReconnec
 		releaseInit: f.releaseInit,
 		closeCalled: make(chan struct{}, 1),
 	}, nil
+}
+
+func pendingPartitionSplitCount(r *partitionSplitReceiver) int {
+	r.partitionSplits.mu.Lock()
+	defer r.partitionSplits.mu.Unlock()
+
+	return r.partitionSplits.Len()
 }
 
 func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
@@ -1273,8 +1282,17 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 	state.RecordSplit(1)
 	multiWriter.orchestrator.partitionSplitReceiver.push(1)
 
-	// Allow time for a running partition splitter to pick up the event (old behavior).
-	time.Sleep(200 * time.Millisecond)
+	select {
+	case err := <-waitResult:
+		require.NoError(t, err, "WaitInit must not finish while initSeqNo is blocked")
+	default:
+	}
+
+	require.Eventually(t, func() bool {
+		return pendingPartitionSplitCount(multiWriter.orchestrator.partitionSplitReceiver) == 1
+	}, 200*time.Millisecond, 10*time.Microsecond,
+		"split event must stay queued until init completes",
+	)
 
 	close(releaseInit)
 
