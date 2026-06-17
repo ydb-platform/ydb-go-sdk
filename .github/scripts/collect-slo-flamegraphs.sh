@@ -49,6 +49,16 @@ fi
 
 mkdir -p "$output_dir"
 
+if ! command -v dot >/dev/null 2>&1; then
+  if command -v apt-get >/dev/null 2>&1; then
+    echo "Installing Graphviz for go tool pprof -svg..."
+    sudo apt-get update -qq
+    sudo apt-get install -y -qq graphviz
+  else
+    die "Graphviz (dot) is required to render SVG flamegraphs"
+  fi
+fi
+
 collect_variant() {
   local variant="$1"
   local container="ydb-workload-${variant}"
@@ -73,14 +83,16 @@ collect_variant() {
 
   if docker cp "${container}:/profiles/cpu.prof" "$cpu_profile" 2>/dev/null; then
     echo "Rendering ${cpu_svg}..."
-    go tool pprof -svg -output="$cpu_svg" "$binary_path" "$cpu_profile"
+    go tool pprof -svg -output="$cpu_svg" "$binary_path" "$cpu_profile" || \
+      echo "Failed to render ${cpu_svg}"
   else
     echo "CPU profile not found in ${container}, skipping ${variant} CPU flamegraph"
   fi
 
   if docker cp "${container}:/profiles/heap.prof" "$heap_profile" 2>/dev/null; then
     echo "Rendering ${heap_svg}..."
-    go tool pprof -svg -output="$heap_svg" "$binary_path" "$heap_profile"
+    go tool pprof -svg -output="$heap_svg" "$binary_path" "$heap_profile" || \
+      echo "Failed to render ${heap_svg}"
   else
     echo "Heap profile not found in ${container}, skipping ${variant} heap flamegraph"
   fi
