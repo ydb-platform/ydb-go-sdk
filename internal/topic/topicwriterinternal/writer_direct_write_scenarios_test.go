@@ -48,7 +48,7 @@ func TestDirectWritePinnedPartitionConnectsToDescribeHost(t *testing.T) {
 	require.Equal(t, 1, recorder.SessionsCount())
 	last := recorder.LastSession()
 	require.Equal(t, uint32(testHostNodeID), last.NodeID)
-	require.True(t, last.DisableFallback)
+	require.False(t, last.Fallback)
 	topicwritetest.RequireDirectInit(t, last.InitRequest, testPartitionID, testInitialGen)
 }
 
@@ -69,12 +69,12 @@ func TestDirectWriteProducerProbeRebind(t *testing.T) {
 	require.Equal(t, 1, cluster.DescribeCalls())
 
 	probe := recorder.Session(0)
-	require.False(t, probe.DisableFallback, "first connect must go through proxy")
+	require.True(t, probe.Fallback, "first connect must go through proxy")
 	require.Nil(t, probe.InitRequest.GetPartitionWithGeneration())
 	require.NotEmpty(t, probe.InitRequest.GetMessageGroupId())
 
 	direct := recorder.Session(1)
-	require.True(t, direct.DisableFallback)
+	require.False(t, direct.Fallback)
 	require.Equal(t, uint32(testHostNodeID), direct.NodeID)
 	topicwritetest.RequireDirectInit(t, direct.InitRequest, testPartitionID, testInitialGen)
 }

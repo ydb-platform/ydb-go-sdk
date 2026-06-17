@@ -15,9 +15,9 @@ import (
 
 // StreamWriteSession records how a single StreamWrite stream was opened on the client.
 type StreamWriteSession struct {
-	NodeID          uint32
-	DisableFallback bool
-	InitRequest     *Ydb_Topic.StreamWriteMessage_InitRequest
+	NodeID      uint32
+	Fallback    bool
+	InitRequest *Ydb_Topic.StreamWriteMessage_InitRequest
 }
 
 // StreamWriteRecorder records StreamWrite client streams via a gRPC interceptor.
@@ -46,7 +46,7 @@ func (r *StreamWriteRecorder) Interceptor() grpc.StreamClientInterceptor {
 		}
 
 		session := StreamWriteSession{
-			DisableFallback: endpoint.ContextDisableFallback(ctx),
+			Fallback: endpoint.ContextFallback(ctx),
 		}
 		if nodeID, ok := endpoint.ContextNodeID(ctx); ok {
 			session.NodeID = nodeID
@@ -97,8 +97,8 @@ func (r *StreamWriteRecorder) LastSession() StreamWriteSession {
 	return r.sessions[len(r.sessions)-1]
 }
 
-// RequireRoutedToNode asserts that StreamWrite was opened in direct-write mode
-// (disableFallback) targeting the given node ID.
+// RequireRoutedToNode asserts that StreamWrite was opened with fallback disabled
+// targeting the given node ID.
 func (r *StreamWriteRecorder) RequireRoutedToNode(t testing.TB, expectedNode uint32) {
 	t.Helper()
 
@@ -106,12 +106,12 @@ func (r *StreamWriteRecorder) RequireRoutedToNode(t testing.TB, expectedNode uin
 	defer r.mu.Unlock()
 
 	for _, session := range r.sessions {
-		if session.DisableFallback && session.NodeID == expectedNode {
+		if !session.Fallback && session.NodeID == expectedNode {
 			return
 		}
 	}
 	require.Failf(t, "direct-write StreamWrite routing not found",
-		"expected disableFallback=true nodeID=%d, sessions=%v", expectedNode, r.sessions)
+		"expected fallback=false nodeID=%d, sessions=%v", expectedNode, r.sessions)
 }
 
 // RequireInitGeneration asserts that a direct StreamWrite init request carried
@@ -127,7 +127,7 @@ func (r *StreamWriteRecorder) RequireInitGeneration(
 	defer r.mu.Unlock()
 
 	for _, session := range r.sessions {
-		if !session.DisableFallback {
+		if session.Fallback {
 			continue
 		}
 

@@ -7,27 +7,30 @@ type (
 	ctxPinnedNodeID uint32
 
 	withNodeIDConfig struct {
-		disableFallback bool
+		fallback bool
 	}
 
 	// WithNodeIDOption configures [WithNodeID].
 	WithNodeIDOption func(*withNodeIDConfig)
 )
 
-// WithDisableFallback disables fallback to another endpoint when the preferred node is unavailable.
-func WithDisableFallback() WithNodeIDOption {
+// WithFallback controls whether the balancer may use another endpoint when the preferred node
+// is unavailable. Default is true when the option is omitted.
+func WithFallback(enabled bool) WithNodeIDOption {
 	return func(cfg *withNodeIDConfig) {
-		cfg.disableFallback = true
+		cfg.fallback = enabled
 	}
 }
 
 func WithNodeID(ctx context.Context, nodeID uint32, opts ...WithNodeIDOption) context.Context {
-	var cfg withNodeIDConfig
+	cfg := withNodeIDConfig{
+		fallback: true,
+	}
 	for _, opt := range opts {
 		opt(&cfg)
 	}
 
-	if cfg.disableFallback {
+	if !cfg.fallback {
 		return context.WithValue(ctx, ctxEndpointKey{}, ctxPinnedNodeID(nodeID))
 	}
 
@@ -45,9 +48,10 @@ func ContextNodeID(ctx context.Context) (nodeID uint32, ok bool) {
 	}
 }
 
-// ContextDisableFallback reports whether [WithNodeID] was called with [WithDisableFallback].
-func ContextDisableFallback(ctx context.Context) bool {
-	_, ok := ctx.Value(ctxEndpointKey{}).(ctxPinnedNodeID)
+// ContextFallback reports whether endpoint fallback is allowed for [WithNodeID] contexts.
+// Returns true by default, including when no node preference is set in the context.
+func ContextFallback(ctx context.Context) bool {
+	_, pinned := ctx.Value(ctxEndpointKey{}).(ctxPinnedNodeID)
 
-	return ok
+	return !pinned
 }

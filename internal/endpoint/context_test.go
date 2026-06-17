@@ -17,11 +17,11 @@ func TestWithNodeID(t *testing.T) {
 		nodeID, ok := ContextNodeID(ctx)
 		require.True(t, ok)
 		require.Equal(t, uint32(7), nodeID)
-		require.False(t, ContextDisableFallback(ctx))
+		require.True(t, ContextFallback(ctx))
 	})
 
-	t.Run("DisableFallback", func(t *testing.T) {
-		ctx := WithNodeID(context.Background(), 7, WithDisableFallback())
+	t.Run("FallbackDisabled", func(t *testing.T) {
+		ctx := WithNodeID(context.Background(), 7, WithFallback(false))
 
 		_, ok := ctx.Value(ctxEndpointKey{}).(ctxPinnedNodeID)
 		require.True(t, ok)
@@ -29,6 +29,6 @@ func TestWithNodeID(t *testing.T) {
 		nodeID, ok := ContextNodeID(ctx)
 		require.True(t, ok)
 		require.Equal(t, uint32(7), nodeID)
-		require.True(t, ContextDisableFallback(ctx))
+		require.False(t, ContextFallback(ctx))
 	})
 }

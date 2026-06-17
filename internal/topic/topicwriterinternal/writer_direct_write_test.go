@@ -21,9 +21,9 @@ func TestDirectWriteConfig(t *testing.T) {
 		cfg := WriterReconnectorConfig{
 			directWriteEnabled: true,
 			WritersCommonConfig: WritersCommonConfig{
-				topic:               "test-topic",
-				defaultPartitioning: rawtopicwriter.Partitioning{Type: rawtopicwriter.PartitioningUndefined},
-				producerID:          "",
+				topic:        "test-topic",
+				partitioning: rawtopicwriter.Partitioning{Type: rawtopicwriter.PartitioningUndefined},
+				producerID:   "",
 			},
 		}
 
@@ -205,12 +205,12 @@ func TestLookupPartitionLocation(t *testing.T) {
 			ctx := endpoint.WithNodeID(
 				context.Background(),
 				location.NodeIDUint32(),
-				endpoint.WithDisableFallback(),
+				endpoint.WithFallback(false),
 			)
 			gotNodeID, ok := endpoint.ContextNodeID(ctx)
 			require.True(t, ok)
 			require.Equal(t, tt.wantNodeID, gotNodeID)
-			require.True(t, endpoint.ContextDisableFallback(ctx))
+			require.False(t, endpoint.ContextFallback(ctx))
 		})
 	}
 }

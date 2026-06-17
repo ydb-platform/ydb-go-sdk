@@ -140,7 +140,7 @@ func WithErrOnQueueFull(enable bool) PublicWriterOption {
 
 func WithPartitioning(partitioning PublicFuturePartitioning) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
-		cfg.defaultPartitioning = partitioning.ToRaw()
+		cfg.partitioning = partitioning.ToRaw()
 	}
 }
 
@@ -159,7 +159,7 @@ func WithDirectWrite(enable bool) PublicWriterOption {
 func WithProducerID(producerID string) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.producerID = producerID
-		oldPartitioningType := cfg.defaultPartitioning.Type
+		oldPartitioningType := cfg.partitioning.Type
 		if oldPartitioningType == rawtopicwriter.PartitioningUndefined ||
 			oldPartitioningType == rawtopicwriter.PartitioningMessageGroupID {
 			WithPartitioning(NewPartitioningWithMessageGroupID(producerID))(cfg)

@@ -490,13 +490,13 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 
 	c, failedCount = state.GetConnection(ctx)
 	if c == nil {
-		if endpoint.ContextDisableFallback(ctx) {
+		if !endpoint.ContextFallback(ctx) {
 			nodeID, _ := endpoint.ContextNodeID(ctx)
 
 			return nil, xerrors.WithStackTrace(
 				xerrors.Transport(grpcStatus.Errorf(
 					grpcCodes.Unavailable,
-					"ydb: direct mode: node %d not found",
+					"ydb: preferred node %d is unavailable (fallback disabled)",
 					nodeID,
 				)),
 			)
