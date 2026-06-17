@@ -59,6 +59,18 @@ go test -race -tags integration ./tests/integration
 
 `no lint`, `no tests`, `no integration tests`, `no changelog`, `no examples`, `broken changes`
 
+## Changelog (unreleased)
+
+User-facing PRs add bullets **at the very top** of `CHANGELOG.md` — **before** any `## vX.Y.Z` header. Do **not** edit an existing version section; `publish.yml` assigns the version at release.
+
+```markdown
+* Fixed …
+
+## v3.139.7
+```
+
+Details: [`.agents/rules/changelog.md`](../rules/changelog.md).
+
 ## Dependencies
 
 Do not run `go mod tidy` or `go get` unless the task requires it.
