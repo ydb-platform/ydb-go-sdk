@@ -1273,7 +1273,7 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 	state.RecordSplit(1)
 	multiWriter.orchestrator.partitionSplitReceiver.push(1)
 
-	// Allow time for a running partition splitter to pick up the event (old behaviour).
+	// Allow time for a running partition splitter to pick up the event (old behavior).
 	time.Sleep(200 * time.Millisecond)
 
 	close(releaseInit)
