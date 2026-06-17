@@ -179,3 +179,27 @@ jobs:
           workload_baseline_command: ${{ matrix.sdk.command }}
           disable_compose_profiles: "${{ (matrix.sdk.name == 'native-table-node-hints' || matrix.sdk.name == 'native-query-node-hints') && 'chaos' || '' }}"
           metrics_yaml: ${{ matrix.sdk.metrics_yaml }}
+
+      - name: Setup Go
+        if: always()
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: false
+
+      - name: Collect flamegraphs
+        if: always()
+        run: |
+          chmod +x "$GITHUB_WORKSPACE/current/.github/scripts/collect-slo-flamegraphs.sh"
+          bash "$GITHUB_WORKSPACE/current/.github/scripts/collect-slo-flamegraphs.sh" \
+            --output-dir "$GITHUB_WORKSPACE/flamegraphs" \
+            --workload "${{ matrix.sdk.name }}"
+
+      - name: Upload flamegraphs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.sdk.name }}-flamegraphs
+          path: flamegraphs/*.svg
+          if-no-files-found: ignore
+          retention-days: 7
