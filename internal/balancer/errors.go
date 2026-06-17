@@ -88,11 +88,9 @@ func IsBadConn(ctx context.Context, err error, ignoreCodes ...grpcCodes.Code) bo
 		return true
 	}
 
-	banOnContextDeadlineExceeded, _ := ctx.Value(ctxBanOnContextDeadlineExceeded{}).(bool)
-	if banOnContextDeadlineExceeded {
-		if xerrors.Is(err, context.DeadlineExceeded) {
-			return true
-		}
+	banOnContextDeadlineExceeded, has := ctx.Value(ctxBanOnContextDeadlineExceeded{}).(bool)
+	if has && banOnContextDeadlineExceeded && xerrors.Is(err, context.DeadlineExceeded) {
+		return true
 	}
 
 	return false

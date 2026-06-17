@@ -218,12 +218,9 @@ func (core *sessionCore) attach(ctx context.Context) (finalErr error) {
 		}
 	}()
 
-	attachStream, err := core.Client.AttachSession(
-		balancer.BanOnSessionCreate(attachCtx),
-		&Ydb_Query.AttachSessionRequest{
-			SessionId: core.id,
-		},
-	)
+	attachStream, err := core.Client.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
+		SessionId: core.id,
+	})```
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
