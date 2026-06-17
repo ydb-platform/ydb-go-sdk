@@ -1317,7 +1317,9 @@ func (s lazyProtoStringifer) String() string {
 				}
 			}()
 		}
-		if updateToken, ok := writeRequest.GetClientMessage().(*Ydb_Topic.StreamWriteMessage_FromClient_UpdateTokenRequest); ok {
+		clientMessage := writeRequest.GetClientMessage()
+		updateToken, ok := clientMessage.(*Ydb_Topic.StreamWriteMessage_FromClient_UpdateTokenRequest)
+		if ok {
 			token := updateToken.UpdateTokenRequest.GetToken()
 			updateToken.UpdateTokenRequest.Token = secret.Token(token)
 			defer func() {
