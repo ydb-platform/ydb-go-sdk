@@ -150,26 +150,26 @@ jobs:
       - name: Build workload images
         run: |
           SCRIPT="$GITHUB_WORKSPACE/current/.github/scripts/build-slo-image.sh"
-          CURRENT_REF="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+          SYNC="$GITHUB_WORKSPACE/current/.github/scripts/sync-slo-workload-from-current.sh"
+          chmod +x "$SCRIPT" "$SYNC"
 
           bash "$SCRIPT" \
             --context "$GITHUB_WORKSPACE/current" \
             --tag "ydb-app-current" \
             --src-path "${{ matrix.sdk.path }}"
 
+          # Keep workload code (and shared internal helpers) on current so baseline
+          # runs the same workload against the baseline SDK via tests/slo/go.mod replace.
+          bash "$SYNC" \
+            --target "$GITHUB_WORKSPACE/baseline" \
+            --source "$GITHUB_WORKSPACE/current" \
+            --workload-path "${{ matrix.sdk.path }}"
+
           bash "$SCRIPT" \
             --context "$GITHUB_WORKSPACE/baseline" \
             --tag "ydb-app-baseline" \
             --src-path "${{ matrix.sdk.path }}" \
             --fallback-image "ydb-app-current"
-
-          BASELINE_STORAGE="$GITHUB_WORKSPACE/baseline/tests/slo/${{ matrix.sdk.path }}/storage.go"
-          if [[ -f "$BASELINE_STORAGE" ]] && \
-             grep -q 'nodehints.RunUpdates' "$BASELINE_STORAGE" && \
-             ! grep -q 'func (s \*Storage) initNodeSelector' "$BASELINE_STORAGE"; then
-            echo "Baseline workload uses legacy node selector init; reusing current image for baseline"
-            docker tag ydb-app-current ydb-app-baseline
-          fi
 
       - name: Run SLO Tests
         uses: ydb-platform/ydb-slo-action/init@v2
