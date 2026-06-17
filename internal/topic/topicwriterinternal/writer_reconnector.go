@@ -39,13 +39,13 @@ var (
 	ErrNonZeroSeqNo          = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
 	errNoAllowedCodecs       = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
 	errLargeMessage          = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
-	ErrPublicQueueIsFull  = xerrors.Wrap(
+	ErrPublicQueueIsFull     = xerrors.Wrap(
 		errors.New("ydb: queue is full"),
 	)
 	// ErrPublicWriterClosed is returned by Writer.Write when the writer has been closed
 	// due to a terminal error or explicit Close call. Use errors.Is to check for this error
 	// and recreate the writer if needed.
-	ErrPublicWriterClosed = xerrors.Wrap(errors.New("ydb: writer is closed"))
+	ErrPublicWriterClosed                          = xerrors.Wrap(errors.New("ydb: writer is closed"))
 	ErrPublicMessagesPutToInternalQueueBeforeError = xerrors.Wrap(errors.New("ydb: the messages was put to internal buffer before the error happened. It mean about the messages can be delivered to the server"))                                                                                                           //nolint:lll
 	errDiffetentTransactions                       = xerrors.Wrap(errors.New("ydb: internal writer has messages from different trasactions. It is internal logic error, write issue please: https://github.com/ydb-platform/ydb-go-sdk/issues/new?assignees=&labels=bug&projects=&template=01_BUG_REPORT.md&title=bug%3A+")) //nolint:lll
 	errWritingByKeyNotSupported                    = xerrors.Wrap(errors.New("ydb: writing by key is not supported for single writer, use WithWriterPartitionByKey or WithPartitionByPartitionID options"))                                                                                                                  //nolint:lll
