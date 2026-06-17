@@ -67,7 +67,7 @@ jobs:
                   query: sum by(ref) (workload_node_hints_misses)
           - name: native-query-node-hints
             path: native/query-node-hints
-            command: "-min-partition-count 10"
+            command: "-min-partition-count=10"
             metrics_yaml: |
               metrics:
                 - name: node_hints_misses
@@ -164,7 +164,7 @@ jobs:
             --fallback-image "ydb-app-current"
 
       - name: Run SLO Tests
-        uses: ydb-platform/ydb-slo-action/init@v2
+        uses: ydb-platform/ydb-slo-action/init@slo-flamegraph-artifacts
         timeout-minutes: 30
         with:
           github_issue: ${{ github.event.inputs.github_issue }}
@@ -195,15 +195,3 @@ jobs:
             --output-dir "$GITHUB_WORKSPACE/.slo" \
             --workload "${{ matrix.sdk.name }}"
 
-      - name: Upload flamegraphs to job artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.sdk.name }}
-          path: |
-            .slo/${{ matrix.sdk.name }}-current-cpu.html
-            .slo/${{ matrix.sdk.name }}-current-heap.html
-            .slo/${{ matrix.sdk.name }}-baseline-cpu.html
-            .slo/${{ matrix.sdk.name }}-baseline-heap.html
-          if-no-files-found: ignore
-          retention-days: 7

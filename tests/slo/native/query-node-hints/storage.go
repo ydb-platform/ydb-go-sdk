@@ -70,8 +70,11 @@ type Storage struct {
 	dropSQL             string
 }
 
-// Storage implements Workload
-var _ framework.Workload = (*Storage)(nil)
+// Storage implements Workload and Warmer
+var (
+	_ framework.Workload = (*Storage)(nil)
+	_ framework.Warmer   = (*Storage)(nil)
+)
 
 func NewStorage(ctx context.Context, fw *framework.Framework) (*Storage, error) {
 	params := kv.ParseParams(fw, "query-node-hints", nil)
@@ -101,18 +104,12 @@ func NewStorage(ctx context.Context, fw *framework.Framework) (*Storage, error) 
 		return nil, err
 	}
 
-	nsPtr, err := nodehints.RunUpdates(ctx, db, params.TablePath, time.Second*5) //nolint:mnd
-	if err != nil {
-		return nil, fmt.Errorf("create node selector: %w", err)
-	}
-
 	s := &Storage{
-		fw:           fw,
-		db:           db,
-		params:       params,
-		misses:       misses,
-		nodeSelector: nsPtr,
-		gen:          generator.NewSeeded(120394832798), //nolint:mnd
+		fw:     fw,
+		db:     db,
+		params: params,
+		misses: misses,
+		gen:    generator.NewSeeded(120394832798), //nolint:mnd
 		createSQL:    fmt.Sprintf(createTableQuery, params.TablePath, params.MinPartitionCount),
 		dropSQL:      fmt.Sprintf(dropTableQuery, params.TablePath),
 	}
@@ -145,6 +142,10 @@ func (s *Storage) Setup(ctx context.Context) error {
 	}
 	s.fw.Logger.Printf("create table ok")
 
+	if err = s.initNodeSelector(ctx); err != nil {
+		return fmt.Errorf("init node selector failed: %w", err)
+	}
+
 	g := errgroup.Group{}
 	for i := uint64(0); i < s.params.PrefillCount; i++ {
 		g.Go(func() error {
@@ -161,6 +162,20 @@ func (s *Storage) Setup(ctx context.Context) error {
 		return fmt.Errorf("fill initial data failed: %w", err)
 	}
 	s.fw.Logger.Printf("entries write ok")
+
+	return nil
+}
+
+func (s *Storage) Warmup(_ context.Context) error {
+	s.fw.Logger.Printf("waiting 10s for partition stabilization...")
+	time.Sleep(10 * time.Second) //nolint:mnd
+
+	s.reportNodeHintMisses(1)
+
+	ns := s.nodeSelector.Load()
+	idx, nodeID := ns.GetRandomNodeID(s.gen)
+	s.fw.Logger.Printf("all requests to node id: %d", nodeID)
+	s.gen.SetRange(ns.LowerBounds[idx], ns.UpperBounds[idx])
 
 	return nil
 }
@@ -229,6 +244,16 @@ func (s *Storage) Teardown(ctx context.Context) error {
 		return fmt.Errorf("drop table failed: %w", err)
 	}
 	s.fw.Logger.Printf("cleanup table ok")
+
+	return nil
+}
+
+func (s *Storage) initNodeSelector(ctx context.Context) error {
+	nsPtr, err := nodehints.RunUpdates(ctx, s.db, s.params.TablePath, time.Second*5) //nolint:mnd
+	if err != nil {
+		return fmt.Errorf("create node selector: %w", err)
+	}
+	s.nodeSelector = nsPtr
 
 	return nil
 }
