@@ -1306,7 +1306,15 @@ type sendFromServerResponse struct {
 }
 
 func testCreateInitRequest(w *WriterReconnector) rawtopicwriter.InitRequest {
-	req := newSingleStreamWriterStopped(context.Background(), w.createWriterStreamConfig(nil)).createInitRequest()
+	cfg := newSingleStreamWriterConfig(
+		w.cfg.WritersCommonConfig,
+		nil,
+		&w.queue,
+		w.encodersMap,
+		w.needReceiveLastSeqNo(),
+		w.writerInstanceID,
+		nil,
+	)
 
-	return req
+	return newSingleStreamWriterStopped(context.Background(), cfg).createInitRequest()
 }
