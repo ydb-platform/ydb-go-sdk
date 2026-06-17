@@ -24,9 +24,9 @@ func TestAlterConsumerToProto(t *testing.T) {
 
 	t.Run("SetsSupportedCodecsWhenRequested", func(t *testing.T) {
 		c := &AlterConsumer{
-			Name:                    "consumer",
-			SetSupportedCodecs:      true,
-			SetSupportedCodecsValue: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecGzip},
+			Name:                   "consumer",
+			NeedSetSupportedCodecs: true,
+			SetSupportedCodecs:     rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecGzip},
 		}
 
 		proto := c.ToProto()
@@ -36,8 +36,8 @@ func TestAlterConsumerToProto(t *testing.T) {
 
 	t.Run("SetsEmptySupportedCodecsWhenRequestedWithEmptyList", func(t *testing.T) {
 		c := &AlterConsumer{
-			Name:               "consumer",
-			SetSupportedCodecs: true,
+			Name:                   "consumer",
+			NeedSetSupportedCodecs: true,
 		}
 
 		proto := c.ToProto()
