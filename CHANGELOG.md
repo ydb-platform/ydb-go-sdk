@@ -1,3 +1,5 @@
+* Added `topicwriter.ErrWriterClosed` sentinel error returned by `Writer.Write` when the writer has been closed due to a terminal error or an explicit `Close` call; use `errors.Is` to detect this condition and recreate the writer if needed
+
 ## v3.140.1
 * Fixed `Topic().Alter()` consumer alters (`AlterConsumerWithImportant`, `AlterConsumerWithReadFrom`, `AlterConsumerWithAttributes`, `AlterConsumerWithAvailabilityPeriod`) silently resetting the consumer's supported-codecs restriction: `set_supported_codecs` is now sent only when `AlterConsumerWithSupportedCodecs` is used
 
