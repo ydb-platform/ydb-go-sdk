@@ -48,8 +48,8 @@ export PROMETHEUS_URL=http://ydb-prometheus:9090
 
 - `WORKLOAD_READ_RPS` - read RPS (default: 1000)
 - `WORKLOAD_WRITE_RPS` - write RPS (default: 100)
-- `WORKLOAD_READ_TIMEOUT` - read timeout in ms (default: 10000)
-- `WORKLOAD_WRITE_TIMEOUT` - write timeout in ms (default: 10000)
+- `WORKLOAD_READ_TIMEOUT` - read timeout in ms (default: 1000)
+- `WORKLOAD_WRITE_TIMEOUT` - write timeout in ms (default: 1000)
 
 - `OTEL_EXPORTER_OTLP_ENDPOINT` - OTLP endpoint for metrics
 - `PROMETHEUS_URL` - Prometheus endpoint
