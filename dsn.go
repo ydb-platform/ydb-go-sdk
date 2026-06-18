@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
@@ -137,6 +138,15 @@ func parseConnectionString(dataSourceName string) (opts []Option, _ error) {
 			}
 		}
 		opts = append(opts, withConnectorOptions(binders...))
+	}
+	if prefetchQueryResultParts := info.Params.Get("prefetch_query_result_parts"); prefetchQueryResultParts != "" {
+		parts, err := strconv.Atoi(prefetchQueryResultParts)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(fmt.Errorf(
+				"invalid prefetch_query_result_parts: %s", prefetchQueryResultParts,
+			))
+		}
+		opts = append(opts, withConnectorOptions(WithPrefetchQueryResultParts(parts)))
 	}
 
 	return opts, nil
