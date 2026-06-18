@@ -13,4 +13,6 @@ type Config interface {
 	ConnectionTTL() time.Duration
 	Trace() *trace.Driver
 	GrpcDialOptions() []grpc.DialOption
+	NotifyConnBan(nodeID uint32)
+	NotifyConnAllow(nodeID uint32)
 }

@@ -36,6 +36,9 @@ type Config struct {
 	meta               *meta.Meta
 
 	excludeGRPCCodesForPessimization []grpcCodes.Code
+
+	onConnBan   func(nodeID uint32)
+	onConnAllow func(nodeID uint32)
 }
 
 func (c *Config) Credentials() credentials.Credentials {
@@ -330,6 +333,38 @@ func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
 			c.excludeGRPCCodesForPessimization,
 			codes...,
 		)
+	}
+}
+
+// NotifyConnBan invokes optional observer registered via WithOnConnBan.
+func (c *Config) NotifyConnBan(nodeID uint32) {
+	if c == nil || c.onConnBan == nil {
+		return
+	}
+
+	c.onConnBan(nodeID)
+}
+
+// NotifyConnAllow invokes optional observer registered via WithOnConnAllow.
+func (c *Config) NotifyConnAllow(nodeID uint32) {
+	if c == nil || c.onConnAllow == nil {
+		return
+	}
+
+	c.onConnAllow(nodeID)
+}
+
+// WithOnConnBan registers callback invoked after balancer pessimizes a connection.
+func WithOnConnBan(fn func(nodeID uint32)) Option {
+	return func(c *Config) {
+		c.onConnBan = fn
+	}
+}
+
+// WithOnConnAllow registers callback invoked after discovery unbans a connection.
+func WithOnConnAllow(fn func(nodeID uint32)) Option {
+	return func(c *Config) {
+		c.onConnAllow = fn
 	}
 }
 

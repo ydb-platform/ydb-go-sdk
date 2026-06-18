@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -58,6 +59,8 @@ type (
 		implicitSessionPool sessionPool
 
 		closed *xsync.Value[*closeState]
+
+	bannedNodes sync.Map // nodeID -> struct{}
 	}
 )
 
@@ -787,13 +790,7 @@ func newWithQueryServiceClient(ctx context.Context,
 		pool.WithTrace[*Session](poolTrace(cfg.Trace())),
 		pool.WithCreateItemTimeout[*Session](cfg.SessionCreateTimeout()),
 		pool.WithCloseItemTimeout[*Session](cfg.SessionDeleteTimeout()),
-		pool.WithMustDeleteItemFunc(func(s *Session, err error) bool {
-			if !s.IsAlive() {
-				return true
-			}
-
-			return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
-		}),
+		pool.WithMustDeleteItemFunc(c.mustDeleteSession),
 		pool.WithIdleTimeToLive[*Session](cfg.SessionIdleTimeToLive()),
 		pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
 			if !cfg.DisableSessionBalancer() {
@@ -831,6 +828,47 @@ func newWithQueryServiceClient(ctx context.Context,
 	c.implicitSessionPool = implicitSessionPool
 
 	return c, nil
+}
+
+// OnConnBanned drops idle query sessions on nodeID and marks in-use sessions for removal.
+func (c *Client) OnConnBanned(ctx context.Context, nodeID uint32) {
+	if c == nil || nodeID == 0 {
+		return
+	}
+
+	c.bannedNodes.Store(nodeID, struct{}{})
+	c.dropIdleSessionsByNodeID(ctx, nodeID)
+}
+
+// OnConnAllowed clears banned-node marker after discovery unbans the connection.
+func (c *Client) OnConnAllowed(nodeID uint32) {
+	if c == nil || nodeID == 0 {
+		return
+	}
+
+	c.bannedNodes.Delete(nodeID)
+}
+
+func (c *Client) mustDeleteSession(s *Session, err error) bool {
+	if !s.IsAlive() {
+		return true
+	}
+
+	if _, banned := c.bannedNodes.Load(s.NodeID()); banned {
+		return true
+	}
+
+	return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
+}
+
+func (c *Client) dropIdleSessionsByNodeID(ctx context.Context, nodeID uint32) {
+	if p, ok := c.explicitSessionPool.(*pool.Pool[*Session, Session]); ok {
+		_, _ = p.DropIdleByNodeID(ctx, nodeID)
+	}
+
+	if p, ok := c.implicitSessionPool.(*pool.Pool[*Session, Session]); ok {
+		_, _ = p.DropIdleByNodeID(ctx, nodeID)
+	}
 }
 
 func poolTrace(t *trace.Query) *pool.Trace[*Session, Session] {
