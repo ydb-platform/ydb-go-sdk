@@ -13,3 +13,13 @@ func WithFakeTx() Option {
 		c.fakeTx = true
 	}
 }
+
+func WithResponsePartPrefetch(parts int) Option {
+	if parts <= 0 {
+		parts = 0
+	}
+
+	return func(c *Conn) {
+		c.responsePartPrefetch = parts
+	}
+}
