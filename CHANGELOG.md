@@ -1,3 +1,5 @@
+* Fixed import cycle in `topicmultiwriter` direct write options unit test that prevented test compilation
+
 ## v3.140.2
 * Added `topicwriter.ErrWriterClosed` sentinel error returned by `Writer.Write` when the writer has been closed due to a terminal error or an explicit `Close` call; use `errors.Is` to detect this condition and recreate the writer if needed
 
