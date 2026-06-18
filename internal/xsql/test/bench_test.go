@@ -156,7 +156,7 @@ func warmUpMock(ctx context.Context, t testing.TB, db *sql.DB) {
 
 const (
 	prefetchBenchParts       = 8
-	prefetchBenchNetDelay    = 200 * time.Microsecond
+	prefetchBenchNetDelay    = 2 * time.Microsecond
 	prefetchBenchWorkBetween = 300 * time.Microsecond
 )
 
@@ -288,8 +288,8 @@ func warmUpMockPrefetchBench(ctx context.Context, t testing.TB, db *sql.DB) {
 // cpu: Apple M3 Pro
 // go test -bench=BenchmarkDatabaseSQLPrefetchQueryResultParts -benchtime=3s ./internal/xsql/test
 //
-// BenchmarkDatabaseSQLPrefetchQueryResultParts/no_prefetch-12   3592737 ns/op    5970899 B/op   1379 allocs/op
-// BenchmarkDatabaseSQLPrefetchQueryResultParts/prefetch_1-12    3376459 ns/op    7006089 B/op   1421 allocs/op
+// BenchmarkDatabaseSQLPrefetchQueryResultParts/no_prefetch-12   3572107 ns/op    5421094 B/op   1292 allocs/op
+// BenchmarkDatabaseSQLPrefetchQueryResultParts/prefetch_1-12    3319621 ns/op    5657165 B/op   1309 allocs/op
 func BenchmarkDatabaseSQLPrefetchQueryResultParts(b *testing.B) {
 	ctx := b.Context()
 
