@@ -406,12 +406,16 @@ func (p *Pool[PT, T]) checkItemAndError(item PT, err error) error {
 		return errItemIsNotAlive
 	}
 
-	if err == nil {
-		return nil
+	if p.config.mustDeleteItemFunc(item, err) {
+		if err == nil {
+			return errItemIsNotAlive
+		}
+
+		return err
 	}
 
-	if p.config.mustDeleteItemFunc(item, err) {
-		return err
+	if err == nil {
+		return nil
 	}
 
 	if !xerrors.IsValid(err, item) {
@@ -748,8 +752,6 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 		}
 
 		switch {
-		case p.config.mustDeleteItemFunc(info.item, nil):
-			p.closeItem(ctx, info.item, batchChanges)
 		case needCloseItem(p.config, info):
 			p.closeItem(ctx, info.item, batchChanges)
 		default:

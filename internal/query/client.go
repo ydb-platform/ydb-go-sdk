@@ -60,7 +60,7 @@ type (
 
 		closed *xsync.Value[*closeState]
 
-	bannedNodes sync.Map // nodeID -> struct{}
+		bannedNodes sync.Map // nodeID -> struct{}
 	}
 )
 
@@ -769,7 +769,6 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) (
 	return newWithQueryServiceClient(ctx, client, cc, cfg)
 }
 
-//nolint:funlen
 func newWithQueryServiceClient(ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
 	cc grpc.ClientConnInterface,
