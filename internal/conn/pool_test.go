@@ -42,6 +42,10 @@ func (m *mockConfig) GrpcDialOptions() []grpc.DialOption {
 	return m.grpcDialOpts
 }
 
+func (m *mockConfig) NotifyConnBan(uint32) {}
+
+func (m *mockConfig) NotifyConnAllow(uint32) {}
+
 func TestPool_Get(t *testing.T) {
 	t.Run("GetSameConnectionTwice", func(t *testing.T) {
 		ctx := context.Background()

@@ -367,17 +367,55 @@ func (p *Pool[PT, T]) Stats() Stats {
 	}
 }
 
+// DropIdleByNodeID closes and removes all idle pool items bound to nodeID.
+// In-use items are dropped on return via mustDeleteItemFunc when the node is marked banned.
+func (p *Pool[PT, T]) DropIdleByNodeID(ctx context.Context, nodeID uint32) (dropped int, finalErr error) {
+	select {
+	case <-ctx.Done():
+		return 0, xerrors.WithStackTrace(ctx.Err())
+	case <-p.done:
+		return 0, xerrors.WithStackTrace(errClosedPool)
+	case _, ok := <-p.sema:
+		if !ok {
+			return 0, xerrors.WithStackTrace(errClosedPool)
+		}
+		defer func() {
+			p.sema <- struct{}{}
+		}()
+	}
+
+	removed := p.idle.RemoveAllByNodeID(nodeID)
+	if len(removed) == 0 {
+		return 0, nil
+	}
+
+	var batchChanges dynamicStats
+	batchChanges.Idle -= len(removed)
+
+	for _, info := range removed {
+		p.closeItem(ctx, info.item, &batchChanges)
+	}
+
+	p.applyBatchStats(&batchChanges)
+
+	return len(removed), nil
+}
+
 func (p *Pool[PT, T]) checkItemAndError(item PT, err error) error {
 	if !item.IsAlive() {
 		return errItemIsNotAlive
 	}
 
-	if err == nil {
-		return nil
+	if p.config.mustDeleteItemFunc(item, err) {
+		if err == nil {
+			return errItemIsNotAlive
+		}
+
+		return err
 	}
 
-	if p.config.mustDeleteItemFunc(item, err) {
-		return err
+	if err == nil {
+		return nil
 	}
 
 	if !xerrors.IsValid(err, item) {

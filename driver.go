@@ -458,6 +458,25 @@ func (d *Driver) connect(ctx context.Context) error {
 		))
 	}
 
+	d.config.With(
+		config.WithOnConnBan(func(nodeID uint32) {
+			client, err := d.query.Get()
+			if err != nil {
+				return
+			}
+
+			client.OnConnBanned(xcontext.ValueOnly(ctx), nodeID)
+		}),
+		config.WithOnConnAllow(func(nodeID uint32) {
+			client, err := d.query.Get()
+			if err != nil {
+				return
+			}
+
+			client.OnConnAllowed(nodeID)
+		}),
+	)
+
 	if d.pool == nil {
 		d.pool = conn.NewPool(ctx, d.config)
 	}

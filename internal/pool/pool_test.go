@@ -2568,6 +2568,131 @@ func benchmarkPoolWithConcurrency(b *testing.B, goroutines int) {
 // BenchmarkPoolWith/concurrency=250-12   740.1             959.0            195708         982    19
 // BenchmarkPoolWith/concurrency=490-12   744.6             959.0            207209         982    19
 // BenchmarkPoolWith/concurrency=500-12   744.9             959.0            207291         982    19
+func TestDropIdleByNodeID(t *testing.T) {
+	ctx := t.Context()
+
+	var closed atomic.Int32
+
+	p := mustNewPool[*testItem, testItem](t,
+		WithLimit[*testItem, testItem](3),
+		WithCreateItemFunc(func(context.Context) (*testItem, error) {
+			return &testItem{
+				v: 1,
+				onNodeID: func() uint32 {
+					return 10
+				},
+				onClose: func() error {
+					closed.Add(1)
+
+					return nil
+				},
+			}, nil
+		}),
+		WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
+	)
+	t.Cleanup(func() {
+		_ = p.Close(ctx)
+	})
+
+	require.NoError(t, p.With(ctx, func(context.Context, *testItem) error {
+		return nil
+	}))
+	requirePoolStats(t, p, poolStats(3, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
+
+	dropped, err := p.DropIdleByNodeID(ctx, 10)
+	require.NoError(t, err)
+	require.Equal(t, 1, dropped)
+	require.Equal(t, int32(1), closed.Load())
+	requirePoolStats(t, p, poolStats(3, nil))
+}
+
+func TestDropIdleByNodeIDSkipsOtherNodes(t *testing.T) {
+	ctx := t.Context()
+
+	var (
+		nextID atomic.Uint32
+		closed atomic.Int32
+	)
+
+	p := mustNewPool[*testItem, testItem](t,
+		WithLimit[*testItem, testItem](2),
+		WithCreateItemFunc(func(context.Context) (*testItem, error) {
+			id := nextID.Add(1)
+
+			return &testItem{
+				onNodeID: func() uint32 {
+					if id == 1 {
+						return 10
+					}
+
+					return 20
+				},
+				onClose: func() error {
+					closed.Add(1)
+
+					return nil
+				},
+			}, nil
+		}),
+		WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
+	)
+	t.Cleanup(func() {
+		_ = p.Close(ctx)
+	})
+
+	info1 := mustGetItem(t, p)
+	info2 := mustGetItem(t, p)
+	mustPutItem(t, p, info1)
+	mustPutItem(t, p, info2)
+	requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 2; s.Idle = 2 }))
+
+	dropped, err := p.DropIdleByNodeID(ctx, 10)
+	require.NoError(t, err)
+	require.Equal(t, 1, dropped)
+	require.Equal(t, int32(1), closed.Load())
+	requirePoolStats(t, p, poolStats(2, func(s *Stats) { s.Size = 1; s.Idle = 1 }))
+}
+
+func TestPoolDropSessionOnReturnWhenBannedNode(t *testing.T) {
+	ctx := t.Context()
+	const bannedNodeID uint32 = 10
+
+	var closed atomic.Int32
+
+	p := mustNewPool[*testItem, testItem](t,
+		WithLimit[*testItem, testItem](1),
+		WithCreateItemFunc(func(context.Context) (*testItem, error) {
+			return &testItem{
+				onNodeID: func() uint32 {
+					return bannedNodeID
+				},
+				onClose: func() error {
+					closed.Add(1)
+
+					return nil
+				},
+			}, nil
+		}),
+		WithMustDeleteItemFunc(func(item *testItem, err error) bool {
+			if item.NodeID() == bannedNodeID {
+				return true
+			}
+
+			return !item.IsAlive()
+		}),
+		WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
+	)
+	t.Cleanup(func() {
+		_ = p.Close(ctx)
+	})
+
+	require.NoError(t, p.With(ctx, func(context.Context, *testItem) error {
+		return nil
+	}))
+	require.Equal(t, int32(1), closed.Load())
+	requirePoolStats(t, p, poolStats(1, nil))
+}
+
 // BenchmarkPoolWith/concurrency=510-12   848.5             1000.0           278750         982    19
 // BenchmarkPoolWith/concurrency=1000-12  1129              1958.0           1738541        982    19
 func BenchmarkPoolWith(b *testing.B) {

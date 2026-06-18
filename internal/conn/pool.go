@@ -95,6 +95,8 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Ban"),
 		cc.Endpoint().Copy(), cc.GetState(), cause,
 	)(cc.SetState(ctx, state.Banned))
+
+	p.config.NotifyConnBan(cc.Endpoint().NodeID())
 }
 
 func (p *Pool) Allow(ctx context.Context, cc Conn) {
@@ -114,6 +116,8 @@ func (p *Pool) Allow(ctx context.Context, cc Conn) {
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Allow"),
 		e, cc.GetState(),
 	)(cc.Unban(ctx))
+
+	p.config.NotifyConnAllow(e.NodeID())
 }
 
 func (p *Pool) Take(context.Context) error {

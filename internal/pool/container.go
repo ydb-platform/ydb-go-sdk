@@ -89,3 +89,25 @@ func (items *sliceContainer[PT, T]) PopByNodeID(nodeID uint32) (*itemInfo[PT, T]
 
 	return nil, errNothingIdleItems
 }
+
+func (items *sliceContainer[PT, T]) RemoveAllByNodeID(nodeID uint32) (removed []*itemInfo[PT, T]) {
+	items.mu.Lock()
+	defer items.mu.Unlock()
+
+	if len(items.data) == 0 {
+		return nil
+	}
+
+	kept := items.data[:0]
+	for _, info := range items.data {
+		if info.item.NodeID() == nodeID {
+			removed = append(removed, info)
+		} else {
+			kept = append(kept, info)
+		}
+	}
+
+	items.data = kept
+
+	return removed
+}
