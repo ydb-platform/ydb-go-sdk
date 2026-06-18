@@ -288,8 +288,8 @@ func warmUpMockPrefetchBench(ctx context.Context, t testing.TB, db *sql.DB) {
 // cpu: Apple M3 Pro
 // go test -bench=BenchmarkDatabaseSQLPrefetchQueryResultParts -benchtime=3s ./internal/xsql/test
 //
-// BenchmarkDatabaseSQLPrefetchQueryResultParts/no_prefetch-12          985   3716708 ns/op
-// BenchmarkDatabaseSQLPrefetchQueryResultParts/prefetch_1-12          1065   3349349 ns/op
+// BenchmarkDatabaseSQLPrefetchQueryResultParts/no_prefetch-12   3592737 ns/op    5970899 B/op   1379 allocs/op
+// BenchmarkDatabaseSQLPrefetchQueryResultParts/prefetch_1-12    3376459 ns/op    7006089 B/op   1421 allocs/op
 func BenchmarkDatabaseSQLPrefetchQueryResultParts(b *testing.B) {
 	ctx := b.Context()
 
