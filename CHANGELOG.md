@@ -1,3 +1,5 @@
+* Added pessimization connection when create table or query session failed with OVERLOADED, UNAVAILABLE, or client-side context.DeadlineExceeded
+
 ## v3.141.0
 * Added `ydb.WithPrefetchQueryResultParts(n)` connector option and `prefetch_query_result_parts` connection string parameter for the `database/sql` driver to enable `query.WithResponsePartPrefetch` on every query executed over Query Service
 
