@@ -244,7 +244,7 @@ func benchmarkDatabaseSQLPrefetchQueryResultParts(b *testing.B, nativeDriver *yd
 		}
 
 		if err := drainMultiResultSetRows(rows, prefetchBenchWorkBetween); err != nil {
-			_ = rows.Close()
+			_ = rows.Close() //nolint:sqlclosecheck
 			b.Fatal(err)
 		}
 

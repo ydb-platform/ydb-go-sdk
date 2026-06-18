@@ -184,6 +184,11 @@ func Example_databaseSQLPrefetchQueryResultPartsConnectionString() {
 	if err != nil {
 		panic(err)
 	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	if !rows.NextResultSet() {
 		panic("first result set not exists")
@@ -192,9 +197,9 @@ func Example_databaseSQLPrefetchQueryResultPartsConnectionString() {
 	var id int32 // required value
 	if err := rows.Scan(&id); err != nil {
 		panic(err)
-	} else {
-		log.Printf("id=%v\n", id)
 	}
+
+	log.Printf("id=%v\n", id)
 
 	if !rows.NextResultSet() {
 		panic("second result set not exists")
@@ -203,11 +208,11 @@ func Example_databaseSQLPrefetchQueryResultPartsConnectionString() {
 	var myStr string // optional value
 	if err := rows.Scan(&myStr); err != nil {
 		panic(err)
-	} else {
-		log.Printf("myStr='%s'\n", myStr)
 	}
 
-	if err := rows.Close(); err != nil {
+	log.Printf("myStr='%s'\n", myStr)
+
+	if err := rows.Err(); err != nil {
 		panic(err)
 	}
 }
@@ -235,6 +240,11 @@ func Example_databaseSQLPrefetchQueryResultParts() {
 	if err != nil {
 		panic(err)
 	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	if !rows.NextResultSet() {
 		panic("first result set not exists")
@@ -243,9 +253,9 @@ func Example_databaseSQLPrefetchQueryResultParts() {
 	var id int32 // required value
 	if err := rows.Scan(&id); err != nil {
 		panic(err)
-	} else {
-		log.Printf("id=%v\n", id)
 	}
+
+	log.Printf("id=%v\n", id)
 
 	if !rows.NextResultSet() {
 		panic("second result set not exists")
@@ -254,11 +264,11 @@ func Example_databaseSQLPrefetchQueryResultParts() {
 	var myStr string // optional value
 	if err := rows.Scan(&myStr); err != nil {
 		panic(err)
-	} else {
-		log.Printf("myStr='%s'\n", myStr)
 	}
 
-	if err := rows.Close(); err != nil {
+	log.Printf("myStr='%s'\n", myStr)
+
+	if err := rows.Err(); err != nil {
 		panic(err)
 	}
 }

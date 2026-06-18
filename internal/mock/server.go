@@ -474,10 +474,10 @@ func withResultSetPayload(rs *Ydb.ResultSet, payload []byte) *Ydb.ResultSet {
 		return rs
 	}
 
-	cloned := proto.Clone(rs).(*Ydb.ResultSet)
+	cloned := proto.Clone(rs).(*Ydb.ResultSet) //nolint:forcetypeassert
 	col, val := bytesColumn("payload", payload)
 	cloned.Columns = append(cloned.Columns, col)
-	for _, row := range cloned.Rows {
+	for _, row := range cloned.GetRows() {
 		row.Items = append(row.Items, val)
 	}
 
