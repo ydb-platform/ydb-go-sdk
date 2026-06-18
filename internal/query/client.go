@@ -60,7 +60,7 @@ type (
 
 		closed *xsync.Value[*closeState]
 
-		bannedNodes sync.Map // nodeID -> struct{}
+		bannedNodes sync.Map // nodeID -> struct{}; cleared on discovery unban via OnConnAllowed
 	}
 )
 
