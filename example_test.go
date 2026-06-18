@@ -168,6 +168,102 @@ func Example_databaseSQLBindNumericArgs() {
 }
 
 //nolint:testableexamples
+func Example_databaseSQLPrefetchQueryResultPartsConnectionString() {
+	db, err := sql.Open("ydb", "grpc://localhost:2136/local?prefetch_query_result_parts=1")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	// numeric args
+	rows, err := db.QueryContext(context.TODO(),
+		"SELECT $p1; SELECT $p2",
+		sql.Named("p1", 42),
+		sql.Named("p2", "my string"),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	if !rows.NextResultSet() {
+		panic("first result set not exists")
+	}
+
+	var id int32 // required value
+	if err := rows.Scan(&id); err != nil {
+		panic(err)
+	} else {
+		log.Printf("id=%v\n", id)
+	}
+
+	if !rows.NextResultSet() {
+		panic("second result set not exists")
+	}
+
+	var myStr string // optional value
+	if err := rows.Scan(&myStr); err != nil {
+		panic(err)
+	} else {
+		log.Printf("myStr='%s'\n", myStr)
+	}
+
+	if err := rows.Close(); err != nil {
+		panic(err)
+	}
+}
+
+//nolint:testableexamples
+func Example_databaseSQLPrefetchQueryResultParts() {
+	var (
+		ctx          = context.TODO()
+		nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
+		db           = sql.OpenDB(
+			ydb.MustConnector(nativeDriver,
+				ydb.WithPrefetchQueryResultParts(1),
+			),
+		)
+	)
+	defer nativeDriver.Close(ctx) // cleanup resources
+	defer db.Close()
+
+	// numeric args
+	rows, err := db.QueryContext(context.TODO(),
+		"SELECT $p1; SELECT $p2",
+		sql.Named("p1", 42),
+		sql.Named("p2", "my string"),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	if !rows.NextResultSet() {
+		panic("first result set not exists")
+	}
+
+	var id int32 // required value
+	if err := rows.Scan(&id); err != nil {
+		panic(err)
+	} else {
+		log.Printf("id=%v\n", id)
+	}
+
+	if !rows.NextResultSet() {
+		panic("second result set not exists")
+	}
+
+	var myStr string // optional value
+	if err := rows.Scan(&myStr); err != nil {
+		panic(err)
+	} else {
+		log.Printf("myStr='%s'\n", myStr)
+	}
+
+	if err := rows.Close(); err != nil {
+		panic(err)
+	}
+}
+
+//nolint:testableexamples
 func Example_databaseSQLBindNumericArgsOverConnector() {
 	var (
 		ctx          = context.TODO()
