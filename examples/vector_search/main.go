@@ -73,12 +73,6 @@ func createVectorTable(ctx context.Context, c query.Client, name string) error {
 
 func insertItemsAsBytes(ctx context.Context, c query.Client, name string, items []item) error {
 	sql := fmt.Sprintf(`
-		DECLARE $items AS List<Struct<
-			id: Utf8,
-			document: Utf8,
-			embedding: String
-		>>;
-
 		UPSERT INTO %s
 		(id, document, embedding)
 		SELECT id, document, embedding
@@ -155,8 +149,6 @@ func searchItemsAsBytes(
 	}
 
 	sql := fmt.Sprintf(`
-		DECLARE $embedding AS String;
-
 		SELECT
 			id,
 			document,
