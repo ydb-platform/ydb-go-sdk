@@ -67,7 +67,7 @@ jobs:
                   query: sum by(ref) (workload_node_hints_misses)
           - name: native-query-node-hints
             path: native/query-node-hints
-            command: "-min-partition-count 10"
+            command: "-min-partition-count=10"
             metrics_yaml: |
               metrics:
                 - name: node_hints_misses
@@ -150,12 +150,20 @@ jobs:
       - name: Build workload images
         run: |
           SCRIPT="$GITHUB_WORKSPACE/current/.github/scripts/build-slo-image.sh"
-          CURRENT_REF="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+          SYNC="$GITHUB_WORKSPACE/current/.github/scripts/sync-slo-workload-from-current.sh"
+          chmod +x "$SCRIPT" "$SYNC"
 
           bash "$SCRIPT" \
             --context "$GITHUB_WORKSPACE/current" \
             --tag "ydb-app-current" \
             --src-path "${{ matrix.sdk.path }}"
+
+          # Keep workload code (and shared internal helpers) on current so baseline
+          # runs the same workload against the baseline SDK via tests/slo/go.mod replace.
+          bash "$SYNC" \
+            --target "$GITHUB_WORKSPACE/baseline" \
+            --source "$GITHUB_WORKSPACE/current" \
+            --workload-path "${{ matrix.sdk.path }}"
 
           bash "$SCRIPT" \
             --context "$GITHUB_WORKSPACE/baseline" \
@@ -179,3 +187,19 @@ jobs:
           workload_baseline_command: ${{ matrix.sdk.command }}
           disable_compose_profiles: "${{ (matrix.sdk.name == 'native-table-node-hints' || matrix.sdk.name == 'native-query-node-hints') && 'chaos' || '' }}"
           metrics_yaml: ${{ matrix.sdk.metrics_yaml }}
+
+      - name: Setup Go
+        if: always()
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: false
+
+      - name: Collect flamegraphs
+        if: always()
+        run: |
+          chmod +x "$GITHUB_WORKSPACE/current/.github/scripts/collect-slo-flamegraphs.sh"
+          bash "$GITHUB_WORKSPACE/current/.github/scripts/collect-slo-flamegraphs.sh" \
+            --output-dir "$GITHUB_WORKSPACE/.slo/extra/flamegraphs" \
+            --workload "${{ matrix.sdk.name }}"
+
