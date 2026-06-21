@@ -1,4 +1,7 @@
-package benchmarks
+//go:build integration
+// +build integration
+
+package integration
 
 import (
 	"fmt"
