@@ -95,3 +95,5 @@ require (
 replace github.com/ydb-platform/ydb-go-sdk/v3 => ../
 
 replace xorm.io/xorm => github.com/ydb-platform/xorm v0.0.3
+
+replace github.com/ydb-platform/ydb-go-genproto => github.com/kartunovv/ydb-go-genproto v0.0.0-20260620115251-86593166420f

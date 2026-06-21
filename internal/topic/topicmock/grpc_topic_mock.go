@@ -20,6 +20,16 @@ import (
 )
 
 func GrpcMockTopicConnString(e fixenv.Env, topicServiceImpl Ydb_Topic_V1.TopicServiceServer) string {
+	return GrpcMockTopicConnStringWithNodeIDs(e, topicServiceImpl, []uint32{1})
+}
+
+// GrpcMockTopicConnStringWithNodeIDs is like [GrpcMockTopicConnString] but discovery
+// advertises the given node IDs (all on the same listener address).
+func GrpcMockTopicConnStringWithNodeIDs(
+	e fixenv.Env,
+	topicServiceImpl Ydb_Topic_V1.TopicServiceServer,
+	nodeIDs []uint32,
+) string {
 	v := reflect.ValueOf(topicServiceImpl)
 	addr := v.Pointer()
 
@@ -27,7 +37,7 @@ func GrpcMockTopicConnString(e fixenv.Env, topicServiceImpl Ydb_Topic_V1.TopicSe
 		listener := sf.LocalTCPListenerNamed(e, fmt.Sprintf("ydb-grpc-mock-topic-%v", addr))
 		connString := fmt.Sprintf("grpc://%s/local", listener.Addr())
 
-		mock, err := newGrpcMock(listener, topicServiceImpl)
+		mock, err := newGrpcMockWithNodeIDs(listener, topicServiceImpl, nodeIDs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create grpc mock: %w", err)
 		}
@@ -54,7 +64,11 @@ func (m *grpcMock) Close() error {
 	return m.listener.Close()
 }
 
-func newGrpcMock(listener net.Listener, topicServiceImpl Ydb_Topic_V1.TopicServiceServer) (*grpcMock, error) {
+func newGrpcMockWithNodeIDs(
+	listener net.Listener,
+	topicServiceImpl Ydb_Topic_V1.TopicServiceServer,
+	nodeIDs []uint32,
+) (*grpcMock, error) {
 	res := &grpcMock{
 		listener:   listener,
 		grpcServer: grpc.NewServer(),
@@ -70,7 +84,7 @@ func newGrpcMock(listener net.Listener, topicServiceImpl Ydb_Topic_V1.TopicServi
 	if err != nil {
 		return nil, fmt.Errorf("failed convert port to int: %w", err)
 	}
-	discoveryService := newMockDiscoveryService(host, uint32(port))
+	discoveryService := newMockDiscoveryService(host, uint32(port), nodeIDs)
 
 	Ydb_Discovery_V1.RegisterDiscoveryServiceServer(res.grpcServer, discoveryService)
 	Ydb_Topic_V1.RegisterTopicServiceServer(res.grpcServer, topicServiceImpl)
@@ -90,14 +104,20 @@ func newGrpcMock(listener net.Listener, topicServiceImpl Ydb_Topic_V1.TopicServi
 type mockDiscoveryService struct {
 	Ydb_Discovery_V1.UnimplementedDiscoveryServiceServer
 
-	host string
-	port uint32
+	host    string
+	port    uint32
+	nodeIDs []uint32
 }
 
-func newMockDiscoveryService(host string, port uint32) *mockDiscoveryService {
+func newMockDiscoveryService(host string, port uint32, nodeIDs []uint32) *mockDiscoveryService {
+	if len(nodeIDs) == 0 {
+		nodeIDs = []uint32{1}
+	}
+
 	return &mockDiscoveryService{
-		host: host,
-		port: port,
+		host:    host,
+		port:    port,
+		nodeIDs: nodeIDs,
 	}
 }
 
@@ -105,19 +125,22 @@ func (m mockDiscoveryService) ListEndpoints(
 	ctx context.Context,
 	request *Ydb_Discovery.ListEndpointsRequest,
 ) (*Ydb_Discovery.ListEndpointsResponse, error) {
+	endpoints := make([]*Ydb_Discovery.EndpointInfo, 0, len(m.nodeIDs))
+	for _, nodeID := range m.nodeIDs {
+		endpoints = append(endpoints, &Ydb_Discovery.EndpointInfo{
+			Address:    m.host,
+			Port:       m.port,
+			LoadFactor: 0,
+			Ssl:        false,
+			Service:    nil,
+			Location:   "",
+			NodeId:     nodeID,
+			IpV4:       []string{"127.0.0.1"},
+		})
+	}
+
 	res := Ydb_Discovery.ListEndpointsResult_builder{
-		Endpoints: []*Ydb_Discovery.EndpointInfo{
-			Ydb_Discovery.EndpointInfo_builder{
-				Address:    m.host,
-				Port:       m.port,
-				LoadFactor: 0,
-				Ssl:        false,
-				Service:    nil,
-				Location:   "",
-				NodeId:     1,
-				IpV4:       []string{"127.0.0.1"},
-			}.Build(),
-		},
+		Endpoints:    endpoints,
 		SelfLocation: "",
 	}.Build()
 	resp := Ydb_Discovery.ListEndpointsResponse_builder{

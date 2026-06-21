@@ -55,6 +55,7 @@ type Partitioning struct {
 	Type           PartitioningType
 	MessageGroupID string
 	PartitionID    int64
+	Generation     int64
 }
 
 func NewPartitioningMessageGroup(messageGroupID string) Partitioning {
@@ -71,6 +72,14 @@ func NewPartitioningPartitionID(partitionID int64) Partitioning {
 	}
 }
 
+func NewPartitioningPartitionWithGeneration(partitionID, generation int64) Partitioning {
+	return Partitioning{
+		Type:        PartitioningPartitionWithGeneration,
+		PartitionID: partitionID,
+		Generation:  generation,
+	}
+}
+
 func (p *Partitioning) setToProtoInitRequest(r *Ydb_Topic.StreamWriteMessage_InitRequest) error {
 	switch p.Type {
 	case PartitioningUndefined:
@@ -78,7 +87,16 @@ func (p *Partitioning) setToProtoInitRequest(r *Ydb_Topic.StreamWriteMessage_Ini
 	case PartitioningMessageGroupID:
 		r.SetMessageGroupId(p.MessageGroupID)
 	case PartitioningPartitionID:
-		r.SetPartitionId(p.PartitionID)
+		r.Partitioning = &Ydb_Topic.StreamWriteMessage_InitRequest_PartitionId{
+			PartitionId: p.PartitionID,
+		}
+	case PartitioningPartitionWithGeneration:
+		r.Partitioning = &Ydb_Topic.StreamWriteMessage_InitRequest_PartitionWithGeneration{
+			PartitionWithGeneration: &Ydb_Topic.PartitionWithGeneration{
+				PartitionId: p.PartitionID,
+				Generation:  p.Generation,
+			},
+		}
 	default:
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: unexpected partition type while set to init request: %v",
@@ -96,7 +114,16 @@ func (p *Partitioning) setToProtoMessage(m *Ydb_Topic.StreamWriteMessage_WriteRe
 	case PartitioningMessageGroupID:
 		m.SetMessageGroupId(p.MessageGroupID)
 	case PartitioningPartitionID:
-		m.SetPartitionId(p.PartitionID)
+		m.Partitioning = &Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData_PartitionId{
+			PartitionId: p.PartitionID,
+		}
+	case PartitioningPartitionWithGeneration:
+		m.Partitioning = &Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData_PartitionWithGeneration{
+			PartitionWithGeneration: &Ydb_Topic.PartitionWithGeneration{
+				PartitionId: p.PartitionID,
+				Generation:  p.Generation,
+			},
+		}
 	default:
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: unexpected partition type while set to message proto: %v",
@@ -113,6 +140,7 @@ const (
 	PartitioningUndefined PartitioningType = iota
 	PartitioningMessageGroupID
 	PartitioningPartitionID
+	PartitioningPartitionWithGeneration
 )
 
 type InitResult struct {

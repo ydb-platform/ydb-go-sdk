@@ -1,3 +1,23 @@
+## v3.141.0
+* Added `ydb.WithPrefetchQueryResultParts(n)` connector option and `prefetch_query_result_parts` connection string parameter for the `database/sql` driver to enable `query.WithResponsePartPrefetch` on every query executed over Query Service
+
+## v3.140.2
+* Added `topicwriter.ErrWriterClosed` sentinel error returned by `Writer.Write` when the writer has been closed due to a terminal error or an explicit `Close` call; use `errors.Is` to detect this condition and recreate the writer if needed
+
+## v3.140.1
+* Fixed `Topic().Alter()` consumer alters (`AlterConsumerWithImportant`, `AlterConsumerWithReadFrom`, `AlterConsumerWithAttributes`, `AlterConsumerWithAvailabilityPeriod`) silently resetting the consumer's supported-codecs restriction: `set_supported_codecs` is now sent only when `AlterConsumerWithSupportedCodecs` is used
+
+## v3.140.0
+* Added `topicoptions.WithWriterDirectWrite(bool)` and `topicoptions.WithMultiWriterDirectWrite(bool)` options to send topic writes to the node that hosts the target partition, bypassing the topic proxy
+
+## v3.139.8
+* Masked access tokens in topic gRPC debug logs for `UpdateTokenRequest` messages
+
+## v3.139.7
+* Fixed YSON scanning in `TableService` to support both underlying `TextValue` and `BytesValue` wire representations
+* Fixed inverted success/error handling in the `ExampleWriter_Write` doc example for `topicwriter`, which printed `OK` on failure and aborted on success
+* Fixed nil pointer dereference panic in `topicsugar.ProtobufIterator` on the first received message by allocating a concrete protobuf message before unmarshaling
+
 ## v3.139.6
 * Fixed panics in built-in trace handlers (`spans`, `log`, and `metrics`) when callback info contains typed-nil interfaces (for example, nil `SessionInfo` or `TxInfo`) or nil context pointers
 

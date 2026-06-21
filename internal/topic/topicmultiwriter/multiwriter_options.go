@@ -28,6 +28,14 @@ func WithWriterIdleTimeout(timeout time.Duration) PublicMultiWriterOption {
 	}
 }
 
+// WithDirectWrite enables direct writes to the node hosting each target
+// partition for all per-partition writers managed by the multi-writer.
+func WithDirectWrite(enable bool) PublicMultiWriterOption {
+	return func(cfg *MultiWriterConfig) {
+		cfg.DirectWrite = enable
+	}
+}
+
 func WithWriterPartitionByPartitionID() PublicMultiWriterOption {
 	return func(cfg *MultiWriterConfig) {
 		cfg.PartitionChooser = partitionchooser.NewByPartitionIDPartitionChooser()

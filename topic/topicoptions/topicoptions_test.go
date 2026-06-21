@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 func TestEqualAlterOptions(t *testing.T) {
@@ -111,6 +112,37 @@ func TestAlterWithResetMetricsLevel(t *testing.T) {
 
 	proto := req.ToProto()
 	require.NotNil(t, proto.GetResetMetricsLevel())
+}
+
+func TestAlterConsumerOptionsDoNotResetSupportedCodecs(t *testing.T) {
+	// Altering an unrelated consumer property must not send set_supported_codecs,
+	// otherwise the server wipes the consumer's existing codec restriction.
+	for _, opt := range []AlterOption{
+		AlterConsumerWithImportant("name", true),
+		AlterConsumerWithReadFrom("name", time.Unix(0, 0)),
+		AlterConsumerWithAttributes("name", map[string]string{"k": "v"}),
+		AlterConsumerWithAvailabilityPeriod("name", time.Hour),
+	} {
+		req := &rawtopic.AlterTopicRequest{}
+		opt.ApplyAlterOption(req)
+
+		proto := req.ToProto()
+		require.Len(t, proto.GetAlterConsumers(), 1)
+		require.Nil(t, proto.GetAlterConsumers()[0].GetSetSupportedCodecs())
+	}
+}
+
+func TestAlterConsumerWithSupportedCodecsSetsCodecs(t *testing.T) {
+	req := &rawtopic.AlterTopicRequest{}
+	AlterConsumerWithSupportedCodecs("name", []topictypes.Codec{topictypes.CodecGzip}).ApplyAlterOption(req)
+
+	proto := req.ToProto()
+	require.Len(t, proto.GetAlterConsumers(), 1)
+	require.NotNil(t, proto.GetAlterConsumers()[0].GetSetSupportedCodecs())
+	require.Equal(t,
+		[]int32{int32(topictypes.CodecGzip)},
+		proto.GetAlterConsumers()[0].GetSetSupportedCodecs().GetCodecs(),
+	)
 }
 
 func TestEqualCreateOptions(t *testing.T) {

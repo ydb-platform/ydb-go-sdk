@@ -1,12 +1,14 @@
 package mock
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -37,6 +39,14 @@ func WithClusterNodes(nodeIDs ...uint32) ServerOption {
 	}
 }
 
+// WithExecuteQueryPartDelay inserts a sleep before each ExecuteQuery response
+// part is sent. Useful for benchmarks that compare query result prefetch.
+func WithExecuteQueryPartDelay(delay time.Duration) ServerOption {
+	return func(m *server) {
+		m.executeQueryPartDelay = delay
+	}
+}
+
 // server is a local gRPC mock (Discovery + Table + Query).
 type server struct {
 	listener   net.Listener
@@ -61,6 +71,13 @@ type server struct {
 	executeQueryBehavior executeQueryBehavior
 	commitQueryCalls     atomic.Uint64
 	queryTxID            atomic.Uint64
+
+	// executeQueryPartDelay is inserted before each ExecuteQuery response part
+	// send to simulate network latency between stream parts in benchmarks.
+	executeQueryPartDelay time.Duration
+
+	executeQueryPayloadOnce sync.Once
+	executeQueryPayload     []byte
 }
 
 // TriggerNodeShutdown makes one AttachSession handler send a
@@ -297,11 +314,17 @@ func (m *querySrv) ExecuteQuery(
 	resultSets := resultSetsForQuery(req.GetQueryContent().GetText())
 
 	for i, rs := range resultSets {
-		err := stream.Send(Ydb_Query.ExecuteQueryResponsePart_builder{
+		rsToSend := rs
+		if delay := m.mock.executeQueryPartDelay; delay > 0 {
+			time.Sleep(delay)
+			rsToSend = withResultSetPayload(rs, m.mock.executeQueryPadding())
+		}
+
+		err := stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: int64(i),
-			ResultSet:      rs,
-		}.Build())
+			ResultSet:      rsToSend,
+		})
 		if err != nil {
 			return err
 		}
@@ -426,6 +449,35 @@ func select42ResultSet() *Ydb.ResultSet {
 		Columns: []*Ydb.Column{col},
 		Rows:    []*Ydb.Value{Ydb.Value_builder{Items: []*Ydb.Value{val}}.Build()},
 	}.Build()
+}
+
+const executeQueryBenchmarkPayloadBytes = 256 * 1024
+
+func (m *server) executeQueryPadding() []byte {
+	if m.executeQueryPartDelay <= 0 {
+		return nil
+	}
+
+	m.executeQueryPayloadOnce.Do(func() {
+		m.executeQueryPayload = bytes.Repeat([]byte{'x'}, executeQueryBenchmarkPayloadBytes)
+	})
+
+	return m.executeQueryPayload
+}
+
+func withResultSetPayload(rs *Ydb.ResultSet, payload []byte) *Ydb.ResultSet {
+	if len(payload) == 0 {
+		return rs
+	}
+
+	cloned := proto.Clone(rs).(*Ydb.ResultSet) //nolint:forcetypeassert
+	col, val := bytesColumn("payload", payload)
+	cloned.Columns = append(cloned.Columns, col)
+	for _, row := range cloned.GetRows() {
+		row.Items = append(row.Items, val)
+	}
+
+	return cloned
 }
 
 func discoveryEndpoints(host string, port uint32, nodeIDs []uint32) []*Ydb_Discovery.EndpointInfo {

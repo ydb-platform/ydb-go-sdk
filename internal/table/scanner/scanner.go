@@ -463,10 +463,24 @@ func (s *valueScanner) any() any {
 		return src
 	case internalTypes.Text, internalTypes.DyNumber:
 		return s.text()
-	case
-		internalTypes.YSON,
-		internalTypes.JSON,
-		internalTypes.JSONDocument:
+	case internalTypes.YSON:
+		cur, ok := s.stack.currentValue().(*Ydb.Value)
+		if !ok {
+			_ = s.errorf(0, "valueScanner.any(): type assertion to *Ydb.Value failed")
+
+			return nil
+		}
+		switch cur.WhichValue() {
+		case Ydb.Value_TextValue_case:
+			return xstring.ToBytes(cur.GetTextValue())
+		case Ydb.Value_BytesValue_case:
+			return cur.GetBytesValue()
+		default:
+			_ = s.errorf(0, "valueScanner.any(): incorrect YSON underlying type (expected TextValue or BytesValue)")
+
+			return nil
+		}
+	case internalTypes.JSON, internalTypes.JSONDocument:
 		return xstring.ToBytes(s.text())
 	default:
 		_ = s.errorf(0, "unknown primitive type '%+v'", p)
@@ -835,8 +849,23 @@ func (s *valueScanner) setString(dst *string) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_UUID:
 		_ = s.errorf(0, "ydb: failed scan uuid: %w", value.ErrIssue1501BadUUID)
-	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
+	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
 		*dst = s.text()
+	case Ydb.Type_YSON:
+		cur, ok := s.stack.currentValue().(*Ydb.Value)
+		if !ok {
+			_ = s.errorf(0, "scan row failed: type assertion to *Ydb.Value failed")
+
+			return
+		}
+		switch cur.WhichValue() {
+		case Ydb.Value_TextValue_case:
+			*dst = cur.GetTextValue()
+		case Ydb.Value_BytesValue_case:
+			*dst = xstring.FromBytes(cur.GetBytesValue())
+		default:
+			_ = s.errorf(0, "scan row failed: incorrect YSON underlying type (expected TextValue or BytesValue)")
+		}
 	case Ydb.Type_STRING:
 		*dst = xstring.FromBytes(s.bytes())
 	default:
@@ -848,8 +877,23 @@ func (s *valueScanner) setByte(dst *[]byte) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_UUID:
 		_ = s.errorf(0, "ydb: failed to scan uuid: %w", value.ErrIssue1501BadUUID)
-	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
+	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
 		*dst = xstring.ToBytes(s.text())
+	case Ydb.Type_YSON:
+		cur, ok := s.stack.currentValue().(*Ydb.Value)
+		if !ok {
+			_ = s.errorf(0, "scan row failed: type assertion to *Ydb.Value failed")
+
+			return
+		}
+		switch cur.WhichValue() {
+		case Ydb.Value_TextValue_case:
+			*dst = xstring.ToBytes(cur.GetTextValue())
+		case Ydb.Value_BytesValue_case:
+			*dst = cur.GetBytesValue()
+		default:
+			_ = s.errorf(0, "scan row failed: incorrect YSON underlying type (expected TextValue or BytesValue)")
+		}
 	case Ydb.Type_STRING:
 		*dst = s.bytes()
 	default:
