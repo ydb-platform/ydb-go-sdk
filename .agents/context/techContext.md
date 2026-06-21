@@ -40,6 +40,8 @@ export YDB_SESSIONS_SHUTDOWN_URLS="http://localhost:8765/actors/kqp_proxy?force_
 go test -race -tags integration ./tests/integration
 ```
 
+Stress a single flaky integration test: add `-count=N -run 'TestName$'` to the `go test` command above.
+
 `YDB_CONNECTION_STRING` is the **insecure** endpoint (port 2136); TLS uses `YDB_CONNECTION_STRING_SECURE` (port 2135). Default in `tests/integration/helpers_test.go`: `grpc://localhost:2136/local`.
 
 ## CI workflows

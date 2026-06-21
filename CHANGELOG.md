@@ -1,3 +1,5 @@
+* Fixed a race in topic multi-writer initialization where partition split handling could close writers still used by `initSeqNo`, causing `WaitInit` to fail with `ydb: stop writer reconnector`; message pipeline workers now start only after init completes
+
 ## v3.141.0
 * Added `ydb.WithPrefetchQueryResultParts(n)` connector option and `prefetch_query_result_parts` connection string parameter for the `database/sql` driver to enable `query.WithResponsePartPrefetch` on every query executed over Query Service
 
