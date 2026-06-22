@@ -92,15 +92,15 @@ type AlterConsumer struct {
 }
 
 func (c *AlterConsumer) ToProto() *Ydb_Topic.AlterConsumer {
-	res := &Ydb_Topic.AlterConsumer{
+	res := Ydb_Topic.AlterConsumer_builder{
 		Name:            c.Name,
 		SetImportant:    c.SetImportant.ToProto(),
 		SetReadFrom:     c.SetReadFrom.ToProto(),
 		AlterAttributes: c.AlterAttributes,
-	}
+	}.Build()
 
 	if c.NeedSetSupportedCodecs {
-		res.SetSupportedCodecs = c.SetSupportedCodecs.ToProto()
+		res.SetSetSupportedCodecs(c.SetSupportedCodecs.ToProto())
 	}
 
 	if c.SetAvailabilityPeriod.HasValue {

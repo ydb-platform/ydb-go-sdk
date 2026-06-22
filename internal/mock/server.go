@@ -320,11 +320,11 @@ func (m *querySrv) ExecuteQuery(
 			rsToSend = withResultSetPayload(rs, m.mock.executeQueryPadding())
 		}
 
-		err := stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
+		err := stream.Send(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: int64(i),
 			ResultSet:      rsToSend,
-		})
+		}.Build())
 		if err != nil {
 			return err
 		}
@@ -472,9 +472,9 @@ func withResultSetPayload(rs *Ydb.ResultSet, payload []byte) *Ydb.ResultSet {
 
 	cloned := proto.Clone(rs).(*Ydb.ResultSet) //nolint:forcetypeassert
 	col, val := bytesColumn("payload", payload)
-	cloned.Columns = append(cloned.Columns, col)
+	cloned.SetColumns(append(cloned.GetColumns(), col))
 	for _, row := range cloned.GetRows() {
-		row.Items = append(row.Items, val)
+		row.SetItems(append(row.GetItems(), val))
 	}
 
 	return cloned

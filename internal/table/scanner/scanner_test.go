@@ -740,41 +740,35 @@ func TestScanYSON(t *testing.T) {
 	}{
 		{
 			name: "TextValue",
-			value: &Ydb.Value{
-				Value: &Ydb.Value_TextValue{
-					TextValue: string(expected),
-				},
-			},
+			value: Ydb.Value_builder{
+				TextValue: proto.String(string(expected)),
+			}.Build(),
 		},
 		{
 			name: "BytesValue",
-			value: &Ydb.Value{
-				Value: &Ydb.Value_BytesValue{
-					BytesValue: expected,
-				},
-			},
+			value: Ydb.Value_builder{
+				BytesValue: expected,
+			}.Build(),
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			set := &Ydb.ResultSet{
+			set := Ydb.ResultSet_builder{
 				Columns: []*Ydb.Column{
-					{
+					Ydb.Column_builder{
 						Name: "yson",
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_YSON,
-							},
-						},
-					},
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_YSON.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				Rows: []*Ydb.Value{
-					{
+					Ydb.Value_builder{
 						Items: []*Ydb.Value{
 							test.value,
 						},
-					},
+					}.Build(),
 				},
-			}
+			}.Build()
 
 			s.reset(set)
 			require.True(t, s.NextRow())
@@ -797,41 +791,35 @@ func TestScanYSONAny(t *testing.T) {
 	}{
 		{
 			name: "TextValue",
-			value: &Ydb.Value{
-				Value: &Ydb.Value_TextValue{
-					TextValue: string(expected),
-				},
-			},
+			value: Ydb.Value_builder{
+				TextValue: proto.String(string(expected)),
+			}.Build(),
 		},
 		{
 			name: "BytesValue",
-			value: &Ydb.Value{
-				Value: &Ydb.Value_BytesValue{
-					BytesValue: expected,
-				},
-			},
+			value: Ydb.Value_builder{
+				BytesValue: expected,
+			}.Build(),
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			set := &Ydb.ResultSet{
+			set := Ydb.ResultSet_builder{
 				Columns: []*Ydb.Column{
-					{
+					Ydb.Column_builder{
 						Name: "yson",
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_YSON,
-							},
-						},
-					},
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_YSON.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				Rows: []*Ydb.Value{
-					{
+					Ydb.Value_builder{
 						Items: []*Ydb.Value{
 							test.value,
 						},
-					},
+					}.Build(),
 				},
-			}
+			}.Build()
 
 			s.reset(set)
 			require.True(t, s.NextRow())

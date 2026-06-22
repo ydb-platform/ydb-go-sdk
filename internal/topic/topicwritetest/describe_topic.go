@@ -15,24 +15,24 @@ func DescribeTopicResponse(
 	topicPath string,
 	partitions []*Ydb_Topic.DescribeTopicResult_PartitionInfo,
 ) (*Ydb_Topic.DescribeTopicResponse, error) {
-	result := &Ydb_Topic.DescribeTopicResult{
-		Self: &Ydb_Scheme.Entry{
+	result := Ydb_Topic.DescribeTopicResult_builder{
+		Self: Ydb_Scheme.Entry_builder{
 			Name: topicPath,
 			Type: Ydb_Scheme.Entry_TOPIC,
-		},
-		PartitioningSettings: &Ydb_Topic.PartitioningSettings{
+		}.Build(),
+		PartitioningSettings: Ydb_Topic.PartitioningSettings_builder{
 			MinActivePartitions:      int64(len(partitions)),
-			AutoPartitioningSettings: &Ydb_Topic.AutoPartitioningSettings{},
-		},
+			AutoPartitioningSettings: Ydb_Topic.AutoPartitioningSettings_builder{}.Build(),
+		}.Build(),
 		Partitions: partitions,
-	}
-	resp := &Ydb_Topic.DescribeTopicResponse{
-		Operation: &Ydb_Operations.Operation{
+	}.Build()
+	resp := Ydb_Topic.DescribeTopicResponse_builder{
+		Operation: Ydb_Operations.Operation_builder{
 			Ready:  true,
 			Status: Ydb.StatusIds_SUCCESS,
 			Result: &anypb.Any{},
-		},
-	}
+		}.Build(),
+	}.Build()
 	if err := resp.GetOperation().GetResult().MarshalFrom(result); err != nil {
 		return nil, fmt.Errorf("marshal describe topic result: %w", err)
 	}

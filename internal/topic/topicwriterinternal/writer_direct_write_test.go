@@ -120,14 +120,19 @@ func TestLookupPartitionLocation(t *testing.T) {
 		{
 			name: "ReturnsHostNodeAndGenerationFromDescribe",
 			partitions: []*Ydb_Topic.DescribeTopicResult_PartitionInfo{
-				{PartitionId: 0, PartitionLocation: &Ydb_Topic.PartitionLocation{NodeId: 100}},
-				{
+				Ydb_Topic.DescribeTopicResult_PartitionInfo_builder{
+					PartitionId: 0,
+					PartitionLocation: Ydb_Topic.PartitionLocation_builder{
+						NodeId: 100,
+					}.Build(),
+				}.Build(),
+				Ydb_Topic.DescribeTopicResult_PartitionInfo_builder{
 					PartitionId: partitionID,
-					PartitionLocation: &Ydb_Topic.PartitionLocation{
+					PartitionLocation: Ydb_Topic.PartitionLocation_builder{
 						NodeId:     42,
 						Generation: 3,
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 			wantNodeID:     42,
 			wantGeneration: 3,
@@ -135,7 +140,12 @@ func TestLookupPartitionLocation(t *testing.T) {
 		{
 			name: "PartitionSplitOrRemoved",
 			partitions: []*Ydb_Topic.DescribeTopicResult_PartitionInfo{
-				{PartitionId: 0, PartitionLocation: &Ydb_Topic.PartitionLocation{NodeId: 100}},
+				Ydb_Topic.DescribeTopicResult_PartitionInfo_builder{
+					PartitionId: 0,
+					PartitionLocation: Ydb_Topic.PartitionLocation_builder{
+						NodeId: 100,
+					}.Build(),
+				}.Build(),
 			},
 			wantErr: errDirectWritePartitionNotFound,
 		},
@@ -149,12 +159,12 @@ func TestLookupPartitionLocation(t *testing.T) {
 		{
 			name: "DescribeSchemeErrorStopsWriter",
 			describeTopic: func(_ *Ydb_Topic.DescribeTopicRequest) (*Ydb_Topic.DescribeTopicResponse, error) {
-				return &Ydb_Topic.DescribeTopicResponse{
-					Operation: &Ydb_Operations.Operation{
+				return Ydb_Topic.DescribeTopicResponse_builder{
+					Operation: Ydb_Operations.Operation_builder{
 						Ready:  true,
 						Status: Ydb.StatusIds_SCHEME_ERROR,
-					},
-				}, nil
+					}.Build(),
+				}.Build(), nil
 			},
 			wantErrSubstr: "SCHEME_ERROR",
 		},

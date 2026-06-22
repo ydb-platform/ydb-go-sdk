@@ -87,16 +87,12 @@ func (p *Partitioning) setToProtoInitRequest(r *Ydb_Topic.StreamWriteMessage_Ini
 	case PartitioningMessageGroupID:
 		r.SetMessageGroupId(p.MessageGroupID)
 	case PartitioningPartitionID:
-		r.Partitioning = &Ydb_Topic.StreamWriteMessage_InitRequest_PartitionId{
-			PartitionId: p.PartitionID,
-		}
+		r.SetPartitionId(p.PartitionID)
 	case PartitioningPartitionWithGeneration:
-		r.Partitioning = &Ydb_Topic.StreamWriteMessage_InitRequest_PartitionWithGeneration{
-			PartitionWithGeneration: &Ydb_Topic.PartitionWithGeneration{
-				PartitionId: p.PartitionID,
-				Generation:  p.Generation,
-			},
-		}
+		r.SetPartitionWithGeneration(Ydb_Topic.PartitionWithGeneration_builder{
+			PartitionId: p.PartitionID,
+			Generation:  p.Generation,
+		}.Build())
 	default:
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: unexpected partition type while set to init request: %v",
@@ -114,16 +110,12 @@ func (p *Partitioning) setToProtoMessage(m *Ydb_Topic.StreamWriteMessage_WriteRe
 	case PartitioningMessageGroupID:
 		m.SetMessageGroupId(p.MessageGroupID)
 	case PartitioningPartitionID:
-		m.Partitioning = &Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData_PartitionId{
-			PartitionId: p.PartitionID,
-		}
+		m.SetPartitionId(p.PartitionID)
 	case PartitioningPartitionWithGeneration:
-		m.Partitioning = &Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData_PartitionWithGeneration{
-			PartitionWithGeneration: &Ydb_Topic.PartitionWithGeneration{
-				PartitionId: p.PartitionID,
-				Generation:  p.Generation,
-			},
-		}
+		m.SetPartitionWithGeneration(Ydb_Topic.PartitionWithGeneration_builder{
+			PartitionId: p.PartitionID,
+			Generation:  p.Generation,
+		}.Build())
 	default:
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: unexpected partition type while set to message proto: %v",

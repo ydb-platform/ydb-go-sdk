@@ -73,20 +73,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_YSON_TextValue",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_YSON,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_YSON.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_TextValue{
-							TextValue: "<a=1>[3;%false]",
-						},
-					},
+					Ydb.Value_builder{
+						TextValue: proto.String("<a=1>[3;%false]"),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -102,21 +98,17 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_YSON_BytesValue",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_YSON,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_YSON.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_BytesValue{
+					Ydb.Value_builder{
 							BytesValue: []byte("<a=1>[3;%false]"),
-						},
+						}.Build(),
 					},
-				},
 			)),
 			dst: [][]any{
 				{func(v string) *string { return &v }("")},

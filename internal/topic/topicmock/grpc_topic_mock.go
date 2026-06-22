@@ -127,7 +127,7 @@ func (m mockDiscoveryService) ListEndpoints(
 ) (*Ydb_Discovery.ListEndpointsResponse, error) {
 	endpoints := make([]*Ydb_Discovery.EndpointInfo, 0, len(m.nodeIDs))
 	for _, nodeID := range m.nodeIDs {
-		endpoints = append(endpoints, &Ydb_Discovery.EndpointInfo{
+		endpoints = append(endpoints, Ydb_Discovery.EndpointInfo_builder{
 			Address:    m.host,
 			Port:       m.port,
 			LoadFactor: 0,
@@ -136,7 +136,7 @@ func (m mockDiscoveryService) ListEndpoints(
 			Location:   "",
 			NodeId:     nodeID,
 			IpV4:       []string{"127.0.0.1"},
-		})
+		}.Build())
 	}
 
 	res := Ydb_Discovery.ListEndpointsResult_builder{

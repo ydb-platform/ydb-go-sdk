@@ -1304,9 +1304,8 @@ func (s lazyProtoStringifer) String() string {
 			storage := make([]messDataType, len(data.GetMessages()))
 			for i := range data.GetMessages() {
 				storage[i].Data = data.GetMessages()[i].GetData()
-				data.GetMessages()[i] = nil
-
 				storage[i].Metadata = data.GetMessages()[i].GetMetadataItems()
+				data.GetMessages()[i].SetData(nil)
 				data.GetMessages()[i].SetMetadataItems(nil)
 			}
 
@@ -1317,13 +1316,12 @@ func (s lazyProtoStringifer) String() string {
 				}
 			}()
 		}
-		clientMessage := writeRequest.GetClientMessage()
-		updateToken, ok := clientMessage.(*Ydb_Topic.StreamWriteMessage_FromClient_UpdateTokenRequest)
-		if ok {
-			token := updateToken.UpdateTokenRequest.GetToken()
-			updateToken.UpdateTokenRequest.Token = secret.Token(token)
+		if writeRequest.WhichClientMessage() == Ydb_Topic.StreamWriteMessage_FromClient_UpdateTokenRequest_case {
+			updateToken := writeRequest.GetUpdateTokenRequest()
+			token := updateToken.GetToken()
+			updateToken.SetToken(secret.Token(token))
 			defer func() {
-				updateToken.UpdateTokenRequest.Token = token
+				updateToken.SetToken(token)
 			}()
 		}
 	}
