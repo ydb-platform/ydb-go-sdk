@@ -6,10 +6,8 @@ import (
 	"math/rand"
 	"path"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -18,11 +16,11 @@ const (
 	expirationQueueCount   = 4
 )
 
-func readExpiredBatchTransaction(ctx context.Context, c table.Client, prefix string, queue,
-	timestamp, prevTimestamp, prevDocID uint64) (result.Result,
+func readExpiredBatchTransaction(ctx context.Context, c query.Client, prefix string, queue,
+	timestamp, prevTimestamp, prevDocID uint64) (query.ClosableResultSet,
 	error,
 ) {
-	query := fmt.Sprintf(`
+	sql := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
 		DECLARE $timestamp AS Uint64;
@@ -52,16 +50,19 @@ func readExpiredBatchTransaction(ctx context.Context, c table.Client, prefix str
         ORDER BY ts, doc_id
         LIMIT 100;`, prefix, queue, queue)
 
-	readTx := table.TxControl(table.BeginTx(table.WithOnlineReadOnly()), table.CommitTx())
-
-	var res result.Result
+	var rs query.ClosableResultSet
 	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, res, err = s.Execute(ctx, readTx, query, table.NewQueryParameters(
-				table.ValueParam("$timestamp", types.Uint64Value(timestamp)),
-				table.ValueParam("$prev_timestamp", types.Uint64Value(prevTimestamp)),
-				table.ValueParam("$prev_doc_id", types.Uint64Value(prevDocID)),
-			))
+		func(ctx context.Context, s query.Session) (err error) {
+			rs, err = s.QueryResultSet(ctx, sql,
+				query.WithTxControl(query.OnlineReadOnlyTxControl()),
+				query.WithParameters(
+					ydb.ParamsBuilder().
+						Param("$timestamp").Any(types.Uint64Value(timestamp)).
+						Param("$prev_timestamp").Any(types.Uint64Value(prevTimestamp)).
+						Param("$prev_doc_id").Any(types.Uint64Value(prevDocID)).
+						Build(),
+				),
+			)
 
 			return err
 		},
@@ -69,17 +70,14 @@ func readExpiredBatchTransaction(ctx context.Context, c table.Client, prefix str
 	if err != nil {
 		return nil, err
 	}
-	if res.Err() != nil {
-		return nil, res.Err()
-	}
 
-	return res, nil
+	return rs, nil
 }
 
 func deleteDocumentWithTimestamp(ctx context.Context,
-	c table.Client, prefix string, queue, lastDocID, timestamp uint64,
+	c query.Client, prefix string, queue, lastDocID, timestamp uint64,
 ) error {
-	query := fmt.Sprintf(`
+	sql := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
 		DECLARE $doc_id AS Uint64;
@@ -91,23 +89,22 @@ func deleteDocumentWithTimestamp(ctx context.Context,
         DELETE FROM expiration_queue_%v
         WHERE ts = $timestamp AND doc_id = $doc_id;`, prefix, queue)
 
-	writeTx := table.TxControl(table.BeginTx(table.WithSerializableReadWrite()), table.CommitTx())
-
-	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(ctx, writeTx, query, table.NewQueryParameters(
-				table.ValueParam("$doc_id", types.Uint64Value(lastDocID)),
-				table.ValueParam("$timestamp", types.Uint64Value(timestamp)),
-			))
-
-			return err
+	return c.Do(ctx,
+		func(ctx context.Context, s query.Session) (err error) {
+			return s.Exec(ctx, sql,
+				query.WithTxControl(query.SerializableReadWriteTxControl(query.CommitTx())),
+				query.WithParameters(
+					ydb.ParamsBuilder().
+						Param("$doc_id").Any(types.Uint64Value(lastDocID)).
+						Param("$timestamp").Any(types.Uint64Value(timestamp)).
+						Build(),
+				),
+			)
 		},
 	)
-
-	return err
 }
 
-func deleteExpired(ctx context.Context, c table.Client, prefix string, queue, timestamp uint64) (err error) {
+func deleteExpired(ctx context.Context, c query.Client, prefix string, queue, timestamp uint64) (err error) {
 	fmt.Printf("> DeleteExpired from queue #%d:\n", queue)
 	empty := false
 	lastTimestamp := uint64(0)
@@ -115,21 +112,23 @@ func deleteExpired(ctx context.Context, c table.Client, prefix string, queue, ti
 
 	for !empty {
 		err = func() (err error) { // for isolate defer inside lambda
-			res, err := readExpiredBatchTransaction(ctx, c, prefix, queue, timestamp, lastTimestamp, lastDocID)
+			rs, err := readExpiredBatchTransaction(ctx, c, prefix, queue, timestamp, lastTimestamp, lastDocID)
 			if err != nil {
 				return err
 			}
 			defer func() {
-				_ = res.Close()
+				_ = rs.Close(ctx)
 			}()
 
-			empty = true
-			res.NextResultSet(ctx)
-			for res.NextRow() {
-				empty = false
-				err = res.ScanNamed(
-					named.OptionalWithDefault("doc_id", &lastDocID),
-					named.OptionalWithDefault("ts", &lastTimestamp),
+			hasRows := false
+			for row, err := range rs.Rows(ctx) {
+				if err != nil {
+					return err
+				}
+				hasRows = true
+				err = row.ScanNamed(
+					query.Named("doc_id", &lastDocID),
+					query.Named("ts", &lastTimestamp),
 				)
 				if err != nil {
 					return err
@@ -142,7 +141,11 @@ func deleteExpired(ctx context.Context, c table.Client, prefix string, queue, ti
 				}
 			}
 
-			return res.Err()
+			if !hasRows {
+				empty = true
+			}
+
+			return nil
 		}()
 		if err != nil {
 			return err
@@ -152,10 +155,10 @@ func deleteExpired(ctx context.Context, c table.Client, prefix string, queue, ti
 	return nil
 }
 
-func readDocument(ctx context.Context, c table.Client, prefix, url string) error {
+func readDocument(ctx context.Context, c query.Client, prefix, url string) error {
 	fmt.Printf("> ReadDocument \"%v\":\n", url)
 
-	query := fmt.Sprintf(`
+	sql := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
         DECLARE $url AS Text;
@@ -166,31 +169,40 @@ func readDocument(ctx context.Context, c table.Client, prefix, url string) error
         FROM documents
         WHERE doc_id = $doc_id;`, prefix)
 
-	readTx := table.TxControl(table.BeginTx(table.WithOnlineReadOnly()), table.CommitTx())
-
-	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, res, err := s.Execute(ctx, readTx, query, table.NewQueryParameters(
-				table.ValueParam("$url", types.TextValue(url)),
-			))
+	return c.Do(ctx,
+		func(ctx context.Context, s query.Session) (err error) {
+			rs, err := s.QueryResultSet(ctx, sql,
+				query.WithTxControl(query.OnlineReadOnlyTxControl()),
+				query.WithParameters(
+					ydb.ParamsBuilder().
+						Param("$url").Any(types.TextValue(url)).
+						Build(),
+				),
+			)
 			if err != nil {
 				return err
 			}
 			defer func() {
-				_ = res.Close()
+				_ = rs.Close(ctx)
 			}()
-			var (
-				docID  *uint64
-				docURL *string
-				ts     *uint64
-				html   *string
-			)
-			if res.NextResultSet(ctx) && res.NextRow() {
-				err = res.ScanNamed(
-					named.Optional("doc_id", &docID),
-					named.Optional("url", &docURL),
-					named.Optional("ts", &ts),
-					named.Optional("html", &html),
+
+			found := false
+			for row, err := range rs.Rows(ctx) {
+				if err != nil {
+					return err
+				}
+				found = true
+				var (
+					docID  *uint64
+					docURL *string
+					ts     *uint64
+					html   *string
+				)
+				err = row.ScanNamed(
+					query.Named("doc_id", &docID),
+					query.Named("url", &docURL),
+					query.Named("ts", &ts),
+					query.Named("html", &html),
 				)
 				if err != nil {
 					return err
@@ -199,22 +211,22 @@ func readDocument(ctx context.Context, c table.Client, prefix, url string) error
 				fmt.Printf("\tUrl: %v\n", docURL)
 				fmt.Printf("\tTimestamp: %v\n", ts)
 				fmt.Printf("\tHtml: %v\n", html)
-			} else {
+			}
+
+			if !found {
 				fmt.Println("\tNot found")
 			}
 
-			return res.Err()
+			return nil
 		},
 	)
-
-	return err
 }
 
-func addDocument(ctx context.Context, c table.Client, prefix, url, html string, timestamp uint64) error {
+func addDocument(ctx context.Context, c query.Client, prefix, url, html string, timestamp uint64) error {
 	fmt.Printf("> AddDocument: \n\tUrl: %v\n\tTimestamp: %v\n", url, timestamp)
 
 	queue := rand.Intn(expirationQueueCount) //nolint:gosec
-	query := fmt.Sprintf(`
+	sql := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
 		DECLARE $url AS Text;
@@ -233,35 +245,33 @@ func addDocument(ctx context.Context, c table.Client, prefix, url, html string, 
         VALUES
             ($timestamp, $doc_id);`, prefix, queue)
 
-	writeTx := table.TxControl(table.BeginTx(table.WithSerializableReadWrite()), table.CommitTx())
-
-	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(ctx, writeTx, query, table.NewQueryParameters(
-				table.ValueParam("$url", types.TextValue(url)),
-				table.ValueParam("$html", types.TextValue(html)),
-				table.ValueParam("$timestamp", types.Uint64Value(timestamp)),
-			))
-
-			return err
-		},
-	)
-
-	return err
-}
-
-func createTables(ctx context.Context, c table.Client, prefix string) (err error) {
-	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) error {
-			return s.CreateTable(ctx, path.Join(prefix, "documents"),
-				options.WithColumn("doc_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("url", types.Optional(types.TypeUTF8)),
-				options.WithColumn("html", types.Optional(types.TypeUTF8)),
-				options.WithColumn("ts", types.Optional(types.TypeUint64)),
-				options.WithPrimaryKeyColumn("doc_id"),
-				options.WithPartitions(options.WithUniformPartitions(uint64(docTablePartitionCount))),
+	return c.Do(ctx,
+		func(ctx context.Context, s query.Session) (err error) {
+			return s.Exec(ctx, sql,
+				query.WithTxControl(query.SerializableReadWriteTxControl(query.CommitTx())),
+				query.WithParameters(
+					ydb.ParamsBuilder().
+						Param("$url").Any(types.TextValue(url)).
+						Param("$html").Any(types.TextValue(html)).
+						Param("$timestamp").Any(types.Uint64Value(timestamp)).
+						Build(),
+				),
 			)
 		},
+	)
+}
+
+func createTables(ctx context.Context, c query.Client, prefix string) (err error) {
+	err = c.Exec(ctx,
+		fmt.Sprintf(`
+			CREATE TABLE IF NOT EXISTS `+"`%s`"+` (
+				doc_id Uint64,
+				url Text,
+				html Text,
+				ts Uint64,
+				PRIMARY KEY (doc_id)
+			)`, path.Join(prefix, "documents")),
+		query.WithTxControl(query.ImplicitTxControl()),
 	)
 	if err != nil {
 		return err
@@ -269,14 +279,14 @@ func createTables(ctx context.Context, c table.Client, prefix string) (err error
 
 	for i := range expirationQueueCount {
 		tableName := path.Join(prefix, fmt.Sprintf("expiration_queue_%v", i))
-		err = c.Do(ctx,
-			func(ctx context.Context, s table.Session) error {
-				return s.CreateTable(ctx, tableName,
-					options.WithColumn("doc_id", types.Optional(types.TypeUint64)),
-					options.WithColumn("ts", types.Optional(types.TypeUint64)),
-					options.WithPrimaryKeyColumn("ts", "doc_id"),
-				)
-			},
+		err = c.Exec(ctx,
+			fmt.Sprintf(`
+				CREATE TABLE IF NOT EXISTS `+"`%s`"+` (
+					doc_id Uint64,
+					ts Uint64,
+					PRIMARY KEY (ts, doc_id)
+				)`, tableName),
+			query.WithTxControl(query.ImplicitTxControl()),
 		)
 		if err != nil {
 			return err

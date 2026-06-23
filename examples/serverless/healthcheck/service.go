@@ -14,9 +14,9 @@ import (
 	"time"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -72,24 +72,22 @@ func (s *service) createTableIfNotExists(ctx context.Context) error {
 	if exists {
 		return nil
 	}
-	query := fmt.Sprintf(`
-		PRAGMA TablePathPrefix("%s");
 
-		CREATE TABLE healthchecks (
-			url         Text,
-			code        Int32,
-			ts          DateTime,
-			error       Text,
-			PRIMARY KEY (url, ts)
-		) WITH (
-			AUTO_PARTITIONING_BY_LOAD = ENABLED
-		);`, path.Join(s.db.Name(), prefix),
-	)
+	return s.db.Query().Exec(ctx,
+		fmt.Sprintf(`
+			PRAGMA TablePathPrefix("%s");
 
-	return s.db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) error {
-			return s.ExecuteSchemeQuery(ctx, query)
-		},
+			CREATE TABLE IF NOT EXISTS healthchecks (
+				url         Text,
+				code        Int32,
+				ts          DateTime,
+				error       Text,
+				PRIMARY KEY (url, ts)
+			) WITH (
+				AUTO_PARTITIONING_BY_LOAD = ENABLED
+			);`, path.Join(s.db.Name(), prefix),
+		),
+		query.WithTxControl(query.ImplicitTxControl()),
 	)
 }
 
@@ -169,31 +167,27 @@ func (s *service) upsertRows(ctx context.Context, rows []row) (err error) {
 			}(rows[i].err))),
 		)
 	}
-	err = s.db.Table().Do(ctx,
-		func(ctx context.Context, session table.Session) (err error) {
-			_, _, err = session.Execute(ctx,
-				table.SerializableReadWriteTxControl(table.CommitTx()),
-				fmt.Sprintf(`
-					PRAGMA TablePathPrefix("%s");
-			
-					DECLARE $rows AS List<Struct<
-						url: Text,
-						code: Int32,
-						ts: DateTime,
-						error: Text
-					>>;
+	err = s.db.Query().Exec(ctx,
+		fmt.Sprintf(`
+			PRAGMA TablePathPrefix("%s");
+	
+			DECLARE $rows AS List<Struct<
+				url: Text,
+				code: Int32,
+				ts: DateTime,
+				error: Text
+			>>;
 
-					UPSERT INTO healthchecks ( url, code, ts, error )
-					SELECT url, code, ts, error FROM AS_TABLE($rows);`,
-					path.Join(s.db.Name(), prefix),
-				),
-				table.NewQueryParameters(
-					table.ValueParam("$rows", types.ListValue(values...)),
-				),
-			)
-
-			return err
-		},
+			UPSERT INTO healthchecks ( url, code, ts, error )
+			SELECT url, code, ts, error FROM AS_TABLE($rows);`,
+			path.Join(s.db.Name(), prefix),
+		),
+		query.WithTxControl(query.SerializableReadWriteTxControl(query.CommitTx())),
+		query.WithParameters(
+			ydb.ParamsBuilder().
+				Param("$rows").Any(types.ListValue(values...)).
+				Build(),
+		),
 	)
 	if err != nil {
 		return fmt.Errorf("error on upsert rows: %w", err)

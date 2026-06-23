@@ -10,8 +10,7 @@ import (
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -69,28 +68,21 @@ func main() {
 	prefix = path.Join(db.Name(), prefix)
 
 	tablePath := path.Join(prefix, "decimals")
-	err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			return s.CreateTable(ctx, tablePath,
-				options.WithColumn("id", types.Optional(types.TypeUint32)),
-				options.WithColumn("value", types.Optional(types.DefaultDecimal)),
-				options.WithPrimaryKeyColumn("id"),
-			)
-		},
+	err = db.Query().Exec(ctx,
+		fmt.Sprintf(`
+			CREATE TABLE IF NOT EXISTS `+"`%s`"+` (
+				id Uint32,
+				value Decimal(22,9),
+				PRIMARY KEY (id)
+			)`, tablePath),
+		query.WithTxControl(query.ImplicitTxControl()),
 	)
 	if err != nil {
 		panic(err)
 	}
 
-	err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			txc := table.TxControl(
-				table.BeginTx(
-					table.WithSerializableReadWrite(),
-				),
-				table.CommitTx(),
-			)
-
+	err = db.Query().DoTx(ctx,
+		func(ctx context.Context, tx query.TxActor) (err error) {
 			x := big.NewInt(42 * 1000000000)
 			x.Mul(x, big.NewInt(2))
 			parsedDecimal, err := types.DecimalValueFromString("42.00", 22, 9)
@@ -98,48 +90,53 @@ func main() {
 				panic(err)
 			}
 
-			_, _, err = s.Execute(ctx, txc, render(writeQuery, templateConfig{
+			err = tx.Exec(ctx, render(writeQuery, templateConfig{
 				TablePathPrefix: prefix,
-			}), table.NewQueryParameters(
-				table.ValueParam("$decimals",
-					types.ListValue(
-						types.StructValue(
-							types.StructFieldValue("id", types.Uint32Value(42)),
-							types.StructFieldValue("value", types.DecimalValueFromBigInt(x, 22, 9)),
-						),
-						types.StructValue(
-							types.StructFieldValue("id", types.Uint32Value(43)),
-							types.StructFieldValue("value", parsedDecimal),
-						),
-					),
+			}),
+				query.WithParameters(
+					ydb.ParamsBuilder().
+						Param("$decimals").Any(
+							types.ListValue(
+								types.StructValue(
+									types.StructFieldValue("id", types.Uint32Value(42)),
+									types.StructFieldValue("value", types.DecimalValueFromBigInt(x, 22, 9)),
+								),
+								types.StructValue(
+									types.StructFieldValue("id", types.Uint32Value(43)),
+									types.StructFieldValue("value", parsedDecimal),
+								),
+							),
+						).
+						Build(),
 				),
-			))
+			)
 			if err != nil {
 				return err
 			}
 
-			_, res, err := s.Execute(ctx, txc, render(readQuery, templateConfig{
+			rs, err := tx.QueryResultSet(ctx, render(readQuery, templateConfig{
 				TablePathPrefix: prefix,
-			}), nil)
+			}))
 			if err != nil {
 				return err
 			}
 			defer func() {
-				_ = res.Close()
+				_ = rs.Close(ctx)
 			}()
-			var p *types.Decimal
-			for res.NextResultSet(ctx) {
-				for res.NextRow() {
-					err = res.Scan(&p)
-					if err != nil {
-						return err
-					}
 
-					fmt.Println(p.String())
+			for row, err := range rs.Rows(ctx) {
+				if err != nil {
+					return err
 				}
+				var p *types.Decimal
+				err = row.Scan(&p)
+				if err != nil {
+					return err
+				}
+				fmt.Println(p.String())
 			}
 
-			return res.Err()
+			return nil
 		},
 	)
 	if err != nil {

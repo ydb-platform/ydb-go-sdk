@@ -11,12 +11,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"strconv"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -288,8 +287,41 @@ func fillTableWeather(ctx context.Context, db *ydb.Driver) error {
 		values = append(values, value)
 	}
 
-	return db.Table().BulkUpsert(ctx, path.Join(db.Name(), "weather"),
-		table.BulkUpsertDataRows(types.ListValue(values...)),
+	return db.Query().Exec(ctx,
+		`
+		DECLARE $rows AS List<Struct<
+			ID: Uint64,
+			Date: Text?,
+			MaxTemperatureF: Int64?,
+			MeanTemperatureF: Int64?,
+			MinTemperatureF: Int64?,
+			MaxDewPointF: Int64?,
+			MeanDewPointF: Int64?,
+			MinDewPointF: Int64?,
+			MaxHumidity: Int64?,
+			MeanHumidity: Int64?,
+			MinHumidity: Int64?,
+			MaxSeaLevelPressureIn: Double?,
+			MeanSeaLevelPressureIn: Double?,
+			MinSeaLevelPressureIn: Double?,
+			MaxVisibilityMiles: Int64?,
+			MeanVisibilityMiles: Int64?,
+			MinVisibilityMiles: Int64?,
+			MaxWindSpeedMPH: Int64?,
+			MeanWindSpeedMPH: Int64?,
+			MaxGustSpeedMPH: Int64?,
+			PrecipitationIn: Double?,
+			CloudCover: Int64?,
+			Events: Text?,
+			WindDirDegrees: Text?,
+			city: Text?,
+			season: Text?
+		>>;
+		UPSERT INTO weather SELECT * FROM AS_TABLE($rows);
+		`,
+		query.WithParameters(
+			ydb.ParamsBuilder().Param("$rows").Any(types.ListValue(values...)).Build(),
+		),
 	)
 }
 

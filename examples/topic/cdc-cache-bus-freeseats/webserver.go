@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -104,7 +104,7 @@ func (s *server) getFreeSeats(ctx context.Context, id string) (int64, error) {
 func (s *server) getContentFromDB(ctx context.Context, id string) (int64, error) {
 	s.dbCounter.Add(1)
 	var freeSeats int64
-	err := s.db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+	err := s.db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
 		var err error
 		freeSeats, err = s.getFreeSeatsTx(ctx, tx, id)
 
@@ -114,30 +114,23 @@ func (s *server) getContentFromDB(ctx context.Context, id string) (int64, error)
 	return freeSeats, err
 }
 
-func (s *server) getFreeSeatsTx(ctx context.Context, tx table.TransactionActor, id string) (int64, error) {
-	var freeSeats int64
-	res, err := tx.Execute(ctx, `
+func (s *server) getFreeSeatsTx(ctx context.Context, tx query.TxActor, id string) (int64, error) {
+	row, err := tx.QueryRow(ctx, `
 DECLARE $id AS Text;
 
 SELECT freeSeats FROM bus WHERE id=$id;
-`, table.NewQueryParameters(table.ValueParam("$id", types.UTF8Value(id))))
-	if err != nil {
-		return 0, err
-	}
-
-	err = res.NextResultSetErr(ctx, "freeSeats")
-	if err != nil {
-		return 0, err
-	}
-
-	if !res.NextRow() {
-		freeSeats = 0
-
+`, query.WithParameters(
+		ydb.ParamsBuilder().Param("$id").Any(types.UTF8Value(id)).Build(),
+	))
+	if errors.Is(err, query.ErrNoRows) {
 		return 0, errors.New("not found")
 	}
-
-	err = res.ScanWithDefaults(&freeSeats)
 	if err != nil {
+		return 0, err
+	}
+
+	var freeSeats int64
+	if err := row.Scan(&freeSeats); err != nil {
 		return 0, err
 	}
 
@@ -146,7 +139,7 @@ SELECT freeSeats FROM bus WHERE id=$id;
 
 func (s *server) sellTicket(ctx context.Context, id string) (int64, error) {
 	var freeSeats int64
-	err := s.db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+	err := s.db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
 		var err error
 		freeSeats, err = s.getFreeSeatsTx(ctx, tx, id)
 		if err != nil {
@@ -156,13 +149,13 @@ func (s *server) sellTicket(ctx context.Context, id string) (int64, error) {
 			return fmt.Errorf("failed to sell ticket: %w", errNotEnthoughtFreeSeats)
 		}
 
-		_, err = tx.Execute(ctx, `
+		return tx.Exec(ctx, `
 DECLARE $id AS Text;
 
 UPDATE bus SET freeSeats = freeSeats - 1 WHERE id=$id;
-`, table.NewQueryParameters(table.ValueParam("$id", types.UTF8Value(id))))
-
-		return err
+`, query.WithParameters(
+			ydb.ParamsBuilder().Param("$id").Any(types.UTF8Value(id)).Build(),
+		))
 	})
 	if err == nil {
 		freeSeats--
@@ -176,19 +169,20 @@ func (s *server) IndexPageHandler(writer http.ResponseWriter, request *http.Requ
 
 	var busIDs []string
 
-	err := s.db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-		res, err := tx.Execute(ctx, "SELECT id FROM bus ORDER BY id", nil)
+	err := s.db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+		rs, err := tx.QueryResultSet(ctx, "SELECT id FROM bus ORDER BY id")
 		if err != nil {
 			return err
 		}
+		defer rs.Close(ctx)
 
-		res.NextResultSet(ctx, "id")
-
-		for res.HasNextRow() {
-			res.NextRow()
-			var id string
-			err = res.ScanWithDefaults(&id)
+		busIDs = busIDs[:0]
+		for row, err := range rs.Rows(ctx) {
 			if err != nil {
+				return err
+			}
+			var id string
+			if err = row.Scan(&id); err != nil {
 				return err
 			}
 			busIDs = append(busIDs, id)

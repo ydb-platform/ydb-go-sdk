@@ -47,10 +47,10 @@ func main() {
 
 	prepareTableWithCDC(ctx, db, prefix, tableName, topicPath, consumerName)
 
-	go fillTable(ctx, db.Table(), prefix, tableName)
+	go fillTable(ctx, db.Query(), prefix, tableName)
 	go func() {
 		time.Sleep(interval / 2)
-		removeFromTable(ctx, db.Table(), prefix, tableName)
+		removeFromTable(ctx, db.Query(), prefix, tableName)
 	}()
 
 	cdcRead(ctx, db, consumerName, topicPath)
@@ -82,7 +82,7 @@ func prepareTableWithCDC(ctx context.Context, db *ydb.Driver, prefix, tableName,
 	log.Println("Drop table (if exists)...")
 	err := dropTableIfExists(
 		ctx,
-		db.Table(),
+		db.Query(),
 		path.Join(prefix, tableName),
 	)
 	if err != nil {
@@ -93,7 +93,7 @@ func prepareTableWithCDC(ctx context.Context, db *ydb.Driver, prefix, tableName,
 	log.Println("Create table...")
 	err = createTable(
 		ctx,
-		db.Table(),
+		db.Query(),
 		prefix, tableName,
 	)
 	if err != nil {

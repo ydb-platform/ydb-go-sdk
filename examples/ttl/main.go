@@ -74,12 +74,12 @@ func main() {
 
 	prefix = path.Join(db.Name(), prefix)
 
-	err = createTables(ctx, db.Table(), prefix)
+	err = createTables(ctx, db.Query(), prefix)
 	if err != nil {
 		panic(fmt.Errorf("create tables error: %w", err))
 	}
 
-	err = addDocument(ctx, db.Table(), prefix,
+	err = addDocument(ctx, db.Query(), prefix,
 		"https://yandex.ru/",
 		"<html><body><h1>Yandex</h1></body></html>",
 		1)
@@ -87,7 +87,7 @@ func main() {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
 
-	err = addDocument(ctx, db.Table(), prefix,
+	err = addDocument(ctx, db.Query(), prefix,
 		"https://ya.ru/",
 		"<html><body><h1>Ya</h1></body></html>",
 		2)
@@ -95,27 +95,27 @@ func main() {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://yandex.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://yandex.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
-	err = readDocument(ctx, db.Table(), prefix, "https://ya.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://ya.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
 	for i := range uint64(expirationQueueCount) {
-		if err = deleteExpired(ctx, db.Table(), prefix, i, 1); err != nil {
+		if err = deleteExpired(ctx, db.Query(), prefix, i, 1); err != nil {
 			panic(fmt.Errorf("delete expired failed: %w", err))
 		}
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://ya.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://ya.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
-	err = addDocument(ctx, db.Table(), prefix,
+	err = addDocument(ctx, db.Query(), prefix,
 		"https://yandex.ru/",
 		"<html><body><h1>Yandex</h1></body></html>",
 		2)
@@ -123,7 +123,7 @@ func main() {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
 
-	err = addDocument(ctx, db.Table(), prefix,
+	err = addDocument(ctx, db.Query(), prefix,
 		"https://yandex.ru/",
 		"<html><body><h1>Yandex</h1></body></html>",
 		3)
@@ -132,16 +132,16 @@ func main() {
 	}
 
 	for i := range uint64(expirationQueueCount) {
-		if err = deleteExpired(ctx, db.Table(), prefix, i, 2); err != nil {
+		if err = deleteExpired(ctx, db.Query(), prefix, i, 2); err != nil {
 			panic(fmt.Errorf("delete expired failed: %w", err))
 		}
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://yandex.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://yandex.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
-	err = readDocument(ctx, db.Table(), prefix, "https://ya.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://ya.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
