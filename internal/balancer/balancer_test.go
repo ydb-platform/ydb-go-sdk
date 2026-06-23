@@ -437,6 +437,107 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		require.NotEqual(t, state.Banned, cc1.GetState())
 	})
 
+	t.Run("BansConnectionOnUnavailableForSessionCreate", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		cc := mock.NewMockClientConnInterface(ctrl)
+		unavailableErr := xerrors.WithStackTrace(xerrors.Operation(
+			xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE),
+		))
+		cc.EXPECT().Invoke(
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+		).DoAndReturn(func(context.Context, string, any, any, ...grpc.CallOption) error {
+			return unavailableErr
+		})
+
+		cc1 := &mock.Conn{
+			ClientConnInterface: cc,
+			AddrField:           "node1:2135",
+			NodeIDField:         1,
+			State:               state.Online,
+		}
+		cc2 := &mock.Conn{
+			ClientConnInterface: cc,
+			AddrField:           "node2:2135",
+			NodeIDField:         2,
+			State:               state.Online,
+		}
+
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.Release(ctx) }()
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
+		b.connectionsState.Store(s)
+
+		invokeCtx := BanOnSessionCreate(endpoint.WithNodeID(ctx, cc1.NodeIDField))
+		err := b.Invoke(invokeCtx, "/Ydb.Query.V1.QueryService/CreateSession", nil, nil)
+		require.Error(t, err)
+		require.Equal(t, state.Banned, cc1.GetState())
+
+		for range 10 {
+			c, nextErr := b.nextConn(ctx)
+			require.NoError(t, nextErr)
+			require.Equal(t, cc2.AddrField, c.Endpoint().Address())
+		}
+	})
+
+	t.Run("BansConnectionOnContextDeadlineExceededForSessionCreate", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		cc := mock.NewMockClientConnInterface(ctrl)
+		cc.EXPECT().Invoke(
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+		).DoAndReturn(func(context.Context, string, any, any, ...grpc.CallOption) error {
+			return context.DeadlineExceeded
+		})
+
+		cc1 := &mock.Conn{
+			ClientConnInterface: cc,
+			AddrField:           "node1:2135",
+			NodeIDField:         1,
+			State:               state.Online,
+		}
+		cc2 := &mock.Conn{
+			ClientConnInterface: cc,
+			AddrField:           "node2:2135",
+			NodeIDField:         2,
+			State:               state.Online,
+		}
+
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.Release(ctx) }()
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
+		b.connectionsState.Store(s)
+
+		invokeCtx := BanOnSessionCreate(endpoint.WithNodeID(ctx, cc1.NodeIDField))
+		err := b.Invoke(invokeCtx, "/Ydb.Query.V1.QueryService/CreateSession", nil, nil)
+		require.Error(t, err)
+		require.Equal(t, state.Banned, cc1.GetState())
+
+		for range 10 {
+			c, nextErr := b.nextConn(ctx)
+			require.NoError(t, nextErr)
+			require.Equal(t, cc2.AddrField, c.Endpoint().Address())
+		}
+	})
+
 	t.Run("AllConnectionsPessimizedFallback", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		cc := mock.NewMockClientConnInterface(ctrl)
