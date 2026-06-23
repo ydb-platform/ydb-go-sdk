@@ -209,7 +209,7 @@ func Test_operationError_SchemaOperationsLimitExceeded(t *testing.T) {
 				}}),
 			),
 			expectedType:    TypeUndefined,
-			expectedBackoff: backoff.TypeNoBackoff,
+			expectedBackoff: backoff.TypeInstant,
 		},
 		{
 			err: Operation(

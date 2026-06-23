@@ -19,5 +19,5 @@ type Conn interface {
 	Explain(ctx context.Context, sql string, params *params.Params) (ast string, plan string, err error)
 	BeginTx(ctx context.Context, opts driver.TxOptions) (Tx, error)
 
-	Close() error
+	Close(ctx context.Context) error
 }

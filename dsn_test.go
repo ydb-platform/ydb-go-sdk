@@ -27,10 +27,10 @@ func TestParse(t *testing.T) {
 		return c
 	}
 	newLegacyConn := func(opts ...xtable.Option) *xtable.Conn {
-		return xtable.New(context.Background(), nil, nil, opts...)
+		return xtable.New(nil, nil, opts...)
 	}
 	newQueryConn := func(opts ...xquery.Option) *xquery.Conn {
-		return xquery.New(context.Background(), nil, opts...)
+		return xquery.New(nil, opts...)
 	}
 	compareConfigs := func(t *testing.T, lhs, rhs *config.Config) {
 		require.Equal(t, lhs.Secure(), rhs.Secure())
@@ -194,6 +194,18 @@ func TestParse(t *testing.T) {
 			},
 			err: nil,
 		},
+		{
+			dsn: "grpc://localhost:2135/local?prefetch_query_result_parts=3",
+			opts: []config.Option{
+				config.WithSecure(false),
+				config.WithEndpoint("localhost:2135"),
+				config.WithDatabase("/local"),
+			},
+			connectorOpts: []xsql.Option{
+				xsql.WithQueryOptions(xquery.WithResponsePartPrefetch(3)),
+			},
+			err: nil,
+		},
 	} {
 		t.Run("", func(t *testing.T) {
 			opts, err := parseConnectionString(tt.dsn)
@@ -221,6 +233,12 @@ func TestParse(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseInvalidPrefetchQueryResultParts(t *testing.T) {
+	_, err := parseConnectionString("grpc://localhost:2135/local?prefetch_query_result_parts=bad")
+	require.Error(t, err)
+	require.ErrorContains(t, err, "invalid prefetch_query_result_parts: bad")
 }
 
 func TestExtractTablePathPrefixFromBinderName(t *testing.T) {

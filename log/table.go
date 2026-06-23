@@ -22,7 +22,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TableEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "init")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "init")
 			l.Log(ctx, "table init starting...")
 			start := time.Now()
 
@@ -37,7 +37,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TableEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "close")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "close")
 			l.Log(ctx, "table close starting...")
 			start := time.Now()
 
@@ -63,7 +63,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TablePoolAPIEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "do")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "do")
 			idempotent := info.Idempotent
 			label := info.Label
 			l.Log(ctx, "table do starting...",
@@ -108,7 +108,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TablePoolAPIEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "do", "tx")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "do", "tx")
 			idempotent := info.Idempotent
 			label := info.Label
 			l.Log(ctx, "table dotx starting...",
@@ -153,17 +153,22 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TablePoolAPIEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "create", "session")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "create", "session")
 			l.Log(ctx, "table create session starting...")
 			start := time.Now()
 
 			return func(info trace.TableCreateSessionDoneInfo) {
-				if info.Error == nil {
+				if info.Error == nil && !isNil(info.Session) {
 					l.Log(ctx, "table create session done",
 						kv.Latency(start),
 						kv.Int("attempts", info.Attempts),
-						kv.String("session_id", info.Session.ID()),
-						kv.String("session_status", info.Session.Status()),
+						kv.String("session_id", safeSessionID(info.Session)),
+						kv.String("session_status", safeSessionStatus(info.Session)),
+					)
+				} else if info.Error == nil {
+					l.Log(ctx, "table create session done",
+						kv.Latency(start),
+						kv.Int("attempts", info.Attempts),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "table create session failed",
@@ -179,16 +184,16 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TableSessionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "session", "new")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "session", "new")
 			l.Log(ctx, "table new session starting")
 			start := time.Now()
 
 			return func(info trace.TableSessionNewDoneInfo) {
 				if info.Error == nil {
-					if info.Session != nil {
+					if !isNil(info.Session) {
 						l.Log(ctx, "table new session done",
 							kv.Latency(start),
-							kv.String("id", info.Session.ID()),
+							kv.String("id", safeSessionID(info.Session)),
 						)
 					} else {
 						l.Log(WithLevel(ctx, WARN), "table new session failed without error",
@@ -209,11 +214,11 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TableSessionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "session", "delete")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "session", "delete")
 			session := info.Session
 			l.Log(ctx, "table session delete starting...",
-				kv.String("id", info.Session.ID()),
-				kv.String("status", info.Session.Status()),
+				kv.String("id", safeSessionID(info.Session)),
+				kv.String("status", safeSessionStatus(info.Session)),
 			)
 			start := time.Now()
 
@@ -221,14 +226,14 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				if info.Error == nil {
 					l.Log(ctx, "table session delete done",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "table session delete failed",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
 						kv.Error(info.Error),
 						kv.Version(),
 					)
@@ -239,11 +244,11 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TableSessionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "session", "keep", "alive")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "session", "keep", "alive")
 			session := info.Session
 			l.Log(ctx, "table session keepalive starting...",
-				kv.String("id", session.ID()),
-				kv.String("status", session.Status()),
+				kv.String("id", safeSessionID(session)),
+				kv.String("status", safeSessionStatus(session)),
 			)
 			start := time.Now()
 
@@ -251,14 +256,14 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				if info.Error == nil {
 					l.Log(ctx, "table session keepalive done",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "table session keepalive failed",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
 						kv.Error(info.Error),
 						kv.Version(),
 					)
@@ -273,14 +278,14 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TableSessionQueryInvokeEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "session", "query", "prepare")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "session", "query", "prepare")
 			session := info.Session
 			query := info.Query
 			l.Log(ctx, "table session query prepare starting...",
 				appendFieldByCondition(l.logQuery,
 					kv.String("query", info.Query),
-					kv.String("id", session.ID()),
-					kv.String("status", session.Status()),
+					kv.String("id", safeSessionID(session)),
+					kv.String("status", safeSessionStatus(session)),
 				)...,
 			)
 			start := time.Now()
@@ -292,8 +297,8 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 							kv.Stringer("result", info.Result),
 							appendFieldByCondition(l.logQuery,
 								kv.String("query", query),
-								kv.String("id", session.ID()),
-								kv.String("status", session.Status()),
+								kv.String("id", safeSessionID(session)),
+								kv.String("status", safeSessionStatus(session)),
 								kv.Latency(start),
 							)...,
 						)...,
@@ -303,8 +308,8 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 						appendFieldByCondition(l.logQuery,
 							kv.String("query", query),
 							kv.Error(info.Error),
-							kv.String("id", session.ID()),
-							kv.String("status", session.Status()),
+							kv.String("id", safeSessionID(session)),
+							kv.String("status", safeSessionStatus(session)),
 							kv.Latency(start),
 							kv.Version(),
 						)...,
@@ -320,29 +325,39 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TableSessionQueryInvokeEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "session", "query", "execute")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "session", "query", "execute")
 			session := info.Session
 			query := info.Query
 			l.Log(ctx, "table session query execute starting...",
 				appendFieldByCondition(l.logQuery,
 					kv.Stringer("query", info.Query),
-					kv.String("id", session.ID()),
-					kv.String("status", session.Status()),
+					kv.String("id", safeSessionID(session)),
+					kv.String("status", safeSessionStatus(session)),
 				)...,
 			)
 			start := time.Now()
 
 			return func(info trace.TableExecuteDataQueryDoneInfo) {
-				if info.Error == nil {
-					tx := info.Tx
+				if info.Error == nil && !isNil(info.Tx) {
 					l.Log(ctx, "table session query execute done",
 						appendFieldByCondition(l.logQuery,
 							kv.Stringer("query", query),
-							kv.String("id", session.ID()),
-							kv.String("tx", tx.ID()),
-							kv.String("status", session.Status()),
+							kv.String("id", safeSessionID(session)),
+							kv.String("tx", safeTxID(info.Tx)),
+							kv.String("status", safeSessionStatus(session)),
 							kv.Bool("prepared", info.Prepared),
-							kv.NamedError("result_err", info.Result.Err()),
+							kv.NamedError("result_err", safeResultErr(info.Result)),
+							kv.Latency(start),
+						)...,
+					)
+				} else if info.Error == nil {
+					l.Log(ctx, "table session query execute done",
+						appendFieldByCondition(l.logQuery,
+							kv.Stringer("query", query),
+							kv.String("id", safeSessionID(session)),
+							kv.String("status", safeSessionStatus(session)),
+							kv.Bool("prepared", info.Prepared),
+							kv.NamedError("result_err", safeResultErr(info.Result)),
 							kv.Latency(start),
 						)...,
 					)
@@ -351,8 +366,8 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 						appendFieldByCondition(l.logQuery,
 							kv.Stringer("query", query),
 							kv.Error(info.Error),
-							kv.String("id", session.ID()),
-							kv.String("status", session.Status()),
+							kv.String("id", safeSessionID(session)),
+							kv.String("status", safeSessionStatus(session)),
 							kv.Bool("prepared", info.Prepared),
 							kv.Latency(start),
 							kv.Version(),
@@ -369,14 +384,14 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TableSessionQueryStreamEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "session", "query", "stream", "execute")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "session", "query", "stream", "execute")
 			session := info.Session
 			query := info.Query
 			l.Log(ctx, "table session query stream execute starting...",
 				appendFieldByCondition(l.logQuery,
 					kv.Stringer("query", info.Query),
-					kv.String("id", session.ID()),
-					kv.String("status", session.Status()),
+					kv.String("id", safeSessionID(session)),
+					kv.String("status", safeSessionStatus(session)),
 				)...,
 			)
 			start := time.Now()
@@ -387,8 +402,8 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 						appendFieldByCondition(l.logQuery,
 							kv.Stringer("query", query),
 							kv.Error(info.Error),
-							kv.String("id", session.ID()),
-							kv.String("status", session.Status()),
+							kv.String("id", safeSessionID(session)),
+							kv.String("status", safeSessionStatus(session)),
 							kv.Latency(start),
 						)...,
 					)
@@ -397,8 +412,8 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 						appendFieldByCondition(l.logQuery,
 							kv.Stringer("query", query),
 							kv.Error(info.Error),
-							kv.String("id", session.ID()),
-							kv.String("status", session.Status()),
+							kv.String("id", safeSessionID(session)),
+							kv.String("status", safeSessionStatus(session)),
 							kv.Latency(start),
 							kv.Version(),
 						)...,
@@ -414,11 +429,11 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TableSessionQueryStreamEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "session", "query", "stream", "read")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "session", "query", "stream", "read")
 			session := info.Session
 			l.Log(ctx, "table session query stream read starting...",
-				kv.String("id", session.ID()),
-				kv.String("status", session.Status()),
+				kv.String("id", safeSessionID(session)),
+				kv.String("status", safeSessionStatus(session)),
 			)
 			start := time.Now()
 
@@ -426,14 +441,14 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				if info.Error == nil {
 					l.Log(ctx, "table session query stream read done",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "table session query stream read failed",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
 						kv.Error(info.Error),
 						kv.Version(),
 					)
@@ -448,27 +463,33 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TableSessionTransactionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "session", "tx", "begin")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "session", "tx", "begin")
 			session := info.Session
 			l.Log(ctx, "table tx begin starting...",
-				kv.String("id", session.ID()),
-				kv.String("status", session.Status()),
+				kv.String("id", safeSessionID(session)),
+				kv.String("status", safeSessionStatus(session)),
 			)
 			start := time.Now()
 
 			return func(info trace.TableTxBeginDoneInfo) {
-				if info.Error == nil {
+				if info.Error == nil && !isNil(info.Tx) {
 					l.Log(ctx, "table tx begin done",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
-						kv.String("tx", info.Tx.ID()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
+						kv.String("tx", safeTxID(info.Tx)),
+					)
+				} else if info.Error == nil {
+					l.Log(ctx, "table tx begin done",
+						kv.Latency(start),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "table tx begin failed",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
 						kv.Error(info.Error),
 						kv.Version(),
 					)
@@ -479,13 +500,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TableSessionTransactionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "session", "tx", "commit")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "session", "tx", "commit")
 			session := info.Session
 			tx := info.Tx
 			l.Log(ctx, "table tx commit starting...",
-				kv.String("id", session.ID()),
-				kv.String("status", session.Status()),
-				kv.String("tx", info.Tx.ID()),
+				kv.String("id", safeSessionID(session)),
+				kv.String("status", safeSessionStatus(session)),
+				kv.String("tx", safeTxID(info.Tx)),
 			)
 			start := time.Now()
 
@@ -493,16 +514,16 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				if info.Error == nil {
 					l.Log(ctx, "table tx commit done",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
-						kv.String("tx", tx.ID()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
+						kv.String("tx", safeTxID(tx)),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "table tx commit failed",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
-						kv.String("tx", tx.ID()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
+						kv.String("tx", safeTxID(tx)),
 						kv.Error(info.Error),
 						kv.Version(),
 					)
@@ -517,13 +538,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TableSessionTransactionEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "session", "tx", "rollback")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "session", "tx", "rollback")
 			session := info.Session
 			tx := info.Tx
 			l.Log(ctx, "table tx rollback starting...",
-				kv.String("id", session.ID()),
-				kv.String("status", session.Status()),
-				kv.String("tx", tx.ID()),
+				kv.String("id", safeSessionID(session)),
+				kv.String("status", safeSessionStatus(session)),
+				kv.String("tx", safeTxID(tx)),
 			)
 			start := time.Now()
 
@@ -531,16 +552,16 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				if info.Error == nil {
 					l.Log(ctx, "table tx rollback done",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
-						kv.String("tx", tx.ID()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
+						kv.String("tx", safeTxID(tx)),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "table tx rollback failed",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
-						kv.String("tx", tx.ID()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
+						kv.String("tx", safeTxID(tx)),
 						kv.Error(info.Error),
 						kv.Version(),
 					)
@@ -551,11 +572,11 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TablePoolAPIEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "pool", "put")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "pool", "put")
 			session := info.Session
 			l.Log(ctx, "table pool put starting...",
-				kv.String("id", session.ID()),
-				kv.String("status", session.Status()),
+				kv.String("id", safeSessionID(session)),
+				kv.String("status", safeSessionStatus(session)),
 			)
 			start := time.Now()
 
@@ -563,14 +584,14 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				if info.Error == nil {
 					l.Log(ctx, "table pool put done",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "table pool put failed",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
 						kv.Error(info.Error),
 						kv.Version(),
 					)
@@ -581,17 +602,22 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if d.Details()&trace.TablePoolAPIEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "table", "pool", "get")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "table", "pool", "get")
 			l.Log(ctx, "table pool get starting...")
 			start := time.Now()
 
 			return func(info trace.TablePoolGetDoneInfo) {
-				if info.Error == nil {
+				if info.Error == nil && !isNil(info.Session) {
 					session := info.Session
 					l.Log(ctx, "done",
 						kv.Latency(start),
-						kv.String("id", session.ID()),
-						kv.String("status", session.Status()),
+						kv.String("id", safeSessionID(session)),
+						kv.String("status", safeSessionStatus(session)),
+						kv.Int("attempts", info.Attempts),
+					)
+				} else if info.Error == nil {
+					l.Log(ctx, "done",
+						kv.Latency(start),
 						kv.Int("attempts", info.Attempts),
 					)
 				} else {
@@ -611,9 +637,16 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			ctx := with(context.Background(), TRACE, "ydb", "table", "pool", "state", "change")
 			l.Log(WithLevel(ctx, DEBUG), "table session pool state changed",
 				kv.Int("limit", info.Limit),
-				kv.Int("index", info.Index),
+				kv.Int("index", info.Size),
 				kv.Int("idle", info.Idle),
-				kv.Int("wait", info.Wait),
+				kv.Int("wait", func() int {
+					if info.Concurrency > info.Limit {
+						return info.Concurrency - info.Limit
+					}
+
+					return 0
+				}()),
+				kv.Int("concurrency", info.Concurrency),
 				kv.Int("create_in_progress", info.CreateInProgress),
 			)
 		},

@@ -14,7 +14,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 type testScanner struct {
@@ -50,21 +49,21 @@ func TestRowScan(t *testing.T) {
 			scan: func() error {
 				return row.Scan()
 			},
-			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.Scan(row.go:50)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func1(row_test.go:51)`", //nolint:lll
+			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.Scan(row.go:50)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func1(row_test.go:50)`", //nolint:lll
 		},
 		{
 			name: "named scan",
 			scan: func() error {
 				return row.ScanNamed()
 			},
-			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.ScanNamed(row.go:62)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func2(row_test.go:58)`", //nolint:lll
+			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.ScanNamed(row.go:62)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func2(row_test.go:57)`", //nolint:lll
 		},
 		{
 			name: "struct scan",
 			scan: func() error {
 				return row.ScanStruct(nil)
 			},
-			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.ScanStruct(row.go:74)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func3(row_test.go:65)`", //nolint:lll
+			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.ScanStruct(row.go:74)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func3(row_test.go:64)`", //nolint:lll
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -187,10 +186,10 @@ func BenchmarkScanner(b *testing.B) {
 
 func TestReadRow(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: &Ydb_Query.TransactionMeta{
@@ -233,10 +232,10 @@ func TestReadRow(t *testing.T) {
 	})
 
 	t.Run("MoreThanOneRow", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: &Ydb_Query.TransactionMeta{
@@ -285,10 +284,10 @@ func TestReadRow(t *testing.T) {
 	})
 
 	t.Run("NoRows", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: &Ydb_Query.TransactionMeta{
@@ -323,10 +322,10 @@ func TestReadRow(t *testing.T) {
 	})
 
 	t.Run("MoreThanOneResultSet", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status: Ydb.StatusIds_SUCCESS,
 			TxMeta: &Ydb_Query.TransactionMeta{

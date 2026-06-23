@@ -14,8 +14,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/safe"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -30,10 +32,76 @@ import (
 // sessionBuilder is the interface that holds logic of creating sessions.
 type sessionBuilder func(ctx context.Context) (*Session, error)
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client { //nolint:funlen
-	onDone := trace.TableOnInit(config.Trace(), &ctx,
+func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (*Client, error) { //nolint:funlen
+	onDone := gtrace.TableOnInit(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.New"),
 	)
+
+	sessionPool, err := pool.New[*Session, Session](ctx,
+		pool.WithLimit[*Session, Session](config.SizeLimit()),
+		pool.WithWarmUpItems[*Session, Session](config.PoolWarmUpSize()),
+		pool.WithItemUsageLimit[*Session, Session](config.SessionUsageLimit()),
+		pool.WithItemUsageTTL[*Session, Session](config.SessionUsageTTL()),
+		pool.WithIdleTimeToLive[*Session, Session](config.IdleThreshold()),
+		pool.WithCreateItemTimeout[*Session, Session](config.CreateSessionTimeout()),
+		pool.WithCloseItemTimeout[*Session, Session](config.DeleteTimeout()),
+		pool.WithMustDeleteItemFunc[*Session, Session](func(s *Session, err error) bool {
+			if !s.IsAlive() {
+				return true
+			}
+
+			return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
+		}),
+		pool.WithClock[*Session, Session](config.Clock()),
+		pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
+			if !config.DisableSessionBalancer() {
+				ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
+			}
+
+			return newSession(ctx, cc, config)
+		}),
+		pool.WithTrace[*Session, Session](&pool.Trace[*Session, Session]{
+			OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
+				return func(limit int) {
+					onDone(limit)
+				}
+			},
+			OnPut: func(ctx *context.Context, call stack.Caller, item *Session) func(err error) {
+				onDone := gtrace.TableOnPoolPut(config.Trace(), ctx, call, safe.SessionInfo(item))
+
+				return func(err error) {
+					onDone(err)
+				}
+			},
+			OnGet: func(ctx *context.Context, call stack.Caller) func(
+				session *Session,
+				hintInfo *trace.NodeHintInfo,
+				attempts int,
+				err error,
+			) {
+				onDone := gtrace.TableOnPoolGet(config.Trace(), ctx, call)
+
+				return func(session *Session, hintInfo *trace.NodeHintInfo, attempts int, err error) {
+					onDone(safe.SessionInfo(session), attempts, hintInfo, err)
+				}
+			},
+			OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
+				onDone := gtrace.TableOnPoolWith(config.Trace(), ctx, call)
+
+				return func(attempts int, err error) {
+					onDone(attempts, err)
+				}
+			},
+			OnChange: func(stats pool.Stats) {
+				gtrace.TableOnPoolStateChange(config.Trace(),
+					stats.Limit, stats.Idle, stats.CreateInProgress, stats.Concurrency, stats.Size,
+				)
+			},
+		}),
+	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
 	return &Client{
 		clock:  config.Clock(),
@@ -42,71 +110,9 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 		build: func(ctx context.Context) (s *Session, err error) {
 			return newSession(ctx, cc, config)
 		},
-		pool: pool.New[*Session, Session](ctx,
-			pool.WithLimit[*Session, Session](config.SizeLimit()),
-			pool.WithItemUsageLimit[*Session, Session](config.SessionUsageLimit()),
-			pool.WithItemUsageTTL[*Session, Session](config.SessionUsageTTL()),
-			pool.WithIdleTimeToLive[*Session, Session](config.IdleThreshold()),
-			pool.WithCreateItemTimeout[*Session, Session](config.CreateSessionTimeout()),
-			pool.WithCloseItemTimeout[*Session, Session](config.DeleteTimeout()),
-			pool.WithMustDeleteItemFunc[*Session, Session](func(s *Session, err error) bool {
-				if !s.IsAlive() {
-					return true
-				}
-
-				return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
-			}),
-			pool.WithClock[*Session, Session](config.Clock()),
-			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
-				if !config.DisableSessionBalancer() {
-					ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
-				}
-
-				return newSession(ctx, cc, config)
-			}),
-			pool.WithTrace[*Session, Session](&pool.Trace{
-				OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
-					return func(limit int) {
-						onDone(limit)
-					}
-				},
-				OnPut: func(ctx *context.Context, call stack.Caller, item any) func(err error) {
-					onDone := trace.TableOnPoolPut( //nolint:forcetypeassert
-						config.Trace(), ctx, call, item.(*Session),
-					)
-
-					return func(err error) {
-						onDone(err)
-					}
-				},
-				OnGet: func(ctx *context.Context, call stack.Caller) func(
-					item any,
-					attempts int,
-					hintInfo *trace.NodeHintInfo,
-					err error,
-				) {
-					onDone := trace.TableOnPoolGet(config.Trace(), ctx, call)
-
-					return func(item any, attempts int, hintInfo *trace.NodeHintInfo, err error) {
-						onDone(item.(*Session), attempts, hintInfo, err) //nolint:forcetypeassert
-					}
-				},
-				OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
-					onDone := trace.TableOnPoolWith(config.Trace(), ctx, call)
-
-					return func(attempts int, err error) {
-						onDone(attempts, err)
-					}
-				},
-				OnChange: func(stats pool.Stats) {
-					trace.TableOnPoolStateChange(config.Trace(),
-						stats.Limit, stats.Index, stats.Idle, stats.Wait, stats.CreateInProgress, stats.Index,
-					)
-				},
-			}),
-		),
+		pool: sessionPool,
 		done: make(chan struct{}),
-	}
+	}, nil
 }
 
 // Client is a set of session instances that may be reused.
@@ -225,19 +231,14 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 	}
 
 	var (
-		onDone = trace.TableOnCreateSession(c.config.Trace(), &ctx,
-			stack.FunctionID(
-				"github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).CreateSession"),
+		onDone = gtrace.TableOnCreateSession(c.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).CreateSession"),
 		)
 		attempts = 0
 		s        *Session
 	)
 	defer func() {
-		if s != nil {
-			onDone(s, attempts, err)
-		} else {
-			onDone(nil, attempts, err)
-		}
+		onDone(safe.SessionInfo(s), attempts, err)
 	}()
 
 	s, err = retry.RetryWithResult(ctx, createSession,
@@ -281,7 +282,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 
 	close(c.done)
 
-	onDone := trace.TableOnClose(c.config.Trace(), &ctx,
+	onDone := gtrace.TableOnClose(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).Close"),
 	)
 	defer func() {
@@ -307,7 +308,7 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 
 	config := c.retryOptions(opts...)
 
-	attempts, onDone := 0, trace.TableOnDo(config.Trace, &ctx,
+	attempts, onDone := 0, gtrace.TableOnDo(config.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).Do"),
 		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
@@ -338,7 +339,7 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 
 	config := c.retryOptions(opts...)
 
-	attempts, onDone := 0, trace.TableOnDoTx(config.Trace, &ctx,
+	attempts, onDone := 0, gtrace.TableOnDoTx(config.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).DoTx"),
 		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
@@ -397,7 +398,7 @@ func (c *Client) BulkUpsert(
 		}),
 	)
 
-	onDone := trace.TableOnBulkUpsert(config.Trace, &ctx,
+	onDone := gtrace.TableOnBulkUpsert(config.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Client).BulkUpsert"),
 	)
 	defer func() {

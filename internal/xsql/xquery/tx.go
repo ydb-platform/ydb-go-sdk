@@ -43,6 +43,7 @@ func (t *transaction) Exec(ctx context.Context, sql string, params *params.Param
 	r := &resultWithStats{}
 	sm := stats.ModeCallbackFromContextWith(ctx, stats.ModeBasic, r.onQueryStats)
 	opts = append(opts, options.WithStatsMode(options.StatsMode(sm.Mode), sm.Callback))
+	opts = t.conn.appendResponsePartPrefetch(opts)
 
 	err := t.tx.Exec(ctx, sql, opts...)
 	if err != nil {
@@ -73,15 +74,21 @@ func (t *transaction) Query(ctx context.Context, sql string, params *params.Para
 		opts = append(opts, options.WithStatsMode(options.StatsMode(sm.Mode), sm.Callback))
 	}
 
-	res, err := t.tx.Query(ctx, sql, opts...)
+	opts = t.conn.appendResponsePartPrefetch(opts)
+
+	result, err := t.tx.Query(ctx, sql, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return &rows{
-		conn:   t.conn,
-		result: res,
-	}, nil
+	rows, err := newRows(ctx, result)
+	if err != nil {
+		_ = result.Close(ctx)
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return rows, nil
 }
 
 func beginTx(ctx context.Context, c *Conn, txOptions driver.TxOptions) (common.Tx, error) {

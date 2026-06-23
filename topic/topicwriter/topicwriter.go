@@ -18,7 +18,19 @@ var (
 	// WithWriterErrOnQueueFull from the topicoptions package
 	// with enable set to true. Otherwise the call blocks on a full queue until
 	// space is available. Must be checked with errors.Is.
-	ErrQueueLimitExceed                      = topicwriterinternal.ErrPublicQueueIsFull
+	ErrQueueLimitExceed = topicwriterinternal.ErrPublicQueueIsFull
+
+	// ErrWriterClosed is returned by Writer.Write when the writer has been closed
+	// due to a terminal error or an explicit Close call.
+	// Use errors.Is to detect this condition and recreate the writer if needed.
+	//
+	// Example:
+	//
+	//	if errors.Is(err, topicwriter.ErrWriterClosed) {
+	//	    writer, err = db.Topic().StartWriter(topicPath)
+	//	}
+	ErrWriterClosed = topicwriterinternal.ErrPublicWriterClosed
+
 	ErrMessagesPutToInternalQueueBeforeError = topicwriterinternal.ErrPublicMessagesPutToInternalQueueBeforeError
 	ErrUnimplemented                         = errors.New("unimplemented")
 	ErrInvalidConfiguration                  = topicmultiwriter.ErrInvalidConfiguration

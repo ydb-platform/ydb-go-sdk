@@ -16,7 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -35,7 +34,7 @@ func (c *deadSessionCommonConn) ID() string     { return "dead-test-session" }
 func (c *deadSessionCommonConn) NodeID() uint32 { return 0 }
 
 func (c *deadSessionCommonConn) Ping(_ context.Context) error { return nil }
-func (c *deadSessionCommonConn) Close() error                 { return nil }
+func (c *deadSessionCommonConn) Close(context.Context) error  { return nil }
 
 func (c *deadSessionCommonConn) Query(
 	_ context.Context, _ string, _ *params.Params,
@@ -86,7 +85,6 @@ func (c *deadSessionXsqlConnector) Connect(ctx context.Context) (driver.Conn, er
 		cc:        c.cc,
 		ctx:       ctx,
 		connector: c.sharedConnCfg,
-		lastUsage: xsync.NewLastUsage(),
 	}, nil
 }
 

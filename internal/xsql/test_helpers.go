@@ -37,7 +37,7 @@ func (m *mockCommonConn) BeginTx(ctx context.Context, opts driver.TxOptions) (co
 	return &mockTx{id: "mock-tx"}, nil
 }
 
-func (m *mockCommonConn) Close() error {
+func (m *mockCommonConn) Close(context.Context) error {
 	return nil
 }
 

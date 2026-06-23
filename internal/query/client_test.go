@@ -30,11 +30,12 @@ import (
 )
 
 func TestClient(t *testing.T) {
-	ctx := xtest.Context(t)
+	ctx := t.Context()
 	t.Run("createSession", func(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+			stubAttachStreamContext(attachStream)
 			attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil).AnyTimes()
@@ -96,6 +97,7 @@ func TestClient(t *testing.T) {
 			t.Run("OnRecv", func(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+				stubAttachStreamContext(attachStream)
 				attachStream.EXPECT().Recv().Return(nil, grpcStatus.Error(grpcCodes.Unavailable, "")).AnyTimes()
 				client := NewMockQueryServiceClient(ctrl)
 				client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
@@ -125,6 +127,7 @@ func TestClient(t *testing.T) {
 			t.Run("OnRecv", func(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+				stubAttachStreamContext(attachStream)
 				attachStream.EXPECT().Recv().Return(nil,
 					xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
 				)
@@ -146,7 +149,7 @@ func TestClient(t *testing.T) {
 	t.Run("Do", func(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
 			var visited bool
-			err := do(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+			err := do(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 				return newTestSession("123"), nil
 			}), func(ctx context.Context, s *Session) error {
 				visited = true
@@ -158,7 +161,7 @@ func TestClient(t *testing.T) {
 		})
 		t.Run("RetryableError", func(t *testing.T) {
 			counter := 0
-			err := do(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+			err := do(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 				return newTestSession("123"), nil
 			}), func(ctx context.Context, s *Session) error {
 				counter++
@@ -176,9 +179,9 @@ func TestClient(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
 			t.Run("LazyTx", func(t *testing.T) {
 				ctrl := gomock.NewController(t)
-				err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+				err := doTx(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 					client := NewMockQueryServiceClient(ctrl)
-					stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+					stream := newExecuteQueryStreamMock(ctrl)
 					stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 						client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
 							Status: Ydb.StatusIds_SUCCESS,
@@ -262,7 +265,7 @@ func TestClient(t *testing.T) {
 			})
 			t.Run("NoLazyTx", func(t *testing.T) {
 				ctrl := gomock.NewController(t)
-				err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+				err := doTx(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 					client := NewMockQueryServiceClient(ctrl)
 					client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).DoAndReturn(
 						func(ctx context.Context, request *Ydb_Query.BeginTransactionRequest, option ...grpc.CallOption) (
@@ -272,7 +275,7 @@ func TestClient(t *testing.T) {
 								func(ctx context.Context, request *Ydb_Query.ExecuteQueryRequest, option ...grpc.CallOption) (
 									Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
 								) {
-									stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+									stream := newExecuteQueryStreamMock(ctrl)
 									stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 										client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
 											Status: Ydb.StatusIds_SUCCESS,
@@ -378,7 +381,7 @@ func TestClient(t *testing.T) {
 			client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil).AnyTimes()
-			err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+			err := doTx(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
 			}), func(ctx context.Context, tx query.TxActor) error {
 				counter++
@@ -397,7 +400,7 @@ func TestClient(t *testing.T) {
 					xtest.TestManyTimes(t, func(t testing.TB) {
 						txInFlight := 0
 						ctrl := gomock.NewController(t)
-						err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+						err := doTx(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 							client := NewMockQueryServiceClient(ctrl)
 							client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
 								func(ctx context.Context, request *Ydb_Query.ExecuteQueryRequest, option ...grpc.CallOption) (
@@ -409,7 +412,7 @@ func TestClient(t *testing.T) {
 
 									txInFlight++
 
-									stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+									stream := newExecuteQueryStreamMock(ctrl)
 									stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 										stream.EXPECT().Recv().Return(nil, io.EOF)
 										client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -450,7 +453,7 @@ func TestClient(t *testing.T) {
 					xtest.TestManyTimes(t, func(t testing.TB) {
 						ctrl := gomock.NewController(t)
 						txInFlight := 0
-						err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+						err := doTx(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 							client := NewMockQueryServiceClient(ctrl)
 							client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
 								func(ctx context.Context, request *Ydb_Query.ExecuteQueryRequest, option ...grpc.CallOption) (
@@ -464,7 +467,7 @@ func TestClient(t *testing.T) {
 
 									txInFlight++
 
-									stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+									stream := newExecuteQueryStreamMock(ctrl)
 									stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 										if rand.Int31n(100) < 50 {
 											txInFlight--
@@ -504,7 +507,7 @@ func TestClient(t *testing.T) {
 					xtest.TestManyTimes(t, func(t testing.TB) {
 						ctrl := gomock.NewController(t)
 						txInFlight := 0
-						err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+						err := doTx(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 							client := NewMockQueryServiceClient(ctrl)
 							client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
 								func(ctx context.Context, request *Ydb_Query.ExecuteQueryRequest, option ...grpc.CallOption) (
@@ -516,7 +519,7 @@ func TestClient(t *testing.T) {
 
 									txInFlight++
 
-									firstStream := NewMockQueryService_ExecuteQueryClient(ctrl)
+									firstStream := newExecuteQueryStreamMock(ctrl)
 									firstStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 										firstStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 											client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -537,7 +540,7 @@ func TestClient(t *testing.T) {
 														return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 													}
 
-													secondStream := NewMockQueryService_ExecuteQueryClient(ctrl)
+													secondStream := newExecuteQueryStreamMock(ctrl)
 													secondStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 														secondStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 															client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -594,7 +597,7 @@ func TestClient(t *testing.T) {
 					xtest.TestManyTimes(t, func(t testing.TB) {
 						ctrl := gomock.NewController(t)
 						txInFlight := 0
-						err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+						err := doTx(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
 							client := NewMockQueryServiceClient(ctrl)
 							client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
 								func(ctx context.Context, request *Ydb_Query.ExecuteQueryRequest, option ...grpc.CallOption) (
@@ -606,7 +609,7 @@ func TestClient(t *testing.T) {
 
 									txInFlight++
 
-									firstStream := NewMockQueryService_ExecuteQueryClient(ctrl)
+									firstStream := newExecuteQueryStreamMock(ctrl)
 									firstStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 										firstStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 											client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -629,7 +632,7 @@ func TestClient(t *testing.T) {
 														return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 													}
 
-													secondStream := NewMockQueryService_ExecuteQueryClient(ctrl)
+													secondStream := newExecuteQueryStreamMock(ctrl)
 													secondStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 														secondStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 															return nil, io.EOF
@@ -677,8 +680,8 @@ func TestClient(t *testing.T) {
 	t.Run("Exec", func(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			err := clientExec(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
-				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			err := clientExec(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
+				stream := newExecuteQueryStreamMock(ctrl)
 				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 					Status: Ydb.StatusIds_SUCCESS,
 					TxMeta: &Ydb_Query.TransactionMeta{
@@ -924,7 +927,7 @@ func TestClient(t *testing.T) {
 				},
 			}
 
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 
 			for _, p := range respParts {
 				stream.EXPECT().Recv().Return(
@@ -938,7 +941,7 @@ func TestClient(t *testing.T) {
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-			r, err := clientQuery(ctx, testPool(ctx, func(context.Context) (*Session, error) {
+			r, err := clientQuery(ctx, testPool(t, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
 			}), "")
 			require.NoError(t, err)
@@ -960,7 +963,7 @@ func TestClient(t *testing.T) {
 					if want.a == 5 {
 						require.NoError(t, err)
 					}
-					if errors.Is(err, io.EOF) {
+					if xerrors.Is(err, io.EOF) {
 						require.Fail(t, "unexpected EOF")
 					}
 					var a uint64
@@ -1047,7 +1050,7 @@ func TestClient(t *testing.T) {
 				},
 			}
 
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 
 			for _, p := range respParts {
 				stream.EXPECT().Recv().Return(
@@ -1061,7 +1064,7 @@ func TestClient(t *testing.T) {
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-			r, err := clientQuery(ctx, testPool(ctx, func(context.Context) (*Session, error) {
+			r, err := clientQuery(ctx, testPool(t, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
 			}), "")
 			require.NoError(t, err)
@@ -1083,7 +1086,7 @@ func TestClient(t *testing.T) {
 					if want.a == 5 {
 						require.NoError(t, err)
 					}
-					if errors.Is(err, io.EOF) {
+					if xerrors.Is(err, io.EOF) {
 						require.Fail(t, "unexpected EOF")
 					}
 					var a uint64
@@ -1170,7 +1173,7 @@ func TestClient(t *testing.T) {
 				},
 			}
 
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 
 			for _, p := range respParts {
 				stream.EXPECT().Recv().Return(
@@ -1184,7 +1187,7 @@ func TestClient(t *testing.T) {
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-			r, err := clientQuery(ctx, testPool(ctx, func(context.Context) (*Session, error) {
+			r, err := clientQuery(ctx, testPool(t, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
 			}), "", query.WithConcurrentResultSets(true))
 			require.NoError(t, err)
@@ -1204,7 +1207,7 @@ func TestClient(t *testing.T) {
 					{5, "5"},
 				} {
 					row, err := rs.NextRow(ctx)
-					if errors.Is(err, io.EOF) {
+					if xerrors.Is(err, io.EOF) {
 						require.Fail(t, "unexpected EOF in RS0")
 					}
 					require.NoError(t, err)
@@ -1250,9 +1253,9 @@ func TestClient(t *testing.T) {
 		})
 		t.Run("CancelWhileReadResult", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			executeCtx, cancel := context.WithCancel(xtest.Context(t))
+			executeCtx, cancel := context.WithCancel(t.Context())
 
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 			stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 				cancel()
 
@@ -1264,7 +1267,7 @@ func TestClient(t *testing.T) {
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-			_, err := clientQuery(executeCtx, testPool(ctx, func(context.Context) (*Session, error) {
+			_, err := clientQuery(executeCtx, testPool(t, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
 			}), "", query.WithConcurrentResultSets(true))
 
@@ -1273,7 +1276,7 @@ func TestClient(t *testing.T) {
 		t.Run("EmptyResultSet", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
-			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream := newExecuteQueryStreamMock(ctrl)
 
 			stream.EXPECT().Recv().Return(
 				&Ydb_Query.ExecuteQueryResponsePart{
@@ -1295,7 +1298,7 @@ func TestClient(t *testing.T) {
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-			r, err := clientQuery(ctx, testPool(ctx, func(context.Context) (*Session, error) {
+			r, err := clientQuery(ctx, testPool(t, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
 			}), "", query.WithConcurrentResultSets(true))
 			require.NoError(t, err)
@@ -1317,8 +1320,8 @@ func TestClient(t *testing.T) {
 	t.Run("QueryResultSet", func(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			rs, rowsCount, err := clientQueryResultSet(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
-				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			rs, rowsCount, err := clientQueryResultSet(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
+				stream := newExecuteQueryStreamMock(ctrl)
 				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 					Status: Ydb.StatusIds_SUCCESS,
 					TxMeta: &Ydb_Query.TransactionMeta{
@@ -1463,8 +1466,8 @@ func TestClient(t *testing.T) {
 		})
 		t.Run("MoreThanOneResultSet", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			rs, rowsCount, err := clientQueryResultSet(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
-				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			rs, rowsCount, err := clientQueryResultSet(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
+				stream := newExecuteQueryStreamMock(ctrl)
 				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 					Status: Ydb.StatusIds_SUCCESS,
 					TxMeta: &Ydb_Query.TransactionMeta{
@@ -1641,8 +1644,8 @@ func TestClient(t *testing.T) {
 	t.Run("QueryRow", func(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			row, err := clientQueryRow(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
-				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			row, err := clientQueryRow(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
+				stream := newExecuteQueryStreamMock(ctrl)
 				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 					Status: Ydb.StatusIds_SUCCESS,
 					TxMeta: &Ydb_Query.TransactionMeta{
@@ -1704,8 +1707,8 @@ func TestClient(t *testing.T) {
 		})
 		t.Run("MoreThanOneRow", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			row, err := clientQueryRow(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
-				stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			row, err := clientQueryRow(ctx, testPool(t, func(ctx context.Context) (*Session, error) {
+				stream := newExecuteQueryStreamMock(ctrl)
 				stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 					Status: Ydb.StatusIds_SUCCESS,
 					TxMeta: &Ydb_Query.TransactionMeta{
@@ -1792,7 +1795,7 @@ func TestClient(t *testing.T) {
 			_, err := client.QueryRow(ctx, "SELECT 1")
 			require.NoError(t, err)
 
-			err = client.Close(context.Background())
+			err = client.Close(t.Context())
 
 			require.NoError(t, err)
 		})
@@ -1805,7 +1808,7 @@ func TestClient(t *testing.T) {
 func mockClientForImplicitSessionTest(ctx context.Context, t *testing.T) *Client {
 	ctrl := gomock.NewController(t)
 
-	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+	stream := newExecuteQueryStreamMock(ctrl)
 	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 		ResultSet: &Ydb.ResultSet{Rows: []*Ydb.Value{{}}},
 	}, nil)
@@ -1816,13 +1819,15 @@ func mockClientForImplicitSessionTest(ctx context.Context, t *testing.T) *Client
 
 	cfg := config.New(config.AllowImplicitSessions())
 
-	return newWithQueryServiceClient(ctx, queryService, nil, cfg)
+	c, err := newWithQueryServiceClient(ctx, queryService, nil, cfg)
+	require.NoError(t, err)
+
+	return c
 }
 
 type sessionControllerMock struct {
 	id     string
 	status Status
-	done   chan struct{}
 }
 
 func (s *sessionControllerMock) IsAlive() bool {
@@ -1849,15 +1854,10 @@ func (s sessionControllerMock) Status() string {
 	return s.status.String()
 }
 
-func (s sessionControllerMock) Done() <-chan struct{} {
-	return s.done
-}
-
 func newTestSession(id string) *Session {
 	return &Session{
 		Core: &sessionControllerMock{
-			id:   id,
-			done: make(chan struct{}),
+			id: id,
 		},
 		trace: &trace.Query{},
 	}
@@ -1866,8 +1866,7 @@ func newTestSession(id string) *Session {
 func newTestSessionWithClient(id string, client Ydb_Query_V1.QueryServiceClient, lazyTx bool) *Session {
 	return &Session{
 		Core: &sessionControllerMock{
-			id:   id,
-			done: make(chan struct{}),
+			id: id,
 		},
 		client: client,
 		trace:  &trace.Query{},
@@ -1876,17 +1875,22 @@ func newTestSessionWithClient(id string, client Ydb_Query_V1.QueryServiceClient,
 }
 
 func testPool(
-	ctx context.Context,
+	t testing.TB,
 	createSession func(ctx context.Context) (*Session, error),
 ) *pool.Pool[*Session, Session] {
-	return pool.New[*Session, Session](ctx,
+	t.Helper()
+
+	p, err := pool.New[*Session, Session](t.Context(),
 		pool.WithLimit[*Session, Session](1),
 		pool.WithCreateItemFunc(createSession),
 	)
+	require.NoError(t, err)
+
+	return p
 }
 
 func TestQueryScript(t *testing.T) {
-	ctx := xtest.Context(t)
+	ctx := t.Context()
 	t.Run("HappyWay", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)

@@ -68,7 +68,7 @@ func TestScripting(sourceTest *testing.T) {
 		if !res.NextResultSet(ctx) {
 			return retry.RetryableError(
 				fmt.Errorf("no result sets"),
-				retry.WithBackoff(retry.TypeNoBackoff),
+				retry.WithBackoff(retry.TypeInstant),
 			)
 		}
 		if !res.NextRow() {
@@ -104,7 +104,7 @@ func TestScripting(sourceTest *testing.T) {
 		if !res.NextResultSet(ctx) {
 			return retry.RetryableError(
 				fmt.Errorf("no result sets"),
-				retry.WithBackoff(retry.TypeNoBackoff),
+				retry.WithBackoff(retry.TypeInstant),
 				retry.WithDeleteSession(),
 			)
 		}

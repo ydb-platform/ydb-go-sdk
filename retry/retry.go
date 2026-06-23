@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -110,7 +111,7 @@ type traceOption struct {
 }
 
 func (t traceOption) ApplyRetryOption(opts *retryOptions) {
-	opts.trace = opts.trace.Compose(t.t)
+	opts.trace = gtrace.Compose(opts.trace, t.t)
 }
 
 func (t traceOption) ApplyDoOption(opts *doOptions) {
@@ -322,9 +323,14 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 		lastErr  error
 
 		code   = int64(0)
-		onDone = trace.RetryOnRetry(options.trace, &ctx,
+		onDone = gtrace.RetryOnRetry(options.trace, &ctx,
 			options.call, options.label, options.idempotent, xcontext.IsNestedCall(ctx),
 		)
+
+		// nextBackoff is the sleep duration that preceded the upcoming
+		// attempt. Zero for the very first attempt; updated below before
+		// looping back into another iteration.
+		nextBackoff time.Duration
 	)
 	defer func() {
 		onDone(attempts, finalErr)
@@ -340,7 +346,13 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 			))
 
 		default:
-			v, err := opWithRecover(ctx, options, op)
+			attemptCtx := ctx
+			onAttemptDone := gtrace.RetryOnRetryAttempt(options.trace, &attemptCtx,
+				options.call, options.label, options.idempotent, attempts, nextBackoff,
+			)
+			v, err := opWithRecover(attemptCtx, options, op)
+			onAttemptDone(err)
+			ctx = attemptCtx
 
 			if err == nil {
 				return v, nil
@@ -362,10 +374,11 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 				))
 			}
 
-			t := time.NewTimer(backoff.Delay(m.BackoffType(), i,
+			delay := backoff.Delay(m.BackoffType(), i,
 				backoff.WithFastBackoff(options.fastBackoff),
 				backoff.WithSlowBackoff(options.slowBackoff),
-			))
+			)
+			t := time.NewTimer(delay)
 
 			select {
 			case <-ctx.Done():
@@ -394,6 +407,7 @@ func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 			}
 
 			lastErr = err
+			nextBackoff = delay
 		}
 	}
 }

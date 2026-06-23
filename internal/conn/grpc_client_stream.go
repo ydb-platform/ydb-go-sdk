@@ -2,19 +2,18 @@ package conn
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type grpcClientStream struct {
@@ -48,7 +47,7 @@ func (s *grpcClientStream) Endpoint() endpoint.Endpoint {
 func (s *grpcClientStream) CloseSend() (err error) {
 	var (
 		ctx    = s.streamCtx
-		onDone = trace.DriverOnConnStreamCloseSend(s.parentConn.config.Trace(), &ctx,
+		onDone = gtrace.DriverOnConnStreamCloseSend(s.parentConn.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).CloseSend"),
 		)
 	)
@@ -61,19 +60,17 @@ func (s *grpcClientStream) CloseSend() (err error) {
 
 	err = s.stream.CloseSend()
 	if err != nil {
-		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
-			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
-		}
-
 		if !s.wrapping {
 			return err
 		}
 
-		return xerrors.WithStackTrace(xerrors.Transport(
-			err,
-			xerrors.WithAddress(s.parentConn.Address()),
-			xerrors.WithNodeID(s.parentConn.NodeID()),
-			xerrors.WithTraceID(s.traceID),
+		return xerrors.WithStackTrace(xerrors.Join(
+			s.streamCtx.Err(),
+			xerrors.Transport(err,
+				xerrors.WithAddress(s.parentConn.Address()),
+				xerrors.WithNodeID(s.parentConn.NodeID()),
+				xerrors.WithTraceID(s.traceID),
+			),
 		))
 	}
 
@@ -83,7 +80,7 @@ func (s *grpcClientStream) CloseSend() (err error) {
 func (s *grpcClientStream) SendMsg(m any) (err error) {
 	var (
 		ctx    = s.streamCtx
-		onDone = trace.DriverOnConnStreamSendMsg(s.parentConn.config.Trace(), &ctx,
+		onDone = gtrace.DriverOnConnStreamSendMsg(s.parentConn.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).SendMsg"),
 		)
 	)
@@ -96,25 +93,27 @@ func (s *grpcClientStream) SendMsg(m any) (err error) {
 
 	err = s.stream.SendMsg(m)
 	if err != nil {
-		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
-			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
-		}
-
 		if !s.wrapping {
 			return err
 		}
 
 		if s.sentMark.canRetry() {
 			return xerrors.WithStackTrace(xerrors.Retryable(
-				xerrors.Transport(err, xerrors.WithTraceID(s.traceID)),
+				xerrors.Join(
+					s.streamCtx.Err(),
+					xerrors.Transport(err, xerrors.WithTraceID(s.traceID)),
+				),
 				xerrors.WithName("SendMsg"),
 			))
 		}
 
-		return xerrors.WithStackTrace(xerrors.Transport(err,
-			xerrors.WithAddress(s.parentConn.Address()),
-			xerrors.WithNodeID(s.parentConn.NodeID()),
-			xerrors.WithTraceID(s.traceID),
+		return xerrors.WithStackTrace(xerrors.Join(
+			s.streamCtx.Err(),
+			xerrors.Transport(err,
+				xerrors.WithAddress(s.parentConn.Address()),
+				xerrors.WithNodeID(s.parentConn.NodeID()),
+				xerrors.WithTraceID(s.traceID),
+			),
 		))
 	}
 
@@ -122,7 +121,7 @@ func (s *grpcClientStream) SendMsg(m any) (err error) {
 }
 
 func (s *grpcClientStream) finish(err error) {
-	trace.DriverOnConnStreamFinish(s.parentConn.config.Trace(), s.streamCtx,
+	gtrace.DriverOnConnStreamFinish(s.parentConn.config.Trace(), s.streamCtx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).finish"), err,
 	)
 	s.streamCancel()
@@ -131,7 +130,7 @@ func (s *grpcClientStream) finish(err error) {
 func (s *grpcClientStream) RecvMsg(m any) (err error) {
 	var (
 		ctx    = s.streamCtx
-		onDone = trace.DriverOnConnStreamRecvMsg(s.parentConn.config.Trace(), &ctx,
+		onDone = gtrace.DriverOnConnStreamRecvMsg(s.parentConn.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).RecvMsg"),
 		)
 	)
@@ -151,26 +150,27 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 			return io.EOF
 		}
 
-		if ctxErr := s.streamCtx.Err(); ctxErr != nil {
-			return xerrors.WithStackTrace(fmt.Errorf("stream context is done: %w", xerrors.Join(err, ctxErr)))
-		}
-
 		if !s.wrapping {
 			return err
 		}
 
 		if s.sentMark.canRetry() {
 			return xerrors.WithStackTrace(xerrors.Retryable(
-				xerrors.Transport(err,
-					xerrors.WithTraceID(s.traceID),
+				xerrors.Join(
+					s.streamCtx.Err(),
+					xerrors.Transport(err, xerrors.WithTraceID(s.traceID)),
 				),
 				xerrors.WithName("RecvMsg"),
 			))
 		}
 
-		return xerrors.WithStackTrace(xerrors.Transport(err,
-			xerrors.WithAddress(s.parentConn.Address()),
-			xerrors.WithNodeID(s.parentConn.NodeID()),
+		return xerrors.WithStackTrace(xerrors.Join(
+			s.streamCtx.Err(),
+			xerrors.Transport(err,
+				xerrors.WithAddress(s.parentConn.Address()),
+				xerrors.WithNodeID(s.parentConn.NodeID()),
+				xerrors.WithTraceID(s.traceID),
+			),
 		))
 	}
 

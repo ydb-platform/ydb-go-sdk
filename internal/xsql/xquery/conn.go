@@ -10,7 +10,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 )
@@ -20,11 +19,12 @@ type Parent interface {
 }
 
 type Conn struct {
-	ctx     context.Context //nolint:containedctx
 	session *query.Session
 	onClose []func()
 	closed  atomic.Bool
 	fakeTx  bool
+
+	responsePartPrefetch int
 }
 
 func (c *Conn) NodeID() uint32 {
@@ -63,6 +63,7 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 	r := &resultWithStats{}
 	sm := stats.ModeCallbackFromContextWith(ctx, stats.ModeBasic, r.onQueryStats)
 	opts = append(opts, options.WithStatsMode(options.StatsMode(sm.Mode), sm.Callback))
+	opts = c.appendResponsePartPrefetch(opts)
 
 	err := c.session.Exec(ctx, sql, opts...)
 	if err != nil {
@@ -73,7 +74,7 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 }
 
 func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
-	result common.Rows, finalErr error,
+	_ common.Rows, finalErr error,
 ) {
 	if !c.isReady() {
 		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
@@ -98,15 +99,21 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 		opts = append(opts, options.WithStatsMode(options.StatsMode(sm.Mode), sm.Callback))
 	}
 
-	res, err := c.session.Query(ctx, sql, opts...)
+	opts = c.appendResponsePartPrefetch(opts)
+
+	result, err := c.session.Query(ctx, sql, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return &rows{
-		conn:   c,
-		result: res,
-	}, nil
+	rows, err := newRows(ctx, result)
+	if err != nil {
+		_ = result.Close(ctx)
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return rows, nil
 }
 
 func (c *Conn) Explain(ctx context.Context, sql string, _ *params.Params) (ast string, plan string, _ error) {
@@ -125,9 +132,8 @@ func (c *Conn) Explain(ctx context.Context, sql string, _ *params.Params) (ast s
 	return ast, plan, nil
 }
 
-func New(ctx context.Context, s *query.Session, opts ...Option) *Conn {
+func New(s *query.Session, opts ...Option) *Conn {
 	cc := &Conn{
-		ctx:     ctx,
 		session: s,
 	}
 
@@ -142,6 +148,14 @@ func New(ctx context.Context, s *query.Session, opts ...Option) *Conn {
 
 func (c *Conn) isReady() bool {
 	return c.session.Status() == query.StatusIdle.String()
+}
+
+func (c *Conn) appendResponsePartPrefetch(opts []options.Execute) []options.Execute {
+	if c.responsePartPrefetch <= 0 {
+		return opts
+	}
+
+	return append(opts, options.WithResponsePartPrefetch(c.responsePartPrefetch))
 }
 
 func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx common.Tx, finalErr error) {
@@ -194,7 +208,7 @@ func (c *Conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (common.
 	return tx, nil
 }
 
-func (c *Conn) Close() (finalErr error) {
+func (c *Conn) Close(ctx context.Context) (finalErr error) {
 	if !c.closed.CompareAndSwap(false, true) {
 		return xerrors.WithStackTrace(xerrors.Retryable(errConnClosedEarly,
 			xerrors.Invalid(c),
@@ -208,7 +222,7 @@ func (c *Conn) Close() (finalErr error) {
 		}
 	}()
 
-	err := c.session.Close(xcontext.ValueOnly(c.ctx))
+	err := c.session.Close(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}

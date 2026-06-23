@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -43,7 +44,7 @@ func (s StreamReader) Recv() (_ ServerMessage, resErr error) {
 	defer func() {
 		s.receiveMessageCount++
 
-		trace.TopicOnReaderReceiveGRPCMessage(
+		gtrace.TopicOnReaderReceiveGRPCMessage(
 			s.Tracer,
 			s.ReaderID,
 			s.sessionID,
@@ -205,7 +206,7 @@ func (s StreamReader) Send(msg ClientMessage) (resErr error) {
 	}
 
 	s.sentMessageCount++
-	trace.TopicOnReaderSentGRPCMessage(
+	gtrace.TopicOnReaderSentGRPCMessage(
 		s.Tracer,
 		s.ReaderID,
 		s.sessionID,

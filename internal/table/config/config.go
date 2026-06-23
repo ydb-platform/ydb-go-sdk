@@ -6,6 +6,7 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -14,16 +15,6 @@ const (
 	DefaultSessionPoolCreateSessionTimeout = 5 * time.Second
 	DefaultSessionPoolSizeLimit            = 50
 	DefaultSessionPoolIdleThreshold        = 5 * time.Minute
-
-	// Deprecated: table client do not supports background session keep-aliving now.
-	// Will be removed after Oct 2024.
-	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-	DefaultKeepAliveMinSize = 10
-
-	// Deprecated: table client do not supports background session keep-aliving now.
-	// Will be removed after Oct 2024.
-	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-	DefaultIdleKeepAliveThreshold = 2
 
 	// Deprecated: table client do not supports background session keep-aliving now.
 	// Will be removed after Oct 2024.
@@ -76,30 +67,12 @@ func WithSessionPoolSessionUsageLimit[T interface{ uint64 | time.Duration }](lim
 	}
 }
 
-// WithKeepAliveMinSize defines lower bound for sessions in the pool. If there are more sessions open, then
-// the excess idle ones will be closed and removed after IdleKeepAliveThreshold is reached for each of them.
-// If keepAliveMinSize is less than zero, then no sessions will be preserved
-// If keepAliveMinSize is zero, the DefaultKeepAliveMinSize is used
-//
-// Deprecated: table client do not supports background session keep-aliving now.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func WithKeepAliveMinSize(keepAliveMinSize int) Option {
-	return func(c *Config) {}
-}
-
-// WithIdleKeepAliveThreshold defines number of keepAlive messages to call before the
-// session is removed if it is an excess session (see KeepAliveMinSize)
-// This means that session will be deleted after the expiration of lifetime = IdleThreshold * IdleKeepAliveThreshold
-// If IdleKeepAliveThreshold is less than zero then it will be treated as infinite and no sessions will
-// be removed ever.
-// If IdleKeepAliveThreshold is equal to zero, it will be set to DefaultIdleKeepAliveThreshold
-//
-// Deprecated: table client do not supports background session keep-aliving now.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func WithIdleKeepAliveThreshold(idleKeepAliveThreshold int) Option {
-	return func(c *Config) {}
+// WithSessionPoolWarmUpSessions sets the number of sessions to pre-create in the pool at client initialization.
+// If poolWarmUpSize is less than or equal to zero, pool warm-up is disabled.
+func WithSessionPoolWarmUpSessions(poolWarmUpSize int) Option {
+	return func(c *Config) {
+		c.poolWarmUpSize = poolWarmUpSize
+	}
 }
 
 // WithIdleThreshold sets maximum duration between any activity within session.
@@ -114,16 +87,6 @@ func WithIdleThreshold(idleThreshold time.Duration) Option {
 		}
 		c.idleThreshold = idleThreshold
 	}
-}
-
-// WithKeepAliveTimeout limits maximum time spent on KeepAlive request
-// If keepAliveTimeout is less than or equal to zero then the DefaultSessionPoolKeepAliveTimeout is used.
-//
-// Deprecated: table client do not supports background session keep-aliving now.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func WithKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
-	return func(c *Config) {}
 }
 
 // WithCreateSessionTimeout limits maximum time spent on Create session request
@@ -145,9 +108,13 @@ func WithDeleteTimeout(deleteTimeout time.Duration) Option {
 }
 
 // WithTrace appends table trace to early defined traces
-func WithTrace(trace *trace.Table, opts ...trace.TableComposeOption) Option {
+func WithTrace(t *trace.Table) Option {
 	return func(c *Config) {
-		c.trace = c.trace.Compose(trace, opts...)
+		var opts []gtrace.TableComposeOption
+		if cb := c.PanicCallback(); cb != nil {
+			opts = append(opts, gtrace.WithTablePanicCallback(cb))
+		}
+		c.trace = gtrace.Compose(c.trace, t, opts...)
 	}
 }
 
@@ -206,6 +173,7 @@ type Config struct {
 	createSessionTimeout time.Duration
 	deleteTimeout        time.Duration
 	idleThreshold        time.Duration
+	poolWarmUpSize       int
 
 	ignoreTruncated                  bool
 	useQuerySession                  bool
@@ -243,16 +211,14 @@ func (c *Config) SessionUsageTTL() time.Duration {
 	return c.poolSessionUsageTTL
 }
 
-// KeepAliveMinSize is a lower bound for sessions in the pool. If there are more sessions open, then
-// the excess idle ones will be closed and removed after IdleKeepAliveThreshold is reached for each of them.
-// If KeepAliveMinSize is less than zero, then no sessions will be preserved
-// If KeepAliveMinSize is zero, the DefaultKeepAliveMinSize is used
-//
-// Deprecated: table client do not supports background session keep-aliving now.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func (c *Config) KeepAliveMinSize() int {
-	return DefaultKeepAliveMinSize
+// PoolWarmUpSize is the number of sessions to pre-create in the pool at client initialization.
+// If PoolWarmUpSize is less than or equal to zero, pool warm-up is disabled.
+func (c *Config) PoolWarmUpSize() int {
+	if c.poolWarmUpSize <= 0 {
+		return 0
+	}
+
+	return c.poolWarmUpSize
 }
 
 // IgnoreTruncated specifies behavior on truncated flag
@@ -268,20 +234,6 @@ func (c *Config) UseQuerySession() bool {
 // ExecuteDataQueryOverQueryService specifies behavior on execute handle
 func (c *Config) ExecuteDataQueryOverQueryService() bool {
 	return c.executeDataQueryOverQueryService
-}
-
-// IdleKeepAliveThreshold is a number of keepAlive messages to call before the
-// session is removed if it is an excess session (see KeepAliveMinSize)
-// This means that session will be deleted after the expiration of lifetime = IdleThreshold * IdleKeepAliveThreshold
-// If IdleKeepAliveThreshold is less than zero then it will be treated as infinite and no sessions will
-// be removed ever.
-// If IdleKeepAliveThreshold is equal to zero, it will be set to DefaultIdleKeepAliveThreshold
-//
-// Deprecated: table client do not supports background session keep-aliving now.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func (c *Config) IdleKeepAliveThreshold() int {
-	return DefaultIdleKeepAliveThreshold
 }
 
 // IdleThreshold is a maximum duration between any activity within session.
@@ -325,6 +277,7 @@ func (c *Config) MaxRequestMessageSize() int {
 func defaults() *Config {
 	return &Config{
 		poolLimit:            DefaultSessionPoolSizeLimit,
+		poolWarmUpSize:       0,
 		createSessionTimeout: DefaultSessionPoolCreateSessionTimeout,
 		deleteTimeout:        DefaultSessionPoolDeleteTimeout,
 		idleThreshold:        DefaultSessionPoolIdleThreshold,

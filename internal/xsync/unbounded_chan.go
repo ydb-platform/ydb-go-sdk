@@ -9,7 +9,11 @@ import (
 // UnboundedChan is a generic unbounded channel implementation that supports
 // message merging and concurrent access.
 type UnboundedChan[T any] struct {
-	signal empty.Chan // buffered channel with capacity 1
+	// signal is a capacity-1 wakeup for Receive only; it is never closed.
+	// Closing it would race with Send/SendWithMerge after Close (e.g. TopicListener
+	// shutdown) and panic with "send on closed channel", because notify sends
+	// outside the buffer mutex. Shutdown is signaled via closed and notify().
+	signal empty.Chan
 
 	mutex  Mutex
 	buffer []T
@@ -24,19 +28,26 @@ func NewUnboundedChan[T any]() *UnboundedChan[T] {
 	}
 }
 
+func (c *UnboundedChan[T]) notify() {
+	select {
+	case c.signal <- empty.Struct{}:
+	default:
+	}
+}
+
 // Send adds a message to the channel.
 // The operation is non-blocking and thread-safe.
 func (c *UnboundedChan[T]) Send(msg T) {
+	var notify bool
 	c.mutex.WithLock(func() {
 		if !c.closed {
 			c.buffer = append(c.buffer, msg)
+			notify = true
 		}
 	})
 
-	// Signal that something happened
-	select {
-	case c.signal <- struct{}{}:
-	default: // channel already has signal, skip
+	if notify {
+		c.notify()
 	}
 }
 
@@ -44,24 +55,27 @@ func (c *UnboundedChan[T]) Send(msg T) {
 // If mergeFunc returns true, the new message will be merged with the last message.
 // The merge operation is atomic and preserves message order.
 func (c *UnboundedChan[T]) SendWithMerge(msg T, mergeFunc func(last, new T) (T, bool)) {
+	var notify bool
 	c.mutex.WithLock(func() {
-		if !c.closed {
-			if len(c.buffer) > 0 {
-				if merged, shouldMerge := mergeFunc(c.buffer[len(c.buffer)-1], msg); shouldMerge {
-					c.buffer[len(c.buffer)-1] = merged
-
-					return
-				}
-			}
-
-			c.buffer = append(c.buffer, msg)
+		if c.closed {
+			return
 		}
+
+		if len(c.buffer) > 0 {
+			if merged, shouldMerge := mergeFunc(c.buffer[len(c.buffer)-1], msg); shouldMerge {
+				c.buffer[len(c.buffer)-1] = merged
+				notify = true
+
+				return
+			}
+		}
+
+		c.buffer = append(c.buffer, msg)
+		notify = true
 	})
 
-	// Signal that something happened
-	select {
-	case c.signal <- empty.Struct{}:
-	default: // channel already has signal, skip
+	if notify {
+		c.notify()
 	}
 }
 
@@ -117,5 +131,5 @@ func (c *UnboundedChan[T]) Close() {
 		return
 	}
 
-	close(c.signal)
+	c.notify()
 }

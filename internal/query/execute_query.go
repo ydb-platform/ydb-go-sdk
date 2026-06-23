@@ -36,6 +36,7 @@ type executeSettings interface {
 	ConcurrentResultSets() bool
 	UserProvidedTxControl() bool
 	IssuesOpts() func([]*Ydb_Issue.IssueMessage)
+	ResponsePartPrefetch() int
 }
 
 type executeScriptConfig interface {
@@ -140,30 +141,19 @@ func execute(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	// If ctx was cancelled during ExecuteQuery, return a retryable error so the
-	// pool can retry with a fresh session. This is safe regardless of idempotency
-	// because the retry loop operates on the caller's (user's) context: if ctx
-	// was cancelled only due to session death the user context is still alive and
-	// a retry is warranted; if the user cancelled their own context the retry loop
-	// will see its own ctx.Done() and stop without retrying.
-	// The check is non-blocking (ctx.Done() is a closed channel once cancelled),
-	// so it does not affect the "cancel during Recv" path: when ctx is cancelled
-	// only after ExecuteQuery returns, the AfterFunc remains active and will
-	// propagate the cancellation to executeCtx during the blocking Recv call.
-	select {
-	case <-ctx.Done():
-		return nil, xerrors.WithStackTrace(xerrors.Retryable(
-			ctx.Err(),
-			xerrors.WithName("streamResultContext"),
-		))
-	default:
-	}
+	stream = wrapExecuteQueryStreamWithAsyncPrefetch(stream, settings.ResponsePartPrefetch())
 
 	// newResult must use executeCtx, not the parent ctx: parent ctx may already
 	// be done (e.g. session death) while the gRPC stream is still readable.
+	//
+	// withStreamCancel exposes executeCancel to nextPart so a Recv blocked
+	// waiting for the server can be unblocked from the caller's ctx via a
+	// per-call context.AfterFunc; withStreamResultOnClose ensures the same
+	// CancelFunc fires once when the user closes the streamResult.
 	r, err := newResult(executeCtx, stream, append(opts,
 		withStreamResultStatsCallback(settings.StatsCallback()),
 		withStreamResultOnClose(executeCancel),
+		withStreamCancel(executeCancel),
 	)...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

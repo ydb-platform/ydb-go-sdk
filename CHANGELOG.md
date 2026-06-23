@@ -1,5 +1,135 @@
 * Added helper `sugar.NewKV(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
 
+## v3.141.1
+* Added connection pessimization when creating table or query session fails with `OVERLOADED`, `UNAVAILABLE`, or client-side `context.DeadlineExceeded`
+
+## v3.141.0
+* Added `ydb.WithPrefetchQueryResultParts(n)` connector option and `prefetch_query_result_parts` connection string parameter for the `database/sql` driver to enable `query.WithResponsePartPrefetch` on every query executed over Query Service
+
+## v3.140.2
+* Added `topicwriter.ErrWriterClosed` sentinel error returned by `Writer.Write` when the writer has been closed due to a terminal error or an explicit `Close` call; use `errors.Is` to detect this condition and recreate the writer if needed
+
+## v3.140.1
+* Fixed `Topic().Alter()` consumer alters (`AlterConsumerWithImportant`, `AlterConsumerWithReadFrom`, `AlterConsumerWithAttributes`, `AlterConsumerWithAvailabilityPeriod`) silently resetting the consumer's supported-codecs restriction: `set_supported_codecs` is now sent only when `AlterConsumerWithSupportedCodecs` is used
+
+## v3.140.0
+* Added `topicoptions.WithWriterDirectWrite(bool)` and `topicoptions.WithMultiWriterDirectWrite(bool)` options to send topic writes to the node that hosts the target partition, bypassing the topic proxy
+
+## v3.139.8
+* Masked access tokens in topic gRPC debug logs for `UpdateTokenRequest` messages
+
+## v3.139.7
+* Fixed YSON scanning in `TableService` to support both underlying `TextValue` and `BytesValue` wire representations
+* Fixed inverted success/error handling in the `ExampleWriter_Write` doc example for `topicwriter`, which printed `OK` on failure and aborted on success
+* Fixed nil pointer dereference panic in `topicsugar.ProtobufIterator` on the first received message by allocating a concrete protobuf message before unmarshaling
+
+## v3.139.6
+* Fixed panics in built-in trace handlers (`spans`, `log`, and `metrics`) when callback info contains typed-nil interfaces (for example, nil `SessionInfo` or `TxInfo`) or nil context pointers
+
+## v3.139.5
+* Fixed panic and data race in `TopicListener` when partition workers were closed while the read stream still delivered messages: `internal/xsync.UnboundedChan` no longer closes its signal channel on shutdown, stop the read loop before closing partition workers, and ignore routed messages after listener shutdown starts
+
+## v3.139.4
+* Fixed query result stream draining when `Close` is called with a fresh context after `NextResultSet` used a cancelled per-call context while `ExecStats` arrive in later stream parts ([#2187](https://github.com/ydb-platform/ydb-go-sdk/issues/2187))
+* Fixed query result `Close` to succeed when the execute stream is already closed (for example after full iteration or per-call context cancellation), matching `database/sql` expectations and table result close behavior ([#2187](https://github.com/ydb-platform/ydb-go-sdk/issues/2187))
+
+## v3.139.3
+* Fixed connection pessimization when a query `ExecuteQuery` stream ends with gRPC `Canceled` or `context.Canceled` during result drain ([#2186](https://github.com/ydb-platform/ydb-go-sdk/issues/2186))
+
+## v3.139.2
+* Added `label` to `table` `OnDo`/`OnDoTx` metrics (`latency`, `errs`, `attempts`) so that `table.WithLabel` breaks them down by label, consistent with the `query` service metrics
+
+## v3.139.1
+* Added support for session and node shutdown hints on the session attach stream. When a node shutdown hint was received, the balancer pessimized (banned) the connection to that YDB node, so subsequent gRPC calls were routed to other nodes.
+* Deprecated `config.WithDisableOptimisticUnban()` option and `config.Config.DisableOptimisticUnban()` method. Optimistic unban (where a successful gRPC call would immediately unban a banned connection) was disabled for all connections; nodes are now unbanned only after the next background discovery refresh if the node is still present in the discovery response.
+
+## v3.139.0
+* Reworked the `spans` package to follow OpenTelemetry semantic conventions: the emitted span tree now uses `ydb.*` names (`ydb.CreateSession`, `ydb.ExecuteQuery`, `ydb.BeginTransaction`, `ydb.Commit`, `ydb.Rollback`, `ydb.GetSession`, `ydb.Driver.Initialize`, `ydb.RunWithRetry`, `ydb.Try`) and OTel attribute keys (`db.*`, `server.*`, `network.peer.*`, `error.*`) plus YDB-specific `ydb.node.id`, `ydb.node.dc` and `ydb.retry.backoff_ms`. Noisy internal-package spans are suppressed. See [SPANS.md](SPANS.md) for the full span/attribute reference and migration notes
+* Added `trace.Retry.OnRetryAttempt` callback fired once per retry attempt with the attempt number and the backoff duration waited before it; this is what feeds the new `ydb.Try` spans
+* Added an `examples/opentelemetry` example that wires `spans.Adapter` onto the OpenTelemetry Go SDK via [`ydb-go-sdk-otel`](https://github.com/ydb-platform/ydb-go-sdk-otel), with an end-to-end docker-compose stack (OTel Collector / Tempo / Prometheus / Grafana)
+
+## v3.138.4
+* Added `topicoptions.CreateWithMetricsLevel`, `topicoptions.AlterWithSetMetricsLevel`, and `topicoptions.AlterWithResetMetricsLevel` to configure topic metrics level
+* Added `MetricsLevel` field to `topictypes.TopicDescription`
+* Bumped `ydb-go-genproto` to expose the `metrics_level` field on topic create/alter/describe protos
+
+## v3.138.3
+* Fixed panic risks in tracing callbacks by separating error and success paths in `spans`/`metrics` and by making internal pool trace types generic-safe.
+* Fixed `ydb.WithStatsMode*` for `database/sql` silently dropping a previously registered stats callback when called more than once on the same context. Repeated calls now chain callbacks (they fire in registration order) and the effective stats mode is the most detailed one across the chain.
+
+## v3.138.2
+* Added an internal query transaction trace field `WithCommit` for spans and logs
+
+## v3.138.1
+* Moved the trace-generated code in `trace` package from the public API to the internal packages
+  This was a backward-incompatible change, but it had been documented in the [versioning policy](VERSIONING.md)
+
+## v3.138.0
+* Reworked the internal table/query session pool ([#2137](https://github.com/ydb-platform/ydb-go-sdk/issues/2137), [#2163](https://github.com/ydb-platform/ydb-go-sdk/pull/2163)):
+  * semaphore-based concurrency limit instead of an internal wait queue and `index` map;
+  * synchronous session creation in the caller goroutine (no background create goroutine per session slot);
+  * pool statistics are updated less frequently after finishing `internal.Pool.With` call to reduce CPU overhead
+* **Session pool behavior:**
+  * `FIFO` semantics replaced with `LIFO` semantics (read about `LIFO` advantages in [article](https://habr.com/ru/companies/ydb/articles/978444/))
+  * when the pool limit is reached, session pool blocks on a semaphore until a slot is released, instead of registering on an internal wait queue 
+  * `errPoolIsOverflow` is no longer returned from the pool. Client can receive only context errors if context is done and pool cannot get session for work  
+  * `trace.Table.OnPoolWait` callbacks are no longer invoked (the hook remains in the trace API but is unused by the pool)
+  * default create/close timeout has been reduced to 500 msec in order to achieve a faster failure, thus leading to earlier retry and successful call, rather than the default multi-second delay on a cold start or under overload conditions.
+* Added **`WithSessionPoolWarmUpSessions`** driver option: at driver initialization, pre-creates up to `N` sessions in the table client pool and the query **explicit** session pool (`N > 0`; `N <= 0` disables warm-up; default is no warm-up). The configured `N` is stored in pool stats as `WarmUp`; the number of sessions actually created is `min(N, pool limit)`. Driver initialization fails if warm-up session creation fails
+* **Trace/metrics (breaking for custom handlers):**
+  * Added to `trace.{TablePoolStateChangeInfo,QueryPoolChange}` field `Concurrency`
+  * Marked as deprecated fields `Index` and `Wait` in `trace.{TablePoolStateChangeInfo,QueryPoolChange}`  
+
+## v3.137.0
+* Added `topicoptions.WithReaderOnStopPartitionSession` to invoke the user callback when the server stops a partition session on the reader
+
+## v3.136.4
+* Fixed concurrent partition map initialization in topic multiwriter (`topicoptions.WithWriteToManyPartitions`) so `DescribeTopic` setup does not race with an early partition-split callback
+* Fixed topic multiwriter (`topicoptions.WithWriteToManyPartitions`) sequence handling: concurrent writes with automatic sequence numbers serialize assignment with enqueue order, and manual sequence numbers return a client-side ordering error when not strictly increasing for a target partition
+* Fixed topic multiwriter (`topicoptions.WithWriteToManyPartitions`) error handling and shutdown: writes after close now fail, partition-split errors are propagated, sub-writer init errors are race-free, and idle sub-writers are closed correctly
+
+## v3.136.3
+* Fixed passing wait server ack to sub-writers in topicmultiwriter
+
+## v3.136.2
+* Fixed `MultiWriterWithTransaction.Write` to materialize lazy query transactions via `tx.UnLazy` before writing (same as single-partition transactional writer)
+* Fixed `MultiWriterWithTransaction`: pass transaction to each incoming message
+
+## v3.136.1
+* Changed the retry behavior for operation error `TIMEOUT` from non-retryable to conditionally retryable
+* Added public `retry.TypeInstant` enum alias to `retry.TypeNoBackoff`
+
+## v3.136.0
+* The `query.WithResponsePartPrefetch(n)` method has been added to enable the prefetching of parts of query results.
+  By default, this feature is disabled. Prefetching produces the following effects:
+  - One additional goroutine per query.
+  - Approximately 5 allocations per query.
+  - Approximately 200–300 additional bytes per query.
+  However, each query also reduced the execution time by approximately 2 milliseconds.
+
+## v3.135.15
+* `database/sql` driver (no public API changes): `QueryContext` / `Stmt.QueryContext` / `Tx.QueryContext` cancellation propagated through row iteration consistently—the SQL `Rows` adapter retained that context for every `Next`, `NextResultSet`, and column-metadata call, and both Query Service and Table Service backends received it where supported.
+* When using **QueryService** (`ydb.WithQueryService(true)`, default), canceling the query context after starting to read a result set surfaced `context.Canceled` from `(*sql.Rows).Err()` after `Next` stopped, matching typical `database/sql` expectations for context-aware queries.
+* When using **TableService** (`ydb.WithQueryService(false)`), row iteration continued to rely on the table client read path; `Rows.Err()` after cancel could be empty or `io.EOF` once rows were exhausted, rather than the cancellation error.
+* Replaced internal query-client "done" signal channels with `atomic.Bool` to improve performance:
+  * Reduced allocations per query and decreased latency for each query.
+  * Disabled cascading cancellation of all child operations, such as canceling a query on session close or query-client close — YDB server is supposed to cancel query executions on closing sessions.
+
+## v3.135.14
+* Adjusted gRPC client-stream error wrapping to improve topic writer reconnect behavior, ensuring stream teardown races don’t cause server-side gRPC cancellations to be misclassified as purely local context cancellations.
+
+## v3.135.13
+* Optimized the `internal/stack.FunctionID` for decreased allocations and CPU usage
+
+## v3.135.12
+* Optimized the `internal/meta.TraceID` generation of `x-ydb-trace-id` gRPC header
+
+## v3.135.11
+* The `trace.DatabaseSQLConnExecStartInfo.IdleTime` and `trace.DatabaseSQLConnQueryStartInfo.IdleTime` fields have been marked as deprecated and will always be zero from now.
+* Default connection last usage tracking has been changed to "no tracking", with real-time tracking enabled only if a connection's time-to-live (TTL) has been defined.
+* `lastUsage.Start()` has been optimized to replace the `sync.OnceFunc` approach with an atomic.Bool-based one, reducing heap allocations for each query start.
+* Optimized `io.EOF` handling in QueryService result iteration by returning `io.EOF` directly instead of wrapping it with `xerrors.WithStackTrace`, reducing per-query allocations
+
 ## v3.135.10
 * Fixed the SDK's `database/sql` driver to consistently map session-invalidating YDB errors to `driver.ErrBadConn` where possible, so `database/sql` can detect and discard bad connections
 

@@ -162,6 +162,16 @@ func AlterWithMaxActivePartitions(maxActivePartitions int64) AlterOption {
 	return alterWithMaxActivePartitions(maxActivePartitions)
 }
 
+// AlterWithSetMetricsLevel sets the metrics level for the topic.
+func AlterWithSetMetricsLevel(level uint32) AlterOption {
+	return withMetricsLevel(level)
+}
+
+// AlterWithResetMetricsLevel resets the topic metrics level back to the database default.
+func AlterWithResetMetricsLevel() AlterOption {
+	return withResetMetricsLevel{}
+}
+
 // AlterWithAutoPartitioningStrategy change auto partitioning strategy for the topic
 func AlterWithAutoPartitioningStrategy(strategy topictypes.AutoPartitioningStrategy) AlterOption {
 	return withAutoPartitioningStrategy(strategy)

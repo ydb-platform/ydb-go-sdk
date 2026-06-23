@@ -6,6 +6,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -18,7 +19,10 @@ import (
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritetest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
@@ -348,6 +352,182 @@ func TestDescribePartitionSettings(t *testing.T) {
 		topicDesc.Partitions[i].ToBound = nil
 	}
 	require.Equal(t, expected, topicDesc)
+}
+
+// directWriteStreamChecker records how StreamWrite streams are opened on the client.
+// It is used when the pinned partition is known up front (WithWriterPartitionID).
+// On a single-node cluster matching nodeID to DescribeTopic is tautological; the
+// check still verifies that the SDK disables fallback and passes the resolved node ID.
+// Multi-writer and probe-and-rebind flows are covered by unit tests and grpc mocks.
+type directWriteStreamChecker struct {
+	*topicwritetest.StreamWriteRecorder
+}
+
+func newDirectWriteStreamChecker() *directWriteStreamChecker {
+	return &directWriteStreamChecker{
+		StreamWriteRecorder: topicwritetest.NewStreamWriteRecorder(),
+	}
+}
+
+// Driver opens a dedicated cached driver instance that includes the StreamWrite interceptor.
+// Do not pass the option to [scopeT.Driver]: fixenv caches drivers by name only, so opts
+// on the default driver are ignored after the first connect.
+// Each subtest must pass a unique driverName: the interceptor is bound to this checker
+// instance and a reused driver name would record sessions into another checker.
+func (c *directWriteStreamChecker) Driver(scope *scopeT, driverName string) *ydb.Driver {
+	return scope.driverNamed(driverName, ydb.With(config.WithGrpcOptions(
+		grpc.WithChainStreamInterceptor(c.Interceptor()),
+	)))
+}
+
+func topicPartitionLocation(
+	ctx context.Context,
+	topicClient topic.Client,
+	topicPath string,
+	partitionID int64,
+) (nodeID uint32, generation int64, err error) {
+	desc, err := topicClient.Describe(ctx, topicPath, topicoptions.IncludeLocation())
+	if err != nil {
+		return 0, 0, err
+	}
+	for i := range desc.Partitions {
+		p := &desc.Partitions[i]
+		if p.PartitionID == partitionID {
+			if p.Location.NodeID == 0 {
+				return 0, 0, fmt.Errorf(
+					"partition %d has empty location (IncludeLocation missing on server?)",
+					partitionID,
+				)
+			}
+
+			return p.Location.NodeID, p.Location.Generation, nil
+		}
+	}
+
+	return 0, 0, fmt.Errorf("partition %d not found in topic %q", partitionID, topicPath)
+}
+
+func TestTopicDirectWrite(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	const partitionID = int64(0)
+
+	topicPath := scope.TopicPath(
+		topicoptions.CreateWithMinActivePartitions(2),
+		topicoptions.CreateWithMaxActivePartitions(2),
+	)
+
+	t.Run("WriteAndRead", func(t *testing.T) {
+		hostNode, generation, err := topicPartitionLocation(ctx, scope.Driver().Topic(), topicPath, partitionID)
+		require.NoError(t, err)
+
+		routing := newDirectWriteStreamChecker()
+		writer, err := routing.Driver(scope, "direct-write-pinned").Topic().StartWriter(
+			topicPath,
+			topicoptions.WithWriterPartitionID(partitionID),
+			topicoptions.WithWriterDirectWrite(true),
+			topicoptions.WithWriterWaitServerAck(true),
+		)
+		require.NoError(t, err)
+
+		payload := []byte("direct-write-payload")
+		require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: bytes.NewReader(payload)}))
+		routing.RequireRoutedToNode(t, hostNode)
+		routing.RequireInitGeneration(t, partitionID, generation)
+		require.NoError(t, writer.Close(ctx))
+
+		reader, err := scope.Driver().Topic().StartReader(
+			scope.TopicConsumerName(),
+			topicoptions.ReadSelectors{
+				{Path: topicPath, Partitions: []int64{partitionID}},
+			},
+		)
+		require.NoError(t, err)
+		defer func() { _ = reader.Close(ctx) }()
+
+		msg, err := reader.ReadMessage(ctx)
+		require.NoError(t, err)
+		require.Equal(t, partitionID, msg.PartitionID())
+
+		got, err := io.ReadAll(msg)
+		require.NoError(t, err)
+		require.Equal(t, payload, got)
+	})
+
+	t.Run("WithoutDirectWrite", func(t *testing.T) {
+		routing := newDirectWriteStreamChecker()
+		writer, err := routing.Driver(scope, "proxy-write-pinned").Topic().StartWriter(
+			topicPath,
+			topicoptions.WithWriterPartitionID(partitionID),
+			topicoptions.WithWriterWaitServerAck(true),
+		)
+		require.NoError(t, err)
+		defer func() { _ = writer.Close(ctx) }()
+
+		require.NoError(t, writer.Write(ctx, topicwriter.Message{
+			Data: bytes.NewReader([]byte("proxy-write")),
+		}))
+		routing.RequireInitPartitionWithoutGeneration(t, partitionID)
+	})
+
+	t.Run("WithAutoProducer", func(t *testing.T) {
+		writer, err := scope.Driver().Topic().StartWriter(
+			topicPath,
+			topicoptions.WithWriterDirectWrite(true),
+			topicoptions.WithWriterWaitServerAck(true),
+		)
+		require.NoError(t, err)
+		defer func() { _ = writer.Close(ctx) }()
+
+		require.NoError(t, writer.WaitInit(ctx))
+		require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: bytes.NewReader([]byte("direct-write-auto-producer"))}))
+	})
+}
+
+func TestTopicMultiWriterDirectWrite(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	topicPath := scope.TopicPath(
+		topicoptions.CreateWithMinActivePartitions(2),
+		topicoptions.CreateWithMaxActivePartitions(2),
+	)
+
+	writer, err := scope.Driver().Topic().StartWriter(
+		topicPath,
+		topicoptions.WithWriterWaitServerAck(true),
+		topicoptions.WithWriteToManyPartitions(
+			topicoptions.WithWriterPartitionByPartitionID(),
+			topicoptions.WithMultiWriterDirectWrite(true),
+		),
+	)
+	require.NoError(t, err)
+
+	const messageText = "multi-writer-direct"
+	require.NoError(t, writer.Write(ctx,
+		topicwriter.Message{PartitionID: 0, Data: strings.NewReader(messageText + "-0")},
+		topicwriter.Message{PartitionID: 1, Data: strings.NewReader(messageText + "-1")},
+	))
+	require.NoError(t, writer.Close(ctx))
+
+	reader, err := scope.Driver().Topic().StartReader(
+		scope.TopicConsumerName(),
+		topicoptions.ReadSelectors{
+			{Path: topicPath, Partitions: []int64{0, 1}},
+		},
+	)
+	require.NoError(t, err)
+	defer func() { _ = reader.Close(ctx) }()
+
+	gotByPartition := map[int64]string{}
+	for range 2 {
+		msg, err := reader.ReadMessage(ctx)
+		require.NoError(t, err)
+		body, err := io.ReadAll(msg)
+		require.NoError(t, err)
+		gotByPartition[msg.PartitionID()] = string(body)
+	}
+	require.Equal(t, messageText+"-0", gotByPartition[0])
+	require.Equal(t, messageText+"-1", gotByPartition[1])
 }
 
 func TestDescribeTopicConsumer(t *testing.T) {
@@ -712,12 +892,52 @@ func TestAlterTopic(t *testing.T) {
 	require.Equal(t, newMinActivePartitions, topicDesc.PartitionSettings.MinActivePartitions)
 }
 
-func connect(t testing.TB, opts ...ydb.Option) *ydb.Driver {
-	return connectWithLogOption(t, false, opts...)
+func TestTopicMetricsLevel(t *testing.T) {
+	if ydbVersion := os.Getenv("YDB_VERSION"); ydbVersion != "" &&
+		ydbVersion != "nightly" && ydbVersion != "edge" && ydbVersion != "latest" &&
+		version.Lt(ydbVersion, "25.4") {
+		t.Skip("require support for topic metrics_level")
+	}
+
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	const initialLevel = uint32(3)
+
+	topicPath := scope.TopicPath(
+		topicoptions.CreateWithMinActivePartitions(1),
+		topicoptions.CreateWithMaxActivePartitions(1),
+		topicoptions.CreateWithMetricsLevel(initialLevel),
+	)
+
+	desc, err := scope.Driver().Topic().Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.NotNil(t, desc.MetricsLevel, "metrics_level must be populated after create")
+	require.Equal(t, initialLevel, *desc.MetricsLevel)
+
+	const updatedLevel = uint32(5)
+	err = scope.Driver().Topic().Alter(ctx, topicPath,
+		topicoptions.AlterWithSetMetricsLevel(updatedLevel),
+	)
+	require.NoError(t, err)
+
+	desc, err = scope.Driver().Topic().Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.NotNil(t, desc.MetricsLevel, "metrics_level must be populated after alter set")
+	require.Equal(t, updatedLevel, *desc.MetricsLevel)
+
+	err = scope.Driver().Topic().Alter(ctx, topicPath,
+		topicoptions.AlterWithResetMetricsLevel(),
+	)
+	require.NoError(t, err)
+
+	desc, err = scope.Driver().Topic().Describe(ctx, topicPath)
+	require.NoError(t, err)
+	require.Nil(t, desc.MetricsLevel, "metrics_level must be reset to the database default")
 }
 
-func connectWithGrpcLogging(t testing.TB, opts ...ydb.Option) *ydb.Driver {
-	return connectWithLogOption(t, true, opts...)
+func connect(t testing.TB, opts ...ydb.Option) *ydb.Driver {
+	return connectWithLogOption(t, false, opts...)
 }
 
 func connectWithLogOption(t testing.TB, logGRPC bool, opts ...ydb.Option) *ydb.Driver {

@@ -17,9 +17,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -47,13 +47,14 @@ type (
 		disableServerBalancer bool
 		onClose               []func(*Connector)
 
-		clock          clockwork.Clock
-		done           chan struct{}
-		trace          *trace.DatabaseSQL
-		traceRetry     *trace.Retry
-		retryBudget    budget.Budget
-		pathNormalizer bind.TablePathPrefix
-		bindings       bind.Bindings
+		clock                clockwork.Clock
+		done                 chan struct{}
+		trace                *trace.DatabaseSQL
+		traceRetry           *trace.Retry
+		composePanicCallback func(e any)
+		retryBudget          budget.Budget
+		pathNormalizer       bind.TablePathPrefix
+		bindings             bind.Bindings
 	}
 	ydbDriver interface {
 		Name() string
@@ -109,8 +110,8 @@ func (c *Connector) Open(name string) (driver.Conn, error) {
 }
 
 func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error) {
-	onDone := trace.DatabaseSQLOnConnectorConnect(c.Trace(), &ctx,
-		stack.FunctionID("database/sql.(*Connector).Connect", stack.Package("database/sql")),
+	onDone := gtrace.DatabaseSQLOnConnectorConnect(c.Trace(), &ctx,
+		stack.FunctionID("database/sql.(*Connector).Connect" /*stack.Package("database/sql")*/),
 	)
 
 	if !c.disableServerBalancer {
@@ -129,10 +130,9 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 
 		conn := &Conn{
 			processor: QUERY,
-			cc:        xquery.New(ctx, s, c.QueryOpts...),
+			cc:        xquery.New(s, c.QueryOpts...),
 			ctx:       ctx,
 			connector: c,
-			lastUsage: xsync.NewLastUsage(xsync.WithClock(c.Clock())),
 		}
 
 		return conn, nil
@@ -148,10 +148,9 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 
 		conn := &Conn{
 			processor: TABLE,
-			cc:        xtable.New(ctx, c.parent.Scripting(), s, c.TableOpts...),
+			cc:        xtable.New(c.parent.Scripting(), s, c.TableOpts...),
 			ctx:       ctx,
 			connector: c,
-			lastUsage: xsync.NewLastUsage(xsync.WithClock(c.Clock())),
 		}
 
 		return conn, nil

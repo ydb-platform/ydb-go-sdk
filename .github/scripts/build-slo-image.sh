@@ -87,7 +87,8 @@ echo "  SRC_PATH:   $src_path"
     fi
 
     echo "Baseline build failed, using fallback image: $fallback_image"
-    docker tag "$fallback_image" "$tag"
+    docker tag "$fallback_image" "$tag" || die "Fallback docker tag failed"
+    exit_code=0
   fi
-  set -e
+  exit $exit_code
 )

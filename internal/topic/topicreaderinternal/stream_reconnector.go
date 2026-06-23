@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -103,7 +104,7 @@ func (r *readerReconnector) ReadSessionID() string {
 
 func (r *readerReconnector) TopicOnReaderStart(consumer string, err error) {
 	logCtx := r.logContext
-	trace.TopicOnReaderStart(r.tracer, &logCtx, r.readerID, consumer, err)
+	gtrace.TopicOnReaderStart(r.tracer, &logCtx, r.readerID, consumer, err)
 }
 
 func (r *readerReconnector) SetLogContext(ctx context.Context) {
@@ -329,7 +330,7 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 			} else {
 				_ = r.CloseWithError(ctx, stopRetryReason)
 				logCtx := r.logContext
-				trace.TopicOnReaderReconnect(r.tracer, &logCtx, request.reason)(stopRetryReason)
+				gtrace.TopicOnReaderReconnect(r.tracer, &logCtx, request.reason)(stopRetryReason)
 
 				return
 			}
@@ -337,7 +338,7 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 
 		err := r.reconnect(ctx, request.reason, request.oldReader)
 		logCtx := r.logContext
-		trace.TopicOnReaderReconnect(r.tracer, &logCtx, request.reason)(err)
+		gtrace.TopicOnReaderReconnect(r.tracer, &logCtx, request.reason)(err)
 	}
 }
 
@@ -345,7 +346,7 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldReader batchedStreamReader) (err error) {
 	defer func() {
 		logCtx := r.logContext
-		trace.TopicOnReaderReconnect(r.tracer, &logCtx, reason)(err)
+		gtrace.TopicOnReaderReconnect(r.tracer, &logCtx, reason)(err)
 	}()
 
 	if err = ctx.Err(); err != nil {
@@ -387,12 +388,12 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 			case r.reconnectFromBadStream <- newReconnectRequest(oldReader, sendReason):
 				{
 					logCtx := r.logContext
-					trace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, err, true)
+					gtrace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, err, true)
 				}
 			case <-ctx.Done():
 				{
 					logCtx := r.logContext
-					trace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, err, false)
+					gtrace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, err, false)
 				}
 			}
 		})
@@ -497,13 +498,13 @@ func (r *readerReconnector) fireReconnectOnRetryableError(stream batchedStreamRe
 		{
 			// send signal
 			logCtx := r.logContext
-			trace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, err, true)
+			gtrace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, err, true)
 		}
 	default:
 		{
 			// previous reconnect signal in process, no need sent signal more
 			logCtx := r.logContext
-			trace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, err, false)
+			gtrace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, err, false)
 		}
 	}
 }

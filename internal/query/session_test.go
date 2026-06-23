@@ -12,7 +12,6 @@ import (
 
 	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -21,14 +20,13 @@ import (
 // for a lazy transaction when the session is no longer alive. This prevents
 // the dead session from being silently reused inside a new transaction.
 func TestSessionBeginLazyTxDeadSession(t *testing.T) {
-	ctx := xtest.Context(t)
+	ctx := t.Context()
 
 	// Create a session whose underlying Core reports IsAlive() == false
 	// (simulates a session that was previously invalidated by BAD_SESSION).
 	deadCore := &sessionControllerMock{
 		id:     "dead-session",
 		status: StatusError,
-		done:   make(chan struct{}),
 	}
 	s := &Session{
 		Core:   deadCore,
@@ -55,7 +53,7 @@ func TestCreateSession(t *testing.T) {
 		},
 	}
 	t.Run("HappyWay", func(t *testing.T) {
-		ctx := xtest.Context(t)
+		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
@@ -63,9 +61,11 @@ func TestCreateSession(t *testing.T) {
 			SessionId: "123",
 		}, nil)
 		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+		stubAttachStreamContext(attachStream)
 		attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
 			Status: Ydb.StatusIds_SUCCESS,
-		}, nil).AnyTimes()
+		}, nil)
+		attachStream.EXPECT().Recv().Return(nil, errSessionClosed).AnyTimes()
 		client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
 			SessionId: "123",
 		}).Return(attachStream, nil)
@@ -78,7 +78,7 @@ func TestCreateSession(t *testing.T) {
 	})
 	t.Run("TransportError", func(t *testing.T) {
 		t.Run("OnCreateSession", func(t *testing.T) {
-			ctx := xtest.Context(t)
+			ctx := t.Context()
 			ctrl := gomock.NewController(t)
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil,
@@ -91,7 +91,7 @@ func TestCreateSession(t *testing.T) {
 			})
 		})
 		t.Run("OnAttachStream", func(t *testing.T) {
-			ctx := xtest.Context(t)
+			ctx := t.Context()
 			ctrl := gomock.NewController(t)
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
@@ -115,7 +115,7 @@ func TestCreateSession(t *testing.T) {
 	})
 	t.Run("OperationError", func(t *testing.T) {
 		t.Run("OnCreateSession", func(t *testing.T) {
-			ctx := xtest.Context(t)
+			ctx := t.Context()
 			ctrl := gomock.NewController(t)
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil,
@@ -128,7 +128,7 @@ func TestCreateSession(t *testing.T) {
 			})
 		})
 		t.Run("OnAttachStream", func(t *testing.T) {
-			ctx := xtest.Context(t)
+			ctx := t.Context()
 			ctrl := gomock.NewController(t)
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{

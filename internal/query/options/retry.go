@@ -1,6 +1,7 @@
 package options
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
@@ -92,7 +93,7 @@ func (s *doTxSettings) LazyTx() *bool {
 }
 
 func (opt TraceOption) applyDoOption(s *doSettings) {
-	s.trace = s.trace.Compose(opt.t)
+	s.trace = gtrace.Compose(s.trace, opt.t)
 }
 
 func (opt TraceOption) applyDoTxOption(s *doTxSettings) {

@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -35,7 +36,6 @@ type Config struct {
 	meta               *meta.Meta
 
 	excludeGRPCCodesForPessimization []grpcCodes.Code
-	disableOptimisticUnban           bool
 }
 
 func (c *Config) Credentials() credentials.Credentials {
@@ -47,8 +47,13 @@ func (c *Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 	return c.excludeGRPCCodesForPessimization
 }
 
+// DisableOptimisticUnban reports whether optimistic unban is disabled.
+//
+// Deprecated: Optimistic unban is now always disabled (this method always returns true).
+// Will be removed after Nov 2026.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (c *Config) DisableOptimisticUnban() bool {
-	return c.disableOptimisticUnban
+	return true
 }
 
 // GrpcDialOptions reports about used grpc dialing options
@@ -163,9 +168,13 @@ func WithTLSConfig(tlsConfig *tls.Config) Option {
 	}
 }
 
-func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
+func WithTrace(t trace.Driver) Option { //nolint:gocritic
 	return func(c *Config) {
-		c.trace = c.trace.Compose(&t, opts...)
+		var opts []gtrace.DriverComposeOption
+		if cb := c.PanicCallback(); cb != nil {
+			opts = append(opts, gtrace.WithDriverPanicCallback(cb))
+		}
+		c.trace = gtrace.Compose(c.trace, &t, opts...)
 	}
 }
 
@@ -176,9 +185,9 @@ func WithRetryBudget(b budget.Budget) Option {
 	}
 }
 
-func WithTraceRetry(t *trace.Retry, opts ...trace.RetryComposeOption) Option {
+func WithTraceRetry(t *trace.Retry) Option {
 	return func(c *Config) {
-		config.SetTraceRetry(&c.Common, t, opts...)
+		config.SetTraceRetry(&c.Common, t)
 	}
 }
 
@@ -324,14 +333,12 @@ func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
 	}
 }
 
-// WithDisableOptimisticUnban disables optimistic unban of nodes after a successful call
-// immediately following pessimization.
+// WithDisableOptimisticUnban
 //
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+// Deprecated: will be removed after Nov 2026.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithDisableOptimisticUnban() Option {
-	return func(c *Config) {
-		c.disableOptimisticUnban = true
-	}
+	return func(c *Config) {}
 }
 
 func New(opts ...Option) *Config {

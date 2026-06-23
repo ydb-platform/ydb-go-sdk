@@ -7,13 +7,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
 )
 
-// tool gtrace used from ./internal/cmd/gtrace
-
-//go:generate gtrace
-
 type (
 	// Coordination specified trace of coordination client activity.
 	// gtrace:gen
+	// gtrace:out internal/coordination/gtrace
 	Coordination struct {
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnNew func(CoordinationNewStartInfo) func(CoordinationNewDoneInfo)
@@ -68,7 +65,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	CoordinationNewDoneInfo struct{}
@@ -79,7 +76,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	CoordinationCloseDoneInfo struct {
@@ -92,7 +89,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 
 		Path string
 	}
@@ -107,7 +104,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 
 		Path string
 	}
@@ -122,7 +119,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 
 		Path string
 	}
@@ -137,7 +134,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 
 		Path string
 	}
@@ -152,7 +149,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 
 		Path string
 	}
@@ -167,7 +164,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	CoordinationSessionNewStreamDoneInfo struct {
