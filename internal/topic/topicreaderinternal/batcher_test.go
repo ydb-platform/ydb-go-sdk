@@ -373,7 +373,7 @@ func TestBatcher_PopFlushed(t *testing.T) {
 	}, xtest.StopAfter(time.Millisecond))
 }
 
-func TestBatcherConcurency(t *testing.T) {
+func TestBatcherConcurrency(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "OneBatch", func(tb testing.TB) {
 		b := newBatcher()
 
