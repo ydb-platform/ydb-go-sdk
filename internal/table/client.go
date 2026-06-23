@@ -497,12 +497,12 @@ func chunkBulkUpsertRequest(
 // Returns two modified bulk upsert requests with their respective item sets.
 func splitBulkUpsertRequestAt(req *Ydb_Table.BulkUpsertRequest, pos int) (_, _ *Ydb_Table.BulkUpsertRequest) {
 	items := req.GetRows().GetValue().GetItems() // save original items
-	req.Rows.Value.Items = nil
+	req.GetRows().GetValue().SetItems(nil)
 
 	right := proto.Clone(req).(*Ydb_Table.BulkUpsertRequest) //nolint:forcetypeassert
 
-	req.Rows.Value.Items = items[:pos]
-	right.Rows.Value.Items = items[pos:]
+	req.GetRows().GetValue().SetItems(items[:pos])
+	right.GetRows().GetValue().SetItems(items[pos:])
 
 	return req, right
 }
@@ -513,18 +513,18 @@ func makeReadRowsRequest(
 	keys value.Value,
 	readRowOpts []options.ReadRowsOption,
 ) *Ydb_Table.ReadRowsRequest {
-	request := Ydb_Table.ReadRowsRequest{
+	request := Ydb_Table.ReadRowsRequest_builder{
 		SessionId: sessionID,
 		Path:      path,
 		Keys:      value.ToYDB(keys),
-	}
+	}.Build()
 	for _, opt := range readRowOpts {
 		if opt != nil {
-			opt.ApplyReadRowsOption((*options.ReadRowsDesc)(&request))
+			opt.ApplyReadRowsOption((*options.ReadRowsDesc)(request))
 		}
 	}
 
-	return &request
+	return request
 }
 
 func makeReadRowsResponse(response *Ydb_Table.ReadRowsResponse, err error, isTruncated bool) (result.Result, error) {
@@ -600,10 +600,10 @@ func externalDataSourceDescription(
 	svc Ydb_Table_V1.TableServiceClient,
 	path string,
 ) (desc options.ExternalDataSourceDescription, err error) {
-	request := &Ydb_Table.DescribeExternalDataSourceRequest{
+	request := Ydb_Table.DescribeExternalDataSourceRequest_builder{
 		Path:            path,
 		OperationParams: operation.Params(ctx, 0, 0, operation.ModeSync),
-	}
+	}.Build()
 	response, err := svc.DescribeExternalDataSource(ctx, request)
 	if err != nil {
 		return desc, xerrors.WithStackTrace(err)
@@ -629,10 +629,10 @@ func externalTableDescription(
 	svc Ydb_Table_V1.TableServiceClient,
 	path string,
 ) (desc options.ExternalTableDescription, err error) {
-	request := &Ydb_Table.DescribeExternalTableRequest{
+	request := Ydb_Table.DescribeExternalTableRequest_builder{
 		Path:            path,
 		OperationParams: operation.Params(ctx, 0, 0, operation.ModeSync),
-	}
+	}.Build()
 	response, err := svc.DescribeExternalTable(ctx, request)
 	if err != nil {
 		return desc, xerrors.WithStackTrace(err)

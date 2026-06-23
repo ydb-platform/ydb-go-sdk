@@ -1,0 +1,197 @@
+panic: test timed out after 30s
+	running tests:
+		TestTxOnCompleted (5s)
+		TestTxOnCompleted/OnQueryWithTxSuccessWithTwoResultSet (1s)
+
+goroutine 440795 [running]:
+testing.(*M).startAlarm.func1()
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:2682 +0x345
+created by time.goFunc
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/time/sleep.go:215 +0x2d
+
+goroutine 1 [chan receive]:
+testing.(*T).Run(0xc000103180, {0xd3d19f?, 0xc0001c1b30?}, 0xd829f8)
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:2005 +0x485
+testing.runTests.func1(0xc000103180)
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:2477 +0x37
+testing.tRunner(0xc000103180, 0xc0001c1c70)
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:1934 +0xea
+testing.runTests(0xc00012cb70, {0x14b0f00, 0x40, 0x40}, {0x7?, 0xc00025e440?, 0x14bdbe0?})
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:2475 +0x4b4
+testing.(*M).Run(0xc000258140)
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:2337 +0x63a
+main.main()
+	_testmain.go:175 +0x9b
+
+goroutine 192082 [chan receive]:
+testing.(*T).Parallel(0xc0002cf180)
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:1708 +0x230
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestWrapExecuteQueryStreamWithPrefetchOrderAndEOF(0xc0002cf180)
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/execute_query_stream_prefetch_test.go:68 +0x25
+testing.tRunner(0xc0002cf180, 0xd82a08)
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:1934 +0xea
+created by testing.(*T).Run in goroutine 1
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:1997 +0x465
+
+goroutine 443854 [chan receive]:
+testing.(*T).Run(0xc00019d180, {0xd4d569?, 0x556993?}, 0xd82ef8)
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:2005 +0x485
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestTxOnCompleted(0xc00019d180)
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/transaction_test.go:353 +0x145
+testing.tRunner(0xc00019d180, 0xd829f8)
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:1934 +0xea
+created by testing.(*T).Run in goroutine 1
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:1997 +0x465
+
+goroutine 192083 [chan receive]:
+testing.(*T).Parallel(0xc0002cf340)
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:1708 +0x230
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestWrapExecuteQueryStreamWithPrefetchPropagatesError(0xc0002cf340)
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/execute_query_stream_prefetch_test.go:107 +0x1f
+testing.tRunner(0xc0002cf340, 0xd82a10)
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:1934 +0xea
+created by testing.(*T).Run in goroutine 1
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:1997 +0x465
+
+goroutine 223514 [chan send]:
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestSessionCoreCancelAttachOnDone.func1.1()
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core_test.go:41 +0x3d
+reflect.Value.call({0xbbeae0?, 0xc0004e40c0?, 0x9f2164?}, {0xd3286a, 0x4}, {0xc000464e90, 0x0, 0x555100?})
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/reflect/value.go:581 +0xcc6
+reflect.Value.Call({0xbbeae0?, 0xc0004e40c0?, 0x20?}, {0xc000464e90?, 0xc000464e10?, 0x50b870?})
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/reflect/value.go:365 +0xb9
+go.uber.org/mock/gomock.(*Call).DoAndReturn.func1({0x0, 0x0, 0xc0004aa030?})
+	/home/kartunovv/go/pkg/mod/go.uber.org/mock@v0.4.0/gomock/call.go:138 +0x536
+go.uber.org/mock/gomock.(*Controller).Call(0xc0005109c0, {0xcabf80, 0xc0004aa030}, {0xd32736, 0x4}, {0x0, 0x0, 0x0})
+	/home/kartunovv/go/pkg/mod/go.uber.org/mock@v0.4.0/gomock/controller.go:229 +0xee
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*MockQueryService_AttachSessionClient).Recv(0xc0004aa030)
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/grpc_client_mock_test.go:581 +0x50
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).listenAttachStream(0xc000052080, {0xe5e9a0, 0xc0004aa030})
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core.go:262 +0x57
+created by github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).attach in goroutine 233652
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core.go:254 +0x476
+
+goroutine 192084 [chan receive]:
+testing.(*T).Parallel(0xc0002cf500)
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:1708 +0x230
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestWrapExecuteQueryStreamWithPrefetchZeroPassthrough(0xc0002cf500)
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/execute_query_stream_prefetch_test.go:133 +0x18
+testing.tRunner(0xc0002cf500, 0xd82a18)
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:1934 +0xea
+created by testing.(*T).Run in goroutine 1
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:1997 +0x465
+
+goroutine 261472 [chan send]:
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestSessionCoreCancelAttachOnDone.func1.1()
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core_test.go:41 +0x3d
+reflect.Value.call({0xbbeae0?, 0xc00041ba70?, 0x9f2164?}, {0xd3286a, 0x4}, {0xc0005d2e90, 0x0, 0x555100?})
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/reflect/value.go:581 +0xcc6
+reflect.Value.Call({0xbbeae0?, 0xc00041ba70?, 0x20?}, {0xc0005d2e90?, 0xc0005d2e10?, 0x50b870?})
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/reflect/value.go:365 +0xb9
+go.uber.org/mock/gomock.(*Call).DoAndReturn.func1({0x0, 0x0, 0xc000590630?})
+	/home/kartunovv/go/pkg/mod/go.uber.org/mock@v0.4.0/gomock/call.go:138 +0x536
+go.uber.org/mock/gomock.(*Controller).Call(0xc00041ba40, {0xcabf80, 0xc000590630}, {0xd32736, 0x4}, {0x0, 0x0, 0x0})
+	/home/kartunovv/go/pkg/mod/go.uber.org/mock@v0.4.0/gomock/controller.go:229 +0xee
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*MockQueryService_AttachSessionClient).Recv(0xc000590630)
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/grpc_client_mock_test.go:581 +0x50
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).listenAttachStream(0xc000416580, {0xe5e9a0, 0xc000590630})
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core.go:262 +0x57
+created by github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).attach in goroutine 233652
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core.go:254 +0x476
+
+goroutine 251498 [chan send]:
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestSessionCoreCancelAttachOnDone.func1.1()
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core_test.go:41 +0x3d
+reflect.Value.call({0xbbeae0?, 0xc0006226f0?, 0x9f2164?}, {0xd3286a, 0x4}, {0xc000323e90, 0x0, 0x555100?})
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/reflect/value.go:581 +0xcc6
+reflect.Value.Call({0xbbeae0?, 0xc0006226f0?, 0x20?}, {0xc000323e90?, 0xc000323e10?, 0x50b870?})
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/reflect/value.go:365 +0xb9
+go.uber.org/mock/gomock.(*Call).DoAndReturn.func1({0x0, 0x0, 0xc0005f3460?})
+	/home/kartunovv/go/pkg/mod/go.uber.org/mock@v0.4.0/gomock/call.go:138 +0x536
+go.uber.org/mock/gomock.(*Controller).Call(0xc0006226c0, {0xcabf80, 0xc0005f3460}, {0xd32736, 0x4}, {0x0, 0x0, 0x0})
+	/home/kartunovv/go/pkg/mod/go.uber.org/mock@v0.4.0/gomock/controller.go:229 +0xee
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*MockQueryService_AttachSessionClient).Recv(0xc0005f3460)
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/grpc_client_mock_test.go:581 +0x50
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).listenAttachStream(0xc00034ee00, {0xe5e9a0, 0xc0005f3460})
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core.go:262 +0x57
+created by github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).attach in goroutine 233652
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core.go:254 +0x476
+
+goroutine 443874 [sleep]:
+time.Sleep(0xf4240)
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/runtime/time.go:363 +0x165
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestTxOnCompleted.func10.1({0xe65b40, 0xc0004a0820})
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/transaction_test.go:385 +0x758
+github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest.runTest({0xe65a70, 0xc00019c540}, 0xd82f00, 0xc000504430)
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/pkg/xtest/manytimes.go:78 +0xb6
+github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest.TestManyTimes({0xe65a70, 0xc00019c540}, 0xd82f00, {0x0, 0x0, 0xc000488510?})
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/pkg/xtest/manytimes.go:45 +0x15f
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestTxOnCompleted.func10(0xc00019c540?)
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/transaction_test.go:354 +0x2b
+testing.tRunner(0xc00019c540, 0xd82ef8)
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:1934 +0xea
+created by testing.(*T).Run in goroutine 443854
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/testing/testing.go:1997 +0x465
+
+goroutine 262885 [chan send]:
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestSessionCoreCancelAttachOnDone.func1.1()
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core_test.go:41 +0x3d
+reflect.Value.call({0xbbeae0?, 0xc0003d2c00?, 0x9f2164?}, {0xd3286a, 0x4}, {0xc000327e90, 0x0, 0x555100?})
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/reflect/value.go:581 +0xcc6
+reflect.Value.Call({0xbbeae0?, 0xc0003d2c00?, 0x20?}, {0xc000327e90?, 0xc000327e10?, 0x50b870?})
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/reflect/value.go:365 +0xb9
+go.uber.org/mock/gomock.(*Call).DoAndReturn.func1({0x0, 0x0, 0xc0003bad50?})
+	/home/kartunovv/go/pkg/mod/go.uber.org/mock@v0.4.0/gomock/call.go:138 +0x536
+go.uber.org/mock/gomock.(*Controller).Call(0xc0003d2bd0, {0xcabf80, 0xc0003bad50}, {0xd32736, 0x4}, {0x0, 0x0, 0x0})
+	/home/kartunovv/go/pkg/mod/go.uber.org/mock@v0.4.0/gomock/controller.go:229 +0xee
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*MockQueryService_AttachSessionClient).Recv(0xc0003bad50)
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/grpc_client_mock_test.go:581 +0x50
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).listenAttachStream(0xc0003cc380, {0xe5e9a0, 0xc0003bad50})
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core.go:262 +0x57
+created by github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).attach in goroutine 233652
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core.go:254 +0x476
+
+goroutine 247215 [chan send]:
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestSessionCoreCancelAttachOnDone.func1.1()
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core_test.go:41 +0x3d
+reflect.Value.call({0xbbeae0?, 0xc000498180?, 0x9f2164?}, {0xd3286a, 0x4}, {0xc000322e90, 0x0, 0x555100?})
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/reflect/value.go:581 +0xcc6
+reflect.Value.Call({0xbbeae0?, 0xc000498180?, 0x20?}, {0xc000322e90?, 0xc000322e10?, 0x50b870?})
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/reflect/value.go:365 +0xb9
+go.uber.org/mock/gomock.(*Call).DoAndReturn.func1({0x0, 0x0, 0xc00049e060?})
+	/home/kartunovv/go/pkg/mod/go.uber.org/mock@v0.4.0/gomock/call.go:138 +0x536
+go.uber.org/mock/gomock.(*Controller).Call(0xc000498150, {0xcabf80, 0xc00049e060}, {0xd32736, 0x4}, {0x0, 0x0, 0x0})
+	/home/kartunovv/go/pkg/mod/go.uber.org/mock@v0.4.0/gomock/controller.go:229 +0xee
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*MockQueryService_AttachSessionClient).Recv(0xc00049e060)
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/grpc_client_mock_test.go:581 +0x50
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).listenAttachStream(0xc00034e400, {0xe5e9a0, 0xc00049e060})
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core.go:262 +0x57
+created by github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).attach in goroutine 233652
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core.go:254 +0x476
+
+goroutine 257095 [chan send]:
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestSessionCoreCancelAttachOnDone.func1.1()
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core_test.go:41 +0x3d
+reflect.Value.call({0xbbeae0?, 0xc00063dc50?, 0x9f2164?}, {0xd3286a, 0x4}, {0xc0005d1e90, 0x0, 0x555100?})
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/reflect/value.go:581 +0xcc6
+reflect.Value.Call({0xbbeae0?, 0xc00063dc50?, 0x20?}, {0xc0005d1e90?, 0xc0005d1e10?, 0x50b870?})
+	/home/kartunovv/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/src/reflect/value.go:365 +0xb9
+go.uber.org/mock/gomock.(*Call).DoAndReturn.func1({0x0, 0x0, 0xc0006482a0?})
+	/home/kartunovv/go/pkg/mod/go.uber.org/mock@v0.4.0/gomock/call.go:138 +0x536
+go.uber.org/mock/gomock.(*Controller).Call(0xc00063dc20, {0xcabf80, 0xc0006482a0}, {0xd32736, 0x4}, {0x0, 0x0, 0x0})
+	/home/kartunovv/go/pkg/mod/go.uber.org/mock@v0.4.0/gomock/controller.go:229 +0xee
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*MockQueryService_AttachSessionClient).Recv(0xc0006482a0)
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/grpc_client_mock_test.go:581 +0x50
+github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).listenAttachStream(0xc00034e800, {0xe5e9a0, 0xc0006482a0})
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core.go:262 +0x57
+created by github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).attach in goroutine 233652
+	/home/kartunovv/projects/go_sdk/ydb-go-sdk/internal/query/session_core.go:254 +0x476
+FAIL	github.com/ydb-platform/ydb-go-sdk/v3/internal/query	30.008s
+?   	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow	[no test files]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config	(cached)
+?   	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace	[no test files]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options	(cached)
+?   	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result	[no test files]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/test	(cached)
+FAIL

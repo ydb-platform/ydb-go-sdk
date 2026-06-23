@@ -10,19 +10,19 @@ func NewTimeToLiveSettings(settings *Ydb_Table.TtlSettings) *options.TimeToLiveS
 	if settings == nil {
 		return nil
 	}
-	switch mode := settings.GetMode().(type) {
-	case *Ydb_Table.TtlSettings_DateTypeColumn:
+	switch settings.WhichMode() {
+	case Ydb_Table.TtlSettings_DateTypeColumn_case:
 		return &options.TimeToLiveSettings{
-			ColumnName:         mode.DateTypeColumn.GetColumnName(),
-			ExpireAfterSeconds: mode.DateTypeColumn.GetExpireAfterSeconds(),
+			ColumnName:         settings.GetDateTypeColumn().GetColumnName(),
+			ExpireAfterSeconds: settings.GetDateTypeColumn().GetExpireAfterSeconds(),
 			Mode:               options.TimeToLiveModeDateType,
 		}
 
-	case *Ydb_Table.TtlSettings_ValueSinceUnixEpoch:
+	case Ydb_Table.TtlSettings_ValueSinceUnixEpoch_case:
 		return &options.TimeToLiveSettings{
-			ColumnName:         mode.ValueSinceUnixEpoch.GetColumnName(),
-			ColumnUnit:         timeToLiveUnit(mode.ValueSinceUnixEpoch.GetColumnUnit()),
-			ExpireAfterSeconds: mode.ValueSinceUnixEpoch.GetExpireAfterSeconds(),
+			ColumnName:         settings.GetValueSinceUnixEpoch().GetColumnName(),
+			ColumnUnit:         timeToLiveUnit(settings.GetValueSinceUnixEpoch().GetColumnUnit()),
+			ExpireAfterSeconds: settings.GetValueSinceUnixEpoch().GetExpireAfterSeconds(),
 			Mode:               options.TimeToLiveModeValueSinceUnixEpoch,
 		}
 	}

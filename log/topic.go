@@ -1304,26 +1304,24 @@ func (s lazyProtoStringifer) String() string {
 			storage := make([]messDataType, len(data.GetMessages()))
 			for i := range data.GetMessages() {
 				storage[i].Data = data.GetMessages()[i].GetData()
-				data.Messages[i] = nil
-
 				storage[i].Metadata = data.GetMessages()[i].GetMetadataItems()
-				data.Messages[i].MetadataItems = nil
+				data.GetMessages()[i].SetData(nil)
+				data.GetMessages()[i].SetMetadataItems(nil)
 			}
 
 			defer func() {
 				for i := range data.GetMessages() {
-					data.Messages[i].Data = storage[i].Data
-					data.Messages[i].MetadataItems = storage[i].Metadata
+					data.GetMessages()[i].SetData(storage[i].Data)
+					data.GetMessages()[i].SetMetadataItems(storage[i].Metadata)
 				}
 			}()
 		}
-		clientMessage := writeRequest.GetClientMessage()
-		updateToken, ok := clientMessage.(*Ydb_Topic.StreamWriteMessage_FromClient_UpdateTokenRequest)
-		if ok {
-			token := updateToken.UpdateTokenRequest.GetToken()
-			updateToken.UpdateTokenRequest.Token = secret.Token(token)
+		if writeRequest.WhichClientMessage() == Ydb_Topic.StreamWriteMessage_FromClient_UpdateTokenRequest_case {
+			updateToken := writeRequest.GetUpdateTokenRequest()
+			token := updateToken.GetToken()
+			updateToken.SetToken(secret.Token(token))
 			defer func() {
-				updateToken.UpdateTokenRequest.Token = token
+				updateToken.SetToken(token)
 			}()
 		}
 	}

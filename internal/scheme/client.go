@@ -71,7 +71,7 @@ func (c *Client) MakeDirectory(ctx context.Context, path string) (finalErr error
 func (c *Client) makeDirectory(ctx context.Context, path string) (err error) {
 	_, err = c.service.MakeDirectory(
 		ctx,
-		&Ydb_Scheme.MakeDirectoryRequest{
+		Ydb_Scheme.MakeDirectoryRequest_builder{
 			Path: path,
 			OperationParams: operation.Params(
 				ctx,
@@ -79,7 +79,7 @@ func (c *Client) makeDirectory(ctx context.Context, path string) (err error) {
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
-		},
+		}.Build(),
 	)
 
 	return xerrors.WithStackTrace(err)
@@ -111,7 +111,7 @@ func (c *Client) RemoveDirectory(ctx context.Context, path string) (finalErr err
 func (c *Client) removeDirectory(ctx context.Context, path string) (err error) {
 	_, err = c.service.RemoveDirectory(
 		ctx,
-		&Ydb_Scheme.RemoveDirectoryRequest{
+		Ydb_Scheme.RemoveDirectoryRequest_builder{
 			Path: path,
 			OperationParams: operation.Params(
 				ctx,
@@ -119,7 +119,7 @@ func (c *Client) removeDirectory(ctx context.Context, path string) (err error) {
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
-		},
+		}.Build(),
 	)
 
 	return xerrors.WithStackTrace(err)
@@ -161,7 +161,7 @@ func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directo
 	)
 	response, err = c.service.ListDirectory(
 		ctx,
-		&Ydb_Scheme.ListDirectoryRequest{
+		Ydb_Scheme.ListDirectoryRequest_builder{
 			Path: path,
 			OperationParams: operation.Params(
 				ctx,
@@ -169,7 +169,7 @@ func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directo
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
-		},
+		}.Build(),
 	)
 	if err != nil {
 		return d, xerrors.WithStackTrace(err)
@@ -223,7 +223,7 @@ func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry,
 	)
 	response, err = c.service.DescribePath(
 		ctx,
-		&Ydb_Scheme.DescribePathRequest{
+		Ydb_Scheme.DescribePathRequest_builder{
 			Path: path,
 			OperationParams: operation.Params(
 				ctx,
@@ -231,7 +231,7 @@ func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry,
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
-		},
+		}.Build(),
 	)
 	if err != nil {
 		return e, xerrors.WithStackTrace(err)
@@ -279,7 +279,7 @@ func (c *Client) ModifyPermissions(
 func (c *Client) modifyPermissions(ctx context.Context, path string, desc permissionsDesc) (err error) {
 	_, err = c.service.ModifyPermissions(
 		ctx,
-		&Ydb_Scheme.ModifyPermissionsRequest{
+		Ydb_Scheme.ModifyPermissionsRequest_builder{
 			Path:             path,
 			Actions:          desc.actions,
 			ClearPermissions: desc.clear,
@@ -289,7 +289,7 @@ func (c *Client) modifyPermissions(ctx context.Context, path string, desc permis
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
-		},
+		}.Build(),
 	)
 	if err != nil {
 		return xerrors.WithStackTrace(err)

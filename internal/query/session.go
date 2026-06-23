@@ -270,7 +270,7 @@ func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Exec
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	request.ResultSetFormat = Ydb.ResultSet_FORMAT_ARROW
+	request.SetResultSetFormat(Ydb.ResultSet_FORMAT_ARROW)
 
 	executeCtx, executeCancel := context.WithCancel(xcontext.ValueOnly(ctx))
 	defer func() {

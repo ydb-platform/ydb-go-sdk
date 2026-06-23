@@ -22,11 +22,9 @@ func TestNewController(t *testing.T) {
 func TestNewConversation(t *testing.T) {
 	t.Run("SimpleConversation", func(t *testing.T) {
 		conv := NewConversation(func() *Ydb_Coordination.SessionRequest {
-			return &Ydb_Coordination.SessionRequest{
-				Request: &Ydb_Coordination.SessionRequest_SessionStop_{
-					SessionStop: &Ydb_Coordination.SessionRequest_SessionStop{},
-				},
-			}
+			return Ydb_Coordination.SessionRequest_builder{
+				SessionStop: &Ydb_Coordination.SessionRequest_SessionStop{},
+			}.Build()
 		})
 		require.NotNil(t, conv)
 		require.NotNil(t, conv.message)
@@ -198,11 +196,9 @@ func TestOnSend(t *testing.T) {
 	t.Run("SendMessage", func(t *testing.T) {
 		controller := NewController()
 		conv := NewConversation(func() *Ydb_Coordination.SessionRequest {
-			return &Ydb_Coordination.SessionRequest{
-				Request: &Ydb_Coordination.SessionRequest_SessionStop_{
-					SessionStop: &Ydb_Coordination.SessionRequest_SessionStop{},
-				},
-			}
+			return Ydb_Coordination.SessionRequest_builder{
+				SessionStop: &Ydb_Coordination.SessionRequest_SessionStop{},
+			}.Build()
 		})
 		err := controller.PushBack(conv)
 		require.NoError(t, err)
@@ -230,15 +226,13 @@ func TestOnRecv(t *testing.T) {
 		controller := NewController()
 		conv := NewConversation(
 			func() *Ydb_Coordination.SessionRequest {
-				return &Ydb_Coordination.SessionRequest{
-					Request: &Ydb_Coordination.SessionRequest_CreateSemaphore_{
-						CreateSemaphore: &Ydb_Coordination.SessionRequest_CreateSemaphore{
-							ReqId: 123,
-							Name:  "test",
-							Limit: 1,
-						},
-					},
-				}
+				return Ydb_Coordination.SessionRequest_builder{
+					CreateSemaphore: Ydb_Coordination.SessionRequest_CreateSemaphore_builder{
+						ReqId: 123,
+						Name:  "test",
+						Limit: 1,
+					}.Build(),
+				}.Build()
 			},
 			WithResponseFilter(func(
 				request *Ydb_Coordination.SessionRequest,
@@ -259,13 +253,11 @@ func TestOnRecv(t *testing.T) {
 		require.NotNil(t, msg)
 
 		// Receive the response
-		response := &Ydb_Coordination.SessionResponse{
-			Response: &Ydb_Coordination.SessionResponse_CreateSemaphoreResult_{
-				CreateSemaphoreResult: &Ydb_Coordination.SessionResponse_CreateSemaphoreResult{
-					ReqId: 123,
-				},
-			},
-		}
+		response := Ydb_Coordination.SessionResponse_builder{
+			CreateSemaphoreResult: Ydb_Coordination.SessionResponse_CreateSemaphoreResult_builder{
+				ReqId: 123,
+			}.Build(),
+		}.Build()
 		handled := controller.OnRecv(response)
 		require.True(t, handled)
 	})
@@ -273,15 +265,13 @@ func TestOnRecv(t *testing.T) {
 		controller := NewController()
 		conv := NewConversation(
 			func() *Ydb_Coordination.SessionRequest {
-				return &Ydb_Coordination.SessionRequest{
-					Request: &Ydb_Coordination.SessionRequest_CreateSemaphore_{
-						CreateSemaphore: &Ydb_Coordination.SessionRequest_CreateSemaphore{
-							ReqId: 123,
-							Name:  "test",
-							Limit: 1,
-						},
-					},
-				}
+				return Ydb_Coordination.SessionRequest_builder{
+					CreateSemaphore: Ydb_Coordination.SessionRequest_CreateSemaphore_builder{
+						ReqId: 123,
+						Name:  "test",
+						Limit: 1,
+					}.Build(),
+				}.Build()
 			},
 			WithResponseFilter(func(
 				request *Ydb_Coordination.SessionRequest,
@@ -302,13 +292,11 @@ func TestOnRecv(t *testing.T) {
 		require.NotNil(t, msg)
 
 		// Receive a non-matching response
-		response := &Ydb_Coordination.SessionResponse{
-			Response: &Ydb_Coordination.SessionResponse_CreateSemaphoreResult_{
-				CreateSemaphoreResult: &Ydb_Coordination.SessionResponse_CreateSemaphoreResult{
-					ReqId: 456, // Different ID
-				},
-			},
-		}
+		response := Ydb_Coordination.SessionResponse_builder{
+			CreateSemaphoreResult: Ydb_Coordination.SessionResponse_CreateSemaphoreResult_builder{
+				ReqId: 456, // Different ID
+			}.Build(),
+		}.Build()
 		handled := controller.OnRecv(response)
 		require.False(t, handled)
 	})
@@ -316,15 +304,13 @@ func TestOnRecv(t *testing.T) {
 		controller := NewController()
 		conv := NewConversation(
 			func() *Ydb_Coordination.SessionRequest {
-				return &Ydb_Coordination.SessionRequest{
-					Request: &Ydb_Coordination.SessionRequest_AcquireSemaphore_{
-						AcquireSemaphore: &Ydb_Coordination.SessionRequest_AcquireSemaphore{
-							ReqId: 123,
-							Name:  "test",
-							Count: 1,
-						},
-					},
-				}
+				return Ydb_Coordination.SessionRequest_builder{
+					AcquireSemaphore: Ydb_Coordination.SessionRequest_AcquireSemaphore_builder{
+						ReqId: 123,
+						Name:  "test",
+						Count: 1,
+					}.Build(),
+				}.Build()
 			},
 			WithResponseFilter(func(
 				request *Ydb_Coordination.SessionRequest,
@@ -351,13 +337,11 @@ func TestOnRecv(t *testing.T) {
 		require.NotNil(t, msg)
 
 		// Receive acknowledgement
-		ackResponse := &Ydb_Coordination.SessionResponse{
-			Response: &Ydb_Coordination.SessionResponse_AcquireSemaphorePending_{
-				AcquireSemaphorePending: &Ydb_Coordination.SessionResponse_AcquireSemaphorePending{
-					ReqId: 123,
-				},
-			},
-		}
+		ackResponse := Ydb_Coordination.SessionResponse_builder{
+			AcquireSemaphorePending: Ydb_Coordination.SessionResponse_AcquireSemaphorePending_builder{
+				ReqId: 123,
+			}.Build(),
+		}.Build()
 		handled := controller.OnRecv(ackResponse)
 		require.True(t, handled)
 	})
@@ -397,11 +381,9 @@ func TestClose(t *testing.T) {
 	t.Run("CloseWithByeConversation", func(t *testing.T) {
 		controller := NewController()
 		byeConv := NewConversation(func() *Ydb_Coordination.SessionRequest {
-			return &Ydb_Coordination.SessionRequest{
-				Request: &Ydb_Coordination.SessionRequest_SessionStop_{
-					SessionStop: &Ydb_Coordination.SessionRequest_SessionStop{},
-				},
-			}
+			return Ydb_Coordination.SessionRequest_builder{
+				SessionStop: &Ydb_Coordination.SessionRequest_SessionStop{},
+			}.Build()
 		})
 		controller.Close(byeConv)
 		require.True(t, controller.closed)
@@ -470,15 +452,13 @@ func TestOnAttach(t *testing.T) {
 		controller := NewController()
 		conv := NewConversation(
 			func() *Ydb_Coordination.SessionRequest {
-				return &Ydb_Coordination.SessionRequest{
-					Request: &Ydb_Coordination.SessionRequest_CreateSemaphore_{
-						CreateSemaphore: &Ydb_Coordination.SessionRequest_CreateSemaphore{
-							ReqId: 123,
-							Name:  "test",
-							Limit: 1,
-						},
-					},
-				}
+				return Ydb_Coordination.SessionRequest_builder{
+					CreateSemaphore: Ydb_Coordination.SessionRequest_CreateSemaphore_builder{
+						ReqId: 123,
+						Name:  "test",
+						Limit: 1,
+					}.Build(),
+				}.Build()
 			},
 			WithResponseFilter(func(
 				request *Ydb_Coordination.SessionRequest,
@@ -512,15 +492,13 @@ func TestAwait(t *testing.T) {
 		controller := NewController()
 		conv := NewConversation(
 			func() *Ydb_Coordination.SessionRequest {
-				return &Ydb_Coordination.SessionRequest{
-					Request: &Ydb_Coordination.SessionRequest_CreateSemaphore_{
-						CreateSemaphore: &Ydb_Coordination.SessionRequest_CreateSemaphore{
-							ReqId: 123,
-							Name:  "test",
-							Limit: 1,
-						},
-					},
-				}
+				return Ydb_Coordination.SessionRequest_builder{
+					CreateSemaphore: Ydb_Coordination.SessionRequest_CreateSemaphore_builder{
+						ReqId: 123,
+						Name:  "test",
+						Limit: 1,
+					}.Build(),
+				}.Build()
 			},
 			WithResponseFilter(func(
 				request *Ydb_Coordination.SessionRequest,
@@ -537,13 +515,11 @@ func TestAwait(t *testing.T) {
 			ctx := context.Background()
 			msg, _ := controller.OnSend(ctx)
 			if msg != nil {
-				response := &Ydb_Coordination.SessionResponse{
-					Response: &Ydb_Coordination.SessionResponse_CreateSemaphoreResult_{
-						CreateSemaphoreResult: &Ydb_Coordination.SessionResponse_CreateSemaphoreResult{
-							ReqId: 123,
-						},
-					},
-				}
+				response := Ydb_Coordination.SessionResponse_builder{
+					CreateSemaphoreResult: Ydb_Coordination.SessionResponse_CreateSemaphoreResult_builder{
+						ReqId: 123,
+					}.Build(),
+				}.Build()
 				controller.OnRecv(response)
 			}
 		}()
@@ -558,15 +534,13 @@ func TestAwait(t *testing.T) {
 		controller := NewController()
 		conv := NewConversation(
 			func() *Ydb_Coordination.SessionRequest {
-				return &Ydb_Coordination.SessionRequest{
-					Request: &Ydb_Coordination.SessionRequest_CreateSemaphore_{
-						CreateSemaphore: &Ydb_Coordination.SessionRequest_CreateSemaphore{
-							ReqId: 123,
-							Name:  "test",
-							Limit: 1,
-						},
-					},
-				}
+				return Ydb_Coordination.SessionRequest_builder{
+					CreateSemaphore: Ydb_Coordination.SessionRequest_CreateSemaphore_builder{
+						ReqId: 123,
+						Name:  "test",
+						Limit: 1,
+					}.Build(),
+				}.Build()
 			},
 			WithResponseFilter(func(
 				request *Ydb_Coordination.SessionRequest,
@@ -588,15 +562,13 @@ func TestAwait(t *testing.T) {
 		controller := NewController()
 		conv := NewConversation(
 			func() *Ydb_Coordination.SessionRequest {
-				return &Ydb_Coordination.SessionRequest{
-					Request: &Ydb_Coordination.SessionRequest_AcquireSemaphore_{
-						AcquireSemaphore: &Ydb_Coordination.SessionRequest_AcquireSemaphore{
-							ReqId: 123,
-							Name:  "test",
-							Count: 1,
-						},
-					},
-				}
+				return Ydb_Coordination.SessionRequest_builder{
+					AcquireSemaphore: Ydb_Coordination.SessionRequest_AcquireSemaphore_builder{
+						ReqId: 123,
+						Name:  "test",
+						Count: 1,
+					}.Build(),
+				}.Build()
 			},
 			WithResponseFilter(func(
 				request *Ydb_Coordination.SessionRequest,
@@ -606,14 +578,12 @@ func TestAwait(t *testing.T) {
 			}),
 			WithCancelMessage(
 				func(req *Ydb_Coordination.SessionRequest) *Ydb_Coordination.SessionRequest {
-					return &Ydb_Coordination.SessionRequest{
-						Request: &Ydb_Coordination.SessionRequest_ReleaseSemaphore_{
-							ReleaseSemaphore: &Ydb_Coordination.SessionRequest_ReleaseSemaphore{
-								ReqId: 456,
-								Name:  "test",
-							},
-						},
-					}
+					return Ydb_Coordination.SessionRequest_builder{
+						ReleaseSemaphore: Ydb_Coordination.SessionRequest_ReleaseSemaphore_builder{
+							ReqId: 456,
+							Name:  "test",
+						}.Build(),
+					}.Build()
 				},
 				func(
 					request *Ydb_Coordination.SessionRequest,
@@ -649,15 +619,13 @@ func TestConflictKey(t *testing.T) {
 
 		conv := NewConversation(
 			func() *Ydb_Coordination.SessionRequest {
-				return &Ydb_Coordination.SessionRequest{
-					Request: &Ydb_Coordination.SessionRequest_CreateSemaphore_{
-						CreateSemaphore: &Ydb_Coordination.SessionRequest_CreateSemaphore{
-							ReqId: 123,
-							Name:  "test",
-							Limit: 1,
-						},
-					},
-				}
+				return Ydb_Coordination.SessionRequest_builder{
+					CreateSemaphore: Ydb_Coordination.SessionRequest_CreateSemaphore_builder{
+						ReqId: 123,
+						Name:  "test",
+						Limit: 1,
+					}.Build(),
+				}.Build()
 			},
 			WithResponseFilter(func(
 				request *Ydb_Coordination.SessionRequest,
@@ -690,15 +658,13 @@ func TestConflictKey(t *testing.T) {
 
 		conv := NewConversation(
 			func() *Ydb_Coordination.SessionRequest {
-				return &Ydb_Coordination.SessionRequest{
-					Request: &Ydb_Coordination.SessionRequest_CreateSemaphore_{
-						CreateSemaphore: &Ydb_Coordination.SessionRequest_CreateSemaphore{
-							ReqId: 123,
-							Name:  "test",
-							Limit: 1,
-						},
-					},
-				}
+				return Ydb_Coordination.SessionRequest_builder{
+					CreateSemaphore: Ydb_Coordination.SessionRequest_CreateSemaphore_builder{
+						ReqId: 123,
+						Name:  "test",
+						Limit: 1,
+					}.Build(),
+				}.Build()
 			},
 			WithResponseFilter(func(
 				request *Ydb_Coordination.SessionRequest,
@@ -727,13 +693,11 @@ func TestConflictKey(t *testing.T) {
 		require.True(t, hasConflict)
 
 		// Process response
-		response := &Ydb_Coordination.SessionResponse{
-			Response: &Ydb_Coordination.SessionResponse_CreateSemaphoreResult_{
-				CreateSemaphoreResult: &Ydb_Coordination.SessionResponse_CreateSemaphoreResult{
-					ReqId: 123,
-				},
-			},
-		}
+		response := Ydb_Coordination.SessionResponse_builder{
+			CreateSemaphoreResult: Ydb_Coordination.SessionResponse_CreateSemaphoreResult_builder{
+				ReqId: 123,
+			}.Build(),
+		}.Build()
 		handled := controller.OnRecv(response)
 		require.True(t, handled)
 
@@ -750,13 +714,11 @@ func TestOnRecvWithFailure(t *testing.T) {
 		controller := NewController()
 		controller.Close(nil)
 
-		response := &Ydb_Coordination.SessionResponse{
-			Response: &Ydb_Coordination.SessionResponse_Failure_{
-				Failure: &Ydb_Coordination.SessionResponse_Failure{
-					Status: Ydb.StatusIds_BAD_SESSION,
-				},
-			},
-		}
+		response := Ydb_Coordination.SessionResponse_builder{
+			Failure: Ydb_Coordination.SessionResponse_Failure_builder{
+				Status: Ydb.StatusIds_BAD_SESSION,
+			}.Build(),
+		}.Build()
 		handled := controller.OnRecv(response)
 		require.True(t, handled)
 	})

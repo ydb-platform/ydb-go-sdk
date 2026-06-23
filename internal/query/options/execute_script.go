@@ -12,7 +12,7 @@ import (
 
 type (
 	FetchScriptResultsRequest struct {
-		Ydb_Query.FetchScriptResultsRequest
+		*Ydb_Query.FetchScriptResultsRequest
 
 		Trace *trace.Query
 	}
@@ -46,19 +46,19 @@ type (
 
 func WithFetchToken(fetchToken string) FetchScriptOption {
 	return func(request *FetchScriptResultsRequest) {
-		request.FetchToken = fetchToken
+		request.SetFetchToken(fetchToken)
 	}
 }
 
 func WithResultSetIndex(resultSetIndex int64) FetchScriptOption {
 	return func(request *FetchScriptResultsRequest) {
-		request.ResultSetIndex = resultSetIndex
+		request.SetResultSetIndex(resultSetIndex)
 	}
 }
 
 func WithRowsLimit(rowsLimit int64) FetchScriptOption {
 	return func(request *FetchScriptResultsRequest) {
-		request.RowsLimit = rowsLimit
+		request.SetRowsLimit(rowsLimit)
 	}
 }
 

@@ -3,7 +3,6 @@ package rawtopicwriter
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strconv"
 	"time"
 
@@ -34,12 +33,12 @@ type InitRequest struct {
 }
 
 func (r *InitRequest) toProto() (*Ydb_Topic.StreamWriteMessage_InitRequest, error) {
-	res := &Ydb_Topic.StreamWriteMessage_InitRequest{
+	res := Ydb_Topic.StreamWriteMessage_InitRequest_builder{
 		Path:             r.Path,
 		ProducerId:       r.ProducerID,
 		WriteSessionMeta: r.WriteSessionMeta,
 		GetLastSeqNo:     r.GetLastSeqNo,
-	}
+	}.Build()
 
 	err := r.Partitioning.setToProtoInitRequest(res)
 	if err != nil {
@@ -84,22 +83,16 @@ func NewPartitioningPartitionWithGeneration(partitionID, generation int64) Parti
 func (p *Partitioning) setToProtoInitRequest(r *Ydb_Topic.StreamWriteMessage_InitRequest) error {
 	switch p.Type {
 	case PartitioningUndefined:
-		r.Partitioning = nil
+		r.ClearPartitioning()
 	case PartitioningMessageGroupID:
-		r.Partitioning = &Ydb_Topic.StreamWriteMessage_InitRequest_MessageGroupId{
-			MessageGroupId: p.MessageGroupID,
-		}
+		r.SetMessageGroupId(p.MessageGroupID)
 	case PartitioningPartitionID:
-		r.Partitioning = &Ydb_Topic.StreamWriteMessage_InitRequest_PartitionId{
-			PartitionId: p.PartitionID,
-		}
+		r.SetPartitionId(p.PartitionID)
 	case PartitioningPartitionWithGeneration:
-		r.Partitioning = &Ydb_Topic.StreamWriteMessage_InitRequest_PartitionWithGeneration{
-			PartitionWithGeneration: &Ydb_Topic.PartitionWithGeneration{
-				PartitionId: p.PartitionID,
-				Generation:  p.Generation,
-			},
-		}
+		r.SetPartitionWithGeneration(Ydb_Topic.PartitionWithGeneration_builder{
+			PartitionId: p.PartitionID,
+			Generation:  p.Generation,
+		}.Build())
 	default:
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: unexpected partition type while set to init request: %v",
@@ -113,22 +106,16 @@ func (p *Partitioning) setToProtoInitRequest(r *Ydb_Topic.StreamWriteMessage_Ini
 func (p *Partitioning) setToProtoMessage(m *Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData) error {
 	switch p.Type {
 	case PartitioningUndefined:
-		m.Partitioning = nil
+		m.ClearPartitioning()
 	case PartitioningMessageGroupID:
-		m.Partitioning = &Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData_MessageGroupId{
-			MessageGroupId: p.MessageGroupID,
-		}
+		m.SetMessageGroupId(p.MessageGroupID)
 	case PartitioningPartitionID:
-		m.Partitioning = &Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData_PartitionId{
-			PartitionId: p.PartitionID,
-		}
+		m.SetPartitionId(p.PartitionID)
 	case PartitioningPartitionWithGeneration:
-		m.Partitioning = &Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData_PartitionWithGeneration{
-			PartitionWithGeneration: &Ydb_Topic.PartitionWithGeneration{
-				PartitionId: p.PartitionID,
-				Generation:  p.Generation,
-			},
-		}
+		m.SetPartitionWithGeneration(Ydb_Topic.PartitionWithGeneration_builder{
+			PartitionId: p.PartitionID,
+			Generation:  p.Generation,
+		}.Build())
 	default:
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: unexpected partition type while set to message proto: %v",
@@ -173,7 +160,7 @@ type WriteRequest struct {
 	Tx       rawtopiccommon.TransactionIdentity
 }
 
-func (r *WriteRequest) toProto() (p *Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest, err error) {
+func (r *WriteRequest) toProto() (p *Ydb_Topic.StreamWriteMessage_WriteRequest, err error) {
 	messages := make([]*Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData, len(r.Messages))
 
 	for i := range r.Messages {
@@ -183,24 +170,20 @@ func (r *WriteRequest) toProto() (p *Ydb_Topic.StreamWriteMessage_FromClient_Wri
 		}
 	}
 
-	res := &Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest{
-		WriteRequest: &Ydb_Topic.StreamWriteMessage_WriteRequest{
-			Messages: messages,
-			Codec:    int32(r.Codec.ToProto()),
-			Tx:       r.Tx.ToProto(),
-		},
-	}
-
-	return res, nil
+	return Ydb_Topic.StreamWriteMessage_WriteRequest_builder{
+		Messages: messages,
+		Codec:    int32(r.Codec.ToProto()),
+		Tx:       r.Tx.ToProto(),
+	}.Build(), nil
 }
 
-var writeRequestClientMessageSize = proto.Size(&Ydb_Topic.StreamWriteMessage_FromClient{
-	ClientMessage: &Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest{},
-})
+var writeRequestClientMessageSize = proto.Size(Ydb_Topic.StreamWriteMessage_FromClient_builder{
+	WriteRequest: &Ydb_Topic.StreamWriteMessage_WriteRequest{},
+}.Build())
 
 func (r *WriteRequest) Size() int {
 	if mess, err := r.toProto(); err == nil {
-		size := proto.Size(mess.WriteRequest) + writeRequestClientMessageSize
+		size := proto.Size(mess) + writeRequestClientMessageSize
 
 		return size
 	}
@@ -243,22 +226,22 @@ func (d *MessageData) ToProto() (*Ydb_Topic.StreamWriteMessage_WriteRequest_Mess
 		return d.proto, nil
 	}
 
-	res := &Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData{
+	res := Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData_builder{
 		SeqNo:            d.SeqNo,
 		CreatedAt:        timestamppb.New(d.CreatedAt),
 		Data:             d.Data,
 		UncompressedSize: d.UncompressedSize,
-	}
+	}.Build()
 	err := d.Partitioning.setToProtoMessage(res)
 	if err != nil {
 		return nil, err
 	}
 
 	for i := range d.MetadataItems {
-		res.MetadataItems = append(res.GetMetadataItems(), &Ydb_Topic.MetadataItem{
+		res.SetMetadataItems(append(res.GetMetadataItems(), Ydb_Topic.MetadataItem_builder{
 			Key:   d.MetadataItems[i].Key,
 			Value: d.MetadataItems[i].Value,
-		})
+		}.Build()))
 	}
 
 	d.proto = res
@@ -356,7 +339,7 @@ func (wa *WriteAck) fromProto(pb *Ydb_Topic.StreamWriteMessage_WriteResponse_Wri
 	}
 	wa.SeqNo = pb.GetSeqNo()
 
-	return wa.MessageWriteStatus.fromProto(pb.GetMessageWriteStatus())
+	return wa.MessageWriteStatus.fromProto(pb)
 }
 
 // MessageWriteStatus is struct because it included in per-message structure and
@@ -368,26 +351,26 @@ type MessageWriteStatus struct {
 	SkippedReason WriteStatusSkipReason
 }
 
-func (s *MessageWriteStatus) fromProto(status any) error {
-	switch v := status.(type) {
-	case *Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Written_:
+func (s *MessageWriteStatus) fromProto(pb *Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck) error {
+	switch pb.WhichMessageWriteStatus() {
+	case Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Written_case:
 		s.Type = WriteStatusTypeWritten
-		s.WrittenOffset = v.Written.GetOffset()
+		s.WrittenOffset = pb.GetWritten().GetOffset()
 
 		return nil
-	case *Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Skipped_:
+	case Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Skipped_case:
 		s.Type = WriteStatusTypeSkipped
-		s.SkippedReason = WriteStatusSkipReason(v.Skipped.GetReason())
+		s.SkippedReason = WriteStatusSkipReason(pb.GetSkipped().GetReason())
 
 		return nil
 
-	case *Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_WrittenInTx_:
+	case Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_WrittenInTx_case:
 		s.Type = WriteStatusTypeWrittenInTx
 
 		return nil
 
 	default:
-		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected write status type: %v", reflect.TypeOf(v))))
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected write status type: %v", pb.WhichMessageWriteStatus())))
 	}
 }
 

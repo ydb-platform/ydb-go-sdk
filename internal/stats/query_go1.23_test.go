@@ -15,28 +15,34 @@ import (
 // iterableQueryStatsPB has 3 phases × 3 tables: enough variety to verify
 // ordering, full traversal, and early-break behavior of the range iterators.
 func iterableQueryStatsPB() *Ydb_TableStats.QueryStats {
-	return &Ydb_TableStats.QueryStats{
+	return Ydb_TableStats.QueryStats_builder{
 		QueryPhases: []*Ydb_TableStats.QueryPhaseStats{
-			{
+			Ydb_TableStats.QueryPhaseStats_builder{
 				DurationUs: 1,
 				TableAccess: []*Ydb_TableStats.TableAccessStats{
-					{Name: "a"}, {Name: "b"}, {Name: "c"},
+					Ydb_TableStats.TableAccessStats_builder{Name: "a"}.Build(),
+					Ydb_TableStats.TableAccessStats_builder{Name: "b"}.Build(),
+					Ydb_TableStats.TableAccessStats_builder{Name: "c"}.Build(),
 				},
-			},
-			{
+			}.Build(),
+			Ydb_TableStats.QueryPhaseStats_builder{
 				DurationUs: 2,
 				TableAccess: []*Ydb_TableStats.TableAccessStats{
-					{Name: "d"}, {Name: "e"}, {Name: "f"},
+					Ydb_TableStats.TableAccessStats_builder{Name: "d"}.Build(),
+					Ydb_TableStats.TableAccessStats_builder{Name: "e"}.Build(),
+					Ydb_TableStats.TableAccessStats_builder{Name: "f"}.Build(),
 				},
-			},
-			{
+			}.Build(),
+			Ydb_TableStats.QueryPhaseStats_builder{
 				DurationUs: 3,
 				TableAccess: []*Ydb_TableStats.TableAccessStats{
-					{Name: "g"}, {Name: "h"}, {Name: "i"},
+					Ydb_TableStats.TableAccessStats_builder{Name: "g"}.Build(),
+					Ydb_TableStats.TableAccessStats_builder{Name: "h"}.Build(),
+					Ydb_TableStats.TableAccessStats_builder{Name: "i"}.Build(),
 				},
-			},
+			}.Build(),
 		},
-	}
+	}.Build()
 }
 
 func TestQueryPhasesIterator(t *testing.T) {

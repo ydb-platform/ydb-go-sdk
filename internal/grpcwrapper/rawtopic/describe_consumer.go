@@ -22,12 +22,12 @@ type DescribeConsumerRequest struct {
 }
 
 func (req *DescribeConsumerRequest) ToProto() *Ydb_Topic.DescribeConsumerRequest {
-	return &Ydb_Topic.DescribeConsumerRequest{
+	return Ydb_Topic.DescribeConsumerRequest_builder{
 		OperationParams: req.OperationParams.ToProto(),
 		Path:            req.Path,
 		Consumer:        req.Consumer,
 		IncludeStats:    req.IncludeStats,
-	}
+	}.Build()
 }
 
 type DescribeConsumerResult struct {

@@ -92,13 +92,13 @@ func (c *DirectWriteCluster) DescribeTopic(
 	c.mu.Lock()
 	partitions := make([]*Ydb_Topic.DescribeTopicResult_PartitionInfo, 0, len(c.partitions))
 	for partitionID, location := range c.partitions {
-		partitions = append(partitions, &Ydb_Topic.DescribeTopicResult_PartitionInfo{
+		partitions = append(partitions, Ydb_Topic.DescribeTopicResult_PartitionInfo_builder{
 			PartitionId: partitionID,
-			PartitionLocation: &Ydb_Topic.PartitionLocation{
+			PartitionLocation: Ydb_Topic.PartitionLocation_builder{
 				NodeId:     location.nodeID,
 				Generation: location.generation,
-			},
-		})
+			}.Build(),
+		}.Build())
 	}
 	c.mu.Unlock()
 
@@ -122,12 +122,12 @@ func (c *DirectWriteCluster) StreamWrite(server Ydb_Topic_V1.TopicService_Stream
 
 	if pwg := initReq.GetPartitionWithGeneration(); pwg != nil {
 		if pwg.GetGeneration() == c.rejectedGeneration {
-			return server.Send(&Ydb_Topic.StreamWriteMessage_FromServer{
+			return server.Send(Ydb_Topic.StreamWriteMessage_FromServer_builder{
 				Status: Ydb.StatusIds_ABORTED,
 				Issues: []*Ydb_Issue.IssueMessage{
-					{Message: "partition generation mismatch"},
+					Ydb_Issue.IssueMessage_builder{Message: "partition generation mismatch"}.Build(),
 				},
-			})
+			}.Build())
 		}
 
 		return c.serveDirectSession(server, pwg.GetPartitionId())
@@ -163,45 +163,39 @@ func (c *DirectWriteCluster) serveDirectSession(
 		return fmt.Errorf("read write request: %w", err)
 	}
 
-	writeReq, ok := messagesMsg.GetClientMessage().(*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest)
-	if !ok || len(writeReq.WriteRequest.GetMessages()) == 0 {
+	if messagesMsg.WhichClientMessage() != Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest_case ||
+		len(messagesMsg.GetWriteRequest().GetMessages()) == 0 {
 		return errors.New("expected non-empty write request")
 	}
 
-	return server.Send(&Ydb_Topic.StreamWriteMessage_FromServer{
+	return server.Send(Ydb_Topic.StreamWriteMessage_FromServer_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-		ServerMessage: &Ydb_Topic.StreamWriteMessage_FromServer_WriteResponse{
-			WriteResponse: &Ydb_Topic.StreamWriteMessage_WriteResponse{
-				Acks: []*Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck{
-					{
-						SeqNo: 1,
-						MessageWriteStatus: &Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Written_{
-							Written: &Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Written{
-								Offset: 1,
-							},
-						},
-					},
-				},
-				PartitionId:     partitionID,
-				WriteStatistics: &Ydb_Topic.StreamWriteMessage_WriteResponse_WriteStatistics{},
+		WriteResponse: Ydb_Topic.StreamWriteMessage_WriteResponse_builder{
+			Acks: []*Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck{
+				Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_builder{
+					SeqNo: 1,
+					Written: Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Written_builder{
+						Offset: 1,
+					}.Build(),
+				}.Build(),
 			},
-		},
-	})
+			PartitionId:     partitionID,
+			WriteStatistics: Ydb_Topic.StreamWriteMessage_WriteResponse_WriteStatistics_builder{}.Build(),
+		}.Build(),
+	}.Build())
 }
 
 func (c *DirectWriteCluster) sendInitResponse(
 	server Ydb_Topic_V1.TopicService_StreamWriteServer,
 	partitionID int64,
 ) error {
-	return server.Send(&Ydb_Topic.StreamWriteMessage_FromServer{
+	return server.Send(Ydb_Topic.StreamWriteMessage_FromServer_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-		ServerMessage: &Ydb_Topic.StreamWriteMessage_FromServer_InitResponse{
-			InitResponse: &Ydb_Topic.StreamWriteMessage_InitResponse{
-				LastSeqNo:       0,
-				SessionId:       "test-session",
-				PartitionId:     partitionID,
-				SupportedCodecs: nil,
-			},
-		},
-	})
+		InitResponse: Ydb_Topic.StreamWriteMessage_InitResponse_builder{
+			LastSeqNo:       0,
+			SessionId:       "test-session",
+			PartitionId:     partitionID,
+			SupportedCodecs: nil,
+		}.Build(),
+	}.Build())
 }

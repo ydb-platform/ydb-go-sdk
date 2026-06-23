@@ -12,10 +12,10 @@ type DropTopicRequest struct {
 }
 
 func (req *DropTopicRequest) ToProto() *Ydb_Topic.DropTopicRequest {
-	return &Ydb_Topic.DropTopicRequest{
+	return Ydb_Topic.DropTopicRequest_builder{
 		OperationParams: req.OperationParams.ToProto(),
 		Path:            req.Path,
-	}
+	}.Build()
 }
 
 type DropTopicResult struct {

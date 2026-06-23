@@ -26,11 +26,11 @@ func TestStreamResult_PerCallCtxCancelDoesNotRunExecuteOnCloseEarly(t *testing.T
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 		executeCtx, executeCancel := context.WithCancel(t.Context())
 		stubExecuteQueryStreamContext(executeCtx, stream)
-		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
-			ResultSet:      &Ydb.ResultSet{},
-		}, nil)
+			ResultSet:      Ydb.ResultSet_builder{}.Build(),
+		}.Build(), nil)
 
 		var onCloseCalls atomic.Uint64
 		onClose := func() {
@@ -58,31 +58,34 @@ func TestStreamResult_CloseDrainsExecStatsAfterPerCallCtxCancel(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctrl := gomock.NewController(t)
 
-		execStats := &Ydb_TableStats.QueryStats{
+		execStats := Ydb_TableStats.QueryStats_builder{
 			QueryPhases: []*Ydb_TableStats.QueryPhaseStats{
-				{
+				Ydb_TableStats.QueryPhaseStats_builder{
 					TableAccess: []*Ydb_TableStats.TableAccessStats{
-						{
-							Name:    "table",
-							Deletes: &Ydb_TableStats.OperationStats{Rows: 1, Bytes: 1},
-						},
+						Ydb_TableStats.TableAccessStats_builder{
+							Name: "table",
+							Deletes: Ydb_TableStats.OperationStats_builder{
+								Rows:  1,
+								Bytes: 1,
+							}.Build(),
+						}.Build(),
 					},
-				},
+				}.Build(),
 			},
-		}
+		}.Build()
 
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 		_, opts := executeQueryStreamContextWithOnClose(stream)
 		gomock.InOrder(
-			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
-				ResultSet:      &Ydb.ResultSet{},
-			}, nil),
-			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				ResultSet:      Ydb.ResultSet_builder{}.Build(),
+			}.Build(), nil),
+			stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:    Ydb.StatusIds_SUCCESS,
 				ExecStats: execStats,
-			}, nil),
+			}.Build(), nil),
 			stream.EXPECT().Recv().Return(nil, io.EOF),
 		)
 
@@ -127,11 +130,11 @@ func TestStreamResult_CloseIsIdempotentViaStreamContext(t *testing.T) {
 
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 		_, opts := executeQueryStreamContextWithOnClose(stream)
-		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
-			ResultSet:      &Ydb.ResultSet{},
-		}, nil)
+			ResultSet:      Ydb.ResultSet_builder{}.Build(),
+		}.Build(), nil)
 		stream.EXPECT().Recv().Return(nil, io.EOF)
 
 		r, err := newResult(t.Context(), stream, opts...)
@@ -150,11 +153,11 @@ func TestStreamResult_CloseTimeoutInterruptsBlockedRecv(t *testing.T) {
 
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 		executeCtx, opts := executeQueryStreamContextWithOnClose(stream)
-		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
-			ResultSet:      &Ydb.ResultSet{},
-		}, nil)
+			ResultSet:      Ydb.ResultSet_builder{}.Build(),
+		}.Build(), nil)
 		stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 			<-executeCtx.Done()
 

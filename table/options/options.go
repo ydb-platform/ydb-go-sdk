@@ -4,32 +4,34 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"google.golang.org/protobuf/proto"
 )
 
 func WithShardKeyBounds() DescribeTableOption {
 	return func(d *DescribeTableDesc) {
-		d.IncludeShardKeyBounds = true
+		(*Ydb_Table.DescribeTableRequest)(d).SetIncludeShardKeyBounds(true)
 	}
 }
 
 func WithTableStats() DescribeTableOption {
 	return func(d *DescribeTableDesc) {
-		d.IncludeTableStats = true
+		(*Ydb_Table.DescribeTableRequest)(d).SetIncludeTableStats(true)
 	}
 }
 
 func WithPartitionStats() DescribeTableOption {
 	return func(d *DescribeTableDesc) {
-		d.IncludePartitionStats = true
+		(*Ydb_Table.DescribeTableRequest)(d).SetIncludePartitionStats(true)
 	}
 }
 
 func WithShardNodesInfo() DescribeTableOption {
 	return func(d *DescribeTableDesc) {
-		d.IncludeShardNodesInfo = true
+		(*Ydb_Table.DescribeTableRequest)(d).SetIncludeShardNodesInfo(true)
 	}
 }
 
@@ -62,17 +64,19 @@ type column struct {
 }
 
 func (c column) ApplyAlterTableOption(d *AlterTableDesc) {
-	d.AddColumns = append(d.AddColumns, &Ydb_Table.ColumnMeta{
+	rd := (*Ydb_Table.AlterTableRequest)(d)
+	rd.SetAddColumns(append(rd.GetAddColumns(), Ydb_Table.ColumnMeta_builder{
 		Name: c.name,
 		Type: types.TypeToYDB(c.typ),
-	})
+	}.Build()))
 }
 
 func (c column) ApplyCreateTableOption(d *CreateTableDesc) {
-	d.Columns = append(d.Columns, &Ydb_Table.ColumnMeta{
+	rc := (*Ydb_Table.CreateTableRequest)(d)
+	rc.SetColumns(append(rc.GetColumns(), Ydb_Table.ColumnMeta_builder{
 		Name: c.name,
 		Type: types.TypeToYDB(c.typ),
-	})
+	}.Build()))
 }
 
 func WithColumn(name string, typ types.Type) CreateTableOption {
@@ -85,11 +89,13 @@ func WithColumn(name string, typ types.Type) CreateTableOption {
 type columnMeta Column
 
 func (c columnMeta) ApplyAlterTableOption(d *AlterTableDesc) {
-	d.AddColumns = append(d.AddColumns, Column(c).toYDB())
+	rd := (*Ydb_Table.AlterTableRequest)(d)
+	rd.SetAddColumns(append(rd.GetAddColumns(), Column(c).toYDB()))
 }
 
 func (c columnMeta) ApplyCreateTableOption(d *CreateTableDesc) {
-	d.Columns = append(d.Columns, Column(c).toYDB())
+	rc := (*Ydb_Table.CreateTableRequest)(d)
+	rc.SetColumns(append(rc.GetColumns(), Column(c).toYDB()))
 }
 
 func WithColumnMeta(column Column) CreateTableOption {
@@ -99,7 +105,8 @@ func WithColumnMeta(column Column) CreateTableOption {
 type primaryKeyColumn []string
 
 func (columns primaryKeyColumn) ApplyCreateTableOption(d *CreateTableDesc) {
-	d.PrimaryKey = append(d.PrimaryKey, columns...)
+	rc := (*Ydb_Table.CreateTableRequest)(d)
+	rc.SetPrimaryKey(append(rc.GetPrimaryKey(), columns...))
 }
 
 func WithPrimaryKeyColumn(columns ...string) CreateTableOption {
@@ -108,14 +115,8 @@ func WithPrimaryKeyColumn(columns ...string) CreateTableOption {
 
 type timeToLiveSettings TimeToLiveSettings
 
-func (settings timeToLiveSettings) ApplyAlterTableOption(d *AlterTableDesc) {
-	d.TtlAction = &Ydb_Table.AlterTableRequest_SetTtlSettings{
-		SetTtlSettings: (*TimeToLiveSettings)(&settings).ToYDB(),
-	}
-}
-
 func (settings timeToLiveSettings) ApplyCreateTableOption(d *CreateTableDesc) {
-	d.TtlSettings = (*TimeToLiveSettings)(&settings).ToYDB()
+	(*Ydb_Table.CreateTableRequest)(d).SetTtlSettings((*TimeToLiveSettings)(&settings).ToYDB())
 }
 
 // WithTimeToLiveSettings defines TTL settings in CreateTable request
@@ -129,17 +130,23 @@ type attribute struct {
 }
 
 func (a attribute) ApplyAlterTableOption(d *AlterTableDesc) {
-	if d.AlterAttributes == nil {
-		d.AlterAttributes = make(map[string]string)
+	rd := (*Ydb_Table.AlterTableRequest)(d)
+	attrs := rd.GetAlterAttributes()
+	if attrs == nil {
+		attrs = make(map[string]string)
 	}
-	d.AlterAttributes[a.key] = a.value
+	attrs[a.key] = a.value
+	rd.SetAlterAttributes(attrs)
 }
 
 func (a attribute) ApplyCreateTableOption(d *CreateTableDesc) {
-	if d.Attributes == nil {
-		d.Attributes = make(map[string]string)
+	rc := (*Ydb_Table.CreateTableRequest)(d)
+	attrs := rc.GetAttributes()
+	if attrs == nil {
+		attrs = make(map[string]string)
 	}
-	d.Attributes[a.key] = a.value
+	attrs[a.key] = a.value
+	rc.SetAttributes(attrs)
 }
 
 func WithAttribute(key, value string) CreateTableOption {
@@ -162,27 +169,29 @@ type index struct {
 }
 
 func (i index) ApplyAlterTableOption(d *AlterTableDesc) {
-	x := &Ydb_Table.TableIndex{
+	x := Ydb_Table.TableIndex_builder{
 		Name: i.name,
-	}
+	}.Build()
 	for _, opt := range i.opts {
 		if opt != nil {
 			opt.ApplyIndexOption((*indexDesc)(x))
 		}
 	}
-	d.AddIndexes = append(d.AddIndexes, x)
+	rd := (*Ydb_Table.AlterTableRequest)(d)
+	rd.SetAddIndexes(append(rd.GetAddIndexes(), x))
 }
 
 func (i index) ApplyCreateTableOption(d *CreateTableDesc) {
-	x := &Ydb_Table.TableIndex{
+	x := Ydb_Table.TableIndex_builder{
 		Name: i.name,
-	}
+	}.Build()
 	for _, opt := range i.opts {
 		if opt != nil {
 			opt.ApplyIndexOption((*indexDesc)(x))
 		}
 	}
-	d.Indexes = append(d.Indexes, x)
+	rc := (*Ydb_Table.CreateTableRequest)(d)
+	rc.SetIndexes(append(rc.GetIndexes(), x))
 }
 
 func WithIndex(name string, opts ...IndexOption) CreateTableOption {
@@ -202,7 +211,8 @@ func WithAddIndex(name string, opts ...IndexOption) AlterTableOption {
 type dropIndex string
 
 func (i dropIndex) ApplyAlterTableOption(d *AlterTableDesc) {
-	d.DropIndexes = append(d.DropIndexes, string(i))
+	rd := (*Ydb_Table.AlterTableRequest)(d)
+	rd.SetDropIndexes(append(rd.GetDropIndexes(), string(i)))
 }
 
 func WithDropIndex(name string) AlterTableOption {
@@ -212,7 +222,8 @@ func WithDropIndex(name string) AlterTableOption {
 type indexColumns []string
 
 func (columns indexColumns) ApplyIndexOption(d *indexDesc) {
-	d.IndexColumns = append(d.IndexColumns, columns...)
+	td := (*Ydb_Table.TableIndex)(d)
+	td.SetIndexColumns(append(td.GetIndexColumns(), columns...))
 }
 
 func WithIndexColumns(columns ...string) IndexOption {
@@ -222,7 +233,8 @@ func WithIndexColumns(columns ...string) IndexOption {
 type dataColumns []string
 
 func (columns dataColumns) ApplyIndexOption(d *indexDesc) {
-	d.DataColumns = append(d.DataColumns, columns...)
+	td := (*Ydb_Table.TableIndex)(d)
+	td.SetDataColumns(append(td.GetDataColumns(), columns...))
 }
 
 func WithDataColumns(columns ...string) IndexOption {
@@ -236,17 +248,21 @@ func WithIndexType(t IndexType) IndexOption {
 type columnFamilies []ColumnFamily
 
 func (cf columnFamilies) ApplyAlterTableOption(d *AlterTableDesc) {
-	d.AddColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
+	rd := (*Ydb_Table.AlterTableRequest)(d)
+	families := make([]*Ydb_Table.ColumnFamily, len(cf))
 	for i := range cf {
-		d.AddColumnFamilies[i] = cf[i].toYDB()
+		families[i] = cf[i].toYDB()
 	}
+	rd.SetAddColumnFamilies(families)
 }
 
 func (cf columnFamilies) ApplyCreateTableOption(d *CreateTableDesc) {
-	d.ColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
+	rc := (*Ydb_Table.CreateTableRequest)(d)
+	families := make([]*Ydb_Table.ColumnFamily, len(cf))
 	for i := range cf {
-		d.ColumnFamilies[i] = cf[i].toYDB()
+		families[i] = cf[i].toYDB()
 	}
+	rc.SetColumnFamilies(families)
 }
 
 func WithColumnFamilies(cf ...ColumnFamily) CreateTableOption {
@@ -256,11 +272,11 @@ func WithColumnFamilies(cf ...ColumnFamily) CreateTableOption {
 type readReplicasSettings ReadReplicasSettings
 
 func (rr readReplicasSettings) ApplyAlterTableOption(d *AlterTableDesc) {
-	d.SetReadReplicasSettings = ReadReplicasSettings(rr).ToYDB()
+	(*Ydb_Table.AlterTableRequest)(d).SetSetReadReplicasSettings(ReadReplicasSettings(rr).ToYDB())
 }
 
 func (rr readReplicasSettings) ApplyCreateTableOption(d *CreateTableDesc) {
-	d.ReadReplicasSettings = ReadReplicasSettings(rr).ToYDB()
+	(*Ydb_Table.CreateTableRequest)(d).SetReadReplicasSettings(ReadReplicasSettings(rr).ToYDB())
 }
 
 func WithReadReplicasSettings(rr ReadReplicasSettings) CreateTableOption {
@@ -270,11 +286,11 @@ func WithReadReplicasSettings(rr ReadReplicasSettings) CreateTableOption {
 type storageSettings StorageSettings
 
 func (ss storageSettings) ApplyAlterTableOption(d *AlterTableDesc) {
-	d.AlterStorageSettings = StorageSettings(ss).ToYDB()
+	(*Ydb_Table.AlterTableRequest)(d).SetAlterStorageSettings(StorageSettings(ss).ToYDB())
 }
 
 func (ss storageSettings) ApplyCreateTableOption(d *CreateTableDesc) {
-	d.StorageSettings = StorageSettings(ss).ToYDB()
+	(*Ydb_Table.CreateTableRequest)(d).SetStorageSettings(StorageSettings(ss).ToYDB())
 }
 
 func WithStorageSettings(ss StorageSettings) CreateTableOption {
@@ -284,11 +300,11 @@ func WithStorageSettings(ss StorageSettings) CreateTableOption {
 type keyBloomFilter FeatureFlag
 
 func (f keyBloomFilter) ApplyAlterTableOption(d *AlterTableDesc) {
-	d.SetKeyBloomFilter = FeatureFlag(f).ToYDB()
+	(*Ydb_Table.AlterTableRequest)(d).SetSetKeyBloomFilter(FeatureFlag(f).ToYDB())
 }
 
 func (f keyBloomFilter) ApplyCreateTableOption(d *CreateTableDesc) {
-	d.KeyBloomFilter = FeatureFlag(f).ToYDB()
+	(*Ydb_Table.CreateTableRequest)(d).SetKeyBloomFilter(FeatureFlag(f).ToYDB())
 }
 
 func WithKeyBloomFilter(f FeatureFlag) CreateTableOption {
@@ -302,9 +318,7 @@ func WithPartitions(p Partitions) CreateTableOption {
 type uniformPartitions uint64
 
 func (u uniformPartitions) ApplyCreateTableOption(d *CreateTableDesc) {
-	d.Partitions = &Ydb_Table.CreateTableRequest_UniformPartitions{
-		UniformPartitions: uint64(u),
-	}
+	(*Ydb_Table.CreateTableRequest)(d).SetUniformPartitions(uint64(u))
 }
 
 func (u uniformPartitions) isPartitions() {}
@@ -320,11 +334,9 @@ func (e explicitPartitions) ApplyCreateTableOption(d *CreateTableDesc) {
 	for i := range values {
 		values[i] = value.ToYDB(e[i])
 	}
-	d.Partitions = &Ydb_Table.CreateTableRequest_PartitionAtKeys{
-		PartitionAtKeys: &Ydb_Table.ExplicitPartitions{
-			SplitPoints: values,
-		},
-	}
+	(*Ydb_Table.CreateTableRequest)(d).SetPartitionAtKeys(Ydb_Table.ExplicitPartitions_builder{
+		SplitPoints: values,
+	}.Build())
 }
 
 func (e explicitPartitions) isPartitions() {}
@@ -336,12 +348,13 @@ func WithExplicitPartitions(splitPoints ...value.Value) Partitions {
 type profileOption []ProfileOption
 
 func (opts profileOption) ApplyCreateTableOption(d *CreateTableDesc) {
-	if d.Profile == nil {
-		d.Profile = new(Ydb_Table.TableProfile)
+	rc := (*Ydb_Table.CreateTableRequest)(d)
+	if rc.GetProfile() == nil {
+		rc.SetProfile(&Ydb_Table.TableProfile{})
 	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyProfileOption((*profile)(d.Profile))
+			opt.ApplyProfileOption((*profile)(rc.GetProfile()))
 		}
 	}
 }
@@ -353,7 +366,7 @@ func WithProfile(opts ...ProfileOption) CreateTableOption {
 type profilePresetProfileOption string
 
 func (preset profilePresetProfileOption) ApplyProfileOption(p *profile) {
-	p.PresetName = string(preset)
+	(*Ydb_Table.TableProfile)(p).SetPresetName(string(preset))
 }
 
 func WithProfilePreset(name string) ProfileOption {
@@ -363,12 +376,13 @@ func WithProfilePreset(name string) ProfileOption {
 type storagePolicyProfileOption []StoragePolicyOption
 
 func (opts storagePolicyProfileOption) ApplyProfileOption(p *profile) {
-	if p.StoragePolicy == nil {
-		p.StoragePolicy = new(Ydb_Table.StoragePolicy)
+	pp := (*Ydb_Table.TableProfile)(p)
+	if pp.GetStoragePolicy() == nil {
+		pp.SetStoragePolicy(&Ydb_Table.StoragePolicy{})
 	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*storagePolicy)(p.StoragePolicy))
+			opt((*storagePolicy)(pp.GetStoragePolicy()))
 		}
 	}
 }
@@ -380,12 +394,13 @@ func WithStoragePolicy(opts ...StoragePolicyOption) ProfileOption {
 type compactionPolicyProfileOption []CompactionPolicyOption
 
 func (opts compactionPolicyProfileOption) ApplyProfileOption(p *profile) {
-	if p.CompactionPolicy == nil {
-		p.CompactionPolicy = new(Ydb_Table.CompactionPolicy)
+	pp := (*Ydb_Table.TableProfile)(p)
+	if pp.GetCompactionPolicy() == nil {
+		pp.SetCompactionPolicy(&Ydb_Table.CompactionPolicy{})
 	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*compactionPolicy)(p.CompactionPolicy))
+			opt((*compactionPolicy)(pp.GetCompactionPolicy()))
 		}
 	}
 }
@@ -397,12 +412,13 @@ func WithCompactionPolicy(opts ...CompactionPolicyOption) ProfileOption {
 type partitioningPolicyProfileOption []PartitioningPolicyOption
 
 func (opts partitioningPolicyProfileOption) ApplyProfileOption(p *profile) {
-	if p.PartitioningPolicy == nil {
-		p.PartitioningPolicy = new(Ydb_Table.PartitioningPolicy)
+	pp := (*Ydb_Table.TableProfile)(p)
+	if pp.GetPartitioningPolicy() == nil {
+		pp.SetPartitioningPolicy(&Ydb_Table.PartitioningPolicy{})
 	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*partitioningPolicy)(p.PartitioningPolicy))
+			opt((*partitioningPolicy)(pp.GetPartitioningPolicy()))
 		}
 	}
 }
@@ -414,12 +430,13 @@ func WithPartitioningPolicy(opts ...PartitioningPolicyOption) ProfileOption {
 type executionPolicyProfileOption []ExecutionPolicyOption
 
 func (opts executionPolicyProfileOption) ApplyProfileOption(p *profile) {
-	if p.ExecutionPolicy == nil {
-		p.ExecutionPolicy = new(Ydb_Table.ExecutionPolicy)
+	pp := (*Ydb_Table.TableProfile)(p)
+	if pp.GetExecutionPolicy() == nil {
+		pp.SetExecutionPolicy(&Ydb_Table.ExecutionPolicy{})
 	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*executionPolicy)(p.ExecutionPolicy))
+			opt((*executionPolicy)(pp.GetExecutionPolicy()))
 		}
 	}
 }
@@ -431,12 +448,13 @@ func WithExecutionPolicy(opts ...ExecutionPolicyOption) ProfileOption {
 type replicationPolicyProfileOption []ReplicationPolicyOption
 
 func (opts replicationPolicyProfileOption) ApplyProfileOption(p *profile) {
-	if p.ReplicationPolicy == nil {
-		p.ReplicationPolicy = new(Ydb_Table.ReplicationPolicy)
+	pp := (*Ydb_Table.TableProfile)(p)
+	if pp.GetReplicationPolicy() == nil {
+		pp.SetReplicationPolicy(&Ydb_Table.ReplicationPolicy{})
 	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*replicationPolicy)(p.ReplicationPolicy))
+			opt((*replicationPolicy)(pp.GetReplicationPolicy()))
 		}
 	}
 }
@@ -448,12 +466,13 @@ func WithReplicationPolicy(opts ...ReplicationPolicyOption) ProfileOption {
 type cachingPolicyProfileOption []CachingPolicyOption
 
 func (opts cachingPolicyProfileOption) ApplyProfileOption(p *profile) {
-	if p.CachingPolicy == nil {
-		p.CachingPolicy = new(Ydb_Table.CachingPolicy)
+	pp := (*Ydb_Table.TableProfile)(p)
+	if pp.GetCachingPolicy() == nil {
+		pp.SetCachingPolicy(&Ydb_Table.CachingPolicy{})
 	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*cachingPolicy)(p.CachingPolicy))
+			opt((*cachingPolicy)(pp.GetCachingPolicy()))
 		}
 	}
 }
@@ -473,53 +492,55 @@ type (
 
 func WithStoragePolicyPreset(name string) StoragePolicyOption {
 	return func(s *storagePolicy) {
-		s.PresetName = name
+		(*Ydb_Table.StoragePolicy)(s).SetPresetName(name)
 	}
 }
 
 func WithStoragePolicySyslog(kind string) StoragePolicyOption {
 	return func(s *storagePolicy) {
-		s.Syslog = &Ydb_Table.StoragePool{Media: kind}
+		(*Ydb_Table.StoragePolicy)(s).SetSyslog(Ydb_Table.StoragePool_builder{Media: kind}.Build())
 	}
 }
 
 func WithStoragePolicyLog(kind string) StoragePolicyOption {
 	return func(s *storagePolicy) {
-		s.Log = &Ydb_Table.StoragePool{Media: kind}
+		(*Ydb_Table.StoragePolicy)(s).SetLog(Ydb_Table.StoragePool_builder{Media: kind}.Build())
 	}
 }
 
 func WithStoragePolicyData(kind string) StoragePolicyOption {
 	return func(s *storagePolicy) {
-		s.Data = &Ydb_Table.StoragePool{Media: kind}
+		(*Ydb_Table.StoragePolicy)(s).SetData(Ydb_Table.StoragePool_builder{Media: kind}.Build())
 	}
 }
 
 func WithStoragePolicyExternal(kind string) StoragePolicyOption {
 	return func(s *storagePolicy) {
-		s.External = &Ydb_Table.StoragePool{Media: kind}
+		(*Ydb_Table.StoragePolicy)(s).SetExternal(Ydb_Table.StoragePool_builder{Media: kind}.Build())
 	}
 }
 
 func WithStoragePolicyKeepInMemory(flag FeatureFlag) StoragePolicyOption {
 	return func(s *storagePolicy) {
-		s.KeepInMemory = flag.ToYDB()
+		(*Ydb_Table.StoragePolicy)(s).SetKeepInMemory(flag.ToYDB())
 	}
 }
 
 func WithCompactionPolicyPreset(name string) CompactionPolicyOption {
-	return func(c *compactionPolicy) { c.PresetName = name }
+	return func(c *compactionPolicy) {
+		(*Ydb_Table.CompactionPolicy)(c).SetPresetName(name)
+	}
 }
 
 func WithPartitioningPolicyPreset(name string) PartitioningPolicyOption {
 	return func(p *partitioningPolicy) {
-		p.PresetName = name
+		(*Ydb_Table.PartitioningPolicy)(p).SetPresetName(name)
 	}
 }
 
 func WithPartitioningPolicyMode(mode PartitioningMode) PartitioningPolicyOption {
 	return func(p *partitioningPolicy) {
-		p.AutoPartitioning = mode.toYDB()
+		(*Ydb_Table.PartitioningPolicy)(p).SetAutoPartitioning(mode.toYDB())
 	}
 }
 
@@ -528,9 +549,7 @@ func WithPartitioningPolicyMode(mode PartitioningMode) PartitioningPolicyOption 
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption {
 	return func(p *partitioningPolicy) {
-		p.Partitions = &Ydb_Table.PartitioningPolicy_UniformPartitions{
-			UniformPartitions: n,
-		}
+		(*Ydb_Table.PartitioningPolicy)(p).SetUniformPartitions(n)
 	}
 }
 
@@ -543,58 +562,56 @@ func WithPartitioningPolicyExplicitPartitions(splitPoints ...value.Value) Partit
 		for i := range values {
 			values[i] = value.ToYDB(splitPoints[i])
 		}
-		p.Partitions = &Ydb_Table.PartitioningPolicy_ExplicitPartitions{
-			ExplicitPartitions: &Ydb_Table.ExplicitPartitions{
-				SplitPoints: values,
-			},
-		}
+		(*Ydb_Table.PartitioningPolicy)(p).SetExplicitPartitions(Ydb_Table.ExplicitPartitions_builder{
+			SplitPoints: values,
+		}.Build())
 	}
 }
 
 func WithReplicationPolicyPreset(name string) ReplicationPolicyOption {
 	return func(e *replicationPolicy) {
-		e.PresetName = name
+		(*Ydb_Table.ReplicationPolicy)(e).SetPresetName(name)
 	}
 }
 
 func WithReplicationPolicyReplicasCount(n uint32) ReplicationPolicyOption {
 	return func(e *replicationPolicy) {
-		e.ReplicasCount = n
+		(*Ydb_Table.ReplicationPolicy)(e).SetReplicasCount(n)
 	}
 }
 
 func WithReplicationPolicyCreatePerAZ(flag FeatureFlag) ReplicationPolicyOption {
 	return func(e *replicationPolicy) {
-		e.CreatePerAvailabilityZone = flag.ToYDB()
+		(*Ydb_Table.ReplicationPolicy)(e).SetCreatePerAvailabilityZone(flag.ToYDB())
 	}
 }
 
 func WithReplicationPolicyAllowPromotion(flag FeatureFlag) ReplicationPolicyOption {
 	return func(e *replicationPolicy) {
-		e.AllowPromotion = flag.ToYDB()
+		(*Ydb_Table.ReplicationPolicy)(e).SetAllowPromotion(flag.ToYDB())
 	}
 }
 
 func WithExecutionPolicyPreset(name string) ExecutionPolicyOption {
 	return func(e *executionPolicy) {
-		e.PresetName = name
+		(*Ydb_Table.ExecutionPolicy)(e).SetPresetName(name)
 	}
 }
 
 func WithCachingPolicyPreset(name string) CachingPolicyOption {
 	return func(e *cachingPolicy) {
-		e.PresetName = name
+		(*Ydb_Table.CachingPolicy)(e).SetPresetName(name)
 	}
 }
 
 type partitioningSettingsObject PartitioningSettings
 
 func (ps partitioningSettingsObject) ApplyAlterTableOption(d *AlterTableDesc) {
-	d.AlterPartitioningSettings = PartitioningSettings(ps).toYDB()
+	(*Ydb_Table.AlterTableRequest)(d).SetAlterPartitioningSettings(PartitioningSettings(ps).toYDB())
 }
 
 func (ps partitioningSettingsObject) ApplyCreateTableOption(d *CreateTableDesc) {
-	d.PartitioningSettings = PartitioningSettings(ps).toYDB()
+	(*Ydb_Table.CreateTableRequest)(d).SetPartitioningSettings(PartitioningSettings(ps).toYDB())
 }
 
 func WithPartitioningSettingsObject(ps PartitioningSettings) CreateTableOption {
@@ -610,7 +627,7 @@ func (opts partitioningSettings) ApplyCreateTableOption(d *CreateTableDesc) {
 			opt.ApplyPartitioningSettingsOption(settings)
 		}
 	}
-	d.PartitioningSettings = (*Ydb_Table.PartitioningSettings)(settings)
+	(*Ydb_Table.CreateTableRequest)(d).SetPartitioningSettings((*Ydb_Table.PartitioningSettings)(settings))
 }
 
 func WithPartitioningSettings(opts ...PartitioningSettingsOption) CreateTableOption {
@@ -629,7 +646,7 @@ type partitioningBySizePartitioningSettingsOption FeatureFlag
 func (flag partitioningBySizePartitioningSettingsOption) ApplyPartitioningSettingsOption(
 	settings *ydbPartitioningSettings,
 ) {
-	settings.PartitioningBySize = FeatureFlag(flag).ToYDB()
+	(*Ydb_Table.PartitioningSettings)(settings).SetPartitioningBySize(FeatureFlag(flag).ToYDB())
 }
 
 func WithPartitioningBySize(flag FeatureFlag) PartitioningSettingsOption {
@@ -641,7 +658,7 @@ type partitionSizeMbPartitioningSettingsOption uint64
 func (partitionSizeMb partitionSizeMbPartitioningSettingsOption) ApplyPartitioningSettingsOption(
 	settings *ydbPartitioningSettings,
 ) {
-	settings.PartitionSizeMb = uint64(partitionSizeMb)
+	(*Ydb_Table.PartitioningSettings)(settings).SetPartitionSizeMb(uint64(partitionSizeMb))
 }
 
 func WithPartitionSizeMb(partitionSizeMb uint64) PartitioningSettingsOption {
@@ -653,7 +670,7 @@ type partitioningByLoadPartitioningSettingsOption FeatureFlag
 func (flag partitioningByLoadPartitioningSettingsOption) ApplyPartitioningSettingsOption(
 	settings *ydbPartitioningSettings,
 ) {
-	settings.PartitioningByLoad = FeatureFlag(flag).ToYDB()
+	(*Ydb_Table.PartitioningSettings)(settings).SetPartitioningByLoad(FeatureFlag(flag).ToYDB())
 }
 
 func WithPartitioningByLoad(flag FeatureFlag) PartitioningSettingsOption {
@@ -665,7 +682,7 @@ type partitioningByPartitioningSettingsOption []string
 func (columns partitioningByPartitioningSettingsOption) ApplyPartitioningSettingsOption(
 	settings *ydbPartitioningSettings,
 ) {
-	settings.PartitionBy = columns
+	(*Ydb_Table.PartitioningSettings)(settings).SetPartitionBy(columns)
 }
 
 func WithPartitioningBy(columns []string) PartitioningSettingsOption {
@@ -677,7 +694,7 @@ type minPartitionsCountPartitioningSettingsOption uint64
 func (minPartitionsCount minPartitionsCountPartitioningSettingsOption) ApplyPartitioningSettingsOption(
 	settings *ydbPartitioningSettings,
 ) {
-	settings.MinPartitionsCount = uint64(minPartitionsCount)
+	(*Ydb_Table.PartitioningSettings)(settings).SetMinPartitionsCount(uint64(minPartitionsCount))
 }
 
 func WithMinPartitionsCount(minPartitionsCount uint64) PartitioningSettingsOption {
@@ -689,7 +706,7 @@ type maxPartitionsCountPartitioningSettingsOption uint64
 func (maxPartitionsCount maxPartitionsCountPartitioningSettingsOption) ApplyPartitioningSettingsOption(
 	settings *ydbPartitioningSettings,
 ) {
-	settings.MaxPartitionsCount = uint64(maxPartitionsCount)
+	(*Ydb_Table.PartitioningSettings)(settings).SetMaxPartitionsCount(uint64(maxPartitionsCount))
 }
 
 func WithMaxPartitionsCount(maxPartitionsCount uint64) PartitioningSettingsOption {
@@ -748,7 +765,8 @@ func WithAddColumnMeta(column Column) AlterTableOption {
 type dropColumn string
 
 func (name dropColumn) ApplyAlterTableOption(d *AlterTableDesc) {
-	d.DropColumns = append(d.DropColumns, string(name))
+	rd := (*Ydb_Table.AlterTableRequest)(d)
+	rd.SetDropColumns(append(rd.GetDropColumns(), string(name)))
 }
 
 func WithDropColumn(name string) AlterTableOption {
@@ -779,6 +797,10 @@ func WithAlterPartitionSettingsObject(ps PartitioningSettings) AlterTableOption 
 	return partitioningSettingsObject(ps)
 }
 
+func (settings timeToLiveSettings) ApplyAlterTableOption(d *AlterTableDesc) {
+	(*Ydb_Table.AlterTableRequest)(d).SetSetTtlSettings((*TimeToLiveSettings)(&settings).ToYDB())
+}
+
 // WithSetTimeToLiveSettings appends TTL settings in AlterTable request
 func WithSetTimeToLiveSettings(settings TimeToLiveSettings) AlterTableOption {
 	return timeToLiveSettings(settings)
@@ -787,7 +809,7 @@ func WithSetTimeToLiveSettings(settings TimeToLiveSettings) AlterTableOption {
 type dropTimeToLive struct{}
 
 func (dropTimeToLive) ApplyAlterTableOption(d *AlterTableDesc) {
-	d.TtlAction = &Ydb_Table.AlterTableRequest_DropTtlSettings{}
+	(*Ydb_Table.AlterTableRequest)(d).SetDropTtlSettings(&emptypb.Empty{})
 }
 
 // WithDropTimeToLive drops TTL settings in AlterTable request
@@ -807,11 +829,12 @@ type (
 
 func CopyTablesItem(src, dst string, omitIndexes bool) CopyTablesOption {
 	return func(desc *CopyTablesDesc) {
-		desc.Tables = append(desc.Tables, &Ydb_Table.CopyTableItem{
+		rd := (*Ydb_Table.CopyTablesRequest)(desc)
+		rd.SetTables(append(rd.GetTables(), Ydb_Table.CopyTableItem_builder{
 			SourcePath:      src,
 			DestinationPath: dst,
 			OmitIndexes:     omitIndexes,
-		})
+		}.Build()))
 	}
 }
 
@@ -822,11 +845,12 @@ type (
 
 func RenameTablesItem(src, dst string, replaceDestination bool) RenameTablesOption {
 	return func(desc *RenameTablesDesc) {
-		desc.Tables = append(desc.Tables, &Ydb_Table.RenameTableItem{
+		rd := (*Ydb_Table.RenameTablesRequest)(desc)
+		rd.SetTables(append(rd.GetTables(), Ydb_Table.RenameTableItem_builder{
 			SourcePath:         src,
 			DestinationPath:    dst,
 			ReplaceDestination: replaceDestination,
-		})
+		}.Build()))
 	}
 }
 
@@ -896,7 +920,7 @@ func WithCallOptions(opts ...grpc.CallOption) withCallOptions {
 // WithCommit appends flag of commit transaction with executing query
 func WithCommit() ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(desc *ExecuteDataQueryDesc) []grpc.CallOption {
-		desc.TxControl.CommitTx = true
+		desc.GetTxControl().SetCommitTx(true)
 
 		return nil
 	})
@@ -922,7 +946,7 @@ func WithQueryCachePolicyKeepInCache() QueryCachePolicyOption {
 
 func withQueryCachePolicyKeepInCache(keepInCache bool) QueryCachePolicyOption {
 	return func(p *queryCachePolicy) {
-		p.KeepInCache = keepInCache
+		(*Ydb_Table.QueryCachePolicy)(p).SetKeepInCache(keepInCache)
 	}
 }
 
@@ -937,14 +961,14 @@ func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption
 
 func withQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc) []grpc.CallOption {
-		if d.QueryCachePolicy == nil {
-			d.QueryCachePolicy = &Ydb_Table.QueryCachePolicy{
+		if d.GetQueryCachePolicy() == nil {
+			d.SetQueryCachePolicy(Ydb_Table.QueryCachePolicy_builder{
 				KeepInCache: true,
-			}
+			}.Build())
 		}
 		for _, opt := range opts {
 			if opt != nil {
-				opt((*queryCachePolicy)(d.QueryCachePolicy))
+				opt((*queryCachePolicy)(d.GetQueryCachePolicy()))
 			}
 		}
 
@@ -954,19 +978,19 @@ func withQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption
 
 func WithCommitCollectStatsModeNone() CommitTransactionOption {
 	return func(d *CommitTransactionDesc) {
-		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
+		(*Ydb_Table.CommitTransactionRequest)(d).SetCollectStats(Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE)
 	}
 }
 
 func WithCommitCollectStatsModeBasic() CommitTransactionOption {
 	return func(d *CommitTransactionDesc) {
-		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
+		(*Ydb_Table.CommitTransactionRequest)(d).SetCollectStats(Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC)
 	}
 }
 
 func WithCollectStatsModeNone() ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc) []grpc.CallOption {
-		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
+		d.ExecuteDataQueryRequest.SetCollectStats(Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE)
 
 		return nil
 	})
@@ -974,7 +998,7 @@ func WithCollectStatsModeNone() ExecuteDataQueryOption {
 
 func WithCollectStatsModeBasic() ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc) []grpc.CallOption {
-		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
+		d.ExecuteDataQueryRequest.SetCollectStats(Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC)
 
 		return nil
 	})
@@ -982,7 +1006,7 @@ func WithCollectStatsModeBasic() ExecuteDataQueryOption {
 
 func WithCollectStatsMode(mode Ydb_Table.QueryStatsCollection_Mode) ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc) []grpc.CallOption {
-		d.CollectStats = mode
+		d.ExecuteDataQueryRequest.SetCollectStats(mode)
 
 		return nil
 	})
@@ -1011,7 +1035,7 @@ var _ ExecuteScanQueryOption = executeScanQueryOptionFunc(nil)
 // WithExecuteScanQueryMode defines scan query mode: execute or explain
 func WithExecuteScanQueryMode(m ExecuteScanQueryRequestMode) ExecuteScanQueryOption {
 	return executeScanQueryOptionFunc(func(desc *ExecuteScanQueryDesc) []grpc.CallOption {
-		desc.Mode = m.toYDB()
+		(*Ydb_Table.ExecuteScanQueryRequest)(desc).SetMode(m.toYDB())
 
 		return nil
 	})
@@ -1042,7 +1066,7 @@ func (stats ExecuteScanQueryStatsType) toYDB() Ydb_Table.QueryStatsCollection_Mo
 // WithExecuteScanQueryStats defines query statistics mode
 func WithExecuteScanQueryStats(stats ExecuteScanQueryStatsType) ExecuteScanQueryOption {
 	return executeScanQueryOptionFunc(func(desc *ExecuteScanQueryDesc) []grpc.CallOption {
-		desc.CollectStats = stats.toYDB()
+		(*Ydb_Table.ExecuteScanQueryRequest)(desc).SetCollectStats(stats.toYDB())
 
 		return nil
 	})
@@ -1082,69 +1106,60 @@ type (
 )
 
 func (n readRowLimitOption) ApplyReadTableOption(desc *ReadTableDesc) {
-	desc.RowLimit = uint64(n)
+	(*Ydb_Table.ReadTableRequest)(desc).SetRowLimit(uint64(n))
 }
 
 func (x readGreaterOption) ApplyReadTableOption(desc *ReadTableDesc) {
 	desc.initKeyRange()
-	desc.KeyRange.FromBound = &Ydb_Table.KeyRange_Greater{
-		Greater: value.ToYDB(x),
-	}
+	(*Ydb_Table.ReadTableRequest)(desc).GetKeyRange().SetGreater(proto.ValueOrDefault(value.ToYDB(x)))
 }
 
 func (x readLessOrEqualOption) ApplyReadTableOption(desc *ReadTableDesc) {
 	desc.initKeyRange()
-	desc.KeyRange.ToBound = &Ydb_Table.KeyRange_LessOrEqual{
-		LessOrEqual: value.ToYDB(x),
-	}
+	(*Ydb_Table.ReadTableRequest)(desc).GetKeyRange().SetLessOrEqual(proto.ValueOrDefault(value.ToYDB(x)))
 }
 
 func (x readLessOption) ApplyReadTableOption(desc *ReadTableDesc) {
 	desc.initKeyRange()
-	desc.KeyRange.ToBound = &Ydb_Table.KeyRange_Less{
-		Less: value.ToYDB(x),
-	}
+	(*Ydb_Table.ReadTableRequest)(desc).GetKeyRange().SetLess(proto.ValueOrDefault(value.ToYDB(x)))
 }
 
 func (columns readColumnsOption) ApplyReadRowsOption(desc *ReadRowsDesc) {
-	desc.Columns = append(desc.Columns, columns...)
+	rd := (*Ydb_Table.ReadRowsRequest)(desc)
+	rd.SetColumns(append(rd.GetColumns(), columns...))
 }
 
 func (columns readColumnsOption) ApplyReadTableOption(desc *ReadTableDesc) {
-	desc.Columns = append(desc.Columns, columns...)
+	rd := (*Ydb_Table.ReadTableRequest)(desc)
+	rd.SetColumns(append(rd.GetColumns(), columns...))
 }
 
 func (readOrderedOption) ApplyReadTableOption(desc *ReadTableDesc) {
-	desc.Ordered = true
+	(*Ydb_Table.ReadTableRequest)(desc).SetOrdered(true)
 }
 
 func (b readSnapshotOption) ApplyReadTableOption(desc *ReadTableDesc) {
 	if b {
-		desc.UseSnapshot = FeatureEnabled.ToYDB()
+		(*Ydb_Table.ReadTableRequest)(desc).SetUseSnapshot(FeatureEnabled.ToYDB())
 	} else {
-		desc.UseSnapshot = FeatureDisabled.ToYDB()
+		(*Ydb_Table.ReadTableRequest)(desc).SetUseSnapshot(FeatureDisabled.ToYDB())
 	}
 }
 
 func (x readKeyRangeOption) ApplyReadTableOption(desc *ReadTableDesc) {
 	desc.initKeyRange()
+	kr := (*Ydb_Table.ReadTableRequest)(desc).GetKeyRange()
 	if x.From != nil {
-		desc.KeyRange.FromBound = &Ydb_Table.KeyRange_GreaterOrEqual{
-			GreaterOrEqual: value.ToYDB(x.From),
-		}
+		kr.SetGreaterOrEqual(proto.ValueOrDefault(value.ToYDB(x.From)))
 	}
 	if x.To != nil {
-		desc.KeyRange.ToBound = &Ydb_Table.KeyRange_Less{
-			Less: value.ToYDB(x.To),
-		}
+		kr.SetLess(proto.ValueOrDefault(value.ToYDB(x.To)))
 	}
 }
 
 func (x readGreaterOrEqualOption) ApplyReadTableOption(desc *ReadTableDesc) {
 	desc.initKeyRange()
-	desc.KeyRange.FromBound = &Ydb_Table.KeyRange_GreaterOrEqual{
-		GreaterOrEqual: value.ToYDB(x),
-	}
+	(*Ydb_Table.ReadTableRequest)(desc).GetKeyRange().SetGreaterOrEqual(proto.ValueOrDefault(value.ToYDB(x)))
 }
 
 func ReadColumn(name string) readColumnsOption {
@@ -1192,7 +1207,8 @@ func ReadRowLimit(n uint64) ReadTableOption {
 }
 
 func (d *ReadTableDesc) initKeyRange() {
-	if d.KeyRange == nil {
-		d.KeyRange = new(Ydb_Table.KeyRange)
+	rd := (*Ydb_Table.ReadTableRequest)(d)
+	if rd.GetKeyRange() == nil {
+		rd.SetKeyRange(&Ydb_Table.KeyRange{})
 	}
 }

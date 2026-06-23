@@ -50,10 +50,10 @@ func begin(
 	}()
 
 	response, err := s.client.BeginTransaction(ctx,
-		&Ydb_Query.BeginTransactionRequest{
+		Ydb_Query.BeginTransactionRequest_builder{
 			SessionId:  s.ID(),
 			TxSettings: txSettings.ToYdbQuerySettings(),
-		},
+		}.Build(),
 	)
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
@@ -344,10 +344,10 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 }
 
 func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID, txID string) error {
-	_, err := client.CommitTransaction(ctx, &Ydb_Query.CommitTransactionRequest{
+	_, err := client.CommitTransaction(ctx, Ydb_Query.CommitTransactionRequest_builder{
 		SessionId: sessionID,
 		TxId:      txID,
-	})
+	}.Build())
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -392,10 +392,10 @@ func (tx *Transaction) CommitTx(ctx context.Context) (finalErr error) {
 }
 
 func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID, txID string) error {
-	_, err := client.RollbackTransaction(ctx, &Ydb_Query.RollbackTransactionRequest{
+	_, err := client.RollbackTransaction(ctx, Ydb_Query.RollbackTransactionRequest_builder{
 		SessionId: sessionID,
 		TxId:      txID,
-	})
+	}.Build())
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}

@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -72,24 +73,24 @@ func (c *Client) createResource(
 	coordinationNodePath string,
 	resource ratelimiter.Resource,
 ) (err error) {
-	_, err = c.service.CreateResource(ctx, &Ydb_RateLimiter.CreateResourceRequest{
+	_, err = c.service.CreateResource(ctx, Ydb_RateLimiter.CreateResourceRequest_builder{
 		CoordinationNodePath: coordinationNodePath,
-		Resource: &Ydb_RateLimiter.Resource{
+		Resource: Ydb_RateLimiter.Resource_builder{
 			ResourcePath: resource.ResourcePath,
-			Type: &Ydb_RateLimiter.Resource_HierarchicalDrr{HierarchicalDrr: &Ydb_RateLimiter.HierarchicalDrrSettings{
+			HierarchicalDrr: Ydb_RateLimiter.HierarchicalDrrSettings_builder{
 				MaxUnitsPerSecond:       resource.HierarchicalDrr.MaxUnitsPerSecond,
 				MaxBurstSizeCoefficient: resource.HierarchicalDrr.MaxBurstSizeCoefficient,
 				PrefetchCoefficient:     resource.HierarchicalDrr.PrefetchCoefficient,
 				PrefetchWatermark:       resource.HierarchicalDrr.PrefetchWatermark,
-			}},
-		},
+			}.Build(),
+		}.Build(),
 		OperationParams: operation.Params(
 			ctx,
 			c.config.OperationTimeout(),
 			c.config.OperationCancelAfter(),
 			operation.ModeSync,
 		),
-	})
+	}.Build())
 
 	return
 }
@@ -122,24 +123,24 @@ func (c *Client) alterResource(
 	coordinationNodePath string,
 	resource ratelimiter.Resource,
 ) (err error) {
-	_, err = c.service.AlterResource(ctx, &Ydb_RateLimiter.AlterResourceRequest{
+	_, err = c.service.AlterResource(ctx, Ydb_RateLimiter.AlterResourceRequest_builder{
 		CoordinationNodePath: coordinationNodePath,
-		Resource: &Ydb_RateLimiter.Resource{
+		Resource: Ydb_RateLimiter.Resource_builder{
 			ResourcePath: resource.ResourcePath,
-			Type: &Ydb_RateLimiter.Resource_HierarchicalDrr{HierarchicalDrr: &Ydb_RateLimiter.HierarchicalDrrSettings{
+			HierarchicalDrr: Ydb_RateLimiter.HierarchicalDrrSettings_builder{
 				MaxUnitsPerSecond:       resource.HierarchicalDrr.MaxUnitsPerSecond,
 				MaxBurstSizeCoefficient: resource.HierarchicalDrr.MaxBurstSizeCoefficient,
 				PrefetchCoefficient:     resource.HierarchicalDrr.PrefetchCoefficient,
 				PrefetchWatermark:       resource.HierarchicalDrr.PrefetchWatermark,
-			}},
-		},
+			}.Build(),
+		}.Build(),
 		OperationParams: operation.Params(
 			ctx,
 			c.config.OperationTimeout(),
 			c.config.OperationCancelAfter(),
 			operation.ModeSync,
 		),
-	})
+	}.Build())
 
 	return
 }
@@ -172,7 +173,7 @@ func (c *Client) dropResource(
 	coordinationNodePath string,
 	resourcePath string,
 ) (err error) {
-	_, err = c.service.DropResource(ctx, &Ydb_RateLimiter.DropResourceRequest{
+	_, err = c.service.DropResource(ctx, Ydb_RateLimiter.DropResourceRequest_builder{
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
 		OperationParams: operation.Params(
@@ -181,7 +182,7 @@ func (c *Client) dropResource(
 			c.config.OperationCancelAfter(),
 			operation.ModeSync,
 		),
-	})
+	}.Build())
 
 	return
 }
@@ -225,7 +226,7 @@ func (c *Client) listResource(
 		response *Ydb_RateLimiter.ListResourcesResponse
 		result   Ydb_RateLimiter.ListResourcesResult
 	)
-	response, err = c.service.ListResources(ctx, &Ydb_RateLimiter.ListResourcesRequest{
+	response, err = c.service.ListResources(ctx, Ydb_RateLimiter.ListResourcesRequest_builder{
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
 		Recursive:            recursive,
@@ -235,7 +236,7 @@ func (c *Client) listResource(
 			c.config.OperationCancelAfter(),
 			operation.ModeSync,
 		),
-	})
+	}.Build())
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -284,7 +285,7 @@ func (c *Client) describeResource(
 		response *Ydb_RateLimiter.DescribeResourceResponse
 		result   Ydb_RateLimiter.DescribeResourceResult
 	)
-	response, err = c.service.DescribeResource(ctx, &Ydb_RateLimiter.DescribeResourceRequest{
+	response, err = c.service.DescribeResource(ctx, Ydb_RateLimiter.DescribeResourceRequest_builder{
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
 		OperationParams: operation.Params(
@@ -293,7 +294,7 @@ func (c *Client) describeResource(
 			c.config.OperationCancelAfter(),
 			operation.ModeSync,
 		),
-	})
+	}.Build())
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -363,36 +364,32 @@ func (c *Client) acquireResource(
 	case options.AcquireTypeAcquire:
 		_, err = c.service.AcquireResource(
 			ctx,
-			&Ydb_RateLimiter.AcquireResourceRequest{
+			Ydb_RateLimiter.AcquireResourceRequest_builder{
 				CoordinationNodePath: coordinationNodePath,
 				ResourcePath:         resourcePath,
-				Units: &Ydb_RateLimiter.AcquireResourceRequest_Required{
-					Required: amount,
-				},
+				Required:             proto.Uint64(amount),
 				OperationParams: operation.Params(
 					ctx,
 					acquireOptions.OperationTimeout(),
 					acquireOptions.OperationCancelAfter(),
 					operation.ModeSync,
 				),
-			},
+			}.Build(),
 		)
 	case options.AcquireTypeReport:
 		_, err = c.service.AcquireResource(
 			ctx,
-			&Ydb_RateLimiter.AcquireResourceRequest{
+			Ydb_RateLimiter.AcquireResourceRequest_builder{
 				CoordinationNodePath: coordinationNodePath,
 				ResourcePath:         resourcePath,
-				Units: &Ydb_RateLimiter.AcquireResourceRequest_Used{
-					Used: amount,
-				},
+				Used:                 proto.Uint64(amount),
 				OperationParams: operation.Params(
 					ctx,
 					acquireOptions.OperationTimeout(),
 					acquireOptions.OperationCancelAfter(),
 					operation.ModeSync,
 				),
-			},
+			}.Build(),
 		)
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf("%w: %d", errUnknownAcquireType, acquireOptions.Type()))

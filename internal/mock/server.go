@@ -1,5 +1,3 @@
-// Package mock provides an in-process YDB gRPC stack (Discovery + Table + Query) with fixed
-// "SELECT 42" responses for benchmarks and tests. It does not require a real YDB endpoint.
 package mock
 
 import (
@@ -149,12 +147,12 @@ func mustMarshalAny(msg proto.Message) *anypb.Any {
 }
 
 func operationOK(msg proto.Message) *Ydb_Operations.Operation {
-	return &Ydb_Operations.Operation{
+	return Ydb_Operations.Operation_builder{
 		Id:     "mock-op",
 		Ready:  true,
 		Status: Ydb.StatusIds_SUCCESS,
 		Result: mustMarshalAny(msg),
-	}
+	}.Build()
 }
 
 type discoverySrv struct {
@@ -167,23 +165,23 @@ func (m *discoverySrv) ListEndpoints(
 	_ context.Context,
 	_ *Ydb_Discovery.ListEndpointsRequest,
 ) (*Ydb_Discovery.ListEndpointsResponse, error) {
-	res := &Ydb_Discovery.ListEndpointsResult{
+	res := Ydb_Discovery.ListEndpointsResult_builder{
 		Endpoints:    m.endpoints,
 		SelfLocation: "",
-	}
+	}.Build()
 
-	return &Ydb_Discovery.ListEndpointsResponse{
+	return Ydb_Discovery.ListEndpointsResponse_builder{
 		Operation: operationOK(res),
-	}, nil
+	}.Build(), nil
 }
 
 func (m *discoverySrv) WhoAmI(
 	_ context.Context,
 	_ *Ydb_Discovery.WhoAmIRequest,
 ) (*Ydb_Discovery.WhoAmIResponse, error) {
-	return &Ydb_Discovery.WhoAmIResponse{
+	return Ydb_Discovery.WhoAmIResponse_builder{
 		Operation: operationOK(&emptypb.Empty{}),
-	}, nil
+	}.Build(), nil
 }
 
 type tableSrv struct {
@@ -196,11 +194,11 @@ func (m *tableSrv) CreateSession(
 	_ context.Context,
 	_ *Ydb_Table.CreateSessionRequest,
 ) (*Ydb_Table.CreateSessionResponse, error) {
-	return &Ydb_Table.CreateSessionResponse{
-		Operation: operationOK(&Ydb_Table.CreateSessionResult{
+	return Ydb_Table.CreateSessionResponse_builder{
+		Operation: operationOK(Ydb_Table.CreateSessionResult_builder{
 			SessionId: m.mock.nextTableSession(),
-		}),
-	}, nil
+		}.Build()),
+	}.Build(), nil
 }
 
 func (m *tableSrv) DeleteSession(
@@ -214,11 +212,11 @@ func (m *tableSrv) KeepAlive(
 	_ context.Context,
 	_ *Ydb_Table.KeepAliveRequest,
 ) (*Ydb_Table.KeepAliveResponse, error) {
-	return &Ydb_Table.KeepAliveResponse{
-		Operation: operationOK(&Ydb_Table.KeepAliveResult{
+	return Ydb_Table.KeepAliveResponse_builder{
+		Operation: operationOK(Ydb_Table.KeepAliveResult_builder{
 			SessionStatus: Ydb_Table.KeepAliveResult_SESSION_STATUS_READY,
-		}),
-	}, nil
+		}.Build()),
+	}.Build(), nil
 }
 
 func (m *tableSrv) ExecuteDataQuery(
@@ -227,11 +225,11 @@ func (m *tableSrv) ExecuteDataQuery(
 ) (*Ydb_Table.ExecuteDataQueryResponse, error) {
 	m.mock.executeDataQueryCalls.Add(1)
 
-	return &Ydb_Table.ExecuteDataQueryResponse{
-		Operation: operationOK(&Ydb_Table.ExecuteQueryResult{
+	return Ydb_Table.ExecuteDataQueryResponse_builder{
+		Operation: operationOK(Ydb_Table.ExecuteQueryResult_builder{
 			ResultSets: resultSetsForQuery(req.GetQuery().GetYqlText()),
-		}),
-	}, nil
+		}.Build()),
+	}.Build(), nil
 }
 
 type querySrv struct {
@@ -246,17 +244,17 @@ func (m *querySrv) BeginTransaction(
 ) (*Ydb_Query.BeginTransactionResponse, error) {
 	id := fmt.Sprintf("tx-%d", m.mock.queryTxID.Add(1))
 
-	return &Ydb_Query.BeginTransactionResponse{
+	return Ydb_Query.BeginTransactionResponse_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-		TxMeta: &Ydb_Query.TransactionMeta{Id: id},
-	}, nil
+		TxMeta: Ydb_Query.TransactionMeta_builder{Id: id}.Build(),
+	}.Build(), nil
 }
 
 func (m *querySrv) RollbackTransaction(
 	_ context.Context,
 	_ *Ydb_Query.RollbackTransactionRequest,
 ) (*Ydb_Query.RollbackTransactionResponse, error) {
-	return &Ydb_Query.RollbackTransactionResponse{Status: Ydb.StatusIds_SUCCESS}, nil
+	return Ydb_Query.RollbackTransactionResponse_builder{Status: Ydb.StatusIds_SUCCESS}.Build(), nil
 }
 
 func (m *querySrv) CreateSession(
@@ -265,41 +263,39 @@ func (m *querySrv) CreateSession(
 ) (*Ydb_Query.CreateSessionResponse, error) {
 	sessionID, nodeID := m.mock.nextQuerySession()
 
-	return &Ydb_Query.CreateSessionResponse{
+	return Ydb_Query.CreateSessionResponse_builder{
 		Status:    Ydb.StatusIds_SUCCESS,
 		SessionId: sessionID,
 		NodeId:    int64(nodeID),
-	}, nil
+	}.Build(), nil
 }
 
 func (m *querySrv) DeleteSession(
 	_ context.Context,
 	_ *Ydb_Query.DeleteSessionRequest,
 ) (*Ydb_Query.DeleteSessionResponse, error) {
-	return &Ydb_Query.DeleteSessionResponse{
+	return Ydb_Query.DeleteSessionResponse_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-	}, nil
+	}.Build(), nil
 }
 
 func (m *querySrv) AttachSession(
 	_ *Ydb_Query.AttachSessionRequest,
 	stream Ydb_Query_V1.QueryService_AttachSessionServer,
 ) error {
-	err := stream.Send(&Ydb_Query.SessionState{
+	err := stream.Send(Ydb_Query.SessionState_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-	})
+	}.Build())
 	if err != nil {
 		return err
 	}
 
 	select {
 	case <-m.mock.nodeShutdownSignal:
-		return stream.Send(&Ydb_Query.SessionState{
-			Status: Ydb.StatusIds_SUCCESS,
-			SessionHint: &Ydb_Query.SessionState_NodeShutdown{
-				NodeShutdown: &Ydb_Query.NodeShutdownHint{},
-			},
-		})
+		return stream.Send(Ydb_Query.SessionState_builder{
+			Status:       Ydb.StatusIds_SUCCESS,
+			NodeShutdown: &Ydb_Query.NodeShutdownHint{},
+		}.Build())
 	case <-stream.Context().Done():
 		return nil
 	}
@@ -324,11 +320,11 @@ func (m *querySrv) ExecuteQuery(
 			rsToSend = withResultSetPayload(rs, m.mock.executeQueryPadding())
 		}
 
-		err := stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
+		err := stream.Send(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: int64(i),
 			ResultSet:      rsToSend,
-		})
+		}.Build())
 		if err != nil {
 			return err
 		}
@@ -396,12 +392,12 @@ func resultSetForStatement(stmt string) *Ydb.ResultSet {
 		items = append(items, val)
 	}
 
-	return &Ydb.ResultSet{
+	return Ydb.ResultSet_builder{
 		Columns: columns,
 		Rows: []*Ydb.Value{
-			{Items: items},
+			Ydb.Value_builder{Items: items}.Build(),
 		},
-	}
+	}.Build()
 }
 
 // projectionColumn maps a parsed (literal, name) pair to an Ydb column
@@ -420,39 +416,39 @@ func projectionColumn(literal, name string) (*Ydb.Column, *Ydb.Value) {
 }
 
 func int32Column(name string, value int32) (*Ydb.Column, *Ydb.Value) {
-	return &Ydb.Column{
+	return Ydb.Column_builder{
 			Name: name,
-			Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32}},
-		}, &Ydb.Value{
-			Value: &Ydb.Value_Int32Value{Int32Value: value},
-		}
+			Type: Ydb.Type_builder{TypeId: Ydb.Type_INT32.Enum()}.Build(),
+		}.Build(), Ydb.Value_builder{
+			Int32Value: proto.Int32(value),
+		}.Build()
 }
 
 func utf8Column(name, value string) (*Ydb.Column, *Ydb.Value) {
-	return &Ydb.Column{
+	return Ydb.Column_builder{
 			Name: name,
-			Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}},
-		}, &Ydb.Value{
-			Value: &Ydb.Value_TextValue{TextValue: value},
-		}
+			Type: Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build(),
+		}.Build(), Ydb.Value_builder{
+			TextValue: proto.String(value),
+		}.Build()
 }
 
 func bytesColumn(name string, value []byte) (*Ydb.Column, *Ydb.Value) {
-	return &Ydb.Column{
+	return Ydb.Column_builder{
 			Name: name,
-			Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING}},
-		}, &Ydb.Value{
-			Value: &Ydb.Value_BytesValue{BytesValue: value},
-		}
+			Type: Ydb.Type_builder{TypeId: Ydb.Type_STRING.Enum()}.Build(),
+		}.Build(), Ydb.Value_builder{
+			BytesValue: proto.ValueOrDefaultBytes(value),
+		}.Build()
 }
 
 func select42ResultSet() *Ydb.ResultSet {
 	col, val := int32Column("", 42)
 
-	return &Ydb.ResultSet{
+	return Ydb.ResultSet_builder{
 		Columns: []*Ydb.Column{col},
-		Rows:    []*Ydb.Value{{Items: []*Ydb.Value{val}}},
-	}
+		Rows:    []*Ydb.Value{Ydb.Value_builder{Items: []*Ydb.Value{val}}.Build()},
+	}.Build()
 }
 
 const executeQueryBenchmarkPayloadBytes = 256 * 1024
@@ -476,9 +472,9 @@ func withResultSetPayload(rs *Ydb.ResultSet, payload []byte) *Ydb.ResultSet {
 
 	cloned := proto.Clone(rs).(*Ydb.ResultSet) //nolint:forcetypeassert
 	col, val := bytesColumn("payload", payload)
-	cloned.Columns = append(cloned.Columns, col)
+	cloned.SetColumns(append(cloned.GetColumns(), col))
 	for _, row := range cloned.GetRows() {
-		row.Items = append(row.Items, val)
+		row.SetItems(append(row.GetItems(), val))
 	}
 
 	return cloned
@@ -487,7 +483,7 @@ func withResultSetPayload(rs *Ydb.ResultSet, payload []byte) *Ydb.ResultSet {
 func discoveryEndpoints(host string, port uint32, nodeIDs []uint32) []*Ydb_Discovery.EndpointInfo {
 	endpoints := make([]*Ydb_Discovery.EndpointInfo, len(nodeIDs))
 	for i, nodeID := range nodeIDs {
-		endpoints[i] = &Ydb_Discovery.EndpointInfo{
+		endpoints[i] = Ydb_Discovery.EndpointInfo_builder{
 			Address:    host,
 			Port:       port,
 			LoadFactor: 0,
@@ -496,7 +492,7 @@ func discoveryEndpoints(host string, port uint32, nodeIDs []uint32) []*Ydb_Disco
 			Location:   "",
 			NodeId:     nodeID,
 			IpV4:       []string{"127.0.0.1"},
-		}
+		}.Build()
 	}
 
 	return endpoints

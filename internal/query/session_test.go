@@ -56,19 +56,19 @@ func TestCreateSession(t *testing.T) {
 		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
-		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.CreateSessionResponse_builder{
 			Status:    Ydb.StatusIds_SUCCESS,
 			SessionId: "123",
-		}, nil)
+		}.Build(), nil)
 		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
 		stubAttachStreamContext(attachStream)
-		attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
+		attachStream.EXPECT().Recv().Return(Ydb_Query.SessionState_builder{
 			Status: Ydb.StatusIds_SUCCESS,
-		}, nil)
+		}.Build(), nil)
 		attachStream.EXPECT().Recv().Return(nil, errSessionClosed).AnyTimes()
-		client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
+		client.EXPECT().AttachSession(gomock.Any(), Ydb_Query.AttachSessionRequest_builder{
 			SessionId: "123",
-		}).Return(attachStream, nil)
+		}.Build()).Return(attachStream, nil)
 		require.NotPanics(t, func() {
 			s, err := createSession(ctx, client, WithTrace(trace))
 			require.NoError(t, err)
@@ -94,18 +94,18 @@ func TestCreateSession(t *testing.T) {
 			ctx := t.Context()
 			ctrl := gomock.NewController(t)
 			client := NewMockQueryServiceClient(ctrl)
-			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.CreateSessionResponse_builder{
 				Status:    Ydb.StatusIds_SUCCESS,
 				SessionId: "123",
-			}, nil)
-			client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
+			}.Build(), nil)
+			client.EXPECT().AttachSession(gomock.Any(), Ydb_Query.AttachSessionRequest_builder{
 				SessionId: "123",
-			}).Return(nil, xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "test")))
-			client.EXPECT().DeleteSession(gomock.Any(), &Ydb_Query.DeleteSessionRequest{
+			}.Build()).Return(nil, xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "test")))
+			client.EXPECT().DeleteSession(gomock.Any(), Ydb_Query.DeleteSessionRequest_builder{
 				SessionId: "123",
-			}).Return(&Ydb_Query.DeleteSessionResponse{
+			}.Build()).Return(Ydb_Query.DeleteSessionResponse_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil)
+			}.Build(), nil)
 			require.NotPanics(t, func() {
 				s, err := createSession(ctx, client, WithTrace(trace))
 				require.Error(t, err)
@@ -131,18 +131,18 @@ func TestCreateSession(t *testing.T) {
 			ctx := t.Context()
 			ctrl := gomock.NewController(t)
 			client := NewMockQueryServiceClient(ctrl)
-			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+			client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.CreateSessionResponse_builder{
 				Status:    Ydb.StatusIds_SUCCESS,
 				SessionId: "123",
-			}, nil)
-			client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
+			}.Build(), nil)
+			client.EXPECT().AttachSession(gomock.Any(), Ydb_Query.AttachSessionRequest_builder{
 				SessionId: "123",
-			}).Return(nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)))
-			client.EXPECT().DeleteSession(gomock.Any(), &Ydb_Query.DeleteSessionRequest{
+			}.Build()).Return(nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)))
+			client.EXPECT().DeleteSession(gomock.Any(), Ydb_Query.DeleteSessionRequest_builder{
 				SessionId: "123",
-			}).Return(&Ydb_Query.DeleteSessionResponse{
+			}.Build()).Return(Ydb_Query.DeleteSessionResponse_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil)
+			}.Build(), nil)
 			require.NotPanics(t, func() {
 				s, err := createSession(ctx, client, WithTrace(trace))
 				require.Error(t, err)

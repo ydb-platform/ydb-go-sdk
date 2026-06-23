@@ -86,7 +86,7 @@ type CreateSessionOptions struct {
 // operation. Ephemeral semaphore are always created with the limit of coordination.MaxSemaphoreLimit.
 func WithEphemeral(ephemeral bool) AcquireSemaphoreOption {
 	return func(c *Ydb_Coordination.SessionRequest_AcquireSemaphore) {
-		c.Ephemeral = ephemeral
+		c.SetEphemeral(ephemeral)
 	}
 }
 
@@ -98,7 +98,7 @@ func WithEphemeral(ephemeral bool) AcquireSemaphoreOption {
 // You can reset the default value of this timeout by calling the WithAcquireInfiniteTimeout method.
 func WithAcquireTimeout(timeout time.Duration) AcquireSemaphoreOption {
 	return func(c *Ydb_Coordination.SessionRequest_AcquireSemaphore) {
-		c.TimeoutMillis = uint64(timeout.Milliseconds())
+		c.SetTimeoutMillis(uint64(timeout.Milliseconds()))
 	}
 }
 
@@ -108,14 +108,14 @@ func WithAcquireTimeout(timeout time.Duration) AcquireSemaphoreOption {
 // This is the default behavior. You can set the specific timeout by calling the WithAcquireTimeout method.
 func WithAcquireInfiniteTimeout() AcquireSemaphoreOption {
 	return func(c *Ydb_Coordination.SessionRequest_AcquireSemaphore) {
-		c.TimeoutMillis = math.MaxUint64
+		c.SetTimeoutMillis(math.MaxUint64)
 	}
 }
 
 // WithAcquireData returns an AcquireSemaphoreOption which attaches user-defined data to the operation.
 func WithAcquireData(data []byte) AcquireSemaphoreOption {
 	return func(c *Ydb_Coordination.SessionRequest_AcquireSemaphore) {
-		c.Data = data
+		c.SetData(data)
 	}
 }
 
@@ -126,7 +126,7 @@ type AcquireSemaphoreOption func(c *Ydb_Coordination.SessionRequest_AcquireSemap
 // by other sessions.
 func WithForceDelete(force bool) DeleteSemaphoreOption {
 	return func(c *Ydb_Coordination.SessionRequest_DeleteSemaphore) {
-		c.Force = force
+		c.SetForce(force)
 	}
 }
 
@@ -136,7 +136,7 @@ type DeleteSemaphoreOption func(c *Ydb_Coordination.SessionRequest_DeleteSemapho
 // WithCreateData return a CreateSemaphoreOption which attaches user-defined data to the semaphore.
 func WithCreateData(data []byte) CreateSemaphoreOption {
 	return func(c *Ydb_Coordination.SessionRequest_CreateSemaphore) {
-		c.Data = data
+		c.SetData(data)
 	}
 }
 
@@ -146,7 +146,7 @@ type CreateSemaphoreOption func(c *Ydb_Coordination.SessionRequest_CreateSemapho
 // WithUpdateData return a UpdateSemaphoreOption which changes user-defined data in the semaphore.
 func WithUpdateData(data []byte) UpdateSemaphoreOption {
 	return func(c *Ydb_Coordination.SessionRequest_UpdateSemaphore) {
-		c.Data = data
+		c.SetData(data)
 	}
 }
 
@@ -157,7 +157,7 @@ type UpdateSemaphoreOption func(c *Ydb_Coordination.SessionRequest_UpdateSemapho
 // to the DescribeSemaphore request.
 func WithDescribeOwners(describeOwners bool) DescribeSemaphoreOption {
 	return func(c *Ydb_Coordination.SessionRequest_DescribeSemaphore) {
-		c.IncludeOwners = describeOwners
+		c.SetIncludeOwners(describeOwners)
 	}
 }
 
@@ -165,7 +165,7 @@ func WithDescribeOwners(describeOwners bool) DescribeSemaphoreOption {
 // to the DescribeSemaphore request.
 func WithDescribeWaiters(describeWaiters bool) DescribeSemaphoreOption {
 	return func(c *Ydb_Coordination.SessionRequest_DescribeSemaphore) {
-		c.IncludeWaiters = describeWaiters
+		c.SetIncludeWaiters(describeWaiters)
 	}
 }
 

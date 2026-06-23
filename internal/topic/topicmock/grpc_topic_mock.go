@@ -127,7 +127,7 @@ func (m mockDiscoveryService) ListEndpoints(
 ) (*Ydb_Discovery.ListEndpointsResponse, error) {
 	endpoints := make([]*Ydb_Discovery.EndpointInfo, 0, len(m.nodeIDs))
 	for _, nodeID := range m.nodeIDs {
-		endpoints = append(endpoints, &Ydb_Discovery.EndpointInfo{
+		endpoints = append(endpoints, Ydb_Discovery.EndpointInfo_builder{
 			Address:    m.host,
 			Port:       m.port,
 			LoadFactor: 0,
@@ -136,21 +136,21 @@ func (m mockDiscoveryService) ListEndpoints(
 			Location:   "",
 			NodeId:     nodeID,
 			IpV4:       []string{"127.0.0.1"},
-		})
+		}.Build())
 	}
 
-	res := &Ydb_Discovery.ListEndpointsResult{
+	res := Ydb_Discovery.ListEndpointsResult_builder{
 		Endpoints:    endpoints,
 		SelfLocation: "",
-	}
-	resp := &Ydb_Discovery.ListEndpointsResponse{
-		Operation: &Ydb_Operations.Operation{
+	}.Build()
+	resp := Ydb_Discovery.ListEndpointsResponse_builder{
+		Operation: Ydb_Operations.Operation_builder{
 			Id:     "test-list-operation",
 			Ready:  true,
 			Status: Ydb.StatusIds_SUCCESS,
 			Result: &anypb.Any{},
-		},
-	}
+		}.Build(),
+	}.Build()
 	err := resp.GetOperation().GetResult().MarshalFrom(res)
 
 	return resp, err

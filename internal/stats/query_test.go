@@ -18,50 +18,50 @@ func us(microseconds uint64) time.Duration {
 // scalar-field tests. Two query phases let us also exercise NextPhase
 // advancement and table access on more than one phase.
 func sampleQueryStatsPB() *Ydb_TableStats.QueryStats {
-	return &Ydb_TableStats.QueryStats{
+	return Ydb_TableStats.QueryStats_builder{
 		QueryPhases: []*Ydb_TableStats.QueryPhaseStats{
-			{
+			Ydb_TableStats.QueryPhaseStats_builder{
 				DurationUs: 10,
 				TableAccess: []*Ydb_TableStats.TableAccessStats{
-					{
+					Ydb_TableStats.TableAccessStats_builder{
 						Name:            "a",
-						Reads:           &Ydb_TableStats.OperationStats{Rows: 100, Bytes: 200},
-						Updates:         &Ydb_TableStats.OperationStats{Rows: 300, Bytes: 400},
-						Deletes:         &Ydb_TableStats.OperationStats{Rows: 500, Bytes: 600},
+						Reads:           Ydb_TableStats.OperationStats_builder{Rows: 100, Bytes: 200}.Build(),
+						Updates:         Ydb_TableStats.OperationStats_builder{Rows: 300, Bytes: 400}.Build(),
+						Deletes:         Ydb_TableStats.OperationStats_builder{Rows: 500, Bytes: 600}.Build(),
 						PartitionsCount: 700,
-					},
+					}.Build(),
 				},
 				CpuTimeUs:      20,
 				AffectedShards: 30,
 				LiteralPhase:   true,
-			},
-			{
+			}.Build(),
+			Ydb_TableStats.QueryPhaseStats_builder{
 				DurationUs: 11,
 				TableAccess: []*Ydb_TableStats.TableAccessStats{
-					{
+					Ydb_TableStats.TableAccessStats_builder{
 						Name:            "b",
-						Reads:           &Ydb_TableStats.OperationStats{Rows: 101, Bytes: 201},
-						Updates:         &Ydb_TableStats.OperationStats{Rows: 301, Bytes: 401},
-						Deletes:         &Ydb_TableStats.OperationStats{Rows: 501, Bytes: 601},
+						Reads:           Ydb_TableStats.OperationStats_builder{Rows: 101, Bytes: 201}.Build(),
+						Updates:         Ydb_TableStats.OperationStats_builder{Rows: 301, Bytes: 401}.Build(),
+						Deletes:         Ydb_TableStats.OperationStats_builder{Rows: 501, Bytes: 601}.Build(),
 						PartitionsCount: 701,
-					},
+					}.Build(),
 				},
 				CpuTimeUs:      21,
 				AffectedShards: 31,
 				LiteralPhase:   false,
-			},
+			}.Build(),
 		},
-		Compilation: &Ydb_TableStats.CompilationStats{
+		Compilation: Ydb_TableStats.CompilationStats_builder{
 			FromCache:  true,
 			DurationUs: 123,
 			CpuTimeUs:  456,
-		},
+		}.Build(),
 		ProcessCpuTimeUs: 100,
 		QueryPlan:        "plan",
 		QueryAst:         "ast",
 		TotalDurationUs:  200,
 		TotalCpuTimeUs:   300,
-	}
+	}.Build()
 }
 
 func TestFromQueryStats(t *testing.T) {
@@ -127,9 +127,7 @@ func TestQueryStatsNextPhase(t *testing.T) {
 		// A nil entry inside the QueryPhases slice must terminate iteration
 		// cleanly instead of panicking when callers later dereference the
 		// returned phase.
-		s := stats.FromQueryStats(&Ydb_TableStats.QueryStats{
-			QueryPhases: []*Ydb_TableStats.QueryPhaseStats{nil},
-		})
+		s := stats.FromQueryStats(Ydb_TableStats.QueryStats_builder{}.Build())
 
 		p, ok := s.NextPhase()
 
@@ -160,9 +158,11 @@ func TestQueryPhaseNextTableAccess(t *testing.T) {
 	})
 
 	t.Run("ReturnsFalseOnEmpty", func(t *testing.T) {
-		s := stats.FromQueryStats(&Ydb_TableStats.QueryStats{
-			QueryPhases: []*Ydb_TableStats.QueryPhaseStats{{}},
-		})
+		s := stats.FromQueryStats(Ydb_TableStats.QueryStats_builder{
+			QueryPhases: []*Ydb_TableStats.QueryPhaseStats{
+				Ydb_TableStats.QueryPhaseStats_builder{}.Build(),
+			},
+		}.Build())
 		phase, ok := s.NextPhase()
 		require.True(t, ok)
 

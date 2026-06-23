@@ -58,21 +58,19 @@ func (t *topicWriterOperationUnavailable) StreamWrite(server Ydb_Topic_V1.TopicS
 		return fmt.Errorf("failed read init message: %w", err)
 	}
 
-	if initMsg.GetInitRequest() == nil {
+	if initMsg.WhichClientMessage() != Ydb_Topic.StreamWriteMessage_FromClient_InitRequest_case {
 		return errors.New("first message must be init message")
 	}
 
-	err = server.Send(&Ydb_Topic.StreamWriteMessage_FromServer{
+	err = server.Send(Ydb_Topic.StreamWriteMessage_FromServer_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-		ServerMessage: &Ydb_Topic.StreamWriteMessage_FromServer_InitResponse{
-			InitResponse: &Ydb_Topic.StreamWriteMessage_InitResponse{
-				LastSeqNo:       0,
-				SessionId:       "test",
-				PartitionId:     0,
-				SupportedCodecs: nil,
-			},
-		},
-	})
+		InitResponse: Ydb_Topic.StreamWriteMessage_InitResponse_builder{
+			LastSeqNo:       0,
+			SessionId:       "test",
+			PartitionId:     0,
+			SupportedCodecs: nil,
+		}.Build(),
+	}.Build())
 	if err != nil {
 		return fmt.Errorf("failed to send init response: %w", err)
 	}
@@ -80,14 +78,14 @@ func (t *topicWriterOperationUnavailable) StreamWrite(server Ydb_Topic_V1.TopicS
 	if !t.UnavailableResponsed {
 		t.UnavailableResponsed = true
 
-		err = server.Send(&Ydb_Topic.StreamWriteMessage_FromServer{
+		err = server.Send(Ydb_Topic.StreamWriteMessage_FromServer_builder{
 			Status: Ydb.StatusIds_UNAVAILABLE,
 			Issues: []*Ydb_Issue.IssueMessage{
-				{
+				Ydb_Issue.IssueMessage_builder{
 					Message: "Test status unavailable",
-				},
+				}.Build(),
 			},
-		})
+		}.Build())
 		if err != nil {
 			return fmt.Errorf("failed to send error response: %w", err)
 		}
@@ -101,30 +99,29 @@ func (t *topicWriterOperationUnavailable) StreamWrite(server Ydb_Topic_V1.TopicS
 		return errors.New("failed to read messages block")
 	}
 
-	if len(messagesMsg.GetClientMessage().(*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest).
-		WriteRequest.GetMessages()) == 0 {
+	if messagesMsg.WhichClientMessage() != Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest_case {
+		return errors.New("expected write request message")
+	}
+
+	if len(messagesMsg.GetWriteRequest().GetMessages()) == 0 {
 		return errors.New("received zero messages block")
 	}
 
-	err = server.Send(&Ydb_Topic.StreamWriteMessage_FromServer{
+	err = server.Send(Ydb_Topic.StreamWriteMessage_FromServer_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-		ServerMessage: &Ydb_Topic.StreamWriteMessage_FromServer_WriteResponse{
-			WriteResponse: &Ydb_Topic.StreamWriteMessage_WriteResponse{
-				Acks: []*Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck{
-					{
-						SeqNo: 1,
-						MessageWriteStatus: &Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Written_{
-							Written: &Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Written{
-								Offset: 1,
-							},
-						},
-					},
-				},
-				PartitionId:     0,
-				WriteStatistics: &Ydb_Topic.StreamWriteMessage_WriteResponse_WriteStatistics{},
+		WriteResponse: Ydb_Topic.StreamWriteMessage_WriteResponse_builder{
+			Acks: []*Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck{
+				Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_builder{
+					SeqNo: 1,
+					Written: Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Written_builder{
+						Offset: 1,
+					}.Build(),
+				}.Build(),
 			},
-		},
-	})
+			PartitionId:     0,
+			WriteStatistics: &Ydb_Topic.StreamWriteMessage_WriteResponse_WriteStatistics{},
+		}.Build(),
+	}.Build())
 	if err != nil {
 		return fmt.Errorf("failed to sent write ack: %w", err)
 	}

@@ -852,6 +852,7 @@ func onSessionSend(t *trace.Coordination, c trace.CoordinationSessionSendStartIn
 	}
 	return res
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnNew(t *trace.Coordination, c *context.Context, c1 trace.Call) func() {
 	var p trace.CoordinationNewStartInfo
@@ -863,6 +864,7 @@ func CoordinationOnNew(t *trace.Coordination, c *context.Context, c1 trace.Call)
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnCreateNode(t *trace.Coordination, c *context.Context, c1 trace.Call, path string) func(error) {
 	var p trace.CoordinationCreateNodeStartInfo
@@ -876,6 +878,7 @@ func CoordinationOnCreateNode(t *trace.Coordination, c *context.Context, c1 trac
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnAlterNode(t *trace.Coordination, c *context.Context, c1 trace.Call, path string) func(error) {
 	var p trace.CoordinationAlterNodeStartInfo
@@ -889,6 +892,7 @@ func CoordinationOnAlterNode(t *trace.Coordination, c *context.Context, c1 trace
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnDropNode(t *trace.Coordination, c *context.Context, c1 trace.Call, path string) func(error) {
 	var p trace.CoordinationDropNodeStartInfo
@@ -902,6 +906,7 @@ func CoordinationOnDropNode(t *trace.Coordination, c *context.Context, c1 trace.
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnDescribeNode(t *trace.Coordination, c *context.Context, c1 trace.Call, path string) func(error) {
 	var p trace.CoordinationDescribeNodeStartInfo
@@ -915,6 +920,7 @@ func CoordinationOnDescribeNode(t *trace.Coordination, c *context.Context, c1 tr
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSession(t *trace.Coordination, c *context.Context, c1 trace.Call, path string) func(error) {
 	var p trace.CoordinationSessionStartInfo
@@ -928,6 +934,7 @@ func CoordinationOnSession(t *trace.Coordination, c *context.Context, c1 trace.C
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnClose(t *trace.Coordination, c *context.Context, c1 trace.Call) func(error) {
 	var p trace.CoordinationCloseStartInfo
@@ -940,6 +947,7 @@ func CoordinationOnClose(t *trace.Coordination, c *context.Context, c1 trace.Cal
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionNewStream(t *trace.Coordination, c *context.Context, c1 trace.Call) func(error) {
 	var p trace.CoordinationSessionNewStreamStartInfo
@@ -952,6 +960,7 @@ func CoordinationOnSessionNewStream(t *trace.Coordination, c *context.Context, c
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionStarted(t *trace.Coordination, sessionID uint64, expectedSessionID uint64) {
 	var p trace.CoordinationSessionStartedInfo
@@ -959,12 +968,14 @@ func CoordinationOnSessionStarted(t *trace.Coordination, sessionID uint64, expec
 	p.ExpectedSessionID = expectedSessionID
 	onSessionStarted(t, p)
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionStartTimeout(t *trace.Coordination, timeout time.Duration) {
 	var p trace.CoordinationSessionStartTimeoutInfo
 	p.Timeout = timeout
 	onSessionStartTimeout(t, p)
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionKeepAliveTimeout(t *trace.Coordination, lastGoodResponseTime time.Time, timeout time.Duration) {
 	var p trace.CoordinationSessionKeepAliveTimeoutInfo
@@ -972,6 +983,7 @@ func CoordinationOnSessionKeepAliveTimeout(t *trace.Coordination, lastGoodRespon
 	p.Timeout = timeout
 	onSessionKeepAliveTimeout(t, p)
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionStopped(t *trace.Coordination, sessionID uint64, expectedSessionID uint64) {
 	var p trace.CoordinationSessionStoppedInfo
@@ -979,12 +991,14 @@ func CoordinationOnSessionStopped(t *trace.Coordination, sessionID uint64, expec
 	p.ExpectedSessionID = expectedSessionID
 	onSessionStopped(t, p)
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionStopTimeout(t *trace.Coordination, timeout time.Duration) {
 	var p trace.CoordinationSessionStopTimeoutInfo
 	p.Timeout = timeout
 	onSessionStopTimeout(t, p)
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionClientTimeout(t *trace.Coordination, lastGoodResponseTime time.Time, timeout time.Duration) {
 	var p trace.CoordinationSessionClientTimeoutInfo
@@ -992,18 +1006,21 @@ func CoordinationOnSessionClientTimeout(t *trace.Coordination, lastGoodResponseT
 	p.Timeout = timeout
 	onSessionClientTimeout(t, p)
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionServerExpire(t *trace.Coordination, failure *Ydb_Coordination.SessionResponse_Failure) {
 	var p trace.CoordinationSessionServerExpireInfo
 	p.Failure = failure
 	onSessionServerExpire(t, p)
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionServerError(t *trace.Coordination, failure *Ydb_Coordination.SessionResponse_Failure) {
 	var p trace.CoordinationSessionServerErrorInfo
 	p.Failure = failure
 	onSessionServerError(t, p)
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionReceive(t *trace.Coordination) func(response *Ydb_Coordination.SessionResponse, _ error) {
 	var p trace.CoordinationSessionReceiveStartInfo
@@ -1015,18 +1032,21 @@ func CoordinationOnSessionReceive(t *trace.Coordination) func(response *Ydb_Coor
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionReceiveUnexpected(t *trace.Coordination, response *Ydb_Coordination.SessionResponse) {
 	var p trace.CoordinationSessionReceiveUnexpectedInfo
 	p.Response = response
 	onSessionReceiveUnexpected(t, p)
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionStop(t *trace.Coordination, sessionID uint64) {
 	var p trace.CoordinationSessionStopInfo
 	p.SessionID = sessionID
 	onSessionStop(t, p)
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionStart(t *trace.Coordination) func(error) {
 	var p trace.CoordinationSessionStartStartInfo
@@ -1037,6 +1057,7 @@ func CoordinationOnSessionStart(t *trace.Coordination) func(error) {
 		res(p)
 	}
 }
+
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func CoordinationOnSessionSend(t *trace.Coordination, request *Ydb_Coordination.SessionRequest) func(error) {
 	var p trace.CoordinationSessionSendStartInfo

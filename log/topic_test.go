@@ -13,13 +13,11 @@ import (
 func TestLazyProtoStringiferUpdateTokenRequest(t *testing.T) {
 	const token = "3:serv:CMmNAXXXXXXSA"
 
-	message := &Ydb_Topic.StreamWriteMessage_FromClient{
-		ClientMessage: &Ydb_Topic.StreamWriteMessage_FromClient_UpdateTokenRequest{
-			UpdateTokenRequest: &Ydb_Topic.UpdateTokenRequest{
-				Token: token,
-			},
-		},
-	}
+	message := Ydb_Topic.StreamWriteMessage_FromClient_builder{
+		UpdateTokenRequest: Ydb_Topic.UpdateTokenRequest_builder{
+			Token: token,
+		}.Build(),
+	}.Build()
 
 	formatted := lazyProtoStringifer{message: message}.String()
 

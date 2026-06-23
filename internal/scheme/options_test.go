@@ -40,26 +40,26 @@ func TestSchemeOptions(t *testing.T) {
 
 		count := len(desc.actions)
 		for _, a := range desc.actions {
-			switch a := a.GetAction().(type) {
-			case *Ydb_Scheme.PermissionsAction_ChangeOwner:
+			switch a.WhichAction() {
+			case Ydb_Scheme.PermissionsAction_ChangeOwner_case:
 				count--
-				if a.ChangeOwner != "ow" {
+				if a.GetChangeOwner() != "ow" {
 					t.Errorf("Owner is not as expected")
 				}
-			case *Ydb_Scheme.PermissionsAction_Grant:
+			case Ydb_Scheme.PermissionsAction_Grant_case:
 				count--
-				if a.Grant.GetSubject() != "grant" || len(a.Grant.GetPermissionNames()) != 3 {
+				if a.GetGrant().GetSubject() != "grant" || len(a.GetGrant().GetPermissionNames()) != 3 {
 					t.Errorf("Grant is not as expected")
 				}
-			case *Ydb_Scheme.PermissionsAction_Set:
+			case Ydb_Scheme.PermissionsAction_Set_case:
 				count--
-				if a.Set.GetSubject() != "set" || len(a.Set.GetPermissionNames()) != 1 || a.Set.GetPermissionNames()[0] != "d" {
+				if a.GetSet().GetSubject() != "set" || len(a.GetSet().GetPermissionNames()) != 1 || a.GetSet().GetPermissionNames()[0] != "d" {
 					t.Errorf("Set is not as expected")
 				}
-			case *Ydb_Scheme.PermissionsAction_Revoke:
+			case Ydb_Scheme.PermissionsAction_Revoke_case:
 				count--
-				revokeSubject := a.Revoke.GetSubject()
-				permissionNames := a.Revoke.GetPermissionNames()
+				revokeSubject := a.GetRevoke().GetSubject()
+				permissionNames := a.GetRevoke().GetPermissionNames()
 				if revokeSubject != "revoke" || len(permissionNames) != 1 || permissionNames[0] != "e" {
 					t.Errorf("Revoke is not as expected")
 				}

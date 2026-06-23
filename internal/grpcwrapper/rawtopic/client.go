@@ -86,14 +86,14 @@ func (c *Client) CommitOffset(
 	offset int64,
 	readSessionID string,
 ) error {
-	resp, err := c.service.CommitOffset(ctx, &Ydb_Topic.CommitOffsetRequest{
+	resp, err := c.service.CommitOffset(ctx, Ydb_Topic.CommitOffsetRequest_builder{
 		OperationParams: operationParams.ToProto(),
 		Path:            path,
 		PartitionId:     partitionID,
 		Consumer:        consumer,
 		Offset:          offset,
 		ReadSessionId:   readSessionID,
-	})
+	}.Build())
 	if err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: commit offset grpc failed: %w", err))
 	}

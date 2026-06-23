@@ -45,12 +45,12 @@ func TestSessionKeepAlive(t *testing.T) {
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableKeepAlive: func(any) (proto.Message, error) {
-						return &Ydb_Table.KeepAliveResult{SessionStatus: status}, e
+						return Ydb_Table.KeepAliveResult_builder{SessionStatus: status}.Build(), e
 					},
 					testutil.TableCreateSession: func(any) (proto.Message, error) {
-						return &Ydb_Table.CreateSessionResult{
+						return Ydb_Table.CreateSessionResult_builder{
 							SessionId: testutil.SessionID(),
-						}, nil
+						}.Build(), nil
 					},
 				},
 			),
@@ -99,9 +99,9 @@ func TestSessionDescribeTable(t *testing.T) {
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(any) (proto.Message, error) {
-						return &Ydb_Table.CreateSessionResult{
+						return Ydb_Table.CreateSessionResult_builder{
 							SessionId: testutil.SessionID(),
-						}, nil
+						}.Build(), nil
 					},
 					testutil.TableDescribeTable: func(any) (proto.Message, error) {
 						r := &Ydb_Table.DescribeTableResult{}
@@ -169,20 +169,20 @@ func TestSessionDescribeTable(t *testing.T) {
 			Indexes:     []options.IndexDescription{},
 			Changefeeds: make([]options.ChangefeedDescription, 0),
 		}
-		result = &Ydb_Table.DescribeTableResult{
-			Self: &Ydb_Scheme.Entry{
+		result = Ydb_Table.DescribeTableResult_builder{
+			Self: Ydb_Scheme.Entry_builder{
 				Name:                 expect.Name,
 				Owner:                "",
 				Type:                 0,
 				EffectivePermissions: nil,
 				Permissions:          nil,
-			},
+			}.Build(),
 			Columns: []*Ydb_Table.ColumnMeta{
-				{
+				Ydb_Table.ColumnMeta_builder{
 					Name:   expect.Columns[0].Name,
 					Type:   types.TypeToYDB(expect.Columns[0].Type),
 					Family: "testFamily",
-				},
+				}.Build(),
 			},
 			PrimaryKey: expect.PrimaryKey,
 			ShardKeyBounds: []*Ydb.TypedValue{
@@ -191,16 +191,16 @@ func TestSessionDescribeTable(t *testing.T) {
 			Indexes:    nil,
 			TableStats: nil,
 			ColumnFamilies: []*Ydb_Table.ColumnFamily{
-				{
+				Ydb_Table.ColumnFamily_builder{
 					Name:         "testFamily",
 					Data:         nil,
 					Compression:  Ydb_Table.ColumnFamily_COMPRESSION_LZ4,
 					KeepInMemory: Ydb.FeatureFlag_ENABLED,
-				},
+				}.Build(),
 			},
 			ReadReplicasSettings: expect.ReadReplicaSettings.ToYDB(),
 			StorageSettings:      expect.StorageSettings.ToYDB(),
-		}
+		}.Build()
 
 		d, err := s.DescribeTable(ctx, "")
 		if err != nil {
@@ -374,18 +374,18 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 							testutil.WithInvokeHandlers(
 								testutil.InvokeHandlers{
 									testutil.TableExecuteDataQuery: func(any) (proto.Message, error) {
-										return &Ydb_Table.ExecuteQueryResult{
-											TxMeta: &Ydb_Table.TransactionMeta{
+										return Ydb_Table.ExecuteQueryResult_builder{
+											TxMeta: Ydb_Table.TransactionMeta_builder{
 												Id: "",
-											},
-										}, nil
+											}.Build(),
+										}.Build(), nil
 									},
 									testutil.TableBeginTransaction: func(any) (proto.Message, error) {
-										return &Ydb_Table.BeginTransactionResult{
-											TxMeta: &Ydb_Table.TransactionMeta{
+										return Ydb_Table.BeginTransactionResult_builder{
+											TxMeta: Ydb_Table.TransactionMeta_builder{
 												Id: "",
-											},
-										}, nil
+											}.Build(),
+										}.Build(), nil
 									},
 									testutil.TableExplainDataQuery: func(request any) (result proto.Message, err error) {
 										return &Ydb_Table.ExplainQueryResult{}, nil
@@ -394,9 +394,9 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 										return &Ydb_Table.PrepareQueryResult{}, nil
 									},
 									testutil.TableCreateSession: func(any) (proto.Message, error) {
-										return &Ydb_Table.CreateSessionResult{
+										return Ydb_Table.CreateSessionResult_builder{
 											SessionId: testutil.SessionID(),
-										}, nil
+										}.Build(), nil
 									},
 									testutil.TableDeleteSession: func(request any) (result proto.Message, err error) {
 										return &Ydb_Table.DeleteSessionResponse{}, nil
@@ -432,68 +432,48 @@ func TestCreateTableRegression(t *testing.T) {
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request any) (proto.Message, error) {
-					return &Ydb_Table.CreateSessionResult{
+					return Ydb_Table.CreateSessionResult_builder{
 						SessionId: "",
-					}, nil
+					}.Build(), nil
 				},
 				testutil.TableCreateTable: func(act any) (proto.Message, error) {
-					exp := &Ydb_Table.CreateTableRequest{
+					exp := Ydb_Table.CreateTableRequest_builder{
 						SessionId: "",
 						Path:      "episodes",
 						Columns: []*Ydb_Table.ColumnMeta{
-							{
+							Ydb_Table.ColumnMeta_builder{
 								Name: "series_id",
-								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									}}},
-								}},
-							},
-							{
+								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+							}.Build(),
+							Ydb_Table.ColumnMeta_builder{
 								Name: "season_id",
-								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									}}},
-								}},
-							},
-							{
+								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+							}.Build(),
+							Ydb_Table.ColumnMeta_builder{
 								Name: "episode_id",
-								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									}}},
-								}},
-							},
-							{
+								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+							}.Build(),
+							Ydb_Table.ColumnMeta_builder{
 								Name: "title",
-								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UTF8,
-									}}},
-								}},
-							},
-							{
+								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build()}.Build()}.Build(),
+							}.Build(),
+							Ydb_Table.ColumnMeta_builder{
 								Name: "air_date",
-								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									}}},
-								}},
-							},
+								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+							}.Build(),
 						},
 						PrimaryKey: []string{
 							"series_id",
 							"season_id",
 							"episode_id",
 						},
-						OperationParams: &Ydb_Operations.OperationParams{
+						OperationParams: Ydb_Operations.OperationParams_builder{
 							OperationMode: Ydb_Operations.OperationParams_SYNC,
-						},
+						}.Build(),
 						Attributes: map[string]string{
 							"attr": "attr_value",
 						},
-					}
+					}.Build()
 					if !proto.Equal(exp, act.(proto.Message)) {
 						//nolint:revive
 						return nil, fmt.Errorf("proto's not equal: \n\nact: %v\n\nexp: %s\n\n", act, exp)
@@ -532,56 +512,36 @@ func TestDescribeTableRegression(t *testing.T) {
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request any) (proto.Message, error) {
-					return &Ydb_Table.CreateSessionResult{
+					return Ydb_Table.CreateSessionResult_builder{
 						SessionId: "",
-					}, nil
+					}.Build(), nil
 				},
 				testutil.TableDescribeTable: func(act any) (proto.Message, error) {
-					return &Ydb_Table.DescribeTableResult{
-						Self: &Ydb_Scheme.Entry{
+					return Ydb_Table.DescribeTableResult_builder{
+						Self: Ydb_Scheme.Entry_builder{
 							Name: "episodes",
-						},
+						}.Build(),
 						Columns: []*Ydb_Table.ColumnMeta{
-							{
+							Ydb_Table.ColumnMeta_builder{
 								Name: "series_id",
-								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									}}},
-								}},
-							},
-							{
+								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+							}.Build(),
+							Ydb_Table.ColumnMeta_builder{
 								Name: "season_id",
-								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									}}},
-								}},
-							},
-							{
+								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+							}.Build(),
+							Ydb_Table.ColumnMeta_builder{
 								Name: "episode_id",
-								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									}}},
-								}},
-							},
-							{
+								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+							}.Build(),
+							Ydb_Table.ColumnMeta_builder{
 								Name: "title",
-								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UTF8,
-									}}},
-								}},
-							},
-							{
+								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build()}.Build()}.Build(),
+							}.Build(),
+							Ydb_Table.ColumnMeta_builder{
 								Name: "air_date",
-								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									}}},
-								}},
-							},
+								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+							}.Build(),
 						},
 						PrimaryKey: []string{
 							"series_id",
@@ -591,7 +551,7 @@ func TestDescribeTableRegression(t *testing.T) {
 						Attributes: map[string]string{
 							"attr": "attr_value",
 						},
-					}, nil
+					}.Build(), nil
 				},
 			},
 		),
@@ -688,21 +648,21 @@ func TestCopyTables(t *testing.T) {
 			operationTimeout:     time.Second,
 			operationCancelAfter: time.Second,
 			service: &copyTablesMock{
-				CopyTablesRequest: &Ydb_Table.CopyTablesRequest{
+				CopyTablesRequest: Ydb_Table.CopyTablesRequest_builder{
 					SessionId: "1",
 					Tables: []*Ydb_Table.CopyTableItem{
-						{
+						Ydb_Table.CopyTableItem_builder{
 							SourcePath:      "from",
 							DestinationPath: "to",
 							OmitIndexes:     true,
-						},
+						}.Build(),
 					},
-					OperationParams: &Ydb_Operations.OperationParams{
+					OperationParams: Ydb_Operations.OperationParams_builder{
 						OperationMode:    Ydb_Operations.OperationParams_SYNC,
 						OperationTimeout: durationpb.New(time.Second),
 						CancelAfter:      durationpb.New(time.Second),
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 			opts: []options.CopyTablesOption{
 				options.CopyTablesItem("from", "to", true),
@@ -714,31 +674,31 @@ func TestCopyTables(t *testing.T) {
 			operationTimeout:     2 * time.Second,
 			operationCancelAfter: 2 * time.Second,
 			service: &copyTablesMock{
-				CopyTablesRequest: &Ydb_Table.CopyTablesRequest{
+				CopyTablesRequest: Ydb_Table.CopyTablesRequest_builder{
 					SessionId: "2",
 					Tables: []*Ydb_Table.CopyTableItem{
-						{
+						Ydb_Table.CopyTableItem_builder{
 							SourcePath:      "from1",
 							DestinationPath: "to1",
 							OmitIndexes:     true,
-						},
-						{
+						}.Build(),
+						Ydb_Table.CopyTableItem_builder{
 							SourcePath:      "from2",
 							DestinationPath: "to2",
 							OmitIndexes:     false,
-						},
-						{
+						}.Build(),
+						Ydb_Table.CopyTableItem_builder{
 							SourcePath:      "from3",
 							DestinationPath: "to3",
 							OmitIndexes:     true,
-						},
+						}.Build(),
 					},
-					OperationParams: &Ydb_Operations.OperationParams{
+					OperationParams: Ydb_Operations.OperationParams_builder{
 						OperationMode:    Ydb_Operations.OperationParams_SYNC,
 						OperationTimeout: durationpb.New(2 * time.Second),
 						CancelAfter:      durationpb.New(2 * time.Second),
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 			opts: []options.CopyTablesOption{
 				options.CopyTablesItem("from1", "to1", true),
@@ -752,21 +712,21 @@ func TestCopyTables(t *testing.T) {
 			operationTimeout:     time.Second,
 			operationCancelAfter: time.Second,
 			service: &copyTablesMock{
-				CopyTablesRequest: &Ydb_Table.CopyTablesRequest{
+				CopyTablesRequest: Ydb_Table.CopyTablesRequest_builder{
 					SessionId: "1",
 					Tables: []*Ydb_Table.CopyTableItem{
-						{
+						Ydb_Table.CopyTableItem_builder{
 							SourcePath:      "from",
 							DestinationPath: "to",
 							OmitIndexes:     true,
-						},
+						}.Build(),
 					},
-					OperationParams: &Ydb_Operations.OperationParams{
+					OperationParams: Ydb_Operations.OperationParams_builder{
 						OperationMode:    Ydb_Operations.OperationParams_SYNC,
 						OperationTimeout: durationpb.New(time.Second),
 						CancelAfter:      durationpb.New(time.Second),
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 			opts: []options.CopyTablesOption{
 				options.CopyTablesItem("from1", "to1", true),
@@ -822,21 +782,21 @@ func TestRenameTables(t *testing.T) {
 			operationTimeout:     time.Second,
 			operationCancelAfter: time.Second,
 			service: &renameTablesMock{
-				RenameTablesRequest: &Ydb_Table.RenameTablesRequest{
+				RenameTablesRequest: Ydb_Table.RenameTablesRequest_builder{
 					SessionId: "1",
 					Tables: []*Ydb_Table.RenameTableItem{
-						{
+						Ydb_Table.RenameTableItem_builder{
 							SourcePath:         "from",
 							DestinationPath:    "to",
 							ReplaceDestination: true,
-						},
+						}.Build(),
 					},
-					OperationParams: &Ydb_Operations.OperationParams{
+					OperationParams: Ydb_Operations.OperationParams_builder{
 						OperationMode:    Ydb_Operations.OperationParams_SYNC,
 						OperationTimeout: durationpb.New(time.Second),
 						CancelAfter:      durationpb.New(time.Second),
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 			opts: []options.RenameTablesOption{
 				options.RenameTablesItem("from", "to", true),
@@ -848,31 +808,31 @@ func TestRenameTables(t *testing.T) {
 			operationTimeout:     2 * time.Second,
 			operationCancelAfter: 2 * time.Second,
 			service: &renameTablesMock{
-				RenameTablesRequest: &Ydb_Table.RenameTablesRequest{
+				RenameTablesRequest: Ydb_Table.RenameTablesRequest_builder{
 					SessionId: "2",
 					Tables: []*Ydb_Table.RenameTableItem{
-						{
+						Ydb_Table.RenameTableItem_builder{
 							SourcePath:         "from1",
 							DestinationPath:    "to1",
 							ReplaceDestination: true,
-						},
-						{
+						}.Build(),
+						Ydb_Table.RenameTableItem_builder{
 							SourcePath:         "from2",
 							DestinationPath:    "to2",
 							ReplaceDestination: false,
-						},
-						{
+						}.Build(),
+						Ydb_Table.RenameTableItem_builder{
 							SourcePath:         "from3",
 							DestinationPath:    "to3",
 							ReplaceDestination: true,
-						},
+						}.Build(),
 					},
-					OperationParams: &Ydb_Operations.OperationParams{
+					OperationParams: Ydb_Operations.OperationParams_builder{
 						OperationMode:    Ydb_Operations.OperationParams_SYNC,
 						OperationTimeout: durationpb.New(2 * time.Second),
 						CancelAfter:      durationpb.New(2 * time.Second),
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 			opts: []options.RenameTablesOption{
 				options.RenameTablesItem("from1", "to1", true),
@@ -886,21 +846,21 @@ func TestRenameTables(t *testing.T) {
 			operationTimeout:     time.Second,
 			operationCancelAfter: time.Second,
 			service: &renameTablesMock{
-				RenameTablesRequest: &Ydb_Table.RenameTablesRequest{
+				RenameTablesRequest: Ydb_Table.RenameTablesRequest_builder{
 					SessionId: "1",
 					Tables: []*Ydb_Table.RenameTableItem{
-						{
+						Ydb_Table.RenameTableItem_builder{
 							SourcePath:         "from",
 							DestinationPath:    "to",
 							ReplaceDestination: true,
-						},
+						}.Build(),
 					},
-					OperationParams: &Ydb_Operations.OperationParams{
+					OperationParams: Ydb_Operations.OperationParams_builder{
 						OperationMode:    Ydb_Operations.OperationParams_SYNC,
 						OperationTimeout: durationpb.New(time.Second),
 						CancelAfter:      durationpb.New(time.Second),
-					},
-				},
+					}.Build(),
+				}.Build(),
 			},
 			opts: []options.RenameTablesOption{
 				options.RenameTablesItem("from1", "to1", true),

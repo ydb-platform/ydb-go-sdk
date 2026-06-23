@@ -1,0 +1,96 @@
+FAIL	github.com/ydb-platform/ydb-go-sdk/v3/internal/stats [setup failed]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3	0.553s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/balancers	0.008s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/coordination	0.010s [no tests to run]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/discovery	0.009s [no tests to run]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/background	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer	3.082s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/cluster	1.368s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/bind	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/cmd/gtrace	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/conn	0.367s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/conversation	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic	0.007s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader	(cached) [no tests to run]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/kv	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/meta	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/operation	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/params	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/pool	(cached)
+FAIL	github.com/ydb-platform/ydb-go-sdk/v3/internal/query [build failed]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/test	0.085s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/errors	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/safe	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/secret	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/stack	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/table	29.074s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/table/test	0.073s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/topic	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter	7.032s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser	0.009s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal	36.028s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal	15.178s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/tx	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/types	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/value	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/version	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/xiface	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/xruntime	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql	0.072s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/test	0.083s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery	0.008s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/log	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/meta	0.009s [no tests to run]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/metrics	0.022s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/operation	0.007s [no tests to run]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/pkg/xhash	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/query	0.017s [no tests to run]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter	0.027s [no tests to run]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/retry	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/retry/budget	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/scheme	0.010s [no tests to run]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/scripting	0.007s [no tests to run]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/spans	0.023s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/sugar	0.043s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/table	0.015s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/table/options	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/table/types	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/testutil	(cached)
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/topic	0.006s [no tests to run]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener	0.012s [no tests to run]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions	0.007s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader	0.006s [no tests to run]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes	0.005s
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter	0.006s [no tests to run]
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/trace	(cached)
+FAIL

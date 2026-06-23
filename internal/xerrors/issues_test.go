@@ -14,34 +14,34 @@ func Test_iterateByIssues(t *testing.T) {
 			counter := 0
 
 			stopped := iterateByIssues(Operation(WithStatusCode(Ydb.StatusIds_ABORTED), WithIssues([]*Ydb_Issue.IssueMessage{
-				{
+				Ydb_Issue.IssueMessage_builder{
 					Message:   "issue one",
 					IssueCode: 1,
-					Position: &Ydb_Issue.IssueMessage_Position{
+					Position: Ydb_Issue.IssueMessage_Position_builder{
 						Row:    15,
 						Column: 3,
 						File:   "",
-					},
-				},
-				{
+					}.Build(),
+				}.Build(),
+				Ydb_Issue.IssueMessage_builder{
 					Message:   "issue two",
 					IssueCode: 2,
 					Issues: []*Ydb_Issue.IssueMessage{
-						{
+						Ydb_Issue.IssueMessage_builder{
 							Message:   "issue three",
 							IssueCode: 3,
-							Position: &Ydb_Issue.IssueMessage_Position{
+							Position: Ydb_Issue.IssueMessage_Position_builder{
 								Row:    16,
 								Column: 4,
 								File:   "test.yql",
-							},
-						},
-						{
+							}.Build(),
+						}.Build(),
+						Ydb_Issue.IssueMessage_builder{
 							Message:   "issue four",
 							IssueCode: 4,
-						},
+						}.Build(),
 					},
-				},
+				}.Build(),
 			})),
 				func(message string, code Ydb.StatusIds_StatusCode, severity uint32) (stop bool) {
 					counter++
@@ -57,34 +57,34 @@ func Test_iterateByIssues(t *testing.T) {
 			counter := 0
 
 			stopped := iterateByIssues(Operation(WithStatusCode(Ydb.StatusIds_ABORTED), WithIssues([]*Ydb_Issue.IssueMessage{
-				{
+				Ydb_Issue.IssueMessage_builder{
 					Message:   "issue one",
 					IssueCode: 1,
-					Position: &Ydb_Issue.IssueMessage_Position{
+					Position: Ydb_Issue.IssueMessage_Position_builder{
 						Row:    15,
 						Column: 3,
 						File:   "",
-					},
-				},
-				{
+					}.Build(),
+				}.Build(),
+				Ydb_Issue.IssueMessage_builder{
 					Message:   "issue two",
 					IssueCode: 2,
 					Issues: []*Ydb_Issue.IssueMessage{
-						{
+						Ydb_Issue.IssueMessage_builder{
 							Message:   "issue three",
 							IssueCode: 3,
-							Position: &Ydb_Issue.IssueMessage_Position{
+							Position: Ydb_Issue.IssueMessage_Position_builder{
 								Row:    16,
 								Column: 4,
 								File:   "test.yql",
-							},
-						},
-						{
+							}.Build(),
+						}.Build(),
+						Ydb_Issue.IssueMessage_builder{
 							Message:   "issue four",
 							IssueCode: 4,
-						},
+						}.Build(),
 					},
-				},
+				}.Build(),
 			})),
 				func(message string, code Ydb.StatusIds_StatusCode, severity uint32) (stop bool) {
 					counter++

@@ -386,6 +386,9 @@ func (s *valueScanner) any() any {
 	if s.isCurrentTypeOptional() {
 		s.unwrap()
 		x = s.stack.current()
+		if s.isNull() {
+			return nil
+		}
 	}
 
 	t := internalTypes.TypeFromYDB(x.t)
@@ -461,13 +464,19 @@ func (s *valueScanner) any() any {
 	case internalTypes.Text, internalTypes.DyNumber:
 		return s.text()
 	case internalTypes.YSON:
-		switch x := s.stack.currentValue().(type) {
-		case *Ydb.Value_TextValue:
-			return xstring.ToBytes(x.TextValue)
-		case *Ydb.Value_BytesValue:
-			return x.BytesValue
+		cur, ok := s.stack.currentValue().(*Ydb.Value)
+		if !ok {
+			_ = s.errorf(0, "valueScanner.any(): type assertion to *Ydb.Value failed")
+
+			return nil
+		}
+		switch cur.WhichValue() {
+		case Ydb.Value_TextValue_case:
+			return xstring.ToBytes(cur.GetTextValue())
+		case Ydb.Value_BytesValue_case:
+			return cur.GetBytesValue()
 		default:
-			_ = s.errorf(0, "valueScanner.any(): incorrect YSON underlying type %T (expected TextValue or BytesValue)", x)
+			_ = s.errorf(0, "valueScanner.any(): incorrect YSON underlying type (expected TextValue or BytesValue)")
 
 			return nil
 		}
@@ -494,9 +503,11 @@ func (s *valueScanner) isCurrentTypeOptional() bool {
 }
 
 func (s *valueScanner) isNull() bool {
-	_, yes := s.stack.currentValue().(*Ydb.Value_NullFlagValue)
-
-	return yes
+	v, ok := s.stack.currentValue().(*Ydb.Value)
+	if !ok {
+		return false
+	}
+	return v.WhichValue() == Ydb.Value_NullFlagValue_case
 }
 
 // unwrap current item under scan interpreting it as Optional<Type> types
@@ -506,26 +517,41 @@ func (s *valueScanner) unwrap() {
 		return
 	}
 
-	t, _ := s.stack.currentType().(*Ydb.Type_OptionalType)
-	if t == nil {
+	typ, ok := s.stack.currentType().(*Ydb.Type)
+	if !ok {
 		return
 	}
+	if typ.WhichType() != Ydb.Type_OptionalType_case {
+		return
+	}
+	t := typ.GetOptionalType()
 
-	if isOptional(t.OptionalType.GetItem()) {
+	if isOptional(t.GetItem()) {
 		s.stack.scanItem.v = s.unwrapValue()
 	}
-	s.stack.scanItem.t = t.OptionalType.GetItem()
+	s.stack.scanItem.t = t.GetItem()
 }
 
 func (s *valueScanner) unwrapValue() (v *Ydb.Value) {
-	x, _ := s.stack.currentValue().(*Ydb.Value_NestedValue)
-	if x == nil {
-		s.valueTypeError(s.stack.currentValue(), x)
-
-		return
+	cur, ok := s.stack.currentValue().(*Ydb.Value)
+	if !ok {
+		s.valueTypeError("type assertion failed", nil)
+		return nil
+	}
+	if cur.WhichValue() != Ydb.Value_NestedValue_case {
+		s.valueTypeError(cur.WhichValue(), nil)
+		return nil
 	}
 
-	return x.NestedValue
+	return cur.GetNestedValue()
+}
+
+func (s *valueScanner) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.DecimalType) {
+	if typ.WhichType() != Ydb.Type_DecimalType_case {
+		s.typeError(typ, nil)
+		return nil
+	}
+	return typ.GetDecimalType()
 }
 
 func (s *valueScanner) unwrapDecimal() decimal.Decimal {
@@ -540,28 +566,23 @@ func (s *valueScanner) unwrapDecimal() decimal.Decimal {
 
 	return decimal.Decimal{
 		Bytes:     s.uint128(),
-		Precision: d.DecimalType.GetPrecision(),
-		Scale:     d.DecimalType.GetScale(),
+		Precision: d.GetPrecision(),
+		Scale:     d.GetScale(),
 	}
-}
-
-func (s *valueScanner) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
-	if t, _ = typ.GetType().(*Ydb.Type_DecimalType); t == nil {
-		s.typeError(typ.GetType(), t)
-	}
-
-	return
 }
 
 func (s *valueScanner) bool() (v bool) {
-	x, _ := s.stack.currentValue().(*Ydb.Value_BoolValue)
-	if x == nil {
-		s.valueTypeError(s.stack.currentValue(), x)
-
+	cur, ok := s.stack.currentValue().(*Ydb.Value)
+	if !ok {
+		s.valueTypeError("type assertion failed", nil)
+		return
+	}
+	if cur.WhichValue() != Ydb.Value_BoolValue_case {
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
-	return x.BoolValue
+	return cur.GetBoolValue()
 }
 
 func (s *valueScanner) int8() (v int8) {
@@ -609,102 +630,124 @@ func (s *valueScanner) uint16() (v uint16) {
 }
 
 func (s *valueScanner) int32() (v int32) {
-	x, _ := s.stack.currentValue().(*Ydb.Value_Int32Value)
-	if x == nil {
-		s.valueTypeError(s.stack.currentValue(), x)
-
+	cur, ok := s.stack.currentValue().(*Ydb.Value)
+	if !ok {
+		s.valueTypeError("type assertion failed", nil)
+		return
+	}
+	if cur.WhichValue() != Ydb.Value_Int32Value_case {
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
-	return x.Int32Value
+	return cur.GetInt32Value()
 }
 
 func (s *valueScanner) uint32() (v uint32) {
-	x, _ := s.stack.currentValue().(*Ydb.Value_Uint32Value)
-	if x == nil {
-		s.valueTypeError(s.stack.currentValue(), x)
-
+	cur, ok := s.stack.currentValue().(*Ydb.Value)
+	if !ok {
+		s.valueTypeError("type assertion failed", nil)
+		return
+	}
+	if cur.WhichValue() != Ydb.Value_Uint32Value_case {
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
-	return x.Uint32Value
+	return cur.GetUint32Value()
 }
 
 func (s *valueScanner) int64() (v int64) {
-	x, _ := s.stack.currentValue().(*Ydb.Value_Int64Value)
-	if x == nil {
-		s.valueTypeError(s.stack.currentValue(), x)
-
+	cur, ok := s.stack.currentValue().(*Ydb.Value)
+	if !ok {
+		s.valueTypeError("type assertion failed", nil)
+		return
+	}
+	if cur.WhichValue() != Ydb.Value_Int64Value_case {
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
-	return x.Int64Value
+	return cur.GetInt64Value()
 }
 
 func (s *valueScanner) uint64() (v uint64) {
-	x, _ := s.stack.currentValue().(*Ydb.Value_Uint64Value)
-	if x == nil {
-		s.valueTypeError(s.stack.currentValue(), x)
-
+	cur, ok := s.stack.currentValue().(*Ydb.Value)
+	if !ok {
+		s.valueTypeError("type assertion failed", nil)
+		return
+	}
+	if cur.WhichValue() != Ydb.Value_Uint64Value_case {
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
-	return x.Uint64Value
+	return cur.GetUint64Value()
 }
 
 func (s *valueScanner) float() (v float32) {
-	x, _ := s.stack.currentValue().(*Ydb.Value_FloatValue)
-	if x == nil {
-		s.valueTypeError(s.stack.currentValue(), x)
-
+	cur, ok := s.stack.currentValue().(*Ydb.Value)
+	if !ok {
+		s.valueTypeError("type assertion failed", nil)
+		return
+	}
+	if cur.WhichValue() != Ydb.Value_FloatValue_case {
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
-	return x.FloatValue
+	return cur.GetFloatValue()
 }
 
 func (s *valueScanner) double() (v float64) {
-	x, _ := s.stack.currentValue().(*Ydb.Value_DoubleValue)
-	if x == nil {
-		s.valueTypeError(s.stack.currentValue(), x)
-
+	cur, ok := s.stack.currentValue().(*Ydb.Value)
+	if !ok {
+		s.valueTypeError("type assertion failed", nil)
+		return
+	}
+	if cur.WhichValue() != Ydb.Value_DoubleValue_case {
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
-	return x.DoubleValue
+	return cur.GetDoubleValue()
 }
 
 func (s *valueScanner) bytes() (v []byte) {
-	x, _ := s.stack.currentValue().(*Ydb.Value_BytesValue)
-	if x == nil {
-		s.valueTypeError(s.stack.currentValue(), x)
-
+	cur, ok := s.stack.currentValue().(*Ydb.Value)
+	if !ok {
+		s.valueTypeError("type assertion failed", nil)
+		return
+	}
+	if cur.WhichValue() != Ydb.Value_BytesValue_case {
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
-	return x.BytesValue
+	return cur.GetBytesValue()
 }
 
 func (s *valueScanner) text() (v string) {
-	x, _ := s.stack.currentValue().(*Ydb.Value_TextValue)
-	if x == nil {
-		s.valueTypeError(s.stack.currentValue(), x)
-
+	cur, ok := s.stack.currentValue().(*Ydb.Value)
+	if !ok {
+		s.valueTypeError("type assertion failed", nil)
+		return
+	}
+	if cur.WhichValue() != Ydb.Value_TextValue_case {
+		s.valueTypeError(cur.WhichValue(), nil)
 		return
 	}
 
-	return x.TextValue
+	return cur.GetTextValue()
 }
 
-func (s *valueScanner) low128() (v uint64) {
-	x, _ := s.stack.currentValue().(*Ydb.Value_Low_128)
-	if x == nil {
-		s.valueTypeError(s.stack.currentValue(), x)
-
-		return
+func (s *valueScanner) low128() uint64 {
+	cur, ok := s.stack.currentValue().(*Ydb.Value)
+	if !ok {
+		_ = s.errorf(0, "low128(): type assertion failed")
+		return 0
 	}
-
-	return x.Low_128
+	return cur.GetLow_128()
 }
 
 func (s *valueScanner) uint128() (v [16]byte) {
@@ -761,9 +804,13 @@ func (s *valueScanner) uuid() uuid.UUID {
 }
 
 func (s *valueScanner) null() {
-	x, _ := s.stack.currentValue().(*Ydb.Value_NullFlagValue)
-	if x == nil {
-		s.valueTypeError(s.stack.currentValue(), x)
+	cur, ok := s.stack.currentValue().(*Ydb.Value)
+	if !ok {
+		s.valueTypeError("type assertion failed", nil)
+		return
+	}
+	if cur.WhichValue() != Ydb.Value_NullFlagValue_case {
+		s.valueTypeError(cur.WhichValue(), nil)
 	}
 }
 
@@ -805,13 +852,19 @@ func (s *valueScanner) setString(dst *string) {
 	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
 		*dst = s.text()
 	case Ydb.Type_YSON:
-		switch x := s.stack.currentValue().(type) {
-		case *Ydb.Value_TextValue:
-			*dst = x.TextValue
-		case *Ydb.Value_BytesValue:
-			*dst = xstring.FromBytes(x.BytesValue)
+		cur, ok := s.stack.currentValue().(*Ydb.Value)
+		if !ok {
+			_ = s.errorf(0, "scan row failed: type assertion to *Ydb.Value failed")
+
+			return
+		}
+		switch cur.WhichValue() {
+		case Ydb.Value_TextValue_case:
+			*dst = cur.GetTextValue()
+		case Ydb.Value_BytesValue_case:
+			*dst = xstring.FromBytes(cur.GetBytesValue())
 		default:
-			_ = s.errorf(0, "scan row failed: incorrect YSON underlying type %T (expected TextValue or BytesValue)", x)
+			_ = s.errorf(0, "scan row failed: incorrect YSON underlying type (expected TextValue or BytesValue)")
 		}
 	case Ydb.Type_STRING:
 		*dst = xstring.FromBytes(s.bytes())
@@ -827,13 +880,19 @@ func (s *valueScanner) setByte(dst *[]byte) {
 	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
 		*dst = xstring.ToBytes(s.text())
 	case Ydb.Type_YSON:
-		switch x := s.stack.currentValue().(type) {
-		case *Ydb.Value_TextValue:
-			*dst = xstring.ToBytes(x.TextValue)
-		case *Ydb.Value_BytesValue:
-			*dst = x.BytesValue
+		cur, ok := s.stack.currentValue().(*Ydb.Value)
+		if !ok {
+			_ = s.errorf(0, "scan row failed: type assertion to *Ydb.Value failed")
+
+			return
+		}
+		switch cur.WhichValue() {
+		case Ydb.Value_TextValue_case:
+			*dst = xstring.ToBytes(cur.GetTextValue())
+		case Ydb.Value_BytesValue_case:
+			*dst = cur.GetBytesValue()
 		default:
-			_ = s.errorf(0, "scan row failed: incorrect YSON underlying type %T (expected TextValue or BytesValue)", x)
+			_ = s.errorf(0, "scan row failed: incorrect YSON underlying type (expected TextValue or BytesValue)")
 		}
 	case Ydb.Type_STRING:
 		*dst = s.bytes()
@@ -1403,7 +1462,7 @@ func (s *scanStack) current() item {
 
 func (s *scanStack) currentValue() any {
 	if v := s.current().v; v != nil {
-		return v.GetValue()
+		return v
 	}
 
 	return nil
@@ -1411,7 +1470,7 @@ func (s *scanStack) currentValue() any {
 
 func (s *scanStack) currentType() any {
 	if t := s.current().t; t != nil {
-		return t.GetType()
+		return t
 	}
 
 	return nil
@@ -1421,7 +1480,5 @@ func isOptional(typ *Ydb.Type) bool {
 	if typ == nil {
 		return false
 	}
-	_, yes := typ.GetType().(*Ydb.Type_OptionalType)
-
-	return yes
+	return typ.WhichType() == Ydb.Type_OptionalType_case
 }

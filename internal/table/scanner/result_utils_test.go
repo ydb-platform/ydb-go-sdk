@@ -64,10 +64,10 @@ func TestBaseResult_Stats(t *testing.T) {
 
 	t.Run("with stats", func(t *testing.T) {
 		r := &baseResult{
-			stats: &Ydb_TableStats.QueryStats{
+			stats: Ydb_TableStats.QueryStats_builder{
 				QueryAst:  "test ast",
 				QueryPlan: "test plan",
-			},
+			}.Build(),
 		}
 		stats := r.Stats()
 		// Stats() returns a value type, not a pointer

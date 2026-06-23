@@ -44,14 +44,14 @@ func Discover(
 	config *config.Config,
 ) (endpoints []endpoint.Endpoint, location string, err error) {
 	var (
-		request = Ydb_Discovery.ListEndpointsRequest{
+		request = Ydb_Discovery.ListEndpointsRequest_builder{
 			Database: config.Database(),
-		}
+		}.Build()
 		response *Ydb_Discovery.ListEndpointsResponse
 		result   Ydb_Discovery.ListEndpointsResult
 	)
 
-	response, err = client.ListEndpoints(ctx, &request)
+	response, err = client.ListEndpoints(ctx, request)
 	if err != nil {
 		return nil, location, xerrors.WithStackTrace(
 			xerrors.TransportError(err),

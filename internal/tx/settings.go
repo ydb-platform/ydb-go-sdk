@@ -5,45 +5,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 )
 
-var (
-	querySerializableReadWrite = &Ydb_Query.TransactionSettings_SerializableReadWrite{
-		SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
-	}
-	queryStaleReadOnly = &Ydb_Query.TransactionSettings_StaleReadOnly{
-		StaleReadOnly: &Ydb_Query.StaleModeSettings{},
-	}
-	querySnapshotReadOnly = &Ydb_Query.TransactionSettings_SnapshotReadOnly{
-		SnapshotReadOnly: &Ydb_Query.SnapshotModeSettings{},
-	}
-	querySnapshotReadWrite = &Ydb_Query.TransactionSettings_SnapshotReadWrite{
-		SnapshotReadWrite: &Ydb_Query.SnapshotRWModeSettings{},
-	}
-	queryOnlineReadOnlyAllowInconsistentReads = &Ydb_Query.TransactionSettings_OnlineReadOnly{
-		OnlineReadOnly: &Ydb_Query.OnlineModeSettings{AllowInconsistentReads: true},
-	}
-	queryOnlineReadOnlyForbidInconsistentReads = &Ydb_Query.TransactionSettings_OnlineReadOnly{
-		OnlineReadOnly: &Ydb_Query.OnlineModeSettings{AllowInconsistentReads: false},
-	}
-	tableSerializableReadWrite = &Ydb_Table.TransactionSettings_SerializableReadWrite{
-		SerializableReadWrite: &Ydb_Table.SerializableModeSettings{},
-	}
-	tableStaleReadOnly = &Ydb_Table.TransactionSettings_StaleReadOnly{
-		StaleReadOnly: &Ydb_Table.StaleModeSettings{},
-	}
-	tableSnapshotReadOnly = &Ydb_Table.TransactionSettings_SnapshotReadOnly{
-		SnapshotReadOnly: &Ydb_Table.SnapshotModeSettings{},
-	}
-	tableSnapshotReadWrite = &Ydb_Table.TransactionSettings_SnapshotReadWrite{
-		SnapshotReadWrite: &Ydb_Table.SnapshotRWModeSettings{},
-	}
-	tableOnlineReadOnlyAllowInconsistentReads = &Ydb_Table.TransactionSettings_OnlineReadOnly{
-		OnlineReadOnly: &Ydb_Table.OnlineModeSettings{AllowInconsistentReads: true},
-	}
-	tableOnlineReadOnlyForbidInconsistentReads = &Ydb_Table.TransactionSettings_OnlineReadOnly{
-		OnlineReadOnly: &Ydb_Table.OnlineModeSettings{AllowInconsistentReads: false},
-	}
-)
-
 // Transaction settings options
 type (
 	SettingsOption interface {
@@ -54,27 +15,23 @@ type (
 )
 
 func (opts Settings) applyTableTxSelector(txControl *Ydb_Table.TransactionControl) {
-	beginTx := &Ydb_Table.TransactionControl_BeginTx{
-		BeginTx: &Ydb_Table.TransactionSettings{},
-	}
+	beginTx := &Ydb_Table.TransactionSettings{}
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyTableTxSettingsOption(beginTx.BeginTx)
+			opt.ApplyTableTxSettingsOption(beginTx)
 		}
 	}
-	txControl.TxSelector = beginTx
+	txControl.SetBeginTx(beginTx)
 }
 
 func (opts Settings) applyQueryTxSelector(txControl *Ydb_Query.TransactionControl) {
-	beginTx := &Ydb_Query.TransactionControl_BeginTx{
-		BeginTx: &Ydb_Query.TransactionSettings{},
-	}
+	beginTx := &Ydb_Query.TransactionSettings{}
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyQueryTxSettingsOption(beginTx.BeginTx)
+			opt.ApplyQueryTxSettingsOption(beginTx)
 		}
 	}
-	txControl.TxSelector = beginTx
+	txControl.SetBeginTx(beginTx)
 }
 
 func (opts Settings) ToYdbQuerySettings() *Ydb_Query.TransactionSettings {
@@ -113,11 +70,11 @@ var _ SettingsOption = serializableReadWriteTxSettingsOption{}
 type serializableReadWriteTxSettingsOption struct{}
 
 func (serializableReadWriteTxSettingsOption) ApplyTableTxSettingsOption(settings *Ydb_Table.TransactionSettings) {
-	settings.TxMode = tableSerializableReadWrite
+	settings.SetSerializableReadWrite(&Ydb_Table.SerializableModeSettings{})
 }
 
 func (serializableReadWriteTxSettingsOption) ApplyQueryTxSettingsOption(settings *Ydb_Query.TransactionSettings) {
-	settings.TxMode = querySerializableReadWrite
+	settings.SetSerializableReadWrite(&Ydb_Query.SerializableModeSettings{})
 }
 
 func WithSerializableReadWrite() SettingsOption {
@@ -129,11 +86,11 @@ var _ SettingsOption = snapshotReadOnlyTxSettingsOption{}
 type snapshotReadOnlyTxSettingsOption struct{}
 
 func (snapshotReadOnlyTxSettingsOption) ApplyTableTxSettingsOption(settings *Ydb_Table.TransactionSettings) {
-	settings.TxMode = tableSnapshotReadOnly
+	settings.SetSnapshotReadOnly(&Ydb_Table.SnapshotModeSettings{})
 }
 
 func (snapshotReadOnlyTxSettingsOption) ApplyQueryTxSettingsOption(settings *Ydb_Query.TransactionSettings) {
-	settings.TxMode = querySnapshotReadOnly
+	settings.SetSnapshotReadOnly(&Ydb_Query.SnapshotModeSettings{})
 }
 
 func WithSnapshotReadOnly() SettingsOption {
@@ -145,11 +102,11 @@ var _ SettingsOption = snapshotReadWriteTxSettingsOption{}
 type snapshotReadWriteTxSettingsOption struct{}
 
 func (snapshotReadWriteTxSettingsOption) ApplyTableTxSettingsOption(settings *Ydb_Table.TransactionSettings) {
-	settings.TxMode = tableSnapshotReadWrite
+	settings.SetSnapshotReadWrite(&Ydb_Table.SnapshotRWModeSettings{})
 }
 
 func (snapshotReadWriteTxSettingsOption) ApplyQueryTxSettingsOption(settings *Ydb_Query.TransactionSettings) {
-	settings.TxMode = querySnapshotReadWrite
+	settings.SetSnapshotReadWrite(&Ydb_Query.SnapshotRWModeSettings{})
 }
 
 func WithSnapshotReadWrite() SettingsOption {
@@ -161,11 +118,11 @@ var _ SettingsOption = staleReadOnlySettingsOption{}
 type staleReadOnlySettingsOption struct{}
 
 func (staleReadOnlySettingsOption) ApplyTableTxSettingsOption(settings *Ydb_Table.TransactionSettings) {
-	settings.TxMode = tableStaleReadOnly
+	settings.SetStaleReadOnly(&Ydb_Table.StaleModeSettings{})
 }
 
 func (staleReadOnlySettingsOption) ApplyQueryTxSettingsOption(settings *Ydb_Query.TransactionSettings) {
-	settings.TxMode = queryStaleReadOnly
+	settings.SetStaleReadOnly(&Ydb_Query.StaleModeSettings{})
 }
 
 func WithStaleReadOnly() SettingsOption {
@@ -203,9 +160,9 @@ func (opts onlineReadOnlySettingsOption) ApplyQueryTxSettingsOption(settings *Yd
 		}
 	}
 	if ro {
-		settings.TxMode = queryOnlineReadOnlyAllowInconsistentReads
+		settings.SetOnlineReadOnly(Ydb_Query.OnlineModeSettings_builder{AllowInconsistentReads: true}.Build())
 	} else {
-		settings.TxMode = queryOnlineReadOnlyForbidInconsistentReads
+		settings.SetOnlineReadOnly(Ydb_Query.OnlineModeSettings_builder{AllowInconsistentReads: false}.Build())
 	}
 }
 
@@ -217,9 +174,9 @@ func (opts onlineReadOnlySettingsOption) ApplyTableTxSettingsOption(settings *Yd
 		}
 	}
 	if ro {
-		settings.TxMode = tableOnlineReadOnlyAllowInconsistentReads
+		settings.SetOnlineReadOnly(Ydb_Table.OnlineModeSettings_builder{AllowInconsistentReads: true}.Build())
 	} else {
-		settings.TxMode = tableOnlineReadOnlyForbidInconsistentReads
+		settings.SetOnlineReadOnly(Ydb_Table.OnlineModeSettings_builder{AllowInconsistentReads: false}.Build())
 	}
 }
 
