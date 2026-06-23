@@ -353,6 +353,7 @@ func (c *kvClient) getValueByKeyUsingReadRows(ctx context.Context, key string) (
 
 	if err := c.db.Table().BulkUpsert(ctx, c.config.tablePath, table.BulkUpsertDataRows(types.ListValue(types.StructValue(
 		types.StructFieldValue(c.config.cols.Key, types.TextValue(key)),
+		types.StructFieldValue(c.config.cols.Value, types.BytesValue(v)),
 		types.StructFieldValue(c.config.cols.LastUsage, types.TimestampValueFromTime(now)),
 	))), table.WithIdempotent()); err != nil {
 		return nil, xerrors.WithStackTrace(err)

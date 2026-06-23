@@ -25,8 +25,7 @@ Create parent directories first (`ydb scheme mkdir`, or [`sugar.MakeRecursive`](
 From the repository `examples/` directory:
 
 ```bash
-export YDB_CONNECTION_STRING='grpc://localhost:2136/local'
-go run ./redis_over_ydb -addr :6379
+export YDB_CONNECTION_STRING='grpc://localhost:2136/local' go run ./redis_over_ydb -addr :6379
 ```
 
 Stop with **Ctrl+C** (SIGINT) or SIGTERM.
@@ -49,25 +48,25 @@ GET: 57803.47 requests per second, p50=13.335 msec
 ```
 - redis-over-ydb using KV API (without session pool limitation):
 ```
-SET: 16339.87 requests per second, p50=46.495 msec                    
-GET: 21786.49 requests per second, p50=35.455 msec 
+SET: 17825.31 requests per second, p50=44.575 msec                    
+GET: 10235.42 requests per second, p50=82.431 msec 
 ```
 - redis-over-ydb using Query API (default session pool limit - 50)
 ```
-SET: 5144.03 requests per second, p50=151.551 msec                    
-GET: 4833.25 requests per second, p50=137.727 msec 
+SET: 5138.75 requests per second, p50=156.543 msec                    
+GET: 1434.51 requests per second, p50=548.863 msec
 ```
 
-Summary table of latencies (p50, msec):
+### Summary table of latencies (p50, msec)
 
 | CMD   | Redis    | KV API   | `KV` / `Redis` | Query API  | `Query` / `Redis` |
 |-------|----------|----------|----------------|------------|-------------------|
-| `SET` | `11.951` | `46.495` | `x3.89`        | `151.551`  | `x12.68`          |
-| `GET` | `13.335` | `35.455` | `x2.66`        | `137.727`  | `x10.33`          |
+| `SET` | `11.951` | `44.575` | `x3.73`        | `156.543`  | `x13.09`          |
+| `GET` | `13.335` | `82.431` | `x6.18`        | `548.863`  | `x41.16`          |
 
-Summary table of throughput (requests per second):
+### Summary table of throughput (requests per second)
 
 | CMD   | Redis   | KV API  | `Redis` / `KV` | Query API | `Redis` / `Query` |
 |-------|---------|---------|----------------|-----------|-------------------|
-| `SET` | `62111` | `16339` | `x3.80`        | `5144`    | `x12.07`          |
-| `GET` | `57803` | `21786` | `x2.65`        | `4833`    | `x12.00`          |
+| `SET` | `62111` | `17825` | `x3.48`        | `5138`    | `x12.09`          |
+| `GET` | `57803` | `10235` | `x5.65`        | `1434`    | `x40.31`          |
