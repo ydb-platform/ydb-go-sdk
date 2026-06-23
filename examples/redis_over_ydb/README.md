@@ -36,7 +36,11 @@ redis-cli -p 6379 PING
 
 ## Performance
 
-Command for measure performance (concurency=900):
+Measured on [local-ydb](https://hub.docker.com/r/ydbplatform/local-ydb).
+All performance metrics bellow are provided as an example.
+Tuned production YDB installations produce different results.
+
+Command for measure performance (concurrency=900):
 ```bash
 redis-benchmark -p 6379 -q -c 900 -n 10000 -r 1000 -t get,set
 ```
