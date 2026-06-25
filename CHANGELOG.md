@@ -1,4 +1,4 @@
-* Made client.BulkUpsert non-idempotent by default to mitigate unexpected CDC behavior.
+* Made client.BulkUpsert non-idempotent by default, so users may choose the behavior by themselves using `WithIdempotent`.
 
 ## v3.141.1
 * Added connection pessimization when creating table or query session fails with `OVERLOADED`, `UNAVAILABLE`, or client-side `context.DeadlineExceeded`
