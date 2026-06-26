@@ -1,3 +1,4 @@
+## v3.141.2
 * Option `table.WithIdempotent()` allowed single optional `bool` argument now 
 
 ## v3.141.1
