@@ -563,16 +563,20 @@ func (c *Client) ReadRows(
 	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
 
 	attempts, config := 0, c.retryOptions(retryOptions...)
-	config.RetryOptions = append(config.RetryOptions,
-		retry.WithIdempotent(true),
-		retry.WithTrace(&trace.Retry{
-			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-				return func(info trace.RetryLoopDoneInfo) {
-					attempts = info.Attempts
-				}
-			},
-		}),
+	config.RetryOptions = append(
+		[]retry.Option{
+			retry.WithIdempotent(true),
+			retry.WithTrace(&trace.Retry{
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopDoneInfo) {
+						attempts = info.Attempts
+					}
+				},
+			}),
+		},
+		config.RetryOptions...,
 	)
+
 	err = retry.Retry(ctx,
 		func(ctx context.Context) (err error) {
 			attempts++
