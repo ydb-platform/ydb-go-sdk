@@ -26,7 +26,7 @@ import (
 func TestTableBulkUpsertIdempotentRetryOverride(t *testing.T) {
 	const (
 		failBeforeSuccess = 2
-		wantRetries       = failBeforeSuccess + 1
+		wantCalls         = failBeforeSuccess + 1
 	)
 
 	noBackoff := backoff.New(
@@ -60,7 +60,7 @@ func TestTableBulkUpsertIdempotentRetryOverride(t *testing.T) {
 				fastRetry,
 				table.WithIdempotent(true),
 			},
-			wantCalls: wantRetries,
+			wantCalls: wantCalls,
 		},
 		{
 			name:   "aborted_idempotent_false_still_retries",
@@ -69,7 +69,7 @@ func TestTableBulkUpsertIdempotentRetryOverride(t *testing.T) {
 				fastRetry,
 				table.WithIdempotent(false),
 			},
-			wantCalls: wantRetries,
+			wantCalls: wantCalls,
 		},
 		{
 			name:   "undetermined_idempotent_true_retries",
@@ -78,7 +78,7 @@ func TestTableBulkUpsertIdempotentRetryOverride(t *testing.T) {
 				fastRetry,
 				table.WithIdempotent(true),
 			},
-			wantCalls: wantRetries,
+			wantCalls: wantCalls,
 		},
 		{
 			name:   "undetermined_idempotent_false_no_retry",
