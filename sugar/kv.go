@@ -77,6 +77,9 @@ func quoteIfNotQuoted(name string) string {
 	return "`" + strings.Trim(name, "`") + "`"
 }
 
+// NewKV returns kv-builder
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func NewKV(ctx context.Context, db *ydb.Driver) kvClientBuilder {
 	return kvClientBuilder{
 		ctx: ctx,
