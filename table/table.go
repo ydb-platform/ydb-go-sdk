@@ -449,6 +449,10 @@ func WithRetryOptions(retryOptions []retry.Option) retryOptionsOption {
 }
 
 // WithIdempotent makes retry call as idempotent
+//
+// No bool arg means that operation is idempotent
+// Implicit bool arg changes default idempotent flag
+// No more than one bool argument is allowed
 func WithIdempotent(bb ...bool) retryOptionsOption {
 	idempotent := true
 	switch len(bb) {
