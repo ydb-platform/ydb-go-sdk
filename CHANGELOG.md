@@ -1,3 +1,5 @@
+* Added experimental helper `sugar.NewKV(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
+
 ## v3.141.2
 * Option `table.WithIdempotent()` allowed single optional `bool` argument now 
 
