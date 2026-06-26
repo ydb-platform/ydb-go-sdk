@@ -1,3 +1,5 @@
+* Decreased default gRPC dial timeout from 5 seconds to 500 milliseconds
+
 ## v3.141.1
 * Added connection pessimization when creating table or query session fails with `OVERLOADED`, `UNAVAILABLE`, or client-side `context.DeadlineExceeded`
 
