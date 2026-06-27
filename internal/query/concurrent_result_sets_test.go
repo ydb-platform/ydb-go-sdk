@@ -57,8 +57,8 @@ func TestClientConcurrentResultSets(t *testing.T) {
 	})
 
 	t.Run("WithConcurrentResultSetsNoop", func(t *testing.T) {
-		require.NotNil(t, query.WithConcurrentResultSets(true))
-		require.NotNil(t, query.WithConcurrentResultSets(false))
+		require.NotNil(t, query.WithConcurrentResultSets(true))  //nolint:staticcheck
+		require.NotNil(t, query.WithConcurrentResultSets(false)) //nolint:staticcheck
 	})
 
 	t.Run("ClientQueryMaterializesInterleavedResultSets", func(t *testing.T) {
@@ -175,9 +175,7 @@ func executeQueryChecker(
 	wantConcurrentResultSets bool,
 	ctrl *gomock.Controller,
 ) func(
-	context.Context,
-	*Ydb_Query.ExecuteQueryRequest,
-	...grpc.CallOption,
+	context.Context, *Ydb_Query.ExecuteQueryRequest, ...grpc.CallOption,
 ) (Ydb_Query_V1.QueryService_ExecuteQueryClient, error) {
 	t.Helper()
 

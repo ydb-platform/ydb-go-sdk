@@ -20,7 +20,7 @@ var (
 	_ Execute = statsModeOption{}
 	_ Execute = execModeOption(0)
 	_ Execute = responsePartPrefetch(0)
-	_ Execute = concurrentResultSetsOption{}
+	_ Execute = nopOption{}
 )
 
 type (
@@ -83,7 +83,7 @@ type (
 		callback func([]*Ydb_Issue.IssueMessage)
 	}
 	responsePartPrefetch int
-	concurrentResultSetsOption struct{}
+	nopOption            struct{}
 )
 
 func (poolID resourcePool) applyExecuteOption(s *executeSettings) {
@@ -305,14 +305,11 @@ func WithCallOptions(opts ...grpc.CallOption) callOptionsOption {
 	return opts
 }
 
-// WithConcurrentResultSets is deprecated and has no effect.
-//
-// Deprecated: WithConcurrentResultSets is deprecated and has no effect.
-func WithConcurrentResultSets(_ bool) concurrentResultSetsOption {
-	return concurrentResultSetsOption{}
+func NOP() nopOption {
+	return nopOption{}
 }
 
-func (concurrentResultSetsOption) applyExecuteOption(*executeSettings) {}
+func (nopOption) applyExecuteOption(*executeSettings) {}
 
 func WithTxControl(txControl *tx.Control) *txControlOption {
 	return (*txControlOption)(txControl)
