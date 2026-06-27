@@ -547,6 +547,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 	r query.Result, err error,
 ) {
 	settings := options.ExecuteSettings(opts...)
+	options.EnableConcurrentResultSets(settings)
 
 	if err := validateTxControl(settings); err != nil {
 		return nil, err

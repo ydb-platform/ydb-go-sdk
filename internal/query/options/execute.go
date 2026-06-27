@@ -142,8 +142,8 @@ func (opts issuesOption) applyExecuteOption(s *executeSettings) {
 	s.issueCallback = opts.callback
 }
 
-func (opt concurrentResultSets) applyExecuteOption(s *executeSettings) {
-	s.concurrentResultSets = bool(opt)
+func (opt concurrentResultSets) applyExecuteOption(*executeSettings) {
+	// deprecated, no-op
 }
 
 func (n responsePartPrefetch) applyExecuteOption(s *executeSettings) {
@@ -267,8 +267,17 @@ func WithResponsePartLimitSizeBytes(size int64) responsePartLimitBytes {
 	return responsePartLimitBytes(size)
 }
 
+// WithConcurrentResultSets is deprecated and has no effect.
+// Use Client.Query, which always enables concurrent result sets internally.
+//
+// Deprecated: WithConcurrentResultSets is deprecated and has no effect.
 func WithConcurrentResultSets(isEnabled bool) concurrentResultSets {
 	return concurrentResultSets(isEnabled)
+}
+
+// EnableConcurrentResultSets forces concurrent result set delivery on the wire.
+func EnableConcurrentResultSets(s *executeSettings) {
+	s.concurrentResultSets = true
 }
 
 // WithResponsePartPrefetch sets how many ExecuteQuery response parts the client

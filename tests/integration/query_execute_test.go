@@ -1030,7 +1030,6 @@ func TestIssue1878ConcurrentResultSet(t *testing.T) {
 	        `,
 			query.WithSyntax(query.SyntaxYQL),
 			query.WithIdempotent(),
-			query.WithConcurrentResultSets(true),
 		)
 		require.NoError(t, err)
 		rsCount := 0

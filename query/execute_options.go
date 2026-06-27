@@ -83,11 +83,10 @@ func WithResponsePartPrefetch(parts int) ExecuteOption {
 	return options.WithResponsePartPrefetch(parts)
 }
 
-// WithConcurrentResultSets enables concurrent computation of result sets. It is useful when a single query executes
-// multiple independent SELECT statements.
+// WithConcurrentResultSets is deprecated and has no effect.
+// Client.Query always enables concurrent result sets internally because it materializes the full response.
 //
-// WARNING: This option must be used only in Query() method. Using it with other methods results in undefined behavior
-// or an error.
+// Deprecated: WithConcurrentResultSets is deprecated and has no effect.
 func WithConcurrentResultSets(isEnabled bool) ExecuteOption {
 	return options.WithConcurrentResultSets(isEnabled)
 }
