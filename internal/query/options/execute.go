@@ -301,7 +301,7 @@ func WithCallOptions(opts ...grpc.CallOption) callOptionsOption {
 	return opts
 }
 
-func NOP() nopOption {
+func Nop() nopOption {
 	return nopOption{}
 }
 
