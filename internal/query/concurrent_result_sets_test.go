@@ -56,6 +56,41 @@ func TestClientConcurrentResultSets(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("DoTxQuery", func(t *testing.T) {
+		ctx := t.Context()
+		ctrl := gomock.NewController(t)
+		queryService := NewMockQueryServiceClient(ctrl)
+		setupExplicitSessionQueryService(t, ctrl, queryService)
+
+		queryService.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.BeginTransactionResponse{
+			Status: Ydb.StatusIds_SUCCESS,
+			TxMeta: &Ydb_Query.TransactionMeta{Id: "tx-1"},
+		}, nil)
+		queryService.EXPECT().
+			ExecuteQuery(gomock.Any(), gomock.Any()).
+			DoAndReturn(executeQueryChecker(t, false, ctrl)).
+			Times(1)
+		queryService.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
+			Status: Ydb.StatusIds_SUCCESS,
+		}, nil)
+		queryService.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.RollbackTransactionResponse{
+			Status: Ydb.StatusIds_SUCCESS,
+		}, nil).AnyTimes()
+
+		client, err := newWithQueryServiceClient(ctx, queryService, nil, explicitSessionConfig())
+		require.NoError(t, err)
+
+		err = client.DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+			r, err := tx.Query(ctx, "SELECT 1")
+			if err != nil {
+				return err
+			}
+
+			return r.Close(ctx)
+		})
+		require.NoError(t, err)
+	})
+
 	t.Run("WithConcurrentResultSetsNoop", func(t *testing.T) {
 		require.NotNil(t, query.WithConcurrentResultSets(true))  //nolint:staticcheck
 		require.NotNil(t, query.WithConcurrentResultSets(false)) //nolint:staticcheck
@@ -144,20 +179,7 @@ func newMockClientCheckingConcurrentResultSets(
 			DoAndReturn(executeQueryChecker(t, wantConcurrentResultSets, ctrl)).
 			Times(1)
 	} else {
-		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
-		stubAttachStreamContext(attachStream)
-		attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
-			Status: Ydb.StatusIds_SUCCESS,
-		}, nil).AnyTimes()
-
-		queryService.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
-			Status:    Ydb.StatusIds_SUCCESS,
-			SessionId: "test-session",
-		}, nil)
-		queryService.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
-		queryService.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
-			Status: Ydb.StatusIds_SUCCESS,
-		}, nil).AnyTimes()
+		setupExplicitSessionQueryService(t, ctrl, queryService)
 		queryService.EXPECT().
 			ExecuteQuery(gomock.Any(), gomock.Any()).
 			DoAndReturn(executeQueryChecker(t, wantConcurrentResultSets, ctrl)).
@@ -168,6 +190,29 @@ func newMockClientCheckingConcurrentResultSets(
 	require.NoError(t, err)
 
 	return client
+}
+
+func setupExplicitSessionQueryService(
+	t *testing.T,
+	ctrl *gomock.Controller,
+	queryService *MockQueryServiceClient,
+) {
+	t.Helper()
+
+	attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+	stubAttachStreamContext(attachStream)
+	attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
+		Status: Ydb.StatusIds_SUCCESS,
+	}, nil).AnyTimes()
+
+	queryService.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+		Status:    Ydb.StatusIds_SUCCESS,
+		SessionId: "test-session",
+	}, nil)
+	queryService.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
+	queryService.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
+		Status: Ydb.StatusIds_SUCCESS,
+	}, nil).AnyTimes()
 }
 
 func executeQueryChecker(

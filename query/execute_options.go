@@ -86,6 +86,8 @@ func WithResponsePartPrefetch(parts int) ExecuteOption {
 // WithConcurrentResultSets is deprecated and has no effect.
 //
 // Client.Query always enables concurrent result sets internally because it materializes the full response.
+// Session, transaction, and other streaming query paths always use sequential result set delivery
+// (`concurrent_result_sets=false` on the wire); the deprecated option no longer changes that behavior.
 //
 // Deprecated: WithConcurrentResultSets is deprecated and has no effect.
 func WithConcurrentResultSets(bool) ExecuteOption {
