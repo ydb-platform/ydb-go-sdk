@@ -115,7 +115,7 @@ func newTracerProvider(ctx context.Context, otlpAddr string) (*sdktrace.TracerPr
 func openDB(ctx context.Context, dsn string) (*ydb.Driver, error) {
 	return ydb.Open(ctx, dsn,
 		ydb.WithApplicationName(serviceName),
-		// Bump dial timeout: the SDK default is 5s which is fine on a real
+		// Bump dial timeout: the SDK default is 500ms which is fine on a real
 		// cluster but tight when YDB is a freshly-booting `local-ydb`
 		// container (especially under Rosetta on arm64). The driver's
 		// internal cluster-discovery retry loop will retry a few times
