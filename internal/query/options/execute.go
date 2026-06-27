@@ -82,7 +82,7 @@ type (
 	issuesOption           struct {
 		callback func([]*Ydb_Issue.IssueMessage)
 	}
-	concurrentResultSets bool
+	concurrentResultSets struct{}
 	responsePartPrefetch int
 )
 
@@ -268,11 +268,12 @@ func WithResponsePartLimitSizeBytes(size int64) responsePartLimitBytes {
 }
 
 // WithConcurrentResultSets is deprecated and has no effect.
+//
 // Use Client.Query, which always enables concurrent result sets internally.
 //
 // Deprecated: WithConcurrentResultSets is deprecated and has no effect.
-func WithConcurrentResultSets(isEnabled bool) concurrentResultSets {
-	return concurrentResultSets(isEnabled)
+func WithConcurrentResultSets(bool) concurrentResultSets {
+	return concurrentResultSets{}
 }
 
 // EnableConcurrentResultSets forces concurrent result set delivery on the wire.
