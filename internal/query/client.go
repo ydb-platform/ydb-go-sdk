@@ -495,7 +495,7 @@ func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options
 	}
 
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := s.execute(ctx, q, settings,
+		streamResult, err := s.execute(ctx, q, settings, false,
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -543,14 +543,6 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 	return nil
 }
 
-type executeSettingsWithConcurrentResultSets struct {
-	executeSettings
-}
-
-func (executeSettingsWithConcurrentResultSets) ConcurrentResultSets() bool {
-	return true
-}
-
 func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (
 	r query.Result, err error,
 ) {
@@ -562,7 +554,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
 		streamResult, err := s.execute(ctx, q,
-			executeSettingsWithConcurrentResultSets{settings},
+			settings, true,
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -617,7 +609,7 @@ func clientQueryResultSet(
 	}
 
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
-		streamResult, err := s.execute(ctx, q, settings, resultOpts...)
+		streamResult, err := s.execute(ctx, q, settings, false, resultOpts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}

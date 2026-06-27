@@ -219,10 +219,6 @@ func (s *executeSettings) Label() string {
 	return s.label
 }
 
-func (s *executeSettings) ConcurrentResultSets() bool {
-	return false
-}
-
 func (s *executeSettings) ResponsePartPrefetch() int {
 	return s.responsePartPrefetch
 }

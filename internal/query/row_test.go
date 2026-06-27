@@ -223,7 +223,7 @@ func TestReadRow(t *testing.T) {
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-		r, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+		r, err := execute(ctx, "123", client, "", options.ExecuteSettings(), false)
 		require.NoError(t, err)
 
 		row, err := readRow(ctx, r)
@@ -276,7 +276,7 @@ func TestReadRow(t *testing.T) {
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-		r, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+		r, err := execute(ctx, "123", client, "", options.ExecuteSettings(), false)
 		require.NoError(t, err)
 
 		_, err = readRow(ctx, r)
@@ -313,7 +313,7 @@ func TestReadRow(t *testing.T) {
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-		r, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+		r, err := execute(ctx, "123", client, "", options.ExecuteSettings(), false)
 		require.NoError(t, err)
 
 		_, err = readRow(ctx, r)
@@ -376,7 +376,7 @@ func TestReadRow(t *testing.T) {
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-		r, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+		r, err := execute(ctx, "123", client, "", options.ExecuteSettings(), false)
 		require.NoError(t, err)
 
 		_, err = readRow(ctx, r)
