@@ -543,11 +543,11 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 	return nil
 }
 
-type executeSettingsWithConurrentResultSets struct {
+type executeSettingsWithConcurrentResultSets struct {
 	executeSettings
 }
 
-func (executeSettingsWithConurrentResultSets) ConcurrentResultSets() bool {
+func (executeSettingsWithConcurrentResultSets) ConcurrentResultSets() bool {
 	return true
 }
 
@@ -562,7 +562,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
 		streamResult, err := s.execute(ctx, q,
-			executeSettingsWithConurrentResultSets{settings},
+			executeSettingsWithConcurrentResultSets{settings},
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
 		if err != nil {
 			return xerrors.WithStackTrace(err)

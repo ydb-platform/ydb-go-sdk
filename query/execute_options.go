@@ -89,7 +89,7 @@ func WithResponsePartPrefetch(parts int) ExecuteOption {
 //
 // Deprecated: WithConcurrentResultSets is deprecated and has no effect.
 func WithConcurrentResultSets(isEnabled bool) ExecuteOption {
-	return nil
+	return options.WithConcurrentResultSets(isEnabled)
 }
 
 func WithCallOptions(opts ...grpc.CallOption) ExecuteOption {

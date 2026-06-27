@@ -55,6 +55,69 @@ func TestClientConcurrentResultSets(t *testing.T) {
 		})
 		require.NoError(t, err)
 	})
+
+	t.Run("WithConcurrentResultSetsNoop", func(t *testing.T) {
+		require.NotNil(t, query.WithConcurrentResultSets(true))
+		require.NotNil(t, query.WithConcurrentResultSets(false))
+	})
+
+	t.Run("ClientQueryMaterializesInterleavedResultSets", func(t *testing.T) {
+		ctx := t.Context()
+		ctrl := gomock.NewController(t)
+
+		queryService := NewMockQueryServiceClient(ctrl)
+		queryService.EXPECT().
+			ExecuteQuery(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(
+				_ context.Context,
+				req *Ydb_Query.ExecuteQueryRequest,
+				_ ...grpc.CallOption,
+			) (Ydb_Query_V1.QueryService_ExecuteQueryClient, error) {
+				require.True(t, req.GetConcurrentResultSets())
+
+				return interleavedMultiResultSetStream(ctrl), nil
+			})
+
+		client, err := newWithQueryServiceClient(ctx, queryService, nil, implicitSessionConfig())
+		require.NoError(t, err)
+
+		r, err := client.Query(ctx, "SELECT 1; SELECT 2")
+		require.NoError(t, err)
+		defer func() { _ = r.Close(ctx) }()
+
+		rs0, err := r.NextResultSet(ctx)
+		require.NoError(t, err)
+		require.Equal(t, 0, rs0.Index())
+
+		for _, want := range []int64{10, 11} {
+			row, err := rs0.NextRow(ctx)
+			require.NoError(t, err)
+
+			var got int64
+			require.NoError(t, row.Scan(&got))
+			require.Equal(t, want, got)
+		}
+		_, err = rs0.NextRow(ctx)
+		require.ErrorIs(t, err, io.EOF)
+
+		rs1, err := r.NextResultSet(ctx)
+		require.NoError(t, err)
+		require.Equal(t, 1, rs1.Index())
+
+		for _, want := range []int64{20, 21} {
+			row, err := rs1.NextRow(ctx)
+			require.NoError(t, err)
+
+			var got int64
+			require.NoError(t, row.Scan(&got))
+			require.Equal(t, want, got)
+		}
+		_, err = rs1.NextRow(ctx)
+		require.ErrorIs(t, err, io.EOF)
+
+		_, err = r.NextResultSet(ctx)
+		require.ErrorIs(t, err, io.EOF)
+	})
 }
 
 func implicitSessionConfig() *config.Config {
@@ -137,6 +200,42 @@ func singleRowExecuteQueryStream(ctrl *gomock.Controller) *MockQueryService_Exec
 			Rows: []*Ydb.Value{{}},
 		},
 	}, nil)
+	stream.EXPECT().Recv().Return(nil, io.EOF)
+
+	return stream
+}
+
+func interleavedMultiResultSetStream(ctrl *gomock.Controller) *MockQueryService_ExecuteQueryClient {
+	int64Type := &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64}}
+	int64Col := func(name string) *Ydb.Column {
+		return &Ydb.Column{Name: name, Type: int64Type}
+	}
+	int64Row := func(v int64) *Ydb.Value {
+		return &Ydb.Value{Items: []*Ydb.Value{{
+			Value: &Ydb.Value_Int64Value{Int64Value: v},
+		}}}
+	}
+	respPart := func(idx int64, columns []*Ydb.Column, rows []*Ydb.Value) *Ydb_Query.ExecuteQueryResponsePart {
+		return &Ydb_Query.ExecuteQueryResponsePart{
+			Status:         Ydb.StatusIds_SUCCESS,
+			ResultSetIndex: idx,
+			ResultSet: &Ydb.ResultSet{
+				Columns: columns,
+				Rows:    rows,
+			},
+		}
+	}
+
+	stream := newExecuteQueryStreamMock(ctrl)
+	parts := []*Ydb_Query.ExecuteQueryResponsePart{
+		respPart(0, []*Ydb.Column{int64Col("a")}, []*Ydb.Value{int64Row(10)}),
+		respPart(1, []*Ydb.Column{int64Col("b")}, []*Ydb.Value{int64Row(20)}),
+		respPart(0, nil, []*Ydb.Value{int64Row(11)}),
+		respPart(1, nil, []*Ydb.Value{int64Row(21)}),
+	}
+	for _, part := range parts {
+		stream.EXPECT().Recv().Return(part, nil)
+	}
 	stream.EXPECT().Recv().Return(nil, io.EOF)
 
 	return stream
