@@ -35,7 +35,7 @@ var (
 	// Will be removed after Aug 2024.
 	// Write Issue if you need the variable https://github.com/ydb-platform/ydb-go-sdk/issues/new/choose
 	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-	DefaultDialTimeout = config.DefaultDialTimeout // 5 * time.Second
+	DefaultDialTimeout = config.DefaultDialTimeout // 500 * time.Milliseconds
 
 	// DefaultGRPCMsgSize
 	//
