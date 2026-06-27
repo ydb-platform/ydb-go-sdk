@@ -5,7 +5,32 @@ import (
 	"time"
 )
 
-type doneCtx <-chan struct{}
+type (
+	doneCtx                <-chan struct{}
+	doneAlreadySignaledCtx struct {
+		context.Context //nolint:containedctx // thin wrapper delegating Deadline/Value
+
+		err error
+	}
+)
+
+var (
+	noopCancel     = func() {}
+	closedDoneChan = func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+
+		return ch
+	}()
+)
+
+func (doneAlreadySignaledCtx) Done() <-chan struct{} {
+	return closedDoneChan
+}
+
+func (ctx doneAlreadySignaledCtx) Err() error {
+	return ctx.err
+}
 
 func (done doneCtx) Deadline() (deadline time.Time, ok bool) {
 	return
@@ -29,22 +54,31 @@ func (done doneCtx) Value(key any) any {
 }
 
 func WithDone(parent context.Context, done <-chan struct{}) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(parent)
+	if parent.Err() != nil {
+		return parent, noopCancel
+	}
 
 	select {
 	case <-done:
-		cancel()
+		err := parent.Err()
+		if err == nil {
+			err = context.Canceled
+		}
 
-		return ctx, cancel
+		return doneAlreadySignaledCtx{
+			Context: parent,
+			err:     err,
+		}, noopCancel
 	default:
-	}
+		ctx, cancel := context.WithCancel(parent)
 
-	stop := context.AfterFunc(doneCtx(done), func() {
-		cancel()
-	})
+		stop := context.AfterFunc(doneCtx(done), func() {
+			cancel()
+		})
 
-	return ctx, func() {
-		stop()
-		cancel()
+		return ctx, func() {
+			stop()
+			cancel()
+		}
 	}
 }
