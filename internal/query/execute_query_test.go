@@ -1000,7 +1000,9 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			request, callOptions, err := executeQueryRequest(tt.name, tt.name, options.ExecuteSettings(tt.opts...), false)
+			request, callOptions, err := executeQueryRequest(
+				tt.name, tt.name, options.ExecuteSettings(tt.opts...), options.ORDERED_RESULT_SETS,
+			)
 			require.NoError(t, err)
 			require.Equal(t, request.String(), tt.request.String())
 			require.Equal(t, tt.callOptions, callOptions)

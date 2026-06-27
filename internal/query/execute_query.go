@@ -96,7 +96,7 @@ func executeQueryRequest(
 		},
 		Parameters:             params,
 		StatsMode:              Ydb_Query.StatsMode(cfg.StatsMode()),
-		ConcurrentResultSets:   bool(concurrentResultSets),
+		ConcurrentResultSets:   concurrentResultSets.Flag,
 		PoolId:                 cfg.ResourcePool(),
 		ResponsePartLimitBytes: cfg.ResponsePartLimitSizeBytes(),
 	}
