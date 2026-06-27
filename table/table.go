@@ -448,8 +448,23 @@ func WithRetryOptions(retryOptions []retry.Option) retryOptionsOption {
 	return retryOptions
 }
 
-func WithIdempotent() retryOptionsOption {
-	return []retry.Option{retry.WithIdempotent(true)}
+// WithIdempotent makes retry call as idempotent
+//
+// No bool arg means that operation is idempotent
+// Implicit bool arg changes default idempotent flag
+// No more than one bool argument is allowed
+func WithIdempotent(bb ...bool) retryOptionsOption {
+	idempotent := true
+	switch len(bb) {
+	case 0:
+		// nop
+	case 1:
+		idempotent = bb[0]
+	default:
+		panic("only one bool arg allowed")
+	}
+
+	return []retry.Option{retry.WithIdempotent(idempotent)}
 }
 
 var _ Option = txSettingsOption{}
