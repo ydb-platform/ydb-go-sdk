@@ -118,7 +118,7 @@ func (tx *Transaction) QueryResultSet(
 			}),
 		)
 	}
-	r, err := tx.s.execute(ctx, q, txSettings, resultOpts...)
+	r, err := tx.s.execute(ctx, q, txSettings, options.ORDERED_RESULT_SETS, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -168,7 +168,7 @@ func (tx *Transaction) QueryRow(
 			}),
 		)
 	}
-	r, err := tx.s.execute(ctx, q, txSettings, resultOpts...)
+	r, err := tx.s.execute(ctx, q, txSettings, options.ORDERED_RESULT_SETS, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -243,7 +243,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		)
 	}
 
-	r, err := tx.s.execute(ctx, q, txSettings, resultOpts...)
+	r, err := tx.s.execute(ctx, q, txSettings, options.ORDERED_RESULT_SETS, resultOpts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -335,7 +335,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 			}),
 		)
 	}
-	r, err := tx.s.execute(ctx, q, txSettings, resultOpts...)
+	r, err := tx.s.execute(ctx, q, txSettings, options.ORDERED_RESULT_SETS, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

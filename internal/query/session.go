@@ -47,7 +47,7 @@ func (s *Session) QueryResultSet(
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, settings,
+	r, err := s.execute(ctx, q, settings, options.ORDERED_RESULT_SETS,
 		withStreamResultTrace(s.trace),
 		withIssuesHandler(settings.IssuesOpts()),
 	)
@@ -66,7 +66,7 @@ func (s *Session) QueryResultSet(
 func (s *Session) queryRow(
 	ctx context.Context, q string, settings executeSettings, resultOpts ...resultOption,
 ) (row query.Row, finalErr error) {
-	r, err := s.execute(ctx, q, settings, resultOpts...)
+	r, err := s.execute(ctx, q, settings, options.ORDERED_RESULT_SETS, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -164,8 +164,8 @@ func (s *Session) Begin(
 	}, nil
 }
 
-func (s *Session) execute(
-	ctx context.Context, q string, settings executeSettings, opts ...resultOption,
+func (s *Session) execute(ctx context.Context,
+	q string, settings executeSettings, concurrentResultSets options.ConcurrentResultSets, opts ...resultOption,
 ) (_ *streamResult, finalErr error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
@@ -175,7 +175,7 @@ func (s *Session) execute(
 		}
 	}()
 
-	r, err := execute(ctx, s.ID(), s.client, q, settings, append(opts,
+	r, err := execute(ctx, s.ID(), s.client, q, settings, concurrentResultSets, append(opts,
 		withStreamResultCloseTimeout(s.streamResultCloseTimeout),
 		withStreamResultOnClose(cancel),
 	)...)
@@ -203,7 +203,7 @@ func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, settings,
+	r, err := s.execute(ctx, q, settings, options.ORDERED_RESULT_SETS,
 		withStreamResultTrace(s.trace),
 		withIssuesHandler(settings.IssuesOpts()),
 	)
@@ -239,7 +239,7 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, settings,
+	r, err := s.execute(ctx, q, settings, options.ORDERED_RESULT_SETS,
 		withStreamResultTrace(s.trace),
 		withIssuesHandler(settings.IssuesOpts()),
 	)
@@ -265,7 +265,7 @@ func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Exec
 		}
 	}()
 
-	request, callOptions, err := executeQueryRequest(s.ID(), q, settings)
+	request, callOptions, err := executeQueryRequest(s.ID(), q, settings, options.ORDERED_RESULT_SETS)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
