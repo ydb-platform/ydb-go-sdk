@@ -553,8 +553,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 	}
 
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := s.execute(ctx, q,
-			settings, true,
+		streamResult, err := s.execute(ctx, q, settings, true,
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
 		if err != nil {
 			return xerrors.WithStackTrace(err)

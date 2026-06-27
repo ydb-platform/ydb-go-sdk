@@ -164,8 +164,8 @@ func (s *Session) Begin(
 	}, nil
 }
 
-func (s *Session) execute(
-	ctx context.Context, q string, settings executeSettings, concurrentResultSets bool, opts ...resultOption,
+func (s *Session) execute(ctx context.Context,
+	q string, settings executeSettings, concurrentResultSets options.ConcurrentResultSets, opts ...resultOption,
 ) (_ *streamResult, finalErr error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
