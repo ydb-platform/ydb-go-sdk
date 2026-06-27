@@ -946,8 +946,7 @@ func TestIssue1872QueryWarning(t *testing.T) {
 	})
 	t.Run("Query 2 inserts", func(t *testing.T) {
 		var issueList []*Ydb_Issue.IssueMessage
-		q := db.Query()
-		_, err := q.Query(ctx, `
+		_, err := db.Query().Query(ctx, `
 		        insert into TestIssue1872QueryWarning (Id, Amount) values (-9, Decimal("3.01",22,9));
 				insert into TestIssue1872QueryWarning (Id, Amount) values (-5, Decimal("5.01",22,9));
 		        `,

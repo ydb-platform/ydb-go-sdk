@@ -543,18 +543,26 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 	return nil
 }
 
+type executeSettingsWithConurrentResultSets struct {
+	executeSettings
+}
+
+func (executeSettingsWithConurrentResultSets) ConcurrentResultSets() bool {
+	return true
+}
+
 func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...options.Execute) (
 	r query.Result, err error,
 ) {
 	settings := options.ExecuteSettings(opts...)
-	options.EnableConcurrentResultSets(settings)
 
 	if err := validateTxControl(settings); err != nil {
 		return nil, err
 	}
 
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := s.execute(ctx, q, settings,
+		streamResult, err := s.execute(ctx, q,
+			executeSettingsWithConurrentResultSets{settings},
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
 		if err != nil {
 			return xerrors.WithStackTrace(err)

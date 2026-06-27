@@ -84,11 +84,12 @@ func WithResponsePartPrefetch(parts int) ExecuteOption {
 }
 
 // WithConcurrentResultSets is deprecated and has no effect.
+//
 // Client.Query always enables concurrent result sets internally because it materializes the full response.
 //
 // Deprecated: WithConcurrentResultSets is deprecated and has no effect.
 func WithConcurrentResultSets(isEnabled bool) ExecuteOption {
-	return options.WithConcurrentResultSets(isEnabled)
+	return nil
 }
 
 func WithCallOptions(opts ...grpc.CallOption) ExecuteOption {

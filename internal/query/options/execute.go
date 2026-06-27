@@ -48,7 +48,6 @@ type (
 		issueCallback          func(issues []*Ydb_Issue.IssueMessage)
 		responsePartLimitBytes int64
 		label                  string
-		concurrentResultSets   bool
 		// responsePartPrefetch is how many stream parts to read ahead of the
 		// consumer (0 disables prefetch and is the default).
 		responsePartPrefetch int
@@ -82,7 +81,6 @@ type (
 	issuesOption           struct {
 		callback func([]*Ydb_Issue.IssueMessage)
 	}
-	concurrentResultSets struct{}
 	responsePartPrefetch int
 )
 
@@ -140,10 +138,6 @@ func (mode ExecMode) applyExecuteOption(s *executeSettings) {
 
 func (opts issuesOption) applyExecuteOption(s *executeSettings) {
 	s.issueCallback = opts.callback
-}
-
-func (opt concurrentResultSets) applyExecuteOption(*executeSettings) {
-	// deprecated, no-op
 }
 
 func (n responsePartPrefetch) applyExecuteOption(s *executeSettings) {
@@ -224,7 +218,7 @@ func (s *executeSettings) Label() string {
 }
 
 func (s *executeSettings) ConcurrentResultSets() bool {
-	return s.concurrentResultSets
+	return false
 }
 
 func (s *executeSettings) ResponsePartPrefetch() int {
@@ -265,20 +259,6 @@ func WithExecMode(mode ExecMode) execModeOption {
 
 func WithResponsePartLimitSizeBytes(size int64) responsePartLimitBytes {
 	return responsePartLimitBytes(size)
-}
-
-// WithConcurrentResultSets is deprecated and has no effect.
-//
-// Use Client.Query, which always enables concurrent result sets internally.
-//
-// Deprecated: WithConcurrentResultSets is deprecated and has no effect.
-func WithConcurrentResultSets(bool) concurrentResultSets {
-	return concurrentResultSets{}
-}
-
-// EnableConcurrentResultSets forces concurrent result set delivery on the wire.
-func EnableConcurrentResultSets(s *executeSettings) {
-	s.concurrentResultSets = true
 }
 
 // WithResponsePartPrefetch sets how many ExecuteQuery response parts the client
