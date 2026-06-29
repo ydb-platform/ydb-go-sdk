@@ -369,7 +369,7 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 
 	err = do(ctx, c.explicitSessionPool,
 		func(ctx context.Context, s *Session) error {
-			return withSessionTrace(s, settings.Trace(), func() error {
+			return withSessionTrace(s, settings.CallTrace(), func() error {
 				return op(ctx, s)
 			})
 		},
@@ -390,13 +390,13 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 	return err
 }
 
-func withSessionTrace(s *Session, t *trace.Query, op func() error) error {
-	if t == nil {
+func withSessionTrace(s *Session, callTrace *trace.Query, op func() error) error {
+	if callTrace == nil {
 		return op()
 	}
 
 	prev := s.trace
-	s.trace = t
+	s.trace = gtrace.Compose(s.trace, callTrace)
 	defer func() {
 		s.trace = prev
 	}()
@@ -719,7 +719,7 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 
 	err = doTx(ctx, c.explicitSessionPool, op,
 		settings.TxSettings(),
-		settings.Trace(),
+		settings.CallTrace(),
 		append(
 			[]retry.Option{
 				// Driver-level trace.Retry (e.g. spans.WithTraces) so retry
