@@ -1,11 +1,10 @@
 package options
 
-type ConcurrentResultSets struct {
+type ConcurrentResultSetsType struct {
 	Flag bool
 }
 
-//nolint:revive
 var (
-	CONCURRENT_RESULT_SETS = ConcurrentResultSets{true}
-	ORDERED_RESULT_SETS    = ConcurrentResultSets{false}
+	ConcurrentResultSets = ConcurrentResultSetsType{true}
+	OrderedResultSets    = ConcurrentResultSetsType{false}
 )

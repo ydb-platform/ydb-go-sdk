@@ -1128,7 +1128,7 @@ func TestClient(t *testing.T) {
 				require.Nil(t, row)
 			}
 		})
-		t.Run("ConcurrentResultSets", func(t *testing.T) {
+		t.Run("ConcurrentResultSetsType", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			colsAB := []*Ydb.Column{
