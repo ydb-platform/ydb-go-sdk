@@ -20,6 +20,7 @@ var (
 	_ Execute = statsModeOption{}
 	_ Execute = execModeOption(0)
 	_ Execute = responsePartPrefetch(0)
+	_ Execute = nopOption{}
 )
 
 type (
@@ -48,7 +49,6 @@ type (
 		issueCallback          func(issues []*Ydb_Issue.IssueMessage)
 		responsePartLimitBytes int64
 		label                  string
-		concurrentResultSets   bool
 		// responsePartPrefetch is how many stream parts to read ahead of the
 		// consumer (0 disables prefetch and is the default).
 		responsePartPrefetch int
@@ -82,8 +82,8 @@ type (
 	issuesOption           struct {
 		callback func([]*Ydb_Issue.IssueMessage)
 	}
-	concurrentResultSets bool
 	responsePartPrefetch int
+	nopOption            struct{}
 )
 
 func (poolID resourcePool) applyExecuteOption(s *executeSettings) {
@@ -140,10 +140,6 @@ func (mode ExecMode) applyExecuteOption(s *executeSettings) {
 
 func (opts issuesOption) applyExecuteOption(s *executeSettings) {
 	s.issueCallback = opts.callback
-}
-
-func (opt concurrentResultSets) applyExecuteOption(s *executeSettings) {
-	s.concurrentResultSets = bool(opt)
 }
 
 func (n responsePartPrefetch) applyExecuteOption(s *executeSettings) {
@@ -223,10 +219,6 @@ func (s *executeSettings) Label() string {
 	return s.label
 }
 
-func (s *executeSettings) ConcurrentResultSets() bool {
-	return s.concurrentResultSets
-}
-
 func (s *executeSettings) ResponsePartPrefetch() int {
 	return s.responsePartPrefetch
 }
@@ -265,10 +257,6 @@ func WithExecMode(mode ExecMode) execModeOption {
 
 func WithResponsePartLimitSizeBytes(size int64) responsePartLimitBytes {
 	return responsePartLimitBytes(size)
-}
-
-func WithConcurrentResultSets(isEnabled bool) concurrentResultSets {
-	return concurrentResultSets(isEnabled)
 }
 
 // WithResponsePartPrefetch sets how many ExecuteQuery response parts the client
@@ -312,6 +300,12 @@ func WithIssuesHandler(callback func(issues []*Ydb_Issue.IssueMessage)) issuesOp
 func WithCallOptions(opts ...grpc.CallOption) callOptionsOption {
 	return opts
 }
+
+func Nop() nopOption {
+	return nopOption{}
+}
+
+func (nopOption) applyExecuteOption(*executeSettings) {}
 
 func WithTxControl(txControl *tx.Control) *txControlOption {
 	return (*txControlOption)(txControl)

@@ -807,8 +807,7 @@ func TestIssue1872QueryWarning(t *testing.T) {
 	require.NoError(t, err)
 	t.Run("Query with declare", func(t *testing.T) {
 		collector := make([]*Ydb_Issue.IssueMessage, 0)
-		q := db.Query()
-		_, err := q.Query(ctx, `
+		_, err := db.Query().Query(ctx, `
 				DECLARE $x as String;
 				SELECT 42;
 				SELECT 43;
@@ -825,8 +824,7 @@ func TestIssue1872QueryWarning(t *testing.T) {
 	})
 	t.Run("Exec with declare", func(t *testing.T) {
 		collector := make([]*Ydb_Issue.IssueMessage, 0)
-		q := db.Query()
-		_, err := q.Query(ctx, `
+		_, err := db.Query().Query(ctx, `
 					DECLARE $x as String;
 					SELECT 42;
 					SELECT 43;
@@ -843,8 +841,7 @@ func TestIssue1872QueryWarning(t *testing.T) {
 	})
 	issueCount := -1
 	t.Run("Query no issues", func(t *testing.T) {
-		q := db.Query()
-		_, err := q.Query(ctx, `
+		_, err := db.Query().Query(ctx, `
 				SELECT 42;
 				SELECT 43;
 	        `,
@@ -859,8 +856,7 @@ func TestIssue1872QueryWarning(t *testing.T) {
 	require.Equal(t, -1, issueCount)
 	issueCount = -1
 	t.Run("Exec no issues", func(t *testing.T) {
-		q := db.Query()
-		_, err := q.Query(ctx, `
+		_, err := db.Query().Query(ctx, `
 				SELECT 42;
 				SELECT 43;
 	        `,
@@ -875,8 +871,7 @@ func TestIssue1872QueryWarning(t *testing.T) {
 	require.Equal(t, -1, issueCount)
 	t.Run("Exec insert", func(t *testing.T) {
 		var issueList []*Ydb_Issue.IssueMessage
-		q := db.Query()
-		err := q.Exec(ctx, `
+		err := db.Query().Exec(ctx, `
 			insert into TestIssue1872QueryWarning (Id, Amount)
 			values (-7, Decimal("37.01",22,9));
 			`,
@@ -946,8 +941,7 @@ func TestIssue1872QueryWarning(t *testing.T) {
 	})
 	t.Run("Query 2 inserts", func(t *testing.T) {
 		var issueList []*Ydb_Issue.IssueMessage
-		q := db.Query()
-		_, err := q.Query(ctx, `
+		_, err := db.Query().Query(ctx, `
 		        insert into TestIssue1872QueryWarning (Id, Amount) values (-9, Decimal("3.01",22,9));
 				insert into TestIssue1872QueryWarning (Id, Amount) values (-5, Decimal("5.01",22,9));
 		        `,
@@ -973,8 +967,7 @@ func TestIssue1872QueryWarning(t *testing.T) {
 	})
 	t.Run("Exec 2 inserts", func(t *testing.T) {
 		var issueList []*Ydb_Issue.IssueMessage
-		q := db.Query()
-		_, err := q.Query(ctx, `
+		_, err := db.Query().Query(ctx, `
 		        insert into TestIssue1872QueryWarning (Id, Amount) values (-19, Decimal("3.01",22,9));
 				insert into TestIssue1872QueryWarning (Id, Amount) values (-15, Decimal("5.01",22,9));
 		        `,
@@ -1020,8 +1013,7 @@ func TestIssue1878ConcurrentResultSet(t *testing.T) {
 	)
 	require.NoError(t, err)
 	t.Run("Select with enabled option", func(t *testing.T) {
-		q := db.Query()
-		res, err := q.Query(ctx, `
+		res, err := db.Query().Query(ctx, `
 				SELECT 1;
 				SELECT 2;
 				SELECT 3;
@@ -1030,7 +1022,6 @@ func TestIssue1878ConcurrentResultSet(t *testing.T) {
 	        `,
 			query.WithSyntax(query.SyntaxYQL),
 			query.WithIdempotent(),
-			query.WithConcurrentResultSets(true),
 		)
 		require.NoError(t, err)
 		rsCount := 0
