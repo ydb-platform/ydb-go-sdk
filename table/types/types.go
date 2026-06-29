@@ -3,6 +3,9 @@
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+//
+// Note: StructOption is not a type alias to types.StructOption.
+// Migrate StructField and Struct (or VariantStruct) to types together.
 package types
 
 import (
@@ -22,6 +25,7 @@ type tStructType struct {
 }
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.StructOption instead.
+// StructOption is not a type alias to types.StructOption; migrate StructField and Struct (or VariantStruct) together.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 type StructOption func(*tStructType)
@@ -133,7 +137,7 @@ type RawValue = public.RawValue
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 type Scanner = public.Scanner
 
-// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.... instead.
+// Deprecated: use the corresponding constant from github.com/ydb-platform/ydb-go-sdk/v3/types instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 const (

@@ -269,8 +269,7 @@ func transformCommitError(ctx context.Context, err error) error {
 
 func mustDeleteConn[T interface {
 	*sql.Conn
-}](err error, conn T,
-) bool {
+}](err error, conn T) bool {
 	if xerrors.Is(err, driver.ErrBadConn) {
 		return true
 	}

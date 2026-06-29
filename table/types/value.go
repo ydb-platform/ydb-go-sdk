@@ -25,6 +25,7 @@ type structValueFields struct {
 }
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.StructValueOption instead.
+// StructValueOption is not a type alias to types.StructValueOption; migrate StructFieldValue and StructValue together.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 type StructValueOption func(*structValueFields)
@@ -34,6 +35,7 @@ type dictValueFields struct {
 }
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DictValueOption instead.
+// DictValueOption is not a type alias to types.DictValueOption; migrate DictFieldValue and DictValue together.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 type DictValueOption func(*dictValueFields)
