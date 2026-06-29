@@ -56,13 +56,6 @@ func Timestamp64Value(v int64) Value { return value.Timestamp64Value(v) }
 // IntervalValueFromMicroseconds makes Value from given microseconds value
 func IntervalValueFromMicroseconds(v int64) Value { return value.IntervalValue(v) }
 
-// IntervalValue makes Value from given microseconds value
-//
-// Deprecated: use IntervalValueFromMicroseconds instead.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func IntervalValue(v int64) Value { return value.IntervalValue(v) }
-
 // Interval64ValueFromNanoseconds returns ydb interval64 value by given nanoseconds
 func Interval64ValueFromNanoseconds(v int64) Value { return value.Interval64Value(v) }
 
@@ -76,76 +69,45 @@ func TzDatetimeValue(v string) Value { return value.TzDatetimeValue(v) }
 func TzTimestampValue(v string) Value { return value.TzTimestampValue(v) }
 
 // DateValueFromTime makes Date value from time.Time
-//
-// Warning: all *From* helpers will be removed at next major release
-// (functional will be implements with go1.18 type lists)
 func DateValueFromTime(t time.Time) Value {
 	return value.DateValueFromTime(t)
 }
 
 // DatetimeValueFromTime makes Datetime value from time.Time
-//
-// Warning: all *From* helpers will be removed at next major release
-// (functional will be implements with go1.18 type lists)
 func DatetimeValueFromTime(t time.Time) Value {
 	return value.DatetimeValueFromTime(t)
 }
 
 // TimestampValueFromTime makes Timestamp value from time.Time
-//
-// Warning: all *From* helpers will be removed at next major release
-// (functional will be implements with go1.18 type lists)
 func TimestampValueFromTime(t time.Time) Value {
 	return value.TimestampValueFromTime(t)
 }
 
 // IntervalValueFromDuration makes Interval value from time.Duration
-//
-// Warning: all *From* helpers will be removed at next major release
-// (functional will be implements with go1.18 type lists)
 func IntervalValueFromDuration(v time.Duration) Value {
 	return value.IntervalValueFromDuration(v)
 }
 
 // TzDateValueFromTime makes TzDate value from time.Time
-//
-// Warning: all *From* helpers will be removed at next major release
-// (functional will be implements with go1.18 type lists)
 func TzDateValueFromTime(t time.Time) Value {
 	return value.TzDateValueFromTime(t)
 }
 
 // TzDatetimeValueFromTime makes TzDatetime value from time.Time
-//
-// Warning: all *From* helpers will be removed at next major release
-// (functional will be implements with go1.18 type lists)
 func TzDatetimeValueFromTime(t time.Time) Value {
 	return value.TzDatetimeValueFromTime(t)
 }
 
 // TzTimestampValueFromTime makes TzTimestamp value from time.Time
-//
-// Warning: all *From* helpers will be removed at next major release
-// (functional will be implements with go1.18 type lists)
 func TzTimestampValueFromTime(t time.Time) Value {
 	return value.TzTimestampValueFromTime(t)
 }
-
-// StringValue returns bytes value
-//
-// Deprecated: use BytesValue instead.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func StringValue(v []byte) Value { return value.BytesValue(v) }
 
 func BytesValue(v []byte) Value { return value.BytesValue(v) }
 
 func BytesValueFromString(v string) Value { return value.BytesValue(xstring.ToBytes(v)) }
 
 // StringValueFromString makes String value from string
-//
-// Warning: all *From* helpers will be removed at next major release
-// (functional will be implements with go1.18 type lists)
 func StringValueFromString(v string) Value { return value.BytesValue(xstring.ToBytes(v)) }
 
 func UTF8Value(v string) Value { return value.TextValue(v) }
@@ -155,17 +117,11 @@ func TextValue(v string) Value { return value.TextValue(v) }
 func YSONValue(v string) Value { return value.YSONValue(xstring.ToBytes(v)) }
 
 // YSONValueFromBytes makes YSON value from bytes
-//
-// Warning: all *From* helpers will be removed at next major release
-// (functional will be implements with go1.18 type lists)
 func YSONValueFromBytes(v []byte) Value { return value.YSONValue(v) }
 
 func JSONValue(v string) Value { return value.JSONValue(v) }
 
 // JSONValueFromBytes makes JSON value from bytes
-//
-// Warning: all *From* helpers will be removed at next major release
-// (functional will be implements with go1.18 type lists)
 func JSONValueFromBytes(v []byte) Value { return value.JSONValue(xstring.FromBytes(v)) }
 
 // removed for https://github.com/ydb-platform/ydb-go-sdk/issues/1501
@@ -194,9 +150,6 @@ func UuidValue(v uuid.UUID) Value { //nolint:revive
 func JSONDocumentValue(v string) Value { return value.JSONDocumentValue(v) }
 
 // JSONDocumentValueFromBytes makes JSONDocument value from bytes
-//
-// Warning: all *From* helpers will be removed at next major release
-// (functional will be implements with go1.18 type lists)
 func JSONDocumentValueFromBytes(v []byte) Value {
 	return value.JSONDocumentValue(xstring.FromBytes(v))
 }
@@ -418,15 +371,6 @@ func NullableTzTimestampValueFromTime(v *time.Time) Value {
 	return value.NullableTzTimestampValueFromTime(v)
 }
 
-// NullableIntervalValue makes Value which maybe nil or valued
-//
-// Deprecated: use NullableIntervalValueFromMicroseconds instead.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func NullableIntervalValue(v *int64) Value {
-	return value.NullableIntervalValueFromMicroseconds(v)
-}
-
 func NullableIntervalValueFromMicroseconds(v *int64) Value {
 	return value.NullableIntervalValueFromMicroseconds(v)
 }
@@ -441,15 +385,6 @@ func NullableInterval64ValueFromNanoseconds(v *int64) Value {
 
 func NullableInterval64ValueFromDuration(v *time.Duration) Value {
 	return value.NullableInterval64ValueFromDuration(v)
-}
-
-// NullableStringValue
-//
-// Deprecated: use NullableBytesValue instead.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func NullableStringValue(v *[]byte) Value {
-	return value.NullableBytesValue(v)
 }
 
 func NullableBytesValue(v *[]byte) Value {

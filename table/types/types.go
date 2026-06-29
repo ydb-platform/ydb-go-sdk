@@ -120,11 +120,11 @@ var DecimalType = public.DecimalType
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 var DecimalTypeFromDecimal = public.DecimalTypeFromDecimal
 
-// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.WriteTypeStringTo instead.
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Type.Yql() instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
-	public.WriteTypeStringTo(buf, t)
+	buf.WriteString(t.Yql())
 }
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.RawValue instead.

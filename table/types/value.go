@@ -130,11 +130,11 @@ var Timestamp64Value = roottypes.Timestamp64Value
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 var IntervalValueFromMicroseconds = roottypes.IntervalValueFromMicroseconds
 
-// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.IntervalValue instead.
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.IntervalValueFromMicroseconds instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func IntervalValue(v int64) Value {
-	return roottypes.IntervalValue(v)
+	return internalvalue.IntervalValue(v)
 }
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Interval64ValueFromNanoseconds instead.
@@ -192,11 +192,11 @@ var TzDatetimeValueFromTime = roottypes.TzDatetimeValueFromTime
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 var TzTimestampValueFromTime = roottypes.TzTimestampValueFromTime
 
-// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.StringValue instead.
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.BytesValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func StringValue(v []byte) Value {
-	return roottypes.StringValue(v)
+	return internalvalue.BytesValue(v)
 }
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.BytesValue instead.
@@ -535,11 +535,11 @@ var NullableTzTimestampValue = roottypes.NullableTzTimestampValue
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 var NullableTzTimestampValueFromTime = roottypes.NullableTzTimestampValueFromTime
 
-// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableIntervalValue instead.
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableIntervalValueFromMicroseconds instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func NullableIntervalValue(v *int64) Value {
-	return roottypes.NullableIntervalValue(v)
+	return internalvalue.NullableIntervalValueFromMicroseconds(v)
 }
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableIntervalValueFromMicroseconds instead.
@@ -562,11 +562,11 @@ var NullableInterval64ValueFromNanoseconds = roottypes.NullableInterval64ValueFr
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 var NullableInterval64ValueFromDuration = roottypes.NullableInterval64ValueFromDuration
 
-// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableStringValue instead.
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableBytesValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func NullableStringValue(v *[]byte) Value {
-	return roottypes.NullableStringValue(v)
+	return internalvalue.NullableBytesValue(v)
 }
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableBytesValue instead.

@@ -100,15 +100,6 @@ func VariantValue(v Value) (name string, idx uint32, _ Value, _ error) {
 	return "", 0, nil, xerrors.WithStackTrace(fmt.Errorf("cannot get variant value from '%s'", v.Type().Yql()))
 }
 
-// DictFields returns dict values from abstract Value
-//
-// Deprecated: use DictValues instead.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func DictFields(v Value) (map[Value]Value, error) {
-	return DictValues(v)
-}
-
 // DictValues returns dict values from abstract Value
 func DictValues(v Value) (map[Value]Value, error) {
 	if vv, has := v.(interface {

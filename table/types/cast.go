@@ -47,11 +47,11 @@ var StructFields = public.StructFields
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 var VariantValue = public.VariantValue
 
-// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DictFields instead.
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DictValues instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func DictFields(v Value) (map[Value]Value, error) {
-	return public.DictFields(v)
+	return DictValues(v)
 }
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DictValues instead.

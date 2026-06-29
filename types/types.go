@@ -2,8 +2,6 @@
 package types
 
 import (
-	"bytes"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 )
@@ -127,15 +125,6 @@ const (
 	TypeJSONDocument = types.JSONDocument
 	TypeDyNumber     = types.DyNumber
 )
-
-// WriteTypeStringTo writes ydb type string representation into buffer
-//
-// Deprecated: use types.Type.Yql() instead.
-// Will be removed after Oct 2024.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func WriteTypeStringTo(buf *bytes.Buffer, t Type) { //nolint: interfacer
-	buf.WriteString(t.Yql())
-}
 
 type (
 	RawValue = scanner.RawValue
