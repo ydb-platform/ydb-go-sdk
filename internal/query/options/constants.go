@@ -1,10 +1,8 @@
 package options
 
-type ConcurrentResultSetsType struct {
-	Flag bool
-}
+type ResultSetsType uint8
 
-var (
-	ConcurrentResultSets = ConcurrentResultSetsType{true}
-	OrderedResultSets    = ConcurrentResultSetsType{false}
+const (
+	ResultSetsTypeOrdered = ResultSetsType(iota)
+	ResultSetsTypeConcurrent
 )

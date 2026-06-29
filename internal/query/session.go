@@ -47,7 +47,7 @@ func (s *Session) QueryResultSet(
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, settings, options.OrderedResultSets,
+	r, err := s.execute(ctx, q, settings, options.ResultSetsTypeOrdered,
 		withStreamResultTrace(s.trace),
 		withIssuesHandler(settings.IssuesOpts()),
 	)
@@ -66,7 +66,7 @@ func (s *Session) QueryResultSet(
 func (s *Session) queryRow(
 	ctx context.Context, q string, settings executeSettings, resultOpts ...resultOption,
 ) (row query.Row, finalErr error) {
-	r, err := s.execute(ctx, q, settings, options.OrderedResultSets, resultOpts...)
+	r, err := s.execute(ctx, q, settings, options.ResultSetsTypeOrdered, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -165,7 +165,7 @@ func (s *Session) Begin(
 }
 
 func (s *Session) execute(ctx context.Context,
-	q string, settings executeSettings, concurrentResultSets options.ConcurrentResultSetsType, opts ...resultOption,
+	q string, settings executeSettings, concurrentResultSets options.ResultSetsType, opts ...resultOption,
 ) (_ *streamResult, finalErr error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
@@ -203,7 +203,7 @@ func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, settings, options.OrderedResultSets,
+	r, err := s.execute(ctx, q, settings, options.ResultSetsTypeOrdered,
 		withStreamResultTrace(s.trace),
 		withIssuesHandler(settings.IssuesOpts()),
 	)
@@ -239,7 +239,7 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, settings, options.OrderedResultSets,
+	r, err := s.execute(ctx, q, settings, options.ResultSetsTypeOrdered,
 		withStreamResultTrace(s.trace),
 		withIssuesHandler(settings.IssuesOpts()),
 	)
@@ -265,7 +265,7 @@ func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Exec
 		}
 	}()
 
-	request, callOptions, err := executeQueryRequest(s.ID(), q, settings, options.OrderedResultSets)
+	request, callOptions, err := executeQueryRequest(s.ID(), q, settings, options.ResultSetsTypeOrdered)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

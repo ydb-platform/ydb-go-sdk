@@ -75,7 +75,7 @@ func executeQueryScriptRequest(q string, cfg executeScriptConfig) (
 }
 
 func executeQueryRequest(
-	sessionID, q string, cfg executeSettings, concurrentResultSets options.ConcurrentResultSetsType,
+	sessionID, q string, cfg executeSettings, concurrentResultSets options.ResultSetsType,
 ) (
 	*Ydb_Query.ExecuteQueryRequest, []grpc.CallOption, error,
 ) {
@@ -96,7 +96,7 @@ func executeQueryRequest(
 		},
 		Parameters:             params,
 		StatsMode:              Ydb_Query.StatsMode(cfg.StatsMode()),
-		ConcurrentResultSets:   concurrentResultSets.Flag,
+		ConcurrentResultSets:   concurrentResultSets == options.ResultSetsTypeConcurrent,
 		PoolId:                 cfg.ResourcePool(),
 		ResponsePartLimitBytes: cfg.ResponsePartLimitSizeBytes(),
 	}
@@ -113,7 +113,7 @@ func queryQueryContent(syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryConten
 
 func execute(
 	ctx context.Context, sessionID string, c Ydb_Query_V1.QueryServiceClient,
-	q string, settings executeSettings, concurrentResultSets options.ConcurrentResultSetsType, opts ...resultOption,
+	q string, settings executeSettings, concurrentResultSets options.ResultSetsType, opts ...resultOption,
 ) (
 	_ *streamResult, finalErr error,
 ) {
