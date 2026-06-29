@@ -1,140 +1,134 @@
+// Package types provides helpers for YDB types and values.
+//
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 package types
 
-import (
-	"bytes"
+import roottypes "github.com/ydb-platform/ydb-go-sdk/v3/types"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scanner"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
-)
-
-const (
-	decimalPrecision uint32 = 22
-	decimalScale     uint32 = 9
-)
-
-// Type describes YDB data types.
-type Type = types.Type
-
-// Equal checks for type equivalence
-func Equal(lhs, rhs Type) bool {
-	return types.Equal(lhs, rhs)
-}
-
-func List(t Type) Type {
-	return types.NewList(t)
-}
-
-func Tuple(elems ...Type) Type {
-	return types.NewTuple(elems...)
-}
-
-type tStructType struct {
-	fields []types.StructField
-}
-
-type StructOption func(*tStructType)
-
-func StructField(name string, t Type) StructOption {
-	return func(s *tStructType) {
-		s.fields = append(s.fields, types.StructField{
-			Name: name,
-			T:    t,
-		})
-	}
-}
-
-func Struct(opts ...StructOption) Type {
-	var s tStructType
-	for _, opt := range opts {
-		if opt != nil {
-			opt(&s)
-		}
-	}
-
-	return types.NewStruct(s.fields...)
-}
-
-func Dict(k, v Type) Type {
-	return types.NewDict(k, v)
-}
-
-func VariantStruct(opts ...StructOption) Type {
-	var s tStructType
-	for _, opt := range opts {
-		if opt != nil {
-			opt(&s)
-		}
-	}
-
-	return types.NewVariantStruct(s.fields...)
-}
-
-func VariantTuple(elems ...Type) Type {
-	return types.NewVariantTuple(elems...)
-}
-
-func Void() Type {
-	return types.NewVoid()
-}
-
-func Optional(t Type) Type {
-	return types.NewOptional(t)
-}
-
-var DefaultDecimal = DecimalType(decimalPrecision, decimalScale)
-
-func DecimalType(precision, scale uint32) Type {
-	return types.NewDecimal(precision, scale)
-}
-
-func DecimalTypeFromDecimal(d *Decimal) Type {
-	return types.NewDecimal(d.Precision, d.Scale)
-}
-
-// Primitive types known by YDB.
-const (
-	TypeUnknown      = types.Unknown
-	TypeBool         = types.Bool
-	TypeInt8         = types.Int8
-	TypeUint8        = types.Uint8
-	TypeInt16        = types.Int16
-	TypeUint16       = types.Uint16
-	TypeInt32        = types.Int32
-	TypeUint32       = types.Uint32
-	TypeInt64        = types.Int64
-	TypeUint64       = types.Uint64
-	TypeFloat        = types.Float
-	TypeDouble       = types.Double
-	TypeDate         = types.Date
-	TypeDatetime     = types.Datetime
-	TypeDatetime64   = types.Datetime64
-	TypeTimestamp    = types.Timestamp
-	TypeTimestamp64  = types.Timestamp64
-	TypeInterval     = types.Interval
-	TypeTzDate       = types.TzDate
-	TypeTzDatetime   = types.TzDatetime
-	TypeTzTimestamp  = types.TzTimestamp
-	TypeString       = types.Bytes
-	TypeBytes        = types.Bytes
-	TypeUTF8         = types.Text
-	TypeText         = types.Text
-	TypeYSON         = types.YSON
-	TypeJSON         = types.JSON
-	TypeUUID         = types.UUID
-	TypeJSONDocument = types.JSONDocument
-	TypeDyNumber     = types.DyNumber
-)
-
-// WriteTypeStringTo writes ydb type string representation into buffer
-//
-// Deprecated: use types.Type.Yql() instead.
-// Will be removed after Oct 2024.
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Type instead.
+// Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func WriteTypeStringTo(buf *bytes.Buffer, t Type) { //nolint: interfacer
-	buf.WriteString(t.Yql())
-}
+type Type = roottypes.Type
 
-type (
-	RawValue = scanner.RawValue
-	Scanner  = scanner.Scanner
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.StructOption instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+type StructOption = roottypes.StructOption
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DefaultDecimal instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var DefaultDecimal = roottypes.DefaultDecimal
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Equal instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var Equal = roottypes.Equal
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.List instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var List = roottypes.List
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Tuple instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var Tuple = roottypes.Tuple
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.StructField instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var StructField = roottypes.StructField
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Struct instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var Struct = roottypes.Struct
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Dict instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var Dict = roottypes.Dict
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.VariantStruct instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var VariantStruct = roottypes.VariantStruct
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.VariantTuple instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var VariantTuple = roottypes.VariantTuple
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Void instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var Void = roottypes.Void
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Optional instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var Optional = roottypes.Optional
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DecimalType instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var DecimalType = roottypes.DecimalType
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DecimalTypeFromDecimal instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var DecimalTypeFromDecimal = roottypes.DecimalTypeFromDecimal
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.WriteTypeStringTo instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var WriteTypeStringTo = roottypes.WriteTypeStringTo
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.RawValue instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+type RawValue = roottypes.RawValue
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Scanner instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+type Scanner = roottypes.Scanner
+
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.... instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+const (
+	TypeUnknown = roottypes.TypeUnknown
+	TypeBool = roottypes.TypeBool
+	TypeInt8 = roottypes.TypeInt8
+	TypeUint8 = roottypes.TypeUint8
+	TypeInt16 = roottypes.TypeInt16
+	TypeUint16 = roottypes.TypeUint16
+	TypeInt32 = roottypes.TypeInt32
+	TypeUint32 = roottypes.TypeUint32
+	TypeInt64 = roottypes.TypeInt64
+	TypeUint64 = roottypes.TypeUint64
+	TypeFloat = roottypes.TypeFloat
+	TypeDouble = roottypes.TypeDouble
+	TypeDate = roottypes.TypeDate
+	TypeDatetime = roottypes.TypeDatetime
+	TypeDatetime64 = roottypes.TypeDatetime64
+	TypeTimestamp = roottypes.TypeTimestamp
+	TypeTimestamp64 = roottypes.TypeTimestamp64
+	TypeInterval = roottypes.TypeInterval
+	TypeTzDate = roottypes.TypeTzDate
+	TypeTzDatetime = roottypes.TypeTzDatetime
+	TypeTzTimestamp = roottypes.TypeTzTimestamp
+	TypeString = roottypes.TypeString
+	TypeBytes = roottypes.TypeBytes
+	TypeUTF8 = roottypes.TypeUTF8
+	TypeText = roottypes.TypeText
+	TypeYSON = roottypes.TypeYSON
+	TypeJSON = roottypes.TypeJSON
+	TypeUUID = roottypes.TypeUUID
+	TypeJSONDocument = roottypes.TypeJSONDocument
+	TypeDyNumber = roottypes.TypeDyNumber
 )

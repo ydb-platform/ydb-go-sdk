@@ -1,3 +1,5 @@
+* Added public package `github.com/ydb-platform/ydb-go-sdk/v3/types` and marked as deprecated all public API in `github.com/ydb-platform/ydb-go-sdk/v3/table/types` as deprecated
+
 ## v3.141.2
 * Option `table.WithIdempotent()` allowed single optional `bool` argument now 
 
