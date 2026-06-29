@@ -1128,7 +1128,7 @@ func TestClient(t *testing.T) {
 				require.Nil(t, row)
 			}
 		})
-		t.Run("ConcurrentResultSets", func(t *testing.T) {
+		t.Run("ResultSetsType", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			colsAB := []*Ydb.Column{
@@ -1189,7 +1189,7 @@ func TestClient(t *testing.T) {
 
 			r, err := clientQuery(ctx, testPool(t, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
-			}), "", query.WithConcurrentResultSets(true))
+			}), "")
 			require.NoError(t, err)
 
 			{
@@ -1269,7 +1269,7 @@ func TestClient(t *testing.T) {
 
 			_, err := clientQuery(executeCtx, testPool(t, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
-			}), "", query.WithConcurrentResultSets(true))
+			}), "")
 
 			require.ErrorIs(t, err, context.Canceled)
 		})
@@ -1300,7 +1300,7 @@ func TestClient(t *testing.T) {
 
 			r, err := clientQuery(ctx, testPool(t, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
-			}), "", query.WithConcurrentResultSets(true))
+			}), "")
 			require.NoError(t, err)
 
 			rs, err := r.NextResultSet(ctx)

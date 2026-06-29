@@ -33,7 +33,6 @@ type executeSettings interface {
 	ResourcePool() string
 	ResponsePartLimitSizeBytes() int64
 	Label() string
-	ConcurrentResultSets() bool
 	UserProvidedTxControl() bool
 	IssuesOpts() func([]*Ydb_Issue.IssueMessage)
 	ResponsePartPrefetch() int
@@ -75,10 +74,10 @@ func executeQueryScriptRequest(q string, cfg executeScriptConfig) (
 	return request, cfg.CallOptions(), nil
 }
 
-func executeQueryRequest(sessionID, q string, cfg executeSettings) (
-	*Ydb_Query.ExecuteQueryRequest,
-	[]grpc.CallOption,
-	error,
+func executeQueryRequest(
+	sessionID, q string, cfg executeSettings, concurrentResultSets options.ResultSetsType,
+) (
+	*Ydb_Query.ExecuteQueryRequest, []grpc.CallOption, error,
 ) {
 	params, err := cfg.Params().ToYDB()
 	if err != nil {
@@ -97,7 +96,7 @@ func executeQueryRequest(sessionID, q string, cfg executeSettings) (
 		},
 		Parameters:             params,
 		StatsMode:              Ydb_Query.StatsMode(cfg.StatsMode()),
-		ConcurrentResultSets:   cfg.ConcurrentResultSets(),
+		ConcurrentResultSets:   concurrentResultSets == options.ResultSetsTypeConcurrent,
 		PoolId:                 cfg.ResourcePool(),
 		ResponsePartLimitBytes: cfg.ResponsePartLimitSizeBytes(),
 	}
@@ -114,11 +113,11 @@ func queryQueryContent(syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryConten
 
 func execute(
 	ctx context.Context, sessionID string, c Ydb_Query_V1.QueryServiceClient,
-	q string, settings executeSettings, opts ...resultOption,
+	q string, settings executeSettings, concurrentResultSets options.ResultSetsType, opts ...resultOption,
 ) (
 	_ *streamResult, finalErr error,
 ) {
-	request, callOptions, err := executeQueryRequest(sessionID, q, settings)
+	request, callOptions, err := executeQueryRequest(sessionID, q, settings, concurrentResultSets)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

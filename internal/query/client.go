@@ -495,7 +495,7 @@ func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options
 	}
 
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := s.execute(ctx, q, settings,
+		streamResult, err := s.execute(ctx, q, settings, options.ResultSetsTypeOrdered,
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -553,7 +553,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 	}
 
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := s.execute(ctx, q, settings,
+		streamResult, err := s.execute(ctx, q, settings, options.ResultSetsTypeConcurrent,
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -608,7 +608,7 @@ func clientQueryResultSet(
 	}
 
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
-		streamResult, err := s.execute(ctx, q, settings, resultOpts...)
+		streamResult, err := s.execute(ctx, q, settings, options.ResultSetsTypeOrdered, resultOpts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}

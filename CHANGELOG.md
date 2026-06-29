@@ -1,3 +1,5 @@
+* Deprecated `query.WithConcurrentResultSets`: the option is now a no-op; `Client.Query` always enables concurrent result sets internally because it materializes the full response. Session, transaction, and other streaming paths always send `concurrent_result_sets=false`
+
 ## v3.141.2
 * Option `table.WithIdempotent()` allowed single optional `bool` argument now 
 
