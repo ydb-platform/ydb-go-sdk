@@ -107,11 +107,13 @@ const (
 	TypeFloat        = types.Float
 	TypeDouble       = types.Double
 	TypeDate         = types.Date
+	TypeDate32       = types.Date32
 	TypeDatetime     = types.Datetime
 	TypeDatetime64   = types.Datetime64
 	TypeTimestamp    = types.Timestamp
 	TypeTimestamp64  = types.Timestamp64
 	TypeInterval     = types.Interval
+	TypeInterval64   = types.Interval64
 	TypeTzDate       = types.TzDate
 	TypeTzDatetime   = types.TzDatetime
 	TypeTzTimestamp  = types.TzTimestamp

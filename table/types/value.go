@@ -1,603 +1,648 @@
 package types
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/types"
+import (
+	internalvalue "github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	roottypes "github.com/ydb-platform/ydb-go-sdk/v3/types"
+)
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-type Value = types.Value
+type Value = roottypes.Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.UUIDBytesWithIssue1501Type instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-type UUIDBytesWithIssue1501Type = types.UUIDBytesWithIssue1501Type
+type UUIDBytesWithIssue1501Type = roottypes.UUIDBytesWithIssue1501Type
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Decimal instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-type Decimal = types.Decimal
+type Decimal = roottypes.Decimal
+
+type structValueFields struct {
+	fields []internalvalue.StructValueField
+}
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.StructValueOption instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-type StructValueOption = types.StructValueOption
+type StructValueOption func(*structValueFields)
+
+type dictValueFields struct {
+	fields []internalvalue.DictValueField
+}
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DictValueOption instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-type DictValueOption = types.DictValueOption
+type DictValueOption func(*dictValueFields)
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.BoolValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var BoolValue = types.BoolValue
+var BoolValue = roottypes.BoolValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Int8Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var Int8Value = types.Int8Value
+var Int8Value = roottypes.Int8Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Uint8Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var Uint8Value = types.Uint8Value
+var Uint8Value = roottypes.Uint8Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Int16Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var Int16Value = types.Int16Value
+var Int16Value = roottypes.Int16Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Uint16Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var Uint16Value = types.Uint16Value
+var Uint16Value = roottypes.Uint16Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Int32Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var Int32Value = types.Int32Value
+var Int32Value = roottypes.Int32Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Uint32Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var Uint32Value = types.Uint32Value
+var Uint32Value = roottypes.Uint32Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Int64Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var Int64Value = types.Int64Value
+var Int64Value = roottypes.Int64Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Uint64Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var Uint64Value = types.Uint64Value
+var Uint64Value = roottypes.Uint64Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.FloatValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var FloatValue = types.FloatValue
+var FloatValue = roottypes.FloatValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DoubleValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var DoubleValue = types.DoubleValue
+var DoubleValue = roottypes.DoubleValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DateValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var DateValue = types.DateValue
+var DateValue = roottypes.DateValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Date32Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var Date32Value = types.Date32Value
+var Date32Value = roottypes.Date32Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DatetimeValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var DatetimeValue = types.DatetimeValue
+var DatetimeValue = roottypes.DatetimeValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Datetime64Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var Datetime64Value = types.Datetime64Value
+var Datetime64Value = roottypes.Datetime64Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.TimestampValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var TimestampValue = types.TimestampValue
+var TimestampValue = roottypes.TimestampValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Timestamp64Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var Timestamp64Value = types.Timestamp64Value
+var Timestamp64Value = roottypes.Timestamp64Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.IntervalValueFromMicroseconds instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var IntervalValueFromMicroseconds = types.IntervalValueFromMicroseconds
+var IntervalValueFromMicroseconds = roottypes.IntervalValueFromMicroseconds
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.IntervalValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var IntervalValue = types.IntervalValue //nolint:staticcheck // backward compatibility re-export
+func IntervalValue(v int64) Value {
+	return roottypes.IntervalValue(v)
+}
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Interval64ValueFromNanoseconds instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var Interval64ValueFromNanoseconds = types.Interval64ValueFromNanoseconds
+var Interval64ValueFromNanoseconds = roottypes.Interval64ValueFromNanoseconds
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.TzDateValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var TzDateValue = types.TzDateValue
+var TzDateValue = roottypes.TzDateValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.TzDatetimeValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var TzDatetimeValue = types.TzDatetimeValue
+var TzDatetimeValue = roottypes.TzDatetimeValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.TzTimestampValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var TzTimestampValue = types.TzTimestampValue
+var TzTimestampValue = roottypes.TzTimestampValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DateValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var DateValueFromTime = types.DateValueFromTime
+var DateValueFromTime = roottypes.DateValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DatetimeValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var DatetimeValueFromTime = types.DatetimeValueFromTime
+var DatetimeValueFromTime = roottypes.DatetimeValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.TimestampValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var TimestampValueFromTime = types.TimestampValueFromTime
+var TimestampValueFromTime = roottypes.TimestampValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.IntervalValueFromDuration instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var IntervalValueFromDuration = types.IntervalValueFromDuration
+var IntervalValueFromDuration = roottypes.IntervalValueFromDuration
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.TzDateValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var TzDateValueFromTime = types.TzDateValueFromTime
+var TzDateValueFromTime = roottypes.TzDateValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.TzDatetimeValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var TzDatetimeValueFromTime = types.TzDatetimeValueFromTime
+var TzDatetimeValueFromTime = roottypes.TzDatetimeValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.TzTimestampValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var TzTimestampValueFromTime = types.TzTimestampValueFromTime
+var TzTimestampValueFromTime = roottypes.TzTimestampValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.StringValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var StringValue = types.StringValue //nolint:staticcheck // backward compatibility re-export
+func StringValue(v []byte) Value {
+	return roottypes.StringValue(v)
+}
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.BytesValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var BytesValue = types.BytesValue
+var BytesValue = roottypes.BytesValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.BytesValueFromString instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var BytesValueFromString = types.BytesValueFromString
+var BytesValueFromString = roottypes.BytesValueFromString
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.StringValueFromString instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var StringValueFromString = types.StringValueFromString
+var StringValueFromString = roottypes.StringValueFromString
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.UTF8Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var UTF8Value = types.UTF8Value
+var UTF8Value = roottypes.UTF8Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.TextValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var TextValue = types.TextValue
+var TextValue = roottypes.TextValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.YSONValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var YSONValue = types.YSONValue
+var YSONValue = roottypes.YSONValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.YSONValueFromBytes instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var YSONValueFromBytes = types.YSONValueFromBytes
+var YSONValueFromBytes = roottypes.YSONValueFromBytes
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.JSONValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var JSONValue = types.JSONValue
+var JSONValue = roottypes.JSONValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.JSONValueFromBytes instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var JSONValueFromBytes = types.JSONValueFromBytes
+var JSONValueFromBytes = roottypes.JSONValueFromBytes
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NewUUIDBytesWithIssue1501 instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NewUUIDBytesWithIssue1501 = types.NewUUIDBytesWithIssue1501
+var NewUUIDBytesWithIssue1501 = roottypes.NewUUIDBytesWithIssue1501
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.UUIDWithIssue1501Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var UUIDWithIssue1501Value = types.UUIDWithIssue1501Value
+var UUIDWithIssue1501Value = roottypes.UUIDWithIssue1501Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.UuidValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var UuidValue = types.UuidValue //nolint:revive // backward compatibility re-export
+var UuidValue = roottypes.UuidValue //nolint:revive // backward compatibility re-export
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.JSONDocumentValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var JSONDocumentValue = types.JSONDocumentValue
+var JSONDocumentValue = roottypes.JSONDocumentValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.JSONDocumentValueFromBytes instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var JSONDocumentValueFromBytes = types.JSONDocumentValueFromBytes
+var JSONDocumentValueFromBytes = roottypes.JSONDocumentValueFromBytes
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DyNumberValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var DyNumberValue = types.DyNumberValue
+var DyNumberValue = roottypes.DyNumberValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.VoidValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var VoidValue = types.VoidValue
+var VoidValue = roottypes.VoidValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullValue = types.NullValue
+var NullValue = roottypes.NullValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.ZeroValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var ZeroValue = types.ZeroValue
+var ZeroValue = roottypes.ZeroValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.OptionalValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var OptionalValue = types.OptionalValue
+var OptionalValue = roottypes.OptionalValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DecimalValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var DecimalValue = types.DecimalValue
+var DecimalValue = roottypes.DecimalValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DecimalValueFromBigInt instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var DecimalValueFromBigInt = types.DecimalValueFromBigInt
+var DecimalValueFromBigInt = roottypes.DecimalValueFromBigInt
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DecimalValueFromString instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var DecimalValueFromString = types.DecimalValueFromString
+var DecimalValueFromString = roottypes.DecimalValueFromString
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.TupleValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var TupleValue = types.TupleValue
+var TupleValue = roottypes.TupleValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.ListValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var ListValue = types.ListValue
+var ListValue = roottypes.ListValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.SetValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var SetValue = types.SetValue
+var SetValue = roottypes.SetValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.StructFieldValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var StructFieldValue = types.StructFieldValue
+func StructFieldValue(name string, v Value) StructValueOption {
+	return func(t *structValueFields) {
+		t.fields = append(t.fields, internalvalue.StructValueField{Name: name, V: v})
+	}
+}
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.StructValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var StructValue = types.StructValue
+func StructValue(opts ...StructValueOption) Value {
+	var p structValueFields
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&p)
+		}
+	}
+
+	return internalvalue.StructValue(p.fields...)
+}
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DictFieldValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var DictFieldValue = types.DictFieldValue
+func DictFieldValue(k, v Value) DictValueOption {
+	return func(t *dictValueFields) {
+		t.fields = append(t.fields, internalvalue.DictValueField{K: k, V: v})
+	}
+}
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DictValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var DictValue = types.DictValue
+func DictValue(opts ...DictValueOption) Value {
+	var p dictValueFields
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&p)
+		}
+	}
+
+	return internalvalue.DictValue(p.fields...)
+}
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.VariantValueStruct instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var VariantValueStruct = types.VariantValueStruct
+var VariantValueStruct = roottypes.VariantValueStruct
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.VariantValueTuple instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var VariantValueTuple = types.VariantValueTuple
+var VariantValueTuple = roottypes.VariantValueTuple
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableBoolValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableBoolValue = types.NullableBoolValue
+var NullableBoolValue = roottypes.NullableBoolValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableInt8Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableInt8Value = types.NullableInt8Value
+var NullableInt8Value = roottypes.NullableInt8Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableInt16Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableInt16Value = types.NullableInt16Value
+var NullableInt16Value = roottypes.NullableInt16Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableInt32Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableInt32Value = types.NullableInt32Value
+var NullableInt32Value = roottypes.NullableInt32Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableInt64Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableInt64Value = types.NullableInt64Value
+var NullableInt64Value = roottypes.NullableInt64Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableUint8Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableUint8Value = types.NullableUint8Value
+var NullableUint8Value = roottypes.NullableUint8Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableUint16Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableUint16Value = types.NullableUint16Value
+var NullableUint16Value = roottypes.NullableUint16Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableUint32Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableUint32Value = types.NullableUint32Value
+var NullableUint32Value = roottypes.NullableUint32Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableUint64Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableUint64Value = types.NullableUint64Value
+var NullableUint64Value = roottypes.NullableUint64Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableFloatValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableFloatValue = types.NullableFloatValue
+var NullableFloatValue = roottypes.NullableFloatValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableDoubleValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableDoubleValue = types.NullableDoubleValue
+var NullableDoubleValue = roottypes.NullableDoubleValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableDateValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableDateValue = types.NullableDateValue
+var NullableDateValue = roottypes.NullableDateValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableDateValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableDateValueFromTime = types.NullableDateValueFromTime
+var NullableDateValueFromTime = roottypes.NullableDateValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableDate32Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableDate32Value = types.NullableDate32Value
+var NullableDate32Value = roottypes.NullableDate32Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableDate32ValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableDate32ValueFromTime = types.NullableDate32ValueFromTime
+var NullableDate32ValueFromTime = roottypes.NullableDate32ValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableDecimalValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableDecimalValue = types.NullableDecimalValue
+var NullableDecimalValue = roottypes.NullableDecimalValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableDecimalValueFromBigInt instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableDecimalValueFromBigInt = types.NullableDecimalValueFromBigInt
+var NullableDecimalValueFromBigInt = roottypes.NullableDecimalValueFromBigInt
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableDatetimeValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableDatetimeValue = types.NullableDatetimeValue
+var NullableDatetimeValue = roottypes.NullableDatetimeValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableDatetimeValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableDatetimeValueFromTime = types.NullableDatetimeValueFromTime
+var NullableDatetimeValueFromTime = roottypes.NullableDatetimeValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableDatetime64Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableDatetime64Value = types.NullableDatetime64Value
+var NullableDatetime64Value = roottypes.NullableDatetime64Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableDatetime64ValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableDatetime64ValueFromTime = types.NullableDatetime64ValueFromTime
+var NullableDatetime64ValueFromTime = roottypes.NullableDatetime64ValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableTzDateValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableTzDateValue = types.NullableTzDateValue
+var NullableTzDateValue = roottypes.NullableTzDateValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableTzDateValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableTzDateValueFromTime = types.NullableTzDateValueFromTime
+var NullableTzDateValueFromTime = roottypes.NullableTzDateValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableTzDatetimeValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableTzDatetimeValue = types.NullableTzDatetimeValue
+var NullableTzDatetimeValue = roottypes.NullableTzDatetimeValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableTzDatetimeValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableTzDatetimeValueFromTime = types.NullableTzDatetimeValueFromTime
+var NullableTzDatetimeValueFromTime = roottypes.NullableTzDatetimeValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableTimestampValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableTimestampValue = types.NullableTimestampValue
+var NullableTimestampValue = roottypes.NullableTimestampValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableTimestampValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableTimestampValueFromTime = types.NullableTimestampValueFromTime
+var NullableTimestampValueFromTime = roottypes.NullableTimestampValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableTimestamp64Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableTimestamp64Value = types.NullableTimestamp64Value
+var NullableTimestamp64Value = roottypes.NullableTimestamp64Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableTimestamp64ValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableTimestamp64ValueFromTime = types.NullableTimestamp64ValueFromTime
+var NullableTimestamp64ValueFromTime = roottypes.NullableTimestamp64ValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableTzTimestampValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableTzTimestampValue = types.NullableTzTimestampValue
+var NullableTzTimestampValue = roottypes.NullableTzTimestampValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableTzTimestampValueFromTime instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableTzTimestampValueFromTime = types.NullableTzTimestampValueFromTime
+var NullableTzTimestampValueFromTime = roottypes.NullableTzTimestampValueFromTime
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableIntervalValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableIntervalValue = types.NullableIntervalValue //nolint:staticcheck // backward compatibility re-export
+func NullableIntervalValue(v *int64) Value {
+	return roottypes.NullableIntervalValue(v)
+}
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableIntervalValueFromMicroseconds instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableIntervalValueFromMicroseconds = types.NullableIntervalValueFromMicroseconds
+var NullableIntervalValueFromMicroseconds = roottypes.NullableIntervalValueFromMicroseconds
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableIntervalValueFromDuration instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableIntervalValueFromDuration = types.NullableIntervalValueFromDuration
+var NullableIntervalValueFromDuration = roottypes.NullableIntervalValueFromDuration
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableInterval64ValueFromNanoseconds instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableInterval64ValueFromNanoseconds = types.NullableInterval64ValueFromNanoseconds
+var NullableInterval64ValueFromNanoseconds = roottypes.NullableInterval64ValueFromNanoseconds
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableInterval64ValueFromDuration instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableInterval64ValueFromDuration = types.NullableInterval64ValueFromDuration
+var NullableInterval64ValueFromDuration = roottypes.NullableInterval64ValueFromDuration
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableStringValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableStringValue = types.NullableStringValue //nolint:staticcheck // backward compatibility re-export
+func NullableStringValue(v *[]byte) Value {
+	return roottypes.NullableStringValue(v)
+}
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableBytesValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableBytesValue = types.NullableBytesValue
+var NullableBytesValue = roottypes.NullableBytesValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableStringValueFromString instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableStringValueFromString = types.NullableStringValueFromString
+var NullableStringValueFromString = roottypes.NullableStringValueFromString
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableBytesValueFromString instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableBytesValueFromString = types.NullableBytesValueFromString
+var NullableBytesValueFromString = roottypes.NullableBytesValueFromString
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableUTF8Value instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableUTF8Value = types.NullableUTF8Value
+var NullableUTF8Value = roottypes.NullableUTF8Value
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableTextValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableTextValue = types.NullableTextValue
+var NullableTextValue = roottypes.NullableTextValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableYSONValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableYSONValue = types.NullableYSONValue
+var NullableYSONValue = roottypes.NullableYSONValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableYSONValueFromBytes instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableYSONValueFromBytes = types.NullableYSONValueFromBytes
+var NullableYSONValueFromBytes = roottypes.NullableYSONValueFromBytes
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableJSONValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableJSONValue = types.NullableJSONValue
+var NullableJSONValue = roottypes.NullableJSONValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableJSONValueFromBytes instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableJSONValueFromBytes = types.NullableJSONValueFromBytes
+var NullableJSONValueFromBytes = roottypes.NullableJSONValueFromBytes
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableUUIDValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableUUIDValue = types.NullableUUIDValue
+var NullableUUIDValue = roottypes.NullableUUIDValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableUUIDValueWithIssue1501 instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableUUIDValueWithIssue1501 = types.NullableUUIDValueWithIssue1501
+var NullableUUIDValueWithIssue1501 = roottypes.NullableUUIDValueWithIssue1501
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableUUIDTypedValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableUUIDTypedValue = types.NullableUUIDTypedValue
+var NullableUUIDTypedValue = roottypes.NullableUUIDTypedValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableJSONDocumentValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableJSONDocumentValue = types.NullableJSONDocumentValue
+var NullableJSONDocumentValue = roottypes.NullableJSONDocumentValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableJSONDocumentValueFromBytes instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableJSONDocumentValueFromBytes = types.NullableJSONDocumentValueFromBytes
+var NullableJSONDocumentValueFromBytes = roottypes.NullableJSONDocumentValueFromBytes
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.NullableDyNumberValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var NullableDyNumberValue = types.NullableDyNumberValue
+var NullableDyNumberValue = roottypes.NullableDyNumberValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Nullable instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var Nullable = types.Nullable
+var Nullable = roottypes.Nullable

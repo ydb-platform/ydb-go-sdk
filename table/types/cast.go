@@ -1,58 +1,60 @@
 package types
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/types"
+import public "github.com/ydb-platform/ydb-go-sdk/v3/types"
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.CastTo instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var CastTo = types.CastTo
+var CastTo = public.CastTo
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.IsOptional instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var IsOptional = types.IsOptional
+var IsOptional = public.IsOptional
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.IsNull instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var IsNull = types.IsNull
+var IsNull = public.IsNull
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Unwrap instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var Unwrap = types.Unwrap
+var Unwrap = public.Unwrap
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.ToDecimal instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var ToDecimal = types.ToDecimal
+var ToDecimal = public.ToDecimal
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.ListItems instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var ListItems = types.ListItems
+var ListItems = public.ListItems
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.TupleItems instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var TupleItems = types.TupleItems
+var TupleItems = public.TupleItems
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.StructFields instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var StructFields = types.StructFields
+var StructFields = public.StructFields
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.VariantValue instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var VariantValue = types.VariantValue
+var VariantValue = public.VariantValue
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DictFields instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var DictFields = types.DictFields //nolint:staticcheck // backward compatibility re-export
+func DictFields(v Value) (map[Value]Value, error) {
+	return public.DictFields(v)
+}
 
 // Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DictValues instead.
 // Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-var DictValues = types.DictValues
+var DictValues = public.DictValues
