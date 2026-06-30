@@ -6,13 +6,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 )
 
-// tool gtrace used from ./internal/cmd/gtrace
-
-//go:generate gtrace
-
 type (
 	// Topic specified trace of topic reader client activity.
 	// gtrace:gen
+	// gtrace:out internal/topic/gtrace
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	Topic struct {
 		// TopicReaderCustomerEvents - upper level, on bridge with customer code
@@ -429,7 +426,7 @@ type (
 		Context              *context.Context
 		ReaderID             int64
 		TransactionSessionID string
-		Tx                   txInfo
+		Tx                   TxInfo
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -446,7 +443,7 @@ type (
 		ReaderID             int64
 		ReaderConnectionID   string
 		TransactionSessionID string
-		Tx                   txInfo
+		Tx                   TxInfo
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -460,7 +457,7 @@ type (
 		ReaderID             int64
 		ReaderConnectionID   string
 		TransactionSessionID string
-		Tx                   txInfo
+		Tx                   TxInfo
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -474,7 +471,7 @@ type (
 		ReaderID             int64
 		ReaderConnectionID   string
 		TransactionSessionID string
-		Tx                   txInfo
+		Tx                   TxInfo
 		TransactionResult    error
 	}
 
@@ -487,7 +484,7 @@ type (
 		ReaderID             int64
 		ReaderConnectionID   string
 		TransactionSessionID string
-		Tx                   txInfo
+		Tx                   TxInfo
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

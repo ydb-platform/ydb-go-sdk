@@ -3,6 +3,7 @@ package config
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -96,8 +97,12 @@ func SetAutoRetry(c *Common, autoRetry bool) {
 	c.disableAutoRetry = !autoRetry
 }
 
-func SetTraceRetry(c *Common, t *trace.Retry, opts ...trace.RetryComposeOption) {
-	c.traceRetry = *c.traceRetry.Compose(t, opts...)
+func SetTraceRetry(c *Common, t *trace.Retry) {
+	var opts []gtrace.RetryComposeOption
+	if cb := c.PanicCallback(); cb != nil {
+		opts = append(opts, gtrace.WithRetryPanicCallback(cb))
+	}
+	c.traceRetry = *gtrace.Compose(&c.traceRetry, t, opts...)
 }
 
 func SetRetryBudget(c *Common, b budget.Budget) {

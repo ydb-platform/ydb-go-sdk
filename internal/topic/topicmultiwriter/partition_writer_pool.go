@@ -95,6 +95,7 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 
 				return checkErrorResult
 			}),
+			topicwriterinternal.WithWaitAckOnWrite(false),
 			topicwriterinternal.WithMaxQueueLen(p.writerCfg.MaxQueueLen),
 		}
 	)
@@ -102,6 +103,9 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 	writerCfg.MultiMode = true
 	for _, opt := range opts {
 		opt(&writerCfg)
+	}
+	if p.cfg.DirectWrite {
+		topicwriterinternal.WithDirectWrite(true)(&writerCfg)
 	}
 
 	wr, err := p.cfg.writersFactory.Create(writerCfg)
@@ -185,9 +189,7 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 
 	p.bg.Start(fmt.Sprintf("writer-init-%d", partitionID), func(ctx context.Context) {
 		_, err := wr.WaitInitInfo(ctx)
-		if err != nil {
-			wrapper.err = err
-		}
+		wrapper.setInitErr(err)
 
 		wrapper.initDone.Store(true)
 		p.onWriterInit()
@@ -250,7 +252,7 @@ func (p *partitionWriterPool) close(ctx context.Context) error {
 		}
 	}
 
-	return nil
+	return p.idle.close(ctx)
 }
 
 func (p *partitionWriterPool) getWritersCount() int {

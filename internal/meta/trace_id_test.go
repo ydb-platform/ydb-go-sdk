@@ -54,4 +54,39 @@ func TestTraceID(t *testing.T) {
 		require.Len(t, md[HeaderTraceID], 1)
 		require.Equal(t, id, md[HeaderTraceID][0])
 	})
+	t.Run("TraceID with default fastUUID", func(t *testing.T) {
+		ctx1, id1, err1 := TraceID(context.Background())
+		require.NoError(t, err1)
+		require.NotEmpty(t, id1)
+		_, has := metadata.FromOutgoingContext(ctx1)
+		require.True(t, has)
+
+		_, id2, err2 := TraceID(context.Background())
+		require.NoError(t, err2)
+		require.NotEqual(t, id1, id2, "consecutive IDs must be unique")
+	})
+}
+
+// BenchmarkNewRandom/fastUUID-12         	594720858	         1.865 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkNewRandom/uuid.NewRandom()-12 	 5434495	       229.1 ns/op	      16 B/op	       1 allocs/op
+// BenchmarkNewRandom/uuid.NewUUID()-12   	30184470	        39.31 ns/op	       0 B/op	       0 allocs/op
+func BenchmarkNewRandom(b *testing.B) {
+	b.Run("fastUUID", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			_, _ = fastUUID()
+		}
+	})
+	b.Run("uuid.NewRandom()", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			_, _ = uuid.NewRandom()
+		}
+	})
+	b.Run("uuid.NewUUID()", func(b *testing.B) {
+		b.ReportAllocs()
+		for range b.N {
+			_, _ = uuid.NewUUID()
+		}
+	})
 }

@@ -1,7 +1,6 @@
 package trace
 
-type (
-	txInfo interface {
-		ID() string
-	}
-)
+// TxInfo contains transaction metadata for trace hooks.
+type TxInfo interface {
+	ID() string
+}

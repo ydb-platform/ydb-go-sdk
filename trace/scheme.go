@@ -4,13 +4,10 @@ import (
 	"context"
 )
 
-// tool gtrace used from ./internal/cmd/gtrace
-
-//go:generate gtrace
-
 type (
 	// Scheme specified trace of scheme client activity.
 	// gtrace:gen
+	// gtrace:out internal/scheme/gtrace
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	Scheme struct {
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -32,7 +29,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	SchemeListDirectoryDoneInfo struct {
@@ -45,7 +42,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 		Path    string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -60,7 +57,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 		Path    string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -74,7 +71,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 		Path    string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -88,7 +85,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 		Path    string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

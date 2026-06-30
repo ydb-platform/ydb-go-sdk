@@ -17,21 +17,11 @@ type (
 		t     atomic.Pointer[time.Time]
 		clock clockwork.Clock
 	}
-	lastUsageOption func(g *lastUsage)
 )
 
-func WithClock(clock clockwork.Clock) lastUsageOption {
-	return func(g *lastUsage) {
-		g.clock = clock
-	}
-}
-
-func NewLastUsage(opts ...lastUsageOption) *lastUsage {
+func NewLastUsage() LastUsage {
 	lastUsage := &lastUsage{
 		clock: clockwork.NewRealClock(),
-	}
-	for _, opt := range opts {
-		opt(lastUsage)
 	}
 
 	now := lastUsage.clock.Now()

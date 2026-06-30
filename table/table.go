@@ -9,6 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -447,8 +448,23 @@ func WithRetryOptions(retryOptions []retry.Option) retryOptionsOption {
 	return retryOptions
 }
 
-func WithIdempotent() retryOptionsOption {
-	return []retry.Option{retry.WithIdempotent(true)}
+// WithIdempotent makes retry call as idempotent
+//
+// No bool arg means that operation is idempotent
+// Implicit bool arg changes default idempotent flag
+// No more than one bool argument is allowed
+func WithIdempotent(bb ...bool) retryOptionsOption {
+	idempotent := true
+	switch len(bb) {
+	case 0:
+		// nop
+	case 1:
+		idempotent = bb[0]
+	default:
+		panic("only one bool arg allowed")
+	}
+
+	return []retry.Option{retry.WithIdempotent(idempotent)}
 }
 
 var _ Option = txSettingsOption{}
@@ -484,7 +500,7 @@ type traceOption struct {
 }
 
 func (opt traceOption) ApplyTableOption(opts *Options) {
-	opts.Trace = opts.Trace.Compose(opt.t)
+	opts.Trace = gtrace.Compose(opts.Trace, opt.t)
 }
 
 func WithTrace(t trace.Table) traceOption { //nolint:gocritic

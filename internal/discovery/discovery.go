@@ -13,6 +13,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -96,7 +97,7 @@ func Discover(
 // Discover cluster endpoints
 func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, finalErr error) {
 	var (
-		onDone = trace.DiscoveryOnDiscover(
+		onDone = gtrace.DiscoveryOnDiscover(
 			c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery.(*Client).Discover"),
 			c.config.Endpoint(), c.config.Database(),
@@ -126,7 +127,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, f
 
 func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
 	var (
-		onDone = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx,
+		onDone = gtrace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery.(*Client).WhoAmI"),
 		)
 		request            = Ydb_Discovery.WhoAmIRequest{}

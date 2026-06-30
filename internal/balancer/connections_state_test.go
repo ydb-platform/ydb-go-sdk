@@ -464,6 +464,32 @@ func TestConnection(t *testing.T) {
 		require.Equal(t, &mock.Conn{AddrField: "1", State: state.Online, NodeIDField: 1}, c)
 		require.Equal(t, 0, failed)
 	})
+	t.Run("FallbackDisabledMissingNode", func(t *testing.T) {
+		s := newConnectionsState([]conn.Conn{
+			&mock.Conn{AddrField: "1", State: state.Online, NodeIDField: 1},
+		}, nil, balancerConfig.Info{}, false)
+		c, failed := s.GetConnection(endpoint.WithNodeID(context.Background(), 2, endpoint.WithFallback(false)))
+		require.Nil(t, c)
+		require.Equal(t, 0, failed)
+	})
+	t.Run("FallbackDisabledBadStateNoFallback", func(t *testing.T) {
+		s := newConnectionsState([]conn.Conn{
+			&mock.Conn{AddrField: "1", State: state.Online, NodeIDField: 1},
+			&mock.Conn{AddrField: "2", State: state.Unknown, NodeIDField: 2},
+		}, nil, balancerConfig.Info{}, false)
+		c, failed := s.GetConnection(endpoint.WithNodeID(context.Background(), 2, endpoint.WithFallback(false)))
+		require.Nil(t, c)
+		require.Equal(t, 0, failed)
+	})
+	t.Run("FallbackDisabledUsesPreferredNode", func(t *testing.T) {
+		s := newConnectionsState([]conn.Conn{
+			&mock.Conn{AddrField: "1", State: state.Online, NodeIDField: 1},
+			&mock.Conn{AddrField: "2", State: state.Online, NodeIDField: 2},
+		}, nil, balancerConfig.Info{}, false)
+		c, failed := s.GetConnection(endpoint.WithNodeID(context.Background(), 2, endpoint.WithFallback(false)))
+		require.Equal(t, &mock.Conn{AddrField: "2", State: state.Online, NodeIDField: 2}, c)
+		require.Equal(t, 0, failed)
+	})
 }
 
 func TestDiscoveryReuseIpAndHostName(t *testing.T) {
