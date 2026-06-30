@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
 func TestFieldName(t *testing.T) {

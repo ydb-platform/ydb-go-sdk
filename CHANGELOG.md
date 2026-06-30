@@ -1,3 +1,4 @@
+* Added public package `github.com/ydb-platform/ydb-go-sdk/v3/types` and marked all public API in `github.com/ydb-platform/ydb-go-sdk/v3/table/types` as deprecated
 * Propagated the call-level `trace.Query` in `db.Query().{Do,DoTx}(..., query.WithTrace(&tracer))`
 
 ## v3.141.3
