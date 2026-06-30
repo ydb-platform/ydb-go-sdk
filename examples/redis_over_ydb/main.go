@@ -34,7 +34,7 @@ func main() {
 	}
 	defer func() { _ = db.Close(ctx) }()
 
-	kv := sugar.NewKV(ctx, db)
+	kv := sugar.NewKVClientBuilder(ctx, db)
 	if tablePath := strings.TrimSpace(os.Getenv(envTablePath)); tablePath != "" {
 		kv = kv.WithTable(tablePath)
 	}

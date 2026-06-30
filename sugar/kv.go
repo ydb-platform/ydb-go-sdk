@@ -16,7 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
 // kvClientBuilder is a Redis-like string key-value store backed by YDB.
@@ -77,10 +77,10 @@ func quoteIfNotQuoted(name string) string {
 	return "`" + strings.Trim(name, "`") + "`"
 }
 
-// NewKV returns kv-builder
+// NewKVClientBuilder returns kv-builder
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func NewKV(ctx context.Context, db *ydb.Driver) kvClientBuilder {
+func NewKVClientBuilder(ctx context.Context, db *ydb.Driver) kvClientBuilder {
 	return kvClientBuilder{
 		ctx: ctx,
 		config: kvConfig{
