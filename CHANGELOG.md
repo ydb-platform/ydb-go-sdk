@@ -1,3 +1,5 @@
+* Propagated the call-level `trace.Query` in `db.Query().{Do,DoTx}(..., query.WithTrace(&tracer))`
+
 ## v3.141.3
 * Deprecated `query.WithConcurrentResultSets`: the option is now a no-op; `Client.Query` always enables concurrent result sets internally because it materializes the full response. Session, transaction, and other streaming paths always send `concurrent_result_sets=false`
 
