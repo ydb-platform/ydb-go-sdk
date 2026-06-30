@@ -529,11 +529,12 @@ func WithQueryConfigOption(option queryConfig.Option) Option {
 	}
 }
 
-// WithSessionPoolSizeLimit set max size of internal sessions pool in table.Client
+// WithSessionPoolSizeLimit sets the max size of the driver session pool shared by table and query clients.
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.tableOptions = append(d.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
-		d.queryOptions = append(d.queryOptions, queryConfig.WithPoolLimit(sizeLimit))
+		if sizeLimit > 0 {
+			d.sessionPoolConfig.limit = sizeLimit
+		}
 
 		return nil
 	}
@@ -544,8 +545,12 @@ func WithSessionPoolSizeLimit(sizeLimit int) Option {
 // - if argument type is time.Duration - WithSessionPoolSessionUsageLimit limits max time to live of pool session
 func WithSessionPoolSessionUsageLimit[T interface{ uint64 | time.Duration }](limit T) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.tableOptions = append(d.tableOptions, tableConfig.WithSessionPoolSessionUsageLimit(limit))
-		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionPoolSessionUsageLimit(limit))
+		switch v := any(limit).(type) {
+		case uint64:
+			d.sessionPoolConfig.itemUsageLimit = v
+		case time.Duration:
+			d.sessionPoolConfig.itemUsageTTL = v
+		}
 
 		return nil
 	}
@@ -565,10 +570,13 @@ func WithLazyTx(lazyTx bool) Option {
 	}
 }
 
-// WithSessionPoolIdleThreshold defines interval for idle sessions
+// WithSessionPoolIdleThreshold defines interval for idle sessions in the driver session pool.
 func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.tableOptions = append(d.tableOptions, tableConfig.WithIdleThreshold(idleThreshold))
+		if idleThreshold < 0 {
+			idleThreshold = 0
+		}
+		d.sessionPoolConfig.idleTTL = idleThreshold
 		d.databaseSQLOptions = append(d.databaseSQLOptions,
 			xsql.WithIdleThreshold(idleThreshold),
 		)
@@ -589,42 +597,47 @@ func WithExecuteDataQueryOverQueryClient(b bool) Option {
 	}
 }
 
-// WithSessionPoolSessionIdleTimeToLive limits maximum time to live of idle session
+// WithSessionPoolSessionIdleTimeToLive limits maximum time to live of idle session in the driver session pool.
 // If idleTimeToLive is less than or equal to zero then sessions will not be closed by idle
 func WithSessionPoolSessionIdleTimeToLive(idleThreshold time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionIdleTimeToLive(idleThreshold))
+		if idleThreshold > 0 {
+			d.sessionPoolConfig.idleTTL = idleThreshold
+		}
 
 		return nil
 	}
 }
 
-// WithSessionPoolCreateSessionTimeout set timeout for new session creation process in table.Client
+// WithSessionPoolCreateSessionTimeout set timeout for new session creation in the driver session pool
 func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.tableOptions = append(d.tableOptions, tableConfig.WithCreateSessionTimeout(createSessionTimeout))
-		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionCreateTimeout(createSessionTimeout))
+		if createSessionTimeout > 0 {
+			d.sessionPoolConfig.createTimeout = createSessionTimeout
+		}
 
 		return nil
 	}
 }
 
-// WithSessionPoolDeleteTimeout set timeout to gracefully close deleting session in table.Client
+// WithSessionPoolDeleteTimeout set timeout to gracefully close deleting session in the driver session pool
 func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.tableOptions = append(d.tableOptions, tableConfig.WithDeleteTimeout(deleteTimeout))
-		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionDeleteTimeout(deleteTimeout))
+		if deleteTimeout > 0 {
+			d.sessionPoolConfig.deleteTimeout = deleteTimeout
+		}
 
 		return nil
 	}
 }
 
-// WithSessionPoolWarmUpSessions sets the number of sessions to pre-create in session pools at driver initialization.
+// WithSessionPoolWarmUpSessions sets the number of sessions to pre-create in the driver session pool at initialization.
 // If warmUpSessions is less than or equal to zero, pool warm-up is disabled.
 func WithSessionPoolWarmUpSessions(warmUpSessions int) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.tableOptions = append(d.tableOptions, tableConfig.WithSessionPoolWarmUpSessions(warmUpSessions))
-		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionPoolWarmUpSessions(warmUpSessions))
+		if warmUpSessions > 0 {
+			d.sessionPoolConfig.warmUp = warmUpSessions
+		}
 
 		return nil
 	}

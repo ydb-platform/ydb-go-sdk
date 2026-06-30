@@ -775,7 +775,14 @@ func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 	return s, nil
 }
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) (*Client, error) {
+func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config, opts ...NewClientOption) (*Client, error) {
+	var clientOpts newClientOptions
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&clientOpts)
+		}
+	}
+
 	onDone := gtrace.QueryOnNew(cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
 	)
@@ -783,7 +790,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) (
 
 	client := Ydb_Query_V1.NewQueryServiceClient(cc)
 
-	return newWithQueryServiceClient(ctx, client, cc, cfg)
+	return newWithQueryServiceClient(ctx, client, cc, cfg, clientOpts)
 }
 
 //nolint:funlen
@@ -791,6 +798,7 @@ func newWithQueryServiceClient(ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
 	cc grpc.ClientConnInterface,
 	cfg *config.Config,
+	clientOpts newClientOptions,
 ) (*Client, error) {
 	c := &Client{
 		config: cfg,
@@ -799,7 +807,13 @@ func newWithQueryServiceClient(ctx context.Context,
 			cancels: make(map[uint64]context.CancelFunc),
 		}),
 	}
-	explicitSessionPool, err := pool.New(ctx,
+
+	var explicitSessionPool sessionPool
+	if clientOpts.sharedSessionPool != nil {
+		explicitSessionPool = newSharedExplicitPoolAdapter(clientOpts.sharedSessionPool, cfg)
+	} else {
+		var err error
+		explicitSessionPool, err = pool.New(ctx,
 		pool.WithLimit[*Session](cfg.PoolLimit()),
 		pool.WithWarmUpItems[*Session](cfg.PoolWarmUpSize()),
 		pool.WithItemUsageLimit[*Session](cfg.PoolSessionUsageLimit()),
@@ -834,9 +848,10 @@ func newWithQueryServiceClient(ctx context.Context,
 
 			return s, nil
 		}),
-	)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
 	}
 
 	c.explicitSessionPool = explicitSessionPool
