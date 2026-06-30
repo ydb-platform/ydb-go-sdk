@@ -260,7 +260,7 @@ func TestClient(t *testing.T) {
 					}()
 
 					return tx.Exec(ctx, "")
-				}, tx.NewSettings(tx.WithDefaultTxMode()))
+				}, tx.NewSettings(tx.WithDefaultTxMode()), nil)
 				require.NoError(t, err)
 			})
 			t.Run("NoLazyTx", func(t *testing.T) {
@@ -364,7 +364,7 @@ func TestClient(t *testing.T) {
 					}()
 
 					return tx.Exec(ctx, "")
-				}, tx.NewSettings(tx.WithDefaultTxMode()))
+				}, tx.NewSettings(tx.WithDefaultTxMode()), nil)
 				require.NoError(t, err)
 			})
 		})
@@ -390,7 +390,7 @@ func TestClient(t *testing.T) {
 				}
 
 				return nil
-			}, tx.NewSettings(tx.WithDefaultTxMode()))
+			}, tx.NewSettings(tx.WithDefaultTxMode()), nil)
 			require.NoError(t, err)
 			require.Equal(t, 10, counter)
 		})
@@ -444,7 +444,7 @@ func TestClient(t *testing.T) {
 							return newTestSessionWithClient("123", client, true), nil
 						}), func(ctx context.Context, tx query.TxActor) error {
 							return tx.Exec(ctx, "")
-						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						}, tx.NewSettings(tx.WithSerializableReadWrite()), nil)
 						require.NoError(t, err)
 						require.Zero(t, txInFlight)
 					})
@@ -496,7 +496,7 @@ func TestClient(t *testing.T) {
 							return newTestSessionWithClient("123", client, true), nil
 						}), func(ctx context.Context, tx query.TxActor) error {
 							return tx.Exec(ctx, "", options.WithCommit())
-						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						}, tx.NewSettings(tx.WithSerializableReadWrite()), nil)
 						require.NoError(t, err)
 						require.Zero(t, txInFlight)
 					})
@@ -589,7 +589,7 @@ func TestClient(t *testing.T) {
 							}
 
 							return tx.Exec(ctx, "")
-						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						}, tx.NewSettings(tx.WithSerializableReadWrite()), nil)
 						require.NoError(t, err)
 					})
 				})
@@ -670,7 +670,7 @@ func TestClient(t *testing.T) {
 							}
 
 							return tx.Exec(ctx, "", options.WithCommit())
-						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						}, tx.NewSettings(tx.WithSerializableReadWrite()), nil)
 						require.NoError(t, err)
 					})
 				})
