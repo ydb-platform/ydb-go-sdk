@@ -1,3 +1,4 @@
+## v3.143.0
 * Added experimental helper `sugar.NewKVClientBuilder(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
 
 ## v3.142.0
