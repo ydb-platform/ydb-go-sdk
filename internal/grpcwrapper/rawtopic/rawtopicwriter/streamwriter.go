@@ -19,7 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var errConcurencyReadDenied = xerrors.Wrap(errors.New("ydb: read from rawtopicwriter in parallel"))
+var errConcurrencyReadDenied = xerrors.Wrap(errors.New("ydb: read from rawtopicwriter in parallel"))
 
 type GrpcStream interface {
 	Send(messageNew *Ydb_Topic.StreamWriteMessage_FromClient) error
@@ -52,7 +52,7 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 	defer w.readCounter.Add(-1)
 
 	if readCnt != 1 {
-		return nil, xerrors.WithStackTrace(errConcurencyReadDenied)
+		return nil, xerrors.WithStackTrace(errConcurrencyReadDenied)
 	}
 
 	grpcMsg, sendErr := w.Stream.Recv()
