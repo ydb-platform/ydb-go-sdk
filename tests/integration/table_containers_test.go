@@ -12,7 +12,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
 // Containers example demonstrates how to work with YDB container values such as `List`, `Tuple`, `Dict`, `Struct` and `Variant`

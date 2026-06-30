@@ -26,6 +26,7 @@ type (
 	doSettings struct {
 		retryOpts []retry.Option
 		trace     *trace.Query
+		callTrace *trace.Query
 		label     string
 	}
 
@@ -76,6 +77,10 @@ func (s *doSettings) Trace() *trace.Query {
 	return s.trace
 }
 
+func (s *doSettings) CallTrace() *trace.Query {
+	return s.callTrace
+}
+
 func (s *doSettings) RetryOpts() []retry.Option {
 	return s.retryOpts
 }
@@ -94,6 +99,7 @@ func (s *doTxSettings) LazyTx() *bool {
 
 func (opt TraceOption) applyDoOption(s *doSettings) {
 	s.trace = gtrace.Compose(s.trace, opt.t)
+	s.callTrace = gtrace.Compose(s.callTrace, opt.t)
 }
 
 func (opt TraceOption) applyDoTxOption(s *doTxSettings) {
