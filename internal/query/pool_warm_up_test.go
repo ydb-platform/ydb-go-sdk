@@ -23,7 +23,7 @@ func TestSessionPoolWarmUp(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		client := newMockQueryServiceForWarmUp(ctrl, 0)
 
-		c, err := newWithQueryServiceClient(ctx, client, nil, config.New(config.WithPoolLimit(10)))
+		c, err := newWithQueryServiceClient(ctx, client, nil, config.New(config.WithPoolLimit(10)), newClientOptions{})
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = c.Close(ctx) })
 
@@ -40,7 +40,7 @@ func TestSessionPoolWarmUp(t *testing.T) {
 		c, err := newWithQueryServiceClient(ctx, client, nil, config.New(
 			config.WithPoolLimit(10),
 			config.WithSessionPoolWarmUpSessions(warmUpSize),
-		))
+		), newClientOptions{})
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = c.Close(ctx) })
 
@@ -58,7 +58,7 @@ func TestSessionPoolWarmUp(t *testing.T) {
 			config.AllowImplicitSessions(),
 			config.WithPoolLimit(10),
 			config.WithSessionPoolWarmUpSessions(warmUpSize),
-		))
+		), newClientOptions{})
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = c.Close(ctx) })
 
@@ -78,7 +78,7 @@ func TestSessionPoolWarmUp(t *testing.T) {
 		c, err := newWithQueryServiceClient(ctx, client, nil, config.New(
 			config.WithPoolLimit(limit),
 			config.WithSessionPoolWarmUpSessions(warmUpSize),
-		))
+		), newClientOptions{})
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = c.Close(ctx) })
 
@@ -92,7 +92,7 @@ func TestSessionPoolWarmUp(t *testing.T) {
 
 		_, err := newWithQueryServiceClient(ctx, client, nil, config.New(
 			config.WithSessionPoolWarmUpSessions(1),
-		))
+		), newClientOptions{})
 		require.Error(t, err)
 	})
 }

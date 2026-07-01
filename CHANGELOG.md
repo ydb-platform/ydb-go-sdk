@@ -1,3 +1,5 @@
+* **Breaking change:** driver session pool is shared between `table.Client` and `query.Client`. `WithSessionPoolSizeLimit(N)` and related `WithSessionPool*` options now configure a single pool on the driver (at most **N** concurrent sessions total, not N per client). Table pooled operations use Query `CreateSession` + `AttachSession` (aligned with ydb-rs-sdk). Use `Driver.SessionPoolStats()` for pool counters. Query implicit session pool is unchanged.
+
 ## v3.143.0
 * Added experimental helper `sugar.NewKVClientBuilder(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
 

@@ -1819,7 +1819,7 @@ func mockClientForImplicitSessionTest(ctx context.Context, t *testing.T) *Client
 
 	cfg := config.New(config.AllowImplicitSessions())
 
-	c, err := newWithQueryServiceClient(ctx, queryService, nil, cfg)
+	c, err := newWithQueryServiceClient(ctx, queryService, nil, cfg, newClientOptions{})
 	require.NoError(t, err)
 
 	return c

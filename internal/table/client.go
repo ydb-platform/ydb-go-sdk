@@ -32,12 +32,25 @@ import (
 // sessionBuilder is the interface that holds logic of creating sessions.
 type sessionBuilder func(ctx context.Context) (*Session, error)
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (*Client, error) { //nolint:funlen
+func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config, opts ...NewClientOption) (*Client, error) { //nolint:funlen
+	var clientOpts newClientOptions
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&clientOpts)
+		}
+	}
+
 	onDone := gtrace.TableOnInit(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.New"),
 	)
 
-	sessionPool, err := pool.New[*Session, Session](ctx,
+	var sessionPool sessionPool
+	if clientOpts.sharedSessionPool != nil {
+		sessionPool = newSharedSessionPoolAdapter(clientOpts.sharedSessionPool, cc, config)
+		onDone(config.SizeLimit())
+	} else {
+		var err error
+		sessionPool, err = pool.New[*Session, Session](ctx,
 		pool.WithLimit[*Session, Session](config.SizeLimit()),
 		pool.WithWarmUpItems[*Session, Session](config.PoolWarmUpSize()),
 		pool.WithItemUsageLimit[*Session, Session](config.SessionUsageLimit()),
@@ -98,9 +111,10 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 				)
 			},
 		}),
-	)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
 	}
 
 	return &Client{
