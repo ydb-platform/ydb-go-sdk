@@ -49,6 +49,7 @@ type Conn interface {
 	GetState() state.State
 	SetState(ctx context.Context, state state.State) state.State
 	Unban(ctx context.Context) state.State
+	Close(ctx context.Context) error
 }
 
 type (

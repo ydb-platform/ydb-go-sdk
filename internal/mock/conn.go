@@ -52,6 +52,10 @@ func (c *Conn) Unban(ctx context.Context) state.State {
 	return state.Online
 }
 
+func (c *Conn) Close(context.Context) error {
+	return nil
+}
+
 type Endpoint struct {
 	AddrField         string
 	LocationField     string
