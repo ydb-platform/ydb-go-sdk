@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"sync/atomic"
+	"unsafe"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"google.golang.org/grpc"
@@ -80,13 +81,19 @@ type Balancer struct {
 
 	connectionsState atomic.Pointer[connectionsState]
 	closed           atomic.Bool
-
-	dropCandidates map[endpoint.Key]*dropCandidate
 }
 
-type dropCandidate struct {
-	conn   conn.Conn
-	missed int
+func compareEndpoints(lhs, rhs endpoint.Endpoint) int {
+	cmp := strings.Compare(lhs.Address(), rhs.Address())
+	if cmp != 0 {
+		return cmp
+	}
+	cmp = int(lhs.NodeID()) - int(rhs.NodeID())
+	if cmp != 0 {
+		return cmp
+	}
+
+	return strings.Compare(lhs.OverrideHost(), rhs.OverrideHost())
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -224,19 +231,8 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 		)
 		previous = b.connections().All()
 	)
+	_, added, dropped := xslices.Diff(previous, newest, compareEndpoints)
 	defer func() {
-		_, added, dropped := xslices.Diff(previous, newest, func(lhs, rhs endpoint.Endpoint) int {
-			cmp := strings.Compare(lhs.Address(), rhs.Address())
-			if cmp != 0 {
-				return cmp
-			}
-			cmp = int(lhs.NodeID()) - int(rhs.NodeID())
-			if cmp != 0 {
-				return cmp
-			}
-
-			return strings.Compare(lhs.OverrideHost(), rhs.OverrideHost())
-		})
 		onDone(
 			xslices.Transform(newest, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
 			xslices.Transform(added, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
@@ -244,8 +240,6 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 			localDC,
 		)
 	}()
-
-	previousConns := b.connections().conns()
 
 	connections := conn.EndpointsToConnections(b.pool, newest)
 	for _, c := range connections {
@@ -258,42 +252,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 
 	b.connectionsState.Store(state)
 
-	b.closeDroppedConns(ctx, previousConns, newest)
-}
-
-func (b *Balancer) closeDroppedConns(ctx context.Context, previous []conn.Conn, newest []endpoint.Endpoint) {
-	if b.dropCandidates == nil {
-		b.dropCandidates = make(map[endpoint.Key]*dropCandidate)
-	}
-
-	inNewest := make(map[endpoint.Key]struct{}, len(newest))
-	for _, e := range newest {
-		inNewest[e.Key()] = struct{}{}
-	}
-
-	for _, c := range previous {
-		key := c.Endpoint().Key()
-		if _, ok := inNewest[key]; ok {
-			continue
-		}
-		if b.dropCandidates[key] == nil {
-			b.dropCandidates[key] = &dropCandidate{conn: c}
-		}
-	}
-
-	for key, cand := range b.dropCandidates {
-		if _, ok := inNewest[key]; ok {
-			delete(b.dropCandidates, key)
-
-			continue
-		}
-
-		cand.missed++
-		if cand.missed >= droppedConnCloseAfterMissedDiscoveries {
-			delete(b.dropCandidates, key)
-			_ = cand.conn.Close(ctx)
-		}
-	}
+	b.pool.NoteDiscoveryUpdate(ctx, uintptr(unsafe.Pointer(b)), dropped, newest)
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
@@ -315,10 +274,8 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		_ = cc.Close()
 	}
 
-	for key, cand := range b.dropCandidates {
-		delete(b.dropCandidates, key)
-		_ = cand.conn.Close(ctx)
-	}
+	b.pool.ForgetDiscoveryOwner(uintptr(unsafe.Pointer(b)))
+	b.pool.ClosePendingDropCandidatesIfSoleUser(ctx)
 
 	return nil
 }
@@ -383,7 +340,6 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 			discoveryConfig.WithMeta(driverConfig.Meta()),
 		)...),
 		localDCDetector: detectLocalDC,
-		dropCandidates:  make(map[endpoint.Key]*dropCandidate),
 	}
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)

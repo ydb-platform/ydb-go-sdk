@@ -29,6 +29,17 @@ type Pool struct {
 	dialOptions []grpc.DialOption
 	conns       xsync.Map[endpoint.Key, *conn]
 	done        chan struct{}
+
+	dropCandidatesMtx sync.Mutex
+	dropCandidates    map[endpoint.Key]*dropCandidate
+	discoveryOwners   map[uintptr]struct{}
+}
+
+const droppedConnCloseAfterMissedDiscoveries = 3
+
+type dropCandidate struct {
+	conn   Conn
+	missed map[uintptr]int
 }
 
 func EndpointsToConnections(p *Pool, endpoints []endpoint.Endpoint) []Conn {
@@ -95,6 +106,101 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Ban"),
 		cc.Endpoint().Copy(), cc.GetState(), cause,
 	)(cc.SetState(ctx, state.Banned))
+}
+
+func (p *Pool) ForgetDiscoveryOwner(owner uintptr) {
+	if owner == 0 {
+		return
+	}
+
+	p.dropCandidatesMtx.Lock()
+	defer p.dropCandidatesMtx.Unlock()
+
+	delete(p.discoveryOwners, owner)
+
+	for _, cand := range p.dropCandidates {
+		delete(cand.missed, owner)
+	}
+}
+
+func (p *Pool) ClosePendingDropCandidatesIfSoleUser(ctx context.Context) {
+	if atomic.LoadInt64(&p.usages) != 1 {
+		return
+	}
+
+	p.dropCandidatesMtx.Lock()
+	defer p.dropCandidatesMtx.Unlock()
+
+	for key, cand := range p.dropCandidates {
+		delete(p.dropCandidates, key)
+		_ = cand.conn.Close(ctx)
+	}
+}
+
+func (p *Pool) NoteDiscoveryUpdate(ctx context.Context, owner uintptr, dropped, newest []endpoint.Endpoint) {
+	if owner == 0 {
+		return
+	}
+
+	p.dropCandidatesMtx.Lock()
+	defer p.dropCandidatesMtx.Unlock()
+
+	if p.dropCandidates == nil {
+		p.dropCandidates = make(map[endpoint.Key]*dropCandidate)
+	}
+	if p.discoveryOwners == nil {
+		p.discoveryOwners = make(map[uintptr]struct{})
+	}
+
+	p.discoveryOwners[owner] = struct{}{}
+
+	inNewest := make(map[endpoint.Key]struct{}, len(newest))
+	for _, e := range newest {
+		key := e.Key()
+		inNewest[key] = struct{}{}
+		if cand := p.dropCandidates[key]; cand != nil {
+			cand.missed[owner] = 0
+		}
+	}
+
+	for _, e := range dropped {
+		key := e.Key()
+		if _, ok := inNewest[key]; ok {
+			continue
+		}
+		if p.dropCandidates[key] == nil {
+			p.dropCandidates[key] = &dropCandidate{
+				conn:   p.Get(e),
+				missed: make(map[uintptr]int),
+			}
+		}
+	}
+
+	for key, cand := range p.dropCandidates {
+		if _, ok := inNewest[key]; ok {
+			continue
+		}
+
+		cand.missed[owner]++
+		if p.readyToCloseDropped(cand.missed) {
+			delete(p.dropCandidates, key)
+			_ = cand.conn.Close(ctx)
+		}
+	}
+}
+
+func (p *Pool) readyToCloseDropped(missed map[uintptr]int) bool {
+	if len(p.discoveryOwners) == 0 {
+		return false
+	}
+
+	for owner := range p.discoveryOwners {
+		if missed[owner] < droppedConnCloseAfterMissedDiscoveries {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (p *Pool) Allow(ctx context.Context, cc Conn) {
