@@ -229,6 +229,56 @@ func TestApplyDiscoveredEndpoints_StopsGRPCReconnectToDroppedEndpoint(t *testing
 	require.Equal(t, int64(0), dialsAfterDrop.Load())
 }
 
+func TestBalancer_CloseClosesPendingDropCandidates(t *testing.T) {
+	ctx := context.Background()
+
+	listener := bufconn.Listen(1024 * 1024)
+	srv := grpc.NewServer()
+	go func() { _ = srv.Serve(listener) }()
+	t.Cleanup(func() {
+		srv.Stop()
+		_ = listener.Close()
+	})
+
+	cfg := config.New(config.WithGrpcOptions(
+		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+			return listener.DialContext(ctx)
+		}),
+	))
+
+	pool := conn.NewPool(ctx, cfg)
+	defer func() { _ = pool.Release(ctx) }()
+
+	b := &Balancer{
+		driverConfig:    cfg,
+		pool:            pool,
+		balancerConfig:  balancerConfig.Config{},
+		discoveryConfig: discoveryConfig.New(),
+		dropCandidates:  make(map[endpoint.Key]*dropCandidate),
+	}
+	b.connectionsState.Store(newConnectionsState(
+		nil, b.balancerConfig.Filter, balancerConfig.Info{}, b.balancerConfig.AllowFallback,
+	))
+
+	removed := endpoint.New("removed.node.example:2135", endpoint.WithID(1))
+	kept := endpoint.New("kept.node.example:2135", endpoint.WithID(2))
+
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{removed, kept}, "")
+
+	droppedConn := pool.Get(removed)
+	err := droppedConn.Invoke(ctx, "/grpc.health.v1.Health/Check", &struct{}{}, &struct{}{})
+	require.Error(t, err)
+	require.Equal(t, state.Online, droppedConn.GetState())
+
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{kept}, "")
+	require.Len(t, b.dropCandidates, 1)
+	require.Equal(t, 1, b.dropCandidates[removed.Key()].missed)
+
+	require.NoError(t, b.Close(ctx))
+	require.Equal(t, state.Destroyed, droppedConn.GetState())
+	require.Empty(t, b.dropCandidates)
+}
+
 // Mock resolver
 //
 

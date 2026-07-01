@@ -32,11 +32,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+const droppedConnCloseAfterMissedDiscoveries = 3
+
 var (
 	ErrNoEndpoints    = xerrors.Wrap(xerrors.Retryable(fmt.Errorf("no endpoints"), xerrors.WithBackoff(backoff.TypeSlow)))
 	errBalancerClosed = xerrors.Wrap(fmt.Errorf("internal ydb sdk balancer closed"))
-
-	droppedConnCloseAfterMissedDiscoveries = 3
 )
 
 // streamWrapper wraps grpc.ClientStream and triggers pool.Ban on RecvMsg/SendMsg/CloseSend
@@ -313,6 +313,11 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 
 	if cc := b.cc.Load(); cc != nil {
 		_ = cc.Close()
+	}
+
+	for key, cand := range b.dropCandidates {
+		delete(b.dropCandidates, key)
+		_ = cand.conn.Close(ctx)
 	}
 
 	return nil

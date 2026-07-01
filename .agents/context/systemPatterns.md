@@ -64,9 +64,6 @@ This is the single production path for gRPC — do not dial around the balancer.
 - One `*conn` per `endpoint.Endpoint` (host:port + node metadata).
 - Created on demand via `pool.Get(endpoint)`; tracks TTL, dial options, trace.
 - Used by balancer to obtain `grpc.ClientConn` for a chosen node.
-- `conn.Conn` includes `Close(ctx) error` — closes gRPC transport and removes the entry from the pool via `withOnClose(p.remove)` registered at `Get` time (removal happens in `(*conn).Close` defer, not in pool API).
-- `pool.Release()` still closes **all** connections on driver shutdown.
-- gRPC has no dial option to disable background reconnect; only `ClientConn.Close()` stops orphaned reconnect loops.
 
 ### 2. YDB session pool (`internal/pool/pool.go`)
 
@@ -84,42 +81,10 @@ Query additionally has **implicit** session pool for server-side session managem
 Balancer
   ├── clusterDiscovery()     # periodic / on-init endpoint list refresh
   ├── discover endpoints     # via Discovery gRPC (or static single endpoint)
-  ├── applyDiscoveredEndpoints()
-  │     ├── update connectionsState (prefer/fallback/all)
-  │     └── closeDroppedConns()  # retire pool conns absent from discovery
   ├── localDCDetector        # for PreferNearestDC balancers
   ├── filter by balancerConfig (RandomChoice, PreferNearestDC, location filters)
   └── wrapCall / wrapStream  # ban endpoint on retriable connection failures
 ```
-
-### Discovery update → routing state
-
-`applyDiscoveredEndpoints` builds `connections` via `conn.EndpointsToConnections(pool, newest)`, refreshes `connectionsState`, and traces added/dropped endpoints (`OnBalancerUpdate`).
-
-`connectionsState` (`connections_state.go`) holds `prefer`, `fallback`, `all` as `[]conn.Conn`; `All()` returns endpoint metadata for trace diffs; private `conns()` returns the previous `all` slice for drop handling.
-
-### Orphaned gRPC connections (endpoints removed from discovery)
-
-**Symptom:** endpoint disappears from `ListEndpoints` → balancer stops routing, but `pool.conns` still holds `grpc.ClientConn` → background reconnect logs (`addrConn.createTransport failed`, `no such host`, …).
-
-**Fix (`closeDroppedConns`):** after each discovery update, compare previous `connectionsState.conns()` with `newest` endpoints:
-
-- Newly absent conns enter `Balancer.dropCandidates` (`map[endpoint.Key]*dropCandidate` with `conn` + `missed` counter).
-- Each subsequent discovery without the endpoint increments `missed`.
-- After `droppedConnCloseAfterMissedDiscoveries` (3) misses → `conn.Close(ctx)` (debounce so in-flight RPCs on a just-dropped node are not cut immediately).
-- Reappearing endpoint clears the candidate.
-
-**Edge cases:**
-
-- `DiscoveryInterval == 0` — discovery repeater does not tick repeatedly; `missed` never reaches the threshold → no proactive closes (static / single-shot discovery).
-- `ClientConn.Close()` is synchronous in grpc-go — discovery repeater blocks during close; risk if long streams still run on a dropped conn.
-- Trace `OnBalancerUpdate` `dropped` list is for observability only; it does not close connections by itself.
-
-**Test:** `TestApplyDiscoveredEndpoints_StopsGRPCReconnectToDroppedEndpoint` (`balancer_test.go`).
-
-**Intentionally not added:** `conn.Conns` wrapper type, `Pool.CloseConn`, close-reason in driver trace (`WithCloseCause` / `DriverConnCloseStartInfo.Cause`).
-
-**Dead code removed:** `endpointsInfo` in `applyDiscoveredEndpoints` — leftover from removed `balancer.OnUpdate` (Nov 2024); was unused since callbacks were deleted.
 
 User-facing presets: `balancers/RandomChoice`, `SingleConn`, `PreferNearestDC`, `PreferNearestDCWithFallBack`.
 
