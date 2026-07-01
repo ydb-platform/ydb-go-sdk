@@ -97,10 +97,6 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 	)(cc.SetState(ctx, state.Banned))
 }
 
-func (p *Pool) HasSingleSharedUser() bool {
-	return atomic.LoadInt64(&p.usages) == 1
-}
-
 func (p *Pool) Allow(ctx context.Context, cc Conn) {
 	if p.isClosed() {
 		return

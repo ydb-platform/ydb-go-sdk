@@ -140,22 +140,6 @@ func closeAllDropCandidatesLocked(ctx context.Context, state *poolDropState) {
 	}
 }
 
-func closePendingDropCandidatesIfSoleUser(ctx context.Context, pool *conn.Pool) {
-	if !pool.HasSingleSharedUser() {
-		return
-	}
-
-	state, ok := poolDropStates.Get(pool)
-	if !ok {
-		return
-	}
-
-	state.mtx.Lock()
-	defer state.mtx.Unlock()
-
-	closeAllDropCandidatesLocked(ctx, state)
-}
-
 func forgetPoolDropState(ctx context.Context, pool *conn.Pool) {
 	state, ok := poolDropStates.Get(pool)
 	if !ok {
@@ -430,7 +414,6 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		_ = cc.Close()
 	}
 
-	closePendingDropCandidatesIfSoleUser(ctx, b.pool)
 	forgetDiscoveryOwner(ctx, b.pool, b)
 
 	return nil
