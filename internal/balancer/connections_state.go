@@ -58,6 +58,14 @@ func (s *connectionsState) All() (all []endpoint.Endpoint) {
 	return all
 }
 
+func (s *connectionsState) conns() []conn.Conn {
+	if s == nil {
+		return nil
+	}
+
+	return s.all
+}
+
 func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, failedCount int) {
 	if err := ctx.Err(); err != nil {
 		return nil, 0

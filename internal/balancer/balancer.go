@@ -35,6 +35,8 @@ import (
 var (
 	ErrNoEndpoints    = xerrors.Wrap(xerrors.Retryable(fmt.Errorf("no endpoints"), xerrors.WithBackoff(backoff.TypeSlow)))
 	errBalancerClosed = xerrors.Wrap(fmt.Errorf("internal ydb sdk balancer closed"))
+
+	droppedConnCloseAfterMissedDiscoveries = 3
 )
 
 // streamWrapper wraps grpc.ClientStream and triggers pool.Ban on RecvMsg/SendMsg/CloseSend
@@ -78,6 +80,13 @@ type Balancer struct {
 
 	connectionsState atomic.Pointer[connectionsState]
 	closed           atomic.Bool
+
+	dropCandidates map[endpoint.Key]*dropCandidate
+}
+
+type dropCandidate struct {
+	conn   conn.Conn
+	missed int
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -236,6 +245,8 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 		)
 	}()
 
+	previousConns := b.connections().conns()
+
 	connections := conn.EndpointsToConnections(b.pool, newest)
 	for _, c := range connections {
 		b.pool.Allow(ctx, c)
@@ -245,12 +256,44 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 	info := balancerConfig.Info{SelfLocation: localDC}
 	state := newConnectionsState(connections, b.balancerConfig.Filter, info, b.balancerConfig.AllowFallback)
 
-	endpointsInfo := make([]endpoint.Info, len(newest))
-	for i, e := range newest {
-		endpointsInfo[i] = e
+	b.connectionsState.Store(state)
+
+	b.closeDroppedConns(ctx, previousConns, newest)
+}
+
+func (b *Balancer) closeDroppedConns(ctx context.Context, previous []conn.Conn, newest []endpoint.Endpoint) {
+	if b.dropCandidates == nil {
+		b.dropCandidates = make(map[endpoint.Key]*dropCandidate)
 	}
 
-	b.connectionsState.Store(state)
+	inNewest := make(map[endpoint.Key]struct{}, len(newest))
+	for _, e := range newest {
+		inNewest[e.Key()] = struct{}{}
+	}
+
+	for _, c := range previous {
+		key := c.Endpoint().Key()
+		if _, ok := inNewest[key]; ok {
+			continue
+		}
+		if b.dropCandidates[key] == nil {
+			b.dropCandidates[key] = &dropCandidate{conn: c}
+		}
+	}
+
+	for key, cand := range b.dropCandidates {
+		if _, ok := inNewest[key]; ok {
+			delete(b.dropCandidates, key)
+
+			continue
+		}
+
+		cand.missed++
+		if cand.missed >= droppedConnCloseAfterMissedDiscoveries {
+			delete(b.dropCandidates, key)
+			_ = cand.conn.Close(ctx)
+		}
+	}
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
@@ -335,6 +378,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 			discoveryConfig.WithMeta(driverConfig.Meta()),
 		)...),
 		localDCDetector: detectLocalDC,
+		dropCandidates:  make(map[endpoint.Key]*dropCandidate),
 	}
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)

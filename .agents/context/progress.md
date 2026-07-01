@@ -10,7 +10,7 @@
 - **Topics**: reader/writer/listener/multiwriter.
 - **Coordination**: distributed semaphores.
 - **Scripting / Ratelimiter / Operation**: exposed on `Driver` (see `systemPatterns.md`).
-- **Discovery** + balancers (`RandomChoice`, `PreferNearestDC`, …).
+- **Discovery** + balancers (`RandomChoice`, `PreferNearestDC`, …); dropped endpoints eventually closed in pool (see `systemPatterns.md` → orphaned gRPC connections).
 - **database/sql** driver via `sql.Open("ydb", ...)`.
 - **Auth**: static tokens, metadata, OAuth credentials.
 - **TLS**: custom CA via `ydb_certs/`.
@@ -32,8 +32,9 @@
 | Date | Milestone |
 |------|-----------|
 | 2026-06 | `.agents/` workspace for AI agents |
+| 2026-06 | Fix orphaned gRPC reconnects when endpoints leave discovery (`closeDroppedConns`, `conn.Conn.Close`) — pending merge |
 | ongoing | Trace handler hardening ([#2194](https://github.com/ydb-platform/ydb-go-sdk/pull/2194)) |
 
 ## Changelog for agents
 
-User-facing API or behavior changes require a bullet at the **top** of `CHANGELOG.md` (past tense, no version number). Internal-only agent docs: label PR `no changelog`.
+User-facing API or behavior changes require a bullet at the **top** of `CHANGELOG.md` (past tense, **no version number**, **before** all `## v3.x.x` headers — released sections are immutable). Write for end users: observable effect only, no implementation details (debounce counts, internal field names, etc. belong in the PR description). Internal-only agent docs: label PR `no changelog`.

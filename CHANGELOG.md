@@ -1,3 +1,5 @@
+* Fixed orphaned gRPC reconnects to endpoints removed from discovery.
+
 ## v3.143.0
 * Added experimental helper `sugar.NewKVClientBuilder(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
 

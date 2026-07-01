@@ -21,6 +21,7 @@ import (
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
+	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -54,6 +55,10 @@ func (c *poolRegisteredConn) SetState(ctx context.Context, s state.State) state.
 
 func (c *poolRegisteredConn) Unban(ctx context.Context) state.State {
 	return c.inner.Unban(ctx)
+}
+
+func (c *poolRegisteredConn) Close(ctx context.Context) error {
+	return c.inner.Close(ctx)
 }
 
 func TestBalancer_discoveryConn(t *testing.T) {
@@ -119,9 +124,11 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	defer func() { _ = pool.Release(ctx) }()
 
 	b := &Balancer{
-		driverConfig:   cfg,
-		pool:           pool,
-		balancerConfig: balancerConfig.Config{},
+		driverConfig:    cfg,
+		pool:            pool,
+		balancerConfig:  balancerConfig.Config{},
+		discoveryConfig: discoveryConfig.New(),
+		dropCandidates:  make(map[endpoint.Key]*dropCandidate),
 	}
 
 	initial := newConnectionsState(nil, b.balancerConfig.Filter, balancerConfig.Info{}, b.balancerConfig.AllowFallback)
@@ -155,6 +162,71 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	require.Equal(t, e2.NodeID(), all[0].NodeID())
 	require.Equal(t, e3.Address(), all[1].Address())
 	require.Equal(t, e3.NodeID(), all[1].NodeID())
+}
+
+func TestApplyDiscoveredEndpoints_StopsGRPCReconnectToDroppedEndpoint(t *testing.T) {
+	ctx := context.Background()
+
+	var (
+		endpointGone   atomic.Bool
+		dialsAfterDrop atomic.Int64
+	)
+
+	listener := bufconn.Listen(1024 * 1024)
+	srv := grpc.NewServer()
+	go func() { _ = srv.Serve(listener) }()
+	t.Cleanup(func() {
+		srv.Stop()
+		_ = listener.Close()
+	})
+
+	cfg := config.New(config.WithGrpcOptions(
+		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			if endpointGone.Load() {
+				dialsAfterDrop.Add(1)
+
+				return nil, fmt.Errorf("lookup %s on [::1]:53: no such host", addr)
+			}
+
+			return listener.DialContext(ctx)
+		}),
+	))
+
+	pool := conn.NewPool(ctx, cfg)
+	defer func() { _ = pool.Release(ctx) }()
+
+	b := &Balancer{
+		driverConfig:    cfg,
+		pool:            pool,
+		balancerConfig:  balancerConfig.Config{},
+		discoveryConfig: discoveryConfig.New(),
+		dropCandidates:  make(map[endpoint.Key]*dropCandidate),
+	}
+	b.connectionsState.Store(newConnectionsState(
+		nil, b.balancerConfig.Filter, balancerConfig.Info{}, b.balancerConfig.AllowFallback,
+	))
+
+	removed := endpoint.New("removed.node.example:2135", endpoint.WithID(1))
+	kept := endpoint.New("kept.node.example:2135", endpoint.WithID(2))
+
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{removed, kept}, "")
+
+	droppedConn := pool.Get(removed)
+	err := droppedConn.Invoke(ctx, "/grpc.health.v1.Health/Check", &struct{}{}, &struct{}{})
+	require.Error(t, err)
+	require.Equal(t, state.Online, droppedConn.GetState())
+
+	keptOnly := []endpoint.Endpoint{kept}
+	b.applyDiscoveredEndpoints(ctx, keptOnly, "")
+	b.applyDiscoveredEndpoints(ctx, keptOnly, "")
+	b.applyDiscoveredEndpoints(ctx, keptOnly, "")
+
+	require.Equal(t, state.Destroyed, droppedConn.GetState())
+
+	endpointGone.Store(true)
+	srv.Stop()
+
+	require.Equal(t, int64(0), dialsAfterDrop.Load())
 }
 
 // Mock resolver
