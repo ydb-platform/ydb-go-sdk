@@ -202,7 +202,7 @@ func newDroppedConnTestEnv(t *testing.T) (context.Context, *conn.Pool, func() *B
 }
 
 func dialDroppedConn(
-	t *testing.T, ctx context.Context, pool *conn.Pool, removed endpoint.Endpoint,
+	ctx context.Context, t *testing.T, pool *conn.Pool, removed endpoint.Endpoint,
 ) conn.Conn {
 	t.Helper()
 
@@ -256,7 +256,7 @@ func TestDroppedDiscoveryConn(t *testing.T) {
 		))
 
 		b.applyDiscoveredEndpoints(ctx, both, "")
-		droppedConn := dialDroppedConn(t, ctx, pool, removed)
+		droppedConn := dialDroppedConn(ctx, t, pool, removed)
 
 		for range droppedConnCloseAfterMissedDiscoveries {
 			b.applyDiscoveredEndpoints(ctx, keptOnly, "")
@@ -275,7 +275,7 @@ func TestDroppedDiscoveryConn(t *testing.T) {
 
 		b := newBalancer()
 		b.applyDiscoveredEndpoints(ctx, both, "")
-		droppedConn := dialDroppedConn(t, ctx, pool, removed)
+		droppedConn := dialDroppedConn(ctx, t, pool, removed)
 
 		b.applyDiscoveredEndpoints(ctx, keptOnly, "")
 
@@ -292,7 +292,7 @@ func TestDroppedDiscoveryConn(t *testing.T) {
 		parent.applyDiscoveredEndpoints(ctx, both, "")
 		child.applyDiscoveredEndpoints(ctx, both, "")
 
-		droppedConn := dialDroppedConn(t, ctx, pool, removed)
+		droppedConn := dialDroppedConn(ctx, t, pool, removed)
 
 		for range droppedConnCloseAfterMissedDiscoveries {
 			parent.applyDiscoveredEndpoints(ctx, keptOnly, "")
@@ -318,7 +318,7 @@ func TestDroppedDiscoveryConn(t *testing.T) {
 			balancers[i].applyDiscoveredEndpoints(ctx, both, "")
 		}
 
-		droppedConn := dialDroppedConn(t, ctx, pool, removed)
+		droppedConn := dialDroppedConn(ctx, t, pool, removed)
 
 		for _, b := range balancers {
 			b.applyDiscoveredEndpoints(ctx, keptOnly, "")
