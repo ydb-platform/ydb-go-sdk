@@ -121,7 +121,10 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 
 	cfg := config.New()
 	pool := conn.NewPool(ctx, cfg)
-	defer func() { _ = pool.Release(ctx) }()
+	defer func() {
+		forgetPoolDropState(ctx, pool)
+		_ = pool.Release(ctx)
+	}()
 
 	b := &Balancer{
 		driverConfig:    cfg,
@@ -183,6 +186,7 @@ func newDroppedConnTestEnv(t *testing.T) (context.Context, *conn.Pool, func() *B
 	cleanup := func() {
 		srv.Stop()
 		_ = listener.Close()
+		forgetPoolDropState(ctx, pool)
 		_ = pool.Release(ctx)
 	}
 	t.Cleanup(cleanup)
@@ -248,7 +252,10 @@ func TestDroppedDiscoveryConn(t *testing.T) {
 		))
 
 		pool := conn.NewPool(ctx, cfg)
-		t.Cleanup(func() { _ = pool.Release(ctx) })
+		t.Cleanup(func() {
+			forgetPoolDropState(ctx, pool)
+			_ = pool.Release(ctx)
+		})
 
 		b := &Balancer{driverConfig: cfg, pool: pool, balancerConfig: balancerConfig.Config{}}
 		b.connectionsState.Store(newConnectionsState(

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"sync/atomic"
-	"unsafe"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"google.golang.org/grpc"
@@ -28,6 +28,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -81,6 +82,161 @@ type Balancer struct {
 
 	connectionsState atomic.Pointer[connectionsState]
 	closed           atomic.Bool
+}
+
+var poolDropStates xsync.Map[*conn.Pool, *poolDropState]
+
+type poolDropState struct {
+	mtx sync.Mutex
+
+	dropCandidates  map[endpoint.Key]*dropCandidate
+	discoveryOwners map[*Balancer]struct{}
+}
+
+type dropCandidate struct {
+	conn   conn.Conn
+	missed map[*Balancer]int
+}
+
+func dropStateFor(pool *conn.Pool) *poolDropState {
+	if state, ok := poolDropStates.Get(pool); ok {
+		return state
+	}
+
+	poolDropStates.Set(pool, &poolDropState{})
+
+	return poolDropStates.Must(pool)
+}
+
+func forgetDiscoveryOwner(ctx context.Context, pool *conn.Pool, owner *Balancer) {
+	if owner == nil {
+		return
+	}
+
+	state, ok := poolDropStates.Get(pool)
+	if !ok {
+		return
+	}
+
+	state.mtx.Lock()
+	defer state.mtx.Unlock()
+
+	delete(state.discoveryOwners, owner)
+
+	for _, cand := range state.dropCandidates {
+		delete(cand.missed, owner)
+	}
+
+	if len(state.discoveryOwners) == 0 {
+		closeAllDropCandidatesLocked(ctx, state)
+		poolDropStates.Delete(pool)
+	}
+}
+
+func closeAllDropCandidatesLocked(ctx context.Context, state *poolDropState) {
+	for key, cand := range state.dropCandidates {
+		delete(state.dropCandidates, key)
+		_ = cand.conn.Close(ctx)
+	}
+}
+
+func closePendingDropCandidatesIfSoleUser(ctx context.Context, pool *conn.Pool) {
+	if !pool.HasSingleSharedUser() {
+		return
+	}
+
+	state, ok := poolDropStates.Get(pool)
+	if !ok {
+		return
+	}
+
+	state.mtx.Lock()
+	defer state.mtx.Unlock()
+
+	closeAllDropCandidatesLocked(ctx, state)
+}
+
+func forgetPoolDropState(ctx context.Context, pool *conn.Pool) {
+	state, ok := poolDropStates.Get(pool)
+	if !ok {
+		return
+	}
+
+	state.mtx.Lock()
+	defer state.mtx.Unlock()
+
+	closeAllDropCandidatesLocked(ctx, state)
+	poolDropStates.Delete(pool)
+}
+
+func noteDiscoveryUpdate(
+	ctx context.Context, pool *conn.Pool, owner *Balancer, dropped, newest []endpoint.Endpoint,
+) {
+	if owner == nil {
+		return
+	}
+
+	state := dropStateFor(pool)
+
+	state.mtx.Lock()
+	defer state.mtx.Unlock()
+
+	if state.dropCandidates == nil {
+		state.dropCandidates = make(map[endpoint.Key]*dropCandidate)
+	}
+	if state.discoveryOwners == nil {
+		state.discoveryOwners = make(map[*Balancer]struct{})
+	}
+
+	state.discoveryOwners[owner] = struct{}{}
+
+	inNewest := make(map[endpoint.Key]struct{}, len(newest))
+	for _, e := range newest {
+		key := e.Key()
+		inNewest[key] = struct{}{}
+		if cand := state.dropCandidates[key]; cand != nil {
+			cand.missed[owner] = 0
+		}
+	}
+
+	for _, e := range dropped {
+		key := e.Key()
+		if _, ok := inNewest[key]; ok {
+			continue
+		}
+		if state.dropCandidates[key] == nil {
+			state.dropCandidates[key] = &dropCandidate{
+				conn:   pool.Get(e),
+				missed: make(map[*Balancer]int),
+			}
+		}
+	}
+
+	for key, cand := range state.dropCandidates {
+		if _, ok := inNewest[key]; ok {
+			continue
+		}
+
+		cand.missed[owner]++
+		if readyToCloseDropped(state.discoveryOwners, cand.missed) {
+			delete(state.dropCandidates, key)
+			_ = cand.conn.Close(ctx)
+		}
+	}
+}
+
+func readyToCloseDropped(owners map[*Balancer]struct{}, missed map[*Balancer]int) bool {
+	if len(owners) == 0 {
+		return false
+	}
+
+	for owner := range owners {
+		if missed[owner] < droppedConnCloseAfterMissedDiscoveries {
+			return false
+		}
+	}
+
+	return true
 }
 
 func compareEndpoints(lhs, rhs endpoint.Endpoint) int {
@@ -252,7 +408,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 
 	b.connectionsState.Store(state)
 
-	b.pool.NoteDiscoveryUpdate(ctx, uintptr(unsafe.Pointer(b)), dropped, newest)
+	noteDiscoveryUpdate(ctx, b.pool, b, dropped, newest)
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
@@ -274,8 +430,8 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		_ = cc.Close()
 	}
 
-	b.pool.ForgetDiscoveryOwner(uintptr(unsafe.Pointer(b)))
-	b.pool.ClosePendingDropCandidatesIfSoleUser(ctx)
+	closePendingDropCandidatesIfSoleUser(ctx, b.pool)
+	forgetDiscoveryOwner(ctx, b.pool, b)
 
 	return nil
 }
