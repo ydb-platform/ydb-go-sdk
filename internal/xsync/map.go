@@ -3,12 +3,10 @@ package xsync
 import (
 	"fmt"
 	"sync"
-	"sync/atomic"
 )
 
 type Map[K comparable, V any] struct {
-	m    sync.Map
-	size atomic.Int32
+	m sync.Map
 }
 
 func (m *Map[K, V]) Get(key K) (value V, ok bool) {
@@ -41,25 +39,13 @@ func (m *Map[K, V]) Has(key K) bool {
 }
 
 func (m *Map[K, V]) Set(key K, value V) {
-	_, exists := m.m.LoadOrStore(key, value)
-
-	if !exists {
-		m.size.Add(1)
-	}
+	m.m.LoadOrStore(key, value)
 }
 
 func (m *Map[K, V]) Delete(key K) bool {
 	_, exists := m.Extract(key)
 
-	if !exists {
-		m.size.Add(-1)
-	}
-
 	return exists
-}
-
-func (m *Map[K, V]) Len() int {
-	return int(m.size.Load())
 }
 
 func (m *Map[K, V]) Extract(key K) (value V, ok bool) {
@@ -67,8 +53,6 @@ func (m *Map[K, V]) Extract(key K) (value V, ok bool) {
 	if !exists {
 		return value, false
 	}
-
-	m.size.Add(-1)
 
 	value, ok = v.(V)
 
@@ -89,8 +73,6 @@ func (m *Map[K, V]) Clear() (removed int) {
 
 		return true
 	})
-
-	m.size.Add(int32(-removed))
 
 	return removed
 }

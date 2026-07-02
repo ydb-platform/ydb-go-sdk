@@ -86,8 +86,14 @@ func (p *Pool) acquireDiscoveryRef(e endpoint.Endpoint) Conn {
 	return cc
 }
 
+// remove is called from conn onClose after grpc shutdown.
+// Compare pointers: extractUnreferencedEndpoints may remove the conn from the map and
+// DiscoveryConnections may install a new *conn for the same endpoint key before
+// Close returns; Delete by key alone would evict the replacement.
 func (p *Pool) remove(c *conn) {
-	p.conns.Delete(c.endpoint.Key())
+	if cc, ok := p.conns.Get(c.endpoint.Key()); ok && cc == c {
+		p.conns.Delete(c.endpoint.Key())
+	}
 }
 
 // ReleaseEndpoint pairs with [Pool.AcquireConn].
@@ -110,20 +116,22 @@ func (p *Pool) releaseDiscoveryRef(e endpoint.Endpoint) {
 	}
 }
 
-// closeUnreferencedEndpoints closes connections that are no longer in use.
-// Caller must hold discoveryMu.
-func (p *Pool) closeUnreferencedEndpoints(ctx context.Context) {
-	if p.isClosed() {
-		return
-	}
+// extractUnreferencedEndpoints removes connections with no in-use marks from the pool.
+// Caller must hold discoveryMu. Close the result outside the lock.
+func (p *Pool) extractUnreferencedEndpoints() []*conn {
+	var toClose []*conn
 
-	p.conns.Range(func(_ endpoint.Key, c *conn) bool {
+	p.conns.Range(func(key endpoint.Key, c *conn) bool {
 		if c.discoveryRefs <= 0 {
-			_ = c.Close(ctx)
+			if extracted, ok := p.conns.Extract(key); ok {
+				toClose = append(toClose, extracted)
+			}
 		}
 
 		return true
 	})
+
+	return toClose
 }
 
 // DiscoveryConnections is the preferred API for discovery-driven pool updates.
@@ -137,9 +145,7 @@ func (p *Pool) DiscoveryConnections(
 	}
 
 	p.discoveryMu.Lock()
-	defer p.discoveryMu.Unlock()
-
-	p.closeUnreferencedEndpoints(ctx)
+	toClose := p.extractUnreferencedEndpoints()
 
 	for _, e := range dropped {
 		p.releaseDiscoveryRef(e)
@@ -149,7 +155,20 @@ func (p *Pool) DiscoveryConnections(
 		p.acquireDiscoveryRef(e)
 	}
 
-	return xslices.Transform(newest, p.get)
+	conns := xslices.Transform(newest, p.get)
+	p.discoveryMu.Unlock()
+
+	// Close synchronously outside discoveryMu: grpc.ClientConn.Close may block on transport
+	// shutdown (GOAWAY, TCP teardown), especially when the peer left the cluster but the
+	// socket is still half-open. With our grpc-go version that wait is bounded (on the order
+	// of seconds per connection, not indefinitely). Never-dialed connections close instantly.
+	// We do not spawn a goroutine here: the conn is already removed from the pool, so a
+	// bounded Close is enough to release resources without complicating lifecycle tracking.
+	for _, c := range toClose {
+		_ = c.Close(ctx)
+	}
+
+	return conns
 }
 
 // ReleaseEndpoints is a batch [Pool.ReleaseEndpoint] (part of the [Pool.AcquireConn] lifecycle).
@@ -227,28 +246,25 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 	close(p.done)
 
 	var (
-		errCh = make(chan error, p.conns.Len())
-		wg    sync.WaitGroup
+		issues   []error
+		issuesMu sync.Mutex
+		wg       sync.WaitGroup
 	)
 
-	wg.Add(cap(errCh))
 	p.conns.Range(func(_ endpoint.Key, c *conn) bool {
+		wg.Add(1)
 		go func(c closer.Closer) {
 			defer wg.Done()
 			if err := c.Close(ctx); err != nil {
-				errCh <- err
+				issuesMu.Lock()
+				issues = append(issues, err)
+				issuesMu.Unlock()
 			}
 		}(c)
 
 		return true
 	})
 	wg.Wait()
-	close(errCh)
-
-	issues := make([]error, 0, cap(errCh))
-	for err := range errCh {
-		issues = append(issues, err)
-	}
 
 	if len(issues) > 0 {
 		return xerrors.WithStackTrace(xerrors.NewWithIssues("connection pool close failed", issues...))

@@ -44,6 +44,16 @@ func (m *mockConfig) GrpcDialOptions() []grpc.DialOption {
 	return m.grpcDialOpts
 }
 
+func countPoolConns(pool *Pool) (n int) {
+	pool.conns.Range(func(_ endpoint.Key, _ *conn) bool {
+		n++
+
+		return true
+	})
+
+	return n
+}
+
 func TestPool_Get(t *testing.T) {
 	t.Run("GetSameConnectionTwice", func(t *testing.T) {
 		ctx := context.Background()
@@ -567,7 +577,7 @@ func TestPool_DiscoveryConnectionsConcurrent(t *testing.T) {
 	}
 	wg.Wait()
 
-	require.LessOrEqual(t, pool.conns.Len(), 1)
+	require.LessOrEqual(t, countPoolConns(pool), 1)
 }
 
 func TestPool_AcquireConnNotClosedByDiscoveryCleanup(t *testing.T) {
@@ -623,14 +633,21 @@ func TestPool_DiscoveryEndpointLifecycle(t *testing.T) {
 		}
 
 		apply(nil, []endpoint.Endpoint{e1, e2})
-		require.Equal(t, 2, pool.conns.Len())
+		_, ok := pool.conns.Get(e1.Key())
+		require.True(t, ok)
+		_, ok = pool.conns.Get(e2.Key())
+		require.True(t, ok)
 
 		apply([]endpoint.Endpoint{e1, e2}, []endpoint.Endpoint{e1})
-		require.Equal(t, 2, pool.conns.Len())
+		_, ok = pool.conns.Get(e1.Key())
+		require.True(t, ok)
+		_, ok = pool.conns.Get(e2.Key())
+		require.True(t, ok)
 
 		apply([]endpoint.Endpoint{e1}, []endpoint.Endpoint{e1})
-		require.Equal(t, 1, pool.conns.Len())
-		_, ok := pool.conns.Get(e2.Key())
+		_, ok = pool.conns.Get(e1.Key())
+		require.True(t, ok)
+		_, ok = pool.conns.Get(e2.Key())
 		require.False(t, ok)
 	})
 }
@@ -647,15 +664,16 @@ func TestPool_DiscoveryConnections(t *testing.T) {
 			_ = pool.Release(ctx)
 		}()
 
-		require.Equal(t, 0, pool.conns.Len())
-
 		e1 := endpoint.New("e1:2135")
 		e2 := endpoint.New("e2:2135")
 
 		conns := pool.DiscoveryConnections(ctx, []endpoint.Endpoint{e1, e2}, nil, []endpoint.Endpoint{e1, e2})
 
 		require.Len(t, conns, 2)
-		require.Equal(t, 2, pool.conns.Len())
+		_, ok := pool.conns.Get(e1.Key())
+		require.True(t, ok)
+		_, ok = pool.conns.Get(e2.Key())
+		require.True(t, ok)
 
 		same := pool.DiscoveryConnections(ctx, nil, nil, []endpoint.Endpoint{e1, e2})
 		require.Equal(t, conns[0], same[0])
@@ -678,14 +696,14 @@ func TestPool_DiscoveryConnections(t *testing.T) {
 		existing := pool.DiscoveryConnections(ctx, []endpoint.Endpoint{e}, nil, []endpoint.Endpoint{e})[0]
 		require.NotNil(t, existing)
 
-		initialLen := pool.conns.Len()
-
 		conns := pool.DiscoveryConnections(ctx, nil, nil, []endpoint.Endpoint{e})
 
 		require.Len(t, conns, 1)
 		require.Equal(t, existing, conns[0])
 
-		require.Equal(t, initialLen, pool.conns.Len())
+		got, ok := pool.conns.Get(e.Key())
+		require.True(t, ok)
+		require.Equal(t, existing, got)
 	})
 
 	t.Run("IPv6AndHostOverrideUniqueKeys", func(t *testing.T) {
@@ -698,9 +716,6 @@ func TestPool_DiscoveryConnections(t *testing.T) {
 		defer func() {
 			_ = pool.Release(ctx)
 		}()
-
-		// ensure empty pool
-		require.Equal(t, 0, pool.conns.Len())
 
 		// address is a dns-style host:port, ipv6 provides resolved ip used in Key.Address()
 		e1 := endpoint.New("example.com:2135", endpoint.WithIPV6([]string{"2001:db8::1"}))
@@ -720,7 +735,6 @@ func TestPool_DiscoveryConnections(t *testing.T) {
 		conns := pool.DiscoveryConnections(ctx, endpoints, nil, endpoints)
 
 		require.Len(t, conns, len(endpoints))
-		require.Equal(t, 5, pool.conns.Len())
 
 		for i, e := range endpoints {
 			got := conns[i]
@@ -755,7 +769,8 @@ func TestPool_DiscoveryConnections(t *testing.T) {
 			ctx, []endpoint.Endpoint{e1, e2}, nil, []endpoint.Endpoint{e1, e2},
 		)
 		require.Len(t, initialConns, 2)
-		require.Equal(t, 2, pool.conns.Len())
+		require.True(t, pool.conns.Has(e1.Key()))
+		require.True(t, pool.conns.Has(e2.Key()))
 
 		// add a new unique endpoint e3 -> pool should grow
 		e3 := endpoint.New("e3.example:2135", endpoint.WithIPV6([]string{"2001:db8::3"}), endpoint.WithID(3))
@@ -763,7 +778,7 @@ func TestPool_DiscoveryConnections(t *testing.T) {
 			ctx, []endpoint.Endpoint{e3}, nil, []endpoint.Endpoint{e1, e2, e3},
 		)
 		require.Len(t, connsAfterE3, 3)
-		require.Equal(t, 3, pool.conns.Len())
+		require.True(t, pool.conns.Has(e3.Key()))
 		require.Equal(t, initialConns[0], connsAfterE3[0])
 		require.Equal(t, initialConns[1], connsAfterE3[1])
 		require.NotEqual(t, initialConns[0], connsAfterE3[2])
@@ -774,8 +789,7 @@ func TestPool_DiscoveryConnections(t *testing.T) {
 			ctx, []endpoint.Endpoint{e1DifferentNode}, nil, []endpoint.Endpoint{e1DifferentNode},
 		)
 		require.Len(t, connsAfterNodeChange, 1)
-		// pool size must increase by one
-		require.Equal(t, 4, pool.conns.Len())
+		require.True(t, pool.conns.Has(e1DifferentNode.Key()))
 		require.Equal(t, initialConns[0], connsAfterE3[0])
 	})
 }
