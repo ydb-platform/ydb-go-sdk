@@ -274,9 +274,11 @@ func Compare(lhs, rhs Endpoint) int {
 	if cmp != 0 {
 		return cmp
 	}
-	cmp = int(lhs.NodeID()) - int(rhs.NodeID())
-	if cmp != 0 {
-		return cmp
+	if lhs.NodeID() < rhs.NodeID() {
+		return -1
+	}
+	if lhs.NodeID() > rhs.NodeID() {
+		return 1
 	}
 
 	return strings.Compare(lhs.OverrideHost(), rhs.OverrideHost())

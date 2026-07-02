@@ -30,6 +30,7 @@ type Pool struct {
 	dialOptions []grpc.DialOption
 	conns       xsync.Map[endpoint.Key, *conn]
 	done        chan struct{}
+	discoveryMu sync.Mutex
 }
 
 func (p *Pool) DialTimeout() time.Duration {
@@ -71,6 +72,13 @@ func (p *Pool) conn(endpoint endpoint.Endpoint) *conn {
 // AcquireConn returns a pooled connection and marks the endpoint as in use.
 // Pair each call with [Pool.ReleaseEndpoint], or use [Pool.DiscoveryConnections] instead.
 func (p *Pool) AcquireConn(e endpoint.Endpoint) Conn {
+	p.discoveryMu.Lock()
+	defer p.discoveryMu.Unlock()
+
+	return p.acquireDiscoveryRef(e)
+}
+
+func (p *Pool) acquireDiscoveryRef(e endpoint.Endpoint) Conn {
 	cc := p.conn(e)
 	cc.discoveryRefs.Add(1)
 
@@ -84,6 +92,13 @@ func (p *Pool) remove(c *conn) {
 // ReleaseEndpoint pairs with [Pool.AcquireConn].
 // For discovery-driven updates use [Pool.DiscoveryConnections] instead.
 func (p *Pool) ReleaseEndpoint(_ context.Context, e endpoint.Endpoint) {
+	p.discoveryMu.Lock()
+	defer p.discoveryMu.Unlock()
+
+	p.releaseDiscoveryRef(e)
+}
+
+func (p *Pool) releaseDiscoveryRef(e endpoint.Endpoint) {
 	if p.isClosed() {
 		return
 	}
@@ -121,14 +136,17 @@ func (p *Pool) DiscoveryConnections(
 		return nil
 	}
 
+	p.discoveryMu.Lock()
+	defer p.discoveryMu.Unlock()
+
 	p.closeUnreferencedEndpoints(ctx)
 
 	for _, e := range dropped {
-		p.ReleaseEndpoint(ctx, e)
+		p.releaseDiscoveryRef(e)
 	}
 
 	for _, e := range added {
-		p.AcquireConn(e)
+		p.acquireDiscoveryRef(e)
 	}
 
 	return xslices.Transform(newest, p.get)
@@ -136,8 +154,11 @@ func (p *Pool) DiscoveryConnections(
 
 // ReleaseEndpoints is a batch [Pool.ReleaseEndpoint] (part of the [Pool.AcquireConn] lifecycle).
 func (p *Pool) ReleaseEndpoints(ctx context.Context, endpoints []endpoint.Endpoint) {
+	p.discoveryMu.Lock()
+	defer p.discoveryMu.Unlock()
+
 	for _, e := range endpoints {
-		p.ReleaseEndpoint(ctx, e)
+		p.releaseDiscoveryRef(e)
 	}
 }
 

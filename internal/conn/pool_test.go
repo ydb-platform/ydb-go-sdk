@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -536,6 +537,37 @@ func TestPool_DiscoveryConnectionsRefs(t *testing.T) {
 		_, ok = pool.conns.Get(e.Key())
 		require.False(t, ok)
 	})
+}
+
+func TestPool_DiscoveryConnectionsConcurrent(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+	defer func() {
+		_ = pool.Release(ctx)
+	}()
+
+	e := endpoint.New("concurrent:2135", endpoint.WithID(1))
+
+	const workers = 8
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for range workers {
+		go func() {
+			defer wg.Done()
+			for range 50 {
+				pool.DiscoveryConnections(
+					ctx,
+					[]endpoint.Endpoint{e},
+					nil,
+					[]endpoint.Endpoint{e},
+				)
+				pool.DiscoveryConnections(ctx, nil, []endpoint.Endpoint{e}, nil)
+			}
+		}()
+	}
+	wg.Wait()
+
+	require.LessOrEqual(t, pool.conns.Len(), 1)
 }
 
 func TestPool_AcquireConnNotClosedByDiscoveryCleanup(t *testing.T) {
