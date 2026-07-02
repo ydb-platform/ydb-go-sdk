@@ -19,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -29,15 +30,6 @@ type Pool struct {
 	dialOptions []grpc.DialOption
 	conns       xsync.Map[endpoint.Key, *conn]
 	done        chan struct{}
-}
-
-func EndpointsToConnections(p *Pool, endpoints []endpoint.Endpoint) []Conn {
-	conns := make([]Conn, 0, len(endpoints))
-	for _, e := range endpoints {
-		conns = append(conns, p.Get(e))
-	}
-
-	return conns
 }
 
 func (p *Pool) DialTimeout() time.Duration {
@@ -52,7 +44,7 @@ func (p *Pool) GrpcDialOptions() []grpc.DialOption {
 	return p.dialOptions
 }
 
-func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
+func (p *Pool) get(endpoint endpoint.Endpoint) Conn {
 	var (
 		cc  *conn
 		has bool
@@ -72,8 +64,77 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 	return cc
 }
 
+// AcquireConn returns a pooled connection and marks the endpoint as in use.
+// Pair each call with [Pool.ReleaseEndpoint], or use [Pool.DiscoveryConnections] instead.
+func (p *Pool) AcquireConn(e endpoint.Endpoint) Conn {
+	cc := p.get(e).(*conn)
+	cc.discoveryRefs.Add(1)
+
+	return cc
+}
+
 func (p *Pool) remove(c *conn) {
 	p.conns.Delete(c.endpoint.Key())
+}
+
+// ReleaseEndpoint pairs with [Pool.AcquireConn].
+// For discovery-driven updates use [Pool.DiscoveryConnections] instead.
+func (p *Pool) ReleaseEndpoint(_ context.Context, e endpoint.Endpoint) {
+	if p.isClosed() {
+		return
+	}
+
+	cc, ok := p.conns.Get(e.Key())
+	if !ok {
+		return
+	}
+
+	cc.discoveryRefs.Add(-1)
+}
+
+// closeUnreferencedEndpoints closes connections that are no longer in use.
+func (p *Pool) closeUnreferencedEndpoints(ctx context.Context) {
+	if p.isClosed() {
+		return
+	}
+
+	p.conns.Range(func(_ endpoint.Key, c *conn) bool {
+		if c.discoveryRefs.Load() <= 0 {
+			_ = c.Close(ctx)
+		}
+
+		return true
+	})
+}
+
+// DiscoveryConnections is the preferred API for discovery-driven pool updates.
+// Alternatively pair [Pool.AcquireConn] with [Pool.ReleaseEndpoint].
+func (p *Pool) DiscoveryConnections(
+	ctx context.Context,
+	added, dropped, newest []endpoint.Endpoint,
+) []Conn {
+	if p.isClosed() {
+		return nil
+	}
+
+	p.closeUnreferencedEndpoints(ctx)
+
+	for _, e := range dropped {
+		p.ReleaseEndpoint(ctx, e)
+	}
+
+	for _, e := range added {
+		p.AcquireConn(e)
+	}
+
+	return xslices.Transform(newest, p.get)
+}
+
+// ReleaseEndpoints is a batch [Pool.ReleaseEndpoint] (part of the [Pool.AcquireConn] lifecycle).
+func (p *Pool) ReleaseEndpoints(ctx context.Context, endpoints []endpoint.Endpoint) {
+	for _, e := range endpoints {
+		p.ReleaseEndpoint(ctx, e)
+	}
 }
 
 func (p *Pool) isClosed() bool {

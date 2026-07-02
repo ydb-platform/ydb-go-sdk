@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -259,4 +260,24 @@ func New(address string, opts ...Option) *endpoint {
 	}
 
 	return e
+}
+
+// Compare orders two discovery endpoints lexicographically: Address, then NodeID,
+// then OverrideHost (each field compared like strings.Compare).
+// Use it as the cmp argument to xslices.Diff to split snapshots into added,
+// dropped, and unchanged endpoints.
+//
+// Return value follows strings.Compare: negative if lhs sorts before rhs, zero if
+// all three fields match (same pool entry), positive if lhs sorts after rhs.
+func Compare(lhs, rhs Endpoint) int {
+	cmp := strings.Compare(lhs.Address(), rhs.Address())
+	if cmp != 0 {
+		return cmp
+	}
+	cmp = int(lhs.NodeID()) - int(rhs.NodeID())
+	if cmp != 0 {
+		return cmp
+	}
+
+	return strings.Compare(lhs.OverrideHost(), rhs.OverrideHost())
 }

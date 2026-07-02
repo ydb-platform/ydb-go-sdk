@@ -231,7 +231,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			defer func() { _ = pool.Release(ctx) }()
 
 			e1 := endpoint.New("node1:2135", endpoint.WithID(1))
-			poolConn := pool.Get(e1)
+			poolConn := pool.AcquireConn(e1)
 			poolConn.SetState(ctx, state.Online)
 
 			cc1 := &poolRegisteredConn{

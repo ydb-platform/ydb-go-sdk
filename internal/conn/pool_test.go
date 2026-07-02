@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -56,10 +57,10 @@ func TestPool_Get(t *testing.T) {
 
 		e := endpoint.New("test-endpoint:2135")
 
-		conn1 := pool.Get(e)
+		conn1 := pool.get(e)
 		require.NotNil(t, conn1)
 
-		conn2 := pool.Get(e)
+		conn2 := pool.get(e)
 		require.NotNil(t, conn2)
 
 		// Should return the same connection
@@ -80,10 +81,10 @@ func TestPool_Get(t *testing.T) {
 		e1 := endpoint.New("endpoint1:2135")
 		e2 := endpoint.New("endpoint2:2135")
 
-		conn1 := pool.Get(e1)
+		conn1 := pool.get(e1)
 		require.NotNil(t, conn1)
 
-		conn2 := pool.Get(e2)
+		conn2 := pool.get(e2)
 		require.NotNil(t, conn2)
 
 		// Should return different connections
@@ -147,7 +148,7 @@ func TestPool_TakeRelease(t *testing.T) {
 
 		// Get a connection to ensure the pool has something to close
 		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
+		conn := pool.get(e)
 		require.NotNil(t, conn)
 
 		// Final release should close the pool
@@ -257,7 +258,7 @@ func TestPool_ConnParker(t *testing.T) {
 
 		// Create a connection and set it to Online
 		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
+		conn := pool.get(e)
 		require.NotNil(t, conn)
 
 		conn.SetState(ctx, state.Online)
@@ -297,7 +298,7 @@ func TestPool_ConnParker(t *testing.T) {
 
 		// Create a connection and set it to Banned
 		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
+		conn := pool.get(e)
 		require.NotNil(t, conn)
 
 		conn.SetState(ctx, state.Banned)
@@ -337,7 +338,7 @@ func TestPool_ConnParker(t *testing.T) {
 
 		// Create a connection and set it to Online
 		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
+		conn := pool.get(e)
 		require.NotNil(t, conn)
 
 		conn.SetState(ctx, state.Online)
@@ -377,7 +378,7 @@ func TestPool_ConnParker(t *testing.T) {
 
 		// Create a connection (default state is Created)
 		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
+		conn := pool.get(e)
 		require.NotNil(t, conn)
 		require.Equal(t, state.Created, conn.GetState())
 
@@ -452,7 +453,7 @@ func TestPool_ConnParker(t *testing.T) {
 
 		// Create connection to track parking attempts
 		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
+		conn := pool.get(e)
 		conn.SetState(ctx, state.Online)
 
 		// Start the parker
@@ -473,7 +474,136 @@ func TestPool_ConnParker(t *testing.T) {
 	})
 }
 
-func TestEndpointsToConnections(t *testing.T) {
+func TestPool_DiscoveryConnectionsRefs(t *testing.T) {
+	t.Run("KeepsConnectionWhileReferenced", func(t *testing.T) {
+		ctx := context.Background()
+		pool := NewPool(ctx, &mockConfig{})
+		defer func() {
+			_ = pool.Release(ctx)
+		}()
+
+		e := endpoint.New("test-endpoint:2135")
+		pool.DiscoveryConnections(ctx, []endpoint.Endpoint{e}, nil, []endpoint.Endpoint{e})
+		pool.DiscoveryConnections(ctx, []endpoint.Endpoint{e}, nil, []endpoint.Endpoint{e})
+
+		pool.DiscoveryConnections(ctx, nil, []endpoint.Endpoint{e}, []endpoint.Endpoint{e})
+		_, ok := pool.conns.Get(e.Key())
+		require.True(t, ok)
+
+		pool.DiscoveryConnections(ctx, nil, []endpoint.Endpoint{e}, nil)
+		_, ok = pool.conns.Get(e.Key())
+		require.True(t, ok)
+
+		pool.DiscoveryConnections(ctx, nil, nil, nil)
+		_, ok = pool.conns.Get(e.Key())
+		require.False(t, ok)
+	})
+
+	t.Run("ReListsEndpointAfterDrop", func(t *testing.T) {
+		ctx := context.Background()
+		pool := NewPool(ctx, &mockConfig{})
+		defer func() {
+			_ = pool.Release(ctx)
+		}()
+
+		e := endpoint.New("test-endpoint:2135")
+		pool.DiscoveryConnections(ctx, []endpoint.Endpoint{e}, nil, []endpoint.Endpoint{e})
+		pool.DiscoveryConnections(ctx, nil, []endpoint.Endpoint{e}, nil)
+
+		pool.DiscoveryConnections(ctx, []endpoint.Endpoint{e}, nil, []endpoint.Endpoint{e})
+		_, ok := pool.conns.Get(e.Key())
+		require.True(t, ok)
+	})
+
+	t.Run("SharedPoolMultipleBalancers", func(t *testing.T) {
+		ctx := context.Background()
+		pool := NewPool(ctx, &mockConfig{})
+		defer func() {
+			_ = pool.Release(ctx)
+		}()
+
+		e := endpoint.New("shared-endpoint:2135")
+		pool.DiscoveryConnections(ctx, []endpoint.Endpoint{e}, nil, []endpoint.Endpoint{e})
+		pool.DiscoveryConnections(ctx, []endpoint.Endpoint{e}, nil, []endpoint.Endpoint{e})
+
+		pool.DiscoveryConnections(ctx, nil, []endpoint.Endpoint{e}, []endpoint.Endpoint{e})
+		pool.DiscoveryConnections(ctx, nil, nil, nil)
+		_, ok := pool.conns.Get(e.Key())
+		require.True(t, ok)
+
+		pool.DiscoveryConnections(ctx, nil, []endpoint.Endpoint{e}, nil)
+		pool.DiscoveryConnections(ctx, nil, []endpoint.Endpoint{e}, nil)
+		_, ok = pool.conns.Get(e.Key())
+		require.False(t, ok)
+	})
+}
+
+func TestPool_AcquireConnNotClosedByDiscoveryCleanup(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+	defer func() {
+		_ = pool.Release(ctx)
+	}()
+
+	e := endpoint.New("bootstrap:2135")
+	conn := pool.AcquireConn(e)
+	require.NotNil(t, conn)
+
+	pool.DiscoveryConnections(ctx, nil, nil, nil)
+
+	got, ok := pool.conns.Get(e.Key())
+	require.True(t, ok)
+	require.Equal(t, conn, got)
+}
+
+func TestPool_AcquireConnReleaseClosedOnDiscovery(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+	defer func() {
+		_ = pool.Release(ctx)
+	}()
+
+	e := endpoint.New("acquire-release:2135")
+	conn := pool.AcquireConn(e)
+	require.NotNil(t, conn)
+
+	pool.ReleaseEndpoint(ctx, e)
+	pool.DiscoveryConnections(ctx, nil, nil, nil)
+
+	_, ok := pool.conns.Get(e.Key())
+	require.False(t, ok)
+}
+
+func TestPool_DiscoveryEndpointLifecycle(t *testing.T) {
+	t.Run("DropsRemovedEndpointsOnNextDiscovery", func(t *testing.T) {
+		ctx := context.Background()
+		pool := NewPool(ctx, &mockConfig{})
+		defer func() {
+			_ = pool.Release(ctx)
+		}()
+
+		e1 := endpoint.New("node1:2135", endpoint.WithID(1))
+		e2 := endpoint.New("node2:2135", endpoint.WithID(2))
+
+		apply := func(previous, newest []endpoint.Endpoint) {
+			_, added, dropped := xslices.Diff(previous, newest, endpoint.Compare)
+			pool.DiscoveryConnections(ctx, added, dropped, newest)
+		}
+
+		apply(nil, []endpoint.Endpoint{e1, e2})
+		require.Equal(t, 2, pool.conns.Len())
+
+		apply([]endpoint.Endpoint{e1, e2}, []endpoint.Endpoint{e1})
+		require.Equal(t, 2, pool.conns.Len())
+
+		apply([]endpoint.Endpoint{e1}, []endpoint.Endpoint{e1})
+		require.Equal(t, 1, pool.conns.Len())
+		_, ok := pool.conns.Get(e2.Key())
+		require.False(t, ok)
+	})
+}
+
+func TestPool_DiscoveryConnections(t *testing.T) {
 	t.Run("CreatesConnectionsForEndpoints", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
@@ -490,13 +620,14 @@ func TestEndpointsToConnections(t *testing.T) {
 		e1 := endpoint.New("e1:2135")
 		e2 := endpoint.New("e2:2135")
 
-		conns := EndpointsToConnections(pool, []endpoint.Endpoint{e1, e2})
+		conns := pool.DiscoveryConnections(ctx, []endpoint.Endpoint{e1, e2}, nil, []endpoint.Endpoint{e1, e2})
 
 		require.Len(t, conns, 2)
 		require.Equal(t, 2, pool.conns.Len())
 
-		require.Equal(t, pool.Get(e1), conns[0])
-		require.Equal(t, pool.Get(e2), conns[1])
+		same := pool.DiscoveryConnections(ctx, nil, nil, []endpoint.Endpoint{e1, e2})
+		require.Equal(t, conns[0], same[0])
+		require.Equal(t, conns[1], same[1])
 	})
 
 	t.Run("ReusesExistingConnections", func(t *testing.T) {
@@ -512,12 +643,12 @@ func TestEndpointsToConnections(t *testing.T) {
 
 		e := endpoint.New("reuse:2135")
 
-		existing := pool.Get(e)
+		existing := pool.DiscoveryConnections(ctx, []endpoint.Endpoint{e}, nil, []endpoint.Endpoint{e})[0]
 		require.NotNil(t, existing)
 
 		initialLen := pool.conns.Len()
 
-		conns := EndpointsToConnections(pool, []endpoint.Endpoint{e})
+		conns := pool.DiscoveryConnections(ctx, nil, nil, []endpoint.Endpoint{e})
 
 		require.Len(t, conns, 1)
 		require.Equal(t, existing, conns[0])
@@ -554,7 +685,7 @@ func TestEndpointsToConnections(t *testing.T) {
 		e5 := endpoint.New("example.com:2135", endpoint.WithIPV6([]string{"2001:db8::1"}), endpoint.WithID(1))
 
 		endpoints := []endpoint.Endpoint{e1, e2, e3, e4, e5}
-		conns := EndpointsToConnections(pool, endpoints)
+		conns := pool.DiscoveryConnections(ctx, endpoints, nil, endpoints)
 
 		require.Len(t, conns, len(endpoints))
 		require.Equal(t, 5, pool.conns.Len())
@@ -562,7 +693,6 @@ func TestEndpointsToConnections(t *testing.T) {
 		for i, e := range endpoints {
 			got := conns[i]
 			require.NotNil(t, got)
-			require.Equal(t, pool.Get(e), got)
 			cc, ok := pool.conns.Get(e.Key())
 			require.True(t, ok)
 			require.Equal(t, cc, got)
@@ -589,27 +719,31 @@ func TestEndpointsToConnections(t *testing.T) {
 		e2 := endpoint.New("e2.example:2135", endpoint.WithIPV6([]string{"2001:db8::2"}), endpoint.WithID(2))
 
 		// create initial connections
-		initialConns := EndpointsToConnections(pool, []endpoint.Endpoint{e1, e2})
+		initialConns := pool.DiscoveryConnections(
+			ctx, []endpoint.Endpoint{e1, e2}, nil, []endpoint.Endpoint{e1, e2},
+		)
 		require.Len(t, initialConns, 2)
 		require.Equal(t, 2, pool.conns.Len())
-		require.Equal(t, pool.Get(e1), initialConns[0])
-		require.Equal(t, pool.Get(e2), initialConns[1])
 
 		// add a new unique endpoint e3 -> pool should grow
 		e3 := endpoint.New("e3.example:2135", endpoint.WithIPV6([]string{"2001:db8::3"}), endpoint.WithID(3))
-		connsAfterE3 := EndpointsToConnections(pool, []endpoint.Endpoint{e1, e2, e3})
+		connsAfterE3 := pool.DiscoveryConnections(
+			ctx, []endpoint.Endpoint{e3}, nil, []endpoint.Endpoint{e1, e2, e3},
+		)
 		require.Len(t, connsAfterE3, 3)
 		require.Equal(t, 3, pool.conns.Len())
-		require.Equal(t, pool.Get(e3), connsAfterE3[2])
+		require.Equal(t, initialConns[0], connsAfterE3[0])
+		require.Equal(t, initialConns[1], connsAfterE3[1])
+		require.NotEqual(t, initialConns[0], connsAfterE3[2])
 
 		// now use same address as e1 but different NodeID (and same ipv6) -> should create new conn
 		e1DifferentNode := endpoint.New("e1.example:2135", endpoint.WithIPV6([]string{"2001:db8::1"}), endpoint.WithID(99))
-		connsAfterNodeChange := EndpointsToConnections(pool, []endpoint.Endpoint{e1DifferentNode})
+		connsAfterNodeChange := pool.DiscoveryConnections(
+			ctx, []endpoint.Endpoint{e1DifferentNode}, nil, []endpoint.Endpoint{e1DifferentNode},
+		)
 		require.Len(t, connsAfterNodeChange, 1)
 		// pool size must increase by one
 		require.Equal(t, 4, pool.conns.Len())
-		// returned conn corresponds to the new endpoint key
-		require.Equal(t, pool.Get(e1DifferentNode), connsAfterNodeChange[0])
-		require.Equal(t, pool.Get(e1), initialConns[0])
+		require.Equal(t, initialConns[0], connsAfterE3[0])
 	})
 }

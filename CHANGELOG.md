@@ -1,3 +1,5 @@
+* Fixed gRPC connections to cluster nodes removed from Discovery staying open in the connection pool
+
 ## v3.143.0
 * Added experimental helper `sugar.NewKVClientBuilder(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
 

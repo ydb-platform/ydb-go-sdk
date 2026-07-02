@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
@@ -215,19 +214,8 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 		)
 		previous = b.connections().All()
 	)
+	_, added, dropped := xslices.Diff(previous, newest, endpoint.Compare)
 	defer func() {
-		_, added, dropped := xslices.Diff(previous, newest, func(lhs, rhs endpoint.Endpoint) int {
-			cmp := strings.Compare(lhs.Address(), rhs.Address())
-			if cmp != 0 {
-				return cmp
-			}
-			cmp = int(lhs.NodeID()) - int(rhs.NodeID())
-			if cmp != 0 {
-				return cmp
-			}
-
-			return strings.Compare(lhs.OverrideHost(), rhs.OverrideHost())
-		})
 		onDone(
 			xslices.Transform(newest, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
 			xslices.Transform(added, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
@@ -236,7 +224,8 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 		)
 	}()
 
-	connections := conn.EndpointsToConnections(b.pool, newest)
+	// Otherwise the shared pool keeps gRPC connections to nodes that left the cluster.
+	connections := b.pool.DiscoveryConnections(ctx, added, dropped, newest)
 	for _, c := range connections {
 		b.pool.Allow(ctx, c)
 		c.Endpoint().Touch()
@@ -267,6 +256,9 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	if b.discoveryRepeater != nil {
 		b.discoveryRepeater.Stop()
 	}
+
+	// Release marks for endpoints this balancer no longer needs.
+	b.pool.ReleaseEndpoints(ctx, b.connections().All())
 
 	if cc := b.cc.Load(); cc != nil {
 		_ = cc.Close()

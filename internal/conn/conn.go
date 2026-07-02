@@ -74,6 +74,9 @@ type (
 		childStreams *xcontext.CancelsGuard
 		lastUsage    xsync.LastUsage
 		onClose      []func(*conn)
+
+		// discoveryRefs tracks [Pool.AcquireConn] / [Pool.ReleaseEndpoint] pairing.
+		discoveryRefs atomic.Int64
 	}
 	nopLastUsage struct{}
 )

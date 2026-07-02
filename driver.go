@@ -552,7 +552,7 @@ func (d *Driver) connect(ctx context.Context) error {
 
 	d.discovery = xsync.OnceValue(func() (*internalDiscovery.Client, error) {
 		return internalDiscovery.New(xcontext.ValueOnly(ctx),
-			d.pool.Get(endpoint.New(d.config.Endpoint())),
+			d.pool.AcquireConn(endpoint.New(d.config.Endpoint())),
 			discoveryConfig.New(
 				append(
 					// prepend common params from root config
