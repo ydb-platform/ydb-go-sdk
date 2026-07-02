@@ -14,6 +14,7 @@ func (tablePathPrefix TablePathPrefix) blockID() blockID {
 }
 
 func (tablePathPrefix TablePathPrefix) NormalizePath(folderOrTable string) string {
+	folderOrTable = path.Clean(folderOrTable)
 	switch ch := folderOrTable[0]; ch {
 	case '/':
 		return folderOrTable
