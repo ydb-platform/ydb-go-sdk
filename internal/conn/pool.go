@@ -45,6 +45,10 @@ func (p *Pool) GrpcDialOptions() []grpc.DialOption {
 }
 
 func (p *Pool) get(endpoint endpoint.Endpoint) Conn {
+	return p.conn(endpoint)
+}
+
+func (p *Pool) conn(endpoint endpoint.Endpoint) *conn {
 	var (
 		cc  *conn
 		has bool
@@ -67,7 +71,7 @@ func (p *Pool) get(endpoint endpoint.Endpoint) Conn {
 // AcquireConn returns a pooled connection and marks the endpoint as in use.
 // Pair each call with [Pool.ReleaseEndpoint], or use [Pool.DiscoveryConnections] instead.
 func (p *Pool) AcquireConn(e endpoint.Endpoint) Conn {
-	cc := p.get(e).(*conn)
+	cc := p.conn(e)
 	cc.discoveryRefs.Add(1)
 
 	return cc
