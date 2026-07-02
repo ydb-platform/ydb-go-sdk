@@ -78,9 +78,10 @@ func (p *Pool) AcquireConn(e endpoint.Endpoint) Conn {
 	return p.acquireDiscoveryRef(e)
 }
 
+// acquireDiscoveryRef marks the endpoint as in use. Caller must hold discoveryMu.
 func (p *Pool) acquireDiscoveryRef(e endpoint.Endpoint) Conn {
 	cc := p.conn(e)
-	cc.discoveryRefs.Add(1)
+	cc.discoveryRefs++
 
 	return cc
 }
@@ -95,30 +96,29 @@ func (p *Pool) ReleaseEndpoint(_ context.Context, e endpoint.Endpoint) {
 	p.discoveryMu.Lock()
 	defer p.discoveryMu.Unlock()
 
-	p.releaseDiscoveryRef(e)
-}
-
-func (p *Pool) releaseDiscoveryRef(e endpoint.Endpoint) {
 	if p.isClosed() {
 		return
 	}
 
-	cc, ok := p.conns.Get(e.Key())
-	if !ok {
-		return
-	}
+	p.releaseDiscoveryRef(e)
+}
 
-	cc.discoveryRefs.Add(-1)
+// releaseDiscoveryRef drops one in-use mark for the endpoint. Caller must hold discoveryMu.
+func (p *Pool) releaseDiscoveryRef(e endpoint.Endpoint) {
+	if cc, ok := p.conns.Get(e.Key()); ok {
+		cc.discoveryRefs--
+	}
 }
 
 // closeUnreferencedEndpoints closes connections that are no longer in use.
+// Caller must hold discoveryMu.
 func (p *Pool) closeUnreferencedEndpoints(ctx context.Context) {
 	if p.isClosed() {
 		return
 	}
 
 	p.conns.Range(func(_ endpoint.Key, c *conn) bool {
-		if c.discoveryRefs.Load() <= 0 {
+		if c.discoveryRefs <= 0 {
 			_ = c.Close(ctx)
 		}
 
@@ -156,6 +156,10 @@ func (p *Pool) DiscoveryConnections(
 func (p *Pool) ReleaseEndpoints(ctx context.Context, endpoints []endpoint.Endpoint) {
 	p.discoveryMu.Lock()
 	defer p.discoveryMu.Unlock()
+
+	if p.isClosed() {
+		return
+	}
 
 	for _, e := range endpoints {
 		p.releaseDiscoveryRef(e)

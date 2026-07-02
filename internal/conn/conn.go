@@ -76,7 +76,7 @@ type (
 		onClose      []func(*conn)
 
 		// discoveryRefs tracks [Pool.AcquireConn] / [Pool.ReleaseEndpoint] pairing.
-		discoveryRefs atomic.Int64
+		discoveryRefs int64
 	}
 	nopLastUsage struct{}
 )
