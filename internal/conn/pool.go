@@ -72,6 +72,9 @@ func (p *Pool) conn(endpoint endpoint.Endpoint) *conn {
 // AcquireConn returns a pooled connection and marks the endpoint as in use.
 // Pair each call with [Pool.ReleaseEndpoint], or use [Pool.DiscoveryConnections] instead.
 func (p *Pool) AcquireConn(e endpoint.Endpoint) Conn {
+	p.discoveryMu.Lock()
+	defer p.discoveryMu.Unlock()
+
 	return p.acquireDiscoveryRef(e)
 }
 
@@ -99,6 +102,9 @@ func (p *Pool) ReleaseEndpoint(_ context.Context, e endpoint.Endpoint) {
 	if p.isClosed() {
 		return
 	}
+
+	p.discoveryMu.Lock()
+	defer p.discoveryMu.Unlock()
 
 	p.releaseDiscoveryRef(e)
 }
