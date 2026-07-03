@@ -28,7 +28,7 @@ tests/slo/
 ```bash
 cd tests/slo
 
-SRC_PATH=native/table WORKLOAD_DURATION=600 docker compose \
+SRC_PATH=native/query WORKLOAD_DURATION=600 docker compose \
   --profile telemetry \
   --profile chaos \
   --profile workload-current \
@@ -37,7 +37,7 @@ SRC_PATH=native/table WORKLOAD_DURATION=600 docker compose \
 
 | Variable            | Description                                    |
 |---------------------|------------------------------------------------|
-| `SRC_PATH`          | Workload directory under `tests/slo/` to build |
+| `SRC_PATH`          | Workload directory under `tests/slo/` to build (default: `native/query`) |
 | `WORKLOAD_DURATION` | Run time in seconds                            |
 
 Available `SRC_PATH` values (matching CI):

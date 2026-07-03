@@ -4,7 +4,7 @@ services:
       context: ../..
       dockerfile: tests/slo/Dockerfile
       args:
-        SRC_PATH: ${SRC_PATH:-native/table}
+        SRC_PATH: ${SRC_PATH:-native/query}
       platforms:
         - linux/amd64
     image: ${WORKLOAD_CURRENT_IMAGE:-ydb-app-current}
