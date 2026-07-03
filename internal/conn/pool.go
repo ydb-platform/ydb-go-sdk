@@ -129,12 +129,16 @@ func (p *Pool) DiscoveryConnections(
 	p.discoveryMu.Lock()
 	defer p.discoveryMu.Unlock()
 
-	// Close synchronously: grpc.ClientConn.Close may block on transport
-	// shutdown (GOAWAY, TCP teardown), especially when the peer left the cluster but the
-	// socket is still half-open. With our grpc-go version that wait is bounded (on the order
-	// of seconds per connection, not indefinitely). Never-dialed connections close instantly.
-	// We do not spawn a goroutine here: the conn is already removed from the pool, so a
-	// bounded Close is enough to release resources without complicating lifecycle tracking.
+	// Close unreferenced connections synchronously while discoveryMu is held.
+	// grpc.ClientConn.Close may block on transport shutdown (GOAWAY, TCP teardown),
+	// especially when the peer left the cluster but the socket is still half-open.
+	// With our grpc-go version that wait is bounded (on the order of seconds per
+	// connection, not indefinitely). Never-dialed connections close instantly.
+	//
+	// We keep discoveryMu across Close on purpose: releasing it before Close would
+	// reopen the race between ref updates, map removal, and a replacement *conn for
+	// the same endpoint key. Discovery runs on a background repeater, so a bounded
+	// stall here is acceptable and preferable to async cleanup complexity.
 	p.conns.Range(func(key endpoint.Key, c *conn) bool {
 		if c.discoveryRefs.Load() <= 0 {
 			_ = c.Close(ctx)
