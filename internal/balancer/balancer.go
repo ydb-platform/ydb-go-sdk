@@ -257,9 +257,6 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		b.discoveryRepeater.Stop()
 	}
 
-	// Release marks for endpoints this balancer no longer needs.
-	b.pool.ReleaseEndpoints(ctx, b.connections().All())
-
 	if cc := b.cc.Load(); cc != nil {
 		_ = cc.Close()
 	}

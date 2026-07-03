@@ -76,7 +76,9 @@ type (
 		onClose      []func(*conn)
 
 		// discoveryRefs tracks [Pool.AcquireConn] / [Pool.ReleaseEndpoint] pairing.
-		discoveryRefs int64
+		// Zero or negative value means the connection is not in use.
+		// guarded by [Pool.discoveryMu]
+		discoveryRefs atomic.Int64
 	}
 	nopLastUsage struct{}
 )

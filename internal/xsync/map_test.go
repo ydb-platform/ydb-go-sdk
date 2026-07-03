@@ -54,12 +54,4 @@ func TestMap(t *testing.T) {
 	})
 	require.Empty(t, exp)
 	require.Empty(t, unexp)
-	m.Clear()
-	empty := true
-	m.Range(func(key int, value string) bool {
-		empty = false
-
-		return false
-	})
-	require.True(t, empty)
 }

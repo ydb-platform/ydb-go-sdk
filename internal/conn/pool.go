@@ -72,16 +72,13 @@ func (p *Pool) conn(endpoint endpoint.Endpoint) *conn {
 // AcquireConn returns a pooled connection and marks the endpoint as in use.
 // Pair each call with [Pool.ReleaseEndpoint], or use [Pool.DiscoveryConnections] instead.
 func (p *Pool) AcquireConn(e endpoint.Endpoint) Conn {
-	p.discoveryMu.Lock()
-	defer p.discoveryMu.Unlock()
-
 	return p.acquireDiscoveryRef(e)
 }
 
-// acquireDiscoveryRef marks the endpoint as in use. Caller must hold discoveryMu.
+// acquireDiscoveryRef marks the endpoint as in use.
 func (p *Pool) acquireDiscoveryRef(e endpoint.Endpoint) Conn {
 	cc := p.conn(e)
-	cc.discoveryRefs++
+	cc.discoveryRefs.Add(+1)
 
 	return cc
 }
@@ -99,9 +96,6 @@ func (p *Pool) remove(c *conn) {
 // ReleaseEndpoint pairs with [Pool.AcquireConn].
 // For discovery-driven updates use [Pool.DiscoveryConnections] instead.
 func (p *Pool) ReleaseEndpoint(_ context.Context, e endpoint.Endpoint) {
-	p.discoveryMu.Lock()
-	defer p.discoveryMu.Unlock()
-
 	if p.isClosed() {
 		return
 	}
@@ -109,29 +103,11 @@ func (p *Pool) ReleaseEndpoint(_ context.Context, e endpoint.Endpoint) {
 	p.releaseDiscoveryRef(e)
 }
 
-// releaseDiscoveryRef drops one in-use mark for the endpoint. Caller must hold discoveryMu.
+// releaseDiscoveryRef drops one in-use mark for the endpoint.
 func (p *Pool) releaseDiscoveryRef(e endpoint.Endpoint) {
 	if cc, ok := p.conns.Get(e.Key()); ok {
-		cc.discoveryRefs--
+		cc.discoveryRefs.Add(-1)
 	}
-}
-
-// extractUnreferencedEndpoints removes connections with no in-use marks from the pool.
-// Caller must hold discoveryMu. Close the result outside the lock.
-func (p *Pool) extractUnreferencedEndpoints() []*conn {
-	var toClose []*conn
-
-	p.conns.Range(func(key endpoint.Key, c *conn) bool {
-		if c.discoveryRefs <= 0 {
-			if extracted, ok := p.conns.Extract(key); ok {
-				toClose = append(toClose, extracted)
-			}
-		}
-
-		return true
-	})
-
-	return toClose
 }
 
 // DiscoveryConnections is the preferred API for discovery-driven pool updates.
@@ -145,7 +121,21 @@ func (p *Pool) DiscoveryConnections(
 	}
 
 	p.discoveryMu.Lock()
-	toClose := p.extractUnreferencedEndpoints()
+	defer p.discoveryMu.Unlock()
+
+	// Close synchronously: grpc.ClientConn.Close may block on transport
+	// shutdown (GOAWAY, TCP teardown), especially when the peer left the cluster but the
+	// socket is still half-open. With our grpc-go version that wait is bounded (on the order
+	// of seconds per connection, not indefinitely). Never-dialed connections close instantly.
+	// We do not spawn a goroutine here: the conn is already removed from the pool, so a
+	// bounded Close is enough to release resources without complicating lifecycle tracking.
+	p.conns.Range(func(key endpoint.Key, c *conn) bool {
+		if c.discoveryRefs.Load() <= 0 {
+			_ = c.Close(ctx)
+		}
+
+		return true
+	})
 
 	for _, e := range dropped {
 		p.releaseDiscoveryRef(e)
@@ -155,34 +145,7 @@ func (p *Pool) DiscoveryConnections(
 		p.acquireDiscoveryRef(e)
 	}
 
-	conns := xslices.Transform(newest, p.get)
-	p.discoveryMu.Unlock()
-
-	// Close synchronously outside discoveryMu: grpc.ClientConn.Close may block on transport
-	// shutdown (GOAWAY, TCP teardown), especially when the peer left the cluster but the
-	// socket is still half-open. With our grpc-go version that wait is bounded (on the order
-	// of seconds per connection, not indefinitely). Never-dialed connections close instantly.
-	// We do not spawn a goroutine here: the conn is already removed from the pool, so a
-	// bounded Close is enough to release resources without complicating lifecycle tracking.
-	for _, c := range toClose {
-		_ = c.Close(ctx)
-	}
-
-	return conns
-}
-
-// ReleaseEndpoints is a batch [Pool.ReleaseEndpoint] (part of the [Pool.AcquireConn] lifecycle).
-func (p *Pool) ReleaseEndpoints(ctx context.Context, endpoints []endpoint.Endpoint) {
-	p.discoveryMu.Lock()
-	defer p.discoveryMu.Unlock()
-
-	if p.isClosed() {
-		return
-	}
-
-	for _, e := range endpoints {
-		p.releaseDiscoveryRef(e)
-	}
+	return xslices.Transform(newest, p.get)
 }
 
 func (p *Pool) isClosed() bool {

@@ -551,7 +551,6 @@ func (d *Driver) connect(ctx context.Context) error {
 	})
 
 	d.discovery = xsync.OnceValue(func() (*internalDiscovery.Client, error) {
-		// Permanent discovery ref: must not be reaped by closeUnreferencedEndpoints.
 		return internalDiscovery.New(xcontext.ValueOnly(ctx),
 			d.pool.AcquireConn(endpoint.New(d.config.Endpoint())),
 			discoveryConfig.New(

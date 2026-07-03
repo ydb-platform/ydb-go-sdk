@@ -64,15 +64,3 @@ func (m *Map[K, V]) Range(f func(key K, value V) bool) {
 		return f(k.(K), v.(V)) //nolint:forcetypeassert
 	})
 }
-
-func (m *Map[K, V]) Clear() (removed int) {
-	m.m.Range(func(k, v any) bool {
-		removed++
-
-		m.m.Delete(k)
-
-		return true
-	})
-
-	return removed
-}
