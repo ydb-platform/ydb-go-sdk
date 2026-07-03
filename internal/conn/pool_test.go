@@ -542,8 +542,10 @@ func TestPool_DiscoveryConnectionsRefs(t *testing.T) {
 		_, ok := pool.conns.Get(e.Key())
 		require.True(t, ok)
 
+		// Each call models [balancer.Balancer.Close] on a shared pool.
 		pool.DiscoveryConnections(ctx, nil, []endpoint.Endpoint{e}, nil)
 		pool.DiscoveryConnections(ctx, nil, []endpoint.Endpoint{e}, nil)
+		pool.DiscoveryConnections(ctx, nil, nil, nil)
 		_, ok = pool.conns.Get(e.Key())
 		require.False(t, ok)
 	})

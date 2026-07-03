@@ -257,6 +257,12 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		b.discoveryRepeater.Stop()
 	}
 
+	if current := b.connections().All(); len(current) > 0 {
+		// Drop discovery refs held by this balancer so a shared pool can close
+		// endpoints once every balancer releases them.
+		b.pool.DiscoveryConnections(ctx, nil, current, nil)
+	}
+
 	if cc := b.cc.Load(); cc != nil {
 		_ = cc.Close()
 	}
