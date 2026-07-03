@@ -23,6 +23,8 @@ type Conn struct {
 	onClose []func()
 	closed  atomic.Bool
 	fakeTx  bool
+
+	responsePartPrefetch int
 }
 
 func (c *Conn) NodeID() uint32 {
@@ -61,6 +63,7 @@ func (c *Conn) Exec(ctx context.Context, sql string, params *params.Params) (
 	r := &resultWithStats{}
 	sm := stats.ModeCallbackFromContextWith(ctx, stats.ModeBasic, r.onQueryStats)
 	opts = append(opts, options.WithStatsMode(options.StatsMode(sm.Mode), sm.Callback))
+	opts = c.appendResponsePartPrefetch(opts)
 
 	err := c.session.Exec(ctx, sql, opts...)
 	if err != nil {
@@ -95,6 +98,8 @@ func (c *Conn) Query(ctx context.Context, sql string, params *params.Params) (
 	if sm := stats.ModeCallbackFromContext(ctx); sm != nil {
 		opts = append(opts, options.WithStatsMode(options.StatsMode(sm.Mode), sm.Callback))
 	}
+
+	opts = c.appendResponsePartPrefetch(opts)
 
 	result, err := c.session.Query(ctx, sql, opts...)
 	if err != nil {
@@ -143,6 +148,14 @@ func New(s *query.Session, opts ...Option) *Conn {
 
 func (c *Conn) isReady() bool {
 	return c.session.Status() == query.StatusIdle.String()
+}
+
+func (c *Conn) appendResponsePartPrefetch(opts []options.Execute) []options.Execute {
+	if c.responsePartPrefetch <= 0 {
+		return opts
+	}
+
+	return append(opts, options.WithResponsePartPrefetch(c.responsePartPrefetch))
 }
 
 func (c *Conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (tx common.Tx, finalErr error) {

@@ -369,7 +369,9 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 
 	err = do(ctx, c.explicitSessionPool,
 		func(ctx context.Context, s *Session) error {
-			return op(ctx, s)
+			return withSessionTrace(s, settings.CallTrace(), func() error {
+				return op(ctx, s)
+			})
 		},
 		append([]retry.Option{
 			// Driver-level trace.Retry (e.g. spans.WithTraces) so retry
@@ -388,34 +390,51 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 	return err
 }
 
+func withSessionTrace(s *Session, callTrace *trace.Query, op func() error) error {
+	if callTrace == nil {
+		return op()
+	}
+
+	prev := s.trace
+	s.trace = gtrace.Compose(s.trace, callTrace)
+	defer func() {
+		s.trace = prev
+	}()
+
+	return op()
+}
+
 func doTx(
 	ctx context.Context,
 	pool sessionPool,
 	op query.TxOperation,
 	txSettings tx.Settings,
+	callTrace *trace.Query,
 	opts ...retry.Option,
 ) (finalErr error) {
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (opErr error) {
-		tx, err := s.Begin(ctx, txSettings)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
+		return withSessionTrace(s, callTrace, func() error {
+			tx, err := s.Begin(ctx, txSettings)
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
 
-		defer func() {
-			_ = tx.Rollback(ctx)
-		}()
+			defer func() {
+				_ = tx.Rollback(ctx)
+			}()
 
-		err = op(ctx, tx)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
+			err = op(ctx, tx)
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
 
-		err = tx.CommitTx(ctx)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
+			err = tx.CommitTx(ctx)
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
 
-		return nil
+			return nil
+		})
 	}, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -495,7 +514,7 @@ func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options
 	}
 
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := s.execute(ctx, q, settings,
+		streamResult, err := s.execute(ctx, q, settings, options.ResultSetsTypeOrdered,
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -553,7 +572,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 	}
 
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := s.execute(ctx, q, settings,
+		streamResult, err := s.execute(ctx, q, settings, options.ResultSetsTypeConcurrent,
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -608,7 +627,7 @@ func clientQueryResultSet(
 	}
 
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
-		streamResult, err := s.execute(ctx, q, settings, resultOpts...)
+		streamResult, err := s.execute(ctx, q, settings, options.ResultSetsTypeOrdered, resultOpts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -700,6 +719,7 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 
 	err = doTx(ctx, c.explicitSessionPool, op,
 		settings.TxSettings(),
+		settings.CallTrace(),
 		append(
 			[]retry.Option{
 				// Driver-level trace.Retry (e.g. spans.WithTraces) so retry

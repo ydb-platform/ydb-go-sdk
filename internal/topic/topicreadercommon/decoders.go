@@ -1,7 +1,6 @@
 package topicreadercommon
 
 import (
-	"bytes"
 	"compress/gzip"
 	"errors"
 	"fmt"
@@ -17,41 +16,93 @@ type PublicResettableReader interface {
 	Reset(rd io.Reader) error
 }
 
-type decoderPool struct {
+type resettableDecoderPool struct {
 	pool sync.Pool
 }
 
-func (p *decoderPool) Get() PublicResettableReader {
+func (p *resettableDecoderPool) Get() PublicResettableReader {
 	dec, _ := p.pool.Get().(PublicResettableReader)
 
 	return dec
 }
 
-func (p *decoderPool) Put(rd PublicResettableReader) {
+func (p *resettableDecoderPool) Put(rd PublicResettableReader) {
 	p.pool.Put(rd)
 }
 
-func newDecoderPool() *decoderPool {
-	return &decoderPool{
-		pool: sync.Pool{},
+type resettableDecoderWrapper struct {
+	rd     PublicResettableReader
+	pool   *resettableDecoderPool
+	closed bool
+}
+
+func wrapResettableDecoder(rd PublicResettableReader, pool *resettableDecoderPool) *resettableDecoderWrapper {
+	return &resettableDecoderWrapper{
+		rd:     rd,
+		pool:   pool,
+		closed: false,
 	}
 }
 
-type MultiDecoder struct {
-	m map[rawtopiccommon.Codec]PublicCreateDecoderFunc
+func (w *resettableDecoderWrapper) Read(p []byte) (n int, err error) {
+	if w.closed {
+		return 0, io.EOF
+	}
 
-	dp map[rawtopiccommon.Codec]*decoderPool
+	n, err = w.rd.Read(p)
+	if errors.Is(err, io.EOF) {
+		w.Close()
+	}
+
+	return n, err
+}
+
+func (w *resettableDecoderWrapper) Close() error {
+	if !w.closed {
+		w.closed = true
+		w.pool.Put(w.rd)
+		w.rd = nil
+		w.pool = nil
+	}
+
+	return nil
+}
+
+type decoderCreator struct {
+	create PublicCreateDecoderFunc
+	pool   resettableDecoderPool
+}
+
+func (c *decoderCreator) getDecoder(input io.Reader) (io.Reader, error) {
+	if rd := c.pool.Get(); rd != nil {
+		if err := rd.Reset(input); err != nil {
+			return nil, err
+		}
+
+		return wrapResettableDecoder(rd, &c.pool), nil
+	}
+
+	dec, err := c.create(input)
+	if err != nil {
+		return nil, err
+	}
+
+	if rd, ok := dec.(PublicResettableReader); ok {
+		return wrapResettableDecoder(rd, &c.pool), nil
+	}
+
+	return dec, nil
+}
+
+type MultiDecoder struct {
+	m map[rawtopiccommon.Codec]*decoderCreator
 }
 
 func NewMultiDecoder() *MultiDecoder {
 	md := &MultiDecoder{
-		m:  make(map[rawtopiccommon.Codec]PublicCreateDecoderFunc),
-		dp: make(map[rawtopiccommon.Codec]*decoderPool),
+		m: make(map[rawtopiccommon.Codec]*decoderCreator),
 	}
 
-	md.AddDecoder(rawtopiccommon.CodecRaw, func(input io.Reader) (io.Reader, error) {
-		return input, nil
-	})
 	md.AddDecoder(rawtopiccommon.CodecGzip, func(input io.Reader) (io.Reader, error) {
 		return gzip.NewReader(input)
 	})
@@ -60,43 +111,16 @@ func NewMultiDecoder() *MultiDecoder {
 }
 
 func (d *MultiDecoder) AddDecoder(codec rawtopiccommon.Codec, createFunc PublicCreateDecoderFunc) {
-	d.m[codec] = createFunc
-	d.dp[codec] = newDecoderPool()
+	d.m[codec] = &decoderCreator{create: createFunc}
 }
 
 func (d *MultiDecoder) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.Reader, error) {
-	dec, err := d.createDecodeReader(codec, input)
-	if err != nil {
-		return nil, err
+	if codec == rawtopiccommon.CodecRaw {
+		return input, nil
 	}
 
-	buf := &bytes.Buffer{}
-	_, err = buf.ReadFrom(dec)
-	if err != nil {
-		return nil, err
-	}
-
-	if resettableDec, ok := dec.(PublicResettableReader); ok {
-		d.dp[codec].Put(resettableDec)
-	}
-
-	return buf, nil
-}
-
-func (d *MultiDecoder) createDecodeReader(codec rawtopiccommon.Codec, source io.Reader) (io.Reader, error) {
-	if dPool, ok := d.dp[codec]; ok {
-		rd := dPool.Get()
-		if rd != nil {
-			if err := rd.Reset(source); err != nil {
-				return nil, err
-			}
-
-			return rd, nil
-		}
-	}
-
-	if decoderCreator, ok := d.m[codec]; ok {
-		return decoderCreator(source)
+	if creator, ok := d.m[codec]; ok {
+		return creator.getDecoder(input)
 	}
 
 	return nil, xerrors.WithStackTrace(xerrors.Wrap(

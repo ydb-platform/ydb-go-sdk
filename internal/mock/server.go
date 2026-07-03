@@ -3,12 +3,14 @@
 package mock
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -39,6 +41,14 @@ func WithClusterNodes(nodeIDs ...uint32) ServerOption {
 	}
 }
 
+// WithExecuteQueryPartDelay inserts a sleep before each ExecuteQuery response
+// part is sent. Useful for benchmarks that compare query result prefetch.
+func WithExecuteQueryPartDelay(delay time.Duration) ServerOption {
+	return func(m *server) {
+		m.executeQueryPartDelay = delay
+	}
+}
+
 // server is a local gRPC mock (Discovery + Table + Query).
 type server struct {
 	listener   net.Listener
@@ -63,6 +73,21 @@ type server struct {
 	executeQueryBehavior executeQueryBehavior
 	commitQueryCalls     atomic.Uint64
 	queryTxID            atomic.Uint64
+
+	// executeQueryPartDelay is inserted before each ExecuteQuery response part
+	// send to simulate network latency between stream parts in benchmarks.
+	executeQueryPartDelay time.Duration
+
+	// bulkUpsertFailFirst is the number of initial BulkUpsert calls that return
+	// bulkUpsertFailStatus before succeeding.
+	bulkUpsertFailFirst  int
+	bulkUpsertFailStatus Ydb.StatusIds_StatusCode
+
+	// bulkUpsertCalls counts TableService.BulkUpsert invocations.
+	bulkUpsertCalls atomic.Uint64
+
+	executeQueryPayloadOnce sync.Once
+	executeQueryPayload     []byte
 }
 
 // TriggerNodeShutdown makes one AttachSession handler send a
@@ -110,7 +135,20 @@ func (m *server) CommitQueryCalls() uint64 {
 	return m.commitQueryCalls.Load()
 }
 
-// ConnString returns a grpc:// DSN for ydb.Open pointing at this mock.
+// WithBulkUpsertFailFirst makes the first n BulkUpsert RPCs return an operation
+// error with the given status; subsequent calls succeed.
+func WithBulkUpsertFailFirst(n int, status Ydb.StatusIds_StatusCode) ServerOption {
+	return func(m *server) {
+		m.bulkUpsertFailFirst = n
+		m.bulkUpsertFailStatus = status
+	}
+}
+
+// BulkUpsertCalls returns BulkUpsert invocations since the mock server started.
+func (m *server) BulkUpsertCalls() uint64 {
+	return m.bulkUpsertCalls.Load()
+}
+
 func (m *server) ConnString() string {
 	return fmt.Sprintf("grpc://%s/local", m.listener.Addr().String())
 }
@@ -217,6 +255,26 @@ func (m *tableSrv) ExecuteDataQuery(
 	}, nil
 }
 
+func (m *tableSrv) BulkUpsert(
+	_ context.Context,
+	_ *Ydb_Table.BulkUpsertRequest,
+) (*Ydb_Table.BulkUpsertResponse, error) {
+	call := m.mock.bulkUpsertCalls.Add(1)
+
+	if m.mock.bulkUpsertFailFirst > 0 && call <= uint64(m.mock.bulkUpsertFailFirst) {
+		return &Ydb_Table.BulkUpsertResponse{
+			Operation: &Ydb_Operations.Operation{
+				Ready:  true,
+				Status: m.mock.bulkUpsertFailStatus,
+			},
+		}, nil
+	}
+
+	return &Ydb_Table.BulkUpsertResponse{
+		Operation: operationOK(&emptypb.Empty{}),
+	}, nil
+}
+
 type querySrv struct {
 	Ydb_Query_V1.UnimplementedQueryServiceServer
 
@@ -301,10 +359,16 @@ func (m *querySrv) ExecuteQuery(
 	resultSets := resultSetsForQuery(req.GetQueryContent().GetText())
 
 	for i, rs := range resultSets {
+		rsToSend := rs
+		if delay := m.mock.executeQueryPartDelay; delay > 0 {
+			time.Sleep(delay)
+			rsToSend = withResultSetPayload(rs, m.mock.executeQueryPadding())
+		}
+
 		err := stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: int64(i),
-			ResultSet:      rs,
+			ResultSet:      rsToSend,
 		})
 		if err != nil {
 			return err
@@ -430,6 +494,35 @@ func select42ResultSet() *Ydb.ResultSet {
 		Columns: []*Ydb.Column{col},
 		Rows:    []*Ydb.Value{{Items: []*Ydb.Value{val}}},
 	}
+}
+
+const executeQueryBenchmarkPayloadBytes = 256 * 1024
+
+func (m *server) executeQueryPadding() []byte {
+	if m.executeQueryPartDelay <= 0 {
+		return nil
+	}
+
+	m.executeQueryPayloadOnce.Do(func() {
+		m.executeQueryPayload = bytes.Repeat([]byte{'x'}, executeQueryBenchmarkPayloadBytes)
+	})
+
+	return m.executeQueryPayload
+}
+
+func withResultSetPayload(rs *Ydb.ResultSet, payload []byte) *Ydb.ResultSet {
+	if len(payload) == 0 {
+		return rs
+	}
+
+	cloned := proto.Clone(rs).(*Ydb.ResultSet) //nolint:forcetypeassert
+	col, val := bytesColumn("payload", payload)
+	cloned.Columns = append(cloned.Columns, col)
+	for _, row := range cloned.GetRows() {
+		row.Items = append(row.Items, val)
+	}
+
+	return cloned
 }
 
 func discoveryEndpoints(host string, port uint32, nodeIDs []uint32) []*Ydb_Discovery.EndpointInfo {
