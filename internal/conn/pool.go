@@ -69,21 +69,20 @@ func (p *Pool) conn(endpoint endpoint.Endpoint) *conn {
 	return cc
 }
 
-// AcquireConn returns a pooled connection and increments discoveryRefs for the endpoint.
-// The ref is held for the lifetime of the driver (for example the discovery client) and is
+// AcquireConn returns a pooled connection and increments useCount for the endpoint.
+// The count is held for the lifetime of the driver (for example the discovery client) and is
 // released only when [Pool.Release] closes the pool. For balancer discovery updates use
 // [Pool.DiscoveryConnections] instead.
 func (p *Pool) AcquireConn(e endpoint.Endpoint) Conn {
 	p.discoveryMu.Lock()
 	defer p.discoveryMu.Unlock()
 
-	return p.acquireDiscoveryRef(e)
+	return p.acquireUseCount(e)
 }
 
-// acquireDiscoveryRef marks the endpoint as in use.
-func (p *Pool) acquireDiscoveryRef(e endpoint.Endpoint) Conn {
+func (p *Pool) acquireUseCount(e endpoint.Endpoint) Conn {
 	cc := p.conn(e)
-	cc.discoveryRefs.Add(+1)
+	cc.useCount.Add(+1)
 
 	return cc
 }
@@ -98,10 +97,10 @@ func (p *Pool) remove(c *conn) {
 	}
 }
 
-// releaseDiscoveryRef drops one in-use mark for the endpoint.
-func (p *Pool) releaseDiscoveryRef(e endpoint.Endpoint) {
+// releaseUseCount drops one use mark for the endpoint.
+func (p *Pool) releaseUseCount(e endpoint.Endpoint) {
 	if cc, ok := p.conns.Get(e.Key()); ok {
-		cc.discoveryRefs.Add(-1)
+		cc.useCount.Add(-1)
 	}
 }
 
@@ -131,7 +130,7 @@ func (p *Pool) DiscoveryConnections(
 	var wg sync.WaitGroup
 
 	p.conns.Range(func(_ endpoint.Key, c *conn) bool {
-		if c.discoveryRefs.Load() <= 0 {
+		if c.useCount.Load() <= 0 {
 			wg.Add(1)
 			go func(c closer.Closer) {
 				defer wg.Done()
@@ -144,11 +143,11 @@ func (p *Pool) DiscoveryConnections(
 	wg.Wait()
 
 	for _, e := range dropped {
-		p.releaseDiscoveryRef(e)
+		p.releaseUseCount(e)
 	}
 
 	for _, e := range added {
-		p.acquireDiscoveryRef(e)
+		p.acquireUseCount(e)
 	}
 
 	return xslices.Transform(newest, p.get)

@@ -75,9 +75,9 @@ type (
 		lastUsage    xsync.LastUsage
 		onClose      []func(*conn)
 
-		// discoveryRefs tracks endpoint usage by [Pool.AcquireConn] and [Pool.DiscoveryConnections].
-		// Zero or negative value means the connection is not in use.
-		discoveryRefs atomic.Int64
+		// useCount tracks endpoint usage by [Pool.AcquireConn] and [Pool.DiscoveryConnections].
+		// Zero means the connection is not in use; negative indicates a ref-count bug.
+		useCount atomic.Int64
 	}
 	nopLastUsage struct{}
 )
