@@ -87,9 +87,9 @@ func (p *Pool) acquireDiscoveryRef(e endpoint.Endpoint) Conn {
 }
 
 // remove is called from conn onClose after grpc shutdown.
-// Compare pointers: extractUnreferencedEndpoints may remove the conn from the map and
-// DiscoveryConnections may install a new *conn for the same endpoint key before
-// Close returns; Delete by key alone would evict the replacement.
+// Compare pointers: the close loop in DiscoveryConnections may remove the conn from the map and
+// install a new *conn for the same endpoint key before Close returns;
+// Delete by key alone would evict the replacement.
 func (p *Pool) remove(c *conn) {
 	if cc, ok := p.conns.Get(c.endpoint.Key()); ok && cc == c {
 		p.conns.Delete(c.endpoint.Key())
