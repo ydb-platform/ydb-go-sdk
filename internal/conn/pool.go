@@ -69,8 +69,10 @@ func (p *Pool) conn(endpoint endpoint.Endpoint) *conn {
 	return cc
 }
 
-// AcquireConn returns a pooled connection and marks the endpoint as in use.
-// Pair each call with [Pool.ReleaseEndpoint], or use [Pool.DiscoveryConnections] instead.
+// AcquireConn returns a pooled connection and increments discoveryRefs for the endpoint.
+// The ref is held for the lifetime of the driver (for example the discovery client) and is
+// released only when [Pool.Release] closes the pool. For balancer discovery updates use
+// [Pool.DiscoveryConnections] instead.
 func (p *Pool) AcquireConn(e endpoint.Endpoint) Conn {
 	p.discoveryMu.Lock()
 	defer p.discoveryMu.Unlock()
@@ -96,19 +98,6 @@ func (p *Pool) remove(c *conn) {
 	}
 }
 
-// ReleaseEndpoint pairs with [Pool.AcquireConn].
-// For discovery-driven updates use [Pool.DiscoveryConnections] instead.
-func (p *Pool) ReleaseEndpoint(_ context.Context, e endpoint.Endpoint) {
-	if p.isClosed() {
-		return
-	}
-
-	p.discoveryMu.Lock()
-	defer p.discoveryMu.Unlock()
-
-	p.releaseDiscoveryRef(e)
-}
-
 // releaseDiscoveryRef drops one in-use mark for the endpoint.
 func (p *Pool) releaseDiscoveryRef(e endpoint.Endpoint) {
 	if cc, ok := p.conns.Get(e.Key()); ok {
@@ -116,8 +105,8 @@ func (p *Pool) releaseDiscoveryRef(e endpoint.Endpoint) {
 	}
 }
 
-// DiscoveryConnections is the preferred API for discovery-driven pool updates.
-// Alternatively pair [Pool.AcquireConn] with [Pool.ReleaseEndpoint].
+// DiscoveryConnections applies a discovery diff: releases dropped endpoints, acquires added
+// ones, and closes unreferenced connections.
 func (p *Pool) DiscoveryConnections(
 	ctx context.Context,
 	added, dropped, newest []endpoint.Endpoint,

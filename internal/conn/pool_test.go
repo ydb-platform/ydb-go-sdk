@@ -611,7 +611,7 @@ func TestPool_AcquireConnReleaseClosedOnDiscovery(t *testing.T) {
 	conn := pool.AcquireConn(e)
 	require.NotNil(t, conn)
 
-	pool.ReleaseEndpoint(ctx, e)
+	pool.DiscoveryConnections(ctx, nil, []endpoint.Endpoint{e}, nil)
 	pool.DiscoveryConnections(ctx, nil, nil, nil)
 
 	_, ok := pool.conns.Get(e.Key())
