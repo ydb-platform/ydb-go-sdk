@@ -1,0 +1,19 @@
+# VCS and CI — not used by go build inside Docker.
+.git
+.github
+
+# Editor, agent, and dev environment.
+.agents
+.claude
+.devcontainer
+.vscode
+
+# Local caches and build artifacts.
+.lint-cache
+*.out
+*.test
+
+# Project docs and linter config.
+*.md
+LICENSE
+.golangci.yml
