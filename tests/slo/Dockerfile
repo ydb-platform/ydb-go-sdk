@@ -1,4 +1,4 @@
-FROM golang:1.24 AS build
+FROM golang:1.26 AS build
 ARG SRC_PATH
 
 # Copy dependency manifests first so module download is cached when only source changes.
