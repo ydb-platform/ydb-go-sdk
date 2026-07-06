@@ -262,10 +262,11 @@ func New(address string, opts ...Option) *endpoint {
 	return e
 }
 
-// Compare orders two discovery endpoints lexicographically: Address, then NodeID,
-// then OverrideHost (each field compared like strings.Compare).
-// Use it as the cmp argument to xslices.Diff to split snapshots into added,
-// dropped, and unchanged endpoints.
+// Compare orders two discovery endpoints for stable diffing of endpoint snapshots.
+//
+// Extracted from the balancer so xslices.Diff and the pool stay free of duplicate
+// comparison logic. NodeID is compared as uint32, not via int subtraction, to avoid
+// overflow on 32-bit platforms when NodeID exceeds math.MaxInt32.
 //
 // Return value follows strings.Compare: negative if lhs sorts before rhs, zero if
 // all three fields match (same pool entry), positive if lhs sorts after rhs.

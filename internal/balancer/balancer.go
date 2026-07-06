@@ -224,8 +224,10 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 		)
 	}()
 
-	// Otherwise the shared pool keeps gRPC connections to nodes that left the cluster.
-	connections := b.pool.DiscoveryConnections(ctx, added, dropped, newest)
+	// Drop refs for endpoints this balancer no longer needs so a shared pool can
+	// close gRPC connections once every balancer releases them.
+	b.pool.UpdateEndpointUsage(ctx, dropped, added)
+	connections := conn.EndpointsToConnections(b.pool, newest)
 	for _, c := range connections {
 		b.pool.Allow(ctx, c)
 		c.Endpoint().Touch()
@@ -258,9 +260,9 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	}
 
 	if current := b.connections().All(); len(current) > 0 {
-		// Drop discovery refs held by this balancer so a shared pool can close
-		// endpoints once every balancer releases them.
-		b.pool.DiscoveryConnections(ctx, nil, current, nil)
+		// Release every endpoint this balancer held; without this, the last balancer
+		// on a shared pool would leave gRPC connections open until driver shutdown.
+		b.pool.UpdateEndpointUsage(ctx, current, nil)
 	}
 
 	if cc := b.cc.Load(); cc != nil {

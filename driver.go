@@ -552,6 +552,8 @@ func (d *Driver) connect(ctx context.Context) error {
 
 	d.discovery = xsync.OnceValue(func() (*internalDiscovery.Client, error) {
 		return internalDiscovery.New(xcontext.ValueOnly(ctx),
+			// Permanent ref: bootstrap discovery conn must survive endpoint cleanup
+			// until [conn.Pool.Release] on driver shutdown (see [conn.Pool.AcquireConn]).
 			d.pool.AcquireConn(endpoint.New(d.config.Endpoint())),
 			discoveryConfig.New(
 				append(

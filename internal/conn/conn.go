@@ -75,8 +75,14 @@ type (
 		lastUsage    xsync.LastUsage
 		onClose      []func(*conn)
 
-		// useCount tracks endpoint usage by [Pool.AcquireConn] and [Pool.DiscoveryConnections].
-		// Zero means the connection is not in use; negative indicates a ref-count bug.
+		// useCount is how many pool users (balancers, driver bootstrap conn, etc.) keep
+		// this endpoint open. When it drops to zero, the next [Pool.UpdateEndpointUsage]
+		// cleanup pass may close the gRPC connection. Separate from lastUsage, which
+		// tracks RPC activity for ConnectionTTL parking — different lifecycle, different
+		// purpose. Stored on the conn (not in a side map) because cleanup iterates
+		// pool entries and must decide per connection whether to close.
+		// Atomic so reads in the cleanup loop do not require per-conn locking; all
+		// writes happen under [Pool.usageMu].
 		useCount atomic.Int64
 	}
 	nopLastUsage struct{}

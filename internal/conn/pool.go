@@ -19,7 +19,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -30,7 +29,23 @@ type Pool struct {
 	dialOptions []grpc.DialOption
 	conns       xsync.Map[endpoint.Key, *conn]
 	done        chan struct{}
-	discoveryMu sync.Mutex
+	// usageMu serializes useCount updates and the unused-connection cleanup pass.
+	// A shared pool may serve several balancers; without the lock their discovery
+	// repeaters can interleave ref changes with Close and map removal, closing a
+	// freshly acquired connection or deleting a replacement *conn for the same key.
+	// The mutex stays held across grpc Close in cleanup: releasing it earlier would
+	// reopen that race. Discovery runs off the request path, so a bounded stall is
+	// acceptable.
+	usageMu sync.Mutex
+}
+
+func EndpointsToConnections(p *Pool, endpoints []endpoint.Endpoint) []Conn {
+	conns := make([]Conn, 0, len(endpoints))
+	for _, e := range endpoints {
+		conns = append(conns, p.Get(e))
+	}
+
+	return conns
 }
 
 func (p *Pool) DialTimeout() time.Duration {
@@ -45,10 +60,13 @@ func (p *Pool) GrpcDialOptions() []grpc.DialOption {
 	return p.dialOptions
 }
 
-func (p *Pool) get(endpoint endpoint.Endpoint) Conn {
+func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 	return p.conn(endpoint)
 }
 
+// conn returns the pooled *conn for the endpoint, creating one if needed.
+// Split from [Pool.Get] so ref-count paths work with the concrete type without
+// interface assertions; [Pool.Get] remains the public Conn-facing entry point.
 func (p *Pool) conn(endpoint endpoint.Endpoint) *conn {
 	var (
 		cc  *conn
@@ -69,64 +87,79 @@ func (p *Pool) conn(endpoint endpoint.Endpoint) *conn {
 	return cc
 }
 
-// AcquireConn returns a pooled connection and increments useCount for the endpoint.
-// The count is held for the lifetime of the driver (for example the discovery client) and is
-// released only when [Pool.Release] closes the pool. For balancer discovery updates use
-// [Pool.DiscoveryConnections] instead.
+// AcquireConn returns a pooled connection and marks the endpoint as in use.
+//
+// Use it when a connection must stay open for the whole driver lifetime and must
+// not be closed by discovery cleanup — for example the bootstrap discovery client
+// in [github.com/ydb-platform/ydb-go-sdk/v3.Driver.connect]. There is no matching
+// release call: [Pool.Release] closes the entire pool on driver shutdown.
+//
+// Balancers should not call AcquireConn directly; they report endpoint diffs via
+// [Pool.UpdateEndpointUsage] instead.
 func (p *Pool) AcquireConn(e endpoint.Endpoint) Conn {
-	p.discoveryMu.Lock()
-	defer p.discoveryMu.Unlock()
+	p.usageMu.Lock()
+	defer p.usageMu.Unlock()
 
-	return p.acquireUseCount(e)
+	c := p.conn(e)
+	c.useCount.Add(+1)
+
+	return c
 }
 
-func (p *Pool) acquireUseCount(e endpoint.Endpoint) Conn {
-	cc := p.conn(e)
-	cc.useCount.Add(+1)
+// UpdateEndpointUsage applies a batch of release/acquire marks and closes idle gRPC
+// connections that nobody references anymore.
+//
+// Callers (typically a balancer) compute release and acquire from their own endpoint
+// snapshot diff; the pool only tracks how many users hold each endpoint open and
+// performs cleanup. Keeping diff logic in the caller avoids discovery-specific names
+// and responsibilities in the pool API.
+//
+// Order is intentional: close connections with useCount <= 0 first, then release,
+// then acquire. Endpoints dropped in this call still have useCount > 0 during the
+// close pass and are removed at the start of the next call — see
+// TestPool_EndpointUsage/DropsRemovedEndpointsOnNextDiscovery.
+func (p *Pool) UpdateEndpointUsage(ctx context.Context, release, acquire []endpoint.Endpoint) {
+	if p.isClosed() {
+		return
+	}
 
-	return cc
-}
+	p.usageMu.Lock()
+	defer p.usageMu.Unlock()
 
-// remove is called from conn onClose after grpc shutdown.
-// Compare pointers: the close loop in DiscoveryConnections may remove the conn from the map and
-// install a new *conn for the same endpoint key before Close returns;
-// Delete by key alone would evict the replacement.
-func (p *Pool) remove(c *conn) {
-	if cc, ok := p.conns.Get(c.endpoint.Key()); ok && cc == c {
-		p.conns.Delete(c.endpoint.Key())
+	p.closeUnusedLocked(ctx)
+
+	for _, e := range release {
+		p.releaseUseCount(e)
+	}
+	for _, e := range acquire {
+		p.acquireUseCount(e)
 	}
 }
 
+// acquireUseCount marks the endpoint as held by one more pool user.
+// Caller must hold usageMu; returns the connection so the caller can route traffic.
+func (p *Pool) acquireUseCount(e endpoint.Endpoint) Conn {
+	c := p.conn(e)
+	c.useCount.Add(+1)
+
+	return c
+}
+
 // releaseUseCount drops one use mark for the endpoint.
+// Caller must hold usageMu. Missing map entries are ignored — the connection may
+// already have been closed and removed by a prior cleanup pass.
 func (p *Pool) releaseUseCount(e endpoint.Endpoint) {
 	if cc, ok := p.conns.Get(e.Key()); ok {
 		cc.useCount.Add(-1)
 	}
 }
 
-// DiscoveryConnections applies a discovery diff: releases dropped endpoints, acquires added
-// ones, and closes unreferenced connections.
-func (p *Pool) DiscoveryConnections(
-	ctx context.Context,
-	added, dropped, newest []endpoint.Endpoint,
-) []Conn {
-	if p.isClosed() {
-		return nil
-	}
-
-	p.discoveryMu.Lock()
-	defer p.discoveryMu.Unlock()
-
-	// Close unreferenced connections in parallel, but wait for every Close to finish
-	// before proceeding. grpc.ClientConn.Close may block on transport shutdown (GOAWAY,
-	// TCP teardown), especially when the peer left the cluster but the socket is still
-	// half-open. With our grpc-go version that wait is bounded (on the order of seconds
-	// per connection, not indefinitely). Never-dialed connections close instantly.
-	//
-	// discoveryMu is held across wg.Wait on purpose: releasing it before Close would
-	// reopen the race between ref updates, map removal, and a replacement *conn for the
-	// same endpoint key. Discovery runs on a background repeater, so a bounded stall
-	// here is acceptable.
+// closeUnusedLocked closes every connection with useCount <= 0.
+// Caller must hold usageMu. Closes run in parallel but wg.Wait blocks until all
+// finish so the following ref updates see a stable map. grpc Close is bounded;
+// we do not release usageMu before Wait because async cleanup would race with
+// acquireUseCount and map replacement for the same endpoint key.
+func (p *Pool) closeUnusedLocked(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	p.conns.Range(func(_ endpoint.Key, c *conn) bool {
@@ -141,16 +174,15 @@ func (p *Pool) DiscoveryConnections(
 		return true
 	})
 	wg.Wait()
+}
 
-	for _, e := range dropped {
-		p.releaseUseCount(e)
+// remove is called from conn onClose after grpc shutdown.
+// Compare pointers, not keys: cleanup may already have inserted a new *conn for the
+// same endpoint key; deleting by key alone would evict that replacement.
+func (p *Pool) remove(c *conn) {
+	if cc, ok := p.conns.Get(c.endpoint.Key()); ok && cc == c {
+		p.conns.Delete(c.endpoint.Key())
 	}
-
-	for _, e := range added {
-		p.acquireUseCount(e)
-	}
-
-	return xslices.Transform(newest, p.get)
 }
 
 func (p *Pool) isClosed() bool {
@@ -213,6 +245,8 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 
 	close(p.done)
 
+	// Collect close errors without pre-sizing: conns map has no Len() (removed due to
+	// incorrect size tracking); the final slice is small in practice.
 	var (
 		issues   []error
 		issuesMu sync.Mutex
