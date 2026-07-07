@@ -786,7 +786,6 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) (
 	return newWithQueryServiceClient(ctx, client, cc, cfg)
 }
 
-//nolint:funlen
 func newWithQueryServiceClient(ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
 	cc grpc.ClientConnInterface,
@@ -807,13 +806,6 @@ func newWithQueryServiceClient(ctx context.Context,
 		pool.WithTrace[*Session](poolTrace(cfg.Trace())),
 		pool.WithCreateItemTimeout[*Session](cfg.SessionCreateTimeout()),
 		pool.WithCloseItemTimeout[*Session](cfg.SessionDeleteTimeout()),
-		pool.WithMustDeleteItemFunc(func(s *Session, err error) bool {
-			if !s.IsAlive() {
-				return true
-			}
-
-			return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
-		}),
 		pool.WithIdleTimeToLive[*Session](cfg.SessionIdleTimeToLive()),
 		pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
 			if !cfg.DisableSessionBalancer() {

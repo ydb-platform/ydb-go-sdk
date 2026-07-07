@@ -32,18 +32,16 @@ type (
 		Item
 	}
 	Config[PT ItemConstraint[T], T any] struct {
-		trace              *Trace[PT, T]
-		clock              clockwork.Clock
-		limit              int
-		createTimeout      time.Duration
-		createItemFunc     func(ctx context.Context) (PT, error)
-		mustDeleteItemFunc func(item PT, err error) bool
-		closeTimeout       time.Duration
-		closeItemFunc      func(ctx context.Context, item PT)
-		idleTimeToLive     time.Duration
-		itemUsageLimit     uint64
-		itemUsageTTL       time.Duration
-		warmUpItems        int
+		trace          *Trace[PT, T]
+		clock          clockwork.Clock
+		limit          int
+		createTimeout  time.Duration
+		createItemFunc func(ctx context.Context) (PT, error)
+		closeTimeout   time.Duration
+		idleTimeToLive time.Duration
+		itemUsageLimit uint64
+		itemUsageTTL   time.Duration
+		warmUpItems    int
 	}
 	itemInfo[PT ItemConstraint[T], T any] struct {
 		item       PT
@@ -67,12 +65,6 @@ type (
 func WithCreateItemFunc[PT ItemConstraint[T], T any](f func(ctx context.Context) (PT, error)) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.createItemFunc = f
-	}
-}
-
-func WithMustDeleteItemFunc[PT ItemConstraint[T], T any](f func(item PT, err error) bool) Option[PT, T] {
-	return func(c *Config[PT, T]) {
-		c.mustDeleteItemFunc = f
 	}
 }
 
@@ -138,7 +130,6 @@ func WithWarmUpItems[PT ItemConstraint[T], T any](size int) Option[PT, T] {
 	}
 }
 
-//nolint:funlen
 func New[PT ItemConstraint[T], T any](
 	ctx context.Context,
 	opts ...Option[PT, T],
@@ -153,14 +144,8 @@ func New[PT ItemConstraint[T], T any](
 
 				return &item, nil
 			},
-			closeItemFunc: func(ctx context.Context, item PT) {
-				_ = item.Close(ctx)
-			},
 			createTimeout: defaultCreateTimeout,
 			closeTimeout:  defaultCloseTimeout,
-			mustDeleteItemFunc: func(item PT, err error) bool {
-				return !item.IsAlive()
-			},
 		},
 		idle: &sliceContainer[PT, T]{},
 		done: make(chan struct{}),
@@ -339,7 +324,7 @@ func (p *Pool[PT, T]) createItem(ctx context.Context, batchChanges *dynamicStats
 	return item, nil
 }
 
-// closeItem wraps the Config.closeItemFunc function with timeout handling
+// closeItem closes the item with timeout handling
 // closeItem called only under p.sema lock
 func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT, batchChanges *dynamicStats) {
 	defer func() {
@@ -356,7 +341,7 @@ func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT, batchChanges *dyna
 		defer cancelClose()
 	}
 
-	p.config.closeItemFunc(closeCtx, item)
+	_ = item.Close(closeCtx)
 }
 
 func (p *Pool[PT, T]) Stats() Stats {
@@ -376,7 +361,7 @@ func (p *Pool[PT, T]) checkItemAndError(item PT, err error) error {
 		return nil
 	}
 
-	if p.config.mustDeleteItemFunc(item, err) {
+	if xerrors.MustDeleteTableOrQuerySession(err) {
 		return err
 	}
 
@@ -583,7 +568,7 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 					defer cancel()
 				}
 
-				p.config.closeItemFunc(ctx, info.item)
+				_ = info.item.Close(ctx)
 			}(ctx, info)
 		}
 		closes.Wait()

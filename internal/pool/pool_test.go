@@ -442,7 +442,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		t.Run("WithItemUsageLimit", func(t *testing.T) {
 			var (
 				newCounter        int64
-				errMustDeleteItem = xerrors.Retryable(errors.New("test"))
+				errMustDeleteItem = xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 			)
 			p := mustNewPool[*testItem, testItem](t,
 				WithLimit[*testItem, testItem](1),
@@ -455,9 +455,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					var v testItem
 
 					return &v, nil
-				}),
-				WithMustDeleteItemFunc[*testItem, testItem](func(item *testItem, err error) bool {
-					return !item.IsAlive() || xerrors.Is(err, errMustDeleteItem)
 				}),
 			)
 			require.EqualValues(t, 1, p.config.limit)
@@ -571,20 +568,20 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCreateItemFunc(func(context.Context) (*testItem, error) {
-						var v testItem
+						// Count closes to detect context-cancelled failures. In a real
+						// scenario (e.g. gRPC session close), a cancelled context would
+						// cause the close call to fail immediately.
+						return &testItem{
+							onClose: func() error {
+								closedCount.Add(1)
 
-						return &v, nil
+								return nil
+							},
+						}, nil
 					}),
 					WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 				)
 				requirePoolStats(t, p, poolStats(3, nil))
-
-				// Override the close func to detect context-cancelled failures.
-				// In a real scenario (e.g. gRPC session close), a cancelled context
-				// would cause the close call to fail immediately.
-				p.config.closeItemFunc = func(ctx context.Context, info *testItem) {
-					closedCount.Add(1)
-				}
 
 				info1 := mustGetItem(t, p)
 				info2 := mustGetItem(t, p)
@@ -1634,7 +1631,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				var (
 					created           atomic.Int32
-					errMustDeleteItem = errors.New("info must be deleted")
+					errMustDeleteItem = xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 				)
 				p := mustNewPool[*testItem, testItem](t,
 					WithLimit[*testItem, testItem](1),
@@ -1646,9 +1643,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						}
 
 						return &v, nil
-					}),
-					WithMustDeleteItemFunc[*testItem, testItem](func(info *testItem, err error) bool {
-						return errors.Is(err, errMustDeleteItem)
 					}),
 				)
 				defer func() {
@@ -1670,7 +1664,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						errThrown = true
 					}()
 
-					return xerrors.Retryable(errMustDeleteItem)
+					return xerrors.WithStackTrace(errMustDeleteItem)
 				})
 
 				require.NoError(t, err)
@@ -2411,7 +2405,7 @@ const (
 	benchCloseItemTimeout  = time.Second
 )
 
-var errBenchDeleteItem = errors.New("bench: delete pool item")
+var errBenchDeleteItem = xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 
 func newBenchPool(ctx context.Context) (*Pool[*testItem, testItem], error) {
 	var created atomic.Uint64
@@ -2424,9 +2418,6 @@ func newBenchPool(ctx context.Context) (*Pool[*testItem, testItem], error) {
 			id := created.Add(1)
 
 			return &testItem{v: int32(id)}, nil
-		}),
-		WithMustDeleteItemFunc[*testItem, testItem](func(_ *testItem, err error) bool {
-			return errors.Is(err, errBenchDeleteItem)
 		}),
 		WithWarmUpItems[*testItem, testItem](benchPrefillItems),
 	)
@@ -2444,7 +2435,7 @@ var benchRetryOpts = []retry.Option{
 
 func benchPoolWithWork(ops *atomic.Uint64) error {
 	if ops.Add(1)%benchDeleteProbability == 0 {
-		return xerrors.Retryable(errBenchDeleteItem)
+		return xerrors.WithStackTrace(errBenchDeleteItem)
 	}
 
 	return nil
