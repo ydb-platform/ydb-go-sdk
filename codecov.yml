@@ -3,6 +3,16 @@
 # all repositories on Codecov. You may adjust the settings
 # below in your own codecov.yml in your repository.
 #
+coverage:
+  status:
+    project:
+      default:
+        target: auto       # do not drop below the current level...
+        threshold: 1%      # ...by more than 1%
+    patch:
+      default:
+        target: 80%        # new/changed code in the PR diff must be >= 80% covered
+
 ignore:
   - spans
   - trace
