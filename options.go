@@ -530,6 +530,7 @@ func WithQueryConfigOption(option queryConfig.Option) Option {
 }
 
 // WithSessionPoolSizeLimit set max size of internal sessions pool in table.Client
+// If sizeLimit is less than or equal to zero then the default pool size limit is used.
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.tableOptions = append(d.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
