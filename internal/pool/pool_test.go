@@ -568,9 +568,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCreateItemFunc(func(context.Context) (*testItem, error) {
-						// Count closes to detect context-cancelled failures. In a real
-						// scenario (e.g. gRPC session close), a cancelled context would
-						// cause the close call to fail immediately.
+						// Count how many items get closed.
 						return &testItem{
 							onClose: func() error {
 								closedCount.Add(1)
