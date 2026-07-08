@@ -7,11 +7,11 @@ type SessionPoolStats = pool.Stats
 
 // SessionPoolStats returns counters for the driver session pool shared by table and query clients.
 func (d *Driver) SessionPoolStats() (SessionPoolStats, error) {
-	if d.sharedSessionPool == nil {
+	if d.sessionPool == nil {
 		return pool.Stats{}, nil
 	}
 
-	shared, err := d.sharedSessionPool.Get()
+	shared, err := d.sessionPool.Get()
 	if err != nil {
 		return pool.Stats{}, err
 	}

@@ -11,14 +11,14 @@ import (
 )
 
 type driverSessionPoolConfig struct {
-	limit            int
-	warmUp           int
-	itemUsageLimit   uint64
-	itemUsageTTL     time.Duration
-	idleTTL          time.Duration
-	createTimeout    time.Duration
-	deleteTimeout    time.Duration
-	disableBalancer  bool
+	limit           int
+	warmUp          int
+	itemUsageLimit  uint64
+	itemUsageTTL    time.Duration
+	idleTTL         time.Duration
+	createTimeout   time.Duration
+	deleteTimeout   time.Duration
+	disableBalancer bool
 }
 
 func defaultDriverSessionPoolConfig() driverSessionPoolConfig {

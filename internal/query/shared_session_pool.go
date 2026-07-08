@@ -31,21 +31,21 @@ type SharedSessionPoolConfig struct {
 	Trace                  *trace.Query
 }
 
-// SharedSessionPool is a driver-level pool of query session cores (CreateSession + AttachSession).
+// SessionPool is a driver-level pool of query session cores (CreateSession + AttachSession).
 // Table and query clients lease sessions from the same pool instance.
-type SharedSessionPool struct {
+type SessionPool struct {
 	corePool *pool.Pool[*sessionCore, sessionCore]
 
 	closed *xsync.Value[*closeState]
 }
 
 // NewSharedSessionPool creates and optionally warms up the driver session pool.
-func NewSharedSessionPool(
+func NewSharedSessionPool( //nolint:funlen
 	ctx context.Context,
 	cc grpc.ClientConnInterface,
 	cfg SharedSessionPoolConfig,
-) (*SharedSessionPool, error) {
-	p := &SharedSessionPool{
+) (*SessionPool, error) {
+	p := &SessionPool{
 		closed: xsync.NewValue(&closeState{
 			cancels: make(map[uint64]context.CancelFunc),
 		}),
@@ -121,7 +121,7 @@ func NewSharedSessionPool(
 	return p, nil
 }
 
-func (p *SharedSessionPool) registerCloseCancel(cancel context.CancelFunc) func() {
+func (p *SessionPool) registerCloseCancel(cancel context.CancelFunc) func() {
 	var id uint64
 	p.closed.Change(func(old *closeState) *closeState {
 		if old.closed {
@@ -147,7 +147,7 @@ func (p *SharedSessionPool) registerCloseCancel(cancel context.CancelFunc) func(
 	}
 }
 
-func (p *SharedSessionPool) unregisterCloseCancel(id uint64) {
+func (p *SessionPool) unregisterCloseCancel(id uint64) {
 	p.closed.Change(func(old *closeState) *closeState {
 		delete(old.cancels, id)
 
@@ -156,12 +156,12 @@ func (p *SharedSessionPool) unregisterCloseCancel(id uint64) {
 }
 
 // Stats returns pool counters (shared by table and query clients).
-func (p *SharedSessionPool) Stats() pool.Stats {
+func (p *SessionPool) Stats() pool.Stats {
 	return p.corePool.Stats()
 }
 
 // Close closes all pooled sessions.
-func (p *SharedSessionPool) Close(ctx context.Context) error {
+func (p *SessionPool) Close(ctx context.Context) error {
 	var cancels []context.CancelFunc
 	p.closed.Change(func(old *closeState) *closeState {
 		if old.closed {
@@ -177,10 +177,8 @@ func (p *SharedSessionPool) Close(ctx context.Context) error {
 
 		return old
 	})
-	if cancels != nil {
-		for _, cancel := range cancels {
-			cancel()
-		}
+	for _, cancel := range cancels {
+		cancel()
 	}
 
 	if err := p.corePool.Close(ctx); err != nil {
@@ -191,7 +189,7 @@ func (p *SharedSessionPool) Close(ctx context.Context) error {
 }
 
 // WithCore leases a session core from the pool.
-func (p *SharedSessionPool) WithCore(
+func (p *SessionPool) WithCore(
 	ctx context.Context,
 	op func(ctx context.Context, core Core) error,
 	opts ...retry.Option,
@@ -205,8 +203,8 @@ func (p *SharedSessionPool) WithCore(
 	}, opts...)
 }
 
-// QueryServiceClientFromCore returns the query gRPC client bound to a pooled session core.
-func QueryServiceClientFromCore(core Core) Ydb_Query_V1.QueryServiceClient {
+// ClientFromCore returns the query gRPC client bound to a pooled session core.
+func ClientFromCore(core Core) Ydb_Query_V1.QueryServiceClient {
 	sc, ok := core.(*sessionCore)
 	if !ok || sc == nil {
 		return nil
