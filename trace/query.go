@@ -535,7 +535,10 @@ type (
 		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-	QueryNewDoneInfo struct{}
+	QueryNewDoneInfo struct {
+		Limit int
+		Error error
+	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryCloseStartInfo struct {
 		// Context make available context in trace callback function.

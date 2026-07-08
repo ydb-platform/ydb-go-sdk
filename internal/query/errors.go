@@ -15,6 +15,7 @@ var (
 	ErrOptionNotForTxExecute  = query.ErrOptionNotForTxExecute
 	ErrTransactionRollingBack = xerrors.Wrap(errors.New("the transaction is rolling back"))
 
+	errNilPool                 = xerrors.Wrap(errors.New("query client required external session pool"))
 	errNilClient               = xerrors.Wrap(errors.New("table client is not initialized"))
 	errClosedClient            = xerrors.Wrap(errors.New("query client closed early"))
 	errWrongNextResultSetIndex = errors.New("wrong result set index")

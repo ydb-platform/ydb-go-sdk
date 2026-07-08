@@ -11,9 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/safe"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
@@ -32,75 +30,25 @@ import (
 // sessionBuilder is the interface that holds logic of creating sessions.
 type sessionBuilder func(ctx context.Context) (*Session, error)
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (*Client, error) { //nolint:funlen
+func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config, opts ...NewClientOption) (
+	_ *Client, finalErr error,
+) {
+	var clientOpts newClientOptions
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&clientOpts)
+		}
+	}
+
 	onDone := gtrace.TableOnInit(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.New"),
 	)
+	defer func() {
+		onDone(config.SizeLimit(), finalErr)
+	}()
 
-	sessionPool, err := pool.New[*Session, Session](ctx,
-		pool.WithLimit[*Session, Session](config.SizeLimit()),
-		pool.WithWarmUpItems[*Session, Session](config.PoolWarmUpSize()),
-		pool.WithItemUsageLimit[*Session, Session](config.SessionUsageLimit()),
-		pool.WithItemUsageTTL[*Session, Session](config.SessionUsageTTL()),
-		pool.WithIdleTimeToLive[*Session, Session](config.IdleThreshold()),
-		pool.WithCreateItemTimeout[*Session, Session](config.CreateSessionTimeout()),
-		pool.WithCloseItemTimeout[*Session, Session](config.DeleteTimeout()),
-		pool.WithMustDeleteItemFunc[*Session, Session](func(s *Session, err error) bool {
-			if !s.IsAlive() {
-				return true
-			}
-
-			return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
-		}),
-		pool.WithClock[*Session, Session](config.Clock()),
-		pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
-			if !config.DisableSessionBalancer() {
-				ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
-			}
-
-			return newSession(ctx, cc, config)
-		}),
-		pool.WithTrace[*Session, Session](&pool.Trace[*Session, Session]{
-			OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
-				return func(limit int) {
-					onDone(limit)
-				}
-			},
-			OnPut: func(ctx *context.Context, call stack.Caller, item *Session) func(err error) {
-				onDone := gtrace.TableOnPoolPut(config.Trace(), ctx, call, safe.SessionInfo(item))
-
-				return func(err error) {
-					onDone(err)
-				}
-			},
-			OnGet: func(ctx *context.Context, call stack.Caller) func(
-				session *Session,
-				hintInfo *trace.NodeHintInfo,
-				attempts int,
-				err error,
-			) {
-				onDone := gtrace.TableOnPoolGet(config.Trace(), ctx, call)
-
-				return func(session *Session, hintInfo *trace.NodeHintInfo, attempts int, err error) {
-					onDone(safe.SessionInfo(session), attempts, hintInfo, err)
-				}
-			},
-			OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
-				onDone := gtrace.TableOnPoolWith(config.Trace(), ctx, call)
-
-				return func(attempts int, err error) {
-					onDone(attempts, err)
-				}
-			},
-			OnChange: func(stats pool.Stats) {
-				gtrace.TableOnPoolStateChange(config.Trace(),
-					stats.Limit, stats.Idle, stats.CreateInProgress, stats.Concurrency, stats.Size,
-				)
-			},
-		}),
-	)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+	if clientOpts.sessionPool == nil {
+		return nil, xerrors.WithStackTrace(errNilPool)
 	}
 
 	return &Client{
@@ -110,7 +58,11 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 		build: func(ctx context.Context) (s *Session, err error) {
 			return newSession(ctx, cc, config)
 		},
-		pool: sessionPool,
+		pool: &sessionPoolAdapter{
+			sessionPool: clientOpts.sessionPool,
+			cc:          cc,
+			cfg:         config,
+		},
 		done: make(chan struct{}),
 	}, nil
 }

@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
@@ -775,23 +774,34 @@ func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 	return s, nil
 }
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) (*Client, error) {
+func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config, opts ...NewClientOption) (
+	_ *Client, finalErr error,
+) {
+	var clientOpts newClientOptions
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&clientOpts)
+		}
+	}
+
 	onDone := gtrace.QueryOnNew(cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
 	)
-	defer onDone()
+	defer func() {
+		onDone(cfg.PoolLimit(), finalErr)
+	}()
 
 	client := Ydb_Query_V1.NewQueryServiceClient(cc)
 
-	return newWithQueryServiceClient(ctx, client, cc, cfg)
+	return newWithQueryServiceClient(ctx, client, cc, cfg, clientOpts)
 }
 
-//nolint:funlen
 func newWithQueryServiceClient(ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
 	cc grpc.ClientConnInterface,
 	cfg *config.Config,
-) (*Client, error) {
+	clientOpts newClientOptions,
+) (_ *Client, err error) {
 	c := &Client{
 		config: cfg,
 		client: client,
@@ -799,47 +809,15 @@ func newWithQueryServiceClient(ctx context.Context,
 			cancels: make(map[uint64]context.CancelFunc),
 		}),
 	}
-	explicitSessionPool, err := pool.New(ctx,
-		pool.WithLimit[*Session](cfg.PoolLimit()),
-		pool.WithWarmUpItems[*Session](cfg.PoolWarmUpSize()),
-		pool.WithItemUsageLimit[*Session](cfg.PoolSessionUsageLimit()),
-		pool.WithItemUsageTTL[*Session](cfg.PoolSessionUsageTTL()),
-		pool.WithTrace[*Session](poolTrace(cfg.Trace())),
-		pool.WithCreateItemTimeout[*Session](cfg.SessionCreateTimeout()),
-		pool.WithCloseItemTimeout[*Session](cfg.SessionDeleteTimeout()),
-		pool.WithMustDeleteItemFunc(func(s *Session, err error) bool {
-			if !s.IsAlive() {
-				return true
-			}
 
-			return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
-		}),
-		pool.WithIdleTimeToLive[*Session](cfg.SessionIdleTimeToLive()),
-		pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
-			if !cfg.DisableSessionBalancer() {
-				ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
-			}
-
-			s, err := createSession(ctx, client,
-				WithConn(cc),
-				WithDeleteTimeout(cfg.SessionDeleteTimeout()),
-				WithRegisterCloseCancel(c.registerCloseCancel),
-				WithTrace(cfg.Trace()),
-			)
-			if err != nil {
-				return nil, xerrors.WithStackTrace(err)
-			}
-
-			s.lazyTx = cfg.LazyTx()
-
-			return s, nil
-		}),
-	)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+	if clientOpts.sessionPool == nil {
+		return nil, xerrors.WithStackTrace(errNilPool)
 	}
 
-	c.explicitSessionPool = explicitSessionPool
+	c.explicitSessionPool = &sessionPoolAdapter{
+		shared: clientOpts.sessionPool,
+		cfg:    cfg,
+	}
 
 	implicitSessionPool, err := createImplicitSessionPool(ctx, cfg, client, cc)
 	if err != nil {
