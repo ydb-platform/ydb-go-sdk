@@ -77,7 +77,7 @@ func TestClientConcurrentResultSets(t *testing.T) {
 			Status: Ydb.StatusIds_SUCCESS,
 		}, nil).AnyTimes()
 
-		client, err := newWithQueryServiceClient(ctx, queryService, nil, explicitSessionConfig())
+		client, err := newWithQueryServiceClient(ctx, queryService, nil, explicitSessionConfig(), newClientOptions{})
 		require.NoError(t, err)
 
 		err = client.DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
@@ -113,7 +113,7 @@ func TestClientConcurrentResultSets(t *testing.T) {
 				return interleavedMultiResultSetStream(ctrl), nil
 			})
 
-		client, err := newWithQueryServiceClient(ctx, queryService, nil, implicitSessionConfig())
+		client, err := newWithQueryServiceClient(ctx, queryService, nil, implicitSessionConfig(), newClientOptions{})
 		require.NoError(t, err)
 
 		r, err := client.Query(ctx, "SELECT 1; SELECT 2")
@@ -186,7 +186,7 @@ func newMockClientCheckingConcurrentResultSets(
 			Times(1)
 	}
 
-	client, err := newWithQueryServiceClient(t.Context(), queryService, nil, cfg)
+	client, err := newWithQueryServiceClient(t.Context(), queryService, nil, cfg, newClientOptions{})
 	require.NoError(t, err)
 
 	return client

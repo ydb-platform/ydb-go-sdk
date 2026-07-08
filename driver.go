@@ -102,6 +102,9 @@ type (
 
 		pool *conn.Pool
 
+		sessionPoolConfig driverSessionPoolConfig
+		sharedSessionPool *xsync.Once[*internalQuery.SharedSessionPool]
+
 		mtx          sync.Mutex
 		metaBalancer *balancerWithMeta
 
@@ -202,6 +205,7 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 		d.table.Close,
 		d.operation.Close,
 		d.query.Close,
+		d.sharedSessionPool.Close,
 		d.topic.Close,
 		d.discovery.Close,
 		d.metaBalancer.Close,
@@ -383,9 +387,10 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:
 func driverFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 	ctx, driverCtxCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	d := &Driver{
-		children:     make(map[uint64]*Driver),
-		ctxCancel:    driverCtxCancel,
-		metaBalancer: &balancerWithMeta{},
+		children:            make(map[uint64]*Driver),
+		ctxCancel:           driverCtxCancel,
+		metaBalancer:        &balancerWithMeta{},
+		sessionPoolConfig:   defaultDriverSessionPoolConfig(),
 	}
 	defer func() {
 		if err != nil {
@@ -492,7 +497,29 @@ func (d *Driver) connect(ctx context.Context) error {
 	}
 	d.metaBalancer.meta = d.config.Meta()
 
+	d.sharedSessionPool = xsync.OnceValue(func() (*internalQuery.SharedSessionPool, error) {
+		queryCfg := queryConfig.New(
+			append(
+				[]queryConfig.Option{
+					queryConfig.With(d.config.Common),
+				},
+				d.queryOptions...,
+			)...,
+		)
+
+		return internalQuery.NewSharedSessionPool(
+			xcontext.ValueOnly(ctx),
+			d.metaBalancer,
+			d.sharedSessionPoolSettings(queryCfg.Trace()),
+		)
+	})
+
 	d.table = xsync.OnceValue(func() (*internalTable.Client, error) {
+		shared, err := d.sharedSessionPool.Get()
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
 		return internalTable.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
 			tableConfig.New(
@@ -502,14 +529,21 @@ func (d *Driver) connect(ctx context.Context) error {
 						tableConfig.With(d.config.Common),
 
 						tableConfig.WithMaxRequestMessageSize(d.config.GrpcMaxMessageSize()),
+						tableConfig.UseQuerySession(true),
 					},
 					d.tableOptions...,
 				)...,
 			),
+			internalTable.WithSharedSessionPool(shared),
 		)
 	})
 
 	d.query = xsync.OnceValue(func() (*internalQuery.Client, error) {
+		shared, err := d.sharedSessionPool.Get()
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
 		return internalQuery.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
 			queryConfig.New(
@@ -522,6 +556,7 @@ func (d *Driver) connect(ctx context.Context) error {
 					d.queryOptions...,
 				)...,
 			),
+			internalQuery.WithSharedSessionPool(shared),
 		)
 	})
 
