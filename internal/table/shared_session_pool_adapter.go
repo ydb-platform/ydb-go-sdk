@@ -17,39 +17,26 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-type sharedSessionPoolAdapter struct {
-	shared *query.SharedSessionPool
-	cc     grpc.ClientConnInterface
-	cfg    *config.Config
+type sessionPoolAdapter struct {
+	sessionPool *query.SessionPool
+	cc          grpc.ClientConnInterface
+	cfg         *config.Config
 }
 
-func newSharedSessionPoolAdapter(
-	shared *query.SharedSessionPool,
-	cc grpc.ClientConnInterface,
-	cfg *config.Config,
-) sessionPool {
-	return &sharedSessionPoolAdapter{
-		shared: shared,
-		cc:     cc,
-		cfg:    cfg,
-	}
+func (a *sessionPoolAdapter) Stats() pool.Stats {
+	return a.sessionPool.Stats()
 }
 
-func (a *sharedSessionPoolAdapter) Stats() pool.Stats {
-	return a.shared.Stats()
+func (a *sessionPoolAdapter) Close(ctx context.Context) error {
+	return a.sessionPool.Close(ctx)
 }
 
-func (a *sharedSessionPoolAdapter) Close(ctx context.Context) error {
-	// The driver owns the shared pool lifecycle.
-	return nil
-}
-
-func (a *sharedSessionPoolAdapter) With(
+func (a *sessionPoolAdapter) With(
 	ctx context.Context,
 	f func(ctx context.Context, s *Session) error,
 	opts ...retry.Option,
 ) error {
-	return a.shared.WithCore(ctx, func(ctx context.Context, core query.Core) error {
+	return a.sessionPool.WithCore(ctx, func(ctx context.Context, core query.Core) error {
 		s := sessionFromQueryCore(a.cc, a.cfg, core)
 
 		if err := f(ctx, s); err != nil {
@@ -81,7 +68,7 @@ func sessionFromQueryCore(
 	if cfg.ExecuteDataQueryOverQueryService() {
 		s.dataQuery = queryClientExecutor{
 			core:   core,
-			client: query.QueryServiceClientFromCore(core),
+			client: query.ClientFromCore(core),
 		}
 	} else {
 		s.dataQuery = tableClientExecutor{

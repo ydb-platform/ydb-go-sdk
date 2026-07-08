@@ -6,12 +6,12 @@ import "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 type NewClientOption func(*newClientOptions)
 
 type newClientOptions struct {
-	sharedSessionPool *query.SharedSessionPool
+	sessionPool *query.SessionPool
 }
 
-// WithSharedSessionPool leases sessions from the driver-level pool.
-func WithSharedSessionPool(pool *query.SharedSessionPool) NewClientOption {
+// WithSessionPool leases sessions from the driver-level pool.
+func WithSessionPool(pool *query.SessionPool) NewClientOption {
 	return func(o *newClientOptions) {
-		o.sharedSessionPool = pool
+		o.sessionPool = pool
 	}
 }

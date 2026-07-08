@@ -9,28 +9,21 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
-type sharedExplicitPoolAdapter struct {
-	shared *SharedSessionPool
+type sessionPoolAdapter struct {
+	shared *SessionPool
 	cfg    *config.Config
 }
 
-func newSharedExplicitPoolAdapter(shared *SharedSessionPool, cfg *config.Config) sessionPool {
-	return &sharedExplicitPoolAdapter{
-		shared: shared,
-		cfg:    cfg,
-	}
-}
-
-func (a *sharedExplicitPoolAdapter) Stats() pool.Stats {
+func (a *sessionPoolAdapter) Stats() pool.Stats {
 	return a.shared.Stats()
 }
 
-func (a *sharedExplicitPoolAdapter) Close(ctx context.Context) error {
+func (a *sessionPoolAdapter) Close(ctx context.Context) error {
 	// The driver owns the shared pool lifecycle.
 	return nil
 }
 
-func (a *sharedExplicitPoolAdapter) With(
+func (a *sessionPoolAdapter) With(
 	ctx context.Context,
 	f func(ctx context.Context, s *Session) error,
 	opts ...retry.Option,

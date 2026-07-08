@@ -4,12 +4,12 @@ package query
 type NewClientOption func(*newClientOptions)
 
 type newClientOptions struct {
-	sharedSessionPool *SharedSessionPool
+	sessionPool *SessionPool
 }
 
-// WithSharedSessionPool leases explicit sessions from the driver-level pool.
-func WithSharedSessionPool(pool *SharedSessionPool) NewClientOption {
+// WithSessionPool leases explicit sessions from the driver-level pool.
+func WithSessionPool(pool *SessionPool) NewClientOption {
 	return func(o *newClientOptions) {
-		o.sharedSessionPool = pool
+		o.sessionPool = pool
 	}
 }
