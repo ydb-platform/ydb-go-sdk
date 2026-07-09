@@ -596,6 +596,147 @@ func TestPartitionWorkerInterface_CloseFreesQueuedBatchCredits(t *testing.T) {
 	require.Len(t, messageSender.GetFreedBatches(), 2)
 }
 
+func TestPartitionWorkerInterface_UserHandlerErrorFreesQueuedBatches(t *testing.T) {
+	ctx := xtest.Context(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	session := createTestPartitionSession()
+	messageSender := newSyncMessageSender()
+	mockHandler := NewMockEventHandler(ctrl)
+
+	errorReceived := make(empty.Chan, 1)
+	onStopped := func(sessionID rawtopicreader.PartitionSessionID, err error) {
+		select {
+		case errorReceived <- empty.Struct{}:
+		default:
+		}
+	}
+
+	mockHandler.EXPECT().
+		OnReadMessages(gomock.Any(), gomock.Any()).
+		Return(errors.New("user handler error"))
+
+	worker := NewPartitionWorker(
+		123,
+		session,
+		messageSender,
+		mockHandler,
+		onStopped,
+		&trace.Topic{},
+		"test-listener",
+	)
+
+	worker.Start(ctx)
+
+	metadata1 := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
+	metadata2 := rawtopiccommon.ServerMessageMetadata{
+		Status: rawydb.StatusSuccess,
+		Issues: rawydb.Issues{{Message: "different metadata to prevent queue merge"}},
+	}
+
+	worker.AddMessagesBatch(metadata1, createTestBatch())
+	worker.AddMessagesBatch(metadata2, createTestBatch())
+
+	xtest.WaitChannelClosed(t, errorReceived)
+
+	require.Len(t, messageSender.GetFreedBatches(), 2)
+}
+
+func TestPartitionWorkerInterface_BadBatchMetadataFreesBuffer(t *testing.T) {
+	ctx := xtest.Context(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	session := createTestPartitionSession()
+	messageSender := newSyncMessageSender()
+	mockHandler := NewMockEventHandler(ctrl)
+
+	errorReceived := make(empty.Chan, 1)
+	onStopped := func(sessionID rawtopicreader.PartitionSessionID, err error) {
+		select {
+		case errorReceived <- empty.Struct{}:
+		default:
+		}
+	}
+
+	worker := NewPartitionWorker(
+		123,
+		session,
+		messageSender,
+		mockHandler,
+		onStopped,
+		&trace.Topic{},
+		"test-listener",
+	)
+
+	worker.Start(ctx)
+	defer func() {
+		require.NoError(t, worker.Close(ctx, nil))
+	}()
+
+	batch := createTestBatch()
+	worker.AddMessagesBatch(rawtopiccommon.ServerMessageMetadata{
+		Status: rawydb.StatusInternalError,
+	}, batch)
+
+	xtest.WaitChannelClosed(t, errorReceived)
+	require.Len(t, messageSender.GetFreedBatches(), 1)
+	require.Same(t, batch, messageSender.GetFreedBatches()[0])
+}
+
+type bareMessageSender struct {
+	freed []*topicreadercommon.PublicBatch
+}
+
+func (b *bareMessageSender) SendRaw(rawtopicreader.ClientMessage) {}
+
+func (b *bareMessageSender) FreeBufferFromBatch(batch *topicreadercommon.PublicBatch) {
+	b.freed = append(b.freed, batch)
+}
+
+func TestPartitionWorkerInterface_NonCommitHandlerFreesBuffer(t *testing.T) {
+	ctx := xtest.Context(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	session := createTestPartitionSession()
+	messageSender := &bareMessageSender{}
+	mockHandler := NewMockEventHandler(ctrl)
+
+	errorReceived := make(empty.Chan, 1)
+	onStopped := func(sessionID rawtopicreader.PartitionSessionID, err error) {
+		select {
+		case errorReceived <- empty.Struct{}:
+		default:
+		}
+	}
+
+	worker := NewPartitionWorker(
+		123,
+		session,
+		messageSender,
+		mockHandler,
+		onStopped,
+		&trace.Topic{},
+		"test-listener",
+	)
+
+	worker.Start(ctx)
+	defer func() {
+		require.NoError(t, worker.Close(ctx, nil))
+	}()
+
+	batch := createTestBatch()
+	worker.AddMessagesBatch(rawtopiccommon.ServerMessageMetadata{
+		Status: rawydb.StatusSuccess,
+	}, batch)
+
+	xtest.WaitChannelClosed(t, errorReceived)
+	require.Len(t, messageSender.freed, 1)
+	require.Same(t, batch, messageSender.freed[0])
+}
+
 // Note: CommitMessage processing has been moved to streamListener
 // and is no longer handled by PartitionWorker
 

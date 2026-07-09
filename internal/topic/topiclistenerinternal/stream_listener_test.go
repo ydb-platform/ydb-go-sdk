@@ -3,6 +3,7 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -314,6 +315,142 @@ func TestStreamListener_ReadResponseReturnsCreditWhenWorkerMissing(t *testing.T)
 	case <-sendDone:
 	case <-time.After(time.Second):
 		t.Fatal("timeout waiting for read request after unrouted batch credit return")
+	}
+}
+
+func TestStreamListener_CollectPendingFreeBytesCoalesces(t *testing.T) {
+	listener := &streamListener{}
+	listener.initVars(&atomic.Int64{})
+	listener.freeBytes = make(chan int, 3)
+
+	listener.freeBytes <- 10
+	listener.freeBytes <- 25
+
+	require.Equal(t, 40, listener.collectPendingFreeBytes(5))
+}
+
+func TestStreamListener_FreeBufferFromBatchNil(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+
+	require.NotPanics(t, func() {
+		listener.freeBufferFromBatch(nil)
+	})
+}
+
+func TestStreamListener_ReadResponseReturnsCreditAfterWorkerProcessing(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+	streamMock := StreamMock(e)
+
+	EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(
+		gomock.Any(),
+		gomock.Any(),
+	).DoAndReturn(func(ctx context.Context, event *PublicEventStartPartitionSession) error {
+		event.Confirm()
+
+		return nil
+	})
+
+	handlerDone := make(chan struct{})
+	EventHandlerMock(e).EXPECT().OnReadMessages(
+		gomock.Any(),
+		gomock.Any(),
+	).DoAndReturn(func(ctx context.Context, event *PublicReadMessages) error {
+		close(handlerDone)
+
+		return nil
+	})
+
+	const uncompressedSize = 4
+	sendDone := make(chan struct{})
+	streamMock.EXPECT().Send(gomock.Any()).DoAndReturn(func(msg rawtopicreader.ClientMessage) error {
+		readReq, ok := msg.(*rawtopicreader.ReadRequest)
+		if !ok {
+			return nil
+		}
+		require.Equal(t, uncompressedSize, readReq.BytesSize)
+		close(sendDone)
+
+		return nil
+	}).AnyTimes()
+
+	listener.background.Start("stream listener send loop", listener.sendMessagesLoop)
+	defer func() {
+		_ = listener.background.Close(ctx, errors.New("test finished"))
+	}()
+
+	require.NoError(t, listener.routeMessage(ctx, &rawtopicreader.StartPartitionSessionRequest{
+		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
+			Status: rawydb.StatusSuccess,
+		},
+		PartitionSession: rawtopicreader.PartitionSession{
+			PartitionSessionID: 100,
+			Path:               "test-topic",
+			PartitionID:        1,
+		},
+		CommittedOffset: 10,
+		PartitionOffsets: rawtopiccommon.OffsetRange{
+			Start: 5,
+			End:   15,
+		},
+	}))
+
+	require.NoError(t, listener.routeMessage(ctx, &rawtopicreader.ReadResponse{
+		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
+			Status: rawydb.StatusSuccess,
+		},
+		BytesSize: uncompressedSize,
+		PartitionData: []rawtopicreader.PartitionData{
+			{
+				PartitionSessionID: 100,
+				Batches: []rawtopicreader.Batch{
+					{
+						Codec: rawtopiccommon.CodecRaw,
+						MessageData: []rawtopicreader.MessageData{
+							{
+								Offset:           10,
+								SeqNo:            1,
+								CreatedAt:        testTime(0),
+								Data:             []byte("test"),
+								UncompressedSize: uncompressedSize,
+							},
+						},
+					},
+				},
+			},
+		},
+	}))
+
+	xtest.WaitChannelClosed(t, handlerDone)
+
+	select {
+	case <-sendDone:
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for read request after worker processed batch")
+	}
+}
+
+func TestStreamListener_FlushPendingMessagesSendError(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+	streamMock := StreamMock(e)
+
+	streamMock.EXPECT().Send(gomock.Any()).Return(errors.New("send failed"))
+
+	listener.background.Start("stream listener send loop", listener.sendMessagesLoop)
+	defer func() {
+		_ = listener.background.Close(ctx, errors.New("test finished"))
+	}()
+
+	listener.sendDataRequest(10)
+
+	select {
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for listener to close after send error")
+	case <-listener.background.Context().Done():
 	}
 }
 
