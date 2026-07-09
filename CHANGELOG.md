@@ -1,3 +1,5 @@
+* Added `topicoptions.WithListenerBufferSizeBytes` option for `TopicListener` to configure the read-ahead buffer size (default 1 MiB, same as topic reader).
+
 ## v3.143.0
 * Added experimental helper `sugar.NewKVClientBuilder(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
 

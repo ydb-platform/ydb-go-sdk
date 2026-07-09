@@ -49,6 +49,8 @@ type streamListener struct {
 	hasNewMessagesToSend empty.Chan
 	syncCommitter        *topicreadercommon.Committer
 
+	freeBytes chan int
+
 	closing atomic.Bool
 	tracer  *trace.Topic
 
@@ -105,7 +107,13 @@ func newStreamListener(
 	)
 
 	res.startBackground()
-	res.sendDataRequest(config.BufferSize)
+
+	// Seed the same path as post-processing releases: sendMessagesLoop sends the
+	// initial ReadRequest. Direct sendDataRequest would bypass credit aggregation.
+	select {
+	case res.freeBytes <- config.BufferSize:
+	case <-res.background.Context().Done():
+	}
 
 	return res, nil
 }
@@ -181,6 +189,9 @@ func (l *streamListener) startBackground() {
 
 func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	l.hasNewMessagesToSend = make(empty.Chan, 1)
+	// Capacity 1 — same as reader: while sendMessagesLoop drains freeBytes, further
+	// FreeBufferFromBatch calls block and apply backpressure to slow handlers.
+	l.freeBytes = make(chan int, 1)
 	l.sessions = &topicreadercommon.PartitionSessionStorage{}
 	l.sessionIDCounter = sessionIDCounter
 	l.workers = make(map[rawtopicreader.PartitionSessionID]*PartitionWorker)
@@ -258,48 +269,57 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 }
 
 func (l *streamListener) sendMessagesLoop(ctx context.Context) {
-	chDone := ctx.Done()
 	for {
 		select {
-		case <-chDone:
+		case <-ctx.Done():
 			return
+		case free := <-l.freeBytes:
+			// Coalesce concurrent releases from multiple partition workers into one
+			// ReadRequest instead of many small grpc messages (same loop as reader).
+			sum := l.collectPendingFreeBytes(free)
+			l.sendDataRequest(sum)
+			l.flushPendingMessages(ctx)
 		case <-l.hasNewMessagesToSend:
-			var messages []rawtopicreader.ClientMessage
-			l.m.WithLock(func() {
-				messages = l.messagesToSend
-				if len(messages) > 0 {
-					l.messagesToSend = make([]rawtopicreader.ClientMessage, 0, cap(messages))
-				}
-			})
-
-			if len(messages) == 0 {
-				continue
-			}
-
-			logCtx := l.background.Context()
-
-			for i, m := range messages {
-				messageType := l.getMessageTypeName(m)
-
-				if err := l.stream.Send(m); err != nil {
-					// Trace send error
-					l.traceMessageSend(&logCtx, messageType, err)
-					gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
-
-					reason := xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
-						"ydb: failed send message by grpc to topic reader stream from listener: "+
-							"message_type=%s, message_index=%d, total_messages=%d: %w",
-						messageType, i, len(messages), err,
-					)))
-					l.goClose(ctx, reason)
-
-					return
-				}
-
-				// Trace successful send
-				l.traceMessageSend(&logCtx, messageType, nil)
-			}
+			l.flushPendingMessages(ctx)
 		}
+	}
+}
+
+func (l *streamListener) flushPendingMessages(ctx context.Context) {
+	var messages []rawtopicreader.ClientMessage
+	l.m.WithLock(func() {
+		messages = l.messagesToSend
+		if len(messages) > 0 {
+			l.messagesToSend = make([]rawtopicreader.ClientMessage, 0, cap(messages))
+		}
+	})
+
+	if len(messages) == 0 {
+		return
+	}
+
+	logCtx := l.background.Context()
+
+	for i, m := range messages {
+		messageType := l.getMessageTypeName(m)
+
+		if err := l.stream.Send(m); err != nil {
+			// Trace send error
+			l.traceMessageSend(&logCtx, messageType, err)
+			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
+
+			reason := xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+				"ydb: failed send message by grpc to topic reader stream from listener: "+
+					"message_type=%s, message_index=%d, total_messages=%d: %w",
+				messageType, i, len(messages), err,
+			)))
+			l.goClose(ctx, reason)
+
+			return
+		}
+
+		// Trace successful send
+		l.traceMessageSend(&logCtx, messageType, nil)
 	}
 }
 
@@ -373,9 +393,11 @@ func (l *streamListener) routeMessage(ctx context.Context, mess rawtopicreader.S
 	case *rawtopicreader.StartPartitionSessionRequest:
 		return l.handleStartPartition(ctx, m)
 	case *rawtopicreader.StopPartitionSessionRequest:
-		return l.routeToWorker(m.PartitionSessionID, func(worker *PartitionWorker) {
+		l.routeToWorker(m.PartitionSessionID, func(worker *PartitionWorker) {
 			worker.AddRawServerMessage(m)
 		})
+
+		return nil
 	case *rawtopicreader.ReadResponse:
 		return l.splitAndRouteReadResponse(m)
 	case *rawtopicreader.CommitOffsetResponse:
@@ -425,12 +447,13 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 	// Route each batch to its partition worker
 	for _, batch := range batches {
 		partitionSession := topicreadercommon.BatchGetPartitionSession(batch)
-		err := l.routeToWorker(partitionSession.StreamPartitionSessionID, func(worker *PartitionWorker) {
+		routed := l.routeToWorker(partitionSession.StreamPartitionSessionID, func(worker *PartitionWorker) {
 			worker.AddMessagesBatch(m.ServerMessageMetadata, batch)
 		})
-		if err != nil {
-			return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
-				"ydb: failed to route batch to worker: %w", err)))
+		if !routed {
+			// Worker missing: batch is dropped but buffer was already charged above.
+			// Return credit here; routeToWorker stays non-fatal for protocol mismatch.
+			l.freeBufferFromBatch(batch)
 		}
 	}
 
@@ -496,6 +519,43 @@ func (l *streamListener) getSyncCommitter() SyncCommitter {
 
 func (l *streamListener) sendDataRequest(bytesCount int) {
 	l.sendMessage(&rawtopicreader.ReadRequest{BytesSize: bytesCount})
+}
+
+// collectPendingFreeBytes drains all byte credits already queued in freeBytes after
+// the first one was received by sendMessagesLoop.
+func (l *streamListener) collectPendingFreeBytes(first int) int {
+	sum := first
+	for {
+		select {
+		case free := <-l.freeBytes:
+			sum += free
+		default:
+			return sum
+		}
+	}
+}
+
+func (l *streamListener) freeBufferFromBatch(batch *topicreadercommon.PublicBatch) {
+	if batch == nil {
+		return
+	}
+
+	size := 0
+	for i := range batch.Messages {
+		size += topicreadercommon.MessageGetBufferBytesAccount(batch.Messages[i])
+	}
+
+	// May block when freeBytes is full — intentional backpressure on slow consumers.
+	// On shutdown, skip send rather than block forever.
+	select {
+	case l.freeBytes <- size:
+	case <-l.background.Context().Done():
+	}
+}
+
+// FreeBufferFromBatch implements MessageSender interface for PartitionWorkers.
+func (l *streamListener) FreeBufferFromBatch(batch *topicreadercommon.PublicBatch) {
+	l.freeBufferFromBatch(batch)
 }
 
 func (l *streamListener) sendMessage(m rawtopicreader.ClientMessage) {
@@ -608,11 +668,12 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 	return worker
 }
 
-// routeToWorker routes a message to the appropriate worker
+// routeToWorker routes a message to the appropriate worker.
+// It returns false if the worker was not found (caller may need to free buffer credit).
 func (l *streamListener) routeToWorker(
 	partitionSessionID rawtopicreader.PartitionSessionID,
 	routeFunc func(*PartitionWorker),
-) error {
+) bool {
 	// Find worker by session
 	var targetWorker *PartitionWorker
 	l.m.WithLock(func() {
@@ -621,9 +682,9 @@ func (l *streamListener) routeToWorker(
 
 	if targetWorker != nil {
 		routeFunc(targetWorker)
+
+		return true
 	}
 
-	// Log error for missing worker but don't fail - this indicates a serious protocol/state issue
-	// In production, this should be extremely rare and indicates server/client state mismatch
-	return nil
+	return false
 }

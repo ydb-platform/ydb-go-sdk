@@ -18,9 +18,13 @@ import (
 
 var errPartitionQueueClosed = xerrors.Wrap(fmt.Errorf("ydb: partition messages queue closed"))
 
-// MessageSender sends messages back to server
+// MessageSender sends messages back to server and releases read-ahead buffer credit.
 type MessageSender interface {
 	SendRaw(msg rawtopicreader.ClientMessage)
+	// FreeBufferFromBatch returns buffer credit to streamListener after a batch is done.
+	// Workers must not send ReadRequest directly: a single BufferSize limit is enforced
+	// centrally (same design as topic reader), otherwise each partition could over-fetch.
+	FreeBufferFromBatch(batch *topicreadercommon.PublicBatch)
 }
 
 // unifiedMessage wraps messages that PartitionWorker can handle
@@ -136,6 +140,11 @@ func (w *PartitionWorker) Close(ctx context.Context, reason error) error {
 
 // receiveMessagesLoop is the main message processing loop
 func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
+	// On stop (Close, handler error, panic) batches may still sit in the queue buffer
+	// without reaching processBatchMessage. Drain them here instead of Close(): only
+	// this goroutine knows processing is finished and must not use blocking Receive.
+	defer w.freeBufferedBatchCredits()
+
 	defer func() {
 		if r := recover(); r != nil {
 			reason := xerrors.WithStackTrace(fmt.Errorf("ydb: partition worker panic: %v", r))
@@ -217,19 +226,6 @@ func (w *PartitionWorker) processRawServerMessage(ctx context.Context, msg rawto
 	}
 }
 
-// calculateBatchMetrics calculates metrics for a batch message
-func (w *PartitionWorker) calculateBatchMetrics(msg *batchMessage) (messagesCount int, accountBytes int) {
-	if msg.Batch != nil && len(msg.Batch.Messages) > 0 {
-		messagesCount = len(msg.Batch.Messages)
-
-		for i := range msg.Batch.Messages {
-			accountBytes += topicreadercommon.MessageGetBufferBytesAccount(msg.Batch.Messages[i])
-		}
-	}
-
-	return messagesCount, accountBytes
-}
-
 // validateBatchMetadata checks if the batch metadata status is successful
 func (w *PartitionWorker) validateBatchMetadata(msg *batchMessage) error {
 	if !msg.ServerMessageMetadata.Status.IsSuccess() {
@@ -285,7 +281,10 @@ func (w *PartitionWorker) callUserHandler(
 // processBatchMessage handles ready PublicBatch messages
 func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMessage) error {
 	// Add tracing for batch processing
-	messagesCount, accountBytes := w.calculateBatchMetrics(msg)
+	messagesCount := 0
+	if msg.Batch != nil {
+		messagesCount = len(msg.Batch.Messages)
+	}
 
 	traceDone := gtrace.TopicOnPartitionWorkerProcessMessage(
 		w.tracer,
@@ -298,6 +297,10 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 		"BatchMessage",
 		messagesCount,
 	)
+	// Release buffer credit when the batch leaves the worker (success, validation error,
+	// or handler error). defer — not after handler only — so credits are not leaked.
+	// Credit is tied to read/processing, not commit (protocol separates these; same as reader).
+	defer w.messageSender.FreeBufferFromBatch(msg.Batch)
 
 	// Check for errors in the metadata
 	if err := w.validateBatchMetadata(msg); err != nil {
@@ -322,12 +325,20 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 		return err
 	}
 
-	// Use estimated bytes size for flow control
-	w.messageSender.SendRaw(&rawtopicreader.ReadRequest{BytesSize: accountBytes})
-
 	traceDone(messagesCount, nil)
 
 	return nil
+}
+
+// freeBufferedBatchCredits returns buffer credit for batches still buffered in the
+// partition queue. In-flight batch is freed by processBatchMessage defer, not here.
+func (w *PartitionWorker) freeBufferedBatchCredits() {
+	for _, msg := range w.messageQueue.DrainBuffered() {
+		// StartPartition / StopPartition do not consume read-ahead data bytes.
+		if msg.BatchMessage != nil {
+			w.messageSender.FreeBufferFromBatch(msg.BatchMessage.Batch)
+		}
+	}
 }
 
 // handleStartPartitionRequest processes StartPartitionSessionRequest

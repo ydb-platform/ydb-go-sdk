@@ -49,6 +49,14 @@ func (s *syncMessageSender) SendRaw(msg rawtopicreader.ClientMessage) {
 	}
 }
 
+func (s *syncMessageSender) FreeBufferFromBatch(batch *topicreadercommon.PublicBatch) {
+	s.mockMessageSender.FreeBufferFromBatch(batch)
+	select {
+	case s.messageReceived <- empty.Struct{}:
+	default:
+	}
+}
+
 // waitForMessage waits for at least one message to be sent
 func (s *syncMessageSender) waitForMessage(ctx context.Context) error {
 	select {
@@ -73,8 +81,9 @@ func (s *syncMessageSender) waitForMessages(ctx context.Context, n int) error {
 // Test Helpers and Mocks
 
 type mockMessageSender struct {
-	mu       sync.Mutex
-	messages []rawtopicreader.ClientMessage
+	mu           sync.Mutex
+	messages     []rawtopicreader.ClientMessage
+	freedBatches []*topicreadercommon.PublicBatch
 }
 
 func newMockMessageSender() *mockMessageSender {
@@ -87,6 +96,22 @@ func (m *mockMessageSender) SendRaw(msg rawtopicreader.ClientMessage) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.messages = append(m.messages, msg)
+}
+
+func (m *mockMessageSender) FreeBufferFromBatch(batch *topicreadercommon.PublicBatch) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.freedBatches = append(m.freedBatches, batch)
+}
+
+func (m *mockMessageSender) GetFreedBatches() []*topicreadercommon.PublicBatch {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	result := make([]*topicreadercommon.PublicBatch, len(m.freedBatches))
+	copy(result, m.freedBatches)
+
+	return result
 }
 
 // Implement CommitHandler interface for tests
@@ -453,19 +478,16 @@ func TestPartitionWorkerInterface_BatchMessageFlow(t *testing.T) {
 	// Wait for processing to complete
 	xtest.WaitChannelClosed(t, processingDone)
 
-	// Wait for the ReadRequest to be sent (small additional wait for async SendRaw)
+	// Wait for buffer release after batch processing
 	err := messageSender.waitForMessage(ctx)
 	require.NoError(t, err)
 
 	require.Nil(t, stoppedErr)
 
-	// Verify ReadRequest was sent for flow control
-	messages := messageSender.GetMessages()
-	require.Len(t, messages, 1)
-
-	readReq, ok := messages[0].(*rawtopicreader.ReadRequest)
-	require.True(t, ok)
-	require.GreaterOrEqual(t, readReq.BytesSize, 0) // Empty batch results in 0 bytes
+	freedBatches := messageSender.GetFreedBatches()
+	require.Len(t, freedBatches, 1)
+	require.Same(t, testBatch, freedBatches[0])
+	require.Empty(t, messageSender.GetMessages())
 }
 
 func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
@@ -528,6 +550,50 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 	errPtr := stoppedErr.Load()
 	require.NotNil(t, errPtr)
 	require.Contains(t, (*errPtr).Error(), "user handler error")
+	require.Len(t, messageSender.GetFreedBatches(), 1)
+	require.Same(t, batch, messageSender.GetFreedBatches()[0])
+}
+
+func TestPartitionWorkerInterface_CloseFreesQueuedBatchCredits(t *testing.T) {
+	ctx := xtest.Context(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	session := createTestPartitionSession()
+	messageSender := newSyncMessageSender()
+	mockHandler := NewMockEventHandler(ctrl)
+	mockHandler.EXPECT().
+		OnReadMessages(gomock.Any(), gomock.Any()).
+		AnyTimes().
+		Return(nil)
+
+	onStopped := func(rawtopicreader.PartitionSessionID, error) {}
+
+	worker := NewPartitionWorker(
+		123,
+		session,
+		messageSender,
+		mockHandler,
+		onStopped,
+		&trace.Topic{},
+		"test-listener",
+	)
+
+	worker.Start(ctx)
+
+	metadata1 := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
+	// Different metadata prevents tryMergeMessages from joining two batches into one
+	// queue item (would look like a single FreeBufferFromBatch in the assertion).
+	metadata2 := rawtopiccommon.ServerMessageMetadata{
+		Status: rawydb.StatusSuccess,
+		Issues: rawydb.Issues{{Message: "different metadata to prevent queue merge"}},
+	}
+
+	worker.AddMessagesBatch(metadata1, createTestBatch())
+	worker.AddMessagesBatch(metadata2, createTestBatch())
+
+	require.NoError(t, worker.Close(ctx, nil))
+	require.Len(t, messageSender.GetFreedBatches(), 2)
 }
 
 // Note: CommitMessage processing has been moved to streamListener

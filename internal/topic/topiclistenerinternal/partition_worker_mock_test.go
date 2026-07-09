@@ -10,6 +10,7 @@ import (
 	reflect "reflect"
 
 	rawtopicreader "github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	topicreadercommon "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -34,6 +35,42 @@ func NewMockMessageSender(ctrl *gomock.Controller) *MockMessageSender {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockMessageSender) EXPECT() *MockMessageSenderMockRecorder {
 	return m.recorder
+}
+
+// FreeBufferFromBatch mocks base method.
+func (m *MockMessageSender) FreeBufferFromBatch(batch *topicreadercommon.PublicBatch) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "FreeBufferFromBatch", batch)
+}
+
+// FreeBufferFromBatch indicates an expected call of FreeBufferFromBatch.
+func (mr *MockMessageSenderMockRecorder) FreeBufferFromBatch(batch any) *MockMessageSenderFreeBufferFromBatchCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FreeBufferFromBatch", reflect.TypeOf((*MockMessageSender)(nil).FreeBufferFromBatch), batch)
+	return &MockMessageSenderFreeBufferFromBatchCall{Call: call}
+}
+
+// MockMessageSenderFreeBufferFromBatchCall wrap *gomock.Call
+type MockMessageSenderFreeBufferFromBatchCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockMessageSenderFreeBufferFromBatchCall) Return() *MockMessageSenderFreeBufferFromBatchCall {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockMessageSenderFreeBufferFromBatchCall) Do(f func(*topicreadercommon.PublicBatch)) *MockMessageSenderFreeBufferFromBatchCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockMessageSenderFreeBufferFromBatchCall) DoAndReturn(f func(*topicreadercommon.PublicBatch)) *MockMessageSenderFreeBufferFromBatchCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
 }
 
 // SendRaw mocks base method.
