@@ -108,12 +108,7 @@ func newStreamListener(
 
 	res.startBackground()
 
-	// Seed the same path as post-processing releases: sendMessagesLoop sends the
-	// initial ReadRequest. Direct sendDataRequest would bypass credit aggregation.
-	select {
-	case res.freeBytes <- config.BufferSize:
-	case <-res.background.Context().Done():
-	}
+	res.seedInitialBufferCredit(config.BufferSize)
 
 	return res, nil
 }
@@ -266,6 +261,15 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 	l.sessionID = initResp.SessionID
 
 	return nil
+}
+
+// seedInitialBufferCredit primes the same path as post-processing releases:
+// sendMessagesLoop sends the initial ReadRequest.
+func (l *streamListener) seedInitialBufferCredit(bufferSize int) {
+	select {
+	case l.freeBytes <- bufferSize:
+	case <-l.background.Context().Done():
+	}
 }
 
 func (l *streamListener) sendMessagesLoop(ctx context.Context) {

@@ -454,6 +454,73 @@ func TestStreamListener_FlushPendingMessagesSendError(t *testing.T) {
 	}
 }
 
+func TestStreamListener_RouteStopPartitionToExistingWorker(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+
+	EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(
+		gomock.Any(),
+		gomock.Any(),
+	).DoAndReturn(func(ctx context.Context, event *PublicEventStartPartitionSession) error {
+		event.Confirm()
+
+		return nil
+	})
+
+	stopHandled := make(chan struct{})
+	EventHandlerMock(e).EXPECT().OnStopPartitionSessionRequest(
+		gomock.Any(),
+		gomock.Any(),
+	).DoAndReturn(func(ctx context.Context, event *PublicEventStopPartitionSession) error {
+		event.Confirm()
+		close(stopHandled)
+
+		return nil
+	})
+
+	require.NoError(t, listener.routeMessage(ctx, &rawtopicreader.StartPartitionSessionRequest{
+		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
+			Status: rawydb.StatusSuccess,
+		},
+		PartitionSession: rawtopicreader.PartitionSession{
+			PartitionSessionID: 100,
+			Path:               "test-topic",
+			PartitionID:        1,
+		},
+		CommittedOffset: 10,
+		PartitionOffsets: rawtopiccommon.OffsetRange{
+			Start: 5,
+			End:   15,
+		},
+	}))
+
+	require.NoError(t, listener.routeMessage(ctx, &rawtopicreader.StopPartitionSessionRequest{
+		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
+			Status: rawydb.StatusSuccess,
+		},
+		PartitionSessionID: 100,
+		Graceful:           true,
+		CommittedOffset:    rawtopiccommon.NewOffset(20),
+	}))
+
+	xtest.WaitChannelClosed(t, stopHandled)
+}
+
+func TestStreamListener_FreeBufferFromBatchSkipsOnShutdown(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+	listener.freeBytes = make(chan int) // unbuffered: no reader after background stops
+
+	listener.background.Start("stream listener send loop", listener.sendMessagesLoop)
+	require.NoError(t, listener.background.Close(ctx, errors.New("shutdown")))
+
+	require.NotPanics(t, func() {
+		listener.freeBufferFromBatch(createTestBatch())
+	})
+}
+
 func testTime(num int) time.Time {
 	return time.Date(2000, 1, 1, 0, 0, num, 0, time.UTC)
 }

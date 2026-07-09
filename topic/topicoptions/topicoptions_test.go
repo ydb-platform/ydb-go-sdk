@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -77,6 +78,14 @@ func TestEqualAlterOptions(t *testing.T) {
 			assert.ElementsMatch(t, tt.lhs, tt.rhs) // compare slices with ignore ordering
 		})
 	}
+}
+
+func TestWithListenerBufferSizeBytes(t *testing.T) {
+	cfg := topiclistenerinternal.NewStreamListenerConfig()
+
+	WithListenerBufferSizeBytes(42)(&cfg)
+
+	require.Equal(t, 42, cfg.BufferSize)
 }
 
 func TestCreateWithMetricsLevel(t *testing.T) {
