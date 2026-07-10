@@ -281,7 +281,9 @@ func (l *streamListener) sendMessagesLoop(ctx context.Context) {
 			// Coalesce concurrent releases from multiple partition workers into one
 			// ReadRequest instead of many small grpc messages (same loop as reader).
 			sum := l.collectPendingFreeBytes(free)
-			l.sendDataRequest(sum)
+			// Enqueue without signaling: we flush right here, so signaling would only
+			// leave a stale hasNewMessagesToSend that triggers an empty flush next tick.
+			l.enqueueMessage(&rawtopicreader.ReadRequest{BytesSize: sum})
 			l.flushPendingMessages(ctx)
 		case <-l.hasNewMessagesToSend:
 			l.flushPendingMessages(ctx)
@@ -521,10 +523,6 @@ func (l *streamListener) getSyncCommitter() SyncCommitter {
 	return l.syncCommitter
 }
 
-func (l *streamListener) sendDataRequest(bytesCount int) {
-	l.sendMessage(&rawtopicreader.ReadRequest{BytesSize: bytesCount})
-}
-
 // collectPendingFreeBytes drains all byte credits already queued in freeBytes after
 // the first one was received by sendMessagesLoop.
 func (l *streamListener) collectPendingFreeBytes(first int) int {
@@ -549,6 +547,11 @@ func (l *streamListener) freeBufferFromBatch(batch *topicreadercommon.PublicBatc
 		size += topicreadercommon.MessageGetBufferBytesAccount(batch.Messages[i])
 	}
 
+	// Nothing was charged for this batch — avoid a pointless ReadRequest{BytesSize: 0}.
+	if size == 0 {
+		return
+	}
+
 	// May block when freeBytes is full — intentional backpressure on slow consumers.
 	// On shutdown, skip send rather than block forever.
 	select {
@@ -563,14 +566,21 @@ func (l *streamListener) FreeBufferFromBatch(batch *topicreadercommon.PublicBatc
 }
 
 func (l *streamListener) sendMessage(m rawtopicreader.ClientMessage) {
-	l.m.WithLock(func() {
-		l.messagesToSend = append(l.messagesToSend, m)
-	})
+	l.enqueueMessage(m)
 
 	select {
 	case l.hasNewMessagesToSend <- empty.Struct{}:
 	default:
 	}
+}
+
+// enqueueMessage appends a message to the send queue without signaling
+// hasNewMessagesToSend. Callers that flush the queue themselves use it to avoid
+// leaving a stale signal behind.
+func (l *streamListener) enqueueMessage(m rawtopicreader.ClientMessage) {
+	l.m.WithLock(func() {
+		l.messagesToSend = append(l.messagesToSend, m)
+	})
 }
 
 type confirmStorage[T any] struct {

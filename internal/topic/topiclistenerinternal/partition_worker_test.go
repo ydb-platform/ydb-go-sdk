@@ -206,6 +206,15 @@ func createTestBatch() *topicreadercommon.PublicBatch {
 	}
 }
 
+// createTestBatchWithBufferBytes returns a batch whose single message accounts for
+// size buffer bytes, so freeBufferFromBatch releases a non-zero credit.
+func createTestBatchWithBufferBytes(size int) *topicreadercommon.PublicBatch {
+	batch := createTestBatch()
+	topicreadercommon.MessageSetBufferBytesAccountForTest(batch.Messages[0], size)
+
+	return batch
+}
+
 // =============================================================================
 // INTERFACE TESTS - Test external behavior through public API only
 // =============================================================================

@@ -445,7 +445,7 @@ func TestStreamListener_FlushPendingMessagesSendError(t *testing.T) {
 		_ = listener.background.Close(ctx, errors.New("test finished"))
 	}()
 
-	listener.sendDataRequest(10)
+	listener.sendMessage(&rawtopicreader.ReadRequest{BytesSize: 10})
 
 	select {
 	case <-time.After(time.Second):
@@ -515,6 +515,18 @@ func TestStreamListener_FreeBufferFromBatchSkipsOnShutdown(t *testing.T) {
 
 	listener.background.Start("stream listener send loop", listener.sendMessagesLoop)
 	require.NoError(t, listener.background.Close(ctx, errors.New("shutdown")))
+
+	require.NotPanics(t, func() {
+		listener.freeBufferFromBatch(createTestBatchWithBufferBytes(10))
+	})
+}
+
+func TestStreamListener_FreeBufferFromBatchSkipsZeroSize(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+	// Unbuffered with no reader: if the zero-size guard did not short-circuit,
+	// the send would block and the test would deadlock.
+	listener.freeBytes = make(chan int)
 
 	require.NotPanics(t, func() {
 		listener.freeBufferFromBatch(createTestBatch())
