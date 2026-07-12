@@ -179,7 +179,7 @@ func TestPool_ConfigMethods(t *testing.T) {
 	t.Run("DialTimeout", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:  10 * time.Second,
+			dialTimeout: 10 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {

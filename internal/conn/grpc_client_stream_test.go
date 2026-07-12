@@ -33,7 +33,7 @@ func TestGrpcClientStream_Header(t *testing.T) {
 		mockStream.EXPECT().Header().Return(expectedMD, nil)
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -56,7 +56,7 @@ func TestGrpcClientStream_Header(t *testing.T) {
 		mockStream.EXPECT().Header().Return(metadata.MD{}, expectedErr)
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -81,7 +81,7 @@ func TestGrpcClientStream_Trailer(t *testing.T) {
 		mockStream.EXPECT().Trailer().Return(expectedMD)
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -105,7 +105,7 @@ func TestGrpcClientStream_Context(t *testing.T) {
 		mockStream.EXPECT().Context().Return(expectedCtx)
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -128,7 +128,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		mockStream.EXPECT().CloseSend().Return(nil)
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -152,7 +152,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		mockStream.EXPECT().CloseSend().Return(context.Canceled)
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -181,7 +181,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		mockStream.EXPECT().CloseSend().Return(streamErr)
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -212,7 +212,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		mockStream.EXPECT().CloseSend().Return(fmt.Errorf("transport error"))
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135", endpoint.WithID(123))
 		parentConn := newConn(e, config)
@@ -238,7 +238,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		mockStream.EXPECT().CloseSend().Return(expectedErr)
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -265,7 +265,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		mockStream.EXPECT().SendMsg(msg).Return(nil)
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -290,7 +290,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		mockStream.EXPECT().SendMsg(msg).Return(context.DeadlineExceeded)
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -320,7 +320,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		mockStream.EXPECT().SendMsg(msg).Return(streamErr)
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -353,7 +353,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		mockStream.EXPECT().SendMsg(msg).Return(grpcStatus.Error(grpcCodes.Unavailable, "unavailable"))
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -381,7 +381,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		mockStream.EXPECT().SendMsg(msg).Return(grpcStatus.Error(grpcCodes.Unavailable, "unavailable"))
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135", endpoint.WithID(123))
 		parentConn := newConn(e, config)
@@ -413,7 +413,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		mockStream.EXPECT().SendMsg(msg).Return(expectedErr)
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -446,7 +446,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		})
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -472,7 +472,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		mockStream.EXPECT().Trailer().Return(metadata.MD{})
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -499,7 +499,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 			mockStream.EXPECT().Trailer().Return(metadata.MD{})
 
 			config := &mockConfig{
-				dialTimeout:   5 * time.Second,
+				dialTimeout: 5 * time.Second,
 			}
 			e := endpoint.New("test-endpoint:2135")
 			parentConn := newConn(e, config)
@@ -525,7 +525,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 			mockStream.EXPECT().Trailer().Return(metadata.MD{})
 
 			config := &mockConfig{
-				dialTimeout:   5 * time.Second,
+				dialTimeout: 5 * time.Second,
 			}
 			e := endpoint.New("test-endpoint:2135")
 			parentConn := newConn(e, config)
@@ -561,7 +561,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		mockStream.EXPECT().Trailer().Return(metadata.MD{})
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -597,7 +597,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 			mockStream.EXPECT().Trailer().Return(metadata.MD{})
 
 			config := &mockConfig{
-				dialTimeout:   5 * time.Second,
+				dialTimeout: 5 * time.Second,
 			}
 			e := endpoint.New("test-endpoint:2135")
 			parentConn := newConn(e, config)
@@ -695,7 +695,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		mockStream.EXPECT().Trailer().Return(metadata.MD{})
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135", endpoint.WithID(123))
 		parentConn := newConn(e, config)
@@ -728,7 +728,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		mockStream.EXPECT().Trailer().Return(metadata.MD{})
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -760,7 +760,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		mockStream.EXPECT().Trailer().Return(metadata.MD{})
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135", endpoint.WithID(123))
 		parentConn := newConn(e, config)
@@ -791,7 +791,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		})
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -815,8 +815,8 @@ func TestGrpcClientStream_Finish(t *testing.T) {
 		mockStream := mock.NewMockClientStream(ctrl)
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			driverTrace:   &trace.Driver{},
+			dialTimeout: 5 * time.Second,
+			driverTrace: &trace.Driver{},
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)
@@ -844,8 +844,8 @@ func TestGrpcClientStream_Finish(t *testing.T) {
 		mockStream := mock.NewMockClientStream(ctrl)
 
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			driverTrace:   &trace.Driver{},
+			dialTimeout: 5 * time.Second,
+			driverTrace: &trace.Driver{},
 		}
 		e := endpoint.New("test-endpoint:2135")
 		parentConn := newConn(e, config)

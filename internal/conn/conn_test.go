@@ -266,7 +266,7 @@ func TestReplyWrapper(t *testing.T) {
 func TestConn_StateManagement(t *testing.T) {
 	t.Run("NewConnHasCreatedState", func(t *testing.T) {
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		c := newConn(e, config)
@@ -275,7 +275,7 @@ func TestConn_StateManagement(t *testing.T) {
 
 	t.Run("EndpointMethodsWork", func(t *testing.T) {
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135", endpoint.WithID(123))
 		c := newConn(e, config)
@@ -343,7 +343,7 @@ func TestStatsHandler(t *testing.T) {
 func TestConn_OnClose(t *testing.T) {
 	t.Run("OnCloseCalledOnClose", func(t *testing.T) {
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 		called := false
@@ -358,7 +358,7 @@ func TestConn_OnClose(t *testing.T) {
 
 	t.Run("MultipleOnCloseCalled", func(t *testing.T) {
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 
@@ -378,7 +378,7 @@ func TestConn_OnClose(t *testing.T) {
 
 	t.Run("OnCloseWithNilCallback", func(t *testing.T) {
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
+			dialTimeout: 5 * time.Second,
 		}
 		e := endpoint.New("test-endpoint:2135")
 

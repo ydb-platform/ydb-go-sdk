@@ -23,7 +23,6 @@ type Config struct {
 
 	trace              *trace.Driver
 	dialTimeout        time.Duration
-	connectionTTL      time.Duration
 	balancerConfig     *balancerConfig.Config
 	secure             bool
 	endpoint           string
@@ -80,7 +79,7 @@ func (c *Config) Meta() *meta.Meta {
 // Will be removed after Dec 2026
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (c *Config) ConnectionTTL() time.Duration {
-	return c.connectionTTL
+	return 0
 }
 
 // Secure is a flag for secure connection
@@ -228,9 +227,7 @@ func WithUserAgent(userAgent string) Option {
 // Will be removed after Dec 2026
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithConnectionTTL(ttl time.Duration) Option {
-	return func(c *Config) {
-		c.connectionTTL = ttl
-	}
+	return func(c *Config) {}
 }
 
 func WithCredentials(credentials credentials.Credentials) Option {
