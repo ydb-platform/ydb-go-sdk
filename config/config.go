@@ -76,7 +76,7 @@ func (c *Config) Meta() *meta.Meta {
 
 // ConnectionTTL defines interval for parking grpc connections.
 //
-// If ConnectionTTL is zero - connections are not park.
+// Deprecated: connection parking was removed; the option is a no-op and will be removed in a future release.
 func (c *Config) ConnectionTTL() time.Duration {
 	return c.connectionTTL
 }
@@ -222,6 +222,7 @@ func WithUserAgent(userAgent string) Option {
 	}
 }
 
+// Deprecated: connection parking was removed; the option is a no-op and will be removed in a future release.
 func WithConnectionTTL(ttl time.Duration) Option {
 	return func(c *Config) {
 		c.connectionTTL = ttl

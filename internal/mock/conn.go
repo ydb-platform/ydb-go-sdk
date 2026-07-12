@@ -32,10 +32,6 @@ func (c *Conn) Endpoint() endpoint.Endpoint {
 	}
 }
 
-func (c *Conn) LastUsage() (*time.Time, error) {
-	panic("not implemented in mock")
-}
-
 func (c *Conn) GetState() state.State {
 	return c.State
 }

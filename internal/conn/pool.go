@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
@@ -15,7 +14,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -24,7 +22,6 @@ import (
 
 type Pool struct {
 	usages      int64
-	clock       clockwork.Clock
 	config      Config
 	dialOptions []grpc.DialOption
 	conns       xsync.Map[endpoint.Key, *conn]
@@ -62,10 +59,7 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 		return cc
 	}
 
-	cc = newConn(endpoint, p,
-		withOnClose(p.remove),
-		withTrackLastUsage(p.config.ConnectionTTL() > 0),
-	)
+	cc = newConn(endpoint, p, withOnClose(p.remove))
 
 	p.conns.Set(endpoint.Key(), cc)
 
@@ -167,33 +161,7 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 	return nil
 }
 
-func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
-	ticker := p.clock.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-p.done:
-			return
-		case <-ticker.Chan():
-			p.conns.Range(func(_ endpoint.Key, c *conn) bool {
-				if t, err := c.LastUsage(); err == nil && time.Since(*t) > ttl {
-					switch c.GetState() {
-					case state.Online, state.Banned:
-						_ = c.park(ctx)
-					default:
-						// nop
-					}
-				}
-
-				return true
-			})
-		}
-	}
-}
-
-type poolOption func(p *Pool)
-
-func NewPool(ctx context.Context, config Config, opts ...poolOption) *Pool {
+func NewPool(ctx context.Context, config Config) *Pool {
 	onDone := gtrace.DriverOnPoolNew(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.NewPool"),
 	)
@@ -201,14 +169,9 @@ func NewPool(ctx context.Context, config Config, opts ...poolOption) *Pool {
 
 	p := &Pool{
 		usages:      1,
-		clock:       clockwork.NewRealClock(),
 		config:      config,
 		dialOptions: config.GrpcDialOptions(),
 		done:        make(chan struct{}),
-	}
-
-	for _, opt := range opts {
-		opt(p)
 	}
 
 	p.dialOptions = append(p.dialOptions,
@@ -234,10 +197,6 @@ func NewPool(ctx context.Context, config Config, opts ...poolOption) *Pool {
 			})),
 		),
 	)
-
-	if ttl := config.ConnectionTTL(); ttl > 0 {
-		go p.connParker(xcontext.ValueOnly(ctx), ttl, ttl/2) //nolint:mnd
-	}
 
 	return p
 }

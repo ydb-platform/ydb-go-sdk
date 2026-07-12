@@ -1,3 +1,7 @@
+## Unreleased
+* Removed background connection parking (`connParker`), `conn.lastUsage` tracking and `xsync.LastUsage`
+* Deprecated `WithConnectionTTL`: the option is now a no-op
+
 ## v3.143.0
 * Added experimental helper `sugar.NewKVClientBuilder(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
 
