@@ -76,7 +76,9 @@ func (c *Config) Meta() *meta.Meta {
 
 // ConnectionTTL defines interval for parking grpc connections.
 //
-// Deprecated: connection parking was removed; the option is a no-op and will be removed in a future release.
+// Deprecated: connection parking was removed without any alternative
+// Will be removed after Dec 2026
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (c *Config) ConnectionTTL() time.Duration {
 	return c.connectionTTL
 }
@@ -222,7 +224,9 @@ func WithUserAgent(userAgent string) Option {
 	}
 }
 
-// Deprecated: connection parking was removed; the option is a no-op and will be removed in a future release.
+// Deprecated: connection parking was removed without any alternative
+// Will be removed after Dec 2026
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithConnectionTTL(ttl time.Duration) Option {
 	return func(c *Config) {
 		c.connectionTTL = ttl

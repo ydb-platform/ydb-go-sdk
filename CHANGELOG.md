@@ -1,4 +1,3 @@
-## Unreleased
 * Removed background connection parking (`connParker`), `conn.lastUsage` tracking and `xsync.LastUsage`
 * Deprecated `WithConnectionTTL`: the option is now a no-op
 
