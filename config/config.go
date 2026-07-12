@@ -73,7 +73,7 @@ func (c *Config) Meta() *meta.Meta {
 	return c.meta
 }
 
-// Deprecated: connection parking was removed without any alternative
+// Deprecated: connection parking was removed; ConnectionTTL always returns 0.
 // Will be removed after Dec 2026
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (c *Config) ConnectionTTL() time.Duration {
