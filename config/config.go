@@ -221,7 +221,7 @@ func WithUserAgent(userAgent string) Option {
 	}
 }
 
-// Deprecated: connection parking was removed without any alternative
+// Deprecated: connection parking was removed; this option is now a no-op.
 // Will be removed after Dec 2026
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithConnectionTTL(ttl time.Duration) Option {
