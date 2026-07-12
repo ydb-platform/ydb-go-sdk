@@ -214,13 +214,11 @@ func WithConnectionString(connectionString string) Option {
 	}
 }
 
-// WithConnectionTTL defines duration for parking idle connections.
-//
 // Deprecated: connection parking was removed without any alternative
 // Will be removed after Dec 2026.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithConnectionTTL(ttl time.Duration) Option {
-	return func(ctx context.Context, d *Driver) error {
+	return func(context.Context, *Driver) error {
 		return nil
 	}
 }
