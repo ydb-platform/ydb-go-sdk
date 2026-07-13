@@ -2,7 +2,6 @@ package conn
 
 import (
 	"context"
-	"maps"
 	"net/url"
 	"sync"
 	"sync/atomic"
@@ -57,6 +56,16 @@ func (p *Pool) GrpcDialOptions() []grpc.DialOption {
 	return p.dialOptions
 }
 
+func (p *Pool) newConnValue(e endpoint.Endpoint) (value *connValue) {
+	defer func() {
+		value.useCount.Add(1)
+	}()
+
+	return &connValue{
+		cc: newConn(e, p),
+	}
+}
+
 // Get returns a pooled connection wrapper for the endpoint and increments its use
 // count. The gRPC connection is established lazily on the first Invoke or
 // NewStream. Call [Pool.Put] when the endpoint is no longer needed.
@@ -77,12 +86,7 @@ func (p *Pool) Get(e endpoint.Endpoint) Conn {
 		return value.cc
 	}
 
-	value := &connValue{
-		cc: newConn(e, p,
-			withOnClose(p.remove),
-		),
-	}
-	value.useCount.Add(1)
+	value := p.newConnValue(e)
 
 	p.conns[key] = value
 
@@ -112,19 +116,8 @@ func (p *Pool) Put(ctx context.Context, cc Conn) {
 	}
 
 	if value.useCount.Add(-1) == 0 {
-		p.mu.Unlock()
-		_ = c.Close(ctx)
-		p.mu.Lock()
-	}
-}
-
-func (p *Pool) remove(c *conn) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	key := c.endpoint.Key()
-	if value, ok := p.conns[key]; ok && value != nil && value.cc == c {
 		delete(p.conns, key)
+		_ = c.Close(ctx)
 	}
 }
 
@@ -240,12 +233,12 @@ func NewPool(ctx context.Context, config Config) *Pool {
 					return func(info trace.DriverResolveDoneInfo) {
 						if info.Error != nil || len(resolved) == 0 {
 							p.mu.Lock()
-							conns := maps.Clone(p.conns)
-							p.mu.Unlock()
+							defer p.mu.Unlock()
 
-							for key, value := range conns {
+							for key, value := range p.conns {
 								cc := value.cc
 								if u, err := url.Parse(key.Address); err == nil && u.Host == target && cc.grpcConn != nil {
+									delete(p.conns, key)
 									_ = cc.Close(xcontext.ValueOnly(ctx))
 								}
 							}

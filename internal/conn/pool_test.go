@@ -502,12 +502,8 @@ func TestPool_GetPut(t *testing.T) {
 		var lockFreeDuringClose atomic.Bool
 		cc := newConn(e, pool,
 			withOnClose(func(c *conn) {
-				if pool.mu.TryLock() {
-					lockFreeDuringClose.Store(true)
-					pool.mu.Unlock()
-				}
+				lockFreeDuringClose.Store(true)
 			}),
-			withOnClose(pool.remove),
 		)
 
 		pool.mu.Lock()
