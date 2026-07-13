@@ -34,10 +34,16 @@ type (
 	}
 )
 
-func EndpointsToConnections(p *Pool, endpoints []endpoint.Endpoint) []Conn {
+func endpointsToConnections(p *Pool, endpoints []endpoint.Endpoint) []Conn {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	conns := make([]Conn, 0, len(endpoints))
 	for _, e := range endpoints {
-		conns = append(conns, p.Get(e))
+		cv := p.get(e)
+		if cv != nil {
+			conns = append(conns, cv.cc)
+		}
 	}
 
 	return conns
@@ -55,16 +61,6 @@ func (p *Pool) GrpcDialOptions() []grpc.DialOption {
 	return p.dialOptions
 }
 
-func (p *Pool) newConnValue(e endpoint.Endpoint) (value *connValue) {
-	defer func() {
-		value.useCount.Add(1)
-	}()
-
-	return &connValue{
-		cc: newConn(e, p),
-	}
-}
-
 // Get returns a pooled connection wrapper for the endpoint and increments its use
 // count. The gRPC connection is established lazily on the first Invoke or
 // NewStream. Call [Pool.Put] when the endpoint is no longer needed.
@@ -72,6 +68,17 @@ func (p *Pool) Get(e endpoint.Endpoint) Conn {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	cv := p.get(e)
+	if cv == nil {
+		return nil
+	}
+
+	cv.useCount.Add(1)
+
+	return cv.cc
+}
+
+func (p *Pool) get(e endpoint.Endpoint) *connValue {
 	if p.closed {
 		return nil
 	}
@@ -79,17 +86,18 @@ func (p *Pool) Get(e endpoint.Endpoint) Conn {
 	key := e.Key()
 
 	if value, ok := p.conns[key]; ok {
-		value.useCount.Add(1)
 		value.cc.lastClusterAnnouncement.Store(time.Now().Unix())
 
-		return value.cc
+		return value
 	}
 
-	value := p.newConnValue(e)
+	value := &connValue{
+		cc: newConn(e, p),
+	}
 
 	p.conns[key] = value
 
-	return value.cc
+	return value
 }
 
 // Put decrements the connection use count. When the count reaches zero, the gRPC

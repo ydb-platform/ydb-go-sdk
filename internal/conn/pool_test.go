@@ -287,7 +287,7 @@ func TestEndpointsToConnections(t *testing.T) {
 		e1 := endpoint.New("e1:2135")
 		e2 := endpoint.New("e2:2135")
 
-		conns := EndpointsToConnections(pool, []endpoint.Endpoint{e1, e2})
+		conns := endpointsToConnections(pool, []endpoint.Endpoint{e1, e2})
 
 		require.Len(t, conns, 2)
 		require.Equal(t, 2, testPoolConnsLen(pool))
@@ -314,7 +314,7 @@ func TestEndpointsToConnections(t *testing.T) {
 
 		initialLen := testPoolConnsLen(pool)
 
-		conns := EndpointsToConnections(pool, []endpoint.Endpoint{e})
+		conns := endpointsToConnections(pool, []endpoint.Endpoint{e})
 
 		require.Len(t, conns, 1)
 		require.Equal(t, existing, conns[0])
@@ -351,7 +351,7 @@ func TestEndpointsToConnections(t *testing.T) {
 		e5 := endpoint.New("example.com:2135", endpoint.WithIPV6([]string{"2001:db8::1"}), endpoint.WithID(1))
 
 		endpoints := []endpoint.Endpoint{e1, e2, e3, e4, e5}
-		conns := EndpointsToConnections(pool, endpoints)
+		conns := endpointsToConnections(pool, endpoints)
 
 		require.Len(t, conns, len(endpoints))
 		require.Equal(t, 5, testPoolConnsLen(pool))
@@ -386,7 +386,7 @@ func TestEndpointsToConnections(t *testing.T) {
 		e2 := endpoint.New("e2.example:2135", endpoint.WithIPV6([]string{"2001:db8::2"}), endpoint.WithID(2))
 
 		// create initial connections
-		initialConns := EndpointsToConnections(pool, []endpoint.Endpoint{e1, e2})
+		initialConns := endpointsToConnections(pool, []endpoint.Endpoint{e1, e2})
 		require.Len(t, initialConns, 2)
 		require.Equal(t, 2, testPoolConnsLen(pool))
 		require.Equal(t, pool.Get(e1), initialConns[0])
@@ -394,14 +394,14 @@ func TestEndpointsToConnections(t *testing.T) {
 
 		// add a new unique endpoint e3 -> pool should grow
 		e3 := endpoint.New("e3.example:2135", endpoint.WithIPV6([]string{"2001:db8::3"}), endpoint.WithID(3))
-		connsAfterE3 := EndpointsToConnections(pool, []endpoint.Endpoint{e1, e2, e3})
+		connsAfterE3 := endpointsToConnections(pool, []endpoint.Endpoint{e1, e2, e3})
 		require.Len(t, connsAfterE3, 3)
 		require.Equal(t, 3, testPoolConnsLen(pool))
 		require.Equal(t, pool.Get(e3), connsAfterE3[2])
 
 		// now use same address as e1 but different NodeID (and same ipv6) -> should create new conn
 		e1DifferentNode := endpoint.New("e1.example:2135", endpoint.WithIPV6([]string{"2001:db8::1"}), endpoint.WithID(99))
-		connsAfterNodeChange := EndpointsToConnections(pool, []endpoint.Endpoint{e1DifferentNode})
+		connsAfterNodeChange := endpointsToConnections(pool, []endpoint.Endpoint{e1DifferentNode})
 		require.Len(t, connsAfterNodeChange, 1)
 		// pool size must increase by one
 		require.Equal(t, 4, testPoolConnsLen(pool))
