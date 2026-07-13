@@ -238,12 +238,12 @@ func NewPool(ctx context.Context, config Config) *Pool {
 
 							for key, value := range p.conns {
 								if u, err := url.Parse(key.Address); err == nil && u.Host == target {
+									value.cc.mtx.Lock()
 									if value.cc.grpcConn != nil {
-										value.cc.mtx.Lock()
 										value.cc.grpcConn.Close()
 										value.cc.grpcConn = nil
-										value.cc.mtx.Unlock()
 									}
+									value.cc.mtx.Unlock()
 								}
 							}
 						}
