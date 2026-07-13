@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -21,6 +22,34 @@ import (
 )
 
 func TestDiscover(t *testing.T) {
+	t.Run("IPv6UsesFQDNForResolver", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		client := NewMockDiscoveryServiceClient(ctrl)
+		client.EXPECT().ListEndpoints(gomock.Any(), gomock.Any()).Return(&Ydb_Discovery.ListEndpointsResponse{
+			Operation: &Ydb_Operations.Operation{
+				Ready:  true,
+				Status: Ydb.StatusIds_SUCCESS,
+				Result: xtest.Must(anypb.New(&Ydb_Discovery.ListEndpointsResult{
+					Endpoints: []*Ydb_Discovery.EndpointInfo{
+						{Address: "dual-stack.example", Port: 2136, IpV4: []string{"192.0.2.1"}, IpV6: []string{"2001:db8::1"}},
+					},
+				})),
+			},
+		}, nil)
+
+		endpoints, _, err := Discover(ctx, client, config.New(
+			config.WithIPVersion(balancerConfig.IPv6),
+		))
+		require.NoError(t, err)
+		require.Equal(t, []string{"dual-stack.example:2136"}, []string{endpoints[0].Address()})
+
+		filter := endpoint.AddressFilter(endpoints[0])
+		require.NotNil(t, filter)
+		require.False(t, filter("192.0.2.1:2136"))
+		require.True(t, filter("[2001:db8::1]:2136"))
+	})
+
 	t.Run("HappyWay", func(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)

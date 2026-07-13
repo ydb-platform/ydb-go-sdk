@@ -80,6 +80,22 @@ func TestPool_Get(t *testing.T) {
 		// Should return different connections
 		require.NotEqual(t, conn1, conn2)
 	})
+
+	t.Run("DoesNotShareConnectionsWithDifferentAddressFilters", func(t *testing.T) {
+		ctx := context.Background()
+		pool := NewPool(ctx, &mockConfig{dialTimeout: 5 * time.Second})
+		defer func() {
+			_ = pool.Release(ctx)
+		}()
+
+		withoutFilter := endpoint.New("example.com:2135")
+		ipv6Only := endpoint.New("example.com:2135", endpoint.WithAddressFilter("IPv6", func(string) bool {
+			return true
+		}))
+
+		require.NotEqual(t, withoutFilter.Key(), ipv6Only.Key())
+		require.NotEqual(t, pool.Get(withoutFilter), pool.Get(ipv6Only))
+	})
 }
 
 func TestPool_TakeRelease(t *testing.T) {
