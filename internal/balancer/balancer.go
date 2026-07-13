@@ -307,6 +307,8 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(errBalancerClosed)
 	}
 
+	b.closed = true
+
 	onDone := gtrace.DriverOnBalancerClose(
 		b.driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).Close"),
