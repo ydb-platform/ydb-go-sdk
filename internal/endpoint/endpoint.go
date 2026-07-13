@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -14,7 +15,6 @@ type (
 		NodeID
 		Address() string
 		Location() string
-		LastUpdated() time.Time
 		LoadFactor() float32
 		OverrideHost() string
 
@@ -33,9 +33,10 @@ type (
 		Info
 
 		String() string
-		Copy() Endpoint
-		Touch(opts ...Option)
 		Key() Key
+		LastUpdated() time.Time
+
+		Copy(opts ...Option) Endpoint
 	}
 )
 
@@ -63,11 +64,11 @@ func (e *endpoint) Key() Key {
 	}
 }
 
-func (e *endpoint) Copy() Endpoint {
+func (e *endpoint) Copy(opts ...Option) Endpoint {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	return &endpoint{
+	c := &endpoint{
 		id:              e.id,
 		address:         e.address,
 		location:        e.location,
@@ -79,6 +80,14 @@ func (e *endpoint) Copy() Endpoint {
 		local:           e.local,
 		lastUpdated:     e.lastUpdated,
 	}
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt(c)
+		}
+	}
+
+	return c
 }
 
 func (e *endpoint) String() string {
@@ -181,16 +190,6 @@ func (e *endpoint) LastUpdated() time.Time {
 	return e.lastUpdated
 }
 
-func (e *endpoint) Touch(opts ...Option) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	for _, opt := range append([]Option{WithLastUpdated(time.Now())}, opts...) {
-		if opt != nil {
-			opt(e)
-		}
-	}
-}
-
 type Option func(e *endpoint)
 
 func WithID(id uint32) Option {
@@ -259,4 +258,20 @@ func New(address string, opts ...Option) *endpoint {
 	}
 
 	return e
+}
+
+// Compare orders two discovery endpoints for stable diffing of endpoint snapshots.
+func Compare(lhs, rhs Endpoint) int {
+	cmp := strings.Compare(lhs.Address(), rhs.Address())
+	if cmp != 0 {
+		return cmp
+	}
+	if lhs.NodeID() < rhs.NodeID() {
+		return -1
+	}
+	if lhs.NodeID() > rhs.NodeID() {
+		return 1
+	}
+
+	return strings.Compare(lhs.OverrideHost(), rhs.OverrideHost())
 }

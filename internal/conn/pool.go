@@ -11,7 +11,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -56,6 +55,8 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 	)
 
 	if cc, has = p.conns.Get(endpoint.Key()); has {
+		cc.lastClusterAnnouncement.Store(time.Now().Unix())
+
 		return cc
 	}
 
@@ -84,30 +85,15 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		return
 	}
 
-	gtrace.DriverOnConnBan(
+	onDone := gtrace.DriverOnConnBan(
 		p.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Ban"),
-		cc.Endpoint().Copy(), cc.GetState(), cause,
-	)(cc.SetState(ctx, state.Banned))
-}
+		cc.Endpoint(), cc.State(), cause,
+	)
 
-func (p *Pool) Allow(ctx context.Context, cc Conn) {
-	if p.isClosed() {
-		return
-	}
+	cc.Ban(ctx)
 
-	e := cc.Endpoint().Copy()
-
-	cc, ok := p.conns.Get(e.Key())
-	if !ok {
-		return
-	}
-
-	gtrace.DriverOnConnAllow(
-		p.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Allow"),
-		e, cc.GetState(),
-	)(cc.Unban(ctx))
+	onDone(cc.State())
 }
 
 func (p *Pool) Take(context.Context) error {

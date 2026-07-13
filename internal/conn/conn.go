@@ -39,9 +39,9 @@ type Conn interface {
 	grpc.ClientConnInterface
 
 	Endpoint() endpoint.Endpoint
-	GetState() state.State
-	SetState(ctx context.Context, state state.State) state.State
-	Unban(ctx context.Context) state.State
+	State() state.State
+	Unban(ctx context.Context)
+	Ban(ctx context.Context)
 }
 
 type (
@@ -57,15 +57,16 @@ type (
 		GetState() connectivity.State
 	}
 	conn struct {
-		mtx          sync.RWMutex
-		config       connConfig // ro access
-		grpcConn     grpcClientConnInterface
-		done         chan struct{}
-		endpoint     endpoint.Endpoint // ro access
-		closed       bool
-		state        atomic.Uint32
-		childStreams *xcontext.CancelsGuard
-		onClose      []func(*conn)
+		mtx                     sync.RWMutex
+		config                  connConfig // ro access
+		grpcConn                grpcClientConnInterface
+		done                    chan struct{}
+		endpoint                endpoint.Endpoint // ro access
+		closed                  bool
+		state                   atomic.Uint32
+		lastClusterAnnouncement atomic.Int64
+		childStreams            *xcontext.CancelsGuard
+		onClose                 []func(*conn)
 	}
 )
 
@@ -83,14 +84,20 @@ func (c *conn) NodeID() uint32 {
 
 func (c *conn) Endpoint() endpoint.Endpoint {
 	if c != nil {
-		return c.endpoint
+		return c.endpoint.Copy(
+			endpoint.WithLastUpdated(time.Unix(c.lastClusterAnnouncement.Load(), 0)),
+		)
 	}
 
 	return nil
 }
 
-func (c *conn) SetState(ctx context.Context, s state.State) state.State {
-	return c.setState(ctx, s)
+func SetState(ctx context.Context, c Conn, s state.State) state.State {
+	if cc, ok := c.(*conn); ok {
+		return cc.setState(ctx, s)
+	}
+
+	return s
 }
 
 func (c *conn) setState(ctx context.Context, s state.State) state.State {
@@ -98,14 +105,14 @@ func (c *conn) setState(ctx context.Context, s state.State) state.State {
 		gtrace.DriverOnConnStateChange(
 			c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).setState"),
-			c.endpoint.Copy(), state,
+			c.Endpoint(), state,
 		)(s)
 	}
 
 	return s
 }
 
-func (c *conn) Unban(ctx context.Context) state.State {
+func (c *conn) unban(ctx context.Context) state.State {
 	var newState state.State
 	c.mtx.RLock()
 	cc := c.grpcConn
@@ -121,7 +128,19 @@ func (c *conn) Unban(ctx context.Context) state.State {
 	return newState
 }
 
-func (c *conn) GetState() (s state.State) {
+func (c *conn) Unban(ctx context.Context) {
+	gtrace.DriverOnConnAllow(
+		c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).Unban"),
+		c.Endpoint(), c.State(),
+	)(c.unban(ctx))
+}
+
+func (c *conn) Ban(ctx context.Context) {
+	c.setState(ctx, state.Banned)
+}
+
+func (c *conn) State() (s state.State) {
 	return state.State(c.state.Load())
 }
 
@@ -145,7 +164,7 @@ func (c *conn) dial(ctx context.Context) (cc grpcClientConnInterface, err error)
 	onDone := gtrace.DriverOnConnDial(
 		c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).dial"),
-		c.endpoint.Copy(),
+		c.Endpoint(),
 	)
 	defer func() {
 		onDone(err)
@@ -377,14 +396,14 @@ func (c *conn) Invoke(
 		onDone = gtrace.DriverOnConnInvoke(
 			c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).Invoke"),
-			c.endpoint, trace.Method(method),
+			c.Endpoint(), trace.Method(method),
 		)
 		cc grpcClientConnInterface
 		md = metadata.MD{}
 	)
 	defer func() {
 		meta.CallTrailerCallback(ctx, md)
-		onDone(err, issues, opID, c.GetState(), md)
+		onDone(err, issues, opID, c.State(), md)
 	}()
 
 	cc, err = c.realConn(ctx)
@@ -417,13 +436,13 @@ func (c *conn) NewStream(
 		onDone = gtrace.DriverOnConnNewStream(
 			c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).NewStream"),
-			c.endpoint.Copy(), trace.Method(method),
+			c.Endpoint(), trace.Method(method),
 		)
 		useWrapping = UseWrapping(ctx)
 	)
 
 	defer func() {
-		onDone(finalErr, c.GetState())
+		onDone(finalErr, c.State())
 	}()
 
 	cc, err := c.realConn(ctx)
@@ -504,7 +523,10 @@ func newConn(e endpoint.Endpoint, config connConfig, opts ...option) *conn {
 			},
 		},
 	}
+
 	c.state.Store(uint32(state.Created))
+	c.lastClusterAnnouncement.Store(time.Now().Unix())
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(c)
