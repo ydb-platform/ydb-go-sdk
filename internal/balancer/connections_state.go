@@ -18,6 +18,8 @@ type connectionsState struct {
 	fallback []conn.Conn
 	all      []conn.Conn
 
+	quarantine []conn.Conn
+
 	rand xrand.Rand
 }
 
@@ -26,10 +28,12 @@ func newConnectionsState(
 	filter balancerConfig.Filter,
 	info balancerConfig.Info,
 	allowFallback bool,
+	quarantine []conn.Conn,
 ) *connectionsState {
 	res := &connectionsState{
 		connByNodeID: connsToNodeIDMap(conns),
 		rand:         xrand.New(xrand.WithLock()),
+		quarantine:   quarantine,
 	}
 
 	res.prefer, res.fallback = sortPreferConnections(conns, filter, info, allowFallback)

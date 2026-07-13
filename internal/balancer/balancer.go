@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
@@ -76,8 +77,9 @@ type Balancer struct {
 	localDCDetector func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
 	connectionsState atomic.Pointer[connectionsState]
-	quarantine       []conn.Conn
-	closed           atomic.Bool
+
+	closeMu sync.RWMutex
+	closed  bool
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -229,8 +231,27 @@ func nextState(ctx context.Context, pool interface {
 	return active, newActive
 }
 
+func (b *Balancer) clearState(ctx context.Context, state *connectionsState) {
+	if state == nil {
+		return
+	}
+
+	for _, c := range state.quarantine {
+		b.pool.Put(ctx, c)
+	}
+
+	for _, cc := range state.all {
+		b.pool.Put(ctx, cc)
+	}
+}
+
 func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
-	if b.closed.Load() {
+	b.closeMu.RLock()
+	defer b.closeMu.RUnlock()
+
+	if b.closed {
+		b.clearState(ctx, b.connectionsState.Swap(nil))
+
 		return
 	}
 
@@ -242,8 +263,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 			b.balancerConfig.DetectNearestDC,
 			b.driverConfig.Database(),
 		)
-		active      = b.connections().All()
-		connections []conn.Conn
+		active = b.connections().All()
 	)
 	defer func() {
 		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
@@ -258,19 +278,34 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 		)
 	}()
 
-	b.quarantine, connections = nextState(ctx, b.pool, b.quarantine, active, endpoints)
+	var (
+		state      = b.connectionsState.Load()
+		quarantine []conn.Conn
+	)
+
+	if state != nil {
+		quarantine = state.quarantine
+	}
+
+	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
 
 	b.connectionsState.Store(
 		newConnectionsState(connections,
 			b.balancerConfig.Filter,
 			balancerConfig.Info{SelfLocation: localDC},
 			b.balancerConfig.AllowFallback,
+			quarantine,
 		),
 	)
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
-	b.closed.Store(true)
+	b.closeMu.RLock()
+	defer b.closeMu.RUnlock()
+
+	if b.closed {
+		return xerrors.WithStackTrace(errBalancerClosed)
+	}
 
 	onDone := gtrace.DriverOnBalancerClose(
 		b.driverConfig.Trace(), &ctx,
@@ -284,17 +319,7 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		b.discoveryRepeater.Stop()
 	}
 
-	if current := b.connections(); current != nil {
-		for _, cc := range current.All() {
-			b.pool.Put(ctx, cc)
-		}
-	}
-
-	for _, c := range b.quarantine {
-		b.pool.Put(ctx, c)
-	}
-
-	b.quarantine = nil
+	b.clearState(ctx, b.connectionsState.Swap(nil))
 
 	if cc := b.cc.Load(); cc != nil {
 		_ = cc.Close()
@@ -402,10 +427,6 @@ func (b *Balancer) Invoke(
 	reply any,
 	opts ...grpc.CallOption,
 ) error {
-	if b.closed.Load() {
-		return xerrors.WithStackTrace(errBalancerClosed)
-	}
-
 	return b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
 		return cc.Invoke(ctx, method, args, reply, opts...)
 	})
@@ -417,10 +438,6 @@ func (b *Balancer) NewStream(
 	method string,
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
-	if b.closed.Load() {
-		return nil, xerrors.WithStackTrace(errBalancerClosed)
-	}
-
 	var stream grpc.ClientStream
 	if err := b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
 		inner, innerErr := cc.NewStream(ctx, desc, method, opts...)
@@ -483,10 +500,6 @@ func (b *Balancer) connections() *connectionsState {
 }
 
 func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
-	if b.closed.Load() {
-		return nil, xerrors.WithStackTrace(errBalancerClosed)
-	}
-
 	onDone := gtrace.DriverOnBalancerChooseEndpoint(
 		b.driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).nextConn"),
@@ -507,6 +520,10 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		state       = b.connections()
 		failedCount int
 	)
+
+	if state == nil || len(state.all) == 0 {
+		return nil, xerrors.WithStackTrace(ErrNoEndpoints)
+	}
 
 	defer func() {
 		if failedCount*2 > state.PreferredCount() && b.discoveryRepeater != nil {

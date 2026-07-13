@@ -120,7 +120,9 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 		balancerConfig: balancerConfig.Config{},
 	}
 
-	initial := newConnectionsState(nil, b.balancerConfig.Filter, balancerConfig.Info{}, b.balancerConfig.AllowFallback)
+	initial := newConnectionsState(nil,
+		b.balancerConfig.Filter, balancerConfig.Info{}, b.balancerConfig.AllowFallback, nil,
+	)
 	b.connectionsState.Store(initial)
 
 	e1 := endpoint.New("e1.example:2135", endpoint.WithIPV6([]string{"2001:db8::1"}), endpoint.WithID(1))
@@ -240,7 +242,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 				pool:           pool,
 				balancerConfig: balancerConfig.Config{},
 			}
-			s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false)
+			s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false, nil)
 			b.connectionsState.Store(s)
 
 			nodeCtx := endpoint.WithNodeID(ctx, e1.NodeID())
@@ -290,7 +292,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			pool:           pool,
 			balancerConfig: balancerConfig.Config{},
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		err := b.Invoke(endpoint.WithNodeID(ctx, cc1.NodeIDField), "/test.Service/Method", nil, nil)
@@ -330,7 +332,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			pool:           pool,
 			balancerConfig: balancerConfig.Config{},
 		}
-		s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false)
+		s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		err := b.Invoke(ctx, "/test.Service/Method", nil, nil)
@@ -372,7 +374,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			pool:           pool,
 			balancerConfig: balancerConfig.Config{},
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		// Call Invoke targeting cc1 with OVERLOADED tagged in context — wrapCall must ban cc1.
@@ -423,7 +425,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			pool:           pool,
 			balancerConfig: balancerConfig.Config{},
 		}
-		s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false)
+		s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		// Context only bans on OVERLOADED — a NOT_FOUND error must not ban.
@@ -470,7 +472,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			pool:           pool,
 			balancerConfig: balancerConfig.Config{},
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		invokeCtx := BanOnSessionCreate(endpoint.WithNodeID(ctx, cc1.NodeIDField))
@@ -519,7 +521,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			pool:           pool,
 			balancerConfig: balancerConfig.Config{},
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		invokeCtx := BanOnSessionCreate(endpoint.WithNodeID(ctx, cc1.NodeIDField))
@@ -564,7 +566,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			pool:           pool,
 			balancerConfig: balancerConfig.Config{},
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		// Sequentially pessimize cc1 then cc2 via the normal Invoke+BanOnOperationError flow.
@@ -617,7 +619,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			pool:           pool,
 			balancerConfig: balancerConfig.Config{},
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		streamCtx := BanOnOperationError(
@@ -671,7 +673,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			pool:           pool,
 			balancerConfig: balancerConfig.Config{},
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		streamCtx := BanOnOperationError(

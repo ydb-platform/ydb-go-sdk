@@ -279,9 +279,11 @@ func activeNodeIDs(b *Balancer) []uint32 {
 }
 
 func connInQuarantine(b *Balancer, nodeID uint32) conn.Conn {
-	for _, cc := range b.quarantine {
-		if cc.Endpoint().NodeID() == nodeID {
-			return cc
+	if state := b.connectionsState.Load(); state != nil {
+		for _, cc := range state.quarantine {
+			if cc.Endpoint().NodeID() == nodeID {
+				return cc
+			}
 		}
 	}
 
