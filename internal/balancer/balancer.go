@@ -289,9 +289,11 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 			b.pool.Put(ctx, cc)
 		}
 	}
+
 	for _, c := range b.quarantine {
 		b.pool.Put(ctx, c)
 	}
+
 	b.quarantine = nil
 
 	if cc := b.cc.Load(); cc != nil {
