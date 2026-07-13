@@ -243,15 +243,12 @@ func NewPool(ctx context.Context, config Config) *Pool {
 							defer p.mu.Unlock()
 
 							for key, value := range p.conns {
-								if u, err := url.Parse(key.Address); err == nil {
-									if u.Host == target && value.cc.grpcConn != nil {
-										func(cc *conn) {
-											cc.mtx.Lock()
-											defer cc.mtx.Unlock()
-
-											cc.grpcConn.Close()
-											cc.grpcConn = nil
-										}(value.cc)
+								if u, err := url.Parse(key.Address); err == nil && u.Host == target {
+									if value.cc.grpcConn != nil {
+										value.cc.mtx.Lock()
+										value.cc.grpcConn.Close()
+										value.cc.grpcConn = nil
+										value.cc.mtx.Unlock()
 									}
 								}
 							}
