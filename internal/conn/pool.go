@@ -108,33 +108,33 @@ func (p *Pool) Put(ctx context.Context, cc Conn) {
 		return
 	}
 
-	key := c.endpoint.Key()
+	if toClose := p.putDecRef(c); toClose != nil {
+		_ = toClose.Close(ctx)
+	}
+}
 
+func (p *Pool) putDecRef(c *conn) *conn {
 	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	if p.closed {
-		p.mu.Unlock()
-
-		return
+		return nil
 	}
+
+	key := c.endpoint.Key()
 
 	value, ok := p.conns[key]
 	if !ok || value == nil || value.cc != c {
-		p.mu.Unlock()
-
-		return
+		return nil
 	}
 
-	var toClose *conn
-	if value.useCount.Add(-1) == 0 {
-		delete(p.conns, key)
-		toClose = c
+	if value.useCount.Add(-1) != 0 {
+		return nil
 	}
-	p.mu.Unlock()
 
-	if toClose != nil {
-		_ = toClose.Close(ctx)
-	}
+	delete(p.conns, key)
+
+	return c
 }
 
 func (p *Pool) isClosed() bool {
@@ -145,11 +145,7 @@ func (p *Pool) isClosed() bool {
 }
 
 func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
-	p.mu.Lock()
-	closed := p.closed
-	p.mu.Unlock()
-
-	if closed {
+	if p.isClosed() {
 		return
 	}
 
@@ -181,24 +177,10 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	p.mu.Lock()
-
-	p.usages--
-	if p.usages > 0 {
-		p.mu.Unlock()
-
+	toClose := p.releaseFinalize()
+	if toClose == nil {
 		return nil
 	}
-
-	p.closed = true
-
-	toClose := make([]closer.Closer, 0, len(p.conns))
-	for _, value := range p.conns {
-		toClose = append(toClose, value.cc)
-	}
-
-	p.conns = nil
-	p.mu.Unlock()
 
 	var (
 		issues   []error
@@ -225,6 +207,27 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 	}
 
 	return nil
+}
+
+func (p *Pool) releaseFinalize() []closer.Closer {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.usages--
+	if p.usages > 0 {
+		return nil
+	}
+
+	p.closed = true
+
+	toClose := make([]closer.Closer, 0, len(p.conns))
+	for _, value := range p.conns {
+		toClose = append(toClose, value.cc)
+	}
+
+	p.conns = nil
+
+	return toClose
 }
 
 func NewPool(ctx context.Context, config Config) *Pool {
