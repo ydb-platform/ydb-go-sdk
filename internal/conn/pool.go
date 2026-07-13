@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"maps"
 	"net/url"
 	"sync"
 	"sync/atomic"
@@ -13,19 +14,27 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type Pool struct {
-	usages      int64
-	config      Config
-	dialOptions []grpc.DialOption
-	conns       xsync.Map[endpoint.Key, *conn]
-	done        chan struct{}
-}
+type (
+	connValue struct {
+		cc       *conn
+		useCount atomic.Int64
+	}
+	Pool struct {
+		config      Config
+		dialOptions []grpc.DialOption
+
+		mu     sync.Mutex
+		usages int64
+		conns  map[endpoint.Key]*connValue
+		closed bool
+	}
+)
 
 func EndpointsToConnections(p *Pool, endpoints []endpoint.Endpoint) []Conn {
 	conns := make([]Conn, 0, len(endpoints))
@@ -48,40 +57,90 @@ func (p *Pool) GrpcDialOptions() []grpc.DialOption {
 	return p.dialOptions
 }
 
-func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
-	var (
-		cc  *conn
-		has bool
-	)
+// Get returns a pooled connection wrapper for the endpoint and increments its use
+// count. The gRPC connection is established lazily on the first Invoke or
+// NewStream. Call [Pool.Put] when the endpoint is no longer needed.
+func (p *Pool) Get(e endpoint.Endpoint) Conn {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	if cc, has = p.conns.Get(endpoint.Key()); has {
-		cc.lastClusterAnnouncement.Store(time.Now().Unix())
-
-		return cc
+	if p.closed {
+		return nil
 	}
 
-	cc = newConn(endpoint, p, withOnClose(p.remove))
+	key := e.Key()
 
-	p.conns.Set(endpoint.Key(), cc)
+	if value, ok := p.conns[key]; ok {
+		value.useCount.Add(1)
+		value.cc.lastClusterAnnouncement.Store(time.Now().Unix())
 
-	return cc
+		return value.cc
+	}
+
+	value := &connValue{
+		cc: newConn(e, p,
+			withOnClose(p.remove),
+		),
+	}
+	value.useCount.Add(1)
+
+	p.conns[key] = value
+
+	return value.cc
+}
+
+// Put decrements the connection use count. When the count reaches zero, the gRPC
+// connection is closed and the entry is removed from the pool.
+func (p *Pool) Put(ctx context.Context, cc Conn) {
+	c, ok := cc.(*conn)
+	if !ok {
+		return
+	}
+
+	key := c.endpoint.Key()
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.closed {
+		return
+	}
+
+	value, ok := p.conns[key]
+	if !ok || value == nil || value.cc != c {
+		return
+	}
+
+	if value.useCount.Add(-1) == 0 {
+		p.mu.Unlock()
+		_ = c.Close(ctx)
+		p.mu.Lock()
+	}
 }
 
 func (p *Pool) remove(c *conn) {
-	p.conns.Delete(c.endpoint.Key())
-}
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-func (p *Pool) isClosed() bool {
-	select {
-	case <-p.done:
-		return true
-	default:
-		return false
+	key := c.endpoint.Key()
+	if value, ok := p.conns[key]; ok && value != nil && value.cc == c {
+		delete(p.conns, key)
 	}
 }
 
+func (p *Pool) isClosed() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.closed
+}
+
 func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
-	if p.isClosed() {
+	p.mu.Lock()
+	closed := p.closed
+	p.mu.Unlock()
+
+	if closed {
 		return
 	}
 
@@ -97,7 +156,10 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 }
 
 func (p *Pool) Take(context.Context) error {
-	atomic.AddInt64(&p.usages, 1)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.usages++
 
 	return nil
 }
@@ -110,35 +172,43 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	if atomic.AddInt64(&p.usages, -1) > 0 {
+	p.mu.Lock()
+	p.usages--
+	if p.usages > 0 {
+		p.mu.Unlock()
+
 		return nil
 	}
 
-	close(p.done)
+	p.closed = true
+
+	toClose := make([]closer.Closer, 0, len(p.conns))
+	for _, value := range p.conns {
+		toClose = append(toClose, value.cc)
+	}
+
+	p.conns = nil
+	p.mu.Unlock()
 
 	var (
-		errCh = make(chan error, p.conns.Len())
-		wg    sync.WaitGroup
+		issues   []error
+		issuesMu sync.Mutex
+		wg       sync.WaitGroup
 	)
 
-	wg.Add(cap(errCh))
-	p.conns.Range(func(_ endpoint.Key, c *conn) bool {
+	wg.Add(len(toClose))
+	for _, c := range toClose {
 		go func(c closer.Closer) {
 			defer wg.Done()
 			if err := c.Close(ctx); err != nil {
-				errCh <- err
+				issuesMu.Lock()
+				issues = append(issues, err)
+				issuesMu.Unlock()
 			}
 		}(c)
-
-		return true
-	})
-	wg.Wait()
-	close(errCh)
-
-	issues := make([]error, 0, cap(errCh))
-	for err := range errCh {
-		issues = append(issues, err)
 	}
+
+	wg.Wait()
 
 	if len(issues) > 0 {
 		return xerrors.WithStackTrace(xerrors.NewWithIssues("connection pool close failed", issues...))
@@ -157,7 +227,7 @@ func NewPool(ctx context.Context, config Config) *Pool {
 		usages:      1,
 		config:      config,
 		dialOptions: config.GrpcDialOptions(),
-		done:        make(chan struct{}),
+		conns:       make(map[endpoint.Key]*connValue),
 	}
 
 	p.dialOptions = append(p.dialOptions,
@@ -169,14 +239,16 @@ func NewPool(ctx context.Context, config Config) *Pool {
 
 					return func(info trace.DriverResolveDoneInfo) {
 						if info.Error != nil || len(resolved) == 0 {
-							p.conns.Range(func(key endpoint.Key, cc *conn) bool {
-								if u, err := url.Parse(key.Address); err == nil && u.Host == target && cc.grpcConn != nil {
-									_ = cc.grpcConn.Close()
-									_ = p.conns.Delete(key)
-								}
+							p.mu.Lock()
+							conns := maps.Clone(p.conns)
+							p.mu.Unlock()
 
-								return true
-							})
+							for key, value := range conns {
+								cc := value.cc
+								if u, err := url.Parse(key.Address); err == nil && u.Host == target && cc.grpcConn != nil {
+									_ = cc.Close(xcontext.ValueOnly(ctx))
+								}
+							}
 						}
 					}
 				},

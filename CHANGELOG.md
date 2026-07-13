@@ -1,3 +1,5 @@
+* Fixed gRPC connections to cluster nodes removed from Discovery staying open in the connection pool
+* Refactored connection pool lifecycle to reference-counted `Get`/`Put` with balancer-side quarantine
 * Removed background connection parking (`connParker`), `conn.lastUsage` tracking and `xsync.LastUsage`
 * Deprecated `WithConnectionTTL`: the option is now a no-op
 

@@ -694,3 +694,122 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		}
 	})
 }
+
+type countingPool struct {
+	counts map[endpoint.Key]int
+	conns  map[endpoint.Key]conn.Conn
+}
+
+func newCountingPool() *countingPool {
+	return &countingPool{
+		counts: make(map[endpoint.Key]int),
+		conns:  make(map[endpoint.Key]conn.Conn),
+	}
+}
+
+func (p *countingPool) Get(e endpoint.Endpoint) conn.Conn {
+	key := e.Key()
+	c, ok := p.conns[key]
+	if !ok {
+		c = &mock.Conn{
+			AddrField:   e.Address(),
+			NodeIDField: e.NodeID(),
+		}
+		p.conns[key] = c
+	}
+	p.counts[key]++
+
+	return c
+}
+
+func (p *countingPool) Put(ctx context.Context, cc conn.Conn) {
+	p.counts[cc.Endpoint().Key()]--
+}
+
+func (p *countingPool) count(key endpoint.Key) int {
+	return p.counts[key]
+}
+
+func requireConnKeys(t *testing.T, expected []endpoint.Endpoint, actual []conn.Conn) {
+	t.Helper()
+
+	require.Len(t, actual, len(expected))
+	for i, e := range expected {
+		require.Equal(t, e.Key(), actual[i].Endpoint().Key())
+	}
+}
+
+func TestNextState(t *testing.T) {
+	var (
+		ctx        = t.Context()
+		pool       = newCountingPool()
+		quarantine []conn.Conn
+		active     []conn.Conn
+
+		a = endpoint.New("node-a:2135", endpoint.WithID(1))
+		b = endpoint.New("node-b:2135", endpoint.WithID(2))
+		c = endpoint.New("node-c:2135", endpoint.WithID(3))
+	)
+
+	// Discovery #1: [a, b, c] — first acquire, nothing to release from quarantine.
+	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b, c})
+	require.Empty(t, quarantine)
+	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, active)
+	require.Equal(t, 1, pool.count(a.Key()))
+	require.Equal(t, 1, pool.count(b.Key()))
+	require.Equal(t, 1, pool.count(c.Key()))
+
+	connA, connB, connC := active[0], active[1], active[2]
+
+	// Discovery #2: same set — previous active moves to quarantine, Get bumps refs again.
+	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b, c})
+	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, quarantine)
+	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, active)
+	require.Same(t, connA, quarantine[0])
+	require.Same(t, connB, quarantine[1])
+	require.Same(t, connC, quarantine[2])
+	require.Equal(t, 2, pool.count(a.Key()))
+	require.Equal(t, 2, pool.count(b.Key()))
+	require.Equal(t, 2, pool.count(c.Key()))
+
+	// Discovery #3: drop c — release quarantine, c stays referenced only from new quarantine.
+	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b})
+	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, quarantine)
+	requireConnKeys(t, []endpoint.Endpoint{a, b}, active)
+	require.Equal(t, 2, pool.count(a.Key()))
+	require.Equal(t, 2, pool.count(b.Key()))
+	require.Equal(t, 1, pool.count(c.Key()))
+
+	// Discovery #4: same [a, b] — release full quarantine; c ref drops to zero.
+	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b})
+	requireConnKeys(t, []endpoint.Endpoint{a, b}, quarantine)
+	requireConnKeys(t, []endpoint.Endpoint{a, b}, active)
+	require.Equal(t, 2, pool.count(a.Key()))
+	require.Equal(t, 2, pool.count(b.Key()))
+	require.Equal(t, 0, pool.count(c.Key()))
+
+	// Discovery #5: c returns — new Get for c, a/b keep elevated refs.
+	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b, c})
+	requireConnKeys(t, []endpoint.Endpoint{a, b}, quarantine)
+	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, active)
+	require.Equal(t, 2, pool.count(a.Key()))
+	require.Equal(t, 2, pool.count(b.Key()))
+	require.Equal(t, 1, pool.count(c.Key()))
+	require.Same(t, connC, active[2])
+
+	// Discovery #6: cluster empty — active set moves to quarantine, one ref each.
+	quarantine, active = nextState(ctx, pool, quarantine, active, nil)
+	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, quarantine)
+	require.Empty(t, active)
+	require.Equal(t, 1, pool.count(a.Key()))
+	require.Equal(t, 1, pool.count(b.Key()))
+	require.Equal(t, 1, pool.count(c.Key()))
+
+	// Discovery #7: still empty — release quarantine, all refs reach zero.
+	quarantine, active = nextState(ctx, pool, quarantine, active, nil)
+	require.Empty(t, quarantine)
+	require.Empty(t, active)
+	require.Equal(t, 0, pool.count(a.Key()))
+	require.Equal(t, 0, pool.count(b.Key()))
+	require.Equal(t, 0, pool.count(c.Key()))
+}

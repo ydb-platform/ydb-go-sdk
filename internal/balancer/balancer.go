@@ -76,6 +76,7 @@ type Balancer struct {
 	localDCDetector func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
 	connectionsState atomic.Pointer[connectionsState]
+	quarantine       []conn.Conn
 	closed           atomic.Bool
 }
 
@@ -203,7 +204,36 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 	return nil
 }
 
-func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoint.Endpoint, localDC string) {
+func nextState(ctx context.Context, pool interface {
+	Get(e endpoint.Endpoint) conn.Conn
+	Put(ctx context.Context, cc conn.Conn)
+}, quarantine []conn.Conn, active []conn.Conn, endpoints []endpoint.Endpoint) (
+	newQuarantine []conn.Conn,
+	newActive []conn.Conn,
+) {
+	newActive = xslices.Filter(
+		xslices.Transform(endpoints, func(e endpoint.Endpoint) conn.Conn {
+			return pool.Get(e)
+		}),
+		func(cc conn.Conn) bool { return cc != nil },
+	)
+
+	for _, cc := range quarantine {
+		pool.Put(ctx, cc)
+	}
+
+	for _, cc := range newActive {
+		cc.Unban(ctx)
+	}
+
+	return active, newActive
+}
+
+func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
+	if b.closed.Load() {
+		return
+	}
+
 	var (
 		onDone = gtrace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
@@ -212,34 +242,31 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 			b.balancerConfig.DetectNearestDC,
 			b.driverConfig.Database(),
 		)
-		previous = b.connections().All()
+		active      = b.connections().All()
+		connections []conn.Conn
 	)
 	defer func() {
-		_, added, dropped := xslices.Diff(
-			xslices.Transform(previous, func(cc conn.Conn) endpoint.Endpoint {
-				return cc.Endpoint()
-			}),
-			newest,
-			endpoint.Compare,
-		)
+		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
+			return cc.Endpoint()
+		}), endpoints, endpoint.Compare)
+
 		onDone(
-			xslices.Transform(newest, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+			xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
 			xslices.Transform(added, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
 			xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
 			localDC,
 		)
 	}()
 
-	connections := conn.EndpointsToConnections(b.pool, newest)
-	for _, c := range connections {
-		c.Unban(ctx)
-	}
+	b.quarantine, connections = nextState(ctx, b.pool, b.quarantine, active, endpoints)
 
-	b.connectionsState.Store(newConnectionsState(connections,
-		b.balancerConfig.Filter,
-		balancerConfig.Info{SelfLocation: localDC},
-		b.balancerConfig.AllowFallback,
-	))
+	b.connectionsState.Store(
+		newConnectionsState(connections,
+			b.balancerConfig.Filter,
+			balancerConfig.Info{SelfLocation: localDC},
+			b.balancerConfig.AllowFallback,
+		),
+	)
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
@@ -256,6 +283,16 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	if b.discoveryRepeater != nil {
 		b.discoveryRepeater.Stop()
 	}
+
+	if current := b.connections(); current != nil {
+		for _, cc := range current.All() {
+			b.pool.Put(ctx, cc)
+		}
+	}
+	for _, c := range b.quarantine {
+		b.pool.Put(ctx, c)
+	}
+	b.quarantine = nil
 
 	if cc := b.cc.Load(); cc != nil {
 		_ = cc.Close()
