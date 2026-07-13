@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
@@ -216,41 +215,31 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 		previous = b.connections().All()
 	)
 	defer func() {
-		_, added, dropped := xslices.Diff(previous, newest, func(lhs, rhs endpoint.Endpoint) int {
-			cmp := strings.Compare(lhs.Address(), rhs.Address())
-			if cmp != 0 {
-				return cmp
-			}
-			cmp = int(lhs.NodeID()) - int(rhs.NodeID())
-			if cmp != 0 {
-				return cmp
-			}
-
-			return strings.Compare(lhs.OverrideHost(), rhs.OverrideHost())
-		})
+		_, added, dropped := xslices.Diff(
+			xslices.Transform(previous, func(cc conn.Conn) endpoint.Endpoint {
+				return cc.Endpoint()
+			}),
+			newest,
+			endpoint.Compare,
+		)
 		onDone(
-			xslices.Transform(newest, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
-			xslices.Transform(added, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
-			xslices.Transform(dropped, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
+			xslices.Transform(newest, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+			xslices.Transform(added, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+			xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
 			localDC,
 		)
 	}()
 
 	connections := conn.EndpointsToConnections(b.pool, newest)
 	for _, c := range connections {
-		b.pool.Allow(ctx, c)
-		c.Endpoint().Touch()
+		c.Unban(ctx)
 	}
 
-	info := balancerConfig.Info{SelfLocation: localDC}
-	state := newConnectionsState(connections, b.balancerConfig.Filter, info, b.balancerConfig.AllowFallback)
-
-	endpointsInfo := make([]endpoint.Info, len(newest))
-	for i, e := range newest {
-		endpointsInfo[i] = e
-	}
-
-	b.connectionsState.Store(state)
+	b.connectionsState.Store(newConnectionsState(connections,
+		b.balancerConfig.Filter,
+		balancerConfig.Info{SelfLocation: localDC},
+		b.balancerConfig.AllowFallback,
+	))
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
@@ -423,7 +412,7 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 	}
 
 	defer func() {
-		if err != nil && cc.GetState() != state.Banned &&
+		if err != nil && cc.State() != state.Banned &&
 			IsBadConn(ctx, err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
 			b.pool.Ban(ctx, cc, err)
 		}

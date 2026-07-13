@@ -19,7 +19,7 @@ type Conn struct {
 	AddrField     string
 	LocationField string
 	NodeIDField   uint32
-	State         state.State
+	StateField    state.State
 	LocalDCField  bool
 }
 
@@ -32,20 +32,16 @@ func (c *Conn) Endpoint() endpoint.Endpoint {
 	}
 }
 
-func (c *Conn) GetState() state.State {
-	return c.State
+func (c *Conn) State() state.State {
+	return c.StateField
 }
 
-func (c *Conn) SetState(ctx context.Context, state state.State) state.State {
-	c.State = state
-
-	return c.State
+func (c *Conn) Unban(ctx context.Context) {
+	c.StateField = state.Online
 }
 
-func (c *Conn) Unban(ctx context.Context) state.State {
-	c.SetState(ctx, state.Online)
-
-	return state.Online
+func (c *Conn) Ban(ctx context.Context) {
+	c.StateField = state.Banned
 }
 
 type Endpoint struct {
@@ -103,11 +99,8 @@ func (e *Endpoint) String() string {
 	panic("not implemented in mock")
 }
 
-func (e *Endpoint) Copy() endpoint.Endpoint {
+func (e *Endpoint) Copy(...endpoint.Option) endpoint.Endpoint {
 	c := *e
 
 	return &c
-}
-
-func (e *Endpoint) Touch(opts ...endpoint.Option) {
 }
