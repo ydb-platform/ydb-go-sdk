@@ -523,7 +523,11 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		failedCount int
 	)
 
-	if state == nil || len(state.all) == 0 {
+	if state == nil {
+		return nil, xerrors.WithStackTrace(errBalancerClosed)
+	}
+
+	if len(state.all) == 0 {
 		return nil, xerrors.WithStackTrace(ErrNoEndpoints)
 	}
 
