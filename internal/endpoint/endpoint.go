@@ -28,6 +28,8 @@ type (
 		Address      string
 		NodeID       uint32
 		HostOverride string
+
+		AddressFilterKey string
 	}
 	Endpoint interface {
 		Info
@@ -50,6 +52,9 @@ type endpoint struct {
 	ipv6            []string
 	sslNameOverride string
 
+	addressFilter    func(string) bool
+	addressFilterKey string
+
 	loadFactor  float32
 	lastUpdated time.Time
 
@@ -61,6 +66,8 @@ func (e *endpoint) Key() Key {
 		Address:      e.Address(),
 		NodeID:       e.id,
 		HostOverride: e.sslNameOverride,
+
+		AddressFilterKey: e.addressFilterKey,
 	}
 }
 
@@ -76,9 +83,12 @@ func (e *endpoint) Copy(opts ...Option) Endpoint {
 		ipv4:            append(make([]string, 0, len(e.ipv4)), e.ipv4...),
 		ipv6:            append(make([]string, 0, len(e.ipv6)), e.ipv6...),
 		sslNameOverride: e.sslNameOverride,
-		loadFactor:      e.loadFactor,
-		local:           e.local,
-		lastUpdated:     e.lastUpdated,
+
+		addressFilter:    e.addressFilter,
+		addressFilterKey: e.addressFilterKey,
+		loadFactor:       e.loadFactor,
+		local:            e.local,
+		lastUpdated:      e.lastUpdated,
 	}
 
 	for _, opt := range opts {
@@ -156,6 +166,13 @@ func (e *endpoint) OverrideHost() string {
 	defer e.mu.RUnlock()
 
 	return e.sslNameOverride
+}
+
+func (e *endpoint) AddressFilter() func(string) bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	return e.addressFilter
 }
 
 func (e *endpoint) Location() string {
@@ -244,6 +261,25 @@ func WithSslTargetNameOverride(nameOverride string) Option {
 	return func(e *endpoint) {
 		e.sslNameOverride = nameOverride
 	}
+}
+
+func WithAddressFilter(key string, filter func(string) bool) Option {
+	return func(e *endpoint) {
+		e.addressFilterKey = key
+		e.addressFilter = filter
+	}
+}
+
+type addressFilterProvider interface {
+	AddressFilter() func(string) bool
+}
+
+func AddressFilter(e Endpoint) func(string) bool {
+	if provider, ok := e.(addressFilterProvider); ok {
+		return provider.AddressFilter()
+	}
+
+	return nil
 }
 
 func New(address string, opts ...Option) *endpoint {

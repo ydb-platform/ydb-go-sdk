@@ -130,7 +130,7 @@ func (b *Balancer) discoveryConn(ctx context.Context) (*grpc.ClientConn, error) 
 		append(
 			b.driverConfig.GrpcDialOptions(),
 			grpc.WithResolvers(
-				xresolver.New("ydb", b.driverConfig.Trace()),
+				xresolver.New(b.driverConfig.Trace(), b.balancerConfig.IPVersion.AddressFilter()),
 			),
 			grpc.WithBlock(), //nolint:staticcheck,nolintlint
 		)...,
@@ -313,30 +313,34 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	}()
 
 	b = &Balancer{
-		driverConfig: driverConfig,
-		pool:         pool,
-		address:      "ydb:///" + driverConfig.Endpoint(),
-		discoveryConfig: discoveryConfig.New(append(opts,
-			discoveryConfig.With(driverConfig.Common),
-			discoveryConfig.WithEndpoint(driverConfig.Endpoint()),
-			discoveryConfig.WithDatabase(driverConfig.Database()),
-			discoveryConfig.WithSecure(driverConfig.Secure()),
-			discoveryConfig.WithMeta(driverConfig.Meta()),
-		)...),
+		driverConfig:    driverConfig,
+		pool:            pool,
+		address:         xresolver.Target(driverConfig.Endpoint()),
 		localDCDetector: detectLocalDC,
 	}
-
-	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
 
 	if config := driverConfig.Balancer(); config == nil {
 		b.balancerConfig = balancerConfig.Config{}
 	} else {
 		b.balancerConfig = *config
 	}
+	b.discoveryConfig = discoveryConfig.New(append(opts,
+		discoveryConfig.With(driverConfig.Common),
+		discoveryConfig.WithEndpoint(driverConfig.Endpoint()),
+		discoveryConfig.WithDatabase(driverConfig.Database()),
+		discoveryConfig.WithSecure(driverConfig.Secure()),
+		discoveryConfig.WithMeta(driverConfig.Meta()),
+		discoveryConfig.WithIPVersion(b.balancerConfig.IPVersion),
+	)...)
+	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
 
 	if b.balancerConfig.SingleConn {
+		opts := []endpoint.Option{}
+		if version := b.balancerConfig.IPVersion; version != balancerConfig.IPVersionUnspecified {
+			opts = append(opts, endpoint.WithAddressFilter(version.String(), version.AddressFilter()))
+		}
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
-			endpoint.New(driverConfig.Endpoint()),
+			endpoint.New(driverConfig.Endpoint(), opts...),
 		}, "")
 	} else {
 		// initialization of balancer state

@@ -1,6 +1,7 @@
 package balancers
 
 import (
+	"fmt"
 	"slices"
 	"sort"
 	"strings"
@@ -8,6 +9,18 @@ import (
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
+)
+
+// IPVersion identifies a requested IP address version.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+type IPVersion = balancerConfig.IPVersion
+
+const (
+	// IPv6 selects IPv6 addresses.
+	//
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+	IPv6 = balancerConfig.IPv6
 )
 
 // Deprecated: RoundRobin is an alias to RandomChoice now
@@ -126,6 +139,23 @@ func PreferLocations(balancer *balancerConfig.Config, locations ...string) *bala
 func PreferLocationsWithFallback(balancer *balancerConfig.Config, locations ...string) *balancerConfig.Config {
 	balancer = PreferLocations(balancer, locations...)
 	balancer.AllowFallback = true
+
+	return balancer
+}
+
+// OnlyIPVersion creates a balancer that establishes connections only to addresses of the specified IP version.
+//
+// IPv6 is the only supported IP version. FQDNs received from discovery are resolved by gRPC and all IPv6
+// addresses are retained. IPv4 addresses are not passed to gRPC for connection attempts.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func OnlyIPVersion(balancer *balancerConfig.Config, version IPVersion) *balancerConfig.Config {
+	switch version {
+	case IPv6:
+		balancer.IPVersion = version
+	default:
+		panic(fmt.Sprintf("unsupported IP version: %d", version))
+	}
 
 	return balancer
 }

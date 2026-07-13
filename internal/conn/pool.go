@@ -160,29 +160,29 @@ func NewPool(ctx context.Context, config Config) *Pool {
 		done:        make(chan struct{}),
 	}
 
-	p.dialOptions = append(p.dialOptions,
-		grpc.WithResolvers(
-			xresolver.New("", gtrace.Compose(config.Trace(), &trace.Driver{
-				OnResolve: func(info trace.DriverResolveStartInfo) func(trace.DriverResolveDoneInfo) {
-					target := info.Target
-					resolved := info.Resolved
-
-					return func(info trace.DriverResolveDoneInfo) {
-						if info.Error != nil || len(resolved) == 0 {
-							p.conns.Range(func(key endpoint.Key, cc *conn) bool {
-								if u, err := url.Parse(key.Address); err == nil && u.Host == target && cc.grpcConn != nil {
-									_ = cc.grpcConn.Close()
-									_ = p.conns.Delete(key)
-								}
-
-								return true
-							})
-						}
-					}
-				},
-			})),
-		),
-	)
-
 	return p
+}
+
+func (p *Pool) resolverDialOption(filter func(string) bool) grpc.DialOption {
+	return grpc.WithResolvers(
+		xresolver.New(gtrace.Compose(p.config.Trace(), &trace.Driver{
+			OnResolve: func(info trace.DriverResolveStartInfo) func(trace.DriverResolveDoneInfo) {
+				target := info.Target
+				resolved := info.Resolved
+
+				return func(info trace.DriverResolveDoneInfo) {
+					if info.Error != nil || len(resolved) == 0 {
+						p.conns.Range(func(key endpoint.Key, cc *conn) bool {
+							if u, err := url.Parse(key.Address); err == nil && u.Host == target && cc.grpcConn != nil {
+								_ = cc.grpcConn.Close()
+								_ = p.conns.Delete(key)
+							}
+
+							return true
+						})
+					}
+				}
+			},
+		}), filter),
+	)
 }

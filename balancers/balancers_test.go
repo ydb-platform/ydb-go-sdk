@@ -23,6 +23,18 @@ func TestPreferLocalDC(t *testing.T) {
 	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(balancerConfig.Info{SelfLocation: "2"}, rr, conns))
 }
 
+func TestOnlyIPVersion(t *testing.T) {
+	t.Run("IPv6", func(t *testing.T) {
+		balancer := OnlyIPVersion(RandomChoice(), IPv6)
+		require.Equal(t, IPv6, balancer.IPVersion)
+	})
+	t.Run("Unsupported", func(t *testing.T) {
+		require.Panics(t, func() {
+			OnlyIPVersion(RandomChoice(), IPVersion(2))
+		})
+	})
+}
+
 func TestPreferLocalDCWithFallBack(t *testing.T) {
 	conns := []conn.Conn{
 		&mock.Conn{AddrField: "1", LocationField: "1"},

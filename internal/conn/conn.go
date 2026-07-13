@@ -24,6 +24,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -50,6 +51,9 @@ type (
 		DialTimeout() time.Duration
 		GrpcDialOptions() []grpc.DialOption
 	}
+	resolverDialOptionConfig interface {
+		resolverDialOption(filter func(string) bool) grpc.DialOption
+	}
 	grpcClientConnInterface interface {
 		grpc.ClientConnInterface
 		io.Closer
@@ -62,6 +66,7 @@ type (
 		grpcConn                grpcClientConnInterface
 		done                    chan struct{}
 		endpoint                endpoint.Endpoint // ro access
+		addressFilter           func(string) bool
 		closed                  bool
 		state                   atomic.Uint32
 		lastClusterAnnouncement atomic.Int64
@@ -179,6 +184,12 @@ func (c *conn) dial(ctx context.Context) (cc grpcClientConnInterface, err error)
 	address := c.endpoint.Address()
 
 	dialOpts := append([]grpc.DialOption{}, c.config.GrpcDialOptions()...)
+	if c.addressFilter != nil {
+		address = xresolver.Target(address)
+		if config, ok := c.config.(resolverDialOptionConfig); ok {
+			dialOpts = append(dialOpts, config.resolverDialOption(c.addressFilter))
+		}
+	}
 
 	dialOpts = append(dialOpts, grpc.WithStatsHandler(statsHandler{}))
 
@@ -513,10 +524,12 @@ func withOnClose(onClose func(*conn)) option {
 
 func newConn(e endpoint.Endpoint, config connConfig, opts ...option) *conn {
 	c := &conn{
-		endpoint:     e,
-		config:       config,
-		done:         make(chan struct{}),
-		childStreams: xcontext.NewCancelsGuard(),
+		endpoint: e,
+		config:   config,
+		done:     make(chan struct{}),
+
+		addressFilter: endpoint.AddressFilter(e),
+		childStreams:  xcontext.NewCancelsGuard(),
 		onClose: []func(*conn){
 			func(c *conn) {
 				c.childStreams.Cancel()

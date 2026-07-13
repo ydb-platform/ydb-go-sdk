@@ -5,6 +5,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 
+	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
@@ -24,6 +25,7 @@ type Config struct {
 	meta           *meta.Meta
 	addressMutator func(address string) string
 	clock          clockwork.Clock
+	ipVersion      balancerConfig.IPVersion
 
 	interval time.Duration
 	trace    *trace.Discovery
@@ -45,6 +47,10 @@ func New(opts ...Option) *Config {
 	}
 
 	return c
+}
+
+func (c *Config) IPVersion() balancerConfig.IPVersion {
+	return c.ipVersion
 }
 
 func (c *Config) MutateAddress(fqdn string) string {
@@ -105,6 +111,12 @@ func WithDatabase(database string) Option {
 func WithClock(clock clockwork.Clock) Option {
 	return func(c *Config) {
 		c.clock = clock
+	}
+}
+
+func WithIPVersion(version balancerConfig.IPVersion) Option {
+	return func(c *Config) {
+		c.ipVersion = version
 	}
 }
 

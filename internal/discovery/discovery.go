@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
+	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -72,26 +73,46 @@ func Discover(
 	location = result.GetSelfLocation()
 	endpoints = make([]endpoint.Endpoint, 0, len(result.GetEndpoints()))
 	for _, e := range result.GetEndpoints() {
-		if e.GetSsl() == config.Secure() {
-			endpoints = append(endpoints, endpoint.New(
-				net.JoinHostPort(
-					config.MutateAddress(e.GetAddress()),
-					strconv.Itoa(int(e.GetPort())),
-				),
-				endpoint.WithLocation(e.GetLocation()),
-				endpoint.WithID(e.GetNodeId()),
-				endpoint.WithLoadFactor(e.GetLoadFactor()),
-				endpoint.WithLocalDC(e.GetLocation() == location),
-				endpoint.WithServices(e.GetService()),
-				endpoint.WithLastUpdated(config.Clock().Now()),
-				endpoint.WithIPV4(e.GetIpV4()),
-				endpoint.WithIPV6(e.GetIpV6()),
-				endpoint.WithSslTargetNameOverride(e.GetSslTargetNameOverride()),
-			))
+		if converted, ok := convertEndpoint(e, location, config); ok {
+			endpoints = append(endpoints, converted)
 		}
 	}
 
 	return endpoints, result.GetSelfLocation(), nil
+}
+
+func convertEndpoint(
+	e *Ydb_Discovery.EndpointInfo, location string, config *config.Config,
+) (endpoint.Endpoint, bool) {
+	if e.GetSsl() != config.Secure() {
+		return nil, false
+	}
+
+	opts := []endpoint.Option{
+		endpoint.WithLocation(e.GetLocation()),
+		endpoint.WithID(e.GetNodeId()),
+		endpoint.WithLoadFactor(e.GetLoadFactor()),
+		endpoint.WithLocalDC(e.GetLocation() == location),
+		endpoint.WithServices(e.GetService()),
+		endpoint.WithLastUpdated(config.Clock().Now()),
+		endpoint.WithSslTargetNameOverride(e.GetSslTargetNameOverride()),
+	}
+	if version := config.IPVersion(); version == balancerConfig.IPVersionUnspecified {
+		opts = append(opts,
+			endpoint.WithIPV4(e.GetIpV4()),
+			endpoint.WithIPV6(e.GetIpV6()),
+		)
+	} else {
+		opts = append(opts, endpoint.WithAddressFilter(version.String(), version.AddressFilter()))
+	}
+
+	return endpoint.New(
+		net.JoinHostPort(
+			config.MutateAddress(e.GetAddress()),
+			strconv.Itoa(int(e.GetPort())),
+		),
+		opts...,
+	), true
 }
 
 // Discover cluster endpoints
