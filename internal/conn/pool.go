@@ -111,20 +111,29 @@ func (p *Pool) Put(ctx context.Context, cc Conn) {
 	key := c.endpoint.Key()
 
 	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	if p.closed {
+		p.mu.Unlock()
+
 		return
 	}
 
 	value, ok := p.conns[key]
 	if !ok || value == nil || value.cc != c {
+		p.mu.Unlock()
+
 		return
 	}
 
+	var toClose *conn
 	if value.useCount.Add(-1) == 0 {
 		delete(p.conns, key)
-		_ = c.Close(ctx)
+		toClose = c
+	}
+	p.mu.Unlock()
+
+	if toClose != nil {
+		_ = toClose.Close(ctx)
 	}
 }
 
@@ -173,14 +182,23 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 	}()
 
 	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	p.usages--
 	if p.usages > 0 {
+		p.mu.Unlock()
+
 		return nil
 	}
 
 	p.closed = true
+
+	toClose := make([]closer.Closer, 0, len(p.conns))
+	for _, value := range p.conns {
+		toClose = append(toClose, value.cc)
+	}
+
+	p.conns = nil
+	p.mu.Unlock()
 
 	var (
 		issues   []error
@@ -188,8 +206,8 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 		wg       sync.WaitGroup
 	)
 
-	wg.Add(len(p.conns))
-	for _, c := range p.conns {
+	wg.Add(len(toClose))
+	for _, c := range toClose {
 		go func(c closer.Closer) {
 			defer wg.Done()
 			if err := c.Close(ctx); err != nil {
@@ -197,11 +215,10 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 				issues = append(issues, err)
 				issuesMu.Unlock()
 			}
-		}(c.cc)
+		}(c)
 	}
-	wg.Wait()
 
-	p.conns = nil
+	wg.Wait()
 
 	if len(issues) > 0 {
 		return xerrors.WithStackTrace(xerrors.NewWithIssues("connection pool close failed", issues...))

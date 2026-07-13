@@ -16,6 +16,22 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 )
 
+func TestConnectionsState_AllReturnsDefensiveCopy(t *testing.T) {
+	s := newConnectionsState([]conn.Conn{
+		&mock.Conn{AddrField: "1"},
+		&mock.Conn{AddrField: "2"},
+	}, nil, balancerConfig.Info{}, false, nil)
+
+	all := s.All()
+	require.Len(t, all, 2)
+
+	all[0] = &mock.Conn{AddrField: "mutated"}
+
+	internal := s.All()
+	require.Equal(t, "1", internal[0].Endpoint().Address())
+	require.Equal(t, "2", internal[1].Endpoint().Address())
+}
+
 func TestConnsToNodeIDMap(t *testing.T) {
 	table := []struct {
 		name   string
