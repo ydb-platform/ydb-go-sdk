@@ -5,29 +5,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // mockConfig implements the Config interface for testing
 type mockConfig struct {
-	dialTimeout   time.Duration
-	connectionTTL time.Duration
-	driverTrace   *trace.Driver
-	grpcDialOpts  []grpc.DialOption
+	dialTimeout  time.Duration
+	driverTrace  *trace.Driver
+	grpcDialOpts []grpc.DialOption
 }
 
 func (m *mockConfig) DialTimeout() time.Duration {
 	return m.dialTimeout
-}
-
-func (m *mockConfig) ConnectionTTL() time.Duration {
-	return m.connectionTTL
 }
 
 func (m *mockConfig) Trace() *trace.Driver {
@@ -46,8 +39,7 @@ func TestPool_Get(t *testing.T) {
 	t.Run("GetSameConnectionTwice", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -69,8 +61,7 @@ func TestPool_Get(t *testing.T) {
 	t.Run("GetDifferentEndpoints", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -95,8 +86,7 @@ func TestPool_TakeRelease(t *testing.T) {
 	t.Run("TakeIncreasesUsageCounter", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 
@@ -120,8 +110,7 @@ func TestPool_TakeRelease(t *testing.T) {
 	t.Run("ReleaseDecreasesUsageCounter", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 
@@ -140,8 +129,7 @@ func TestPool_TakeRelease(t *testing.T) {
 	t.Run("FinalReleaseClosesPool", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 
@@ -163,8 +151,7 @@ func TestPool_IsClosed(t *testing.T) {
 	t.Run("NewPoolIsNotClosed", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -177,8 +164,7 @@ func TestPool_IsClosed(t *testing.T) {
 	t.Run("ReleasedPoolIsClosed", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 
@@ -193,8 +179,7 @@ func TestPool_ConfigMethods(t *testing.T) {
 	t.Run("DialTimeout", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   10 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 10 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -208,9 +193,8 @@ func TestPool_ConfigMethods(t *testing.T) {
 		ctx := context.Background()
 		driverTrace := &trace.Driver{}
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-			driverTrace:   driverTrace,
+			dialTimeout: 5 * time.Second,
+			driverTrace: driverTrace,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -224,9 +208,8 @@ func TestPool_ConfigMethods(t *testing.T) {
 		ctx := context.Background()
 		opts := []grpc.DialOption{grpc.WithBlock()} //nolint:staticcheck,nolintlint
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-			grpcDialOpts:  opts,
+			dialTimeout:  5 * time.Second,
+			grpcDialOpts: opts,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -238,247 +221,11 @@ func TestPool_ConfigMethods(t *testing.T) {
 	})
 }
 
-func TestPool_ConnParker(t *testing.T) {
-	t.Run("AttemptsToCheckIdleOnlineConnections", func(t *testing.T) {
-		ctx := context.Background()
-		fakeClock := clockwork.NewFakeClock()
-
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 5 * time.Minute,
-		}
-
-		pool := NewPool(ctx, config, func(p *Pool) {
-			p.clock = fakeClock
-		})
-		defer func() {
-			_ = pool.Release(ctx)
-		}()
-
-		// Create a connection and set it to Online
-		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
-		require.NotNil(t, conn)
-
-		conn.SetState(ctx, state.Online)
-		require.Equal(t, state.Online, conn.GetState())
-
-		// Start the parker in background
-		ttl := 10 * time.Second
-		interval := 5 * time.Second
-		go pool.connParker(ctx, ttl, interval)
-
-		// Advance clock past the TTL
-		fakeClock.Advance(interval)
-		fakeClock.Advance(ttl + time.Second)
-
-		// Give goroutine time to process
-		time.Sleep(50 * time.Millisecond)
-
-		// Note: Without actual grpcConn, park() is a no-op, so state won't change
-		// This test verifies the parker runs without error
-	})
-
-	t.Run("AttemptsToCheckBannedConnections", func(t *testing.T) {
-		ctx := context.Background()
-		fakeClock := clockwork.NewFakeClock()
-
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 5 * time.Minute,
-		}
-
-		pool := NewPool(ctx, config, func(p *Pool) {
-			p.clock = fakeClock
-		})
-		defer func() {
-			_ = pool.Release(ctx)
-		}()
-
-		// Create a connection and set it to Banned
-		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
-		require.NotNil(t, conn)
-
-		conn.SetState(ctx, state.Banned)
-		require.Equal(t, state.Banned, conn.GetState())
-
-		// Start the parker in background
-		ttl := 10 * time.Second
-		interval := 5 * time.Second
-		go pool.connParker(ctx, ttl, interval)
-
-		// Advance clock past the TTL
-		fakeClock.Advance(interval)
-		fakeClock.Advance(ttl + time.Second)
-
-		// Give goroutine time to process
-		time.Sleep(50 * time.Millisecond)
-
-		// Note: Without actual grpcConn, park() is a no-op, so state won't change
-		// This test verifies the parker runs without error
-	})
-
-	t.Run("DoesNotParkRecentlyUsedConnections", func(t *testing.T) {
-		ctx := context.Background()
-		fakeClock := clockwork.NewFakeClock()
-
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 5 * time.Minute,
-		}
-
-		pool := NewPool(ctx, config, func(p *Pool) {
-			p.clock = fakeClock
-		})
-		defer func() {
-			_ = pool.Release(ctx)
-		}()
-
-		// Create a connection and set it to Online
-		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
-		require.NotNil(t, conn)
-
-		conn.SetState(ctx, state.Online)
-		require.Equal(t, state.Online, conn.GetState())
-
-		// Start the parker in background
-		ttl := 10 * time.Second
-		interval := 5 * time.Second
-		go pool.connParker(ctx, ttl, interval)
-
-		// Advance clock but not past TTL
-		fakeClock.Advance(interval)
-		fakeClock.Advance(ttl / 2)
-
-		// Give goroutine time to process
-		time.Sleep(50 * time.Millisecond)
-
-		// Connection should still be Online (not idle enough to park)
-		require.Equal(t, state.Online, conn.GetState())
-	})
-
-	t.Run("DoesNotParkCreatedConnections", func(t *testing.T) {
-		ctx := context.Background()
-		fakeClock := clockwork.NewFakeClock()
-
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 5 * time.Minute,
-		}
-
-		pool := NewPool(ctx, config, func(p *Pool) {
-			p.clock = fakeClock
-		})
-		defer func() {
-			_ = pool.Release(ctx)
-		}()
-
-		// Create a connection (default state is Created)
-		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
-		require.NotNil(t, conn)
-		require.Equal(t, state.Created, conn.GetState())
-
-		// Start the parker in background
-		ttl := 10 * time.Second
-		interval := 5 * time.Second
-		go pool.connParker(ctx, ttl, interval)
-
-		// Advance clock past the TTL
-		fakeClock.Advance(interval)
-		fakeClock.Advance(ttl + time.Second)
-
-		// Give goroutine time to process
-		time.Sleep(50 * time.Millisecond)
-
-		// Connection should still be Created (not parked since not Online/Banned)
-		require.Equal(t, state.Created, conn.GetState())
-	})
-
-	t.Run("StopsWhenPoolIsClosed", func(t *testing.T) {
-		ctx := context.Background()
-		fakeClock := clockwork.NewFakeClock()
-
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 5 * time.Minute,
-		}
-
-		pool := NewPool(ctx, config, func(p *Pool) {
-			p.clock = fakeClock
-		})
-
-		// Start the parker in background
-		ttl := 10 * time.Second
-		interval := 5 * time.Second
-		parkerDone := make(chan struct{})
-		go func() {
-			pool.connParker(ctx, ttl, interval)
-			close(parkerDone)
-		}()
-
-		// Close the pool
-		err := pool.Release(ctx)
-		require.NoError(t, err)
-
-		// Parker should stop
-		select {
-		case <-parkerDone:
-			// Success - parker stopped
-		case <-time.After(100 * time.Millisecond):
-			t.Fatal("connParker did not stop after pool was closed")
-		}
-	})
-
-	t.Run("TickerAdvancesCorrectly", func(t *testing.T) {
-		ctx := context.Background()
-		fakeClock := clockwork.NewFakeClock()
-
-		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 5 * time.Minute,
-		}
-
-		pool := NewPool(ctx, config, func(p *Pool) {
-			p.clock = fakeClock
-		})
-		defer func() {
-			_ = pool.Release(ctx)
-		}()
-
-		tickCount := 0
-
-		// Create connection to track parking attempts
-		e := endpoint.New("test-endpoint:2135")
-		conn := pool.Get(e)
-		conn.SetState(ctx, state.Online)
-
-		// Start the parker
-		ttl := 10 * time.Second
-		interval := 5 * time.Second
-		go pool.connParker(ctx, ttl, interval)
-
-		// Advance clock multiple times and verify parker is running
-		for range 3 {
-			fakeClock.Advance(interval)
-			fakeClock.Advance(ttl)
-			time.Sleep(50 * time.Millisecond)
-			tickCount++
-		}
-
-		// If we got here without hanging, the ticker is working
-		require.Equal(t, 3, tickCount)
-	})
-}
-
 func TestEndpointsToConnections(t *testing.T) {
 	t.Run("CreatesConnectionsForEndpoints", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -502,8 +249,7 @@ func TestEndpointsToConnections(t *testing.T) {
 	t.Run("ReusesExistingConnections", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -528,8 +274,7 @@ func TestEndpointsToConnections(t *testing.T) {
 	t.Run("IPv6AndHostOverrideUniqueKeys", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -576,8 +321,7 @@ func TestEndpointsToConnections(t *testing.T) {
 	t.Run("AddNewEndpointAndNodeIDVariation", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {

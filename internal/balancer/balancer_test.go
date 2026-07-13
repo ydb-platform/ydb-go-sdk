@@ -40,10 +40,6 @@ func (c *poolRegisteredConn) Endpoint() endpoint.Endpoint {
 	return c.inner.Endpoint()
 }
 
-func (c *poolRegisteredConn) LastUsage() (*time.Time, error) {
-	return c.inner.LastUsage()
-}
-
 func (c *poolRegisteredConn) GetState() state.State {
 	return c.inner.GetState()
 }

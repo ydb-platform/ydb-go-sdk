@@ -24,7 +24,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -34,18 +33,12 @@ var (
 
 	// errClosedConnection specified error when connection are closed early
 	errClosedConnection = xerrors.Wrap(fmt.Errorf("connection closed early"))
-
-	// errNoTrackingLastUsage specified error when connection no track last usage
-	errNoTrackingLastUsage = xerrors.Wrap(fmt.Errorf("no tracking last usage"))
-
-	noopStopFunc = func() {}
 )
 
 type Conn interface {
 	grpc.ClientConnInterface
 
 	Endpoint() endpoint.Endpoint
-	LastUsage() (*time.Time, error)
 	GetState() state.State
 	SetState(ctx context.Context, state state.State) state.State
 	Unban(ctx context.Context) state.State
@@ -72,32 +65,12 @@ type (
 		closed       bool
 		state        atomic.Uint32
 		childStreams *xcontext.CancelsGuard
-		lastUsage    xsync.LastUsage
 		onClose      []func(*conn)
 	}
-	nopLastUsage struct{}
 )
-
-func (nopLastUsage) Get() (t time.Time) {
-	return t
-}
-
-func (nopLastUsage) Start() (stop func()) {
-	return noopStopFunc
-}
 
 func (c *conn) Address() string {
 	return c.endpoint.Address()
-}
-
-func (c *conn) LastUsage() (*time.Time, error) {
-	if c.lastUsage == nil {
-		return nil, errNoTrackingLastUsage
-	}
-
-	t := c.lastUsage.Get()
-
-	return &t, nil
 }
 
 func (c *conn) NodeID() uint32 {
@@ -106,35 +79,6 @@ func (c *conn) NodeID() uint32 {
 	}
 
 	return 0
-}
-
-func (c *conn) park(ctx context.Context) (err error) {
-	onDone := gtrace.DriverOnConnPark(
-		c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).park"),
-		c.Endpoint(),
-	)
-	defer func() {
-		onDone(err)
-	}()
-
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-
-	if c.closed {
-		return nil
-	}
-
-	if c.grpcConn == nil {
-		return nil
-	}
-
-	err = c.close(ctx)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	return nil
 }
 
 func (c *conn) Endpoint() endpoint.Endpoint {
@@ -448,9 +392,6 @@ func (c *conn) Invoke(
 		return xerrors.WithStackTrace(err)
 	}
 
-	stop := c.lastUsage.Start()
-	defer stop()
-
 	opID, issues, err = invoke(
 		ctx,
 		method,
@@ -489,9 +430,6 @@ func (c *conn) NewStream(
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-
-	stop := c.lastUsage.Start()
-	defer stop()
 
 	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
@@ -554,19 +492,10 @@ func withOnClose(onClose func(*conn)) option {
 	}
 }
 
-func withTrackLastUsage(b bool) option {
-	return func(c *conn) {
-		if b {
-			c.lastUsage = xsync.NewLastUsage()
-		}
-	}
-}
-
 func newConn(e endpoint.Endpoint, config connConfig, opts ...option) *conn {
 	c := &conn{
 		endpoint:     e,
 		config:       config,
-		lastUsage:    nopLastUsage{},
 		done:         make(chan struct{}),
 		childStreams: xcontext.NewCancelsGuard(),
 		onClose: []func(*conn){
