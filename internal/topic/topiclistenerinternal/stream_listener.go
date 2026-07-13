@@ -107,8 +107,10 @@ func newStreamListener(
 	)
 
 	res.startBackground()
-
-	res.seedInitialBufferCredit(config.BufferSize)
+	select {
+	case res.freeBytes <- config.BufferSize:
+	case <-res.background.Context().Done():
+	}
 
 	return res, nil
 }
@@ -184,8 +186,7 @@ func (l *streamListener) startBackground() {
 
 func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	l.hasNewMessagesToSend = make(empty.Chan, 1)
-	// Capacity 1 — same as reader: while sendMessagesLoop drains freeBytes, further
-	// FreeBufferFromBatch calls block and apply backpressure to slow handlers.
+	// A full channel applies backpressure until sendMessagesLoop drains it.
 	l.freeBytes = make(chan int, 1)
 	l.sessions = &topicreadercommon.PartitionSessionStorage{}
 	l.sessionIDCounter = sessionIDCounter
@@ -263,26 +264,15 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 	return nil
 }
 
-// seedInitialBufferCredit primes the same path as post-processing releases:
-// sendMessagesLoop sends the initial ReadRequest.
-func (l *streamListener) seedInitialBufferCredit(bufferSize int) {
-	select {
-	case l.freeBytes <- bufferSize:
-	case <-l.background.Context().Done():
-	}
-}
-
 func (l *streamListener) sendMessagesLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case free := <-l.freeBytes:
-			// Coalesce concurrent releases from multiple partition workers into one
-			// ReadRequest instead of many small grpc messages (same loop as reader).
+			// Coalesce releases into one ReadRequest.
 			sum := l.collectPendingFreeBytes(free)
-			// Enqueue without signaling: we flush right here, so signaling would only
-			// leave a stale hasNewMessagesToSend that triggers an empty flush next tick.
+			// We flush immediately, so there is no need to signal the send loop.
 			l.enqueueMessage(&rawtopicreader.ReadRequest{BytesSize: sum})
 			l.flushPendingMessages(ctx)
 		case <-l.hasNewMessagesToSend:

@@ -18,12 +18,10 @@ import (
 
 var errPartitionQueueClosed = xerrors.Wrap(fmt.Errorf("ydb: partition messages queue closed"))
 
-// MessageSender sends messages back to server and releases read-ahead buffer credit.
+// MessageSender sends messages and returns read-ahead buffer credit.
 type MessageSender interface {
 	SendRaw(msg rawtopicreader.ClientMessage)
-	// FreeBufferFromBatch returns buffer credit to streamListener after a batch is done.
-	// Workers must not send ReadRequest directly: a single BufferSize limit is enforced
-	// centrally (same design as topic reader), otherwise each partition could over-fetch.
+	// FreeBufferFromBatch returns credit after a batch is done.
 	FreeBufferFromBatch(batch *topicreadercommon.PublicBatch)
 }
 

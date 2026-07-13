@@ -2,14 +2,11 @@ package topiclistenerinternal
 
 import (
 	"context"
-	"errors"
 	"io"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/rekby/fixenv"
-	"github.com/rekby/fixenv/sf"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
@@ -106,17 +103,4 @@ func TestNewStreamListener_SeedsInitialReadRequest(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return grpcStream.readRequestBytes.Load() == bufferSize
 	}, time.Second, 10*time.Millisecond)
-}
-
-func TestStreamListener_SeedInitialBufferCreditSkipsWhenStopped(t *testing.T) {
-	e := fixenv.New(t)
-	ctx := sf.Context(e)
-	listener := StreamListener(e)
-
-	listener.background.Start("stream listener send loop", listener.sendMessagesLoop)
-	require.NoError(t, listener.background.Close(ctx, errors.New("shutdown")))
-
-	require.NotPanics(t, func() {
-		listener.seedInitialBufferCredit(42)
-	})
 }

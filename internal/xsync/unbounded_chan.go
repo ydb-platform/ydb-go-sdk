@@ -115,9 +115,7 @@ func (c *UnboundedChan[T]) Receive(ctx context.Context) (T, bool, error) {
 	}
 }
 
-// DrainBuffered removes and returns all messages currently buffered in the channel.
-// It does not block waiting for new messages. Used on partition worker shutdown to
-// free read-ahead credits for queued batches without a blocking Receive loop.
+// DrainBuffered removes and returns all currently buffered messages without blocking.
 func (c *UnboundedChan[T]) DrainBuffered() []T {
 	var drained []T
 
