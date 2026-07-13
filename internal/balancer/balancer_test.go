@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -153,6 +154,131 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	require.Equal(t, e2.NodeID(), all[0].Endpoint().NodeID())
 	require.Equal(t, e3.Address(), all[1].Endpoint().Address())
 	require.Equal(t, e3.NodeID(), all[1].Endpoint().NodeID())
+}
+
+func TestApplyDiscoveredEndpointsClosedPool(t *testing.T) {
+	ctx := context.Background()
+	pool := conn.NewPool(ctx, config.New())
+	require.NoError(t, pool.Release(ctx))
+
+	b := &Balancer{
+		driverConfig:   config.New(),
+		pool:           pool,
+		balancerConfig: balancerConfig.Config{},
+	}
+
+	require.NotPanics(t, func() {
+		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
+			endpoint.New("node:2135", endpoint.WithID(1)),
+		}, "")
+	})
+}
+
+func TestBalancer_Close(t *testing.T) {
+	t.Run("InvokeAfterCloseReturnsBalancerClosed", func(t *testing.T) {
+		ctx := context.Background()
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.Release(ctx) }()
+
+		cc := &mock.Conn{
+			ClientConnInterface: &grpc.ClientConn{},
+			AddrField:           "node:2135",
+			NodeIDField:         1,
+		}
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		b.connectionsState.Store(newConnectionsState(
+			[]conn.Conn{cc},
+			nil,
+			balancerConfig.Info{},
+			true,
+			nil,
+		))
+
+		require.NoError(t, b.Close(ctx))
+
+		err := b.Invoke(ctx, "/test.Service/Method", nil, nil)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, errBalancerClosed))
+	})
+
+	t.Run("IsIdempotentUnderConcurrency", func(t *testing.T) {
+		ctx := context.Background()
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.Release(ctx) }()
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		b.connectionsState.Store(newConnectionsState(nil,
+			nil, balancerConfig.Info{}, true, nil,
+		))
+
+		var wg sync.WaitGroup
+		errs := make(chan error, 8)
+		wg.Add(8)
+
+		for range 8 {
+			go func() {
+				defer wg.Done()
+				errs <- b.Close(ctx)
+			}()
+		}
+
+		wg.Wait()
+		close(errs)
+
+		var closedErrs int
+		for err := range errs {
+			if errors.Is(err, errBalancerClosed) {
+				closedErrs++
+			} else {
+				require.NoError(t, err)
+			}
+		}
+
+		require.Equal(t, 7, closedErrs)
+		require.True(t, b.closed)
+	})
+
+	t.Run("ApplyDiscoveredEndpointsDuringCloseDoesNotPanic", func(t *testing.T) {
+		ctx := context.Background()
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.Release(ctx) }()
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		b.connectionsState.Store(newConnectionsState(nil,
+			nil, balancerConfig.Info{}, true, nil,
+		))
+
+		closeStarted := make(chan struct{})
+		go func() {
+			close(closeStarted)
+			_ = b.Close(ctx)
+		}()
+
+		<-closeStarted
+		time.Sleep(10 * time.Millisecond)
+
+		require.NotPanics(t, func() {
+			b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
+				endpoint.New("late-discovery:2135", endpoint.WithID(1)),
+			}, "")
+		})
+	})
 }
 
 // Mock resolver
@@ -814,4 +940,17 @@ func TestNextState(t *testing.T) {
 	require.Equal(t, 0, pool.count(a.Key()))
 	require.Equal(t, 0, pool.count(b.Key()))
 	require.Equal(t, 0, pool.count(c.Key()))
+}
+
+func TestNextStateClosedPool(t *testing.T) {
+	ctx := context.Background()
+	pool := conn.NewPool(ctx, config.New())
+	require.NoError(t, pool.Release(ctx))
+
+	newQuarantine, newActive := nextState(ctx, pool, nil, nil, []endpoint.Endpoint{
+		endpoint.New("node:2135", endpoint.WithID(1)),
+	})
+
+	require.Empty(t, newQuarantine)
+	require.Empty(t, newActive)
 }
