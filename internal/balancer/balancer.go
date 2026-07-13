@@ -300,8 +300,8 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
-	b.closeMu.RLock()
-	defer b.closeMu.RUnlock()
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
 
 	if b.closed {
 		return xerrors.WithStackTrace(errBalancerClosed)
