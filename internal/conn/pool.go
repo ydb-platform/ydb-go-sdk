@@ -13,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -236,10 +235,16 @@ func NewPool(ctx context.Context, config Config) *Pool {
 							defer p.mu.Unlock()
 
 							for key, value := range p.conns {
-								cc := value.cc
-								if u, err := url.Parse(key.Address); err == nil && u.Host == target && cc.grpcConn != nil {
-									delete(p.conns, key)
-									_ = cc.Close(xcontext.ValueOnly(ctx))
+								if u, err := url.Parse(key.Address); err == nil {
+									if u.Host == target && value.cc.grpcConn != nil {
+										func(cc *conn) {
+											cc.mtx.Lock()
+											defer cc.mtx.Unlock()
+
+											cc.grpcConn.Close()
+											cc.grpcConn = nil
+										}(value.cc)
+									}
 								}
 							}
 						}
