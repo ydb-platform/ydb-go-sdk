@@ -251,14 +251,18 @@ func NewPool(ctx context.Context, config Config) *Pool {
 					return func(info trace.DriverResolveDoneInfo) {
 						if info.Error != nil || len(resolved) == 0 {
 							p.mu.Lock()
-							defer p.mu.Unlock()
-
+							var toClose []*conn
 							for key, value := range p.conns {
 								if u, err := url.Parse(key.Address); err == nil && u.Host == target {
-									value.cc.mtx.Lock()
-									value.cc.close(ctx)
-									value.cc.mtx.Unlock()
+									toClose = append(toClose, value.cc)
 								}
+							}
+							p.mu.Unlock()
+
+							for _, cc := range toClose {
+								cc.mtx.Lock()
+								cc.close(ctx)
+								cc.mtx.Unlock()
 							}
 						}
 					}
