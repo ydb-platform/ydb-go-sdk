@@ -143,12 +143,12 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 }
 
 func (p *Pool) AddRef(context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	if p.closed.Load() {
 		return xerrors.WithStackTrace(errClosedPool)
 	}
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	p.usages++
 
