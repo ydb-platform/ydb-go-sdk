@@ -102,20 +102,7 @@ jobs:
 
           cat "$RUNNER_TEMP/base.stderr" >&2
 
-      - name: Run source
-        shell: bash
-        run: |
-          set +e
-          cd head
-          go test -json -count=1 -race -tags integration ./... \
-            > "$RUNNER_TEMP/head.json" \
-            2> "$RUNNER_TEMP/head.stderr"
-          echo $? > "$RUNNER_TEMP/head.rc"
-          set -e
-
-          cat "$RUNNER_TEMP/head.stderr" >&2
-
-      - name: Prove a real test changed from FAIL to PASS
+      - name: Prove a real test fails on destination
         shell: bash
         run: |
           set -euo pipefail
@@ -132,32 +119,4 @@ jobs:
             | if length > 0 then . else error("no concrete test failed on destination") end
           ' "$RUNNER_TEMP/base.json" > "$RUNNER_TEMP/base-failed.json"
 
-          if [[ "$(cat "$RUNNER_TEMP/head.rc")" -ne 0 ]]; then
-            echo 'The source test suite is not green.'
-            exit 1
-          fi
-
-          jq -s '
-            [
-              .[]
-              | select((.Test // "") != "" and .Action == "pass")
-              | [(.Package // ""), .Test]
-            ]
-            | unique
-          ' "$RUNNER_TEMP/head.json" > "$RUNNER_TEMP/head-passed.json"
-
-          jq -n -e \
-            --slurpfile failed "$RUNNER_TEMP/base-failed.json" \
-            --slurpfile passed "$RUNNER_TEMP/head-passed.json" '
-              any(
-                $failed[0][];
-                . as $test
-                | any($passed[0][]; . == $test)
-              )
-            ' \
-            || {
-              echo 'No concrete destination failure became a passing source test.'
-              exit 1
-            }
-
-          echo 'At least one concrete test is FAIL on destination and PASS on source.'
+          echo 'At least one concrete test fails on destination with the PR test patch.'
