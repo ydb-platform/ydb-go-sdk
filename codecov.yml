@@ -14,11 +14,10 @@ coverage:
         target: 80%        # new/changed code in the PR diff must be >= 80% covered
 
 ignore:
-  - spans
-  - trace
   - testutil
   - examples
   - internal/mock
+  - internal/cmd
   - pkg/xtest
 
 # Cross-repo uniform metric: every YDB SDK repo defines this same component_id,
