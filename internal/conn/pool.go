@@ -3,7 +3,7 @@ package conn
 import (
 	"context"
 	"fmt"
-	"net/url"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -202,6 +202,10 @@ func (p *Pool) release() []closer.Closer {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	if p.closed.Load() {
+		return nil
+	}
+
 	p.usages--
 	if p.usages > 0 {
 		return nil
@@ -219,6 +223,39 @@ func (p *Pool) release() []closer.Closer {
 	p.conns = nil
 
 	return toClose
+}
+
+func matchesResolveTarget(address, target string) bool {
+	if address == target {
+		return true
+	}
+
+	host, _, err := net.SplitHostPort(address)
+	if err == nil && host == target {
+		return true
+	}
+
+	return false
+}
+
+func (p *Pool) closeConnsForFailedResolve(ctx context.Context, target string) {
+	p.mu.Lock()
+	var toClose []*conn
+	for key, value := range p.conns {
+		if matchesResolveTarget(key.Address, target) {
+			toClose = append(toClose, value.cc)
+		}
+	}
+	p.mu.Unlock()
+
+	closeCtx := xcontext.ValueOnly(ctx)
+	for _, cc := range toClose {
+		cc.mtx.Lock()
+		if !cc.closed {
+			cc.close(closeCtx)
+		}
+		cc.mtx.Unlock()
+	}
 }
 
 func NewPool(ctx context.Context, config Config) *Pool {
@@ -247,23 +284,7 @@ func NewPool(ctx context.Context, config Config) *Pool {
 							// The balancer still holds pool refs from discovery Get/Put; deleting
 							// here would desync ref-counting and leak or double-close wrappers.
 							// Stale entries are removed when discovery Put drops useCount to zero.
-							p.mu.Lock()
-							var toClose []*conn
-							for key, value := range p.conns {
-								if u, err := url.Parse(key.Address); err == nil && u.Host == target {
-									toClose = append(toClose, value.cc)
-								}
-							}
-							p.mu.Unlock()
-
-							closeCtx := xcontext.ValueOnly(ctx)
-							for _, cc := range toClose {
-								cc.mtx.Lock()
-								if !cc.closed {
-									cc.close(closeCtx)
-								}
-								cc.mtx.Unlock()
-							}
+							p.closeConnsForFailedResolve(ctx, target)
 						}
 					}
 				},

@@ -866,3 +866,32 @@ func TestPool_GetPut(t *testing.T) {
 		require.Equal(t, int64(0), closedConns.Load())
 	})
 }
+
+func TestMatchesResolveTarget(t *testing.T) {
+	require.True(t, matchesResolveTarget("localhost:2135", "localhost:2135"))
+	require.True(t, matchesResolveTarget("localhost:2135", "localhost"))
+	require.False(t, matchesResolveTarget("localhost:2135", "other:2135"))
+}
+
+func TestPool_CloseConnsForFailedResolvePreservesPoolEntry(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+	defer func() {
+		_ = pool.RemoveRef(ctx)
+	}()
+
+	target := "localhost:2135"
+	e := endpoint.New(target)
+	_ = pool.Get(e)
+
+	useCount, ok := testPoolConnUseCount(pool, e.Key())
+	require.True(t, ok)
+	require.Equal(t, int64(1), useCount)
+
+	pool.closeConnsForFailedResolve(ctx, target)
+
+	require.True(t, testPoolHasConn(pool, e.Key()))
+	useCount, ok = testPoolConnUseCount(pool, e.Key())
+	require.True(t, ok)
+	require.Equal(t, int64(1), useCount)
+}

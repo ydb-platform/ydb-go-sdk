@@ -347,6 +347,7 @@ func TestNewState(t *testing.T) {
 					&mock.Conn{AddrField: "t2", NodeIDField: 3, LocationField: "t"},
 					&mock.Conn{AddrField: "f2", NodeIDField: 4, LocationField: "f"},
 				},
+				allowFallback: false,
 			},
 		},
 		{
@@ -380,6 +381,7 @@ func TestNewState(t *testing.T) {
 					&mock.Conn{AddrField: "t2", NodeIDField: 3, LocationField: "t"},
 					&mock.Conn{AddrField: "f2", NodeIDField: 4, LocationField: "f"},
 				},
+				allowFallback: true,
 			},
 		},
 		{
@@ -413,6 +415,7 @@ func TestNewState(t *testing.T) {
 					&mock.Conn{AddrField: "t2", NodeIDField: 3, LocationField: "t"},
 					&mock.Conn{AddrField: "f2", NodeIDField: 4, LocationField: "f"},
 				},
+				allowFallback: true,
 			},
 		},
 	}

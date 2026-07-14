@@ -20,6 +20,8 @@ type connectionsState struct {
 
 	quarantine []conn.Conn
 
+	allowFallback bool
+
 	rand xrand.Rand
 }
 
@@ -31,9 +33,10 @@ func newConnectionsState(
 	quarantine []conn.Conn,
 ) *connectionsState {
 	res := &connectionsState{
-		connByNodeID: connsToNodeIDMap(conns),
-		rand:         xrand.New(xrand.WithLock()),
-		quarantine:   quarantine,
+		connByNodeID:  connsToNodeIDMap(conns),
+		rand:          xrand.New(xrand.WithLock()),
+		quarantine:    quarantine,
+		allowFallback: allowFallback,
 	}
 
 	res.prefer, res.fallback = sortPreferConnections(conns, filter, info, allowFallback)
@@ -82,7 +85,7 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 	}
 
 	lastResort := s.all
-	if len(s.fallback) == 0 && len(s.prefer) != len(s.all) {
+	if !s.allowFallback && len(s.prefer) != len(s.all) {
 		lastResort = s.prefer
 	}
 
