@@ -263,8 +263,16 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 			b.balancerConfig.DetectNearestDC,
 			b.driverConfig.Database(),
 		)
-		active = b.connections().All()
+		state      = b.connections()
+		active     []conn.Conn
+		quarantine []conn.Conn
 	)
+
+	if state != nil {
+		active = state.all
+		quarantine = state.quarantine
+	}
+
 	defer func() {
 		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
 			return cc.Endpoint()
@@ -277,15 +285,6 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 			localDC,
 		)
 	}()
-
-	var (
-		state      = b.connectionsState.Load()
-		quarantine []conn.Conn
-	)
-
-	if state != nil {
-		quarantine = state.quarantine
-	}
 
 	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
 
