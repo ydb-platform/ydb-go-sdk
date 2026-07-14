@@ -322,7 +322,7 @@ func TestBalancer_Close(t *testing.T) {
 		})
 	})
 
-	t.Run("CloseCompletesWhileApplyWaitsForCloseMu", func(t *testing.T) {
+	t.Run("CloseReleasesCloseMuBeforeStop", func(t *testing.T) {
 		ctx := context.Background()
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
@@ -337,45 +337,35 @@ func TestBalancer_Close(t *testing.T) {
 			nil, balancerConfig.Info{}, true, nil,
 		))
 
-		applyEntered := make(chan struct{})
-		applyRelease := make(chan struct{})
-		go func() {
-			b.closeMu.Lock()
-			close(applyEntered)
-			<-applyRelease
-			b.closeMu.Unlock()
-		}()
-		<-applyEntered
-
-		applyDone := make(chan struct{})
-		go func() {
-			b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
-				endpoint.New("contended:2135", endpoint.WithID(1)),
-			}, "")
-			close(applyDone)
-		}()
-
-		closeDone := make(chan error, 1)
-		go func() {
-			closeDone <- b.Close(ctx)
-		}()
-
-		select {
-		case err := <-closeDone:
-			require.NoError(t, err)
-		case <-time.After(2 * time.Second):
-			t.Fatal("Close deadlocked while discovery worker waits for closeMu")
+		stopCalled := make(chan struct{})
+		closeMuFreeDuringStop := false
+		b.discoveryRepeater = &stubRepeater{
+			stopFn: func() {
+				if b.closeMu.TryLock() {
+					closeMuFreeDuringStop = true
+					b.closeMu.Unlock()
+				}
+				close(stopCalled)
+			},
 		}
 
-		close(applyRelease)
-
-		select {
-		case <-applyDone:
-		case <-time.After(2 * time.Second):
-			t.Fatal("applyDiscoveredEndpoints did not finish after Close released closeMu")
-		}
+		require.NoError(t, b.Close(ctx))
+		require.True(t, closeMuFreeDuringStop, "closeMu must be released before repeater Stop")
+		<-stopCalled
 	})
 }
+
+type stubRepeater struct {
+	stopFn func()
+}
+
+func (s *stubRepeater) Stop() {
+	if s.stopFn != nil {
+		s.stopFn()
+	}
+}
+
+func (s *stubRepeater) Force() {}
 
 // Mock resolver
 //
