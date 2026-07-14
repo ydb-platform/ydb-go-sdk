@@ -321,6 +321,60 @@ func TestBalancer_Close(t *testing.T) {
 			}, "")
 		})
 	})
+
+	t.Run("CloseCompletesWhileApplyWaitsForCloseMu", func(t *testing.T) {
+		ctx := context.Background()
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.RemoveRef(ctx) }()
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		b.connectionsState.Store(newConnectionsState(nil,
+			nil, balancerConfig.Info{}, true, nil,
+		))
+
+		applyEntered := make(chan struct{})
+		applyRelease := make(chan struct{})
+		go func() {
+			b.closeMu.Lock()
+			close(applyEntered)
+			<-applyRelease
+			b.closeMu.Unlock()
+		}()
+		<-applyEntered
+
+		applyDone := make(chan struct{})
+		go func() {
+			b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
+				endpoint.New("contended:2135", endpoint.WithID(1)),
+			}, "")
+			close(applyDone)
+		}()
+
+		closeDone := make(chan error, 1)
+		go func() {
+			closeDone <- b.Close(ctx)
+		}()
+
+		select {
+		case err := <-closeDone:
+			require.NoError(t, err)
+		case <-time.After(2 * time.Second):
+			t.Fatal("Close deadlocked while discovery worker waits for closeMu")
+		}
+
+		close(applyRelease)
+
+		select {
+		case <-applyDone:
+		case <-time.After(2 * time.Second):
+			t.Fatal("applyDiscoveredEndpoints did not finish after Close released closeMu")
+		}
+	})
 }
 
 // Mock resolver

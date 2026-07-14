@@ -310,11 +310,11 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 
 	oldState := b.connectionsState.Swap(nil)
 
-	if b.discoveryRepeater != nil {
-		b.discoveryRepeater.Stop()
-	}
+	rep := b.discoveryRepeater
+	b.discoveryRepeater = nil
 
 	discoveryCC := b.cc.Load()
+	b.cc.Store(nil)
 
 	b.closeMu.Unlock()
 
@@ -325,6 +325,10 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	defer func() {
 		onDone(err)
 	}()
+
+	if rep != nil {
+		rep.Stop()
+	}
 
 	b.clearState(ctx, oldState)
 

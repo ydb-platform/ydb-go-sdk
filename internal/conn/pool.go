@@ -36,7 +36,7 @@ type (
 	}
 )
 
-var errClosedPool = xerrors.Wrap(fmt.Errorf("pool closed early"))
+var ErrClosedPool = xerrors.Wrap(fmt.Errorf("pool closed early"))
 
 func (p *Pool) DialTimeout() time.Duration {
 	return p.config.DialTimeout()
@@ -152,7 +152,7 @@ func (p *Pool) AddRef(context.Context) error {
 	defer p.mu.Unlock()
 
 	if p.closed.Load() {
-		return xerrors.WithStackTrace(errClosedPool)
+		return xerrors.WithStackTrace(ErrClosedPool)
 	}
 
 	p.usages++

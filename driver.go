@@ -154,7 +154,7 @@ func (b *balancerWithMeta) Close(ctx context.Context) error {
 func (c *driverDiscoveryClient) Close(ctx context.Context) error {
 	c.pool.Put(ctx, c.conn)
 
-	return nil
+	return c.Client.Close(ctx)
 }
 
 // Close closes Driver and clear resources
@@ -564,6 +564,12 @@ func (d *Driver) connect(ctx context.Context) error {
 
 	d.discovery = xsync.OnceValue(func() (*driverDiscoveryClient, error) {
 		bootstrap := d.pool.Get(endpoint.New(d.config.Endpoint()))
+		if bootstrap == nil {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("discovery bootstrap connection: %w", conn.ErrClosedPool),
+			)
+		}
+
 		client := internalDiscovery.New(xcontext.ValueOnly(ctx),
 			bootstrap,
 			discoveryConfig.New(
