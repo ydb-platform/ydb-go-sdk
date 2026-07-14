@@ -115,7 +115,11 @@ func makeBuildInfoHeader(info *buildInfo) string {
 	}
 
 	if info.observabilityMetricsOn {
-		builder.WriteString(" ")
+		if info.observabilityTracingOn {
+			builder.WriteString(";")
+		} else {
+			builder.WriteString(" ")
+		}
 		builder.WriteString(observability.MetricsChainName)
 		builder.WriteString("/")
 		builder.WriteString(observability.MetricsChainVersion)

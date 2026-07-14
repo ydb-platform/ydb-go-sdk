@@ -113,7 +113,7 @@ func TestMetaContext(t *testing.T) {
 		require.True(t, has)
 		require.Equal(t, []string{
 			buildInfoFirstPart + " " +
-				observability.TracingChainName + "/" + observability.TracingChainVersion + " " +
+				observability.TracingChainName + "/" + observability.TracingChainVersion + ";" +
 				observability.MetricsChainName + "/" + observability.MetricsChainVersion,
 		}, md.Get(HeaderVersion))
 	})
