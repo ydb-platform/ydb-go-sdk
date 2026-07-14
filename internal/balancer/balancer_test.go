@@ -392,6 +392,29 @@ func TestBalancer_Close(t *testing.T) {
 		require.Equal(t, connectivity.Shutdown, cc.GetState())
 	})
 
+	t.Run("NextConnNoEndpoints", func(t *testing.T) {
+		ctx := context.Background()
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.RemoveRef(ctx) }()
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		b.connectionsState.Store(newConnectionsState(
+			nil,
+			nil,
+			balancerConfig.Info{},
+			true,
+			nil,
+		))
+
+		_, err := b.nextConn(ctx)
+		require.ErrorIs(t, err, ErrNoEndpoints)
+	})
+
 	t.Run("ApplyDiscoveredEndpointsWhenBalancerClosed", func(t *testing.T) {
 		ctx := context.Background()
 		cfg := config.New()

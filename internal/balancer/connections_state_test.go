@@ -560,6 +560,19 @@ func TestConnection(t *testing.T) {
 	})
 }
 
+func TestGetConnectionCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	s := newConnectionsState([]conn.Conn{
+		&mock.Conn{AddrField: "1", StateField: state.Online},
+	}, nil, balancerConfig.Info{}, false, nil)
+
+	c, failed := s.GetConnection(ctx)
+	require.Nil(t, c)
+	require.Equal(t, 0, failed)
+}
+
 func TestDiscoveryReuseIpAndHostName(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.New()

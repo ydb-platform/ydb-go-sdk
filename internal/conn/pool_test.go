@@ -12,9 +12,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -1070,6 +1072,28 @@ func TestPool_CloseConnsForFailedResolveSkipsAlreadyClosed(t *testing.T) {
 	require.NotPanics(t, func() {
 		pool.closeConnsForFailedResolve(ctx, target)
 	})
+}
+
+func TestPool_OnResolveDriverTrace(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+	defer func() {
+		_ = pool.RemoveRef(ctx)
+	}()
+
+	target := "localhost:2135"
+	e := endpoint.New(target)
+	_ = pool.Get(e)
+
+	onDone := gtrace.DriverOnResolve(
+		pool.onResolveDriverTrace(ctx, (&mockConfig{}).Trace()),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.TestPool_OnResolveDriverTrace"),
+		target,
+		nil,
+	)
+	onDone(errors.New("resolve failed"))
+
+	require.True(t, testPoolHasConn(pool, e.Key()))
 }
 
 type mockGrpcConn struct {

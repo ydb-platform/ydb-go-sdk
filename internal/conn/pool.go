@@ -62,10 +62,6 @@ func (p *Pool) Get(e endpoint.Endpoint) Conn {
 	}
 
 	cv := p.get(e)
-	if cv == nil {
-		return nil
-	}
-
 	cv.useCount++
 
 	return cv.cc
@@ -279,6 +275,14 @@ func (p *Pool) onResolveCallback(
 	}
 }
 
+func (p *Pool) onResolveDriverTrace(ctx context.Context, base *trace.Driver) *trace.Driver {
+	return gtrace.Compose(base, &trace.Driver{
+		OnResolve: func(info trace.DriverResolveStartInfo) func(trace.DriverResolveDoneInfo) {
+			return p.onResolveCallback(ctx, info)
+		},
+	})
+}
+
 func (p *Pool) onResolveDone(ctx context.Context, target string, resolved []string, info trace.DriverResolveDoneInfo) {
 	if info.Error != nil || len(resolved) == 0 {
 		// Reset gRPC transport only; keep map entries and useCount unchanged.
@@ -304,11 +308,7 @@ func NewPool(ctx context.Context, config Config) *Pool {
 
 	p.dialOptions = append(p.dialOptions,
 		grpc.WithResolvers(
-			xresolver.New("", gtrace.Compose(config.Trace(), &trace.Driver{
-				OnResolve: func(info trace.DriverResolveStartInfo) func(trace.DriverResolveDoneInfo) {
-					return p.onResolveCallback(ctx, info)
-				},
-			})),
+			xresolver.New("", p.onResolveDriverTrace(ctx, config.Trace())),
 		),
 	)
 
