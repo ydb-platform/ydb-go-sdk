@@ -262,33 +262,22 @@ func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryServi
 		msg, recvErr := attachStream.Recv()
 		if recvErr != nil {
 			core.releaseSession()
-			core.onSessionDelete(attachStream.Context(), recvErr)
 
 			return
 		}
 
 		if msg.GetSessionShutdown() != nil {
 			core.releaseSession()
-			core.onSessionDelete(attachStream.Context(), errSessionShutdownHint)
 
 			return
 		}
 		if msg.GetNodeShutdown() != nil {
 			core.onNodeShutdown(errNodeShutdownHint)
 			core.releaseSession()
-			core.onSessionDelete(attachStream.Context(), errNodeShutdownHint)
 
 			return
 		}
 	}
-}
-
-func (core *sessionCore) onSessionDelete(ctx context.Context, err error) {
-	onDone := gtrace.QueryOnSessionDelete(core.Trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).onSessionDelete"),
-		core,
-	)
-	onDone(err)
 }
 
 type deleteSessionClient interface {
