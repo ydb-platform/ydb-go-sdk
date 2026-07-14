@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"sync"
 	"time"
@@ -32,6 +33,8 @@ type (
 		closed bool
 	}
 )
+
+var errClosedPool = xerrors.Wrap(fmt.Errorf("pool closed early"))
 
 func (p *Pool) DialTimeout() time.Duration {
 	return p.config.DialTimeout()
@@ -148,6 +151,10 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 func (p *Pool) AddRef(context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	if p.closed {
+		return xerrors.WithStackTrace(errClosedPool)
+	}
 
 	p.usages++
 
