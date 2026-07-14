@@ -83,7 +83,7 @@ func testPoolConnUseCount(p *Pool, key endpoint.Key) (int64, bool) {
 		return 0, false
 	}
 
-	return value.useCount.Load(), true
+	return value.useCount, true
 }
 
 func TestPool_Get(t *testing.T) {
@@ -523,7 +523,7 @@ func TestPool_GetPut(t *testing.T) {
 
 		pool.mu.Lock()
 		value := &connValue{cc: cc}
-		value.useCount.Store(1)
+		value.useCount = 1
 		pool.conns[e.Key()] = value
 		pool.mu.Unlock()
 
@@ -685,7 +685,7 @@ func TestPool_GetPut(t *testing.T) {
 
 		pool.mu.Lock()
 		value := &connValue{cc: cc}
-		value.useCount.Store(1)
+		value.useCount = 1
 		pool.conns[e.Key()] = value
 		pool.mu.Unlock()
 

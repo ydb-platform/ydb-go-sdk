@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/url"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
@@ -21,7 +20,7 @@ import (
 type (
 	connValue struct {
 		cc       *conn
-		useCount atomic.Int64
+		useCount int64
 	}
 	Pool struct {
 		config      Config
@@ -73,7 +72,7 @@ func (p *Pool) Get(e endpoint.Endpoint) Conn {
 		return nil
 	}
 
-	cv.useCount.Add(1)
+	cv.useCount++
 
 	return cv.cc
 }
@@ -128,12 +127,13 @@ func (p *Pool) tryPut(c *conn) bool {
 		return false
 	}
 
-	if value.useCount.Add(-1) == 0 {
+	value.useCount--
+	if value.useCount == 0 {
 		delete(p.conns, key)
 
 		return false
 	}
-	
+
 	return true
 }
 
