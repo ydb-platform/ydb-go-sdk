@@ -16,18 +16,13 @@ import (
 
 // mockConfig implements the Config interface for testing
 type mockConfig struct {
-	dialTimeout   time.Duration
-	connectionTTL time.Duration
-	driverTrace   *trace.Driver
-	grpcDialOpts  []grpc.DialOption
+	dialTimeout  time.Duration
+	driverTrace  *trace.Driver
+	grpcDialOpts []grpc.DialOption
 }
 
 func (m *mockConfig) DialTimeout() time.Duration {
 	return m.dialTimeout
-}
-
-func (m *mockConfig) ConnectionTTL() time.Duration {
-	return m.connectionTTL
 }
 
 func (m *mockConfig) Trace() *trace.Driver {
@@ -105,8 +100,7 @@ func TestPool_Get(t *testing.T) {
 	t.Run("GetSameConnectionTwice", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -128,8 +122,7 @@ func TestPool_Get(t *testing.T) {
 	t.Run("GetDifferentEndpoints", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -154,8 +147,7 @@ func TestPool_TakeRelease(t *testing.T) {
 	t.Run("TakeIncreasesUsageCounter", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 
@@ -179,8 +171,7 @@ func TestPool_TakeRelease(t *testing.T) {
 	t.Run("ReleaseDecreasesUsageCounter", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 
@@ -199,8 +190,7 @@ func TestPool_TakeRelease(t *testing.T) {
 	t.Run("FinalReleaseClosesPool", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 
@@ -222,8 +212,7 @@ func TestPool_IsClosed(t *testing.T) {
 	t.Run("NewPoolIsNotClosed", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -236,8 +225,7 @@ func TestPool_IsClosed(t *testing.T) {
 	t.Run("ReleasedPoolIsClosed", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 
@@ -252,8 +240,7 @@ func TestPool_ConfigMethods(t *testing.T) {
 	t.Run("DialTimeout", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   10 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 10 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -267,9 +254,8 @@ func TestPool_ConfigMethods(t *testing.T) {
 		ctx := context.Background()
 		driverTrace := &trace.Driver{}
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-			driverTrace:   driverTrace,
+			dialTimeout: 5 * time.Second,
+			driverTrace: driverTrace,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -283,9 +269,8 @@ func TestPool_ConfigMethods(t *testing.T) {
 		ctx := context.Background()
 		opts := []grpc.DialOption{grpc.WithBlock()} //nolint:staticcheck,nolintlint
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
-			grpcDialOpts:  opts,
+			dialTimeout:  5 * time.Second,
+			grpcDialOpts: opts,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -301,8 +286,7 @@ func TestEndpointsToConnections(t *testing.T) {
 	t.Run("CreatesConnectionsForEndpoints", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -326,8 +310,7 @@ func TestEndpointsToConnections(t *testing.T) {
 	t.Run("ReusesExistingConnections", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -352,8 +335,7 @@ func TestEndpointsToConnections(t *testing.T) {
 	t.Run("IPv6AndHostOverrideUniqueKeys", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
@@ -400,8 +382,7 @@ func TestEndpointsToConnections(t *testing.T) {
 	t.Run("AddNewEndpointAndNodeIDVariation", func(t *testing.T) {
 		ctx := context.Background()
 		config := &mockConfig{
-			dialTimeout:   5 * time.Second,
-			connectionTTL: 0,
+			dialTimeout: 5 * time.Second,
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
