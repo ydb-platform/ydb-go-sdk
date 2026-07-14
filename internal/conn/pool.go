@@ -267,6 +267,16 @@ func (p *Pool) closeConnsForFailedResolve(ctx context.Context, target string) {
 	}
 }
 
+func (p *Pool) onResolveDone(ctx context.Context, target string, resolved []string, info trace.DriverResolveDoneInfo) {
+	if info.Error != nil || len(resolved) == 0 {
+		// Reset gRPC transport only; keep map entries and useCount unchanged.
+		// The balancer still holds pool refs from discovery Get/Put; deleting
+		// here would desync ref-counting and leak or double-close wrappers.
+		// Stale entries are removed when discovery Put drops useCount to zero.
+		p.closeConnsForFailedResolve(ctx, target)
+	}
+}
+
 func NewPool(ctx context.Context, config Config) *Pool {
 	onDone := gtrace.DriverOnPoolNew(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.NewPool"),
@@ -288,13 +298,7 @@ func NewPool(ctx context.Context, config Config) *Pool {
 					resolved := info.Resolved
 
 					return func(info trace.DriverResolveDoneInfo) {
-						if info.Error != nil || len(resolved) == 0 {
-							// Reset gRPC transport only; keep map entries and useCount unchanged.
-							// The balancer still holds pool refs from discovery Get/Put; deleting
-							// here would desync ref-counting and leak or double-close wrappers.
-							// Stale entries are removed when discovery Put drops useCount to zero.
-							p.closeConnsForFailedResolve(ctx, target)
-						}
+						p.onResolveDone(ctx, target, resolved, info)
 					}
 				},
 			})),

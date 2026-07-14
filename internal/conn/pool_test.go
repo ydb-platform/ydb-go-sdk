@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -10,7 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -912,4 +915,87 @@ func TestPool_RemoveRefSetsClosedUnderMutex(t *testing.T) {
 	wg.Wait()
 
 	require.True(t, pool.closed.Load())
+}
+
+func TestPool_PutIgnoresInvalidConn(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+	defer func() {
+		_ = pool.RemoveRef(ctx)
+	}()
+
+	var typedNil *conn
+	var asConn Conn = typedNil
+	pool.Put(ctx, asConn)
+	pool.Put(ctx, &mock.Conn{})
+}
+
+func TestPool_Ban(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+
+	e := endpoint.New("ban:2135")
+	c := pool.Get(e)
+	require.NotNil(t, c)
+
+	pool.Ban(ctx, c, errors.New("overload"))
+	require.Equal(t, state.Banned, c.State())
+
+	require.NoError(t, pool.RemoveRef(ctx))
+	require.NotPanics(t, func() {
+		pool.Ban(ctx, c, errors.New("after close"))
+	})
+}
+
+func TestPool_PutAfterRemoveRefClosesOutsideMap(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+
+	e := endpoint.New("put-after-close:2135")
+	c := pool.Get(e)
+	require.NoError(t, pool.RemoveRef(ctx))
+
+	pool.Put(ctx, c)
+	require.False(t, testPoolHasConn(pool, e.Key()))
+}
+
+func TestPool_OnResolveDone(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+	defer func() {
+		_ = pool.RemoveRef(ctx)
+	}()
+
+	target := "localhost:2135"
+	e := endpoint.New(target)
+	_ = pool.Get(e)
+
+	pool.onResolveDone(ctx, target, []string{target}, trace.DriverResolveDoneInfo{
+		Error: errors.New("resolve failed"),
+	})
+	require.True(t, testPoolHasConn(pool, e.Key()))
+
+	useCount, ok := testPoolConnUseCount(pool, e.Key())
+	require.True(t, ok)
+	require.Equal(t, int64(1), useCount)
+
+	pool.onResolveDone(ctx, target, nil, trace.DriverResolveDoneInfo{})
+	require.True(t, testPoolHasConn(pool, e.Key()))
+}
+
+func TestPool_ConnsMatchingResolveTargetNilMap(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+	require.NoError(t, pool.RemoveRef(ctx))
+
+	require.Nil(t, pool.connsMatchingResolveTarget("localhost:2135"))
+}
+
+func TestPool_EndpointsToConnectionsNilMap(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+	require.NoError(t, pool.RemoveRef(ctx))
+
+	e := endpoint.New("closed:2135")
+	require.Empty(t, endpointsToConnections(pool, []endpoint.Endpoint{e}))
 }

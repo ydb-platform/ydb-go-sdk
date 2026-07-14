@@ -52,6 +52,33 @@ func TestConnectionsState_AllReturnsEveryDiscoveredConn(t *testing.T) {
 	require.Len(t, s.prefer, 1)
 }
 
+func TestConnectionsState_AllNilReceiver(t *testing.T) {
+	var s *connectionsState
+
+	require.Nil(t, s.All())
+}
+
+func TestConnection_LastResortUsesPreferWhenFallbackDisabled(t *testing.T) {
+	filter := filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
+		return info.SelfLocation == e.Location()
+	})
+
+	s := newConnectionsState(
+		[]conn.Conn{
+			&mock.Conn{AddrField: "t1", NodeIDField: 1, LocationField: "t", StateField: state.Banned},
+			&mock.Conn{AddrField: "f1", NodeIDField: 2, LocationField: "f", StateField: state.Online},
+		},
+		filter,
+		balancerConfig.Info{SelfLocation: "t"},
+		false,
+		nil,
+	)
+
+	c, failed := s.GetConnection(context.Background())
+	require.Equal(t, &mock.Conn{AddrField: "t1", NodeIDField: 1, LocationField: "t", StateField: state.Banned}, c)
+	require.Equal(t, 1, failed)
+}
+
 func TestConnsToNodeIDMap(t *testing.T) {
 	table := []struct {
 		name   string

@@ -15,6 +15,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/test/bufconn"
 
@@ -352,6 +354,73 @@ func TestBalancer_Close(t *testing.T) {
 		require.NoError(t, b.Close(ctx))
 		require.True(t, closeMuFreeDuringStop, "closeMu must be released before repeater Stop")
 		<-stopCalled
+	})
+
+	t.Run("CloseClosesDiscoveryConn", func(t *testing.T) {
+		ctx := context.Background()
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.RemoveRef(ctx) }()
+
+		lis := bufconn.Listen(1024 * 1024)
+		t.Cleanup(func() { _ = lis.Close() })
+
+		srv := grpc.NewServer()
+		t.Cleanup(srv.Stop)
+		go func() { _ = srv.Serve(lis) }()
+
+		cc, err := grpc.NewClient("passthrough:///test",
+			grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+				return lis.Dial()
+			}),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = cc.Close() })
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		b.connectionsState.Store(newConnectionsState(nil,
+			nil, balancerConfig.Info{}, true, nil,
+		))
+		b.cc.Store(cc)
+
+		require.NoError(t, b.Close(ctx))
+		require.Equal(t, connectivity.Shutdown, cc.GetState())
+	})
+
+	t.Run("ApplyDiscoveredEndpointsWhenBalancerClosed", func(t *testing.T) {
+		ctx := context.Background()
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.RemoveRef(ctx) }()
+
+		e := endpoint.New("closed-balancer:2135", endpoint.WithID(1))
+		c := pool.Get(e)
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+			closed:         true,
+		}
+		b.connectionsState.Store(newConnectionsState(
+			[]conn.Conn{c},
+			nil,
+			balancerConfig.Info{},
+			true,
+			nil,
+		))
+
+		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e}, "")
+		require.Nil(t, b.connectionsState.Load())
+
+		c2 := pool.Get(e)
+		require.NotNil(t, c2)
+		require.NotSame(t, c, c2)
 	})
 }
 
