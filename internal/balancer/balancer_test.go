@@ -188,8 +188,8 @@ func TestApplyDiscoveredEndpointsReleasesFilteredOutConns(t *testing.T) {
 	e2 := endpoint.New("e2.example:2135", endpoint.WithID(2))
 
 	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, "")
-	require.Len(t, b.connections().All(), 1)
-	require.Len(t, b.connections().Held(), 2)
+	require.Len(t, b.connections().All(), 2)
+	require.Len(t, b.connections().prefer, 1)
 
 	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1}, "")
 	require.NotNil(t, connInQuarantine(b, 2), "filtered-out conn must stay in quarantine until released")

@@ -263,7 +263,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 			b.balancerConfig.DetectNearestDC,
 			b.driverConfig.Database(),
 		)
-		active = b.connections().Held()
+		active = b.connections().All()
 	)
 	defer func() {
 		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {

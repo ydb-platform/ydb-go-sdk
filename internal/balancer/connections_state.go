@@ -37,11 +37,7 @@ func newConnectionsState(
 	}
 
 	res.prefer, res.fallback = sortPreferConnections(conns, filter, info, allowFallback)
-	if allowFallback {
-		res.all = conns
-	} else {
-		res.all = res.prefer
-	}
+	res.all = conns
 
 	return res
 }
@@ -56,21 +52,6 @@ func (s *connectionsState) All() []conn.Conn {
 	}
 
 	return slices.Clone(s.all)
-}
-
-// Held returns every connection the balancer currently owns a pool ref for
-// (full active set from discovery), regardless of endpoint filter views.
-func (s *connectionsState) Held() []conn.Conn {
-	if s == nil || len(s.connByNodeID) == 0 {
-		return nil
-	}
-
-	result := make([]conn.Conn, 0, len(s.connByNodeID))
-	for _, c := range s.connByNodeID {
-		result = append(result, c)
-	}
-
-	return result
 }
 
 func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, failedCount int) {
@@ -100,7 +81,12 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 		return c, failedCount
 	}
 
-	c, _ := s.selectRandomConnection(s.all, true)
+	lastResort := s.all
+	if len(s.fallback) == 0 && len(s.prefer) != len(s.all) {
+		lastResort = s.prefer
+	}
+
+	c, _ := s.selectRandomConnection(lastResort, true)
 
 	return c, failedCount
 }
