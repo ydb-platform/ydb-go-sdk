@@ -189,22 +189,6 @@ func WithRequestsType(requestsType string) Option {
 	}
 }
 
-func WithObservabilityTracingBuildInfoChain() Option {
-	return func(ctx context.Context, d *Driver) error {
-		d.options = append(d.options, config.WithObservabilityTracingBuildInfoChain())
-
-		return nil
-	}
-}
-
-func WithObservabilityMetricsBuildInfoChain() Option {
-	return func(ctx context.Context, d *Driver) error {
-		d.options = append(d.options, config.WithObservabilityMetricsBuildInfoChain())
-
-		return nil
-	}
-}
-
 // WithConnectionString accept Driver string like
 //
 //	grpc[s]://{endpoint}/{database}[?param=value]

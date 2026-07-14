@@ -2,6 +2,8 @@ package spans
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/observability"
 )
 
 func WithTraces(adapter Adapter) ydb.Option {
@@ -10,7 +12,7 @@ func WithTraces(adapter Adapter) ydb.Option {
 	}
 
 	return ydb.MergeOptions(
-		ydb.WithObservabilityTracingBuildInfoChain(),
+		ydb.With(config.WithBuildInfo(observability.TracingChainName, observability.TracingChainVersion)),
 		ydb.WithTraceDriver(driver(adapter)),
 		ydb.WithTraceTable(table(adapter)),
 		ydb.WithTraceQuery(query(adapter)),

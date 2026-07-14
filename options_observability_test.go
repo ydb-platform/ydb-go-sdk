@@ -7,11 +7,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/observability"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
-	"github.com/ydb-platform/ydb-go-sdk/v3/observability"
 )
 
-func TestWithObservabilityBuildInfoChainOptions(t *testing.T) {
+func TestWithObservabilityBuildInfoChains(t *testing.T) {
 	for _, tt := range []struct {
 		name     string
 		opts     []Option
@@ -20,7 +21,7 @@ func TestWithObservabilityBuildInfoChainOptions(t *testing.T) {
 		{
 			name: "tracing only",
 			opts: []Option{
-				WithObservabilityTracingBuildInfoChain(),
+				With(config.WithBuildInfo(observability.TracingChainName, observability.TracingChainVersion)),
 			},
 			expected: version.FullVersion + " " +
 				observability.TracingChainName + "/" + observability.TracingChainVersion,
@@ -28,7 +29,7 @@ func TestWithObservabilityBuildInfoChainOptions(t *testing.T) {
 		{
 			name: "metrics only",
 			opts: []Option{
-				WithObservabilityMetricsBuildInfoChain(),
+				With(config.WithBuildInfo(observability.MetricsChainName, observability.MetricsChainVersion)),
 			},
 			expected: version.FullVersion + " " +
 				observability.MetricsChainName + "/" + observability.MetricsChainVersion,
@@ -36,8 +37,8 @@ func TestWithObservabilityBuildInfoChainOptions(t *testing.T) {
 		{
 			name: "tracing and metrics",
 			opts: []Option{
-				WithObservabilityTracingBuildInfoChain(),
-				WithObservabilityMetricsBuildInfoChain(),
+				With(config.WithBuildInfo(observability.TracingChainName, observability.TracingChainVersion)),
+				With(config.WithBuildInfo(observability.MetricsChainName, observability.MetricsChainVersion)),
 			},
 			expected: version.FullVersion + " " +
 				observability.TracingChainName + "/" + observability.TracingChainVersion + ";" +

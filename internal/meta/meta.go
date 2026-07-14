@@ -13,11 +13,11 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/observability"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/observability"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -53,34 +53,6 @@ func New(
 
 type Option func(m *Meta)
 
-func WithObservabilityTracingBuildInfoChain() Option {
-	return func(m *Meta) {
-		current := m.buildInfo.Load()
-		next := &buildInfo{
-			frameworks:             make(map[string]string, len(current.frameworks)),
-			observabilityTracingOn: true,
-			observabilityMetricsOn: current.observabilityMetricsOn,
-		}
-		maps.Copy(next.frameworks, current.frameworks)
-		next.buildInfoHeader = makeBuildInfoHeader(next)
-		m.buildInfo.Store(next)
-	}
-}
-
-func WithObservabilityMetricsBuildInfoChain() Option {
-	return func(m *Meta) {
-		current := m.buildInfo.Load()
-		next := &buildInfo{
-			frameworks:             make(map[string]string, len(current.frameworks)),
-			observabilityTracingOn: current.observabilityTracingOn,
-			observabilityMetricsOn: true,
-		}
-		maps.Copy(next.frameworks, current.frameworks)
-		next.buildInfoHeader = makeBuildInfoHeader(next)
-		m.buildInfo.Store(next)
-	}
-}
-
 func WithApplicationNameOption(applicationName string) Option {
 	return func(m *Meta) {
 		m.applicationName = applicationName
@@ -91,9 +63,7 @@ func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
 	return func(m *Meta) {
 		current := m.buildInfo.Load()
 		next := &buildInfo{
-			frameworks:             make(map[string]string, len(current.frameworks)+1),
-			observabilityTracingOn: current.observabilityTracingOn,
-			observabilityMetricsOn: current.observabilityMetricsOn,
+			frameworks: make(map[string]string, len(current.frameworks)+1),
 		}
 		maps.Copy(next.frameworks, current.frameworks)
 		next.frameworks[frameworkName] = frameworkVersion
@@ -107,25 +77,31 @@ func makeBuildInfoHeader(info *buildInfo) string {
 	builder := strings.Builder{}
 	builder.WriteString(buildInfoFirstPart)
 
-	if info.observabilityTracingOn {
+	if tracingVersion, has := info.frameworks[observability.TracingChainName]; has {
 		builder.WriteString(" ")
 		builder.WriteString(observability.TracingChainName)
 		builder.WriteString("/")
-		builder.WriteString(observability.TracingChainVersion)
+		builder.WriteString(tracingVersion)
 	}
 
-	if info.observabilityMetricsOn {
-		if info.observabilityTracingOn {
+	if metricsVersion, has := info.frameworks[observability.MetricsChainName]; has {
+		if _, hasTracing := info.frameworks[observability.TracingChainName]; hasTracing {
 			builder.WriteString(";")
 		} else {
 			builder.WriteString(" ")
 		}
 		builder.WriteString(observability.MetricsChainName)
 		builder.WriteString("/")
-		builder.WriteString(observability.MetricsChainVersion)
+		builder.WriteString(metricsVersion)
 	}
 
-	if len(info.frameworks) == 0 {
+	frameworkKeys := xslices.Keys(info.frameworks)
+	frameworkKeys = xslices.Filter(frameworkKeys, func(frameworkName string) bool {
+		return frameworkName != observability.TracingChainName &&
+			frameworkName != observability.MetricsChainName
+	})
+
+	if len(frameworkKeys) == 0 {
 		return builder.String()
 	}
 
@@ -133,7 +109,7 @@ func makeBuildInfoHeader(info *buildInfo) string {
 	builder.WriteString(
 		strings.Join(
 			xslices.Transform(
-				xslices.Keys(info.frameworks),
+				frameworkKeys,
 				func(frameworkName string) string {
 					return frameworkName + "/" + info.frameworks[frameworkName]
 				},
@@ -171,10 +147,8 @@ func ForbidOption(feature string) Option {
 
 type (
 	buildInfo struct {
-		frameworks             map[string]string // frameworkName -> version
-		observabilityTracingOn bool
-		observabilityMetricsOn bool
-		buildInfoHeader        string
+		frameworks      map[string]string // frameworkName -> version
+		buildInfoHeader string
 	}
 	Meta struct {
 		pid             string

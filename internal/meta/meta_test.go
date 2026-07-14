@@ -10,8 +10,8 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/observability"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
-	"github.com/ydb-platform/ydb-go-sdk/v3/observability"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -102,8 +102,8 @@ func TestMetaContext(t *testing.T) {
 			"database",
 			nil,
 			&trace.Driver{},
-			WithObservabilityTracingBuildInfoChain(),
-			WithObservabilityMetricsBuildInfoChain(),
+			WithBuildInfo(observability.TracingChainName, observability.TracingChainVersion),
+			WithBuildInfo(observability.MetricsChainName, observability.MetricsChainVersion),
 		)
 
 		ctx, err := m.Context(context.Background())
@@ -123,7 +123,7 @@ func TestMetaContext(t *testing.T) {
 			"database",
 			nil,
 			&trace.Driver{},
-			WithObservabilityTracingBuildInfoChain(),
+			WithBuildInfo(observability.TracingChainName, observability.TracingChainVersion),
 			WithBuildInfo("database/sql", "1.2.3"),
 		)
 
