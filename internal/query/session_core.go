@@ -285,7 +285,7 @@ func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryServi
 
 func (core *sessionCore) onSessionDelete(ctx context.Context, err error) {
 	onDone := gtrace.QueryOnSessionDelete(core.Trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).releaseSession"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).onSessionDelete"),
 		core,
 	)
 	onDone(err)
