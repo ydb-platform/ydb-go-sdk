@@ -33,21 +33,6 @@ type (
 	}
 )
 
-func endpointsToConnections(p *Pool, endpoints []endpoint.Endpoint) []Conn {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	conns := make([]Conn, 0, len(endpoints))
-	for _, e := range endpoints {
-		cv := p.get(e)
-		if cv != nil {
-			conns = append(conns, cv.cc)
-		}
-	}
-
-	return conns
-}
-
 func (p *Pool) DialTimeout() time.Duration {
 	return p.config.DialTimeout()
 }

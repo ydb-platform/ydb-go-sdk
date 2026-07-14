@@ -78,7 +78,7 @@ type Balancer struct {
 
 	connectionsState atomic.Pointer[connectionsState]
 
-	closeMu sync.RWMutex
+	closeMu sync.Mutex
 	closed  bool
 }
 
@@ -246,8 +246,8 @@ func (b *Balancer) clearState(ctx context.Context, state *connectionsState) {
 }
 
 func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
-	b.closeMu.RLock()
-	defer b.closeMu.RUnlock()
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
 
 	if b.closed {
 		b.clearState(ctx, b.connectionsState.Swap(nil))
