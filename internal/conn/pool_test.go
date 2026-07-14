@@ -730,10 +730,7 @@ func TestPool_GetPut(t *testing.T) {
 		}()
 
 		deadline := time.After(2 * time.Second)
-		for {
-			if pool.isClosed() {
-				break
-			}
+		for !pool.isClosed() {
 			select {
 			case <-deadline:
 				t.Fatal("isClosed stayed blocked while Release closes connections")

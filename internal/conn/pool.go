@@ -108,33 +108,33 @@ func (p *Pool) Put(ctx context.Context, cc Conn) {
 		return
 	}
 
-	if toClose := p.putDecRef(c); toClose != nil {
-		_ = toClose.Close(ctx)
+	if !p.tryPut(c) {
+		_ = c.Close(ctx)
 	}
 }
 
-func (p *Pool) putDecRef(c *conn) *conn {
+func (p *Pool) tryPut(c *conn) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	if p.closed {
-		return nil
+		return false
 	}
 
 	key := c.endpoint.Key()
 
 	value, ok := p.conns[key]
 	if !ok || value == nil || value.cc != c {
-		return nil
+		return false
 	}
 
-	if value.useCount.Add(-1) != 0 {
-		return nil
+	if value.useCount.Add(-1) == 0 {
+		delete(p.conns, key)
+
+		return false
 	}
-
-	delete(p.conns, key)
-
-	return c
+	
+	return true
 }
 
 func (p *Pool) isClosed() bool {
@@ -177,8 +177,8 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	toClose := p.releaseFinalize()
-	if toClose == nil {
+	toClose := p.release()
+	if len(toClose) == 0 {
 		return nil
 	}
 
@@ -187,19 +187,17 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 		issuesMu sync.Mutex
 		wg       sync.WaitGroup
 	)
-
 	wg.Add(len(toClose))
 	for _, c := range toClose {
 		go func(c closer.Closer) {
 			defer wg.Done()
-			if err := c.Close(ctx); err != nil {
+			if err := c.Close(ctx); err != nil && !xerrors.IsContextError(err) {
 				issuesMu.Lock()
 				issues = append(issues, err)
 				issuesMu.Unlock()
 			}
 		}(c)
 	}
-
 	wg.Wait()
 
 	if len(issues) > 0 {
@@ -209,7 +207,7 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 	return nil
 }
 
-func (p *Pool) releaseFinalize() []closer.Closer {
+func (p *Pool) release() []closer.Closer {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
