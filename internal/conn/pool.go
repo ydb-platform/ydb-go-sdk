@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
@@ -255,10 +256,11 @@ func NewPool(ctx context.Context, config Config) *Pool {
 							}
 							p.mu.Unlock()
 
+							closeCtx := xcontext.ValueOnly(ctx)
 							for _, cc := range toClose {
 								cc.mtx.Lock()
 								if !cc.closed {
-									cc.close(ctx)
+									cc.close(closeCtx)
 								}
 								cc.mtx.Unlock()
 							}
