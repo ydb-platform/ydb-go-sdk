@@ -139,6 +139,27 @@ func TestMetaContext(t *testing.T) {
 		}, md.Get(HeaderVersion))
 	})
 
+	t.Run("ObservabilityMetricsKeepFrameworkFormat", func(t *testing.T) {
+		m := New(
+			"database",
+			nil,
+			&trace.Driver{},
+			WithBuildInfo(observability.MetricsChainName, observability.MetricsChainVersion),
+			WithBuildInfo("database/sql", "1.2.3"),
+		)
+
+		ctx, err := m.Context(context.Background())
+		require.NoError(t, err)
+
+		md, has := metadata.FromOutgoingContext(ctx)
+		require.True(t, has)
+		require.Equal(t, []string{
+			buildInfoFirstPart + " " +
+				observability.MetricsChainName + "/" + observability.MetricsChainVersion +
+				";database/sql/1.2.3",
+		}, md.Get(HeaderVersion))
+	})
+
 	t.Run("ObservabilityChainsDisabled", func(t *testing.T) {
 		m := New(
 			"database",

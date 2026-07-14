@@ -1,5 +1,7 @@
 package observability
 
+// Chain versions are coordinated across SDKs.
+// The version sequence is global for ydb-sdk-* adoption markers.
 const (
 	TracingChainName    = "ydb-sdk-tracing"
 	MetricsChainName    = "ydb-sdk-metrics"

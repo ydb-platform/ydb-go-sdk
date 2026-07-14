@@ -68,12 +68,16 @@ func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
 		maps.Copy(next.frameworks, current.frameworks)
 		next.frameworks[frameworkName] = frameworkVersion
 
-		next.buildInfoHeader = makeBuildInfoHeader(next)
+		next.buildInfoHeader = next.makeHeader()
 		m.buildInfo.Store(next)
 	}
 }
 
-func makeBuildInfoHeader(info *buildInfo) string {
+// makeHeader keeps backward-compatible semantics for build-info parsers:
+// - chain markers are appended after the base token using a space;
+// - tracing and metrics markers are separated with ';' when both are present;
+// - custom frameworks remain in ';framework/version' form.
+func (info *buildInfo) makeHeader() string {
 	builder := strings.Builder{}
 	builder.WriteString(buildInfoFirstPart)
 
