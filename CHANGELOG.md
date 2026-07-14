@@ -1,4 +1,4 @@
-* Fixed a burst of `BAD_SESSION` errors from `database/sql` during rolling restarts by pessimizing nodes reported as under shutdown and invalidating their pooled sessions
+* Fixed a burst of `BAD_SESSION` errors from `database/sql` during rolling restarts by pessimizing affected nodes and letting `database/sql` discard failed sessions
 
 * Removed background connection parking (`connParker`), `conn.lastUsage` tracking and `xsync.LastUsage`
 * Deprecated `WithConnectionTTL`: the option is now a no-op

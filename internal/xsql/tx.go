@@ -47,10 +47,6 @@ func (tx *Tx) Commit() (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	if !tx.conn.IsValid() {
-		return xerrors.WithStackTrace(tx.conn.invalidError())
-	}
-
 	if err := tx.tx.Commit(tx.ctx); err != nil {
 		return xerrors.WithStackTrace(badconn.Map(err))
 	}
@@ -74,10 +70,6 @@ func (tx *Tx) Rollback() (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	if !tx.conn.IsValid() {
-		return xerrors.WithStackTrace(tx.conn.invalidError())
-	}
-
 	err := tx.tx.Rollback(tx.ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(badconn.Map(err))
@@ -96,10 +88,6 @@ func (tx *Tx) QueryContext(ctx context.Context, sql string, args []driver.NamedV
 	defer func() {
 		onDone(finalErr)
 	}()
-
-	if !tx.conn.IsValid() {
-		return nil, xerrors.WithStackTrace(tx.conn.invalidError())
-	}
 
 	sql, params, err := tx.conn.toYdb(sql, args...)
 	if err != nil {
@@ -134,10 +122,6 @@ func (tx *Tx) ExecContext(ctx context.Context, sql string, args []driver.NamedVa
 		onDone(finalErr)
 	}()
 
-	if !tx.conn.IsValid() {
-		return nil, xerrors.WithStackTrace(tx.conn.invalidError())
-	}
-
 	sql, params, err := tx.conn.toYdb(sql, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -159,7 +143,7 @@ func (tx *Tx) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, fi
 	defer func() {
 		onDone(finalErr)
 	}()
-	if !tx.conn.IsValid() {
+	if !tx.conn.cc.IsValid() {
 		return nil, badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(tx),
 			xerrors.Invalid(tx.conn),

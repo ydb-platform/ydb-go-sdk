@@ -24,7 +24,6 @@ func TestTx_ID(t *testing.T) {
 
 func TestTx_Commit(t *testing.T) {
 	mockConn := &Conn{
-		cc: &mockCommonConn{},
 		connector: &Connector{
 			trace: &trace.DatabaseSQL{},
 		},
@@ -43,7 +42,6 @@ func TestTx_Commit(t *testing.T) {
 
 func TestTx_Rollback(t *testing.T) {
 	mockConn := &Conn{
-		cc: &mockCommonConn{},
 		connector: &Connector{
 			trace: &trace.DatabaseSQL{},
 		},
@@ -58,30 +56,6 @@ func TestTx_Rollback(t *testing.T) {
 	err := tx.Rollback()
 	require.NoError(t, err)
 	require.Nil(t, mockConn.currentTx)
-}
-
-func TestTxCommitSkipsRPCWhenNodeIsBanned(t *testing.T) {
-	connector := &Connector{trace: &trace.DatabaseSQL{}}
-	conn := connector.registerConn(&Conn{
-		cc:        &mockCommonConn{nodeID: 42},
-		connector: connector,
-	})
-	commitCalls := 0
-	tx := &Tx{
-		conn: conn,
-		tx: &mockTx{
-			id:          "test-tx",
-			commitCalls: &commitCalls,
-		},
-		ctx: t.Context(),
-	}
-	conn.currentTx = tx
-
-	connector.OnConnBanned(conn.NodeID())
-	err := tx.Commit()
-
-	require.ErrorIs(t, err, driver.ErrBadConn)
-	require.Zero(t, commitCalls)
 }
 
 func TestTx_QueryContext(t *testing.T) {

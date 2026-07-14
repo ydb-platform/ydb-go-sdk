@@ -3,7 +3,6 @@ package xsql
 import (
 	"context"
 	"database/sql/driver"
-	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -21,16 +20,6 @@ type Conn struct {
 	ctx       context.Context //nolint:containedctx
 
 	connector *Connector
-	invalid   atomic.Bool
-}
-
-var _ driver.SessionResetter = (*Conn)(nil)
-
-func (c *Conn) invalidError() error {
-	return xerrors.Retryable(errNotReadyConn,
-		xerrors.Invalid(c),
-		xerrors.Invalid(c.cc),
-	)
 }
 
 func (c *Conn) ID() string {
@@ -48,10 +37,6 @@ func (c *Conn) Ping(ctx context.Context) (finalErr error) {
 	defer func() {
 		onDone(finalErr)
 	}()
-
-	if !c.IsValid() {
-		return xerrors.WithStackTrace(c.invalidError())
-	}
 
 	if err := c.cc.Ping(ctx); err != nil {
 		return xerrors.WithStackTrace(badconn.Map(err))
@@ -85,10 +70,6 @@ func (c *Conn) BeginTx(ctx context.Context, opts driver.TxOptions) (_ driver.Tx,
 		}
 	}()
 
-	if !c.IsValid() {
-		return nil, xerrors.WithStackTrace(c.invalidError())
-	}
-
 	if c.currentTx != nil {
 		return nil, xerrors.WithStackTrace(xerrors.AlreadyHasTx(c.currentTx.ID()))
 	}
@@ -112,7 +93,6 @@ func (c *Conn) Close() (finalErr error) {
 		stack.FunctionID("database/sql.(*Conn).Close" /*stack.Package("database/sql")*/),
 	)
 	defer func() {
-		c.connector.connections.Remove(c)
 		onDone(finalErr)
 	}()
 
@@ -124,29 +104,11 @@ func (c *Conn) Close() (finalErr error) {
 	return nil
 }
 
-// IsValid implements driver.Validator. database/sql calls it before returning
-// a connection to the idle pool.
+// IsValid implements driver.Validator interface.
+// database/sql calls IsValid before reusing a connection from the pool.
+// If IsValid returns false, the connection is discarded and a new one is requested.
 func (c *Conn) IsValid() bool {
-	return !c.invalid.Load() && c.cc.IsValid()
-}
-
-func (c *Conn) invalidate() {
-	c.invalid.Store(true)
-}
-
-// ResetSession implements driver.SessionResetter.
-//
-// database/sql calls IsValid before putting a connection into its idle pool,
-// but a session can be invalidated asynchronously while it is already idle,
-// for example when its node is pessimized. ResetSession is called when the
-// connection is taken from the pool, so it prevents such sessions from
-// reaching the next query or transaction.
-func (c *Conn) ResetSession(context.Context) error {
-	if !c.IsValid() {
-		return c.invalidError()
-	}
-
-	return nil
+	return c.cc.IsValid()
 }
 
 func (c *Conn) Begin() (_ driver.Tx, finalErr error) {
@@ -181,7 +143,7 @@ func (c *Conn) PrepareContext(ctx context.Context, sql string) (_ driver.Stmt, f
 		onDone(finalErr)
 	}()
 
-	if !c.IsValid() {
+	if !c.cc.IsValid() {
 		return nil, xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(c),
 			xerrors.Invalid(c.cc),
@@ -206,10 +168,6 @@ func (c *Conn) QueryContext(ctx context.Context, sql string, args []driver.Named
 	defer func() {
 		onDone(finalErr)
 	}()
-
-	if !c.IsValid() {
-		return nil, xerrors.WithStackTrace(c.invalidError())
-	}
 
 	sql, params, err := c.toYdb(sql, args...)
 	if err != nil {
@@ -252,10 +210,6 @@ func (c *Conn) ExecContext(ctx context.Context, sql string, args []driver.NamedV
 	defer func() {
 		onDone(finalErr)
 	}()
-
-	if !c.IsValid() {
-		return nil, xerrors.WithStackTrace(c.invalidError())
-	}
 
 	sql, params, err := c.toYdb(sql, args...)
 	if err != nil {

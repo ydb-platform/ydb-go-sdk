@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"sync/atomic"
+	"errors"
 	"testing"
 	"time"
 
@@ -100,161 +100,94 @@ func (c *deadSessionXsqlConnector) Driver() driver.Driver { return c }
 // had no way to detect that a session was dead and kept pooling (and reusing)
 // the same dead connection across all retry attempts.
 //
-// Fix: xsql.Conn checks the underlying common.Conn before starting work and
-// implements driver.Validator so database/sql discards invalid connections.
+// Fix: xsql.Conn.IsValid() delegates to the underlying common.Conn.IsValid().
+// When it returns false, database/sql discards the connection instead of
+// pooling it, forcing a fresh Connect() on the next attempt.
 //
 // The test uses real xsql.Conn objects so it directly exercises the fix in
-// internal/xsql/conn.go:IsValid(). No BeginTx RPC must reach a known-dead
-// session, and every database/sql retry must request a fresh connection.
+// internal/xsql/conn.go:IsValid(). Without the fix (IsValid() absent from
+// xsql.Conn), connectCounter would be 1 (same dead session reused 830 times)
+// and the assertion would fail. With the fix, connectCounter equals
+// maxAttempts (one fresh connection per retry).
 func TestXsqlConnIsValidPreventsDeadSessionPoolReuse(t *testing.T) {
 	const maxAttempts = 830 // https://github.com/ydb-platform/ydb-go-sdk/issues/2108
 
-	ctx, cancel := context.WithCancel(t.Context())
-	beginTxCounter := 0
-	cc := &deadSessionCommonConn{
-		beginTxFn: func() error {
-			beginTxCounter++
-
-			return nil
+	cases := []struct {
+		name       string
+		beginTxErr error
+	}{
+		{
+			name:       "retryable error",
+			beginTxErr: xerrors.Retryable(errors.New("simulated BAD_SESSION error")),
+		},
+		{
+			name:       "BAD_SESSION",
+			beginTxErr: xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION)),
+		},
+		{
+			name:       "SESSION_BUSY",
+			beginTxErr: xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY)),
 		},
 	}
-	sharedConnCfg := &Connector{
-		trace:     &trace.DatabaseSQL{},
-		bindings:  newMockBindings(),
-		clock:     clockwork.NewRealClock(),
-		processor: QUERY,
-		done:      make(chan struct{}),
-	}
-	bc := &deadSessionXsqlConnector{
-		cc:            cc,
-		sharedConnCfg: sharedConnCfg,
-		onConnect: func(attempt int) {
-			if attempt >= maxAttempts {
-				cancel()
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+
+			beginTxCounter := 0
+			cc := &deadSessionCommonConn{
+				beginTxFn: func() error {
+					beginTxCounter++
+					if beginTxCounter >= maxAttempts {
+						cancel()
+					}
+
+					return tt.beginTxErr
+				},
 			}
-		},
+
+			// sharedConnCfg holds the configuration used by all xsql.Conn instances
+			// created during the test. It is not used as the outer driver.Connector
+			// (that role belongs to deadSessionXsqlConnector), so its own Connect()
+			// path is never invoked here.
+			sharedConnCfg := &Connector{
+				trace:     &trace.DatabaseSQL{},
+				bindings:  newMockBindings(),
+				clock:     clockwork.NewRealClock(),
+				processor: QUERY,
+				done:      make(chan struct{}),
+			}
+
+			bc := &deadSessionXsqlConnector{
+				cc:            cc,
+				sharedConnCfg: sharedConnCfg,
+			}
+
+			db := sql.OpenDB(bc)
+			defer func() { _ = db.Close() }()
+
+			err := retry.DoTx(ctx, db,
+				func(ctx context.Context, tx *sql.Tx) error {
+					return nil
+				},
+				retry.WithDoTxRetryOptions(
+					retry.WithFastBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
+					retry.WithSlowBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
+					retry.WithIdempotent(true),
+				),
+			)
+
+			assert.ErrorIs(t, err, context.Canceled)
+
+			// Each retry must create a fresh xsql.Conn because
+			// xsql.Conn.IsValid() returns false (delegates to cc.IsValid()),
+			// causing database/sql to discard the dead connection rather than
+			// pooling it for the next attempt.
+			//
+			// If IsValid() were removed from xsql.Conn, database/sql would pool
+			// the same connection every time → connectCounter == 1 (regression).
+			assert.Equal(t, maxAttempts, bc.connectCounter)
+			assert.Equal(t, maxAttempts, beginTxCounter)
+		})
 	}
-	db := sql.OpenDB(bc)
-	t.Cleanup(func() { _ = db.Close() })
-
-	err := retry.DoTx(ctx, db,
-		func(context.Context, *sql.Tx) error { return nil },
-		retry.WithDoTxRetryOptions(
-			retry.WithFastBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
-			retry.WithSlowBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
-			retry.WithIdempotent(true),
-		),
-	)
-
-	assert.ErrorIs(t, err, context.Canceled)
-	assert.Equal(t, maxAttempts, bc.connectCounter)
-	assert.Zero(t, beginTxCounter)
-}
-
-type asyncShutdownCommonConn struct {
-	nodeID           uint32
-	valid            atomic.Bool
-	execCalls        atomic.Int64
-	invalidExecCalls atomic.Int64
-}
-
-var _ common.Conn = (*asyncShutdownCommonConn)(nil)
-
-func newAsyncShutdownCommonConn(nodeID uint32) *asyncShutdownCommonConn {
-	c := &asyncShutdownCommonConn{nodeID: nodeID}
-	c.valid.Store(true)
-
-	return c
-}
-
-func (c *asyncShutdownCommonConn) IsValid() bool  { return c.valid.Load() }
-func (c *asyncShutdownCommonConn) ID() string     { return "async-shutdown-session" }
-func (c *asyncShutdownCommonConn) NodeID() uint32 { return c.nodeID }
-
-func (c *asyncShutdownCommonConn) Ping(context.Context) error  { return nil }
-func (c *asyncShutdownCommonConn) Close(context.Context) error { return nil }
-
-func (c *asyncShutdownCommonConn) Query(
-	context.Context, string, *params.Params,
-) (common.Rows, error) {
-	return nil, nil
-}
-
-func (c *asyncShutdownCommonConn) Exec(
-	context.Context, string, *params.Params,
-) (driver.Result, error) {
-	c.execCalls.Add(1)
-	if !c.valid.Load() {
-		c.invalidExecCalls.Add(1)
-
-		return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
-	}
-
-	return driver.RowsAffected(0), nil
-}
-
-func (c *asyncShutdownCommonConn) Explain(
-	context.Context, string, *params.Params,
-) (string, string, error) {
-	return "", "", nil
-}
-
-func (c *asyncShutdownCommonConn) BeginTx(context.Context, driver.TxOptions) (common.Tx, error) {
-	return nil, nil
-}
-
-type asyncShutdownConnector struct {
-	sharedConnCfg *Connector
-	connections   []*asyncShutdownCommonConn
-}
-
-var (
-	_ driver.Connector = (*asyncShutdownConnector)(nil)
-	_ driver.Driver    = (*asyncShutdownConnector)(nil)
-)
-
-func (c *asyncShutdownConnector) Connect(ctx context.Context) (driver.Conn, error) {
-	cc := newAsyncShutdownCommonConn(uint32(42 + len(c.connections)))
-	c.connections = append(c.connections, cc)
-
-	conn := &Conn{
-		processor: QUERY,
-		cc:        cc,
-		ctx:       ctx,
-		connector: c.sharedConnCfg,
-	}
-
-	return c.sharedConnCfg.registerConn(conn), nil
-}
-
-func (c *asyncShutdownConnector) Open(string) (driver.Conn, error) { return nil, driver.ErrSkip }
-func (c *asyncShutdownConnector) Driver() driver.Driver            { return c }
-
-func TestXsqlConnResetSessionDiscardsSessionInvalidatedWhileIdle(t *testing.T) {
-	connector := &asyncShutdownConnector{
-		sharedConnCfg: &Connector{
-			trace:     &trace.DatabaseSQL{},
-			bindings:  newMockBindings(),
-			clock:     clockwork.NewRealClock(),
-			processor: QUERY,
-			done:      make(chan struct{}),
-		},
-	}
-	db := sql.OpenDB(connector)
-	t.Cleanup(func() { _ = db.Close() })
-
-	_, err := db.ExecContext(t.Context(), "SELECT 1")
-	assert.NoError(t, err)
-	assert.Len(t, connector.connections, 1)
-
-	// Simulate endpoint pessimization after database/sql has already put the
-	// connection into its idle pool.
-	first := connector.connections[0]
-	connector.sharedConnCfg.OnConnBanned(first.NodeID())
-
-	_, err = db.ExecContext(t.Context(), "SELECT 1")
-	assert.NoError(t, err)
-	assert.Len(t, connector.connections, 2)
-	assert.EqualValues(t, 1, first.execCalls.Load())
-	assert.Zero(t, first.invalidExecCalls.Load())
 }

@@ -232,7 +232,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 
 	connections := conn.EndpointsToConnections(b.pool, newest)
 	for _, c := range connections {
-		b.pool.Allow(ctx, c)
+		c.Unban(ctx)
 	}
 
 	b.connectionsState.Store(newConnectionsState(connections,

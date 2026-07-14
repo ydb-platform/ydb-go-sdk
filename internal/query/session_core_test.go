@@ -260,10 +260,9 @@ func TestSessionCoreAttachStreamErrorBansConnection(t *testing.T) {
 	var firstRecv atomic.Bool
 	attachErr := errors.New("attach stream closed")
 	attachStream := NewMockQueryService_AttachSessionClient(ctrl)
-	var banned atomic.Bool
+	var bannedCause atomic.Value
 	ctx = conn.WithBanCallback(ctx, func(cause error) {
-		banned.Store(true)
-		require.ErrorIs(t, cause, attachErr)
+		bannedCause.Store(cause)
 	})
 	stubAttachStreamContextWith(ctx, attachStream)
 	attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
@@ -281,8 +280,9 @@ func TestSessionCoreAttachStreamErrorBansConnection(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, core)
 	require.Eventually(t, func() bool {
-		return banned.Load() && !core.IsAlive()
+		return bannedCause.Load() != nil && !core.IsAlive()
 	}, time.Second, time.Millisecond)
+	require.ErrorIs(t, bannedCause.Load().(error), attachErr)
 }
 
 func TestSessionCoreSessionShutdownHintClosesSession(t *testing.T) {

@@ -55,8 +55,7 @@ func (m *mockCommonConn) Explain(ctx context.Context, sql string, p *params.Para
 
 // mockTx implements common.Tx for testing
 type mockTx struct {
-	id          string
-	commitCalls *int
+	id string
 }
 
 func (m *mockTx) ID() string {
@@ -64,10 +63,6 @@ func (m *mockTx) ID() string {
 }
 
 func (m *mockTx) Commit(ctx context.Context) error {
-	if m.commitCalls != nil {
-		*m.commitCalls++
-	}
-
 	return nil
 }
 

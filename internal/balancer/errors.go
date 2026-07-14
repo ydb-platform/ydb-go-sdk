@@ -2,7 +2,6 @@ package balancer
 
 import (
 	"context"
-	"strings"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
@@ -82,7 +81,7 @@ func IsBadConn(ctx context.Context, err error, ignoreCodes ...grpcCodes.Code) bo
 	if xerrors.IsTransportError(err, xslices.Subtract(badCodes, ignoreCodes)...) {
 		return true
 	}
-	if isSessionUnderShutdown(err) {
+	if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
 		return true
 	}
 
@@ -98,18 +97,4 @@ func IsBadConn(ctx context.Context, err error, ignoreCodes ...grpcCodes.Code) bo
 	}
 
 	return false
-}
-
-func isSessionUnderShutdown(err error) bool {
-	if !xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
-		return false
-	}
-
-	underShutdown := false
-	xerrors.IterateByIssues(err, func(message string, _ Ydb.StatusIds_StatusCode, _ uint32) {
-		message = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(message), "."))
-		underShutdown = underShutdown || strings.EqualFold(message, "Session is under shutdown")
-	})
-
-	return underShutdown
 }
