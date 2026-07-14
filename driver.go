@@ -119,6 +119,7 @@ type (
 	}
 	driverDiscoveryClient struct {
 		*internalDiscovery.Client
+
 		pool *conn.Pool
 		conn conn.Conn
 	}
