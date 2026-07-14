@@ -10,6 +10,7 @@ func WithTraces(adapter Adapter) ydb.Option {
 	}
 
 	return ydb.MergeOptions(
+		ydb.WithObservabilityTracingBuildInfoChain(),
 		ydb.WithTraceDriver(driver(adapter)),
 		ydb.WithTraceTable(table(adapter)),
 		ydb.WithTraceQuery(query(adapter)),

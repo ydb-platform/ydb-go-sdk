@@ -11,6 +11,7 @@ func WithTraces(config Config) ydb.Option {
 	config = config.WithSystem("ydb")
 
 	return ydb.MergeOptions(
+		ydb.WithObservabilityMetricsBuildInfoChain(),
 		ydb.WithTraceDriver(driver(config)),
 		ydb.WithTraceTable(table(config)),
 		ydb.WithTraceQuery(query(config)),

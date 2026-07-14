@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/observability"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -52,6 +53,34 @@ func New(
 
 type Option func(m *Meta)
 
+func WithObservabilityTracingBuildInfoChain() Option {
+	return func(m *Meta) {
+		current := m.buildInfo.Load()
+		next := &buildInfo{
+			frameworks:             make(map[string]string, len(current.frameworks)),
+			observabilityTracingOn: true,
+			observabilityMetricsOn: current.observabilityMetricsOn,
+		}
+		maps.Copy(next.frameworks, current.frameworks)
+		next.buildInfoHeader = makeBuildInfoHeader(next)
+		m.buildInfo.Store(next)
+	}
+}
+
+func WithObservabilityMetricsBuildInfoChain() Option {
+	return func(m *Meta) {
+		current := m.buildInfo.Load()
+		next := &buildInfo{
+			frameworks:             make(map[string]string, len(current.frameworks)),
+			observabilityTracingOn: current.observabilityTracingOn,
+			observabilityMetricsOn: true,
+		}
+		maps.Copy(next.frameworks, current.frameworks)
+		next.buildInfoHeader = makeBuildInfoHeader(next)
+		m.buildInfo.Store(next)
+	}
+}
+
 func WithApplicationNameOption(applicationName string) Option {
 	return func(m *Meta) {
 		m.applicationName = applicationName
@@ -60,29 +89,55 @@ func WithApplicationNameOption(applicationName string) Option {
 
 func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
 	return func(m *Meta) {
-		var buildInfo buildInfo
-
-		if frameworks := m.buildInfo.Load().frameworks; len(frameworks) > 0 {
-			buildInfo.frameworks = make(map[string]string, len(frameworks)+1)
-			maps.Copy(buildInfo.frameworks, frameworks)
-			buildInfo.frameworks[frameworkName] = frameworkVersion
-		} else {
-			buildInfo.frameworks = map[string]string{
-				frameworkName: frameworkVersion,
-			}
+		current := m.buildInfo.Load()
+		next := &buildInfo{
+			frameworks:             make(map[string]string, len(current.frameworks)+1),
+			observabilityTracingOn: current.observabilityTracingOn,
+			observabilityMetricsOn: current.observabilityMetricsOn,
 		}
+		maps.Copy(next.frameworks, current.frameworks)
+		next.frameworks[frameworkName] = frameworkVersion
 
-		buildInfo.buildInfoHeader = buildInfoFirstPart + ";" + strings.Join(
+		next.buildInfoHeader = makeBuildInfoHeader(next)
+		m.buildInfo.Store(next)
+	}
+}
+
+func makeBuildInfoHeader(info *buildInfo) string {
+	builder := strings.Builder{}
+	builder.WriteString(buildInfoFirstPart)
+
+	if info.observabilityTracingOn {
+		builder.WriteString(" ")
+		builder.WriteString(observability.TracingChainName)
+		builder.WriteString("/")
+		builder.WriteString(observability.TracingChainVersion)
+	}
+
+	if info.observabilityMetricsOn {
+		builder.WriteString(" ")
+		builder.WriteString(observability.MetricsChainName)
+		builder.WriteString("/")
+		builder.WriteString(observability.MetricsChainVersion)
+	}
+
+	if len(info.frameworks) == 0 {
+		return builder.String()
+	}
+
+	builder.WriteString(";")
+	builder.WriteString(
+		strings.Join(
 			xslices.Transform(
-				xslices.Keys(buildInfo.frameworks),
+				xslices.Keys(info.frameworks),
 				func(frameworkName string) string {
-					return frameworkName + "/" + buildInfo.frameworks[frameworkName]
+					return frameworkName + "/" + info.frameworks[frameworkName]
 				},
 			), ";",
-		)
+		),
+	)
 
-		m.buildInfo.Store(&buildInfo)
-	}
+	return builder.String()
 }
 
 func WithRequestTypeOption(requestType string) Option {
@@ -112,8 +167,10 @@ func ForbidOption(feature string) Option {
 
 type (
 	buildInfo struct {
-		frameworks      map[string]string // frameworkName -> version
-		buildInfoHeader string
+		frameworks             map[string]string // frameworkName -> version
+		observabilityTracingOn bool
+		observabilityMetricsOn bool
+		buildInfoHeader        string
 	}
 	Meta struct {
 		pid             string

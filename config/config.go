@@ -210,6 +210,18 @@ func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
 	}
 }
 
+func WithObservabilityTracingBuildInfoChain() Option {
+	return func(c *Config) {
+		c.metaOptions = append(c.metaOptions, meta.WithObservabilityTracingBuildInfoChain())
+	}
+}
+
+func WithObservabilityMetricsBuildInfoChain() Option {
+	return func(c *Config) {
+		c.metaOptions = append(c.metaOptions, meta.WithObservabilityMetricsBuildInfoChain())
+	}
+}
+
 // WithUserAgent add provided user agent to all api requests
 //
 // Deprecated: use WithApplicationName instead.

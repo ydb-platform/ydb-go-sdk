@@ -3,6 +3,7 @@ package meta
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
+	"github.com/ydb-platform/ydb-go-sdk/v3/observability"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -93,6 +95,65 @@ func TestMetaContext(t *testing.T) {
 		require.True(t, has)
 		// Keys are sorted alphabetically: "database/sql" < "my-framework"
 		require.Equal(t, []string{buildInfoFirstPart + ";database/sql/1.0.0;my-framework/2.0.0"}, md.Get(HeaderVersion))
+	})
+
+	t.Run("ObservabilityChainsEnabled", func(t *testing.T) {
+		m := New(
+			"database",
+			nil,
+			&trace.Driver{},
+			WithObservabilityTracingBuildInfoChain(),
+			WithObservabilityMetricsBuildInfoChain(),
+		)
+
+		ctx, err := m.Context(context.Background())
+		require.NoError(t, err)
+
+		md, has := metadata.FromOutgoingContext(ctx)
+		require.True(t, has)
+		require.Equal(t, []string{
+			buildInfoFirstPart + " " +
+				observability.TracingChainName + "/" + observability.TracingChainVersion + " " +
+				observability.MetricsChainName + "/" + observability.MetricsChainVersion,
+		}, md.Get(HeaderVersion))
+	})
+
+	t.Run("ObservabilityChainsKeepFrameworkFormat", func(t *testing.T) {
+		m := New(
+			"database",
+			nil,
+			&trace.Driver{},
+			WithObservabilityTracingBuildInfoChain(),
+			WithBuildInfo("database/sql", "1.2.3"),
+		)
+
+		ctx, err := m.Context(context.Background())
+		require.NoError(t, err)
+
+		md, has := metadata.FromOutgoingContext(ctx)
+		require.True(t, has)
+		require.Equal(t, []string{
+			buildInfoFirstPart + " " +
+				observability.TracingChainName + "/" + observability.TracingChainVersion +
+				";database/sql/1.2.3",
+		}, md.Get(HeaderVersion))
+	})
+
+	t.Run("ObservabilityChainsDisabled", func(t *testing.T) {
+		m := New(
+			"database",
+			nil,
+			&trace.Driver{},
+		)
+
+		ctx, err := m.Context(context.Background())
+		require.NoError(t, err)
+
+		md, has := metadata.FromOutgoingContext(ctx)
+		require.True(t, has)
+		require.Equal(t, []string{buildInfoFirstPart}, md.Get(HeaderVersion))
+		require.False(t, strings.Contains(md.Get(HeaderVersion)[0], observability.TracingChainName))
+		require.False(t, strings.Contains(md.Get(HeaderVersion)[0], observability.MetricsChainName))
 	})
 
 	t.Run("SDKVersionCannotBeOverwritten", func(t *testing.T) {
