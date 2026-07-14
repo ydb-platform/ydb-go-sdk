@@ -113,7 +113,7 @@ func (p *Pool) tryPut(c *conn) bool {
 	}
 
 	value.useCount--
-	if value.useCount == 0 {
+	if value.useCount <= 0 {
 		delete(p.conns, key)
 
 		return false
