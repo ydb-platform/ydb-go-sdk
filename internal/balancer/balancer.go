@@ -231,6 +231,8 @@ func nextState(ctx context.Context, pool interface {
 	return active, newActive
 }
 
+// quarantine refs were acquired in discovery round N-1,
+// all refs in round N — each Put matches its own Get.
 func (b *Balancer) clearState(ctx context.Context, state *connectionsState) {
 	if state == nil {
 		return
