@@ -2,7 +2,7 @@ name: regression-proof
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened, labeled]
 
 permissions:
   contents: read
