@@ -876,3 +876,40 @@ func TestPool_CloseConnsForFailedResolvePreservesPoolEntry(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, int64(1), useCount)
 }
+
+func TestPool_CloseConnsForFailedResolveReleasesPoolMutexAfterSnapshot(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+	t.Cleanup(func() {
+		_ = pool.RemoveRef(ctx)
+	})
+
+	target := "localhost:2135"
+	e := endpoint.New(target)
+	_ = pool.Get(e)
+
+	pool.closeConnsForFailedResolve(ctx, target)
+
+	require.True(t, pool.mu.TryLock(), "pool mutex must be released after snapshot")
+	pool.mu.Unlock()
+}
+
+func TestPool_RemoveRefSetsClosedUnderMutex(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+
+	require.NoError(t, pool.RemoveRef(ctx))
+	require.True(t, pool.closed.Load())
+
+	var wg sync.WaitGroup
+	wg.Add(8)
+	for range 8 {
+		go func() {
+			defer wg.Done()
+			_ = pool.RemoveRef(ctx)
+		}()
+	}
+	wg.Wait()
+
+	require.True(t, pool.closed.Load())
+}

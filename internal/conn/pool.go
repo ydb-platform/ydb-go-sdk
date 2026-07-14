@@ -211,9 +211,7 @@ func (p *Pool) release() []closer.Closer {
 		return nil
 	}
 
-	if p.closed.Swap(true) {
-		return nil
-	}
+	p.closed.Store(true)
 
 	toClose := make([]closer.Closer, 0, len(p.conns))
 	for _, value := range p.conns {
@@ -238,15 +236,26 @@ func matchesResolveTarget(address, target string) bool {
 	return false
 }
 
-func (p *Pool) closeConnsForFailedResolve(ctx context.Context, target string) {
+func (p *Pool) connsMatchingResolveTarget(target string) []*conn {
 	p.mu.Lock()
-	var toClose []*conn
+	defer p.mu.Unlock()
+
+	if p.conns == nil {
+		return nil
+	}
+
+	result := make([]*conn, 0, len(p.conns))
 	for key, value := range p.conns {
 		if matchesResolveTarget(key.Address, target) {
-			toClose = append(toClose, value.cc)
+			result = append(result, value.cc)
 		}
 	}
-	p.mu.Unlock()
+
+	return result
+}
+
+func (p *Pool) closeConnsForFailedResolve(ctx context.Context, target string) {
+	toClose := p.connsMatchingResolveTarget(target)
 
 	closeCtx := xcontext.ValueOnly(ctx)
 	for _, cc := range toClose {

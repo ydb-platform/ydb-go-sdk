@@ -300,13 +300,23 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
 	b.closeMu.Lock()
-	defer b.closeMu.Unlock()
-
 	if b.closed {
+		b.closeMu.Unlock()
+
 		return xerrors.WithStackTrace(errBalancerClosed)
 	}
 
 	b.closed = true
+
+	oldState := b.connectionsState.Swap(nil)
+
+	if b.discoveryRepeater != nil {
+		b.discoveryRepeater.Stop()
+	}
+
+	discoveryCC := b.cc.Load()
+
+	b.closeMu.Unlock()
 
 	onDone := gtrace.DriverOnBalancerClose(
 		b.driverConfig.Trace(), &ctx,
@@ -316,16 +326,10 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	oldState := b.connectionsState.Swap(nil)
-
-	if b.discoveryRepeater != nil {
-		b.discoveryRepeater.Stop()
-	}
-
 	b.clearState(ctx, oldState)
 
-	if cc := b.cc.Load(); cc != nil {
-		_ = cc.Close()
+	if discoveryCC != nil {
+		_ = discoveryCC.Close()
 	}
 
 	return nil
