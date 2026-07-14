@@ -49,7 +49,7 @@ type (
 		id             string
 		nodeID         uint32
 		status         atomic.Uint32
-		onChangeStatus []func(SessionStatusChangeInfo)
+		onChangeStatus []func(status Status)
 		onNodeShutdown func(cause error)
 		cancelAttach   context.CancelFunc
 
@@ -84,10 +84,7 @@ func (core *sessionCore) SetStatus(status Status) {
 	default:
 		if old := core.status.Swap(uint32(status)); old != uint32(status) {
 			for _, onChangeStatus := range core.onChangeStatus {
-				onChangeStatus(SessionStatusChangeInfo{
-					SessionID: core.ID(),
-					Status:    status,
-				})
+				onChangeStatus(status)
 			}
 		}
 	}
@@ -126,12 +123,7 @@ func WithConn(cc grpc.ClientConnInterface) Option {
 	}
 }
 
-type SessionStatusChangeInfo struct {
-	SessionID string
-	Status    Status
-}
-
-func OnChangeStatus(onChangeStatus func(SessionStatusChangeInfo)) Option {
+func OnChangeStatus(onChangeStatus func(status Status)) Option {
 	return func(c *sessionCore) {
 		c.onChangeStatus = append(c.onChangeStatus, onChangeStatus)
 	}

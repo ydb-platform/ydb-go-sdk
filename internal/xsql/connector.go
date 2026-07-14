@@ -126,8 +126,8 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 			connector: c,
 		}
 		s, err := internalQuery.CreateSession(ctx, Ydb_Query_V1.NewQueryServiceClient(c.balancer), c.queryConfig,
-			internalQuery.OnChangeStatus(func(info internalQuery.SessionStatusChangeInfo) {
-				if info.Status == internalQuery.StatusClosed && conn.hasSessionID(info.SessionID) {
+			internalQuery.OnChangeStatus(func(status internalQuery.Status) {
+				if status == internalQuery.StatusClosed {
 					conn.invalidate()
 				}
 			}),
@@ -139,7 +139,6 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		conn.setSessionID(s.ID())
 		conn.cc = xquery.New(s, c.QueryOpts...)
 
 		return conn, nil

@@ -22,7 +22,6 @@ type Conn struct {
 
 	connector *Connector
 	invalid   atomic.Bool
-	sessionID atomic.Pointer[string]
 }
 
 var _ driver.SessionResetter = (*Conn)(nil)
@@ -118,16 +117,6 @@ func (c *Conn) IsValid() bool {
 
 func (c *Conn) invalidate() {
 	c.invalid.Store(true)
-}
-
-func (c *Conn) setSessionID(sessionID string) {
-	c.sessionID.Store(&sessionID)
-}
-
-func (c *Conn) hasSessionID(sessionID string) bool {
-	id := c.sessionID.Load()
-
-	return id != nil && *id == sessionID
 }
 
 // ResetSession implements driver.SessionResetter.
