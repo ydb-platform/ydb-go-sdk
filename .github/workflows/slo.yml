@@ -156,7 +156,8 @@ jobs:
           bash "$SCRIPT" \
             --context "$GITHUB_WORKSPACE/current" \
             --tag "ydb-app-current" \
-            --src-path "${{ matrix.sdk.path }}"
+            --src-path "${{ matrix.sdk.path }}" \
+            --enable-coverage
 
           # Keep workload code (and shared internal helpers) on current so baseline
           # runs the same workload against the baseline SDK via tests/slo/go.mod replace.
@@ -202,4 +203,23 @@ jobs:
           bash "$GITHUB_WORKSPACE/current/.github/scripts/collect-slo-flamegraphs.sh" \
             --output-dir "$GITHUB_WORKSPACE/.slo/extra/flamegraphs" \
             --workload "${{ matrix.sdk.name }}"
+
+      - name: Collect coverage
+        if: always()
+        run: |
+          chmod +x "$GITHUB_WORKSPACE/current/.github/scripts/collect-slo-coverage.sh"
+          bash "$GITHUB_WORKSPACE/current/.github/scripts/collect-slo-coverage.sh" \
+            --output-dir "$GITHUB_WORKSPACE/.slo/extra/coverage" \
+            --workload "${{ matrix.sdk.name }}"
+
+      - name: Upload SLO coverage report to Codecov
+        if: always() && hashFiles('.slo/extra/coverage/${{ matrix.sdk.name }}.txt') != ''
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./.slo/extra/coverage/${{ matrix.sdk.name }}.txt
+          flags: slo,${{ matrix.sdk.name }}
+          name: slo-${{ matrix.sdk.name }}
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 

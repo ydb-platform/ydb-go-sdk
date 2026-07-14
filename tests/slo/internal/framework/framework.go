@@ -36,6 +36,8 @@ type WorkloadFactory func(ctx context.Context, fw *Framework) (Workload, error)
 func Run(factory WorkloadFactory) {
 	exitCode := 0
 
+	ensureCoverageDir()
+
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cancel()
 

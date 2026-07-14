@@ -9,13 +9,15 @@ Usage:
     --context <path> \
     --tag <docker-tag> \
     --src-path <sdk-path> \
-    --fallback-image <docker-tag>
+    [--enable-coverage] \
+    [--fallback-image <docker-tag>]
 
 Options:
-  --context         Docker build context directory (e.g. $GITHUB_WORKSPACE/current).
-  --tag             Docker image tag to build (e.g. ydb-app-current).
-  --src-path        Value for Docker build arg SRC_PATH (e.g. native/table).
-  --fallback-image  Image tag to return if initial Docker image build fails
+  --context          Docker build context directory (e.g. $GITHUB_WORKSPACE/current).
+  --tag              Docker image tag to build (e.g. ydb-app-current).
+  --src-path         Value for Docker build arg SRC_PATH (e.g. native/table).
+  --enable-coverage  Build an instrumented workload binary that emits SDK coverage.
+  --fallback-image   Image tag to return if initial Docker image build fails
 EOF
 }
 
@@ -28,6 +30,7 @@ context_dir=""
 dockerfile="tests/slo/Dockerfile"
 tag=""
 src_path=""
+enable_coverage="false"
 fallback_image=""
 
 while [[ $# -gt 0 ]]; do
@@ -43,6 +46,10 @@ while [[ $# -gt 0 ]]; do
     --src-path)
       src_path="${2:-}"
       shift 2
+      ;;
+    --enable-coverage)
+      enable_coverage="true"
+      shift
       ;;
     --fallback-image)
       fallback_image="${2:-}"
@@ -69,8 +76,9 @@ context_dir="$(cd "$context_dir" && pwd)"
 [[ -f "$context_dir/$dockerfile" ]] || die "Dockerfile not found: $context_dir/$dockerfile"
 
 echo "Building SLO image..."
-echo "  TAG:        $tag"
-echo "  SRC_PATH:   $src_path"
+echo "  TAG:             $tag"
+echo "  SRC_PATH:        $src_path"
+echo "  ENABLE_COVERAGE: $enable_coverage"
 
 (
   set +e
@@ -78,6 +86,7 @@ echo "  SRC_PATH:   $src_path"
   docker build -t "$tag" \
     --platform linux/amd64 \
     --build-arg "SRC_PATH=$src_path" \
+    --build-arg "ENABLE_COVERAGE=$enable_coverage" \
     -f "$dockerfile" .
   exit_code=$?
   echo "Docker build exit code: $exit_code"
