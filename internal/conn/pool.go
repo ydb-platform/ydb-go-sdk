@@ -267,6 +267,18 @@ func (p *Pool) closeConnsForFailedResolve(ctx context.Context, target string) {
 	}
 }
 
+func (p *Pool) onResolveCallback(
+	ctx context.Context,
+	start trace.DriverResolveStartInfo,
+) func(trace.DriverResolveDoneInfo) {
+	target := start.Target
+	resolved := start.Resolved
+
+	return func(info trace.DriverResolveDoneInfo) {
+		p.onResolveDone(ctx, target, resolved, info)
+	}
+}
+
 func (p *Pool) onResolveDone(ctx context.Context, target string, resolved []string, info trace.DriverResolveDoneInfo) {
 	if info.Error != nil || len(resolved) == 0 {
 		// Reset gRPC transport only; keep map entries and useCount unchanged.
@@ -294,12 +306,7 @@ func NewPool(ctx context.Context, config Config) *Pool {
 		grpc.WithResolvers(
 			xresolver.New("", gtrace.Compose(config.Trace(), &trace.Driver{
 				OnResolve: func(info trace.DriverResolveStartInfo) func(trace.DriverResolveDoneInfo) {
-					target := info.Target
-					resolved := info.Resolved
-
-					return func(info trace.DriverResolveDoneInfo) {
-						p.onResolveDone(ctx, target, resolved, info)
-					}
+					return p.onResolveCallback(ctx, info)
 				},
 			})),
 		),

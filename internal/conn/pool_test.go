@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -998,4 +999,100 @@ func TestPool_EndpointsToConnectionsNilMap(t *testing.T) {
 
 	e := endpoint.New("closed:2135")
 	require.Empty(t, endpointsToConnections(pool, []endpoint.Endpoint{e}))
+}
+
+func TestPool_AddRefReturnsErrorWhenClosed(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+	require.NoError(t, pool.RemoveRef(ctx))
+
+	err := pool.AddRef(ctx)
+	require.ErrorIs(t, err, ErrClosedPool)
+}
+
+func TestPool_RemoveRefReturnsCloseErrors(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+
+	e := endpoint.New("close-error:2135")
+	cc := newConn(e, pool)
+	cc.mtx.Lock()
+	cc.grpcConn = &mockGrpcConn{closeErr: errors.New("grpc close failed")}
+	cc.mtx.Unlock()
+
+	pool.mu.Lock()
+	pool.conns[e.Key()] = &connValue{cc: cc}
+	pool.mu.Unlock()
+
+	err := pool.RemoveRef(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "connection pool close failed")
+}
+
+func TestPool_OnResolveCallback(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+	defer func() {
+		_ = pool.RemoveRef(ctx)
+	}()
+
+	target := "localhost:2135"
+	e := endpoint.New(target)
+	_ = pool.Get(e)
+
+	done := pool.onResolveCallback(ctx, trace.DriverResolveStartInfo{
+		Target:   target,
+		Resolved: []string{target},
+	})
+	done(trace.DriverResolveDoneInfo{Error: errors.New("resolve failed")})
+
+	require.True(t, testPoolHasConn(pool, e.Key()))
+}
+
+func TestPool_CloseConnsForFailedResolveSkipsAlreadyClosed(t *testing.T) {
+	ctx := context.Background()
+	pool := NewPool(ctx, &mockConfig{})
+	defer func() {
+		_ = pool.RemoveRef(ctx)
+	}()
+
+	target := "localhost:2135"
+	e := endpoint.New(target)
+	cc := newConn(e, pool)
+	cc.mtx.Lock()
+	cc.closed = true
+	cc.mtx.Unlock()
+
+	pool.mu.Lock()
+	pool.conns[e.Key()] = &connValue{cc: cc}
+	pool.mu.Unlock()
+
+	require.NotPanics(t, func() {
+		pool.closeConnsForFailedResolve(ctx, target)
+	})
+}
+
+type mockGrpcConn struct {
+	closeErr error
+}
+
+func (m *mockGrpcConn) Invoke(context.Context, string, any, any, ...grpc.CallOption) error {
+	return nil
+}
+
+func (m *mockGrpcConn) NewStream(
+	context.Context,
+	*grpc.StreamDesc,
+	string,
+	...grpc.CallOption,
+) (grpc.ClientStream, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockGrpcConn) Close() error {
+	return m.closeErr
+}
+
+func (m *mockGrpcConn) GetState() connectivity.State {
+	return connectivity.Ready
 }
