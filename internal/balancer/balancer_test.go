@@ -156,6 +156,48 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	require.Equal(t, e3.NodeID(), all[1].Endpoint().NodeID())
 }
 
+type allowNodeIDFilter struct {
+	nodeID uint32
+}
+
+func (f allowNodeIDFilter) Allow(_ balancerConfig.Info, e endpoint.Info) bool {
+	return e.NodeID() == f.nodeID
+}
+
+func (f allowNodeIDFilter) String() string {
+	return "allowNodeID"
+}
+
+func TestApplyDiscoveredEndpointsReleasesFilteredOutConns(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	defer func() { _ = pool.RemoveRef(ctx) }()
+
+	b := &Balancer{
+		driverConfig: cfg,
+		pool:         pool,
+		balancerConfig: balancerConfig.Config{
+			AllowFallback: false,
+			Filter:        allowNodeIDFilter{nodeID: 1},
+		},
+	}
+
+	e1 := endpoint.New("e1.example:2135", endpoint.WithID(1))
+	e2 := endpoint.New("e2.example:2135", endpoint.WithID(2))
+
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, "")
+	require.Len(t, b.connections().All(), 1)
+	require.Len(t, b.connections().Held(), 2)
+
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1}, "")
+	require.NotNil(t, connInQuarantine(b, 2), "filtered-out conn must stay in quarantine until released")
+
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1}, "")
+	require.Nil(t, connInQuarantine(b, 2), "filtered-out conn must be released after quarantine cycle")
+}
+
 func TestApplyDiscoveredEndpointsClosedPool(t *testing.T) {
 	ctx := context.Background()
 	pool := conn.NewPool(ctx, config.New())

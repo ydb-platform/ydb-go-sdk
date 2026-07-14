@@ -32,6 +32,26 @@ func TestConnectionsState_AllReturnsDefensiveCopy(t *testing.T) {
 	require.Equal(t, "2", internal[1].Endpoint().Address())
 }
 
+func TestConnectionsState_HeldIncludesFilteredOutConns(t *testing.T) {
+	e1 := endpoint.New("e1:2135", endpoint.WithID(1))
+	e2 := endpoint.New("e2:2135", endpoint.WithID(2))
+
+	filter := allowNodeIDFilter{nodeID: 1}
+	s := newConnectionsState(
+		[]conn.Conn{
+			&mock.Conn{AddrField: e1.Address(), NodeIDField: e1.NodeID()},
+			&mock.Conn{AddrField: e2.Address(), NodeIDField: e2.NodeID()},
+		},
+		filter,
+		balancerConfig.Info{},
+		false,
+		nil,
+	)
+
+	require.Len(t, s.All(), 1)
+	require.Len(t, s.Held(), 2)
+}
+
 func TestConnsToNodeIDMap(t *testing.T) {
 	table := []struct {
 		name   string

@@ -58,6 +58,21 @@ func (s *connectionsState) All() []conn.Conn {
 	return slices.Clone(s.all)
 }
 
+// Held returns every connection the balancer currently owns a pool ref for
+// (full active set from discovery), regardless of endpoint filter views.
+func (s *connectionsState) Held() []conn.Conn {
+	if s == nil || len(s.connByNodeID) == 0 {
+		return nil
+	}
+
+	result := make([]conn.Conn, 0, len(s.connByNodeID))
+	for _, c := range s.connByNodeID {
+		result = append(result, c)
+	}
+
+	return result
+}
+
 func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, failedCount int) {
 	if err := ctx.Err(); err != nil {
 		return nil, 0

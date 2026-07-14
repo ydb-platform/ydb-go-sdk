@@ -46,22 +46,26 @@ When a function holds `sync.Mutex` / `sync.RWMutex`:
 Example from `internal/conn/pool.go`:
 
 ```go
-func (p *Pool) Put(ctx context.Context, cc Conn) {
-    if toClose := p.putDecRef(c); toClose != nil {
-        _ = toClose.Close(ctx) // outside pool mutex
+func (p *Pool) Put(ctx context.Context, c Conn) {
+    cc, ok := c.(*conn)
+    if !ok || cc == nil {
+        return
+    }
+    if !p.tryPut(cc) {
+        _ = cc.Close(ctx) // outside pool mutex
     }
 }
 
-func (p *Pool) putDecRef(c *conn) *conn {
+func (p *Pool) tryPut(c *conn) bool {
     p.mu.Lock()
     defer p.mu.Unlock()
     // refcount + map update only; single unlock path via defer
     ...
-    return c
+    return true
 }
 ```
 
-Same pattern for `releaseFinalize()` in `Pool.Release`.
+Same pattern for `release()` in `Pool.RemoveRef`.
 
 **Avoid** holding a pool-wide mutex across blocking `Close()` unless there is a documented lock-order reason (e.g. `onClose` must re-enter the same mutex). Prefer delete-from-map under lock, then close outside.
 
