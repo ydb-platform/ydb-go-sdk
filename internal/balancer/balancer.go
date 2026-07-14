@@ -313,8 +313,7 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	rep := b.discoveryRepeater
 	b.discoveryRepeater = nil
 
-	discoveryCC := b.cc.Load()
-	b.cc.Store(nil)
+	discoveryCC := b.cc.Swap(nil)
 
 	b.closeMu.Unlock()
 
