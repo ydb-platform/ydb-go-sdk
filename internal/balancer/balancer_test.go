@@ -113,7 +113,7 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 
 	cfg := config.New()
 	pool := conn.NewPool(ctx, cfg)
-	defer func() { _ = pool.Release(ctx) }()
+	defer func() { _ = pool.RemoveRef(ctx) }()
 
 	b := &Balancer{
 		driverConfig:   cfg,
@@ -159,7 +159,7 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 func TestApplyDiscoveredEndpointsClosedPool(t *testing.T) {
 	ctx := context.Background()
 	pool := conn.NewPool(ctx, config.New())
-	require.NoError(t, pool.Release(ctx))
+	require.NoError(t, pool.RemoveRef(ctx))
 
 	b := &Balancer{
 		driverConfig:   config.New(),
@@ -179,7 +179,7 @@ func TestBalancer_Close(t *testing.T) {
 		ctx := context.Background()
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
-		defer func() { _ = pool.Release(ctx) }()
+		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		cc := &mock.Conn{
 			ClientConnInterface: &grpc.ClientConn{},
@@ -211,7 +211,7 @@ func TestBalancer_Close(t *testing.T) {
 		ctx := context.Background()
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
-		defer func() { _ = pool.Release(ctx) }()
+		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
 			driverConfig:   cfg,
@@ -253,7 +253,7 @@ func TestBalancer_Close(t *testing.T) {
 		ctx := context.Background()
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
-		defer func() { _ = pool.Release(ctx) }()
+		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
 			driverConfig:   cfg,
@@ -352,7 +352,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 			cfg := config.New()
 			pool := conn.NewPool(ctx, cfg)
-			defer func() { _ = pool.Release(ctx) }()
+			defer func() { _ = pool.RemoveRef(ctx) }()
 
 			e1 := endpoint.New("node1:2135", endpoint.WithID(1))
 			poolConn := pool.Get(e1)
@@ -411,7 +411,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
-		defer func() { _ = pool.Release(ctx) }()
+		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
 			driverConfig:   cfg,
@@ -451,7 +451,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
-		defer func() { _ = pool.Release(ctx) }()
+		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
 			driverConfig:   cfg,
@@ -493,7 +493,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
-		defer func() { _ = pool.Release(ctx) }()
+		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
 			driverConfig:   cfg,
@@ -544,7 +544,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
-		defer func() { _ = pool.Release(ctx) }()
+		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
 			driverConfig:   cfg,
@@ -591,7 +591,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
-		defer func() { _ = pool.Release(ctx) }()
+		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
 			driverConfig:   cfg,
@@ -640,7 +640,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
-		defer func() { _ = pool.Release(ctx) }()
+		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
 			driverConfig:   cfg,
@@ -685,7 +685,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
-		defer func() { _ = pool.Release(ctx) }()
+		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
 			driverConfig:   cfg,
@@ -738,7 +738,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
-		defer func() { _ = pool.Release(ctx) }()
+		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
 			driverConfig:   cfg,
@@ -792,7 +792,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
-		defer func() { _ = pool.Release(ctx) }()
+		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
 			driverConfig:   cfg,
@@ -945,7 +945,7 @@ func TestNextState(t *testing.T) {
 func TestNextStateClosedPool(t *testing.T) {
 	ctx := context.Background()
 	pool := conn.NewPool(ctx, config.New())
-	require.NoError(t, pool.Release(ctx))
+	require.NoError(t, pool.RemoveRef(ctx))
 
 	newQuarantine, newActive := nextState(ctx, pool, nil, nil, []endpoint.Endpoint{
 		endpoint.New("node:2135", endpoint.WithID(1)),

@@ -86,14 +86,14 @@ func (p *Pool) get(e endpoint.Endpoint) *connValue {
 
 // Put decrements the connection use count. When the count reaches zero, the gRPC
 // connection is closed and the entry is removed from the pool.
-func (p *Pool) Put(ctx context.Context, cc Conn) {
-	c, ok := cc.(*conn)
-	if !ok {
+func (p *Pool) Put(ctx context.Context, c Conn) {
+	cc, ok := c.(*conn)
+	if !ok || cc == nil {
 		return
 	}
 
-	if !p.tryPut(c) {
-		_ = c.Close(ctx)
+	if !p.tryPut(cc) {
+		_ = cc.Close(ctx)
 	}
 }
 
@@ -145,7 +145,7 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 	onDone(cc.State())
 }
 
-func (p *Pool) Take(context.Context) error {
+func (p *Pool) AddRef(context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -154,9 +154,9 @@ func (p *Pool) Take(context.Context) error {
 	return nil
 }
 
-func (p *Pool) Release(ctx context.Context) (finalErr error) {
+func (p *Pool) RemoveRef(ctx context.Context) (finalErr error) {
 	onDone := gtrace.DriverOnPoolRelease(p.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Release"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).RemoveRef"),
 	)
 	defer func() {
 		onDone(finalErr)

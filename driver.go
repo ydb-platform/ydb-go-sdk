@@ -193,7 +193,7 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 		d.topic.Close,
 		d.discovery.Close,
 		d.metaBalancer.Close,
-		d.pool.Release,
+		d.pool.RemoveRef,
 	)
 
 	var issues []error
@@ -314,7 +314,7 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 
 	if err = d.connect(ctx); err != nil {
 		if d.pool != nil {
-			_ = d.pool.Release(ctx)
+			_ = d.pool.RemoveRef(ctx)
 		}
 
 		return nil, xerrors.WithStackTrace(err)

@@ -110,7 +110,7 @@ func TestPool_Get(t *testing.T) {
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		e := endpoint.New("test-endpoint:2135")
@@ -133,7 +133,7 @@ func TestPool_Get(t *testing.T) {
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		e1 := endpoint.New("endpoint1:2135")
@@ -162,18 +162,18 @@ func TestPool_TakeRelease(t *testing.T) {
 		// Initial usage is 1
 		require.Equal(t, int64(1), testPoolUsages(pool))
 
-		err := pool.Take(ctx)
+		err := pool.AddRef(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(2), testPoolUsages(pool))
 
-		err = pool.Take(ctx)
+		err = pool.AddRef(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(3), testPoolUsages(pool))
 
 		// Clean up
-		_ = pool.Release(ctx)
-		_ = pool.Release(ctx)
-		_ = pool.Release(ctx)
+		_ = pool.RemoveRef(ctx)
+		_ = pool.RemoveRef(ctx)
+		_ = pool.RemoveRef(ctx)
 	})
 
 	t.Run("ReleaseDecreasesUsageCounter", func(t *testing.T) {
@@ -184,16 +184,16 @@ func TestPool_TakeRelease(t *testing.T) {
 		}
 		pool := NewPool(ctx, config)
 
-		err := pool.Take(ctx)
+		err := pool.AddRef(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(2), testPoolUsages(pool))
 
-		err = pool.Release(ctx)
+		err = pool.RemoveRef(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(1), testPoolUsages(pool))
 
 		// Clean up
-		_ = pool.Release(ctx)
+		_ = pool.RemoveRef(ctx)
 	})
 
 	t.Run("FinalReleaseClosesPool", func(t *testing.T) {
@@ -210,7 +210,7 @@ func TestPool_TakeRelease(t *testing.T) {
 		require.NotNil(t, conn)
 
 		// Final release should close the pool
-		err := pool.Release(ctx)
+		err := pool.RemoveRef(ctx)
 		require.NoError(t, err)
 
 		// Pool should be closed
@@ -227,7 +227,7 @@ func TestPool_IsClosed(t *testing.T) {
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		require.False(t, pool.isClosed())
@@ -241,7 +241,7 @@ func TestPool_IsClosed(t *testing.T) {
 		}
 		pool := NewPool(ctx, config)
 
-		err := pool.Release(ctx)
+		err := pool.RemoveRef(ctx)
 		require.NoError(t, err)
 
 		require.True(t, pool.isClosed())
@@ -257,7 +257,7 @@ func TestPool_ConfigMethods(t *testing.T) {
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		require.Equal(t, 10*time.Second, pool.DialTimeout())
@@ -273,7 +273,7 @@ func TestPool_ConfigMethods(t *testing.T) {
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		require.Equal(t, driverTrace, pool.Trace())
@@ -289,7 +289,7 @@ func TestPool_ConfigMethods(t *testing.T) {
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		// The pool adds additional options, so we check the length is at least the ones we provided
@@ -306,7 +306,7 @@ func TestEndpointsToConnections(t *testing.T) {
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		require.Equal(t, 0, testPoolConnsLen(pool))
@@ -331,7 +331,7 @@ func TestEndpointsToConnections(t *testing.T) {
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		e := endpoint.New("reuse:2135")
@@ -357,7 +357,7 @@ func TestEndpointsToConnections(t *testing.T) {
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		// ensure empty pool
@@ -405,7 +405,7 @@ func TestEndpointsToConnections(t *testing.T) {
 		}
 		pool := NewPool(ctx, config)
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		// initial two endpoints with IPv6 and distinct NodeIDs
@@ -443,7 +443,7 @@ func TestPool_GetPut(t *testing.T) {
 		ctx := context.Background()
 		pool := NewPool(ctx, &mockConfig{})
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		e := endpoint.New("node:2135")
@@ -458,7 +458,7 @@ func TestPool_GetPut(t *testing.T) {
 		ctx := context.Background()
 		pool := NewPool(ctx, &mockConfig{})
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		e1 := endpoint.New("node1:2135", endpoint.WithID(1))
@@ -484,7 +484,7 @@ func TestPool_GetPut(t *testing.T) {
 		ctx := context.Background()
 		pool := NewPool(ctx, &mockConfig{})
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		e := endpoint.New("shared-endpoint:2135")
@@ -503,7 +503,7 @@ func TestPool_GetPut(t *testing.T) {
 		ctx := context.Background()
 		pool := NewPool(ctx, &mockConfig{})
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		e := endpoint.New("bootstrap:2135")
@@ -521,7 +521,7 @@ func TestPool_GetPut(t *testing.T) {
 		ctx := context.Background()
 		pool := NewPool(ctx, &mockConfig{})
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		e := endpoint.New("deadlock:2135")
@@ -564,7 +564,7 @@ func TestPool_GetPut(t *testing.T) {
 		ctx := context.Background()
 		pool := NewPool(ctx, &mockConfig{})
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		const workers = 16
@@ -601,7 +601,7 @@ func TestPool_GetPut(t *testing.T) {
 		ctx := context.Background()
 		pool := NewPool(ctx, &mockConfig{})
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		e := endpoint.New("race-endpoint:2135")
@@ -621,7 +621,7 @@ func TestPool_GetPut(t *testing.T) {
 		ctx := context.Background()
 		pool := NewPool(ctx, &mockConfig{})
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		e := endpoint.New("atomic:2135")
@@ -657,7 +657,7 @@ func TestPool_GetPut(t *testing.T) {
 		e := endpoint.New("closed-pool:2135")
 		require.NotNil(t, pool.Get(e))
 
-		require.NoError(t, pool.Release(ctx))
+		require.NoError(t, pool.RemoveRef(ctx))
 		require.True(t, pool.isClosed())
 		require.Nil(t, pool.Get(e))
 	})
@@ -666,7 +666,7 @@ func TestPool_GetPut(t *testing.T) {
 		ctx := context.Background()
 		pool := NewPool(ctx, &mockConfig{})
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		e := endpoint.New("underflow:2135")
@@ -684,7 +684,7 @@ func TestPool_GetPut(t *testing.T) {
 		ctx := context.Background()
 		pool := NewPool(ctx, &mockConfig{})
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		e := endpoint.New("slow-close:2135")
@@ -741,14 +741,14 @@ func TestPool_GetPut(t *testing.T) {
 		releaseDone := make(chan struct{})
 		go func() {
 			defer close(releaseDone)
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		deadline := time.After(2 * time.Second)
 		for !pool.isClosed() {
 			select {
 			case <-deadline:
-				t.Fatal("isClosed stayed blocked while Release closes connections")
+				t.Fatal("isClosed stayed blocked while RemoveRef closes connections")
 			case <-time.After(10 * time.Millisecond):
 			}
 		}
@@ -756,7 +756,7 @@ func TestPool_GetPut(t *testing.T) {
 		select {
 		case <-releaseDone:
 		case <-time.After(5 * time.Second):
-			t.Fatal("Release did not finish")
+			t.Fatal("RemoveRef did not finish")
 		}
 	})
 
@@ -764,7 +764,7 @@ func TestPool_GetPut(t *testing.T) {
 		ctx := context.Background()
 		pool := NewPool(ctx, &mockConfig{})
 		defer func() {
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		e := endpoint.New("refcount-api:2135")
@@ -795,7 +795,7 @@ func TestPool_GetPut(t *testing.T) {
 		defer func() {
 			close(stop)
 			wg.Wait()
-			_ = pool.Release(ctx)
+			_ = pool.RemoveRef(ctx)
 		}()
 
 		for range 2 {

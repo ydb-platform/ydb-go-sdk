@@ -803,6 +803,6 @@ func withConnPool(pool *conn.Pool) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.pool = pool
 
-		return pool.Take(ctx)
+		return pool.AddRef(ctx)
 	}
 }

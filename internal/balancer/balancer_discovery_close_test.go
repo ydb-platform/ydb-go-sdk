@@ -313,7 +313,7 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 
 	pool := conn.NewPool(ctx, cfg)
 	defer func() {
-		require.NoError(t, pool.Release(ctx))
+		require.NoError(t, pool.RemoveRef(ctx))
 	}()
 
 	b, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
