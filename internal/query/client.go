@@ -743,12 +743,7 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 	return nil
 }
 
-func CreateSession(
-	ctx context.Context,
-	client Ydb_Query_V1.QueryServiceClient,
-	cfg *config.Config,
-	opts ...Option,
-) (*Session, error) {
+func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, cfg *config.Config) (*Session, error) {
 	s, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*Session, error) {
 		var (
 			createCtx    context.Context
@@ -761,11 +756,10 @@ func CreateSession(
 		}
 		defer cancelCreate()
 
-		sessionOpts := append([]Option{
+		s, err := createSession(createCtx, client,
 			WithDeleteTimeout(cfg.SessionDeleteTimeout()),
 			WithTrace(cfg.Trace()),
-		}, opts...)
-		s, err := createSession(createCtx, client, sessionOpts...)
+		)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}

@@ -3,7 +3,6 @@ package xsql
 import (
 	"context"
 	"database/sql/driver"
-	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -21,7 +20,6 @@ type Conn struct {
 	ctx       context.Context //nolint:containedctx
 
 	connector *Connector
-	invalid   atomic.Bool
 }
 
 var _ driver.SessionResetter = (*Conn)(nil)
@@ -112,11 +110,7 @@ func (c *Conn) Close() (finalErr error) {
 // database/sql calls IsValid before reusing a connection from the pool.
 // If IsValid returns false, the connection is discarded and a new one is requested.
 func (c *Conn) IsValid() bool {
-	return !c.invalid.Load() && c.cc.IsValid()
-}
-
-func (c *Conn) invalidate() {
-	c.invalid.Store(true)
+	return c.cc.IsValid()
 }
 
 // ResetSession implements driver.SessionResetter.

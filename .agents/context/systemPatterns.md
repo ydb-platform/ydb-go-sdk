@@ -163,6 +163,27 @@ Do(ctx, op, opts)
 - `internal/xsql/connector.go` — `CreateSession` uses native table client; balancing happens at session creation.
 - See `SQL.md` for DSN params, balancing, and connector options.
 
+### Idle QueryService sessions
+
+For QueryService, one `database/sql` connection owns one YDB session. That
+session can become `Closed` while its `database/sql` connection is idle, for
+example when its attach stream ends after an external `DeleteSession`.
+
+`driver.Validator` runs when `database/sql` returns a connection to its pool,
+not when it takes an already-idle connection back out. `xsql.Conn` therefore
+implements `driver.SessionResetter`: `ResetSession` rechecks the underlying
+`common.Conn.IsValid()` and returns a bad-connection error when the YDB session
+is closed. `database/sql` then discards the connection before the next
+`BeginTransaction`. Mapping a server-side `BAD_SESSION` to `driver.ErrBadConn`
+remains a fallback after an RPC has already been attempted; it does not replace
+the reset check.
+
+Do not add session-status callbacks, extra invalidation flags, or trace
+semantics solely for this case. The integration regression captures the first
+Query session through `trace.Query.OnSessionCreate`, externally deletes it,
+periodically waits for `SessionInfo.Status() == "Closed"`, then verifies a
+second empty `database/sql` transaction produces no BeginTransaction error.
+
 ## Adding a new RPC surface
 
 1. Confirm protobuf in `ydb-go-genproto`.
