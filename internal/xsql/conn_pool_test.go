@@ -195,6 +195,7 @@ func TestXsqlConnIsValidPreventsDeadSessionPoolReuse(t *testing.T) {
 
 type invalidatedSessionCommonConn struct {
 	mockCommonConn
+
 	valid        bool
 	beginTxCalls int
 }
