@@ -25,6 +25,13 @@ type Pool struct {
 	dialOptions []grpc.DialOption
 	conns       xsync.Map[endpoint.Key, *conn]
 	done        chan struct{}
+	onBan       func(nodeID uint32)
+	onAllow     func(nodeID uint32)
+}
+
+func (p *Pool) SetConnStateCallbacks(onBan, onAllow func(nodeID uint32)) {
+	p.onBan = onBan
+	p.onAllow = onAllow
 }
 
 func EndpointsToConnections(p *Pool, endpoints []endpoint.Endpoint) []Conn {
@@ -94,6 +101,18 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 	cc.Ban(ctx)
 
 	onDone(cc.State())
+
+	if p.onBan != nil {
+		p.onBan(cc.Endpoint().NodeID())
+	}
+}
+
+func (p *Pool) Allow(ctx context.Context, cc Conn) {
+	cc.Unban(ctx)
+
+	if p.onAllow != nil {
+		p.onAllow(cc.Endpoint().NodeID())
+	}
 }
 
 func (p *Pool) Take(context.Context) error {

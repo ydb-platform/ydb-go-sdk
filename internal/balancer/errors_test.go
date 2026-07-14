@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
@@ -166,4 +167,21 @@ func TestBanOnSessionCreate(t *testing.T) {
 	))
 	require.True(t, IsBadConn(ctx, context.DeadlineExceeded))
 	require.False(t, IsBadConn(ctx, context.Canceled))
+}
+
+func TestSessionUnderShutdownPessimizesConnection(t *testing.T) {
+	ctx := xtest.Context(t)
+
+	require.True(t, IsBadConn(ctx, xerrors.Operation(
+		xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+		xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{Message: "Session is under shutdown"}}),
+	)))
+	require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(xerrors.Operation(
+		xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+		xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{Message: "session is under shutdown."}}),
+	))))
+	require.False(t, IsBadConn(ctx, xerrors.Operation(
+		xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+		xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{Message: "Session not found"}}),
+	)))
 }

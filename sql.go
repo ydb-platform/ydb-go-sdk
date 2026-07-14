@@ -290,6 +290,7 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 		version.Version,
 	)(parent.config.Meta())
 
+	var unregisterConnStateListener func()
 	c, err := xsql.Open(parent, parent.metaBalancer, parent.query.Must().Config(),
 		append(
 			append(
@@ -303,11 +304,17 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 			),
 			xsql.WithTraceRetry(parent.config.TraceRetry()),
 			xsql.WithRetryBudget(parent.config.RetryBudget()),
+			xsql.WithOnClose(func(*xsql.Connector) {
+				if unregisterConnStateListener != nil {
+					unregisterConnStateListener()
+				}
+			}),
 		)...,
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+	unregisterConnStateListener = parent.registerConnStateListener(c)
 
 	return c, nil
 }

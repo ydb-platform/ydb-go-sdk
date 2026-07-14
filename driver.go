@@ -99,6 +99,7 @@ type (
 		topicOptions []topicoptions.TopicOption
 
 		databaseSQLOptions []xsql.Option
+		connStateListeners xsync.Set[connStateListener]
 
 		pool *conn.Pool
 
@@ -112,12 +113,40 @@ type (
 
 		panicCallback func(e any)
 	}
+	connStateListener interface {
+		OnConnBanned(nodeID uint32)
+		OnConnAllowed(nodeID uint32)
+	}
 	balancerWithMeta struct {
 		balancer *balancer.Balancer
 		meta     *meta.Meta
 		close    func(ctx context.Context) error
 	}
 )
+
+func (d *Driver) registerConnStateListener(listener connStateListener) func() {
+	d.connStateListeners.Add(listener)
+
+	return func() {
+		d.connStateListeners.Remove(listener)
+	}
+}
+
+func (d *Driver) onConnBanned(nodeID uint32) {
+	d.connStateListeners.Range(func(listener connStateListener) bool {
+		listener.OnConnBanned(nodeID)
+
+		return true
+	})
+}
+
+func (d *Driver) onConnAllowed(nodeID uint32) {
+	d.connStateListeners.Range(func(listener connStateListener) bool {
+		listener.OnConnAllowed(nodeID)
+
+		return true
+	})
+}
 
 func (b *balancerWithMeta) Invoke(ctx context.Context, method string, args any, reply any,
 	opts ...grpc.CallOption,
@@ -461,6 +490,7 @@ func (d *Driver) connect(ctx context.Context) error {
 	if d.pool == nil {
 		d.pool = conn.NewPool(ctx, d.config)
 	}
+	d.pool.SetConnStateCallbacks(d.onConnBanned, d.onConnAllowed)
 
 	if d.metaBalancer.balancer == nil {
 		b, err := balancer.New(ctx, d.config, d.pool, d.discoveryOptions...)

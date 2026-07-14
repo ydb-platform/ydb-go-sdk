@@ -20,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xquery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/xtable"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -55,6 +56,8 @@ type (
 		retryBudget          budget.Budget
 		pathNormalizer       bind.TablePathPrefix
 		bindings             bind.Bindings
+		connections          xsync.Set[*Conn]
+		bannedNodes          xsync.Set[uint32]
 	}
 	ydbDriver interface {
 		Name() string
@@ -100,6 +103,34 @@ func (c *Connector) TraceRetry() *trace.Retry {
 	return c.traceRetry
 }
 
+func (c *Connector) OnConnBanned(nodeID uint32) {
+	if nodeID == 0 {
+		return
+	}
+
+	c.bannedNodes.Add(nodeID)
+	c.connections.Range(func(conn *Conn) bool {
+		if conn.NodeID() == nodeID {
+			conn.invalidate()
+		}
+
+		return true
+	})
+}
+
+func (c *Connector) OnConnAllowed(nodeID uint32) {
+	c.bannedNodes.Remove(nodeID)
+}
+
+func (c *Connector) registerConn(conn *Conn) *Conn {
+	c.connections.Add(conn)
+	if c.bannedNodes.Has(conn.NodeID()) {
+		conn.invalidate()
+	}
+
+	return conn
+}
+
 const (
 	QUERY = iota + 1
 	TABLE
@@ -135,7 +166,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 			connector: c,
 		}
 
-		return conn, nil
+		return c.registerConn(conn), nil
 
 	case TABLE:
 		s, err := c.parent.Table().CreateSession(ctx) //nolint:staticcheck
@@ -153,7 +184,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 			connector: c,
 		}
 
-		return conn, nil
+		return c.registerConn(conn), nil
 	default:
 		return nil, xerrors.WithStackTrace(errWrongQueryProcessor)
 	}

@@ -261,6 +261,9 @@ func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryServi
 	for core.IsAlive() {
 		msg, recvErr := attachStream.Recv()
 		if recvErr != nil {
+			if core.onNodeShutdown != nil && !core.closed.Load() && !xerrors.IsContextError(recvErr) {
+				core.onNodeShutdown(recvErr)
+			}
 			core.releaseSession()
 
 			return

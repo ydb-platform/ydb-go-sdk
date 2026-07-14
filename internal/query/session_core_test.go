@@ -247,6 +247,44 @@ func TestSessionCoreNodeShutdownHintBansConnection(t *testing.T) {
 	}, xtest.StopAfter(time.Second))
 }
 
+func TestSessionCoreAttachStreamErrorBansConnection(t *testing.T) {
+	ctx := t.Context()
+	ctrl := gomock.NewController(t)
+	client := NewMockQueryServiceClient(ctrl)
+	client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+		Status:    Ydb.StatusIds_SUCCESS,
+		SessionId: "123",
+		NodeId:    1,
+	}, nil)
+
+	var firstRecv atomic.Bool
+	attachErr := errors.New("attach stream closed")
+	attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+	var banned atomic.Bool
+	ctx = conn.WithBanCallback(ctx, func(cause error) {
+		banned.Store(true)
+		require.ErrorIs(t, cause, attachErr)
+	})
+	stubAttachStreamContextWith(ctx, attachStream)
+	attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
+		if !firstRecv.Swap(true) {
+			return &Ydb_Query.SessionState{Status: Ydb.StatusIds_SUCCESS}, nil
+		}
+
+		return nil, attachErr
+	}).AnyTimes()
+	client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
+		SessionId: "123",
+	}).Return(attachStream, nil)
+
+	core, err := Open(ctx, client)
+	require.NoError(t, err)
+	require.NotNil(t, core)
+	require.Eventually(t, func() bool {
+		return banned.Load() && !core.IsAlive()
+	}, time.Second, time.Millisecond)
+}
+
 func TestSessionCoreSessionShutdownHintClosesSession(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx := t.Context()

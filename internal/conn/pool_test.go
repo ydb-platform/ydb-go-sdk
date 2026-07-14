@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -80,6 +81,29 @@ func TestPool_Get(t *testing.T) {
 		// Should return different connections
 		require.NotEqual(t, conn1, conn2)
 	})
+}
+
+func TestPoolConnStateCallbacks(t *testing.T) {
+	ctx := t.Context()
+	p := NewPool(ctx, &mockConfig{})
+	t.Cleanup(func() { _ = p.Release(ctx) })
+
+	var (
+		banned  uint32
+		allowed uint32
+	)
+	p.SetConnStateCallbacks(func(nodeID uint32) {
+		banned = nodeID
+	}, func(nodeID uint32) {
+		allowed = nodeID
+	})
+
+	cc := p.Get(endpoint.New("node:2135", endpoint.WithID(42)))
+	p.Ban(ctx, cc, errors.New("node is unavailable"))
+	require.Equal(t, uint32(42), banned)
+
+	p.Allow(ctx, cc)
+	require.Equal(t, uint32(42), allowed)
 }
 
 func TestPool_TakeRelease(t *testing.T) {
