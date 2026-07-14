@@ -214,7 +214,7 @@ func TestPool_TakeRelease(t *testing.T) {
 		require.NoError(t, err)
 
 		// Pool should be closed
-		require.True(t, pool.isClosed())
+		require.True(t, pool.closed.Load())
 	})
 }
 
@@ -230,7 +230,7 @@ func TestPool_IsClosed(t *testing.T) {
 			_ = pool.RemoveRef(ctx)
 		}()
 
-		require.False(t, pool.isClosed())
+		require.False(t, pool.closed.Load())
 	})
 
 	t.Run("ReleasedPoolIsClosed", func(t *testing.T) {
@@ -244,7 +244,7 @@ func TestPool_IsClosed(t *testing.T) {
 		err := pool.RemoveRef(ctx)
 		require.NoError(t, err)
 
-		require.True(t, pool.isClosed())
+		require.True(t, pool.closed.Load())
 	})
 }
 
@@ -658,7 +658,7 @@ func TestPool_GetPut(t *testing.T) {
 		require.NotNil(t, pool.Get(e))
 
 		require.NoError(t, pool.RemoveRef(ctx))
-		require.True(t, pool.isClosed())
+		require.True(t, pool.closed.Load())
 		require.Nil(t, pool.Get(e))
 	})
 
@@ -745,7 +745,7 @@ func TestPool_GetPut(t *testing.T) {
 		}()
 
 		deadline := time.After(2 * time.Second)
-		for !pool.isClosed() {
+		for !pool.closed.Load() {
 			select {
 			case <-deadline:
 				t.Fatal("isClosed stayed blocked while RemoveRef closes connections")

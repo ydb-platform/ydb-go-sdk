@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
@@ -30,7 +31,7 @@ type (
 		mu     sync.Mutex
 		usages int64
 		conns  map[endpoint.Key]*connValue
-		closed bool
+		closed atomic.Bool
 	}
 )
 
@@ -52,6 +53,10 @@ func (p *Pool) GrpcDialOptions() []grpc.DialOption {
 // count. The gRPC connection is established lazily on the first Invoke or
 // NewStream. Call [Pool.Put] when the endpoint is no longer needed.
 func (p *Pool) Get(e endpoint.Endpoint) Conn {
+	if p.closed.Load() {
+		return nil
+	}
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -66,10 +71,6 @@ func (p *Pool) Get(e endpoint.Endpoint) Conn {
 }
 
 func (p *Pool) get(e endpoint.Endpoint) *connValue {
-	if p.closed {
-		return nil
-	}
-
 	key := e.Key()
 
 	if value, ok := p.conns[key]; ok {
@@ -101,12 +102,12 @@ func (p *Pool) Put(ctx context.Context, c Conn) {
 }
 
 func (p *Pool) tryPut(c *conn) bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.closed {
+	if p.closed.Load() {
 		return false
 	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	key := c.endpoint.Key()
 
@@ -125,15 +126,8 @@ func (p *Pool) tryPut(c *conn) bool {
 	return true
 }
 
-func (p *Pool) isClosed() bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	return p.closed
-}
-
 func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
-	if p.isClosed() {
+	if p.closed.Load() {
 		return
 	}
 
@@ -149,12 +143,12 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 }
 
 func (p *Pool) AddRef(context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.closed {
+	if p.closed.Load() {
 		return xerrors.WithStackTrace(errClosedPool)
 	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	p.usages++
 
@@ -208,7 +202,9 @@ func (p *Pool) release() []closer.Closer {
 		return nil
 	}
 
-	p.closed = true
+	if p.closed.Swap(true) {
+		return nil
+	}
 
 	toClose := make([]closer.Closer, 0, len(p.conns))
 	for _, value := range p.conns {
@@ -242,6 +238,10 @@ func NewPool(ctx context.Context, config Config) *Pool {
 
 					return func(info trace.DriverResolveDoneInfo) {
 						if info.Error != nil || len(resolved) == 0 {
+							// Reset gRPC transport only; keep map entries and useCount unchanged.
+							// The balancer still holds pool refs from discovery Get/Put; deleting
+							// here would desync ref-counting and leak or double-close wrappers.
+							// Stale entries are removed when discovery Put drops useCount to zero.
 							p.mu.Lock()
 							var toClose []*conn
 							for key, value := range p.conns {
