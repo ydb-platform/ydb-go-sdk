@@ -53,12 +53,12 @@ func (p *Pool) GrpcDialOptions() []grpc.DialOption {
 // count. The gRPC connection is established lazily on the first Invoke or
 // NewStream. Call [Pool.Put] when the endpoint is no longer needed.
 func (p *Pool) Get(e endpoint.Endpoint) Conn {
-	if p.closed.Load() {
-		return nil
-	}
-
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	if p.closed.Load() || p.conns == nil {
+		return nil
+	}
 
 	cv := p.get(e)
 	if cv == nil {
@@ -71,6 +71,10 @@ func (p *Pool) Get(e endpoint.Endpoint) Conn {
 }
 
 func (p *Pool) get(e endpoint.Endpoint) *connValue {
+	if p.conns == nil {
+		return nil
+	}
+
 	key := e.Key()
 
 	if value, ok := p.conns[key]; ok {
@@ -102,12 +106,12 @@ func (p *Pool) Put(ctx context.Context, c Conn) {
 }
 
 func (p *Pool) tryPut(c *conn) bool {
-	if p.closed.Load() {
-		return false
-	}
-
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	if p.closed.Load() || p.conns == nil {
+		return false
+	}
 
 	key := c.endpoint.Key()
 
@@ -253,7 +257,9 @@ func NewPool(ctx context.Context, config Config) *Pool {
 
 							for _, cc := range toClose {
 								cc.mtx.Lock()
-								cc.close(ctx)
+								if !cc.closed {
+									cc.close(ctx)
+								}
 								cc.mtx.Unlock()
 							}
 						}

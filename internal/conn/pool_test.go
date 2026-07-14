@@ -662,6 +662,48 @@ func TestPool_GetPut(t *testing.T) {
 		require.Nil(t, pool.Get(e))
 	})
 
+	t.Run("GetDoesNotPanicConcurrentWithRemoveRef", func(t *testing.T) {
+		ctx := context.Background()
+		pool := NewPool(ctx, &mockConfig{})
+
+		e := endpoint.New("get-remove-race:2135")
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			for range 128 {
+				_ = pool.Get(e)
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			_ = pool.RemoveRef(ctx)
+		}()
+
+		done := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("Get/RemoveRef race did not finish")
+		}
+	})
+
+	t.Run("AddRefAfterRemoveRefReturnsError", func(t *testing.T) {
+		ctx := context.Background()
+		pool := NewPool(ctx, &mockConfig{})
+
+		require.NoError(t, pool.RemoveRef(ctx))
+		require.Error(t, pool.AddRef(ctx))
+	})
+
 	t.Run("PutExtraCallsDoNotUnderflowUseCount", func(t *testing.T) {
 		ctx := context.Background()
 		pool := NewPool(ctx, &mockConfig{})

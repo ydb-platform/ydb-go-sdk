@@ -263,13 +263,13 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 			b.balancerConfig.DetectNearestDC,
 			b.driverConfig.Database(),
 		)
-		state      = b.connections()
+		state      = b.connectionsState.Load()
 		active     []conn.Conn
 		quarantine []conn.Conn
 	)
 
 	if state != nil {
-		active = state.all
+		active = state.All()
 		quarantine = state.quarantine
 	}
 
@@ -316,11 +316,13 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
+	oldState := b.connectionsState.Swap(nil)
+
 	if b.discoveryRepeater != nil {
 		b.discoveryRepeater.Stop()
 	}
 
-	b.clearState(ctx, b.connectionsState.Swap(nil))
+	b.clearState(ctx, oldState)
 
 	if cc := b.cc.Load(); cc != nil {
 		_ = cc.Close()
