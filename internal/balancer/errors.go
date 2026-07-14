@@ -81,9 +81,6 @@ func IsBadConn(ctx context.Context, err error, ignoreCodes ...grpcCodes.Code) bo
 	if xerrors.IsTransportError(err, xslices.Subtract(badCodes, ignoreCodes)...) {
 		return true
 	}
-	if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
-		return true
-	}
 
 	operationErrorCodes, _ := ctx.Value(ctxBanOnOperationError{}).(operationErrorCodesType)
 

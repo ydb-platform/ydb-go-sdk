@@ -3,6 +3,7 @@ package xsql
 import (
 	"context"
 	"database/sql/driver"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -20,7 +21,11 @@ type Conn struct {
 	ctx       context.Context //nolint:containedctx
 
 	connector *Connector
+	invalid   atomic.Bool
+	sessionID atomic.Pointer[string]
 }
+
+var _ driver.SessionResetter = (*Conn)(nil)
 
 func (c *Conn) ID() string {
 	return c.cc.ID()
@@ -108,7 +113,33 @@ func (c *Conn) Close() (finalErr error) {
 // database/sql calls IsValid before reusing a connection from the pool.
 // If IsValid returns false, the connection is discarded and a new one is requested.
 func (c *Conn) IsValid() bool {
-	return c.cc.IsValid()
+	return !c.invalid.Load() && c.cc.IsValid()
+}
+
+func (c *Conn) invalidate() {
+	c.invalid.Store(true)
+}
+
+func (c *Conn) setSessionID(sessionID string) {
+	c.sessionID.Store(&sessionID)
+}
+
+func (c *Conn) hasSessionID(sessionID string) bool {
+	id := c.sessionID.Load()
+
+	return id != nil && *id == sessionID
+}
+
+// ResetSession implements driver.SessionResetter.
+//
+// A YDB session can become invalid while its database/sql connection is idle.
+// database/sql calls ResetSession before reusing such a connection.
+func (c *Conn) ResetSession(context.Context) error {
+	if !c.IsValid() {
+		return badconn.New("session is not valid for reuse")
+	}
+
+	return nil
 }
 
 func (c *Conn) Begin() (_ driver.Tx, finalErr error) {

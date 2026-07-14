@@ -362,8 +362,8 @@ func newQuerySession(
 	core, err := query.Open(ctx,
 		Ydb_Query_V1.NewQueryServiceClient(cc),
 		query.WithConn(cc),
-		query.OnChangeStatus(func(status query.Status) {
-			switch status {
+		query.OnChangeStatus(func(info query.SessionStatusChangeInfo) {
+			switch info.Status {
 			case query.StatusClosed:
 				s.SetStatus(table.SessionClosed)
 			case query.StatusClosing:

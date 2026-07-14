@@ -49,7 +49,7 @@ type (
 		id             string
 		nodeID         uint32
 		status         atomic.Uint32
-		onChangeStatus []func(status Status)
+		onChangeStatus []func(SessionStatusChangeInfo)
 		onNodeShutdown func(cause error)
 		cancelAttach   context.CancelFunc
 
@@ -84,7 +84,10 @@ func (core *sessionCore) SetStatus(status Status) {
 	default:
 		if old := core.status.Swap(uint32(status)); old != uint32(status) {
 			for _, onChangeStatus := range core.onChangeStatus {
-				onChangeStatus(status)
+				onChangeStatus(SessionStatusChangeInfo{
+					SessionID: core.ID(),
+					Status:    status,
+				})
 			}
 		}
 	}
@@ -123,7 +126,12 @@ func WithConn(cc grpc.ClientConnInterface) Option {
 	}
 }
 
-func OnChangeStatus(onChangeStatus func(status Status)) Option {
+type SessionStatusChangeInfo struct {
+	SessionID string
+	Status    Status
+}
+
+func OnChangeStatus(onChangeStatus func(SessionStatusChangeInfo)) Option {
 	return func(c *sessionCore) {
 		c.onChangeStatus = append(c.onChangeStatus, onChangeStatus)
 	}
@@ -261,26 +269,34 @@ func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryServi
 	for core.IsAlive() {
 		msg, recvErr := attachStream.Recv()
 		if recvErr != nil {
-			if core.onNodeShutdown != nil && !core.closed.Load() && !xerrors.IsContextError(recvErr) {
-				core.onNodeShutdown(recvErr)
-			}
 			core.releaseSession()
+			core.onSessionDelete(attachStream.Context(), recvErr)
 
 			return
 		}
 
 		if msg.GetSessionShutdown() != nil {
 			core.releaseSession()
+			core.onSessionDelete(attachStream.Context(), errSessionShutdownHint)
 
 			return
 		}
 		if msg.GetNodeShutdown() != nil {
 			core.onNodeShutdown(errNodeShutdownHint)
 			core.releaseSession()
+			core.onSessionDelete(attachStream.Context(), errNodeShutdownHint)
 
 			return
 		}
 	}
+}
+
+func (core *sessionCore) onSessionDelete(ctx context.Context, err error) {
+	onDone := gtrace.QueryOnSessionDelete(core.Trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*sessionCore).releaseSession"),
+		core,
+	)
+	onDone(err)
 }
 
 type deleteSessionClient interface {

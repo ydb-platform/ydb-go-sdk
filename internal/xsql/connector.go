@@ -120,7 +120,18 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 
 	switch c.processor {
 	case QUERY:
-		s, err := internalQuery.CreateSession(ctx, Ydb_Query_V1.NewQueryServiceClient(c.balancer), c.queryConfig)
+		conn := &Conn{
+			processor: QUERY,
+			ctx:       ctx,
+			connector: c,
+		}
+		s, err := internalQuery.CreateSession(ctx, Ydb_Query_V1.NewQueryServiceClient(c.balancer), c.queryConfig,
+			internalQuery.OnChangeStatus(func(info internalQuery.SessionStatusChangeInfo) {
+				if info.Status == internalQuery.StatusClosed && conn.hasSessionID(info.SessionID) {
+					conn.invalidate()
+				}
+			}),
+		)
 		defer func() {
 			onDone(s, finalErr)
 		}()
@@ -128,12 +139,8 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		conn := &Conn{
-			processor: QUERY,
-			cc:        xquery.New(s, c.QueryOpts...),
-			ctx:       ctx,
-			connector: c,
-		}
+		conn.setSessionID(s.ID())
+		conn.cc = xquery.New(s, c.QueryOpts...)
 
 		return conn, nil
 

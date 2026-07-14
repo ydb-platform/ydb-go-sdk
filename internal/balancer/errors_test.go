@@ -167,17 +167,3 @@ func TestBanOnSessionCreate(t *testing.T) {
 	require.True(t, IsBadConn(ctx, context.DeadlineExceeded))
 	require.False(t, IsBadConn(ctx, context.Canceled))
 }
-
-func TestBadSessionPessimizesConnection(t *testing.T) {
-	ctx := xtest.Context(t)
-
-	require.True(t, IsBadConn(ctx, xerrors.Operation(
-		xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
-	)))
-	require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(xerrors.Operation(
-		xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
-	))))
-	require.False(t, IsBadConn(ctx, xerrors.Operation(
-		xerrors.WithStatusCode(Ydb.StatusIds_NOT_FOUND),
-	)))
-}
