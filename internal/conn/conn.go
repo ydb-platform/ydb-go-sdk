@@ -161,6 +161,10 @@ func (c *conn) realConn(ctx context.Context) (cc grpcClientConnInterface, err er
 
 // c.mtx must be locked
 func (c *conn) dial(ctx context.Context) (cc grpcClientConnInterface, err error) {
+	if c.closed {
+		return nil, xerrors.WithStackTrace(errClosedConnection)
+	}
+
 	onDone := gtrace.DriverOnConnDial(
 		c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).dial"),

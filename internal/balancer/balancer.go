@@ -144,9 +144,26 @@ func (b *Balancer) discoveryConn(ctx context.Context) (*grpc.ClientConn, error) 
 		)
 	}
 
-	b.cc.Store(cc)
+	if err := b.tryStoreDiscoveryConn(cc); err != nil {
+		_ = cc.Close()
+
+		return nil, xerrors.WithStackTrace(err)
+	}
 
 	return cc, nil
+}
+
+func (b *Balancer) tryStoreDiscoveryConn(cc *grpc.ClientConn) error {
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+
+	if b.closed {
+		return xerrors.WithStackTrace(errBalancerClosed)
+	}
+
+	b.cc.Store(cc)
+
+	return nil
 }
 
 func (b *Balancer) clusterDiscoveryAttemptWithDial(ctx context.Context) (finalErr error) {
@@ -541,9 +558,18 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		return nil, xerrors.WithStackTrace(ErrNoEndpoints)
 	}
 
+	preferredCount := state.PreferredCount()
 	defer func() {
-		if failedCount*2 > state.PreferredCount() && b.discoveryRepeater != nil {
-			b.discoveryRepeater.Force()
+		if failedCount*2 <= preferredCount {
+			return
+		}
+
+		b.closeMu.Lock()
+		rep := b.discoveryRepeater
+		b.closeMu.Unlock()
+
+		if rep != nil {
+			rep.Force()
 		}
 	}()
 

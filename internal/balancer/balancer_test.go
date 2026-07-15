@@ -558,14 +558,12 @@ func TestBalancer_CloseWhileDiscoveryDialInFlight(t *testing.T) {
 	require.NoError(t, closeErr)
 
 	res := <-result
-	require.NoError(t, res.err)
-	require.NotNil(t, res.cc)
-	t.Cleanup(func() { _ = res.cc.Close() })
+	require.ErrorIs(t, res.err, errBalancerClosed)
+	require.Nil(t, res.cc)
 
 	if leaked := b.cc.Load(); leaked != nil {
 		t.Fatalf("an in-flight discovery dial published a connection in state %s after Balancer.Close", leaked.GetState())
 	}
-	require.Equal(t, connectivity.Shutdown, res.cc.GetState())
 }
 
 type blockingStateConn struct {
