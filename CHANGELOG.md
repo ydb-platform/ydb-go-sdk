@@ -1,3 +1,5 @@
+* Fixed `database/sql` reusing a QueryService session after its attach stream closed
+
 ## v3.144.1
 * Fixed topic multi-writer initialization failures caused by concurrent partition splits
 
