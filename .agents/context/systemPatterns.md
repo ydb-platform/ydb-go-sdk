@@ -164,6 +164,8 @@ Do(ctx, op, opts)
 - `internal/xsql/connector.go` — `CreateSession` uses native table client; balancing happens at session creation.
 - See `SQL.md` for DSN params, balancing, and connector options.
 
+Topic / multiwriter details (load only when needed): [`topicContext.md`](topicContext.md), [`topicMultiwriterContext.md`](topicMultiwriterContext.md).
+
 ## Adding a new RPC surface
 
 1. Confirm protobuf in `ydb-go-genproto`.

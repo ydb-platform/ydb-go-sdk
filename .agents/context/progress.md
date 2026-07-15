@@ -32,7 +32,7 @@
 | Date | Milestone |
 |------|-----------|
 | 2026-06 | `.agents/` workspace for AI agents |
-| ongoing | Trace handler hardening ([#2194](https://github.com/ydb-platform/ydb-go-sdk/pull/2194)) |
+| 2026-06 | Hardened trace handlers and added fuzz tests ([#2194](https://github.com/ydb-platform/ydb-go-sdk/pull/2194)) |
 
 ## Changelog for agents
 
