@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
@@ -76,7 +77,9 @@ type Balancer struct {
 	localDCDetector func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
 	connectionsState atomic.Pointer[connectionsState]
-	closed           atomic.Bool
+
+	closeMu sync.Mutex
+	closed  bool
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -141,9 +144,26 @@ func (b *Balancer) discoveryConn(ctx context.Context) (*grpc.ClientConn, error) 
 		)
 	}
 
-	b.cc.Store(cc)
+	if err := b.tryStoreDiscoveryConn(cc); err != nil {
+		_ = cc.Close()
+
+		return nil, xerrors.WithStackTrace(err)
+	}
 
 	return cc, nil
+}
+
+func (b *Balancer) tryStoreDiscoveryConn(cc *grpc.ClientConn) error {
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+
+	if b.closed {
+		return xerrors.WithStackTrace(errBalancerClosed)
+	}
+
+	b.cc.Store(cc)
+
+	return nil
 }
 
 func (b *Balancer) clusterDiscoveryAttemptWithDial(ctx context.Context) (finalErr error) {
@@ -203,7 +223,59 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 	return nil
 }
 
-func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoint.Endpoint, localDC string) {
+func nextState(ctx context.Context, pool interface {
+	Get(e endpoint.Endpoint) conn.Conn
+	Put(ctx context.Context, cc conn.Conn)
+}, quarantine []conn.Conn, active []conn.Conn, endpoints []endpoint.Endpoint) (
+	newQuarantine []conn.Conn,
+	newActive []conn.Conn,
+) {
+	newActive = xslices.Filter(
+		xslices.Transform(endpoints, func(e endpoint.Endpoint) conn.Conn {
+			return pool.Get(e)
+		}),
+		func(cc conn.Conn) bool { return cc != nil },
+	)
+
+	for _, cc := range quarantine {
+		pool.Put(ctx, cc)
+	}
+
+	for _, cc := range newActive {
+		cc.Unban(ctx)
+	}
+
+	return active, newActive
+}
+
+// releaseStateConns releases connections from state
+//
+// quarantine refs were acquired in discovery round N-1,
+// all refs in round N — each Put matches its own Get.
+func (b *Balancer) releaseStateConns(ctx context.Context, state *connectionsState) {
+	if state == nil {
+		return
+	}
+
+	for _, c := range state.quarantine {
+		b.pool.Put(ctx, c)
+	}
+
+	for _, cc := range state.all {
+		b.pool.Put(ctx, cc)
+	}
+}
+
+func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+
+	if b.closed {
+		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
+
+		return
+	}
+
 	var (
 		onDone = gtrace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
@@ -212,38 +284,59 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoi
 			b.balancerConfig.DetectNearestDC,
 			b.driverConfig.Database(),
 		)
-		previous = b.connections().All()
+		state      = b.connectionsState.Load()
+		active     []conn.Conn
+		quarantine []conn.Conn
 	)
+
+	if state != nil {
+		active = state.All()
+		quarantine = state.quarantine
+	}
+
 	defer func() {
-		_, added, dropped := xslices.Diff(
-			xslices.Transform(previous, func(cc conn.Conn) endpoint.Endpoint {
-				return cc.Endpoint()
-			}),
-			newest,
-			endpoint.Compare,
-		)
+		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
+			return cc.Endpoint()
+		}), endpoints, endpoint.Compare)
+
 		onDone(
-			xslices.Transform(newest, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+			xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
 			xslices.Transform(added, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
 			xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
 			localDC,
 		)
 	}()
 
-	connections := conn.EndpointsToConnections(b.pool, newest)
-	for _, c := range connections {
-		c.Unban(ctx)
-	}
+	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
 
-	b.connectionsState.Store(newConnectionsState(connections,
-		b.balancerConfig.Filter,
-		balancerConfig.Info{SelfLocation: localDC},
-		b.balancerConfig.AllowFallback,
-	))
+	b.connectionsState.Store(
+		newConnectionsState(connections,
+			b.balancerConfig.Filter,
+			balancerConfig.Info{SelfLocation: localDC},
+			b.balancerConfig.AllowFallback,
+			quarantine,
+		),
+	)
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
-	b.closed.Store(true)
+	b.closeMu.Lock()
+	if b.closed {
+		b.closeMu.Unlock()
+
+		return xerrors.WithStackTrace(errBalancerClosed)
+	}
+
+	b.closed = true
+
+	oldState := b.connectionsState.Swap(nil)
+
+	rep := b.discoveryRepeater
+	b.discoveryRepeater = nil
+
+	discoveryCC := b.cc.Swap(nil)
+
+	b.closeMu.Unlock()
 
 	onDone := gtrace.DriverOnBalancerClose(
 		b.driverConfig.Trace(), &ctx,
@@ -253,12 +346,14 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	if b.discoveryRepeater != nil {
-		b.discoveryRepeater.Stop()
+	if rep != nil {
+		rep.Stop()
 	}
 
-	if cc := b.cc.Load(); cc != nil {
-		_ = cc.Close()
+	b.releaseStateConns(ctx, oldState)
+
+	if discoveryCC != nil {
+		_ = discoveryCC.Close()
 	}
 
 	return nil
@@ -363,10 +458,6 @@ func (b *Balancer) Invoke(
 	reply any,
 	opts ...grpc.CallOption,
 ) error {
-	if b.closed.Load() {
-		return xerrors.WithStackTrace(errBalancerClosed)
-	}
-
 	return b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
 		return cc.Invoke(ctx, method, args, reply, opts...)
 	})
@@ -378,10 +469,6 @@ func (b *Balancer) NewStream(
 	method string,
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
-	if b.closed.Load() {
-		return nil, xerrors.WithStackTrace(errBalancerClosed)
-	}
-
 	var stream grpc.ClientStream
 	if err := b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
 		inner, innerErr := cc.NewStream(ctx, desc, method, opts...)
@@ -444,10 +531,6 @@ func (b *Balancer) connections() *connectionsState {
 }
 
 func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
-	if b.closed.Load() {
-		return nil, xerrors.WithStackTrace(errBalancerClosed)
-	}
-
 	onDone := gtrace.DriverOnBalancerChooseEndpoint(
 		b.driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).nextConn"),
@@ -469,9 +552,26 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		failedCount int
 	)
 
+	if state == nil {
+		return nil, xerrors.WithStackTrace(errBalancerClosed)
+	}
+
+	if len(state.all) == 0 {
+		return nil, xerrors.WithStackTrace(ErrNoEndpoints)
+	}
+
+	preferredCount := state.PreferredCount()
 	defer func() {
-		if failedCount*2 > state.PreferredCount() && b.discoveryRepeater != nil {
-			b.discoveryRepeater.Force()
+		if failedCount*2 <= preferredCount {
+			return
+		}
+
+		b.closeMu.Lock()
+		rep := b.discoveryRepeater
+		b.closeMu.Unlock()
+
+		if rep != nil {
+			rep.Force()
 		}
 	}()
 

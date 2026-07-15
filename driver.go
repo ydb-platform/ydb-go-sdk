@@ -72,7 +72,7 @@ type (
 		config  *config.Config
 		options []config.Option
 
-		discovery        *xsync.Once[*internalDiscovery.Client]
+		discovery        *xsync.Once[*driverDiscoveryClient]
 		discoveryOptions []discoveryConfig.Option
 
 		operation *xsync.Once[*operation.Client]
@@ -117,6 +117,12 @@ type (
 		meta     *meta.Meta
 		close    func(ctx context.Context) error
 	}
+	driverDiscoveryClient struct {
+		*internalDiscovery.Client
+
+		pool *conn.Pool
+		conn conn.Conn
+	}
 )
 
 func (b *balancerWithMeta) Invoke(ctx context.Context, method string, args any, reply any,
@@ -143,6 +149,12 @@ func (b *balancerWithMeta) NewStream(ctx context.Context, desc *grpc.StreamDesc,
 
 func (b *balancerWithMeta) Close(ctx context.Context) error {
 	return b.close(ctx)
+}
+
+func (c *driverDiscoveryClient) Close(ctx context.Context) error {
+	c.pool.Put(ctx, c.conn)
+
+	return c.Client.Close(ctx)
 }
 
 // Close closes Driver and clear resources
@@ -193,7 +205,7 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 		d.topic.Close,
 		d.discovery.Close,
 		d.metaBalancer.Close,
-		d.pool.Release,
+		d.pool.RemoveRef,
 	)
 
 	var issues []error
@@ -314,7 +326,7 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 
 	if err = d.connect(ctx); err != nil {
 		if d.pool != nil {
-			_ = d.pool.Release(ctx)
+			_ = d.pool.RemoveRef(ctx)
 		}
 
 		return nil, xerrors.WithStackTrace(err)
@@ -550,9 +562,16 @@ func (d *Driver) connect(ctx context.Context) error {
 		), nil
 	})
 
-	d.discovery = xsync.OnceValue(func() (*internalDiscovery.Client, error) {
-		return internalDiscovery.New(xcontext.ValueOnly(ctx),
-			d.pool.Get(endpoint.New(d.config.Endpoint())),
+	d.discovery = xsync.OnceValue(func() (*driverDiscoveryClient, error) {
+		bootstrap := d.pool.Get(endpoint.New(d.config.Endpoint()))
+		if bootstrap == nil {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("discovery bootstrap connection: %w", conn.ErrClosedPool),
+			)
+		}
+
+		client := internalDiscovery.New(xcontext.ValueOnly(ctx),
+			bootstrap,
 			discoveryConfig.New(
 				append(
 					// prepend common params from root config
@@ -566,7 +585,13 @@ func (d *Driver) connect(ctx context.Context) error {
 					d.discoveryOptions...,
 				)...,
 			),
-		), nil
+		)
+
+		return &driverDiscoveryClient{
+			Client: client,
+			pool:   d.pool,
+			conn:   bootstrap,
+		}, nil
 	})
 
 	d.operation = xsync.OnceValue(func() (*operation.Client, error) {

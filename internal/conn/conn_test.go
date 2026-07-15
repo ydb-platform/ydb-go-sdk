@@ -16,6 +16,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/stats"
 	grpcStatus "google.golang.org/grpc/status"
 
@@ -289,6 +290,34 @@ func TestConn_StateManagement(t *testing.T) {
 		require.Equal(t, uint32(0), c.NodeID())
 		require.Nil(t, c.Endpoint())
 	})
+}
+
+func TestConn_StaleClosedCheckMustNotRedial(t *testing.T) {
+	ctx := t.Context()
+	c := newConn(
+		endpoint.New("passthrough:///127.0.0.1:1"),
+		&mockConfig{
+			grpcDialOpts: []grpc.DialOption{
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+			},
+		},
+	)
+
+	// Reproduce the two phases of realConn around c.mtx.Lock: its first
+	// closed check succeeds, then Close wins the race before dialing starts.
+	require.False(t, c.isClosed())
+	require.NoError(t, c.Close(ctx))
+
+	c.mtx.Lock()
+	cc, err := c.dial(ctx)
+	c.mtx.Unlock()
+	if cc != nil {
+		t.Cleanup(func() { _ = cc.Close() })
+	}
+
+	require.ErrorIs(t, err, errClosedConnection)
+	require.Nil(t, cc)
+	require.Nil(t, c.grpcConn)
 }
 
 func TestStatsHandler(t *testing.T) {
