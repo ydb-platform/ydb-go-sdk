@@ -1,6 +1,9 @@
 * Fixed gRPC connections to cluster nodes removed from Discovery staying open in the connection pool
 * Refactored connection pool lifecycle to reference-counted `Get`/`Put` with balancer-side quarantine
 
+## v3.144.2
+* Fixed `database/sql` reusing a QueryService session after its attach stream closed
+
 ## v3.144.1
 * Fixed topic multi-writer initialization failures caused by concurrent partition splits
 
