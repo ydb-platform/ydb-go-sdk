@@ -1,5 +1,28 @@
 * Fixed a race in topic multi-writer initialization where partition split handling could close writers still used by `initSeqNo`, causing `WaitInit` to fail with `ydb: stop writer reconnector`; message pipeline workers now start only after init completes
 
+## v3.144.0
+* Added observability chain tokens `ydb-sdk-tracing/0.1.0` and `ydb-sdk-metrics/0.1.0` to `x-ydb-sdk-build-info` when tracing/metrics adapters are enabled via SDK observability options
+* Removed background connection parking (`connParker`), `conn.lastUsage` tracking and `xsync.LastUsage`
+* Deprecated `WithConnectionTTL`: the option is now a no-op
+
+## v3.143.0
+* Added experimental helper `sugar.NewKVClientBuilder(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
+
+## v3.142.0
+* Removed intermediate `bytes.Buffer` allocation in topic message decoding: `MultiDecoder.Decode` now returns a streaming reader that releases the underlying decoder back to the pool on EOF/Close, instead of buffering the whole decoded payload into memory before returning.
+* Fixed `CodecRaw` decoder pooling resettable inputs: when a caller passed an `io.Reader` that happened to implement `PublicResettableReader`, the raw codec previously stored it in its decoder pool and `Reset()` it on subsequent reads, hijacking caller-owned reader state. The raw codec no longer maintains a pool.
+* Added public package `github.com/ydb-platform/ydb-go-sdk/v3/types` and marked all public API in `github.com/ydb-platform/ydb-go-sdk/v3/table/types` as deprecated
+* Propagated the call-level `trace.Query` in `db.Query().{Do,DoTx}(..., query.WithTrace(&tracer))`
+
+## v3.141.3
+* Deprecated `query.WithConcurrentResultSets`: the option is now a no-op; `Client.Query` always enables concurrent result sets internally because it materializes the full response. Session, transaction, and other streaming paths always send `concurrent_result_sets=false`
+
+## v3.141.2
+* Option `table.WithIdempotent()` allowed single optional `bool` argument now 
+
+## v3.141.1
+* Added connection pessimization when creating table or query session fails with `OVERLOADED`, `UNAVAILABLE`, or client-side `context.DeadlineExceeded`
+
 ## v3.141.0
 * Added `ydb.WithPrefetchQueryResultParts(n)` connector option and `prefetch_query_result_parts` connection string parameter for the `database/sql` driver to enable `query.WithResponsePartPrefetch` on every query executed over Query Service
 

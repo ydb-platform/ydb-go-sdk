@@ -55,9 +55,6 @@ func (s *grpcClientStream) CloseSend() (err error) {
 		onDone(err)
 	}()
 
-	stop := s.parentConn.lastUsage.Start()
-	defer stop()
-
 	err = s.stream.CloseSend()
 	if err != nil {
 		if !s.wrapping {
@@ -87,9 +84,6 @@ func (s *grpcClientStream) SendMsg(m any) (err error) {
 	defer func() {
 		onDone(err)
 	}()
-
-	stop := s.parentConn.lastUsage.Start()
-	defer stop()
 
 	err = s.stream.SendMsg(m)
 	if err != nil {
@@ -140,9 +134,6 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 			meta.CallTrailerCallback(s.streamCtx, s.stream.Trailer())
 		}
 	}()
-
-	stop := s.parentConn.lastUsage.Start()
-	defer stop()
 
 	err = s.stream.RecvMsg(m)
 	if err != nil {

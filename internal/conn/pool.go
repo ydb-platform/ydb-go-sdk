@@ -7,15 +7,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -24,7 +21,6 @@ import (
 
 type Pool struct {
 	usages      int64
-	clock       clockwork.Clock
 	config      Config
 	dialOptions []grpc.DialOption
 	conns       xsync.Map[endpoint.Key, *conn]
@@ -59,13 +55,12 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 	)
 
 	if cc, has = p.conns.Get(endpoint.Key()); has {
+		cc.lastClusterAnnouncement.Store(time.Now().Unix())
+
 		return cc
 	}
 
-	cc = newConn(endpoint, p,
-		withOnClose(p.remove),
-		withTrackLastUsage(p.config.ConnectionTTL() > 0),
-	)
+	cc = newConn(endpoint, p, withOnClose(p.remove))
 
 	p.conns.Set(endpoint.Key(), cc)
 
@@ -90,30 +85,15 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		return
 	}
 
-	gtrace.DriverOnConnBan(
+	onDone := gtrace.DriverOnConnBan(
 		p.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Ban"),
-		cc.Endpoint().Copy(), cc.GetState(), cause,
-	)(cc.SetState(ctx, state.Banned))
-}
+		cc.Endpoint(), cc.State(), cause,
+	)
 
-func (p *Pool) Allow(ctx context.Context, cc Conn) {
-	if p.isClosed() {
-		return
-	}
+	cc.Ban(ctx)
 
-	e := cc.Endpoint().Copy()
-
-	cc, ok := p.conns.Get(e.Key())
-	if !ok {
-		return
-	}
-
-	gtrace.DriverOnConnAllow(
-		p.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*Pool).Allow"),
-		e, cc.GetState(),
-	)(cc.Unban(ctx))
+	onDone(cc.State())
 }
 
 func (p *Pool) Take(context.Context) error {
@@ -167,33 +147,7 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 	return nil
 }
 
-func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
-	ticker := p.clock.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-p.done:
-			return
-		case <-ticker.Chan():
-			p.conns.Range(func(_ endpoint.Key, c *conn) bool {
-				if t, err := c.LastUsage(); err == nil && time.Since(*t) > ttl {
-					switch c.GetState() {
-					case state.Online, state.Banned:
-						_ = c.park(ctx)
-					default:
-						// nop
-					}
-				}
-
-				return true
-			})
-		}
-	}
-}
-
-type poolOption func(p *Pool)
-
-func NewPool(ctx context.Context, config Config, opts ...poolOption) *Pool {
+func NewPool(ctx context.Context, config Config) *Pool {
 	onDone := gtrace.DriverOnPoolNew(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.NewPool"),
 	)
@@ -201,14 +155,9 @@ func NewPool(ctx context.Context, config Config, opts ...poolOption) *Pool {
 
 	p := &Pool{
 		usages:      1,
-		clock:       clockwork.NewRealClock(),
 		config:      config,
 		dialOptions: config.GrpcDialOptions(),
 		done:        make(chan struct{}),
-	}
-
-	for _, opt := range opts {
-		opt(p)
 	}
 
 	p.dialOptions = append(p.dialOptions,
@@ -234,10 +183,6 @@ func NewPool(ctx context.Context, config Config, opts ...poolOption) *Pool {
 			})),
 		),
 	)
-
-	if ttl := config.ConnectionTTL(); ttl > 0 {
-		go p.connParker(xcontext.ValueOnly(ctx), ttl, ttl/2) //nolint:mnd
-	}
 
 	return p
 }

@@ -2,6 +2,7 @@ package balancer
 
 import (
 	"context"
+	"slices"
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -45,17 +46,12 @@ func (s *connectionsState) PreferredCount() int {
 	return len(s.prefer)
 }
 
-func (s *connectionsState) All() (all []endpoint.Endpoint) {
+func (s *connectionsState) All() []conn.Conn {
 	if s == nil {
 		return nil
 	}
 
-	all = make([]endpoint.Endpoint, len(s.all))
-	for i, c := range s.all {
-		all[i] = c.Endpoint()
-	}
-
-	return all
+	return slices.Clone(s.all)
 }
 
 func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, failedCount int) {
@@ -172,7 +168,7 @@ func sortPreferConnections(
 }
 
 func isOkConnection(c conn.Conn, bannedIsOk bool) bool {
-	switch c.GetState() {
+	switch c.State() {
 	case state.Online, state.Created, state.Offline:
 		return true
 	case state.Banned:

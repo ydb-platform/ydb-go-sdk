@@ -36,24 +36,20 @@ type poolRegisteredConn struct {
 	inner conn.Conn
 }
 
+func (c *poolRegisteredConn) Ban(ctx context.Context) {
+	c.inner.Ban(ctx)
+}
+
 func (c *poolRegisteredConn) Endpoint() endpoint.Endpoint {
 	return c.inner.Endpoint()
 }
 
-func (c *poolRegisteredConn) LastUsage() (*time.Time, error) {
-	return c.inner.LastUsage()
+func (c *poolRegisteredConn) State() state.State {
+	return c.inner.State()
 }
 
-func (c *poolRegisteredConn) GetState() state.State {
-	return c.inner.GetState()
-}
-
-func (c *poolRegisteredConn) SetState(ctx context.Context, s state.State) state.State {
-	return c.inner.SetState(ctx, s)
-}
-
-func (c *poolRegisteredConn) Unban(ctx context.Context) state.State {
-	return c.inner.Unban(ctx)
+func (c *poolRegisteredConn) Unban(ctx context.Context) {
+	c.inner.Unban(ctx)
 }
 
 func TestBalancer_discoveryConn(t *testing.T) {
@@ -138,10 +134,10 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	require.NotNil(t, after)
 	all := after.All()
 	require.Equal(t, 2, len(all))
-	require.Equal(t, e1.Address(), all[0].Address())
-	require.Equal(t, e1.NodeID(), all[0].NodeID())
-	require.Equal(t, e2.Address(), all[1].Address())
-	require.Equal(t, e2.NodeID(), all[1].NodeID())
+	require.Equal(t, e1.Address(), all[0].Endpoint().Address())
+	require.Equal(t, e1.NodeID(), all[0].Endpoint().NodeID())
+	require.Equal(t, e2.Address(), all[1].Endpoint().Address())
+	require.Equal(t, e2.NodeID(), all[1].Endpoint().NodeID())
 
 	// partially replace endpoints
 	e3 := endpoint.New("e3.example:2135", endpoint.WithIPV6([]string{"2001:db8::3"}), endpoint.WithID(1))
@@ -151,10 +147,10 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	require.NotNil(t, after)
 	all = after.All()
 	require.Equal(t, 2, len(all))
-	require.Equal(t, e2.Address(), all[0].Address())
-	require.Equal(t, e2.NodeID(), all[0].NodeID())
-	require.Equal(t, e3.Address(), all[1].Address())
-	require.Equal(t, e3.NodeID(), all[1].NodeID())
+	require.Equal(t, e2.Address(), all[0].Endpoint().Address())
+	require.Equal(t, e2.NodeID(), all[0].Endpoint().NodeID())
+	require.Equal(t, e3.Address(), all[1].Endpoint().Address())
+	require.Equal(t, e3.NodeID(), all[1].Endpoint().NodeID())
 }
 
 // Mock resolver
@@ -232,7 +228,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 			e1 := endpoint.New("node1:2135", endpoint.WithID(1))
 			poolConn := pool.Get(e1)
-			poolConn.SetState(ctx, state.Online)
+			conn.SetState(ctx, poolConn, state.Online)
 
 			cc1 := &poolRegisteredConn{
 				inner:               poolConn,
@@ -251,11 +247,11 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 			err := b.Invoke(nodeCtx, "/test.Service/Method", nil, nil)
 			require.NoError(t, err)
-			assert.Equal(t, state.Banned, cc1.GetState())
+			assert.Equal(t, state.Banned, cc1.State())
 
 			err = b.Invoke(nodeCtx, "/test.Service/Method", nil, nil)
 			require.NoError(t, err)
-			assert.Equal(t, state.Banned, cc1.GetState(),
+			assert.Equal(t, state.Banned, cc1.State(),
 				"hint-based ban must remain after a successful RPC when the connection is in the pool",
 			)
 		})
@@ -279,10 +275,10 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			ClientConnInterface: cc,
 			AddrField:           "node1:2135",
 			NodeIDField:         1,
-			State:               state.Online,
+			StateField:          state.Online,
 		}
 		cc2 := &mock.Conn{
-			AddrField: "node2:2135", NodeIDField: 2, State: state.Online,
+			AddrField: "node2:2135", NodeIDField: 2, StateField: state.Online,
 		}
 
 		cfg := config.New()
@@ -299,7 +295,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		err := b.Invoke(endpoint.WithNodeID(ctx, cc1.NodeIDField), "/test.Service/Method", nil, nil)
 		require.NoError(t, err)
-		require.Equal(t, state.Banned, cc1.GetState())
+		require.Equal(t, state.Banned, cc1.State())
 
 		for range 10 {
 			c, nextErr := b.nextConn(ctx)
@@ -322,7 +318,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		cc1 := &mock.Conn{
 			ClientConnInterface: cc,
-			AddrField:           "node1:2135", NodeIDField: 1, State: state.Online,
+			AddrField:           "node1:2135", NodeIDField: 1, StateField: state.Online,
 		}
 
 		cfg := config.New()
@@ -339,7 +335,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		err := b.Invoke(ctx, "/test.Service/Method", nil, nil)
 		require.NoError(t, err)
-		require.NotEqual(t, state.Banned, cc1.GetState())
+		require.NotEqual(t, state.Banned, cc1.State())
 	})
 
 	t.Run("PessimizedConnectionExcludedFromBalancing", func(t *testing.T) {
@@ -358,13 +354,13 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			ClientConnInterface: cc,
 			AddrField:           "node1:2135",
 			NodeIDField:         1,
-			State:               state.Online,
+			StateField:          state.Online,
 		}
 		cc2 := &mock.Conn{
 			ClientConnInterface: cc,
 			AddrField:           "node2:2135",
 			NodeIDField:         2,
-			State:               state.Online,
+			StateField:          state.Online,
 		}
 
 		cfg := config.New()
@@ -389,7 +385,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED))
 
 		// cc1 must be Banned now.
-		require.Equal(t, state.Banned, cc1.GetState())
+		require.Equal(t, state.Banned, cc1.State())
 
 		// nextConn must only return cc2 now.
 		for range 100 {
@@ -415,7 +411,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		cc1 := &mock.Conn{
 			ClientConnInterface: cc,
-			AddrField:           "node1:2135", NodeIDField: 1, State: state.Online,
+			AddrField:           "node1:2135", NodeIDField: 1, StateField: state.Online,
 		}
 
 		cfg := config.New()
@@ -434,7 +430,108 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		invokeCtx := BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED)
 		err := b.Invoke(invokeCtx, "/test.Service/Method", nil, nil)
 		require.Error(t, err)
-		require.NotEqual(t, state.Banned, cc1.GetState())
+		require.NotEqual(t, state.Banned, cc1.State())
+	})
+
+	t.Run("BansConnectionOnUnavailableForSessionCreate", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		cc := mock.NewMockClientConnInterface(ctrl)
+		unavailableErr := xerrors.WithStackTrace(xerrors.Operation(
+			xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE),
+		))
+		cc.EXPECT().Invoke(
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+		).DoAndReturn(func(context.Context, string, any, any, ...grpc.CallOption) error {
+			return unavailableErr
+		})
+
+		cc1 := &mock.Conn{
+			ClientConnInterface: cc,
+			AddrField:           "node1:2135",
+			NodeIDField:         1,
+			StateField:          state.Online,
+		}
+		cc2 := &mock.Conn{
+			ClientConnInterface: cc,
+			AddrField:           "node2:2135",
+			NodeIDField:         2,
+			StateField:          state.Online,
+		}
+
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.Release(ctx) }()
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
+		b.connectionsState.Store(s)
+
+		invokeCtx := BanOnSessionCreate(endpoint.WithNodeID(ctx, cc1.NodeIDField))
+		err := b.Invoke(invokeCtx, "/Ydb.Query.V1.QueryService/CreateSession", nil, nil)
+		require.Error(t, err)
+		require.Equal(t, state.Banned, cc1.State())
+
+		for range 10 {
+			c, nextErr := b.nextConn(ctx)
+			require.NoError(t, nextErr)
+			require.Equal(t, cc2.AddrField, c.Endpoint().Address())
+		}
+	})
+
+	t.Run("BansConnectionOnContextDeadlineExceededForSessionCreate", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		cc := mock.NewMockClientConnInterface(ctrl)
+		cc.EXPECT().Invoke(
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+		).DoAndReturn(func(context.Context, string, any, any, ...grpc.CallOption) error {
+			return context.DeadlineExceeded
+		})
+
+		cc1 := &mock.Conn{
+			ClientConnInterface: cc,
+			AddrField:           "node1:2135",
+			NodeIDField:         1,
+			StateField:          state.Online,
+		}
+		cc2 := &mock.Conn{
+			ClientConnInterface: cc,
+			AddrField:           "node2:2135",
+			NodeIDField:         2,
+			StateField:          state.Online,
+		}
+
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { _ = pool.Release(ctx) }()
+
+		b := &Balancer{
+			driverConfig:   cfg,
+			pool:           pool,
+			balancerConfig: balancerConfig.Config{},
+		}
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false)
+		b.connectionsState.Store(s)
+
+		invokeCtx := BanOnSessionCreate(endpoint.WithNodeID(ctx, cc1.NodeIDField))
+		err := b.Invoke(invokeCtx, "/Ydb.Query.V1.QueryService/CreateSession", nil, nil)
+		require.Error(t, err)
+		require.Equal(t, state.Banned, cc1.State())
+
+		for range 10 {
+			c, nextErr := b.nextConn(ctx)
+			require.NoError(t, nextErr)
+			require.Equal(t, cc2.AddrField, c.Endpoint().Address())
+		}
 	})
 
 	t.Run("AllConnectionsPessimizedFallback", func(t *testing.T) {
@@ -451,11 +548,11 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		cc1 := &mock.Conn{
 			ClientConnInterface: cc,
-			AddrField:           "node1:2135", NodeIDField: 1, State: state.Online,
+			AddrField:           "node1:2135", NodeIDField: 1, StateField: state.Online,
 		}
 		cc2 := &mock.Conn{
 			ClientConnInterface: cc,
-			AddrField:           "node2:2135", NodeIDField: 2, State: state.Online,
+			AddrField:           "node2:2135", NodeIDField: 2, StateField: state.Online,
 		}
 
 		cfg := config.New()
@@ -474,19 +571,19 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		cc1Ctx := BanOnOperationError(endpoint.WithNodeID(ctx, cc1.NodeIDField), Ydb.StatusIds_OVERLOADED)
 		err := b.Invoke(cc1Ctx, "/test.Service/Method", nil, nil)
 		require.Error(t, err)
-		require.Equal(t, state.Banned, cc1.GetState())
+		require.Equal(t, state.Banned, cc1.State())
 
 		cc2Ctx := BanOnOperationError(endpoint.WithNodeID(ctx, cc2.NodeIDField), Ydb.StatusIds_OVERLOADED)
 		err = b.Invoke(cc2Ctx, "/test.Service/Method", nil, nil)
 		require.Error(t, err)
-		require.Equal(t, state.Banned, cc2.GetState())
+		require.Equal(t, state.Banned, cc2.State())
 
 		// When all connections are banned, the balancer must still return a connection
 		// (falling back to the banned connections pool so callers can retry).
 		c, err := b.nextConn(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, c)
-		require.Equal(t, state.Banned, c.GetState())
+		require.Equal(t, state.Banned, c.State())
 	})
 
 	t.Run("StreamSendMsgErrorBansConnection", func(t *testing.T) {
@@ -507,9 +604,9 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		cc1 := &mock.Conn{
 			ClientConnInterface: cc,
-			AddrField:           "node1:2135", NodeIDField: 1, State: state.Online,
+			AddrField:           "node1:2135", NodeIDField: 1, StateField: state.Online,
 		}
-		cc2 := &mock.Conn{AddrField: "node2:2135", NodeIDField: 2, State: state.Online}
+		cc2 := &mock.Conn{AddrField: "node2:2135", NodeIDField: 2, StateField: state.Online}
 
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
@@ -534,7 +631,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		err = stream.SendMsg(nil)
 		require.Error(t, err)
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED))
-		require.Equal(t, state.Banned, cc1.GetState())
+		require.Equal(t, state.Banned, cc1.State())
 
 		for range 10 {
 			c, nextErr := b.nextConn(ctx)
@@ -561,9 +658,9 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 
 		cc1 := &mock.Conn{
 			ClientConnInterface: cc,
-			AddrField:           "node1:2135", NodeIDField: 1, State: state.Online,
+			AddrField:           "node1:2135", NodeIDField: 1, StateField: state.Online,
 		}
-		cc2 := &mock.Conn{AddrField: "node2:2135", NodeIDField: 2, State: state.Online}
+		cc2 := &mock.Conn{AddrField: "node2:2135", NodeIDField: 2, StateField: state.Online}
 
 		cfg := config.New()
 		pool := conn.NewPool(ctx, cfg)
@@ -588,7 +685,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		err = stream.RecvMsg(nil)
 		require.Error(t, err)
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED))
-		require.Equal(t, state.Banned, cc1.GetState())
+		require.Equal(t, state.Banned, cc1.State())
 
 		for range 10 {
 			c, nextErr := b.nextConn(ctx)

@@ -13,6 +13,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/observability"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
@@ -60,29 +61,67 @@ func WithApplicationNameOption(applicationName string) Option {
 
 func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
 	return func(m *Meta) {
-		var buildInfo buildInfo
-
-		if frameworks := m.buildInfo.Load().frameworks; len(frameworks) > 0 {
-			buildInfo.frameworks = make(map[string]string, len(frameworks)+1)
-			maps.Copy(buildInfo.frameworks, frameworks)
-			buildInfo.frameworks[frameworkName] = frameworkVersion
-		} else {
-			buildInfo.frameworks = map[string]string{
-				frameworkName: frameworkVersion,
-			}
+		current := m.buildInfo.Load()
+		next := &buildInfo{
+			frameworks: make(map[string]string, len(current.frameworks)+1),
 		}
+		maps.Copy(next.frameworks, current.frameworks)
+		next.frameworks[frameworkName] = frameworkVersion
 
-		buildInfo.buildInfoHeader = buildInfoFirstPart + ";" + strings.Join(
+		next.buildInfoHeader = next.makeHeader()
+		m.buildInfo.Store(next)
+	}
+}
+
+// makeHeader keeps backward-compatible semantics for build-info parsers:
+// - chain markers are appended after the base token using a space;
+// - tracing and metrics markers are separated with ';' when both are present;
+// - custom frameworks remain in ';framework/version' form.
+func (info *buildInfo) makeHeader() string {
+	builder := strings.Builder{}
+	builder.WriteString(buildInfoFirstPart)
+
+	if tracingVersion, has := info.frameworks[observability.TracingChainName]; has {
+		builder.WriteString(" ")
+		builder.WriteString(observability.TracingChainName)
+		builder.WriteString("/")
+		builder.WriteString(tracingVersion)
+	}
+
+	if metricsVersion, has := info.frameworks[observability.MetricsChainName]; has {
+		if _, hasTracing := info.frameworks[observability.TracingChainName]; hasTracing {
+			builder.WriteString(";")
+		} else {
+			builder.WriteString(" ")
+		}
+		builder.WriteString(observability.MetricsChainName)
+		builder.WriteString("/")
+		builder.WriteString(metricsVersion)
+	}
+
+	frameworkKeys := xslices.Keys(info.frameworks)
+	frameworkKeys = xslices.Filter(frameworkKeys, func(frameworkName string) bool {
+		return frameworkName != observability.TracingChainName &&
+			frameworkName != observability.MetricsChainName
+	})
+
+	if len(frameworkKeys) == 0 {
+		return builder.String()
+	}
+
+	builder.WriteString(";")
+	builder.WriteString(
+		strings.Join(
 			xslices.Transform(
-				xslices.Keys(buildInfo.frameworks),
+				frameworkKeys,
 				func(frameworkName string) string {
-					return frameworkName + "/" + buildInfo.frameworks[frameworkName]
+					return frameworkName + "/" + info.frameworks[frameworkName]
 				},
 			), ";",
-		)
+		),
+	)
 
-		m.buildInfo.Store(&buildInfo)
-	}
+	return builder.String()
 }
 
 func WithRequestTypeOption(requestType string) Option {

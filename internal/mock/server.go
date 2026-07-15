@@ -78,6 +78,14 @@ type server struct {
 	// send to simulate network latency between stream parts in benchmarks.
 	executeQueryPartDelay time.Duration
 
+	// bulkUpsertFailFirst is the number of initial BulkUpsert calls that return
+	// bulkUpsertFailStatus before succeeding.
+	bulkUpsertFailFirst  int
+	bulkUpsertFailStatus Ydb.StatusIds_StatusCode
+
+	// bulkUpsertCalls counts TableService.BulkUpsert invocations.
+	bulkUpsertCalls atomic.Uint64
+
 	executeQueryPayloadOnce sync.Once
 	executeQueryPayload     []byte
 }
@@ -127,7 +135,20 @@ func (m *server) CommitQueryCalls() uint64 {
 	return m.commitQueryCalls.Load()
 }
 
-// ConnString returns a grpc:// DSN for ydb.Open pointing at this mock.
+// WithBulkUpsertFailFirst makes the first n BulkUpsert RPCs return an operation
+// error with the given status; subsequent calls succeed.
+func WithBulkUpsertFailFirst(n int, status Ydb.StatusIds_StatusCode) ServerOption {
+	return func(m *server) {
+		m.bulkUpsertFailFirst = n
+		m.bulkUpsertFailStatus = status
+	}
+}
+
+// BulkUpsertCalls returns BulkUpsert invocations since the mock server started.
+func (m *server) BulkUpsertCalls() uint64 {
+	return m.bulkUpsertCalls.Load()
+}
+
 func (m *server) ConnString() string {
 	return fmt.Sprintf("grpc://%s/local", m.listener.Addr().String())
 }
@@ -231,6 +252,26 @@ func (m *tableSrv) ExecuteDataQuery(
 		Operation: operationOK(&Ydb_Table.ExecuteQueryResult{
 			ResultSets: resultSetsForQuery(req.GetQuery().GetYqlText()),
 		}),
+	}, nil
+}
+
+func (m *tableSrv) BulkUpsert(
+	_ context.Context,
+	_ *Ydb_Table.BulkUpsertRequest,
+) (*Ydb_Table.BulkUpsertResponse, error) {
+	call := m.mock.bulkUpsertCalls.Add(1)
+
+	if m.mock.bulkUpsertFailFirst > 0 && call <= uint64(m.mock.bulkUpsertFailFirst) {
+		return &Ydb_Table.BulkUpsertResponse{
+			Operation: &Ydb_Operations.Operation{
+				Ready:  true,
+				Status: m.mock.bulkUpsertFailStatus,
+			},
+		}, nil
+	}
+
+	return &Ydb_Table.BulkUpsertResponse{
+		Operation: operationOK(&emptypb.Empty{}),
 	}, nil
 }
 

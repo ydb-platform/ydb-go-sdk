@@ -173,7 +173,7 @@ func Open(
 	}()
 
 	response, err := client.CreateSession(
-		balancer.BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED),
+		balancer.BanOnSessionCreate(ctx),
 		&Ydb_Query.CreateSessionRequest{},
 	)
 	if err != nil {
