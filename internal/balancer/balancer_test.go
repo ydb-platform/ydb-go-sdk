@@ -447,6 +447,144 @@ func TestBalancer_Close(t *testing.T) {
 	})
 }
 
+func TestBalancer_CloseRacesWithNextConnRepeater(t *testing.T) {
+	ctx := t.Context()
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	defer func() { _ = pool.RemoveRef(ctx) }()
+
+	stateEntered := make(chan struct{})
+	releaseState := make(chan struct{})
+	blockingConn := &blockingStateConn{
+		Conn: &mock.Conn{
+			AddrField:   "blocked:2135",
+			NodeIDField: 1,
+		},
+		stateEntered: stateEntered,
+		releaseState: releaseState,
+	}
+
+	b := &Balancer{
+		driverConfig:      cfg,
+		pool:              pool,
+		balancerConfig:    balancerConfig.Config{},
+		discoveryRepeater: &stubRepeater{},
+	}
+	b.connectionsState.Store(newConnectionsState(
+		[]conn.Conn{blockingConn},
+		nil,
+		balancerConfig.Info{},
+		true,
+		nil,
+	))
+
+	nextConnDone := make(chan error, 1)
+	go func() {
+		_, err := b.nextConn(ctx)
+		nextConnDone <- err
+	}()
+
+	<-stateEntered
+
+	closeDone := make(chan error, 1)
+	go func() {
+		closeDone <- b.Close(ctx)
+	}()
+
+	close(releaseState)
+
+	require.ErrorIs(t, <-nextConnDone, ErrNoEndpoints)
+	require.NoError(t, <-closeDone)
+}
+
+func TestBalancer_CloseWhileDiscoveryDialInFlight(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	lis := bufconn.Listen(1024 * 1024)
+	t.Cleanup(func() { _ = lis.Close() })
+
+	srv := grpc.NewServer()
+	t.Cleanup(srv.Stop)
+	go func() { _ = srv.Serve(lis) }()
+
+	dialStarted := make(chan struct{})
+	continueDial := make(chan struct{})
+	cfg := config.New(
+		config.WithEndpoint("test"),
+		config.WithGrpcOptions(
+			grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+				close(dialStarted)
+				select {
+				case <-continueDial:
+					return lis.DialContext(ctx)
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+			}),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		),
+	)
+	pool := conn.NewPool(ctx, cfg)
+	defer func() { _ = pool.RemoveRef(ctx) }()
+
+	b := &Balancer{
+		address:        "passthrough:///test",
+		driverConfig:   cfg,
+		pool:           pool,
+		balancerConfig: balancerConfig.Config{},
+	}
+	b.connectionsState.Store(newConnectionsState(
+		nil,
+		nil,
+		balancerConfig.Info{},
+		true,
+		nil,
+	))
+
+	type discoveryConnResult struct {
+		cc  *grpc.ClientConn
+		err error
+	}
+	result := make(chan discoveryConnResult, 1)
+	go func() {
+		cc, err := b.discoveryConn(ctx)
+		result <- discoveryConnResult{cc: cc, err: err}
+	}()
+
+	<-dialStarted
+	closeErr := b.Close(ctx)
+	close(continueDial)
+	require.NoError(t, closeErr)
+
+	res := <-result
+	require.NoError(t, res.err)
+	require.NotNil(t, res.cc)
+	t.Cleanup(func() { _ = res.cc.Close() })
+
+	if leaked := b.cc.Load(); leaked != nil {
+		t.Fatalf("an in-flight discovery dial published a connection in state %s after Balancer.Close", leaked.GetState())
+	}
+	require.Equal(t, connectivity.Shutdown, res.cc.GetState())
+}
+
+type blockingStateConn struct {
+	conn.Conn
+
+	once         sync.Once
+	stateEntered chan struct{}
+	releaseState <-chan struct{}
+}
+
+func (c *blockingStateConn) State() state.State {
+	c.once.Do(func() {
+		close(c.stateEntered)
+	})
+	<-c.releaseState
+
+	return state.Destroyed
+}
+
 type stubRepeater struct {
 	stopFn func()
 }
