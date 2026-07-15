@@ -15,6 +15,7 @@ Project knowledge lives in [`.agents/context/`](.agents/context/). Coding rules 
    - toolchain / CI / local dev → [`techContext.md`](.agents/context/techContext.md)
    - API surface / users → [`productContext.md`](.agents/context/productContext.md)
    - scope / goals → [`projectBrief.md`](.agents/context/projectBrief.md)
+2. Domain file if the task is scoped (e.g. topic → [`topicContext.md`](.agents/context/topicContext.md); multiwriter → [`topicMultiwriterContext.md`](.agents/context/topicMultiwriterContext.md))
 3. Quick lookup: [`README.md`](README.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), [pkg.go.dev](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3)
 
 **After significant work** — update `progress.md` and stable context files when the work itself merges. Do **not** merge changes to `activeContext.md` (branch-only scratch pad — see file header).
