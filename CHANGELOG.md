@@ -1,3 +1,4 @@
+## v3.144.2
 * Fixed `database/sql` reusing a QueryService session after its attach stream closed
 
 ## v3.144.1
