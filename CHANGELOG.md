@@ -1,3 +1,4 @@
+* Added observability chain tokens `ydb-sdk-tracing/0.1.0` and `ydb-sdk-metrics/0.1.0` to `x-ydb-sdk-build-info` when tracing/metrics adapters are enabled via SDK observability options
 * Removed background connection parking (`connParker`), `conn.lastUsage` tracking and `xsync.LastUsage`
 * Deprecated `WithConnectionTTL`: the option is now a no-op
 
