@@ -248,9 +248,11 @@ func nextState(ctx context.Context, pool interface {
 	return active, newActive
 }
 
+// releaseStateConns releases connections from state
+//
 // quarantine refs were acquired in discovery round N-1,
 // all refs in round N — each Put matches its own Get.
-func (b *Balancer) clearState(ctx context.Context, state *connectionsState) {
+func (b *Balancer) releaseStateConns(ctx context.Context, state *connectionsState) {
 	if state == nil {
 		return
 	}
@@ -269,7 +271,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	defer b.closeMu.Unlock()
 
 	if b.closed {
-		b.clearState(ctx, b.connectionsState.Swap(nil))
+		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
 
 		return
 	}
@@ -348,7 +350,7 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		rep.Stop()
 	}
 
-	b.clearState(ctx, oldState)
+	b.releaseStateConns(ctx, oldState)
 
 	if discoveryCC != nil {
 		_ = discoveryCC.Close()
