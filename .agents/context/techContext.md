@@ -22,6 +22,8 @@ golangci-lint run ./...
 
 `.devcontainer/compose.yml` — Go devcontainer + `ghcr.io/ydb-platform/local-ydb:24.3`.
 
+`.devcontainer/Dockerfile` currently installs golangci-lint v1.62.2; CI uses v2.11.4.
+
 Env: `YDB_CONNECTION_STRING=grpc://ydb:2136/local`, `YDB_CONNECTION_STRING_SECURE=grpcs://ydb:2135/local`, `YDB_SSL_ROOT_CERTIFICATES_FILE=/ydb_certs/ca.pem`.
 
 ### Integration tests (host)

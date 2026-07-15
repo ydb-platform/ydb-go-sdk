@@ -1,6 +1,6 @@
 # Topic service context
 
-> **Load on demand** — only when working on `topic/`, `internal/topic/`, or topic integration tests.  
+> **Load on demand** — only when working on `topic/`, `internal/topic/`, or topic integration tests.
 > Multi-writer specifics: [`topicMultiwriterContext.md`](topicMultiwriterContext.md).
 
 ## Public vs internal
@@ -20,7 +20,7 @@
 
 | Mode | Public option | Internal |
 |------|---------------|----------|
-| Single partition / classic writer | default `StartWriter` | `topicwriterinternal.WriterReconnector` |
+| Classic writer | default `StartWriter` | `topicwriterinternal.WriterReconnector` |
 | Many partitions | `topicoptions.WithWriteToManyPartitions(...)` | `internal/topic/topicmultiwriter/` — see [`topicMultiwriterContext.md`](topicMultiwriterContext.md) |
 
 ## Integration tests

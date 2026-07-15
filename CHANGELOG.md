@@ -1,4 +1,4 @@
-* Fixed a race in topic multi-writer initialization where partition split handling could close writers still used by `initSeqNo`, causing `WaitInit` to fail with `ydb: stop writer reconnector`; message pipeline workers now start only after init completes
+* Fixed topic multi-writer initialization failures caused by concurrent partition splits
 
 ## v3.144.0
 * Added observability chain tokens `ydb-sdk-tracing/0.1.0` and `ydb-sdk-metrics/0.1.0` to `x-ydb-sdk-build-info` when tracing/metrics adapters are enabled via SDK observability options

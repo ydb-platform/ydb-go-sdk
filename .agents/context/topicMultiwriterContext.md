@@ -1,6 +1,6 @@
 # Topic multiwriter context
 
-> **Load on demand** — only for `WithWriteToManyPartitions`, `internal/topic/topicmultiwriter/`, or multiwriter integration tests.  
+> **Load on demand** — only for `WithWriteToManyPartitions`, `internal/topic/topicmultiwriter/`, or multiwriter integration tests.
 > General topic layout: [`topicContext.md`](topicContext.md).
 
 ## Entry points
@@ -23,7 +23,7 @@ Key files:
 ```
 NewMultiWriter → background goroutine runs orchestrator.init()
   1. Describe topic → populate partitions map
-  2. initSeqNo() → getMaxSeqNo() creates temp partition writers, WaitInitInfo, then evict
+  2. initSeqNo() → getMaxSeqNo() obtains partition writers and waits for init info, then evicts them
   3. Register partitions in PartitionChooser
   4. startWorkers() → ack receiver, partition splitter, sender
 ```
@@ -32,7 +32,7 @@ NewMultiWriter → background goroutine runs orchestrator.init()
 
 ## Invariant
 
-Message-pipeline workers (splitter / sender / ack) must **not** run until step 4 completes.
+Message-pipeline workers (splitter / sender / ack) must start only after steps 1–3 succeed.
 
 If `onPartitionSplit` runs during `initSeqNo`, it can `evict()` writers still used by `getMaxSeqNo` → `WaitInit` fails with `ydb: stop writer reconnector`.
 

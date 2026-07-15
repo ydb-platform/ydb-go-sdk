@@ -1267,6 +1267,16 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 		},
 		&blockingInitWritersFactory{releaseInit: releaseInit},
 	)
+	defer func() {
+		select {
+		case <-releaseInit:
+		default:
+			close(releaseInit)
+		}
+		if !multiWriter.closed.Load() {
+			_ = multiWriter.Close(ctx)
+		}
+	}()
 
 	waitResult := make(chan error, 1)
 	go func() {
@@ -1288,9 +1298,9 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 	default:
 	}
 
-	require.Eventually(t, func() bool {
-		return pendingPartitionSplitCount(multiWriter.orchestrator.partitionSplitReceiver) == 1
-	}, 200*time.Millisecond, 10*time.Microsecond,
+	require.Never(t, func() bool {
+		return pendingPartitionSplitCount(multiWriter.orchestrator.partitionSplitReceiver) == 0
+	}, 200*time.Millisecond, time.Millisecond,
 		"split event must stay queued until init completes",
 	)
 
