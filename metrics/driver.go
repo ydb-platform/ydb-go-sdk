@@ -164,6 +164,7 @@ func driver(config Config) (t trace.Driver) {
 			}
 		}
 	}
+
 	return t
 }
 
