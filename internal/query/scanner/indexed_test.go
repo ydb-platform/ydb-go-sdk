@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestIndexed(t *testing.T) {
@@ -106,9 +106,9 @@ func TestIndexed(t *testing.T) {
 				},
 				[]*Ydb.Value{
 					Ydb.Value_builder{
-							BytesValue: []byte("<a=1>[3;%false]"),
-						}.Build(),
-					},
+						BytesValue: []byte("<a=1>[3;%false]"),
+					}.Build(),
+				},
 			)),
 			dst: [][]any{
 				{func(v string) *string { return &v }("")},

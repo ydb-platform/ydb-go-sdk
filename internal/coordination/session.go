@@ -263,14 +263,14 @@ func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan 
 		// Start a new session.
 		onStart := gtrace.CoordinationOnSessionStart(s.trace)
 		startSession := Ydb_Coordination.SessionRequest_builder{
-				SessionStart: Ydb_Coordination.SessionRequest_SessionStart_builder{
-					Path:          path,
-					SessionId:     s.sessionID,
-					TimeoutMillis: uint64(s.sessionTimeout.Milliseconds()),
-					ProtectionKey: protectionKey,
-					SeqNo:         seqNo,
-					Description:   s.description,
-				}.Build(),
+			SessionStart: Ydb_Coordination.SessionRequest_SessionStart_builder{
+				Path:          path,
+				SessionId:     s.sessionID,
+				TimeoutMillis: uint64(s.sessionTimeout.Milliseconds()),
+				ProtectionKey: protectionKey,
+				SeqNo:         seqNo,
+				Description:   s.description,
+			}.Build(),
 		}.Build()
 
 		err = sessionClient.Send(startSession)

@@ -188,7 +188,9 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) balancerOption {
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}
-				if setter, ok := reply.(interface{ SetOperation(*Ydb_Operations.Operation) }); ok {
+				if setter, ok := reply.(interface {
+					SetOperation(operation *Ydb_Operations.Operation)
+				}); ok {
 					setter.SetOperation(Ydb_Operations.Operation_builder{
 						Result: anyResult,
 					}.Build())

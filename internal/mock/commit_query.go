@@ -130,7 +130,7 @@ func commitExecStats() *Ydb_TableStats.QueryStats {
 					Ydb_TableStats.TableAccessStats_builder{
 						Name: "table",
 						Deletes: Ydb_TableStats.OperationStats_builder{
-							Rows: 1,
+							Rows:  1,
 							Bytes: 1,
 						}.Build(),
 					}.Build(),

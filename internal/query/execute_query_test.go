@@ -15,13 +15,13 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	grpcStatus "google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestExecute(t *testing.T) {
@@ -32,7 +32,7 @@ func TestExecute(t *testing.T) {
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 		var txID string
-		r, err := execute(ctx, "123", client, "", options.ExecuteSettings(),
+		r, err := execute(ctx, "123", client, "", options.ExecuteSettings(), options.ResultSetsTypeOrdered,
 			onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 				txID = txMeta.GetId()
 			}),
@@ -146,7 +146,7 @@ func TestExecute(t *testing.T) {
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
 			t.Log("execute")
-			_, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+			_, err := execute(ctx, "123", client, "", options.ExecuteSettings(), options.ResultSetsTypeOrdered)
 			require.Error(t, err)
 			require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 		})
@@ -227,7 +227,7 @@ func TestExecute(t *testing.T) {
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			t.Log("execute")
 			var txID string
-			r, err := execute(ctx, "123", client, "", options.ExecuteSettings(),
+			r, err := execute(ctx, "123", client, "", options.ExecuteSettings(), options.ResultSetsTypeOrdered,
 				onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 					txID = txMeta.GetId()
 				}),
@@ -291,7 +291,7 @@ func TestExecute(t *testing.T) {
 			client := NewMockQueryServiceClient(ctrl)
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			t.Log("execute")
-			_, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+			_, err := execute(ctx, "123", client, "", options.ExecuteSettings(), options.ResultSetsTypeOrdered)
 			require.Error(t, err)
 			require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 		})
@@ -352,7 +352,7 @@ func TestExecute(t *testing.T) {
 			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			t.Log("execute")
 			var txID string
-			r, err := execute(ctx, "123", client, "", options.ExecuteSettings(),
+			r, err := execute(ctx, "123", client, "", options.ExecuteSettings(), options.ResultSetsTypeOrdered,
 				onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 					txID = txMeta.GetId()
 				}),
@@ -419,7 +419,7 @@ func TestExecute(t *testing.T) {
 				})
 
 			// When execute() with context, cancelled in progress
-			_, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+			_, err := execute(ctx, "123", client, "", options.ExecuteSettings(), options.ResultSetsTypeOrdered)
 
 			// Then context cancellation error is returned
 			require.ErrorIs(t, err, context.Canceled)
@@ -442,7 +442,7 @@ func TestExecute(t *testing.T) {
 				})
 
 			executeCtx, cancelExecuteCtx := context.WithCancel(t.Context())
-			r, err := execute(executeCtx, "123", client, "", options.ExecuteSettings())
+			r, err := execute(executeCtx, "123", client, "", options.ExecuteSettings(), options.ResultSetsTypeOrdered)
 			require.NoError(t, err)
 
 			cancelExecuteCtx()
@@ -505,7 +505,7 @@ func TestExecute(t *testing.T) {
 					})
 
 				_, err := execute(xcontext.WithIdempotent(ctx, true),
-					"123", client, "", options.ExecuteSettings(),
+					"123", client, "", options.ExecuteSettings(), options.ResultSetsTypeOrdered,
 				)
 				require.Error(t, err)
 				require.ErrorIs(t, err, context.Canceled)
@@ -535,8 +535,8 @@ func TestExecute(t *testing.T) {
 						return stream, nil
 					})
 
-				_, err := execute(ctx, // xcontext.WithIdempotent(ctx, false),
-					"123", client, "", options.ExecuteSettings(),
+				_, err := execute(ctx,
+					"123", client, "", options.ExecuteSettings(), options.ResultSetsTypeConcurrent,
 				)
 				require.Error(t, err)
 				require.ErrorIs(t, err, context.Canceled)
@@ -568,7 +568,7 @@ func TestExecute(t *testing.T) {
 					return stream, nil
 				})
 
-			r, err := execute(t.Context(), "123", client, "", options.ExecuteSettings())
+			r, err := execute(t.Context(), "123", client, "", options.ExecuteSettings(), options.ResultSetsTypeConcurrent)
 			require.NoError(t, err)
 
 			callCtx, callCancel := context.WithCancel(t.Context())
@@ -618,7 +618,7 @@ func TestExecute(t *testing.T) {
 					return stream, nil
 				})
 
-			r, err := execute(t.Context(), "123", client, "", options.ExecuteSettings(),
+			r, err := execute(t.Context(), "123", client, "", options.ExecuteSettings(), options.ResultSetsTypeConcurrent,
 				withStreamResultCloseTimeout(50*time.Millisecond),
 			)
 			require.NoError(t, err)
@@ -925,7 +925,9 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			request, callOptions, err := executeQueryRequest(tt.name, tt.name, options.ExecuteSettings(tt.opts...))
+			request, callOptions, err := executeQueryRequest(
+				tt.name, tt.name, options.ExecuteSettings(tt.opts...), options.ResultSetsTypeOrdered,
+			)
 			require.NoError(t, err)
 			require.Equal(t, request.String(), tt.request.String())
 			require.Equal(t, tt.callOptions, callOptions)

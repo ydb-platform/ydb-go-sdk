@@ -22,6 +22,8 @@ golangci-lint run ./...
 
 `.devcontainer/compose.yml` — Go devcontainer + `ghcr.io/ydb-platform/local-ydb:24.3`.
 
+`.devcontainer/Dockerfile` currently installs golangci-lint v1.62.2; CI uses v2.11.4.
+
 Env: `YDB_CONNECTION_STRING=grpc://ydb:2136/local`, `YDB_CONNECTION_STRING_SECURE=grpcs://ydb:2135/local`, `YDB_SSL_ROOT_CERTIFICATES_FILE=/ydb_certs/ca.pem`.
 
 ### Integration tests (host)
@@ -39,6 +41,8 @@ export YDB_SESSIONS_SHUTDOWN_URLS="http://localhost:8765/actors/kqp_proxy?force_
 
 go test -race -tags integration ./tests/integration
 ```
+
+Stress a single flaky integration test: add `-count=N -run 'TestName$'` to the `go test` command above.
 
 `YDB_CONNECTION_STRING` is the **insecure** endpoint (port 2136); TLS uses `YDB_CONNECTION_STRING_SECURE` (port 2135). Default in `tests/integration/helpers_test.go`: `grpc://localhost:2136/local`.
 

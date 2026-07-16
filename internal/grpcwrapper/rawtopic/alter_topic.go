@@ -2,12 +2,12 @@ package rawtopic
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawoptional"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
-	"google.golang.org/protobuf/proto"
 )
 
 type AlterTopicRequest struct {

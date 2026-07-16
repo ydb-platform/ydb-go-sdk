@@ -370,7 +370,9 @@ func (s *MessageWriteStatus) fromProto(pb *Ydb_Topic.StreamWriteMessage_WriteRes
 		return nil
 
 	default:
-		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected write status type: %v", pb.WhichMessageWriteStatus())))
+		return xerrors.WithStackTrace(xerrors.Wrap(
+			fmt.Errorf("ydb: unexpected write status type: %v", pb.WhichMessageWriteStatus()),
+		))
 	}
 }
 

@@ -1005,7 +1005,7 @@ func TestTypeFromYDB(t *testing.T) {
 		ydbType := Ydb.Type_builder{
 			DictType: Ydb.DictType_builder{
 				Key:     Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build(),
-				Payload: Ydb.Type_builder{VoidType: structpb.NullValue_NULL_VALUE.Enum(),}.Build(),
+				Payload: Ydb.Type_builder{VoidType: structpb.NullValue_NULL_VALUE.Enum()}.Build(),
 			}.Build(),
 		}.Build()
 		goType := TypeFromYDB(ydbType)

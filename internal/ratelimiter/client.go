@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_RateLimiter"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
@@ -17,7 +18,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"google.golang.org/protobuf/proto"
 )
 
 var (

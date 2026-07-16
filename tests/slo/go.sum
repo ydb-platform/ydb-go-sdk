@@ -3228,8 +3228,6 @@ github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7V
 github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8IZAc4RVcycCCAKdM=
 github.com/jung-kurt/gofpdf v1.0.0/go.mod h1:7Id9E/uU8ce6rXgefFLlgrJj/GYY22cpxn+r32jIOes=
 github.com/jung-kurt/gofpdf v1.0.3-0.20190309125859-24315acbbda5/go.mod h1:7Id9E/uU8ce6rXgefFLlgrJj/GYY22cpxn+r32jIOes=
-github.com/kartunovv/ydb-go-genproto v0.0.0-20260620115251-86593166420f h1:3Owq12kqFK0mBi65NKKlWZzNSB8fPvUYAuTTHn5Yy8Q=
-github.com/kartunovv/ydb-go-genproto v0.0.0-20260620115251-86593166420f/go.mod h1:jdQJeMxIXsud0kyFe85pJt5QGr//NIJkWSmc5Ba+UVk=
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 h1:Z9n2FFNUXsshfwJMBgNA0RU6/i7WVaAegv3PtuIHPMs=
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51/go.mod h1:CzGEWj7cYgsdH8dAjBGEr58BoE7ScuLd+fwFZ44+/x8=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
@@ -3524,6 +3522,8 @@ github.com/ydb-platform/gorm-driver v0.1.3 h1:uewwScbRuCixNPC0LF7gDKvWcB13/iLj76
 github.com/ydb-platform/gorm-driver v0.1.3/go.mod h1:49cSoG5J18muQTiKj4StL2dHs1/dB94OitnHOvetK24=
 github.com/ydb-platform/xorm v0.0.3 h1:MXk42lANB6r/MMLg/XdJfyXJycGUDlCeLiMlLGDKVPw=
 github.com/ydb-platform/xorm v0.0.3/go.mod h1:hFsU7EUF0o3S+l5c0eyP2yPVjJ0d4gsFdqCsyazzwBc=
+github.com/ydb-platform/ydb-go-genproto v0.0.0-20260623105045-f5dde53f1303 h1:U/nJYWLCg8AUsOeFuT43AcrGbF0V/thzc6ElLtQu29A=
+github.com/ydb-platform/ydb-go-genproto v0.0.0-20260623105045-f5dde53f1303/go.mod h1:jdQJeMxIXsud0kyFe85pJt5QGr//NIJkWSmc5Ba+UVk=
 github.com/ydb-platform/ydb-go-sdk-auth-environ v0.3.0 h1:JxSvw+Moont8qCmibP2MjSEIHfkWJLkw0fHZemAk+d0=
 github.com/ydb-platform/ydb-go-sdk-auth-environ v0.3.0/go.mod h1:YzCPoNrTbrXZg9bO2YkbjI6eQLkaRIE9Bq8ponu0g8A=
 github.com/ydb-platform/ydb-go-yc v0.12.1 h1:qw3Fa+T81+Kpu5Io2vYHJOwcrYrVjgJlT6t/0dOXJrA=

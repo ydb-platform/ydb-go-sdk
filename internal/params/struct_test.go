@@ -7,9 +7,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
 
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestStruct(t *testing.T) {

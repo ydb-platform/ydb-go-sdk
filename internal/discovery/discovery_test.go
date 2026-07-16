@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -164,4 +165,12 @@ func TestDiscover(t *testing.T) {
 			),
 		}, endpoints)
 	})
+}
+
+func TestClientCloseSkipsConnWithoutIOCloser(t *testing.T) {
+	client := &Client{
+		cc: struct{ grpc.ClientConnInterface }{},
+	}
+
+	require.NoError(t, client.Close(t.Context()))
 }

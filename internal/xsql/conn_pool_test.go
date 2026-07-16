@@ -10,6 +10,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
@@ -190,4 +191,78 @@ func TestXsqlConnIsValidPreventsDeadSessionPoolReuse(t *testing.T) {
 			assert.Equal(t, maxAttempts, beginTxCounter)
 		})
 	}
+}
+
+type invalidatedSessionCommonConn struct {
+	mockCommonConn
+
+	valid        bool
+	beginTxCalls int
+}
+
+var _ common.Conn = (*invalidatedSessionCommonConn)(nil)
+
+func (c *invalidatedSessionCommonConn) IsValid() bool { return c.valid }
+func (c *invalidatedSessionCommonConn) BeginTx(context.Context, driver.TxOptions) (common.Tx, error) {
+	c.beginTxCalls++
+	if !c.valid {
+		return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
+	}
+
+	return &mockTx{}, nil
+}
+
+type invalidatedSessionConnector struct {
+	sharedConnCfg *Connector
+	connections   []*invalidatedSessionCommonConn
+}
+
+var (
+	_ driver.Connector = (*invalidatedSessionConnector)(nil)
+	_ driver.Driver    = (*invalidatedSessionConnector)(nil)
+)
+
+func (c *invalidatedSessionConnector) Connect(ctx context.Context) (driver.Conn, error) {
+	cc := &invalidatedSessionCommonConn{valid: true}
+	c.connections = append(c.connections, cc)
+
+	return &Conn{
+		processor: QUERY,
+		cc:        cc,
+		ctx:       ctx,
+		connector: c.sharedConnCfg,
+	}, nil
+}
+
+func (c *invalidatedSessionConnector) Open(string) (driver.Conn, error) { return nil, driver.ErrSkip }
+
+func (c *invalidatedSessionConnector) Driver() driver.Driver { return c }
+
+func TestXsqlConnDoesNotBeginTransactionOnInvalidatedIdleSession(t *testing.T) {
+	connector := &invalidatedSessionConnector{
+		sharedConnCfg: &Connector{
+			trace:     &trace.DatabaseSQL{},
+			bindings:  newMockBindings(),
+			clock:     clockwork.NewRealClock(),
+			processor: QUERY,
+			done:      make(chan struct{}),
+		},
+	}
+	db := sql.OpenDB(connector)
+	t.Cleanup(func() { _ = db.Close() })
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+
+	tx, err := db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	require.Len(t, connector.connections, 1)
+
+	first := connector.connections[0]
+	first.valid = false
+
+	tx, err = db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	require.Equal(t, 1, first.beginTxCalls)
 }

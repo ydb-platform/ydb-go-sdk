@@ -5,7 +5,9 @@ package integration
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,10 +18,70 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
+
+func TestDatabaseSQLDoesNotBeginTransactionOnDeletedSession(t *testing.T) {
+	scope := newScope(t)
+
+	var session atomic.Value
+	driver := scope.Driver(
+		ydb.WithBalancer(balancers.SingleConn()),
+		ydb.WithTraceQuery(trace.Query{
+			OnSessionCreate: func(trace.QuerySessionCreateStartInfo) func(trace.QuerySessionCreateDoneInfo) {
+				return func(info trace.QuerySessionCreateDoneInfo) {
+					require.NoError(t, info.Error)
+					session.Store(info.Session)
+				}
+			},
+			OnSessionBeginTransaction: func(
+				trace.QuerySessionBeginTransactionStartInfo,
+			) func(trace.QuerySessionBeginTransactionDoneInfo) {
+				return func(info trace.QuerySessionBeginTransactionDoneInfo) {
+					require.NoError(t, info.Error)
+				}
+			},
+		}),
+	)
+
+	connector, err := ydb.Connector(driver,
+		ydb.WithQueryService(true),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, connector.Close())
+	})
+
+	db := sql.OpenDB(connector)
+	t.Cleanup(func() {
+		require.NoError(t, db.Close())
+	})
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	err = retry.DoTx(scope.Ctx, db, func(context.Context, *sql.Tx) error {
+		return nil
+	})
+	require.NoError(t, err)
+
+	sessionInfo := session.Load().(trace.SessionInfo)
+	deleteSession(t, scope.Ctx, driver, sessionInfo.ID())
+	require.Eventually(t, func() bool {
+		return sessionInfo.Status() == "Closed"
+	}, time.Second, time.Millisecond)
+
+	txCtx, cancel := context.WithTimeout(scope.Ctx, time.Second)
+	defer cancel()
+
+	err = retry.DoTx(txCtx, db, func(context.Context, *sql.Tx) error {
+		return nil
+	})
+	require.NoError(t, err)
+}
 
 func TestSessionCoreContextCancel(t *testing.T) {
 	scope := newScope(t)

@@ -274,7 +274,7 @@ func newTableSession(
 	ctx context.Context, cc grpc.ClientConnInterface, config *config.Config,
 ) (*Session, error) {
 	response, err := Ydb_Table_V1.NewTableServiceClient(cc).CreateSession(
-		balancer.BanOnOperationError(ctx, Ydb.StatusIds_OVERLOADED),
+		balancer.BanOnSessionCreate(ctx),
 		Ydb_Table.CreateSessionRequest_builder{
 			OperationParams: operation.Params(
 				ctx,
@@ -1017,8 +1017,8 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 	txr table.Transaction, r result.Result, err error,
 ) {
 	var (
-		q       = queryFromText(sql)
-		ydbParams, _ = params.ToYDB()
+		q                = queryFromText(sql)
+		ydbParams, _     = params.ToYDB()
 		queryCachePolicy = Ydb_Table.QueryCachePolicy_builder{
 			KeepInCache: true,
 		}.Build()
@@ -1029,12 +1029,12 @@ func (s *Session) Execute(ctx context.Context, txControl *table.TransactionContr
 		)
 		request = options.ExecuteDataQueryDesc{
 			ExecuteDataQueryRequest: Ydb_Table.ExecuteDataQueryRequest_builder{
-				SessionId: s.id,
-				TxControl: txControl.ToYdbTableTransactionControl(),
-				Parameters: ydbParams,
-				Query: q.toYDB(),
+				SessionId:        s.id,
+				TxControl:        txControl.ToYdbTableTransactionControl(),
+				Parameters:       ydbParams,
+				Query:            q.toYDB(),
 				QueryCachePolicy: queryCachePolicy,
-				OperationParams: operationParams,
+				OperationParams:  operationParams,
 			}.Build(),
 			IgnoreTruncated: s.config.IgnoreTruncated(),
 		}

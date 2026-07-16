@@ -88,7 +88,10 @@ func expandTuple(v *Ydb.TypedValue) []*Ydb.TypedValue {
 	size := len(tuple.GetElements())
 	values := make([]*Ydb.TypedValue, 0, size)
 	for idx, typ := range tuple.GetElements() {
-		values = append(values, unwrapTypedValue(Ydb.TypedValue_builder{Type: typ, Value: v.GetValue().GetItems()[idx]}.Build()))
+		values = append(values, unwrapTypedValue(Ydb.TypedValue_builder{
+			Type:  typ,
+			Value: v.GetValue().GetItems()[idx],
+		}.Build()))
 	}
 
 	return values

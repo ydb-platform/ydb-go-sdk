@@ -53,7 +53,8 @@ func TestSchemeOptions(t *testing.T) {
 				}
 			case Ydb_Scheme.PermissionsAction_Set_case:
 				count--
-				if a.GetSet().GetSubject() != "set" || len(a.GetSet().GetPermissionNames()) != 1 || a.GetSet().GetPermissionNames()[0] != "d" {
+				set := a.GetSet()
+				if set.GetSubject() != "set" || len(set.GetPermissionNames()) != 1 || set.GetPermissionNames()[0] != "d" {
 					t.Errorf("Set is not as expected")
 				}
 			case Ydb_Scheme.PermissionsAction_Revoke_case:

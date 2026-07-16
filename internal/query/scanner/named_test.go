@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestNamed(t *testing.T) {
@@ -72,22 +72,22 @@ func TestNamed(t *testing.T) {
 			},
 		},
 		{
-    		name: "Ydb.Type_YSON_TextValue",
-    		s: Named(NewData(
-        		[]*Ydb.Column{
-            		Ydb.Column_builder{
-                		Name: "a",
-                		Type: Ydb.Type_builder{
-                    		TypeId: Ydb.Type_YSON.Enum(),
-                		}.Build(),
-            		}.Build(),
-        		},
-        		[]*Ydb.Value{
-            		Ydb.Value_builder{
-                		TextValue: proto.String("<a=1>[3;%false]"),
-            		}.Build(),
-        		},
-    		)),
+			name: "Ydb.Type_YSON_TextValue",
+			s: Named(NewData(
+				[]*Ydb.Column{
+					Ydb.Column_builder{
+						Name: "a",
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_YSON.Enum(),
+						}.Build(),
+					}.Build(),
+				},
+				[]*Ydb.Value{
+					Ydb.Value_builder{
+						TextValue: proto.String("<a=1>[3;%false]"),
+					}.Build(),
+				},
+			)),
 			dst: [][]any{
 				{func(v string) *string { return &v }("")},
 				{func(v []byte) *[]byte { return &v }([]byte(""))},
@@ -98,22 +98,22 @@ func TestNamed(t *testing.T) {
 			},
 		},
 		{
-    		name: "Ydb.Type_YSON_BytesValue",
-    		s: Named(NewData(
-        		[]*Ydb.Column{
-            		Ydb.Column_builder{
-                		Name: "a",
-                		Type: Ydb.Type_builder{
-                    		TypeId: Ydb.Type_YSON.Enum(),
-                		}.Build(),
-            		}.Build(),
-        		},
-        		[]*Ydb.Value{
-            		Ydb.Value_builder{
-                		BytesValue: []byte("<a=1>[3;%false]"),
-            		}.Build(),
-        		},
-    		)),
+			name: "Ydb.Type_YSON_BytesValue",
+			s: Named(NewData(
+				[]*Ydb.Column{
+					Ydb.Column_builder{
+						Name: "a",
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_YSON.Enum(),
+						}.Build(),
+					}.Build(),
+				},
+				[]*Ydb.Value{
+					Ydb.Value_builder{
+						BytesValue: []byte("<a=1>[3;%false]"),
+					}.Build(),
+				},
+			)),
 			dst: [][]any{
 				{func(v string) *string { return &v }("")},
 				{func(v []byte) *[]byte { return &v }([]byte(""))},

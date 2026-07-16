@@ -8,12 +8,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-	"google.golang.org/protobuf/proto"
+	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
 func TestFieldName(t *testing.T) {

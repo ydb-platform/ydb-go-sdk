@@ -16,8 +16,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
 // Operation is the interface that holds an operation for retry.
@@ -448,8 +448,23 @@ func WithRetryOptions(retryOptions []retry.Option) retryOptionsOption {
 	return retryOptions
 }
 
-func WithIdempotent() retryOptionsOption {
-	return []retry.Option{retry.WithIdempotent(true)}
+// WithIdempotent makes retry call as idempotent
+//
+// No bool arg means that operation is idempotent
+// Implicit bool arg changes default idempotent flag
+// No more than one bool argument is allowed
+func WithIdempotent(bb ...bool) retryOptionsOption {
+	idempotent := true
+	switch len(bb) {
+	case 0:
+		// nop
+	case 1:
+		idempotent = bb[0]
+	default:
+		panic("only one bool arg allowed")
+	}
+
+	return []retry.Option{retry.WithIdempotent(idempotent)}
 }
 
 var _ Option = txSettingsOption{}
@@ -526,7 +541,7 @@ func (data bulkUpsertCsv) ToYDB(tableName string) (*Ydb_Table.BulkUpsertRequest,
 		Table: tableName,
 		Data:  data.data,
 	}.Build()
-	
+
 	csvSettings := &Ydb_Formats.CsvSettings{}
 
 	for _, opt := range data.opts {
@@ -615,7 +630,7 @@ func (data bulkUpsertArrow) ToYDB(tableName string) (*Ydb_Table.BulkUpsertReques
 		Table: tableName,
 		Data:  data.data,
 	}.Build()
-	
+
 	arrowSettings := &Ydb_Formats.ArrowBatchSettings{}
 
 	for _, opt := range data.opts {

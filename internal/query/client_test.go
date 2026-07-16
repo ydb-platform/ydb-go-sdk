@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
@@ -27,7 +28,6 @@ import (
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestClient(t *testing.T) {
@@ -245,7 +245,7 @@ func TestClient(t *testing.T) {
 					}()
 
 					return tx.Exec(ctx, "")
-				}, tx.NewSettings(tx.WithDefaultTxMode()))
+				}, tx.NewSettings(tx.WithDefaultTxMode()), nil)
 				require.NoError(t, err)
 			})
 			t.Run("NoLazyTx", func(t *testing.T) {
@@ -262,9 +262,10 @@ func TestClient(t *testing.T) {
 								) {
 									stream := newExecuteQueryStreamMock(ctrl)
 									stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-										client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(Ydb_Query.CommitTransactionResponse_builder{
-											Status: Ydb.StatusIds_SUCCESS,
-										}.Build(), nil)
+										client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(
+											Ydb_Query.CommitTransactionResponse_builder{
+												Status: Ydb.StatusIds_SUCCESS,
+											}.Build(), nil)
 
 										return Ydb_Query.ExecuteQueryResponsePart_builder{
 											Status: Ydb.StatusIds_SUCCESS,
@@ -333,7 +334,7 @@ func TestClient(t *testing.T) {
 					}()
 
 					return tx.Exec(ctx, "")
-				}, tx.NewSettings(tx.WithDefaultTxMode()))
+				}, tx.NewSettings(tx.WithDefaultTxMode()), nil)
 				require.NoError(t, err)
 			})
 		})
@@ -359,7 +360,7 @@ func TestClient(t *testing.T) {
 				}
 
 				return nil
-			}, tx.NewSettings(tx.WithDefaultTxMode()))
+			}, tx.NewSettings(tx.WithDefaultTxMode()), nil)
 			require.NoError(t, err)
 			require.Equal(t, 10, counter)
 		})
@@ -413,7 +414,7 @@ func TestClient(t *testing.T) {
 							return newTestSessionWithClient("123", client, true), nil
 						}), func(ctx context.Context, tx query.TxActor) error {
 							return tx.Exec(ctx, "")
-						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						}, tx.NewSettings(tx.WithSerializableReadWrite()), nil)
 						require.NoError(t, err)
 						require.Zero(t, txInFlight)
 					})
@@ -465,7 +466,7 @@ func TestClient(t *testing.T) {
 							return newTestSessionWithClient("123", client, true), nil
 						}), func(ctx context.Context, tx query.TxActor) error {
 							return tx.Exec(ctx, "", options.WithCommit())
-						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						}, tx.NewSettings(tx.WithSerializableReadWrite()), nil)
 						require.NoError(t, err)
 						require.Zero(t, txInFlight)
 					})
@@ -558,7 +559,7 @@ func TestClient(t *testing.T) {
 							}
 
 							return tx.Exec(ctx, "")
-						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						}, tx.NewSettings(tx.WithSerializableReadWrite()), nil)
 						require.NoError(t, err)
 					})
 				})
@@ -639,7 +640,7 @@ func TestClient(t *testing.T) {
 							}
 
 							return tx.Exec(ctx, "", options.WithCommit())
-						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						}, tx.NewSettings(tx.WithSerializableReadWrite()), nil)
 						require.NoError(t, err)
 					})
 				})
@@ -1055,7 +1056,7 @@ func TestClient(t *testing.T) {
 				require.Nil(t, row)
 			}
 		})
-		t.Run("ConcurrentResultSets", func(t *testing.T) {
+		t.Run("ResultSetsType", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			colsAB := []*Ydb.Column{
@@ -1116,7 +1117,7 @@ func TestClient(t *testing.T) {
 
 			r, err := clientQuery(ctx, testPool(t, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
-			}), "", query.WithConcurrentResultSets(true))
+			}), "")
 			require.NoError(t, err)
 
 			{
@@ -1196,7 +1197,7 @@ func TestClient(t *testing.T) {
 
 			_, err := clientQuery(executeCtx, testPool(t, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
-			}), "", query.WithConcurrentResultSets(true))
+			}), "")
 
 			require.ErrorIs(t, err, context.Canceled)
 		})
@@ -1227,7 +1228,7 @@ func TestClient(t *testing.T) {
 
 			r, err := clientQuery(ctx, testPool(t, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
-			}), "", query.WithConcurrentResultSets(true))
+			}), "")
 			require.NoError(t, err)
 
 			rs, err := r.NextResultSet(ctx)

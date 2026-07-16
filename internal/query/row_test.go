@@ -11,10 +11,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
-	"google.golang.org/protobuf/proto"
 )
 
 type testScanner struct {
@@ -204,7 +204,7 @@ func TestReadRow(t *testing.T) {
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-		r, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+		r, err := execute(ctx, "123", client, "", options.ExecuteSettings(), options.ResultSetsTypeConcurrent)
 		require.NoError(t, err)
 
 		row, err := readRow(ctx, r)
@@ -251,7 +251,7 @@ func TestReadRow(t *testing.T) {
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-		r, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+		r, err := execute(ctx, "123", client, "", options.ExecuteSettings(), options.ResultSetsTypeConcurrent)
 		require.NoError(t, err)
 
 		_, err = readRow(ctx, r)
@@ -286,7 +286,7 @@ func TestReadRow(t *testing.T) {
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-		r, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+		r, err := execute(ctx, "123", client, "", options.ExecuteSettings(), options.ResultSetsTypeConcurrent)
 		require.NoError(t, err)
 
 		_, err = readRow(ctx, r)
@@ -343,7 +343,7 @@ func TestReadRow(t *testing.T) {
 		client := NewMockQueryServiceClient(ctrl)
 		client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-		r, err := execute(ctx, "123", client, "", options.ExecuteSettings())
+		r, err := execute(ctx, "123", client, "", options.ExecuteSettings(), options.ResultSetsTypeConcurrent)
 		require.NoError(t, err)
 
 		_, err = readRow(ctx, r)

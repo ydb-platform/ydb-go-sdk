@@ -45,13 +45,6 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 		pool.WithIdleTimeToLive[*Session, Session](config.IdleThreshold()),
 		pool.WithCreateItemTimeout[*Session, Session](config.CreateSessionTimeout()),
 		pool.WithCloseItemTimeout[*Session, Session](config.DeleteTimeout()),
-		pool.WithMustDeleteItemFunc[*Session, Session](func(s *Session, err error) bool {
-			if !s.IsAlive() {
-				return true
-			}
-
-			return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
-		}),
 		pool.WithClock[*Session, Session](config.Clock()),
 		pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 			if !config.DisableSessionBalancer() {
@@ -387,15 +380,18 @@ func (c *Client) BulkUpsert(
 	}
 
 	attempts, config := 0, c.retryOptions(opts...)
-	config.RetryOptions = append(config.RetryOptions,
-		retry.WithIdempotent(true),
-		retry.WithTrace(&trace.Retry{
-			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-				return func(info trace.RetryLoopDoneInfo) {
-					attempts += max(info.Attempts-1, 0) // `max` guarded against negative values
-				}
-			},
-		}),
+	config.RetryOptions = append(
+		[]retry.Option{
+			retry.WithIdempotent(true),
+			retry.WithTrace(&trace.Retry{
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopDoneInfo) {
+						attempts += max(info.Attempts-1, 0) // `max` guarded against negative values
+					}
+				},
+			}),
+		},
+		config.RetryOptions...,
 	)
 
 	onDone := gtrace.TableOnBulkUpsert(config.Trace, &ctx,
@@ -560,16 +556,20 @@ func (c *Client) ReadRows(
 	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
 
 	attempts, config := 0, c.retryOptions(retryOptions...)
-	config.RetryOptions = append(config.RetryOptions,
-		retry.WithIdempotent(true),
-		retry.WithTrace(&trace.Retry{
-			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-				return func(info trace.RetryLoopDoneInfo) {
-					attempts = info.Attempts
-				}
-			},
-		}),
+	config.RetryOptions = append(
+		[]retry.Option{
+			retry.WithIdempotent(true),
+			retry.WithTrace(&trace.Retry{
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopDoneInfo) {
+						attempts = info.Attempts
+					}
+				},
+			}),
+		},
+		config.RetryOptions...,
 	)
+
 	err = retry.Retry(ctx,
 		func(ctx context.Context) (err error) {
 			attempts++

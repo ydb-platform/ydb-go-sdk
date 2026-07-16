@@ -7,11 +7,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestSet(t *testing.T) {

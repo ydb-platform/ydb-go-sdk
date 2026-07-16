@@ -610,6 +610,7 @@ func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
 
 func (s *rawConverter) isCurrentTypeDecimal() bool {
 	c := s.stack.current()
+
 	return c.t.WhichType() == Ydb.Type_DecimalType_case
 }
 
@@ -699,9 +700,11 @@ func (s *rawConverter) boundsCheck(n, i int) bool {
 
 func (s *valueScanner) assertTypeOptional(typ *Ydb.Type) (t *Ydb.OptionalType) {
 	if typ.WhichType() != Ydb.Type_OptionalType_case {
-		s.typeError(typ, nil)
+		s.typeError(typ)
+
 		return nil
 	}
+
 	return typ.GetOptionalType()
 }
 
@@ -762,49 +765,61 @@ func (s *rawConverter) assertCurrentTypeDecimal(t types.Type) bool {
 
 func (s *rawConverter) assertTypeList(typ *Ydb.Type) (t *Ydb.ListType) {
 	if typ.WhichType() != Ydb.Type_ListType_case {
-		s.typeError(typ, nil)
+		s.typeError(typ)
+
 		return nil
 	}
+
 	return typ.GetListType()
 }
 
 func (s *rawConverter) assertTypeTuple(typ *Ydb.Type) (t *Ydb.TupleType) {
 	if typ.WhichType() != Ydb.Type_TupleType_case {
-		s.typeError(typ, nil)
+		s.typeError(typ)
+
 		return nil
 	}
+
 	return typ.GetTupleType()
 }
 
 func (s *rawConverter) assertTypeStruct(typ *Ydb.Type) (t *Ydb.StructType) {
 	if typ.WhichType() != Ydb.Type_StructType_case {
-		s.typeError(typ, nil)
+		s.typeError(typ)
+
 		return nil
 	}
+
 	return typ.GetStructType()
 }
 
 func (s *rawConverter) assertTypeDict(typ *Ydb.Type) (t *Ydb.DictType) {
 	if typ.WhichType() != Ydb.Type_DictType_case {
-		s.typeError(typ, nil)
+		s.typeError(typ)
+
 		return nil
 	}
+
 	return typ.GetDictType()
 }
 
 func (s *rawConverter) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.DecimalType) {
 	if typ.WhichType() != Ydb.Type_DecimalType_case {
-		s.typeError(typ, nil)
+		s.typeError(typ)
+
 		return nil
 	}
+
 	return typ.GetDecimalType()
 }
 
 func (s *rawConverter) assertTypeVariant(typ *Ydb.Type) (t *Ydb.VariantType) {
 	if typ.WhichType() != Ydb.Type_VariantType_case {
-		s.typeError(typ, nil)
+		s.typeError(typ)
+
 		return nil
 	}
+
 	return typ.GetVariantType()
 }
 

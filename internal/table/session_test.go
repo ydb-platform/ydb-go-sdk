@@ -427,6 +427,14 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 	}
 }
 
+func optionalPrimitiveType(id Ydb.Type_PrimitiveTypeId) *Ydb.Type {
+	return Ydb.Type_builder{
+		OptionalType: Ydb.OptionalType_builder{
+			Item: Ydb.Type_builder{TypeId: id.Enum()}.Build(),
+		}.Build(),
+	}.Build()
+}
+
 func TestCreateTableRegression(t *testing.T) {
 	client, newErr := New(context.Background(), testutil.NewBalancer(
 		testutil.WithInvokeHandlers(
@@ -443,23 +451,23 @@ func TestCreateTableRegression(t *testing.T) {
 						Columns: []*Ydb_Table.ColumnMeta{
 							Ydb_Table.ColumnMeta_builder{
 								Name: "series_id",
-								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+								Type: optionalPrimitiveType(Ydb.Type_UINT64),
 							}.Build(),
 							Ydb_Table.ColumnMeta_builder{
 								Name: "season_id",
-								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+								Type: optionalPrimitiveType(Ydb.Type_UINT64),
 							}.Build(),
 							Ydb_Table.ColumnMeta_builder{
 								Name: "episode_id",
-								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+								Type: optionalPrimitiveType(Ydb.Type_UINT64),
 							}.Build(),
 							Ydb_Table.ColumnMeta_builder{
 								Name: "title",
-								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build()}.Build()}.Build(),
+								Type: optionalPrimitiveType(Ydb.Type_UTF8),
 							}.Build(),
 							Ydb_Table.ColumnMeta_builder{
 								Name: "air_date",
-								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+								Type: optionalPrimitiveType(Ydb.Type_UINT64),
 							}.Build(),
 						},
 						PrimaryKey: []string{
@@ -524,23 +532,23 @@ func TestDescribeTableRegression(t *testing.T) {
 						Columns: []*Ydb_Table.ColumnMeta{
 							Ydb_Table.ColumnMeta_builder{
 								Name: "series_id",
-								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+								Type: optionalPrimitiveType(Ydb.Type_UINT64),
 							}.Build(),
 							Ydb_Table.ColumnMeta_builder{
 								Name: "season_id",
-								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+								Type: optionalPrimitiveType(Ydb.Type_UINT64),
 							}.Build(),
 							Ydb_Table.ColumnMeta_builder{
 								Name: "episode_id",
-								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+								Type: optionalPrimitiveType(Ydb.Type_UINT64),
 							}.Build(),
 							Ydb_Table.ColumnMeta_builder{
 								Name: "title",
-								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build()}.Build()}.Build(),
+								Type: optionalPrimitiveType(Ydb.Type_UTF8),
 							}.Build(),
 							Ydb_Table.ColumnMeta_builder{
 								Name: "air_date",
-								Type: Ydb.Type_builder{OptionalType: Ydb.OptionalType_builder{Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build()}.Build()}.Build(),
+								Type: optionalPrimitiveType(Ydb.Type_UINT64),
 							}.Build(),
 						},
 						PrimaryKey: []string{

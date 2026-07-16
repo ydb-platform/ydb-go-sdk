@@ -1216,7 +1216,6 @@ func onPoolStateChange(t *trace.Table, t1 trace.TablePoolStateChangeInfo) {
 	}
 	fn(t1)
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnInit(t *trace.Table, c *context.Context, c1 trace.Call) func(limit int) {
 	var p trace.TableInitStartInfo
@@ -1229,7 +1228,6 @@ func TableOnInit(t *trace.Table, c *context.Context, c1 trace.Call) func(limit i
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnClose(t *trace.Table, c *context.Context, c1 trace.Call) func(error) {
 	var p trace.TableCloseStartInfo
@@ -1242,7 +1240,6 @@ func TableOnClose(t *trace.Table, c *context.Context, c1 trace.Call) func(error)
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnDo(t *trace.Table, c *context.Context, c1 trace.Call, label string, idempotent bool, nestedCall bool) func(attempts int, _ error) {
 	var p trace.TableDoStartInfo
@@ -1259,7 +1256,6 @@ func TableOnDo(t *trace.Table, c *context.Context, c1 trace.Call, label string, 
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnDoTx(t *trace.Table, c *context.Context, c1 trace.Call, label string, idempotent bool, nestedCall bool) func(attempts int, _ error) {
 	var p trace.TableDoTxStartInfo
@@ -1276,7 +1272,6 @@ func TableOnDoTx(t *trace.Table, c *context.Context, c1 trace.Call, label string
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnBulkUpsert(t *trace.Table, c *context.Context, c1 trace.Call) func(_ error, attempts int) {
 	var p trace.TableBulkUpsertStartInfo
@@ -1290,7 +1285,6 @@ func TableOnBulkUpsert(t *trace.Table, c *context.Context, c1 trace.Call) func(_
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnCreateSession(t *trace.Table, c *context.Context, c1 trace.Call) func(session trace.SessionInfo, attempts int, _ error) {
 	var p trace.TableCreateSessionStartInfo
@@ -1305,7 +1299,6 @@ func TableOnCreateSession(t *trace.Table, c *context.Context, c1 trace.Call) fun
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionNew(t *trace.Table, c *context.Context, c1 trace.Call) func(session trace.SessionInfo, _ error) {
 	var p trace.TableSessionNewStartInfo
@@ -1319,7 +1312,6 @@ func TableOnSessionNew(t *trace.Table, c *context.Context, c1 trace.Call) func(s
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionDelete(t *trace.Table, c *context.Context, c1 trace.Call, session trace.SessionInfo) func(error) {
 	var p trace.TableSessionDeleteStartInfo
@@ -1333,7 +1325,6 @@ func TableOnSessionDelete(t *trace.Table, c *context.Context, c1 trace.Call, ses
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionKeepAlive(t *trace.Table, c *context.Context, c1 trace.Call, session trace.SessionInfo) func(error) {
 	var p trace.TableKeepAliveStartInfo
@@ -1347,7 +1338,6 @@ func TableOnSessionKeepAlive(t *trace.Table, c *context.Context, c1 trace.Call, 
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionBulkUpsert(t *trace.Table, c *context.Context, c1 trace.Call, session trace.SessionInfo) func(error) {
 	var p trace.TableSessionBulkUpsertStartInfo
@@ -1361,7 +1351,6 @@ func TableOnSessionBulkUpsert(t *trace.Table, c *context.Context, c1 trace.Call,
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionQueryPrepare(t *trace.Table, c *context.Context, c1 trace.Call, session trace.SessionInfo, query string) func(result trace.TableDataQuery, _ error) {
 	var p trace.TablePrepareDataQueryStartInfo
@@ -1377,7 +1366,6 @@ func TableOnSessionQueryPrepare(t *trace.Table, c *context.Context, c1 trace.Cal
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionQueryExecute(t *trace.Table, c *context.Context, c1 trace.Call, session trace.SessionInfo, query trace.TableDataQuery, parameters trace.TableQueryParameters, keepInCache bool) func(tx trace.TxInfo, prepared bool, result trace.TableResult, _ error) {
 	var p trace.TableExecuteDataQueryStartInfo
@@ -1397,7 +1385,6 @@ func TableOnSessionQueryExecute(t *trace.Table, c *context.Context, c1 trace.Cal
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionQueryExplain(t *trace.Table, c *context.Context, c1 trace.Call, session trace.SessionInfo, query string) func(aST string, plan string, _ error) {
 	var p trace.TableExplainQueryStartInfo
@@ -1414,7 +1401,6 @@ func TableOnSessionQueryExplain(t *trace.Table, c *context.Context, c1 trace.Cal
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionQueryStreamExecute(t *trace.Table, c *context.Context, c1 trace.Call, session trace.SessionInfo, query trace.TableDataQuery, parameters trace.TableQueryParameters) func(error) {
 	var p trace.TableSessionQueryStreamExecuteStartInfo
@@ -1430,7 +1416,6 @@ func TableOnSessionQueryStreamExecute(t *trace.Table, c *context.Context, c1 tra
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnSessionQueryStreamRead(t *trace.Table, c *context.Context, c1 trace.Call, session trace.SessionInfo) func(error) {
 	var p trace.TableSessionQueryStreamReadStartInfo
@@ -1444,7 +1429,6 @@ func TableOnSessionQueryStreamRead(t *trace.Table, c *context.Context, c1 trace.
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnTxBegin(t *trace.Table, c *context.Context, c1 trace.Call, session trace.SessionInfo) func(tx trace.TxInfo, _ error) {
 	var p trace.TableTxBeginStartInfo
@@ -1459,7 +1443,6 @@ func TableOnTxBegin(t *trace.Table, c *context.Context, c1 trace.Call, session t
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnTxExecute(t *trace.Table, c *context.Context, c1 trace.Call, session trace.SessionInfo, tx trace.TxInfo, query trace.TableDataQuery, parameters trace.TableQueryParameters) func(result trace.TableResult, _ error) {
 	var p trace.TableTransactionExecuteStartInfo
@@ -1477,7 +1460,6 @@ func TableOnTxExecute(t *trace.Table, c *context.Context, c1 trace.Call, session
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnTxExecuteStatement(t *trace.Table, c *context.Context, c1 trace.Call, session trace.SessionInfo, tx trace.TxInfo, statementQuery trace.TableDataQuery, parameters trace.TableQueryParameters) func(result trace.TableResult, _ error) {
 	var p trace.TableTransactionExecuteStatementStartInfo
@@ -1495,7 +1477,6 @@ func TableOnTxExecuteStatement(t *trace.Table, c *context.Context, c1 trace.Call
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnTxCommit(t *trace.Table, c *context.Context, c1 trace.Call, session trace.SessionInfo, tx trace.TxInfo) func(error) {
 	var p trace.TableTxCommitStartInfo
@@ -1510,7 +1491,6 @@ func TableOnTxCommit(t *trace.Table, c *context.Context, c1 trace.Call, session 
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnTxRollback(t *trace.Table, c *context.Context, c1 trace.Call, session trace.SessionInfo, tx trace.TxInfo) func(error) {
 	var p trace.TableTxRollbackStartInfo
@@ -1525,7 +1505,6 @@ func TableOnTxRollback(t *trace.Table, c *context.Context, c1 trace.Call, sessio
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnPoolPut(t *trace.Table, c *context.Context, c1 trace.Call, session trace.SessionInfo) func(error) {
 	var p trace.TablePoolPutStartInfo
@@ -1539,7 +1518,6 @@ func TableOnPoolPut(t *trace.Table, c *context.Context, c1 trace.Call, session t
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnPoolGet(t *trace.Table, c *context.Context, c1 trace.Call) func(session trace.SessionInfo, attempts int, _ *trace.NodeHintInfo, _ error) {
 	var p trace.TablePoolGetStartInfo
@@ -1555,7 +1533,6 @@ func TableOnPoolGet(t *trace.Table, c *context.Context, c1 trace.Call) func(sess
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnPoolWith(t *trace.Table, c *context.Context, c1 trace.Call) func(attempts int, _ error) {
 	var p trace.TablePoolWithStartInfo
@@ -1569,7 +1546,6 @@ func TableOnPoolWith(t *trace.Table, c *context.Context, c1 trace.Call) func(att
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnPoolStateChange(t *trace.Table, limit int, idle int, createInProgress int, concurrency int, size int) {
 	var p trace.TablePoolStateChangeInfo

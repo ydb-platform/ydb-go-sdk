@@ -62,8 +62,33 @@ This is the single production path for gRPC — do not dial around the balancer.
 ### 1. gRPC connection pool (`internal/conn/pool.go`)
 
 - One `*conn` per `endpoint.Endpoint` (host:port + node metadata).
-- Created on demand via `pool.Get(endpoint)`; tracks TTL, dial options, trace.
+- `Get` / `Put` reference-count pooled wrappers; gRPC dial is lazy on first RPC.
+- Refcount and map updates run under `p.mu` with `defer p.mu.Unlock()` in helpers (`tryPut`, `release`); blocking `Close()` runs **after** the helper returns. See mutex rules in [`.agents/rules/coding-standards.md`](../rules/coding-standards.md).
 - Used by balancer to obtain `grpc.ClientConn` for a chosen node.
+
+Connection state lifecycle:
+
+```text
+Created → Online ↔ Banned
+             ↕
+           Offline
+             ↓
+          Destroyed
+```
+
+- `newConn` stores `Created` directly; there is no state-change event at wrapper creation. The first successful lazy dial emits `Created → Online`.
+- `Ban` moves the wrapper to `Banned`; `Unban` chooses `Online` or `Offline` from the underlying gRPC transport readiness.
+- Closing the gRPC transport moves the wrapper to `Offline`; closing the wrapper finishes with `Destroyed`.
+- `conn.setState` is the central transition point and emits `trace.Driver.OnConnStateChange` with the previous and new states. `Online`, `Offline`, and `Banned` are valid operational states; `Created`, `Destroyed`, and `Unknown` are lifecycle sentinels.
+
+### Driver connection metrics
+
+- The `metrics.Registry` API is push-based (`Gauge.Add` / `Gauge.Set`); it has no scrape-time callback or connection-pool snapshot API.
+- Derive current connection state from the existing `OnConnStateChange` trace. Moving one connection between valid states decrements the old state and increments the new state, so `sum(conns)` remains invariant. Entering the first valid state increments the sum; moving to `Destroyed` decrements it.
+- Do not create a `Created` series from the first `Created → Online` transition: there was no preceding creation event, so decrementing it would produce `-1`.
+- A ban with `cause` is an event and belongs in a counter. Current banned connection cardinality belongs in the `state="banned"` partition of the connection gauge.
+- Adding `state` changes the raw `conns` series shape, but dashboards using only `sum(conns)` retain their query and intended total. Direct selectors, grouping, joins, and alerts must account for the new label.
+- The former dial/close event accounting could drift: redial could add twice after an internal transport reset, while closing a never-dialed wrapper could subtract without a prior add. State transitions avoid both cases.
 
 ### 2. YDB session pool (`internal/pool/pool.go`)
 
@@ -162,6 +187,8 @@ Do(ctx, op, opts)
 - Driver registered as `"ydb"` in `sql.go`.
 - `internal/xsql/connector.go` — `CreateSession` uses native table client; balancing happens at session creation.
 - See `SQL.md` for DSN params, balancing, and connector options.
+
+Topic / multiwriter details (load only when needed): [`topicContext.md`](topicContext.md), [`topicMultiwriterContext.md`](topicMultiwriterContext.md).
 
 ## Adding a new RPC surface
 

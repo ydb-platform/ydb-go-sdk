@@ -14,13 +14,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -257,15 +257,15 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		return DecimalValue(BigEndianUint128(v.GetHigh_128(), v.GetLow_128()), ttt.Precision(), ttt.Scale()), nil
 
 	case types.Optional:
-    	if t.WhichType() != Ydb.Type_OptionalType_case {
-        	panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Type_OptionalType", t))
-    	}	
-    	t = t.GetOptionalType().GetItem()
-    	if v.WhichValue() == Ydb.Value_NestedValue_case {
-        	return OptionalValue(FromYDB(t, v.GetNestedValue())), nil
-    	}
+		if t.WhichType() != Ydb.Type_OptionalType_case {
+			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Type_OptionalType", t))
+		}
+		t = t.GetOptionalType().GetItem()
+		if v.WhichValue() == Ydb.Value_NestedValue_case {
+			return OptionalValue(FromYDB(t, v.GetNestedValue())), nil
+		}
 
-    	return OptionalValue(FromYDB(t, v)), nil
+		return OptionalValue(FromYDB(t, v)), nil
 
 	case *types.List:
 		return ListValue(func() []Value {
@@ -2928,12 +2928,10 @@ func (v voidValue) Yql() string {
 
 var (
 	_voidValueType = types.Void{}
-	_voidValue     = &Ydb.Value{}
+	_voidValue     = Ydb.Value_builder{
+		NullFlagValue: structpb.NullValue_NULL_VALUE.Enum(),
+	}.Build()
 )
-
-func init() {
-	_voidValue.SetNullFlagValue(structpb.NullValue_NULL_VALUE)
-}
 
 func (voidValue) Type() types.Type {
 	return _voidValueType

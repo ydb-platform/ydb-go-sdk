@@ -10,11 +10,12 @@ require (
 	github.com/lib/pq v1.10.2
 	github.com/pressly/goose/v3 v3.22.1
 	github.com/prometheus/client_golang v1.21.1
+	github.com/tidwall/redcon v1.6.2
 	github.com/ydb-platform/gorm-driver v0.1.3
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.3.0
 	github.com/ydb-platform/ydb-go-sdk-otel v0.11.1
 	github.com/ydb-platform/ydb-go-sdk-prometheus/v2 v2.1.2
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.130.0
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.117.0
 	github.com/ydb-platform/ydb-go-yc v0.12.1
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.44.0
@@ -66,8 +67,10 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
+	github.com/tidwall/btree v1.1.0 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
 	github.com/yandex-cloud/go-genproto v0.0.0-20220815090733-4c139c0154e2 // indirect
-	github.com/ydb-platform/ydb-go-genproto v0.0.0-20260428144813-1c07baab7f7b // indirect
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20260623105045-f5dde53f1303 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.6.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.44.0 // indirect
@@ -95,5 +98,3 @@ require (
 replace github.com/ydb-platform/ydb-go-sdk/v3 => ../
 
 replace xorm.io/xorm => github.com/ydb-platform/xorm v0.0.3
-
-replace github.com/ydb-platform/ydb-go-genproto => github.com/kartunovv/ydb-go-genproto v0.0.0-20260620115251-86593166420f

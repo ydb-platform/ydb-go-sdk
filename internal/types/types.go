@@ -57,15 +57,7 @@ func TypeFromYDB(x *Ydb.Type) Type {
 		return NewDict(keyType, valueType)
 
 	case Ydb.Type_VariantType_case:
-		t := x.GetVariantType()
-		switch t.WhichType() {
-		case Ydb.VariantType_TupleItems_case:
-			return NewVariantTuple(FromYDB(t.GetTupleItems().GetElements())...)
-		case Ydb.VariantType_StructItems_case:
-			return NewVariantStruct(StructFields(t.GetStructItems().GetMembers())...)
-		default:
-			panic("ydb: unknown variant type")
-		}
+		return variantTypeFromYDB(x.GetVariantType())
 
 	case Ydb.Type_VoidType_case:
 		return NewVoid()
@@ -86,6 +78,17 @@ func TypeFromYDB(x *Ydb.Type) Type {
 
 	default:
 		panic(fmt.Sprintf("ydb: unknown type %v", x.WhichType()))
+	}
+}
+
+func variantTypeFromYDB(t *Ydb.VariantType) Type {
+	switch t.WhichType() {
+	case Ydb.VariantType_TupleItems_case:
+		return NewVariantTuple(FromYDB(t.GetTupleItems().GetElements())...)
+	case Ydb.VariantType_StructItems_case:
+		return NewVariantStruct(StructFields(t.GetStructItems().GetMembers())...)
+	default:
+		panic("ydb: unknown variant type")
 	}
 }
 

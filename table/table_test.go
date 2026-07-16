@@ -7,10 +7,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Formats"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-	"google.golang.org/protobuf/proto"
+	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
 func TestQueryParameters_String(t *testing.T) {

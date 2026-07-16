@@ -2,6 +2,7 @@ package balancer
 
 import (
 	"context"
+	"slices"
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -17,6 +18,10 @@ type connectionsState struct {
 	fallback []conn.Conn
 	all      []conn.Conn
 
+	quarantine []conn.Conn
+
+	allowFallback bool
+
 	rand xrand.Rand
 }
 
@@ -25,18 +30,17 @@ func newConnectionsState(
 	filter balancerConfig.Filter,
 	info balancerConfig.Info,
 	allowFallback bool,
+	quarantine []conn.Conn,
 ) *connectionsState {
 	res := &connectionsState{
-		connByNodeID: connsToNodeIDMap(conns),
-		rand:         xrand.New(xrand.WithLock()),
+		connByNodeID:  connsToNodeIDMap(conns),
+		rand:          xrand.New(xrand.WithLock()),
+		quarantine:    quarantine,
+		allowFallback: allowFallback,
 	}
 
 	res.prefer, res.fallback = sortPreferConnections(conns, filter, info, allowFallback)
-	if allowFallback {
-		res.all = conns
-	} else {
-		res.all = res.prefer
-	}
+	res.all = conns
 
 	return res
 }
@@ -45,17 +49,12 @@ func (s *connectionsState) PreferredCount() int {
 	return len(s.prefer)
 }
 
-func (s *connectionsState) All() (all []endpoint.Endpoint) {
+func (s *connectionsState) All() []conn.Conn {
 	if s == nil {
 		return nil
 	}
 
-	all = make([]endpoint.Endpoint, len(s.all))
-	for i, c := range s.all {
-		all[i] = c.Endpoint()
-	}
-
-	return all
+	return slices.Clone(s.all)
 }
 
 func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, failedCount int) {
@@ -85,7 +84,12 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 		return c, failedCount
 	}
 
-	c, _ := s.selectRandomConnection(s.all, true)
+	lastResort := s.all
+	if !s.allowFallback && len(s.prefer) != len(s.all) {
+		lastResort = s.prefer
+	}
+
+	c, _ := s.selectRandomConnection(lastResort, true)
 
 	return c, failedCount
 }
@@ -172,7 +176,7 @@ func sortPreferConnections(
 }
 
 func isOkConnection(c conn.Conn, bannedIsOk bool) bool {
-	switch c.GetState() {
+	switch c.State() {
 	case state.Online, state.Created, state.Offline:
 		return true
 	case state.Banned:

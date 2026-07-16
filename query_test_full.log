@@ -1,8 +1,0 @@
-ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/query	32.056s
-?   	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow	[no test files]
-ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config	(cached)
-?   	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace	[no test files]
-ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options	(cached)
-?   	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result	[no test files]
-ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner	(cached)
-ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/query/test	(cached)

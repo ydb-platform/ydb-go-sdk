@@ -14,10 +14,10 @@ import (
 	"go.uber.org/mock/gomock"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestResultSetRangeRows(t *testing.T) {

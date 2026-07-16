@@ -11,9 +11,9 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestResultRangeResultSets(t *testing.T) {
