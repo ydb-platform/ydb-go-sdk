@@ -1,3 +1,4 @@
+## v3.144.4
 * Changed driver connection metrics to expose `conns` by state and count `conn.banned` events with a counter
 
 ## v3.144.3
