@@ -1,10 +1,14 @@
 package options
 
 import (
+	"bytes"
+	"compress/gzip"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -876,6 +880,30 @@ func (f executeDataQueryOptionFunc) ApplyExecuteDataQueryOption(d *ExecuteDataQu
 }
 
 var _ ExecuteDataQueryOption = executeDataQueryOptionFunc(nil)
+
+// Deprecated: Use ExecuteDataQueryRequest.ProtoReflect().Descriptor() instead.
+func (d ExecuteDataQueryDesc) Descriptor() ([]byte, []int) {
+	md := (&Ydb_Table.ExecuteDataQueryRequest{}).ProtoReflect().Descriptor()
+	idxPath := []int{md.Index()}
+
+	rawDesc, err := proto.Marshal(protodesc.ToFileDescriptorProto(md.ParentFile()))
+	if err != nil {
+		return nil, idxPath
+	}
+
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	if _, err = zw.Write(rawDesc); err != nil {
+		_ = zw.Close()
+
+		return nil, idxPath
+	}
+	if err = zw.Close(); err != nil {
+		return nil, idxPath
+	}
+
+	return buf.Bytes(), idxPath
+}
 
 type (
 	CommitTransactionDesc   Ydb_Table.CommitTransactionRequest
