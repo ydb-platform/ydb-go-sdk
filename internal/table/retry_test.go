@@ -87,13 +87,6 @@ func TestDoBadSession(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		closed := make(map[table.Session]bool)
 		p, poolErr := pool.New[*Session, Session](ctx,
-			pool.WithMustDeleteItemFunc[*Session, Session](func(session *Session, err error) bool {
-				if !session.IsAlive() {
-					return true
-				}
-
-				return xerrors.MustDeleteTableOrQuerySession(err)
-			}),
 			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 				s := simpleSession(t)
 				s.closeOnce = func(_ context.Context) error {
@@ -367,13 +360,6 @@ func TestDoWithCustomErrors(t *testing.T) {
 	p, poolErr := pool.New[*Session, Session](ctx,
 		pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 			return simpleSession(t), nil
-		}),
-		pool.WithMustDeleteItemFunc[*Session, Session](func(session *Session, err error) bool {
-			if !session.IsAlive() {
-				return true
-			}
-
-			return xerrors.MustDeleteTableOrQuerySession(err)
 		}),
 		pool.WithLimit[*Session, Session](limit),
 	)
