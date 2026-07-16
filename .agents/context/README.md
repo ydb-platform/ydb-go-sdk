@@ -19,7 +19,9 @@ ydb-go-sdk/
 │   │   ├── projectBrief.md         stable: scope, goals, constraints
 │   │   ├── productContext.md       stable: users, API surface, feature parity
 │   │   ├── systemPatterns.md       evolving: package layout, Do/DoTx, retry, pools
-│   │   └── techContext.md          evolving: CI, Go versions, local YDB, build commands
+│   │   ├── techContext.md          evolving: CI, Go versions, local YDB, build commands
+│   │   ├── topicContext.md         on demand: topic reader/writer/listener layout
+│   │   └── topicMultiwriterContext.md  on demand: multiwriter orchestrator, init race
 │   └── rules/                      coding standards (on demand via AGENTS.md)
 │
 ├── AGENTS.md                       lean agent router (read first)
@@ -43,12 +45,20 @@ ydb-go-sdk/
 | [`productContext.md`](productContext.md) | Stable | Public API, users, feature parity |
 | [`projectBrief.md`](projectBrief.md) | Stable | Scope, goals, constraints |
 
+## Domain files (optional — load only for that area)
+
+| File | Read when |
+|------|-----------|
+| [`topicContext.md`](topicContext.md) | Topic reader/writer/listener, `topic/`, topic integration tests |
+| [`topicMultiwriterContext.md`](topicMultiwriterContext.md) | `WithWriteToManyPartitions`, `topicmultiwriter/`, auto-partitioning tests |
+
 ## Reading strategy
 
 ```
-If needed:      one stable file matching the task (see table)
+Core:           one stable file matching the task (see table)
+Domain:         topicContext / topicMultiwriterContext only when touching topics
 Code patterns:  .agents/rules/ via AGENTS.md router (on demand)
-Full review:    all files (on "update memory bank" or major onboarding)
+Full review:    all core files (+ domain files if relevant) on "update memory bank"
 ```
 
 Avoid loading all six core files at session start — it wastes context tokens without improving outcomes.
@@ -56,7 +66,7 @@ Avoid loading all six core files at session start — it wastes context tokens w
 ## Update triggers
 
 1. Feature/fix ready for PR → `progress.md` (if milestone); revert `activeContext.md` to placeholder
-2. Architecture or CI changed → `systemPatterns.md` or `techContext.md`
+2. Architecture or CI changed → `systemPatterns.md` or `techContext.md`; topic internals → `topicContext.md` / `topicMultiwriterContext.md`
 3. Scope changed → `projectBrief.md` or `productContext.md`
 4. User says **"update memory bank"** → review every core file
 

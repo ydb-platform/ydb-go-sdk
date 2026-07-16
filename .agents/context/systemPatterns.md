@@ -62,7 +62,8 @@ This is the single production path for gRPC — do not dial around the balancer.
 ### 1. gRPC connection pool (`internal/conn/pool.go`)
 
 - One `*conn` per `endpoint.Endpoint` (host:port + node metadata).
-- Created on demand via `pool.Get(endpoint)`; tracks TTL, dial options, trace.
+- `Get` / `Put` reference-count pooled wrappers; gRPC dial is lazy on first RPC.
+- Refcount and map updates run under `p.mu` with `defer p.mu.Unlock()` in helpers (`tryPut`, `release`); blocking `Close()` runs **after** the helper returns. See mutex rules in [`.agents/rules/coding-standards.md`](../rules/coding-standards.md).
 - Used by balancer to obtain `grpc.ClientConn` for a chosen node.
 
 ### 2. YDB session pool (`internal/pool/pool.go`)
@@ -162,6 +163,8 @@ Do(ctx, op, opts)
 - Driver registered as `"ydb"` in `sql.go`.
 - `internal/xsql/connector.go` — `CreateSession` uses native table client; balancing happens at session creation.
 - See `SQL.md` for DSN params, balancing, and connector options.
+
+Topic / multiwriter details (load only when needed): [`topicContext.md`](topicContext.md), [`topicMultiwriterContext.md`](topicMultiwriterContext.md).
 
 ## Adding a new RPC surface
 

@@ -1,3 +1,18 @@
+## v3.144.3
+* Fixed gRPC connections to cluster nodes removed from Discovery staying open in the connection pool
+* Refactored connection pool lifecycle to reference-counted `Get`/`Put` with balancer-side quarantine
+
+## v3.144.2
+* Fixed `database/sql` reusing a QueryService session after its attach stream closed
+
+## v3.144.1
+* Fixed topic multi-writer initialization failures caused by concurrent partition splits
+
+## v3.144.0
+* Added observability chain tokens `ydb-sdk-tracing/0.1.0` and `ydb-sdk-metrics/0.1.0` to `x-ydb-sdk-build-info` when tracing/metrics adapters are enabled via SDK observability options
+* Removed background connection parking (`connParker`), `conn.lastUsage` tracking and `xsync.LastUsage`
+* Deprecated `WithConnectionTTL`: the option is now a no-op
+
 ## v3.143.0
 * Added experimental helper `sugar.NewKVClientBuilder(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
 
