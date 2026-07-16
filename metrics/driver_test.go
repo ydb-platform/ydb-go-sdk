@@ -15,7 +15,10 @@ import (
 
 func TestDriverConnectionMetrics(t *testing.T) {
 	registry := newRecordingRegistry()
-	tracer := driver(recordingConfig{registry: registry})
+	tracer := driver(recordingConfig{
+		registry: registry,
+		details:  trace.DriverConnEvents,
+	})
 	ep := endpoint.New("localhost:2135", endpoint.WithID(42))
 	connLabels := func(connState state.State) map[string]string {
 		return map[string]string{
@@ -64,6 +67,16 @@ func TestDriverConnectionMetrics(t *testing.T) {
 		"node_id":  "42",
 		"cause":    "context/Canceled",
 	}))
+}
+
+func TestDriverConnectionMetricsDisabled(t *testing.T) {
+	tracer := driver(recordingConfig{
+		registry: newRecordingRegistry(),
+		details:  trace.DriverBalancerEvents,
+	})
+
+	require.Nil(t, tracer.OnConnStateChange(trace.DriverConnStateChangeStartInfo{}))
+	require.Nil(t, tracer.OnConnBan(trace.DriverConnBanStartInfo{}))
 }
 
 type recordingRegistry struct {
@@ -165,10 +178,11 @@ func (v recordingGaugeVec) With(labels map[string]string) Gauge {
 type recordingConfig struct {
 	registry *recordingRegistry
 	system   string
+	details  trace.Details
 }
 
 func (c recordingConfig) Details() trace.Details {
-	return trace.DetailsAll
+	return c.details
 }
 
 func (c recordingConfig) WithSystem(system string) Config {
