@@ -1,3 +1,5 @@
+* Changed driver connection metrics to expose `conns` by state and count `conn.banned` events with a counter
+
 ## v3.144.3
 * Fixed gRPC connections to cluster nodes removed from Discovery staying open in the connection pool
 * Refactored connection pool lifecycle to reference-counted `Get`/`Put` with balancer-side quarantine
