@@ -90,23 +90,7 @@ func (info *buildInfo) makeHeader(includeObservability bool) string {
 	builder.WriteString(buildInfoFirstPart)
 
 	if includeObservability {
-		if tracingVersion, has := info.frameworks[observability.TracingChainName]; has {
-			builder.WriteString(" ")
-			builder.WriteString(observability.TracingChainName)
-			builder.WriteString("/")
-			builder.WriteString(tracingVersion)
-		}
-
-		if metricsVersion, has := info.frameworks[observability.MetricsChainName]; has {
-			if _, hasTracing := info.frameworks[observability.TracingChainName]; hasTracing {
-				builder.WriteString(";")
-			} else {
-				builder.WriteString(" ")
-			}
-			builder.WriteString(observability.MetricsChainName)
-			builder.WriteString("/")
-			builder.WriteString(metricsVersion)
-		}
+		info.writeObservabilityChains(&builder)
 	}
 
 	frameworkKeys := xslices.Keys(info.frameworks)
@@ -132,6 +116,30 @@ func (info *buildInfo) makeHeader(includeObservability bool) string {
 	)
 
 	return builder.String()
+}
+
+func (info *buildInfo) writeObservabilityChains(builder *strings.Builder) {
+	tracingVersion, hasTracing := info.frameworks[observability.TracingChainName]
+	if hasTracing {
+		builder.WriteString(" ")
+		builder.WriteString(observability.TracingChainName)
+		builder.WriteString("/")
+		builder.WriteString(tracingVersion)
+	}
+
+	metricsVersion, hasMetrics := info.frameworks[observability.MetricsChainName]
+	if !hasMetrics {
+		return
+	}
+
+	if hasTracing {
+		builder.WriteString(";")
+	} else {
+		builder.WriteString(" ")
+	}
+	builder.WriteString(observability.MetricsChainName)
+	builder.WriteString("/")
+	builder.WriteString(metricsVersion)
 }
 
 func WithRequestTypeOption(requestType string) Option {
