@@ -630,6 +630,8 @@ func needCloseItem[PT ItemConstraint[T], T any](c *Config[PT, T], info *itemInfo
 }
 
 func needCloseOldestItem[PT ItemConstraint[T], T any](c *Config[PT, T], info *itemInfo[PT, T]) bool {
+	// Do not call IsAlive while only inspecting the oldest item. The item selected
+	// from the container goes through the full needCloseItem check afterwards.
 	return needCloseItemByMaxUsage(c, info) ||
 		needCloseItemByTTL(c, info) ||
 		needCloseItemByIdleTTL(c, info)

@@ -103,18 +103,13 @@ Query additionally has **implicit** session pool for server-side session managem
 ### Session-pool reuse and expiration
 
 - Session expiration is lazy: idle TTL, usage TTL, and usage-limit checks run while an item is acquired from the pool. There is no background idle-session reaper in `internal/pool`.
-- Commit `0d2a081093671731fea36ffbbb62853b99a3133f` (`perf: internal.Pool with semaphore (#2163)`) shipped in v3.138.0 and changed idle-item reuse to a slice-backed LIFO path. This improved hot-item reuse, but a naive LIFO path can permanently hide older idle sessions underneath a frequently reused item.
-- The resulting failure mode is visible during rolling restarts: the client continues creating sessions while old server sessions await cleanup, even when `WithSessionPoolIdleThreshold` is configured. Repeated connection bans or `OVERLOADED` responses may accompany the incident, but they do not explain sessions that never reach the pool's idle-expiration check.
-- Preserve the LIFO fast path for valid items, but give the oldest item an expiration opportunity. On the first acquisition attempt, check the oldest item for idle TTL, usage TTL, or usage-limit expiry; close it if expired, otherwise acquire through normal LIFO/node-hint selection. Do not run the liveness predicate merely to inspect the oldest item; the selected item still goes through the normal full close check.
-- The slice container supports O(1) oldest removal with a logical `head` and amortized compaction. All length, limit, clear, LIFO, and node-specific operations must account for `head`.
-- Regression-test shape: create several sessions with a fake clock, refresh only the newest LIFO session, advance beyond idle TTL for the older sessions, and verify repeated operations close the old sessions while continuing to use the hot one. This test failed before the fix because the old sessions were never selected.
+- LIFO reuse must not starve older sessions from expiration checks. Inspect the oldest item for configured expiry before the normal LIFO or node-hint selection, without running its liveness predicate merely for inspection.
+- The idle container supports efficient removal from both ends while preserving its length, limit, clear, LIFO, and node-specific semantics.
 
 ### Session metrics: client state vs server state
 
-- `ydb.table.sessions{node_id}` is a client lifecycle gauge from `metrics/table.go`: it increments after successful session creation and decrements when deletion starts. It does **not** confirm that `DeleteSession` succeeded on the server.
-- `ydb.table.pool.index`, `idle`, `in_use`, `createInProgress`, `concurrency`, and `wait` are pool-state snapshots derived from `TablePoolStateChange`. `pool.index` is the pool's current `Size`, so it can legitimately differ from `ydb.table.sessions`.
-- Driver `request_methods{method,node_id,...}` and `request_statuses{status,node_id,...}` expose gRPC attempt traffic and outcomes, but method and status are separate counter families; they cannot reliably reconstruct an operation-by-status matrix without additional instrumentation.
-- For a server-session leak investigation, use YDB's `table_session_active_count` as the authoritative active-session count and correlate it with SDK pool gauges and CreateSession/DeleteSession request counters.
+- SDK session and pool metrics describe client lifecycle and pool state; they do not prove that a session was deleted on the server.
+- Diagnose server-session leaks with server-side active-session metrics, correlated with SDK pool state and session RPC activity.
 
 ## Balancer and discovery (`internal/balancer/`)
 
