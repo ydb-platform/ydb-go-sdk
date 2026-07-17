@@ -149,9 +149,8 @@ func TestMetaContext(t *testing.T) {
 		discoveryMD, has := metadata.FromOutgoingContext(discoveryCtx)
 		require.True(t, has)
 		require.Equal(t, []string{
-			buildInfoFirstPart + " " +
-				observability.TracingChainName + "/" + observability.TracingChainVersion +
-				";database/sql/1.2.3",
+			buildInfoFirstPart + ";database/sql/1.2.3 " +
+				observability.TracingChainName + "/" + observability.TracingChainVersion,
 		}, discoveryMD.Get(HeaderVersion))
 	})
 
@@ -177,9 +176,8 @@ func TestMetaContext(t *testing.T) {
 		discoveryMD, has := metadata.FromOutgoingContext(discoveryCtx)
 		require.True(t, has)
 		require.Equal(t, []string{
-			buildInfoFirstPart + " " +
-				observability.MetricsChainName + "/" + observability.MetricsChainVersion +
-				";database/sql/1.2.3",
+			buildInfoFirstPart + ";database/sql/1.2.3 " +
+				observability.MetricsChainName + "/" + observability.MetricsChainVersion,
 		}, discoveryMD.Get(HeaderVersion))
 	})
 
@@ -206,10 +204,9 @@ func TestMetaContext(t *testing.T) {
 		discoveryMD, has := metadata.FromOutgoingContext(discoveryCtx)
 		require.True(t, has)
 		require.Equal(t, []string{
-			buildInfoFirstPart + " " +
+			buildInfoFirstPart + ";database/sql/1.2.3 " +
 				observability.TracingChainName + "/" + observability.TracingChainVersion + ";" +
-				observability.MetricsChainName + "/" + observability.MetricsChainVersion +
-				";database/sql/1.2.3",
+				observability.MetricsChainName + "/" + observability.MetricsChainVersion,
 		}, discoveryMD.Get(HeaderVersion))
 	})
 

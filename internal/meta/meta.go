@@ -77,21 +77,16 @@ func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
 // intentionally omitted here so they do not pollute
 // `.sys/query_sessions.ClientSdkBuildInfo`.
 func (info *buildInfo) makeHeader() string {
-	return buildInfoFirstPart + info.frameworkSuffix()
-}
-
-// frameworkSuffix returns ";framework/version..." for custom frameworks only.
-func (info *buildInfo) frameworkSuffix() string {
 	frameworkKeys := xslices.Keys(info.frameworks)
 	frameworkKeys = xslices.Filter(frameworkKeys, func(frameworkName string) bool {
 		return frameworkName != observability.TracingChainName &&
 			frameworkName != observability.MetricsChainName
 	})
 	if len(frameworkKeys) == 0 {
-		return ""
+		return buildInfoFirstPart
 	}
 
-	return ";" + strings.Join(
+	return buildInfoFirstPart + ";" + strings.Join(
 		xslices.Transform(
 			frameworkKeys,
 			func(frameworkName string) string {
@@ -245,11 +240,10 @@ func (m *Meta) Context(ctx context.Context) (_ context.Context, err error) {
 // x-ydb-sdk-build-info. Use it only for Discovery.ListEndpoints.
 func (m *Meta) DiscoveryContext(ctx context.Context) (_ context.Context, err error) {
 	info := m.buildInfo.Load()
-	header := buildInfoFirstPart
+	header := info.buildInfoHeader
 	if chains := info.observabilityChains(); chains != "" {
 		header += " " + chains
 	}
-	header += info.frameworkSuffix()
 
 	md, err := m.meta(ctx, header)
 	if err != nil {
