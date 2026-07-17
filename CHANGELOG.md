@@ -1,3 +1,5 @@
+* Fixed expired idle sessions being starved behind frequently reused sessions in Table and Query session pools
+
 ## v3.144.4
 * Changed driver connection metrics to expose `conns` by state and count `conn.banned` events with a counter
 

@@ -629,6 +629,12 @@ func needCloseItem[PT ItemConstraint[T], T any](c *Config[PT, T], info *itemInfo
 	return false
 }
 
+func needCloseOldestItem[PT ItemConstraint[T], T any](c *Config[PT, T], info *itemInfo[PT, T]) bool {
+	return needCloseItemByMaxUsage(c, info) ||
+		needCloseItemByTTL(c, info) ||
+		needCloseItemByIdleTTL(c, info)
+}
+
 func getNodeHintInfo[PT ItemConstraint[T], T any](
 	item PT,
 	preferredNodeID uint32,
@@ -648,7 +654,7 @@ func getNodeHintInfo[PT ItemConstraint[T], T any](
 	return res
 }
 
-func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID bool, batchChanges *dynamicStats) (
+func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID, checkOldest bool, batchChanges *dynamicStats) (
 	info *itemInfo[PT, T], _ error,
 ) {
 	defer func() {
@@ -656,6 +662,17 @@ func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID bool, batchChanges *dynam
 			batchChanges.Idle--
 		}
 	}()
+
+	if checkOldest {
+		predicate := func(info *itemInfo[PT, T]) bool {
+			return needCloseOldestItem(p.config, info)
+		}
+		if useNodeID {
+			return p.idle.PopByNodeIDOrOldestIf(nodeID, predicate)
+		}
+
+		return p.idle.PopOrOldestIf(predicate)
+	}
 
 	if useNodeID {
 		return p.idle.PopByNodeID(nodeID)
@@ -690,10 +707,10 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 		}
 	}
 
-	for range 2 {
+	for i := range 2 {
 		attempts++
 
-		info, err := p.popItem(nodeID, hasPreferredNodeID, batchChanges)
+		info, err := p.popItem(nodeID, hasPreferredNodeID, i == 0, batchChanges)
 		if err != nil {
 			break
 		}
@@ -711,7 +728,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 		size := st.Size + batchChanges.Size
 		if st.Concurrency == p.config.limit || size >= p.config.limit {
 			// Free a slot before createItem: full concurrent load or pool already at limit.
-			info, err := p.popItem(0, false, batchChanges)
+			info, err := p.popItem(0, false, false, batchChanges)
 			if err != nil {
 				return nil, errNothingIdleItems
 			}

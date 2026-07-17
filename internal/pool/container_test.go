@@ -41,6 +41,53 @@ type (
 
 const containerLen = 500
 
+func TestSliceContainerPopOldestIfPreservesLIFO(t *testing.T) {
+	items := &sliceContainer[*testItem, testItem]{}
+	newInfo := func(id uint32) *itemInfo[*testItem, testItem] {
+		return &itemInfo[*testItem, testItem]{
+			item: &testItem{
+				v: int32(id),
+				onNodeID: func() uint32 {
+					return id
+				},
+			},
+		}
+	}
+
+	for id := uint32(1); id <= 3; id++ {
+		require.NoError(t, items.Put(newInfo(id)))
+	}
+
+	info, err := items.PopOrOldestIf(func(info *itemInfo[*testItem, testItem]) bool {
+		return info.item.v == 0
+	})
+	require.NoError(t, err)
+	require.EqualValues(t, 3, info.item.v)
+	require.NoError(t, items.Put(info))
+	require.Equal(t, 3, items.Len())
+
+	info, err = items.PopOrOldestIf(func(info *itemInfo[*testItem, testItem]) bool {
+		return info.item.v == 1
+	})
+	require.NoError(t, err)
+	require.EqualValues(t, 1, info.item.v)
+	require.Equal(t, 2, items.Len())
+
+	info, err = items.Pop()
+	require.NoError(t, err)
+	require.EqualValues(t, 3, info.item.v)
+
+	require.NoError(t, items.Put(newInfo(4)))
+	info, err = items.PopByNodeID(2)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, info.item.v)
+
+	info, err = items.Pop()
+	require.NoError(t, err)
+	require.EqualValues(t, 4, info.item.v)
+	require.Zero(t, items.Len())
+}
+
 // BenchmarkContainers/xsync.Set-12         	 1174489	      1011 ns/op	      86 B/op	       1 allocs/op
 // BenchmarkContainers/slice-12             	 1000000	      1511 ns/op	       0 B/op	       0 allocs/op
 // BenchmarkContainers/map-12               	  674767	      1757 ns/op	       1 B/op	       0 allocs/op

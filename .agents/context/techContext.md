@@ -59,6 +59,41 @@ Stress a single flaky integration test: add `-count=N -run 'TestName$'` to the `
 | `slo.yml` | push/PR + manual | SLO benchmarks (active in go-sdk) |
 | `publish.yml` | manual | version bump + release |
 
+## Rolling-restart session-pool A/B
+
+For session-lifecycle regressions, use the native Table workload with a five-node stack and isolate the rolling-restart scenario. The default chaos profile runs multiple/random scenarios and is unsuitable for comparing two SDK revisions unless the selected fault sequence is identical.
+
+Baseline and candidate must use the same:
+
+- `SRC_PATH=native/table` workload;
+- `WithSessionPoolIdleThreshold(5 * time.Second)` option;
+- five database nodes (`--profile extra-nodes`);
+- workload duration, load, server images, rolling order, and observation offsets;
+- clean Compose volumes between runs.
+
+Use a temporary Compose override for `chaos-monkey` that runs only `/opt/ydb.tech/chaos/scenarios/05-rolling-restart.sh`. Keep the override out of the production diff. On Apple Silicon, build both workload images for `linux/amd64`, matching the upstream Compose service.
+
+Measure the server metric, not only SDK gauges:
+
+```promql
+sum(table_session_active_count)
+max_over_time(sum(table_session_active_count)[5m:2s])
+sum by (instance) (table_session_active_count)
+```
+
+Record the peak, values at fixed offsets (for example 25 and 90 seconds after rolling completes), per-node distribution, workload exit code, and the value after `Driver.Close`.
+
+Validated 2026-07-17 with otherwise identical rolling-only runs:
+
+| Measurement | clean v3.137.0 | oldest-expired/LIFO fix |
+|-------------|---------------:|------------------------:|
+| Peak server sessions | 1029 | 1000 |
+| About 25 seconds after rolling | 634 | 46 |
+| About 90 seconds after rolling | 630 | 25 |
+| First post-workload observation | 2 | 0 after the next scrape |
+
+Both workloads exited successfully. Treat the exact counts as environment-specific evidence; the durable signal is that the candidate returns to the small active working set instead of retaining hundreds of sessions.
+
 ## PR labels that skip CI gates
 
 `no lint`, `no tests`, `no integration tests`, `no changelog`, `no examples`, `broken changes`

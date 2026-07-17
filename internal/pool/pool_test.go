@@ -191,6 +191,64 @@ func requirePoolStats(t testing.TB, p *Pool[*testItem, testItem], want Stats, ms
 	require.Equal(t, want, p.Stats(), msg...)
 }
 
+func TestPoolIdleTTLDoesNotStarveBehindHotItem(t *testing.T) {
+	const (
+		limit         = 3
+		idleThreshold = 4 * time.Second
+	)
+
+	var (
+		created   atomic.Int32
+		closed    atomic.Int32
+		fakeClock = clockwork.NewFakeClock()
+	)
+	p := mustNewPool[*testItem, testItem](t,
+		WithLimit[*testItem, testItem](limit),
+		WithClock[*testItem, testItem](fakeClock),
+		WithIdleTimeToLive[*testItem, testItem](idleThreshold),
+		WithCreateItemFunc(func(context.Context) (*testItem, error) {
+			return &testItem{
+				v: created.Add(1),
+				onClose: func() error {
+					closed.Add(1)
+
+					return nil
+				},
+			}, nil
+		}),
+	)
+	defer mustClose(t, p)
+
+	infos := make([]*itemInfo[*testItem, testItem], limit)
+	for i := range limit {
+		infos[i] = mustGetItem(t, p)
+	}
+	for _, info := range infos {
+		mustPutItem(t, p, info)
+	}
+
+	fakeClock.Advance(idleThreshold / 2)
+	hot := mustGetItem(t, p)
+	require.EqualValues(t, limit, hot.item.v)
+	mustPutItem(t, p, hot)
+
+	fakeClock.Advance(idleThreshold/2 + time.Nanosecond)
+	for range limit - 1 {
+		err := p.With(t.Context(), func(_ context.Context, item *testItem) error {
+			require.EqualValues(t, limit, item.v)
+
+			return nil
+		})
+		require.NoError(t, err)
+	}
+
+	require.Equal(t, int32(limit-1), closed.Load())
+	requirePoolStats(t, p, poolStats(limit, func(s *Stats) {
+		s.Size = 1
+		s.Idle = 1
+	}))
+}
+
 func TestPool(t *testing.T) { //nolint:gocyclo
 	t.Run("New", func(t *testing.T) {
 		t.Run("Default", func(t *testing.T) {
