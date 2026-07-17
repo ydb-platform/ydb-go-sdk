@@ -97,7 +97,7 @@ func TestMetaContext(t *testing.T) {
 		require.Equal(t, []string{buildInfoFirstPart + ";database/sql/1.0.0;my-framework/2.0.0"}, md.Get(HeaderVersion))
 	})
 
-	t.Run("ObservabilityChainsEnabled", func(t *testing.T) {
+	t.Run("ObservabilityChainsOnlyOnDiscovery", func(t *testing.T) {
 		m := New(
 			"database",
 			nil,
@@ -110,15 +110,24 @@ func TestMetaContext(t *testing.T) {
 		require.NoError(t, err)
 
 		md, has := metadata.FromOutgoingContext(ctx)
+		require.True(t, has)
+		require.Equal(t, []string{buildInfoFirstPart}, md.Get(HeaderVersion))
+		require.False(t, strings.Contains(md.Get(HeaderVersion)[0], observability.TracingChainName))
+		require.False(t, strings.Contains(md.Get(HeaderVersion)[0], observability.MetricsChainName))
+
+		discoveryCtx, err := m.DiscoveryContext(context.Background())
+		require.NoError(t, err)
+
+		discoveryMD, has := metadata.FromOutgoingContext(discoveryCtx)
 		require.True(t, has)
 		require.Equal(t, []string{
 			buildInfoFirstPart + " " +
 				observability.TracingChainName + "/" + observability.TracingChainVersion + ";" +
 				observability.MetricsChainName + "/" + observability.MetricsChainVersion,
-		}, md.Get(HeaderVersion))
+		}, discoveryMD.Get(HeaderVersion))
 	})
 
-	t.Run("ObservabilityChainsKeepFrameworkFormat", func(t *testing.T) {
+	t.Run("ObservabilityChainsKeepFrameworkFormatOnDiscovery", func(t *testing.T) {
 		m := New(
 			"database",
 			nil,
@@ -132,14 +141,21 @@ func TestMetaContext(t *testing.T) {
 
 		md, has := metadata.FromOutgoingContext(ctx)
 		require.True(t, has)
+		require.Equal(t, []string{buildInfoFirstPart + ";database/sql/1.2.3"}, md.Get(HeaderVersion))
+
+		discoveryCtx, err := m.DiscoveryContext(context.Background())
+		require.NoError(t, err)
+
+		discoveryMD, has := metadata.FromOutgoingContext(discoveryCtx)
+		require.True(t, has)
 		require.Equal(t, []string{
 			buildInfoFirstPart + " " +
 				observability.TracingChainName + "/" + observability.TracingChainVersion +
 				";database/sql/1.2.3",
-		}, md.Get(HeaderVersion))
+		}, discoveryMD.Get(HeaderVersion))
 	})
 
-	t.Run("ObservabilityMetricsKeepFrameworkFormat", func(t *testing.T) {
+	t.Run("ObservabilityMetricsKeepFrameworkFormatOnDiscovery", func(t *testing.T) {
 		m := New(
 			"database",
 			nil,
@@ -153,11 +169,18 @@ func TestMetaContext(t *testing.T) {
 
 		md, has := metadata.FromOutgoingContext(ctx)
 		require.True(t, has)
+		require.Equal(t, []string{buildInfoFirstPart + ";database/sql/1.2.3"}, md.Get(HeaderVersion))
+
+		discoveryCtx, err := m.DiscoveryContext(context.Background())
+		require.NoError(t, err)
+
+		discoveryMD, has := metadata.FromOutgoingContext(discoveryCtx)
+		require.True(t, has)
 		require.Equal(t, []string{
 			buildInfoFirstPart + " " +
 				observability.MetricsChainName + "/" + observability.MetricsChainVersion +
 				";database/sql/1.2.3",
-		}, md.Get(HeaderVersion))
+		}, discoveryMD.Get(HeaderVersion))
 	})
 
 	t.Run("ObservabilityChainsDisabled", func(t *testing.T) {
@@ -175,6 +198,13 @@ func TestMetaContext(t *testing.T) {
 		require.Equal(t, []string{buildInfoFirstPart}, md.Get(HeaderVersion))
 		require.False(t, strings.Contains(md.Get(HeaderVersion)[0], observability.TracingChainName))
 		require.False(t, strings.Contains(md.Get(HeaderVersion)[0], observability.MetricsChainName))
+
+		discoveryCtx, err := m.DiscoveryContext(context.Background())
+		require.NoError(t, err)
+
+		discoveryMD, has := metadata.FromOutgoingContext(discoveryCtx)
+		require.True(t, has)
+		require.Equal(t, []string{buildInfoFirstPart}, discoveryMD.Get(HeaderVersion))
 	})
 
 	t.Run("SDKVersionCannotBeOverwritten", func(t *testing.T) {

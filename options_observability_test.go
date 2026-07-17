@@ -14,16 +14,18 @@ import (
 
 func TestWithObservabilityBuildInfoChains(t *testing.T) {
 	for _, tt := range []struct {
-		name     string
-		opts     []Option
-		expected string
+		name              string
+		opts              []Option
+		expectedRegular   string
+		expectedDiscovery string
 	}{
 		{
 			name: "tracing only",
 			opts: []Option{
 				With(config.WithBuildInfo(observability.TracingChainName, observability.TracingChainVersion)),
 			},
-			expected: version.FullVersion + " " +
+			expectedRegular: version.FullVersion,
+			expectedDiscovery: version.FullVersion + " " +
 				observability.TracingChainName + "/" + observability.TracingChainVersion,
 		},
 		{
@@ -31,7 +33,8 @@ func TestWithObservabilityBuildInfoChains(t *testing.T) {
 			opts: []Option{
 				With(config.WithBuildInfo(observability.MetricsChainName, observability.MetricsChainVersion)),
 			},
-			expected: version.FullVersion + " " +
+			expectedRegular: version.FullVersion,
+			expectedDiscovery: version.FullVersion + " " +
 				observability.MetricsChainName + "/" + observability.MetricsChainVersion,
 		},
 		{
@@ -40,7 +43,8 @@ func TestWithObservabilityBuildInfoChains(t *testing.T) {
 				With(config.WithBuildInfo(observability.TracingChainName, observability.TracingChainVersion)),
 				With(config.WithBuildInfo(observability.MetricsChainName, observability.MetricsChainVersion)),
 			},
-			expected: version.FullVersion + " " +
+			expectedRegular: version.FullVersion,
+			expectedDiscovery: version.FullVersion + " " +
 				observability.TracingChainName + "/" + observability.TracingChainVersion + ";" +
 				observability.MetricsChainName + "/" + observability.MetricsChainVersion,
 		},
@@ -58,7 +62,14 @@ func TestWithObservabilityBuildInfoChains(t *testing.T) {
 
 			md, has := metadata.FromOutgoingContext(ctx)
 			require.True(t, has)
-			require.Equal(t, []string{tt.expected}, md.Get("x-ydb-sdk-build-info"))
+			require.Equal(t, []string{tt.expectedRegular}, md.Get("x-ydb-sdk-build-info"))
+
+			discoveryCtx, err := d.config.Meta().DiscoveryContext(context.Background())
+			require.NoError(t, err)
+
+			discoveryMD, has := metadata.FromOutgoingContext(discoveryCtx)
+			require.True(t, has)
+			require.Equal(t, []string{tt.expectedDiscovery}, discoveryMD.Get("x-ydb-sdk-build-info"))
 		})
 	}
 }
