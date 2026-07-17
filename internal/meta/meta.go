@@ -242,7 +242,7 @@ func (m *Meta) DiscoveryContext(ctx context.Context) (_ context.Context, err err
 	info := m.buildInfo.Load()
 	header := info.buildInfoHeader
 	if chains := info.observabilityChains(); chains != "" {
-		header += " " + chains
+		header += ";" + chains
 	}
 
 	md, err := m.meta(ctx, header)

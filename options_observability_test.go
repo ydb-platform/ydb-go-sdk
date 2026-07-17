@@ -25,7 +25,7 @@ func TestWithObservabilityBuildInfoChains(t *testing.T) {
 				With(config.WithBuildInfo(observability.TracingChainName, observability.TracingChainVersion)),
 			},
 			expectedRegular: version.FullVersion,
-			expectedDiscovery: version.FullVersion + " " +
+			expectedDiscovery: version.FullVersion + ";" +
 				observability.TracingChainName + "/" + observability.TracingChainVersion,
 		},
 		{
@@ -34,7 +34,7 @@ func TestWithObservabilityBuildInfoChains(t *testing.T) {
 				With(config.WithBuildInfo(observability.MetricsChainName, observability.MetricsChainVersion)),
 			},
 			expectedRegular: version.FullVersion,
-			expectedDiscovery: version.FullVersion + " " +
+			expectedDiscovery: version.FullVersion + ";" +
 				observability.MetricsChainName + "/" + observability.MetricsChainVersion,
 		},
 		{
@@ -44,7 +44,7 @@ func TestWithObservabilityBuildInfoChains(t *testing.T) {
 				With(config.WithBuildInfo(observability.MetricsChainName, observability.MetricsChainVersion)),
 			},
 			expectedRegular: version.FullVersion,
-			expectedDiscovery: version.FullVersion + " " +
+			expectedDiscovery: version.FullVersion + ";" +
 				observability.TracingChainName + "/" + observability.TracingChainVersion + ";" +
 				observability.MetricsChainName + "/" + observability.MetricsChainVersion,
 		},
