@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -88,10 +89,12 @@ func TestDiscoveryBuildInfoContainsObservabilityChains(t *testing.T) {
 				) error {
 					if strings.Contains(method, "ListEndpoints") {
 						md, has := metadata.FromOutgoingContext(ctx)
-						require.True(t, has)
-						values := md.Get(meta.HeaderVersion)
-						require.NotEmpty(t, values)
-						discoveryBuildInfo = values[0]
+						if assert.True(t, has) {
+							values := md.Get(meta.HeaderVersion)
+							if assert.NotEmpty(t, values) {
+								discoveryBuildInfo = values[0]
+							}
+						}
 					}
 
 					return invoker(ctx, method, req, reply, cc, opts...)

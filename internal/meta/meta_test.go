@@ -183,6 +183,36 @@ func TestMetaContext(t *testing.T) {
 		}, discoveryMD.Get(HeaderVersion))
 	})
 
+	t.Run("ObservabilityTracingAndMetricsKeepFrameworkFormatOnDiscovery", func(t *testing.T) {
+		m := New(
+			"database",
+			nil,
+			&trace.Driver{},
+			WithBuildInfo(observability.TracingChainName, observability.TracingChainVersion),
+			WithBuildInfo(observability.MetricsChainName, observability.MetricsChainVersion),
+			WithBuildInfo("database/sql", "1.2.3"),
+		)
+
+		ctx, err := m.Context(context.Background())
+		require.NoError(t, err)
+
+		md, has := metadata.FromOutgoingContext(ctx)
+		require.True(t, has)
+		require.Equal(t, []string{buildInfoFirstPart + ";database/sql/1.2.3"}, md.Get(HeaderVersion))
+
+		discoveryCtx, err := m.DiscoveryContext(context.Background())
+		require.NoError(t, err)
+
+		discoveryMD, has := metadata.FromOutgoingContext(discoveryCtx)
+		require.True(t, has)
+		require.Equal(t, []string{
+			buildInfoFirstPart + " " +
+				observability.TracingChainName + "/" + observability.TracingChainVersion + ";" +
+				observability.MetricsChainName + "/" + observability.MetricsChainVersion +
+				";database/sql/1.2.3",
+		}, discoveryMD.Get(HeaderVersion))
+	})
+
 	t.Run("ObservabilityChainsDisabled", func(t *testing.T) {
 		m := New(
 			"database",
