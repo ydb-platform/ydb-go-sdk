@@ -38,9 +38,8 @@ func New(
 	}
 
 	m.buildInfo.Store(&buildInfo{
-		frameworks:               make(map[string]string),
-		buildInfoHeader:          buildInfoFirstPart,
-		discoveryBuildInfoHeader: buildInfoFirstPart,
+		frameworks:      make(map[string]string),
+		buildInfoHeader: buildInfoFirstPart,
 	})
 
 	for _, opt := range opts {
@@ -68,78 +67,48 @@ func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
 		}
 		maps.Copy(next.frameworks, current.frameworks)
 		next.frameworks[frameworkName] = frameworkVersion
-
-		next.buildInfoHeader = next.makeHeader(false)
-		next.discoveryBuildInfoHeader = next.makeHeader(true)
+		next.buildInfoHeader = next.makeHeader()
 		m.buildInfo.Store(next)
 	}
 }
 
-// makeHeader keeps backward-compatible semantics for build-info parsers.
-//
-// Regular requests (includeObservability=false) keep session-facing headers lean:
-// only the base SDK token and custom frameworks. Observability adoption chains are
-// intentionally omitted so they do not pollute `.sys/query_sessions.ClientSdkBuildInfo`.
-//
-// Discovery requests (includeObservability=true) append chain markers:
-// - chain markers are appended after the base token using a space;
-// - tracing and metrics markers are separated with ';' when both are present;
-// - custom frameworks remain in ';framework/version' form.
-func (info *buildInfo) makeHeader(includeObservability bool) string {
-	builder := strings.Builder{}
-	builder.WriteString(buildInfoFirstPart)
-
-	if includeObservability {
-		info.writeObservabilityChains(&builder)
-	}
-
+// makeHeader builds the session-facing x-ydb-sdk-build-info value:
+// base SDK token plus custom frameworks. Observability adoption chains are
+// intentionally omitted here so they do not pollute
+// `.sys/query_sessions.ClientSdkBuildInfo`.
+func (info *buildInfo) makeHeader() string {
 	frameworkKeys := xslices.Keys(info.frameworks)
 	frameworkKeys = xslices.Filter(frameworkKeys, func(frameworkName string) bool {
 		return frameworkName != observability.TracingChainName &&
 			frameworkName != observability.MetricsChainName
 	})
-
 	if len(frameworkKeys) == 0 {
-		return builder.String()
+		return buildInfoFirstPart
 	}
 
-	builder.WriteString(";")
-	builder.WriteString(
-		strings.Join(
-			xslices.Transform(
-				frameworkKeys,
-				func(frameworkName string) string {
-					return frameworkName + "/" + info.frameworks[frameworkName]
-				},
-			), ";",
+	return buildInfoFirstPart + ";" + strings.Join(
+		xslices.Transform(
+			frameworkKeys,
+			func(frameworkName string) string {
+				return frameworkName + "/" + info.frameworks[frameworkName]
+			},
 		),
+		";",
 	)
-
-	return builder.String()
 }
 
-func (info *buildInfo) writeObservabilityChains(builder *strings.Builder) {
-	tracingVersion, hasTracing := info.frameworks[observability.TracingChainName]
-	if hasTracing {
-		builder.WriteString(" ")
-		builder.WriteString(observability.TracingChainName)
-		builder.WriteString("/")
-		builder.WriteString(tracingVersion)
+// observabilityChains returns adoption markers for Discovery only, joined with ';'.
+// Example: "ydb-sdk-tracing/0.1.0;ydb-sdk-metrics/0.1.0".
+func (info *buildInfo) observabilityChains() string {
+	var chains []string
+	if version, ok := info.frameworks[observability.TracingChainName]; ok {
+		chains = append(chains, observability.TracingChainName+"/"+version)
+	}
+	if version, ok := info.frameworks[observability.MetricsChainName]; ok {
+		chains = append(chains, observability.MetricsChainName+"/"+version)
 	}
 
-	metricsVersion, hasMetrics := info.frameworks[observability.MetricsChainName]
-	if !hasMetrics {
-		return
-	}
-
-	if hasTracing {
-		builder.WriteString(";")
-	} else {
-		builder.WriteString(" ")
-	}
-	builder.WriteString(observability.MetricsChainName)
-	builder.WriteString("/")
-	builder.WriteString(metricsVersion)
+	return strings.Join(chains, ";")
 }
 
 func WithRequestTypeOption(requestType string) Option {
@@ -169,9 +138,8 @@ func ForbidOption(feature string) Option {
 
 type (
 	buildInfo struct {
-		frameworks               map[string]string // frameworkName -> version
-		buildInfoHeader          string
-		discoveryBuildInfoHeader string
+		frameworks      map[string]string // frameworkName -> version
+		buildInfoHeader string
 	}
 	Meta struct {
 		pid             string
@@ -268,11 +236,16 @@ func (m *Meta) Context(ctx context.Context) (_ context.Context, err error) {
 	return metadata.NewOutgoingContext(ctx, md), nil
 }
 
-// DiscoveryContext is like Context, but includes observability adoption chains in
-// x-ydb-sdk-build-info. Use it only for Discovery.ListEndpoints so session-facing
-// RPCs (CreateSession and friends) keep a lean ClientSdkBuildInfo.
+// DiscoveryContext is like Context, but appends observability adoption chains to
+// x-ydb-sdk-build-info. Use it only for Discovery.ListEndpoints.
 func (m *Meta) DiscoveryContext(ctx context.Context) (_ context.Context, err error) {
-	md, err := m.meta(ctx, m.buildInfo.Load().discoveryBuildInfoHeader)
+	info := m.buildInfo.Load()
+	header := info.buildInfoHeader
+	if chains := info.observabilityChains(); chains != "" {
+		header = buildInfoFirstPart + " " + chains + strings.TrimPrefix(info.buildInfoHeader, buildInfoFirstPart)
+	}
+
+	md, err := m.meta(ctx, header)
 	if err != nil {
 		return ctx, xerrors.WithStackTrace(err)
 	}
