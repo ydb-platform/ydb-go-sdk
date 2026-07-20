@@ -1,0 +1,122 @@
+name: regression-proof
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  regression-proof:
+    if: contains(github.event.pull_request.labels.*.name, 'bug')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: regression-proof-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+
+    services:
+      ydb:
+        image: ydbplatform/local-ydb:latest
+        ports:
+          - 2135:2135
+          - 2136:2136
+          - 8765:8765
+        volumes:
+          - /tmp/ydb_certs:/ydb_certs
+        env:
+          YDB_FEATURE_FLAGS: enable_external_data_sources
+          YDB_LOCAL_SURVIVE_RESTART: true
+          YDB_USE_IN_MEMORY_PDISKS: true
+          YDB_TABLE_ENABLE_PREPARED_DDL: true
+          YDB_ENABLE_COLUMN_TABLES: true
+        options: '-h localhost --name ydb'
+
+    env:
+      YDB_CONNECTION_STRING: grpc://localhost:2136/local
+      YDB_CONNECTION_STRING_SECURE: grpcs://localhost:2135/local
+      YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
+      YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
+      HIDE_APPLICATION_OUTPUT: 1
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          path: head
+
+      - name: Checkout destination
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 1
+          path: base
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.26.x
+          cache: false
+
+      - name: Apply only changed tests to destination
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! git -C head cat-file -e "${BASE_SHA}^{commit}"; then
+            git -C head fetch --no-tags origin "$BASE_SHA"
+          fi
+
+          git -C head diff --name-only "$BASE_SHA" "$HEAD_SHA" \
+            -- ':(glob)**/*_test.go' > "$RUNNER_TEMP/changed-tests"
+
+          if [[ ! -s "$RUNNER_TEMP/changed-tests" ]]; then
+            echo 'A PR with the bug label must change at least one *_test.go file.'
+            exit 1
+          fi
+
+          echo 'Changed test files:'
+          sed 's/^/  /' "$RUNNER_TEMP/changed-tests"
+
+          git -C head diff --binary "$BASE_SHA" "$HEAD_SHA" \
+            -- ':(glob)**/*_test.go' > "$RUNNER_TEMP/test-only.patch"
+
+          git -C base apply --check "$RUNNER_TEMP/test-only.patch"
+          git -C base apply "$RUNNER_TEMP/test-only.patch"
+
+      - name: Run destination with the changed tests
+        shell: bash
+        run: |
+          set +e
+          cd base
+          go test -json -count=1 -race -tags integration ./... \
+            > "$RUNNER_TEMP/base.json" \
+            2> "$RUNNER_TEMP/base.stderr"
+          echo $? > "$RUNNER_TEMP/base.rc"
+          set -e
+
+          cat "$RUNNER_TEMP/base.stderr" >&2
+
+      - name: Prove a real test fails on destination
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Build failures and package-level failures have no Test field. They
+          # are intentionally ignored; only concrete go test failures count.
+          jq -s -e '
+            [
+              .[]
+              | select((.Test // "") != "" and .Action == "fail")
+              | [(.Package // ""), .Test]
+            ]
+            | unique
+            | if length > 0 then . else error("no concrete test failed on destination") end
+          ' "$RUNNER_TEMP/base.json" > "$RUNNER_TEMP/base-failed.json"
+
+          echo 'At least one concrete test fails on destination with the PR test patch.'
