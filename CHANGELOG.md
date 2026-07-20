@@ -1,3 +1,4 @@
+## v3.144.5
 * Send observability adoption chains (`ydb-sdk-tracing`, `ydb-sdk-metrics`) in `x-ydb-sdk-build-info` only on Discovery, so `.sys/query_sessions.ClientSdkBuildInfo` stays free of telemetry markers
 
 ## v3.144.4
