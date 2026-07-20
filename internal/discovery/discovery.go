@@ -112,7 +112,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, f
 		onDone(location, nodes, finalErr)
 	}()
 
-	ctx, err := c.config.Meta().Context(ctx)
+	ctx, err := c.config.Meta().DiscoveryContext(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

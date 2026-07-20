@@ -1,5 +1,8 @@
 * Fixed expired idle sessions being starved behind frequently reused sessions in Table and Query session pools
 
+## v3.144.5
+* Send observability adoption chains (`ydb-sdk-tracing`, `ydb-sdk-metrics`) in `x-ydb-sdk-build-info` only on Discovery, so `.sys/query_sessions.ClientSdkBuildInfo` stays free of telemetry markers
+
 ## v3.144.4
 * Changed driver connection metrics to expose `conns` by state and count `conn.banned` events with a counter
 
