@@ -31,9 +31,13 @@ cd tests/slo
 SRC_PATH=native/query WORKLOAD_DURATION=600 docker compose \
   --profile telemetry \
   --profile chaos \
+  --profile extra-nodes \
   --profile workload-current \
   up --build
 ```
+
+The default local run enables telemetry, chaos injection, all five database nodes, and the current workload.
+The `workload-baseline` profile is only needed when comparing two SDK versions.
 
 | Variable            | Description                                    |
 |---------------------|------------------------------------------------|
@@ -105,6 +109,7 @@ rate(sdk_retry_attempts_total[1m])
 docker compose \
   --profile telemetry \
   --profile chaos \
+  --profile extra-nodes \
   --profile workload-current \
   down
 ```

@@ -6,6 +6,8 @@
 go test -race ./...
 ```
 
+Within a test file, place test functions first. Put helper functions, fixtures, recording implementations, mocks, and other support code after the tests.
+
 Integration tests in `tests/integration/` are excluded automatically (`//go:build integration`).
 
 > Note: `CONTRIBUTING.md` documents `-tags fast` for unit-only runs, but that build tag does not exist. Default `go test ./...` is correct.

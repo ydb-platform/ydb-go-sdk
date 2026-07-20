@@ -45,13 +45,6 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 		pool.WithIdleTimeToLive[*Session, Session](config.IdleThreshold()),
 		pool.WithCreateItemTimeout[*Session, Session](config.CreateSessionTimeout()),
 		pool.WithCloseItemTimeout[*Session, Session](config.DeleteTimeout()),
-		pool.WithMustDeleteItemFunc[*Session, Session](func(s *Session, err error) bool {
-			if !s.IsAlive() {
-				return true
-			}
-
-			return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
-		}),
 		pool.WithClock[*Session, Session](config.Clock()),
 		pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 			if !config.DisableSessionBalancer() {
