@@ -146,17 +146,17 @@ func (w *PartitionWorker) Close(ctx context.Context, reason error) error {
 
 // receiveMessagesLoop is the main message processing loop
 func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
-	// On stop (Close, handler error, panic) batches may still sit in the queue buffer
-	// without reaching processBatchMessage. Drain them here instead of Close(): only
-	// this goroutine knows processing is finished and must not use blocking Receive.
-	defer w.freeBufferedBatchCredits()
-
 	defer func() {
 		if r := recover(); r != nil {
 			reason := xerrors.WithStackTrace(fmt.Errorf("ydb: partition worker panic: %v", r))
 			w.onStopped(w.partitionSessionID, reason)
 		}
 	}()
+
+	// On stop (Close, handler error, panic) batches may still sit in the queue buffer
+	// without reaching processBatchMessage. Drain them here instead of Close(): only
+	// this goroutine knows processing is finished and must not use blocking Receive.
+	defer w.freeBufferedBatchCredits()
 
 	for {
 		// Use context-aware Receive method
