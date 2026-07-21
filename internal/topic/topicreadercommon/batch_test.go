@@ -143,7 +143,14 @@ func TestBatch_Extend(t *testing.T) {
 
 func TestSplitBytesByBatches(t *testing.T) {
 	checkTotalBytes := func(t *testing.T, totalBytes int, batches ...*PublicBatch) {
-		require.Equal(t, totalBytes, PublicBatches(batches).bufferBytesAccount())
+		sum := 0
+		for _, batch := range batches {
+			for _, msg := range batch.Messages {
+				sum += msg.bufferBytesAccount
+			}
+		}
+
+		require.Equal(t, totalBytes, sum)
 	}
 
 	t.Run("Empty", func(t *testing.T) {

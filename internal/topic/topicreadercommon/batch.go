@@ -18,38 +18,12 @@ var (
 type PublicBatch struct {
 	empty.DoNotCopy
 
-	Messages PublicMessages
+	Messages []*PublicMessage
 
-	commitRange CommitRange // for all messages in the batch
+	commitRange CommitRange // от всех сообщений батча
 }
 
-// PublicBatches is a collection of public message batches.
-type PublicBatches []*PublicBatch
-
-func (batches PublicBatches) bufferBytesAccount() int {
-	size := 0
-	for i := range batches {
-		if batches[i] != nil {
-			size += batches[i].Messages.bufferBytesAccount()
-		}
-	}
-
-	return size
-}
-
-// PublicMessages is a collection of public topic messages.
-type PublicMessages []*PublicMessage
-
-func (messages PublicMessages) bufferBytesAccount() int {
-	size := 0
-	for i := range messages {
-		size += messages[i].bufferBytesAccount
-	}
-
-	return size
-}
-
-func NewBatch(session *PartitionSession, messages PublicMessages) (*PublicBatch, error) {
+func NewBatch(session *PartitionSession, messages []*PublicMessage) (*PublicBatch, error) {
 	for i := range messages {
 		msg := messages[i]
 
@@ -89,7 +63,7 @@ func NewBatchFromStream(
 	session *PartitionSession,
 	sb rawtopicreader.Batch, //nolint:gocritic
 ) (*PublicBatch, error) {
-	messages := make(PublicMessages, len(sb.MessageData))
+	messages := make([]*PublicMessage, len(sb.MessageData))
 	prevOffset := session.LastReceivedMessageOffset()
 	for i := range sb.MessageData {
 		sMess := &sb.MessageData[i]
@@ -151,7 +125,7 @@ func (m *PublicBatch) getCommitRange() PublicCommitRange {
 	return m.commitRange.getCommitRange()
 }
 
-func splitBytesByMessagesInBatches(batches PublicBatches, totalBytesCount int) error {
+func splitBytesByMessagesInBatches(batches []*PublicBatch, totalBytesCount int) error {
 	restBytes := totalBytesCount
 
 	cutBytes := func(want int) int {
@@ -248,15 +222,6 @@ func BatchIsEmpty(b *PublicBatch) bool {
 
 func BatchGetPartitionSession(item *PublicBatch) *PartitionSession {
 	return item.partitionSession()
-}
-
-// ReadBufferSize returns the number of bytes occupied by the batch in the read buffer.
-func (batch *PublicBatch) ReadBufferSize() int {
-	if batch == nil {
-		return 0
-	}
-
-	return batch.Messages.bufferBytesAccount()
 }
 
 func BatchSetCommitRangeForTest(b *PublicBatch, commitRange CommitRange) *PublicBatch {

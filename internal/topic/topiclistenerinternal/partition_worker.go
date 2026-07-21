@@ -41,6 +41,19 @@ type batchMessage struct {
 	Batch                 *topicreadercommon.PublicBatch
 }
 
+func batchReadBufferSize(batch *topicreadercommon.PublicBatch) int {
+	if batch == nil {
+		return 0
+	}
+
+	size := 0
+	for i := range batch.Messages {
+		size += topicreadercommon.MessageGetBufferBytesAccount(batch.Messages[i])
+	}
+
+	return size
+}
+
 // WorkerStoppedCallback notifies when worker is stopped
 type WorkerStoppedCallback func(sessionID rawtopicreader.PartitionSessionID, reason error)
 
@@ -306,7 +319,7 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 	// Release buffer credit when the batch leaves the worker (success, validation error,
 	// or handler error). defer — not after handler only — so credits are not leaked.
 	// Credit is tied to read/processing, not commit (protocol separates these; same as reader).
-	defer w.readBufferReleaser.ReadBufferRelease(msg.Batch.ReadBufferSize())
+	defer w.readBufferReleaser.ReadBufferRelease(batchReadBufferSize(msg.Batch))
 
 	// Check for errors in the metadata
 	if err := w.validateBatchMetadata(msg); err != nil {
@@ -342,7 +355,7 @@ func (w *PartitionWorker) freeBufferedBatchCredits() {
 	for _, msg := range w.messageQueue.DrainBuffered() {
 		// StartPartition / StopPartition do not consume read-ahead data bytes.
 		if msg.BatchMessage != nil {
-			w.readBufferReleaser.ReadBufferRelease(msg.BatchMessage.Batch.ReadBufferSize())
+			w.readBufferReleaser.ReadBufferRelease(batchReadBufferSize(msg.BatchMessage.Batch))
 		}
 	}
 }

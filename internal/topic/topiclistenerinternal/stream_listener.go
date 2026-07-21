@@ -357,10 +357,6 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 
 		logCtx := ctx
 		if err != nil {
-			if ctx.Err() != nil || l.closing.Load() {
-				return
-			}
-
 			gtrace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, "", 0, err)
 			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
 			l.goClose(ctx, xerrors.WithStackTrace(xerrors.Wrap(
@@ -455,7 +451,7 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 		if !routed {
 			// Worker missing: batch is dropped but buffer was already charged above.
 			// Return credit here; routeToWorker stays non-fatal for protocol mismatch.
-			l.ReadBufferRelease(batch.ReadBufferSize())
+			l.ReadBufferRelease(batchReadBufferSize(batch))
 		}
 	}
 
