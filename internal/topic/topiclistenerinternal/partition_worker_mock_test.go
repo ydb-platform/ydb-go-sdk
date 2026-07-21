@@ -10,7 +10,6 @@ import (
 	reflect "reflect"
 
 	rawtopicreader "github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
-	topicreadercommon "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -35,42 +34,6 @@ func NewMockMessageSender(ctrl *gomock.Controller) *MockMessageSender {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockMessageSender) EXPECT() *MockMessageSenderMockRecorder {
 	return m.recorder
-}
-
-// FreeBufferFromBatch mocks base method.
-func (m *MockMessageSender) FreeBufferFromBatch(batch *topicreadercommon.PublicBatch) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "FreeBufferFromBatch", batch)
-}
-
-// FreeBufferFromBatch indicates an expected call of FreeBufferFromBatch.
-func (mr *MockMessageSenderMockRecorder) FreeBufferFromBatch(batch any) *MockMessageSenderFreeBufferFromBatchCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FreeBufferFromBatch", reflect.TypeOf((*MockMessageSender)(nil).FreeBufferFromBatch), batch)
-	return &MockMessageSenderFreeBufferFromBatchCall{Call: call}
-}
-
-// MockMessageSenderFreeBufferFromBatchCall wrap *gomock.Call
-type MockMessageSenderFreeBufferFromBatchCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockMessageSenderFreeBufferFromBatchCall) Return() *MockMessageSenderFreeBufferFromBatchCall {
-	c.Call = c.Call.Return()
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockMessageSenderFreeBufferFromBatchCall) Do(f func(*topicreadercommon.PublicBatch)) *MockMessageSenderFreeBufferFromBatchCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockMessageSenderFreeBufferFromBatchCall) DoAndReturn(f func(*topicreadercommon.PublicBatch)) *MockMessageSenderFreeBufferFromBatchCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
 }
 
 // SendRaw mocks base method.
@@ -105,6 +68,65 @@ func (c *MockMessageSenderSendRawCall) Do(f func(rawtopicreader.ClientMessage)) 
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockMessageSenderSendRawCall) DoAndReturn(f func(rawtopicreader.ClientMessage)) *MockMessageSenderSendRawCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// MockReadBufferReleaser is a mock of ReadBufferReleaser interface.
+type MockReadBufferReleaser struct {
+	ctrl     *gomock.Controller
+	recorder *MockReadBufferReleaserMockRecorder
+}
+
+// MockReadBufferReleaserMockRecorder is the mock recorder for MockReadBufferReleaser.
+type MockReadBufferReleaserMockRecorder struct {
+	mock *MockReadBufferReleaser
+}
+
+// NewMockReadBufferReleaser creates a new mock instance.
+func NewMockReadBufferReleaser(ctrl *gomock.Controller) *MockReadBufferReleaser {
+	mock := &MockReadBufferReleaser{ctrl: ctrl}
+	mock.recorder = &MockReadBufferReleaserMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockReadBufferReleaser) EXPECT() *MockReadBufferReleaserMockRecorder {
+	return m.recorder
+}
+
+// ReleaseReadBuffer mocks base method.
+func (m *MockReadBufferReleaser) ReleaseReadBuffer(size int) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ReleaseReadBuffer", size)
+}
+
+// ReleaseReadBuffer indicates an expected call of ReleaseReadBuffer.
+func (mr *MockReadBufferReleaserMockRecorder) ReleaseReadBuffer(size any) *MockReadBufferReleaserReleaseReadBufferCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseReadBuffer", reflect.TypeOf((*MockReadBufferReleaser)(nil).ReleaseReadBuffer), size)
+	return &MockReadBufferReleaserReleaseReadBufferCall{Call: call}
+}
+
+// MockReadBufferReleaserReleaseReadBufferCall wrap *gomock.Call
+type MockReadBufferReleaserReleaseReadBufferCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockReadBufferReleaserReleaseReadBufferCall) Return() *MockReadBufferReleaserReleaseReadBufferCall {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockReadBufferReleaserReleaseReadBufferCall) Do(f func(int)) *MockReadBufferReleaserReleaseReadBufferCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockReadBufferReleaserReleaseReadBufferCall) DoAndReturn(f func(int)) *MockReadBufferReleaserReleaseReadBufferCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

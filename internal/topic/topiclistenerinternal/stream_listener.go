@@ -355,6 +355,10 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 
 		logCtx := ctx
 		if err != nil {
+			if ctx.Err() != nil || l.closing.Load() {
+				return
+			}
+
 			gtrace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, "", 0, err)
 			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
 			l.goClose(ctx, xerrors.WithStackTrace(xerrors.Wrap(
@@ -449,7 +453,7 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 		if !routed {
 			// Worker missing: batch is dropped but buffer was already charged above.
 			// Return credit here; routeToWorker stays non-fatal for protocol mismatch.
-			l.freeBufferFromBatch(batch)
+			l.releaseReadBuffer(topicreadercommon.BatchGetBufferBytesAccount(batch))
 		}
 	}
 
@@ -527,16 +531,7 @@ func (l *streamListener) collectPendingFreeBytes(first int) int {
 	}
 }
 
-func (l *streamListener) freeBufferFromBatch(batch *topicreadercommon.PublicBatch) {
-	if batch == nil {
-		return
-	}
-
-	size := 0
-	for i := range batch.Messages {
-		size += topicreadercommon.MessageGetBufferBytesAccount(batch.Messages[i])
-	}
-
+func (l *streamListener) releaseReadBuffer(size int) {
 	// Nothing was charged for this batch — avoid a pointless ReadRequest{BytesSize: 0}.
 	if size == 0 {
 		return
@@ -550,9 +545,9 @@ func (l *streamListener) freeBufferFromBatch(batch *topicreadercommon.PublicBatc
 	}
 }
 
-// FreeBufferFromBatch implements MessageSender interface for PartitionWorkers.
-func (l *streamListener) FreeBufferFromBatch(batch *topicreadercommon.PublicBatch) {
-	l.freeBufferFromBatch(batch)
+// ReleaseReadBuffer implements ReadBufferReleaser for partition workers.
+func (l *streamListener) ReleaseReadBuffer(size int) {
+	l.releaseReadBuffer(size)
 }
 
 func (l *streamListener) sendMessage(m rawtopicreader.ClientMessage) {
@@ -617,7 +612,7 @@ func (l *streamListener) ReadSessionID() string {
 	return l.sessionID
 }
 
-// SendRaw implements MessageSender interface for PartitionWorkers
+// SendRaw implements MessageSender for partition workers.
 func (l *streamListener) SendRaw(msg rawtopicreader.ClientMessage) {
 	l.sendMessage(msg)
 }
@@ -654,7 +649,7 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 	worker := NewPartitionWorker(
 		session.StreamPartitionSessionID,
 		session,
-		l, // streamListener implements MessageSender and CommitHandler
+		l,
 		l.handler,
 		l.onWorkerStopped,
 		l.tracer,

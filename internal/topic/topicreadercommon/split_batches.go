@@ -12,7 +12,7 @@ func ReadRawBatchesToPublicBatches(
 		batchesCount += len(msg.PartitionData[i].Batches)
 	}
 
-	var batches []*PublicBatch
+	batches := make(PublicBatches, 0, batchesCount)
 	for pIndex := range msg.PartitionData {
 		p := &msg.PartitionData[pIndex]
 

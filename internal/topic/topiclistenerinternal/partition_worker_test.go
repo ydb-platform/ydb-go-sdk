@@ -49,8 +49,8 @@ func (s *syncMessageSender) SendRaw(msg rawtopicreader.ClientMessage) {
 	}
 }
 
-func (s *syncMessageSender) FreeBufferFromBatch(batch *topicreadercommon.PublicBatch) {
-	s.mockMessageSender.FreeBufferFromBatch(batch)
+func (s *syncMessageSender) ReleaseReadBuffer(size int) {
+	s.mockMessageSender.ReleaseReadBuffer(size)
 	select {
 	case s.messageReceived <- empty.Struct{}:
 	default:
@@ -81,9 +81,9 @@ func (s *syncMessageSender) waitForMessages(ctx context.Context, n int) error {
 // Test Helpers and Mocks
 
 type mockMessageSender struct {
-	mu           sync.Mutex
-	messages     []rawtopicreader.ClientMessage
-	freedBatches []*topicreadercommon.PublicBatch
+	mu          sync.Mutex
+	messages    []rawtopicreader.ClientMessage
+	freedBuffer []int
 }
 
 func newMockMessageSender() *mockMessageSender {
@@ -98,18 +98,18 @@ func (m *mockMessageSender) SendRaw(msg rawtopicreader.ClientMessage) {
 	m.messages = append(m.messages, msg)
 }
 
-func (m *mockMessageSender) FreeBufferFromBatch(batch *topicreadercommon.PublicBatch) {
+func (m *mockMessageSender) ReleaseReadBuffer(size int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.freedBatches = append(m.freedBatches, batch)
+	m.freedBuffer = append(m.freedBuffer, size)
 }
 
-func (m *mockMessageSender) GetFreedBatches() []*topicreadercommon.PublicBatch {
+func (m *mockMessageSender) GetFreedBuffer() []int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	result := make([]*topicreadercommon.PublicBatch, len(m.freedBatches))
-	copy(result, m.freedBatches)
+	result := make([]int, len(m.freedBuffer))
+	copy(result, m.freedBuffer)
 
 	return result
 }
@@ -207,10 +207,11 @@ func createTestBatch() *topicreadercommon.PublicBatch {
 }
 
 // createTestBatchWithBufferBytes returns a batch whose single message accounts for
-// size buffer bytes, so freeBufferFromBatch releases a non-zero credit.
+// size buffer bytes, so freeBuffer releases a non-zero credit.
 func createTestBatchWithBufferBytes(size int) *topicreadercommon.PublicBatch {
 	batch := createTestBatch()
 	topicreadercommon.MessageSetBufferBytesAccountForTest(batch.Messages[0], size)
+	batch, _ = topicreadercommon.NewBatch(nil, batch.Messages)
 
 	return batch
 }
@@ -493,9 +494,7 @@ func TestPartitionWorkerInterface_BatchMessageFlow(t *testing.T) {
 
 	require.Nil(t, stoppedErr)
 
-	freedBatches := messageSender.GetFreedBatches()
-	require.Len(t, freedBatches, 1)
-	require.Same(t, testBatch, freedBatches[0])
+	require.Equal(t, []int{0}, messageSender.GetFreedBuffer())
 	require.Empty(t, messageSender.GetMessages())
 }
 
@@ -559,8 +558,46 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 	errPtr := stoppedErr.Load()
 	require.NotNil(t, errPtr)
 	require.Contains(t, (*errPtr).Error(), "user handler error")
-	require.Len(t, messageSender.GetFreedBatches(), 1)
-	require.Same(t, batch, messageSender.GetFreedBatches()[0])
+	require.Equal(t, []int{0}, messageSender.GetFreedBuffer())
+}
+
+func TestPartitionWorkerInterface_HandlerMutationDoesNotChangeFreedBuffer(t *testing.T) {
+	ctx := xtest.Context(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	messageSender := newSyncMessageSender()
+	mockHandler := NewMockEventHandler(ctrl)
+	mockHandler.EXPECT().
+		OnReadMessages(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, event *PublicReadMessages) error {
+			*event.Batch = topicreadercommon.PublicBatch{}
+
+			return nil
+		})
+
+	worker := NewPartitionWorker(
+		123,
+		createTestPartitionSession(),
+		messageSender,
+		mockHandler,
+		func(rawtopicreader.PartitionSessionID, error) {},
+		&trace.Topic{},
+		"test-listener",
+	)
+	worker.Start(ctx)
+	defer func() {
+		require.NoError(t, worker.Close(ctx, nil))
+	}()
+
+	const bufferSize = 17
+	worker.AddMessagesBatch(
+		rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+		createTestBatchWithBufferBytes(bufferSize),
+	)
+
+	require.NoError(t, messageSender.waitForMessage(ctx))
+	require.Equal(t, []int{bufferSize}, messageSender.GetFreedBuffer())
 }
 
 func TestPartitionWorkerInterface_CloseFreesQueuedBatchCredits(t *testing.T) {
@@ -592,7 +629,7 @@ func TestPartitionWorkerInterface_CloseFreesQueuedBatchCredits(t *testing.T) {
 
 	metadata1 := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
 	// Different metadata prevents tryMergeMessages from joining two batches into one
-	// queue item (would look like a single FreeBufferFromBatch in the assertion).
+	// queue item (would look like a single FreeBuffer call in the assertion).
 	metadata2 := rawtopiccommon.ServerMessageMetadata{
 		Status: rawydb.StatusSuccess,
 		Issues: rawydb.Issues{{Message: "different metadata to prevent queue merge"}},
@@ -602,7 +639,7 @@ func TestPartitionWorkerInterface_CloseFreesQueuedBatchCredits(t *testing.T) {
 	worker.AddMessagesBatch(metadata2, createTestBatch())
 
 	require.NoError(t, worker.Close(ctx, nil))
-	require.Len(t, messageSender.GetFreedBatches(), 2)
+	require.Len(t, messageSender.GetFreedBuffer(), 2)
 }
 
 func TestPartitionWorkerInterface_UserHandlerErrorFreesQueuedBatches(t *testing.T) {
@@ -649,7 +686,8 @@ func TestPartitionWorkerInterface_UserHandlerErrorFreesQueuedBatches(t *testing.
 
 	xtest.WaitChannelClosed(t, errorReceived)
 
-	require.Len(t, messageSender.GetFreedBatches(), 2)
+	require.NoError(t, worker.Close(ctx, nil))
+	require.Len(t, messageSender.GetFreedBuffer(), 2)
 }
 
 func TestPartitionWorkerInterface_BadBatchMetadataFreesBuffer(t *testing.T) {
@@ -690,18 +728,17 @@ func TestPartitionWorkerInterface_BadBatchMetadataFreesBuffer(t *testing.T) {
 	}, batch)
 
 	xtest.WaitChannelClosed(t, errorReceived)
-	require.Len(t, messageSender.GetFreedBatches(), 1)
-	require.Same(t, batch, messageSender.GetFreedBatches()[0])
+	require.Equal(t, []int{0}, messageSender.GetFreedBuffer())
 }
 
 type bareMessageSender struct {
-	freed []*topicreadercommon.PublicBatch
+	freed []int
 }
 
 func (b *bareMessageSender) SendRaw(rawtopicreader.ClientMessage) {}
 
-func (b *bareMessageSender) FreeBufferFromBatch(batch *topicreadercommon.PublicBatch) {
-	b.freed = append(b.freed, batch)
+func (b *bareMessageSender) ReleaseReadBuffer(size int) {
+	b.freed = append(b.freed, size)
 }
 
 func TestPartitionWorkerInterface_NonCommitHandlerFreesBuffer(t *testing.T) {
@@ -742,8 +779,7 @@ func TestPartitionWorkerInterface_NonCommitHandlerFreesBuffer(t *testing.T) {
 	}, batch)
 
 	xtest.WaitChannelClosed(t, errorReceived)
-	require.Len(t, messageSender.freed, 1)
-	require.Same(t, batch, messageSender.freed[0])
+	require.Equal(t, []int{0}, messageSender.freed)
 }
 
 // Note: CommitMessage processing has been moved to streamListener

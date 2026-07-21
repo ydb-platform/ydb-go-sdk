@@ -329,12 +329,12 @@ func TestStreamListener_CollectPendingFreeBytesCoalesces(t *testing.T) {
 	require.Equal(t, 40, listener.collectPendingFreeBytes(5))
 }
 
-func TestStreamListener_FreeBufferFromBatchNil(t *testing.T) {
+func TestStreamListener_ReleaseReadBufferZero(t *testing.T) {
 	e := fixenv.New(t)
 	listener := StreamListener(e)
 
 	require.NotPanics(t, func() {
-		listener.freeBufferFromBatch(nil)
+		listener.releaseReadBuffer(0)
 	})
 }
 
@@ -507,7 +507,7 @@ func TestStreamListener_RouteStopPartitionToExistingWorker(t *testing.T) {
 	xtest.WaitChannelClosed(t, stopHandled)
 }
 
-func TestStreamListener_FreeBufferFromBatchSkipsOnShutdown(t *testing.T) {
+func TestStreamListener_ReleaseReadBufferSkipsOnShutdown(t *testing.T) {
 	e := fixenv.New(t)
 	ctx := sf.Context(e)
 	listener := StreamListener(e)
@@ -517,11 +517,11 @@ func TestStreamListener_FreeBufferFromBatchSkipsOnShutdown(t *testing.T) {
 	require.NoError(t, listener.background.Close(ctx, errors.New("shutdown")))
 
 	require.NotPanics(t, func() {
-		listener.freeBufferFromBatch(createTestBatchWithBufferBytes(10))
+		listener.releaseReadBuffer(10)
 	})
 }
 
-func TestStreamListener_FreeBufferFromBatchSkipsZeroSize(t *testing.T) {
+func TestStreamListener_ReleaseReadBufferSkipsZeroSize(t *testing.T) {
 	e := fixenv.New(t)
 	listener := StreamListener(e)
 	// Unbuffered with no reader: if the zero-size guard did not short-circuit,
@@ -529,7 +529,7 @@ func TestStreamListener_FreeBufferFromBatchSkipsZeroSize(t *testing.T) {
 	listener.freeBytes = make(chan int)
 
 	require.NotPanics(t, func() {
-		listener.freeBufferFromBatch(createTestBatch())
+		listener.releaseReadBuffer(0)
 	})
 }
 

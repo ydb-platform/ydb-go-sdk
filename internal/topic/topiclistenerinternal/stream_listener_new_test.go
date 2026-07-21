@@ -2,7 +2,6 @@ package topiclistenerinternal
 
 import (
 	"context"
-	"io"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -21,7 +20,7 @@ import (
 type testInitGrpcStream struct {
 	sessionID        string
 	initSent         bool
-	recvBlock        chan struct{}
+	recvContext      context.Context //nolint:containedctx
 	readRequestBytes atomic.Int64
 }
 
@@ -47,9 +46,9 @@ func (s *testInitGrpcStream) Recv() (*Ydb_Topic.StreamReadMessage_FromServer, er
 		}, nil
 	}
 
-	<-s.recvBlock
+	<-s.recvContext.Done()
 
-	return nil, io.EOF
+	return nil, s.recvContext.Err()
 }
 
 func (s *testInitGrpcStream) CloseSend() error {
@@ -61,10 +60,12 @@ type testTopicClient struct {
 }
 
 func (c *testTopicClient) StreamRead(
-	_ context.Context,
+	ctx context.Context,
 	_ int64,
 	_ *trace.Topic,
 ) (rawtopicreader.StreamReader, error) {
+	c.stream.Stream.(*testInitGrpcStream).recvContext = ctx
+
 	return c.stream, nil
 }
 
@@ -77,7 +78,6 @@ func TestNewStreamListener_SeedsInitialReadRequest(t *testing.T) {
 
 	grpcStream := &testInitGrpcStream{
 		sessionID: "test-session-id",
-		recvBlock: make(chan struct{}),
 	}
 	client := &testTopicClient{
 		stream: rawtopicreader.StreamReader{
@@ -96,7 +96,6 @@ func TestNewStreamListener_SeedsInitialReadRequest(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, listener)
 	defer func() {
-		close(grpcStream.recvBlock)
 		require.NoError(t, listener.Close(ctx, nil))
 	}()
 
