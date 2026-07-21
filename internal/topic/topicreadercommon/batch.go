@@ -250,7 +250,8 @@ func BatchGetPartitionSession(item *PublicBatch) *PartitionSession {
 	return item.partitionSession()
 }
 
-func BatchGetBufferBytesAccount(batch *PublicBatch) int {
+// ReadBufferSize returns the number of bytes occupied by the batch in the read buffer.
+func (batch *PublicBatch) ReadBufferSize() int {
 	if batch == nil {
 		return 0
 	}

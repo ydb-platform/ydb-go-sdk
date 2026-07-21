@@ -49,8 +49,8 @@ func (s *syncMessageSender) SendRaw(msg rawtopicreader.ClientMessage) {
 	}
 }
 
-func (s *syncMessageSender) ReleaseReadBuffer(size int) {
-	s.mockMessageSender.ReleaseReadBuffer(size)
+func (s *syncMessageSender) ReadBufferRelease(size int) {
+	s.mockMessageSender.ReadBufferRelease(size)
 	select {
 	case s.messageReceived <- empty.Struct{}:
 	default:
@@ -98,7 +98,7 @@ func (m *mockMessageSender) SendRaw(msg rawtopicreader.ClientMessage) {
 	m.messages = append(m.messages, msg)
 }
 
-func (m *mockMessageSender) ReleaseReadBuffer(size int) {
+func (m *mockMessageSender) ReadBufferRelease(size int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.freedBuffer = append(m.freedBuffer, size)
@@ -206,14 +206,35 @@ func createTestBatch() *topicreadercommon.PublicBatch {
 	}
 }
 
-// createTestBatchWithBufferBytes returns a batch whose single message accounts for
-// size buffer bytes, so freeBuffer releases a non-zero credit.
-func createTestBatchWithBufferBytes(size int) *topicreadercommon.PublicBatch {
-	batch := createTestBatch()
-	topicreadercommon.MessageSetBufferBytesAccountForTest(batch.Messages[0], size)
-	batch, _ = topicreadercommon.NewBatch(nil, batch.Messages)
+// createTestBatchWithBufferBytes returns a batch whose single message occupies size bytes in the read buffer.
+func createTestBatchWithBufferBytes(t *testing.T, size int) *topicreadercommon.PublicBatch {
+	sessions := &topicreadercommon.PartitionSessionStorage{}
+	require.NoError(t, sessions.Add(createTestPartitionSession()))
 
-	return batch
+	batches, err := topicreadercommon.ReadRawBatchesToPublicBatches(
+		&rawtopicreader.ReadResponse{
+			BytesSize: size,
+			PartitionData: []rawtopicreader.PartitionData{
+				{
+					PartitionSessionID: 456,
+					Batches: []rawtopicreader.Batch{
+						{
+							Codec: rawtopiccommon.CodecRaw,
+							MessageData: []rawtopicreader.MessageData{
+								{Offset: 101},
+							},
+						},
+					},
+				},
+			},
+		},
+		sessions,
+		topicreadercommon.NewMultiDecoder(),
+	)
+	require.NoError(t, err)
+	require.Len(t, batches, 1)
+
+	return batches[0]
 }
 
 // =============================================================================
@@ -593,7 +614,7 @@ func TestPartitionWorkerInterface_HandlerMutationDoesNotChangeFreedBuffer(t *tes
 	const bufferSize = 17
 	worker.AddMessagesBatch(
 		rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
-		createTestBatchWithBufferBytes(bufferSize),
+		createTestBatchWithBufferBytes(t, bufferSize),
 	)
 
 	require.NoError(t, messageSender.waitForMessage(ctx))
@@ -737,7 +758,7 @@ type bareMessageSender struct {
 
 func (b *bareMessageSender) SendRaw(rawtopicreader.ClientMessage) {}
 
-func (b *bareMessageSender) ReleaseReadBuffer(size int) {
+func (b *bareMessageSender) ReadBufferRelease(size int) {
 	b.freed = append(b.freed, size)
 }
 

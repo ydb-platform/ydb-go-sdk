@@ -263,12 +263,6 @@ func MessageGetBufferBytesAccount(m *PublicMessage) int {
 	return m.bufferBytesAccount
 }
 
-func MessageSetBufferBytesAccountForTest(m *PublicMessage, size int) *PublicMessage {
-	m.bufferBytesAccount = size
-
-	return m
-}
-
 func MessageWithSetCommitRangeForTest(m *PublicMessage, commitRange CommitRange) *PublicMessage {
 	m.commitRange = commitRange
 

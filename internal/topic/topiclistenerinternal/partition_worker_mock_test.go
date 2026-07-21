@@ -95,38 +95,38 @@ func (m *MockReadBufferReleaser) EXPECT() *MockReadBufferReleaserMockRecorder {
 	return m.recorder
 }
 
-// ReleaseReadBuffer mocks base method.
-func (m *MockReadBufferReleaser) ReleaseReadBuffer(size int) {
+// ReadBufferRelease mocks base method.
+func (m *MockReadBufferReleaser) ReadBufferRelease(size int) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "ReleaseReadBuffer", size)
+	m.ctrl.Call(m, "ReadBufferRelease", size)
 }
 
-// ReleaseReadBuffer indicates an expected call of ReleaseReadBuffer.
-func (mr *MockReadBufferReleaserMockRecorder) ReleaseReadBuffer(size any) *MockReadBufferReleaserReleaseReadBufferCall {
+// ReadBufferRelease indicates an expected call of ReadBufferRelease.
+func (mr *MockReadBufferReleaserMockRecorder) ReadBufferRelease(size any) *MockReadBufferReleaserReadBufferReleaseCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseReadBuffer", reflect.TypeOf((*MockReadBufferReleaser)(nil).ReleaseReadBuffer), size)
-	return &MockReadBufferReleaserReleaseReadBufferCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadBufferRelease", reflect.TypeOf((*MockReadBufferReleaser)(nil).ReadBufferRelease), size)
+	return &MockReadBufferReleaserReadBufferReleaseCall{Call: call}
 }
 
-// MockReadBufferReleaserReleaseReadBufferCall wrap *gomock.Call
-type MockReadBufferReleaserReleaseReadBufferCall struct {
+// MockReadBufferReleaserReadBufferReleaseCall wrap *gomock.Call
+type MockReadBufferReleaserReadBufferReleaseCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockReadBufferReleaserReleaseReadBufferCall) Return() *MockReadBufferReleaserReleaseReadBufferCall {
+func (c *MockReadBufferReleaserReadBufferReleaseCall) Return() *MockReadBufferReleaserReadBufferReleaseCall {
 	c.Call = c.Call.Return()
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockReadBufferReleaserReleaseReadBufferCall) Do(f func(int)) *MockReadBufferReleaserReleaseReadBufferCall {
+func (c *MockReadBufferReleaserReadBufferReleaseCall) Do(f func(int)) *MockReadBufferReleaserReadBufferReleaseCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockReadBufferReleaserReleaseReadBufferCall) DoAndReturn(f func(int)) *MockReadBufferReleaserReleaseReadBufferCall {
+func (c *MockReadBufferReleaserReadBufferReleaseCall) DoAndReturn(f func(int)) *MockReadBufferReleaserReadBufferReleaseCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

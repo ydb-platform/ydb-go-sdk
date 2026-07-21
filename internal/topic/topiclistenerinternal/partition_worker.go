@@ -25,7 +25,7 @@ type MessageSender interface {
 
 // ReadBufferReleaser returns read-ahead buffer credit.
 type ReadBufferReleaser interface {
-	ReleaseReadBuffer(size int)
+	ReadBufferRelease(size int)
 }
 
 // unifiedMessage wraps messages that PartitionWorker can handle
@@ -39,7 +39,6 @@ type unifiedMessage struct {
 type batchMessage struct {
 	ServerMessageMetadata rawtopiccommon.ServerMessageMetadata
 	Batch                 *topicreadercommon.PublicBatch
-	BufferBytesAccount    int
 }
 
 // WorkerStoppedCallback notifies when worker is stopped
@@ -131,7 +130,6 @@ func (w *PartitionWorker) AddMessagesBatch(
 		BatchMessage: &batchMessage{
 			ServerMessageMetadata: metadata,
 			Batch:                 batch,
-			BufferBytesAccount:    topicreadercommon.BatchGetBufferBytesAccount(batch),
 		},
 	})
 }
@@ -308,7 +306,7 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 	// Release buffer credit when the batch leaves the worker (success, validation error,
 	// or handler error). defer — not after handler only — so credits are not leaked.
 	// Credit is tied to read/processing, not commit (protocol separates these; same as reader).
-	defer w.readBufferReleaser.ReleaseReadBuffer(msg.BufferBytesAccount)
+	defer w.readBufferReleaser.ReadBufferRelease(msg.Batch.ReadBufferSize())
 
 	// Check for errors in the metadata
 	if err := w.validateBatchMetadata(msg); err != nil {
@@ -344,7 +342,7 @@ func (w *PartitionWorker) freeBufferedBatchCredits() {
 	for _, msg := range w.messageQueue.DrainBuffered() {
 		// StartPartition / StopPartition do not consume read-ahead data bytes.
 		if msg.BatchMessage != nil {
-			w.readBufferReleaser.ReleaseReadBuffer(msg.BatchMessage.BufferBytesAccount)
+			w.readBufferReleaser.ReadBufferRelease(msg.BatchMessage.Batch.ReadBufferSize())
 		}
 	}
 }
@@ -450,7 +448,6 @@ func (w *PartitionWorker) tryMergeMessages(last, new unifiedMessage) (unifiedMes
 		return unifiedMessage{BatchMessage: &batchMessage{
 			ServerMessageMetadata: last.BatchMessage.ServerMessageMetadata,
 			Batch:                 result,
-			BufferBytesAccount:    topicreadercommon.BatchGetBufferBytesAccount(result),
 		}}, true
 	}
 
