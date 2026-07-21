@@ -454,6 +454,28 @@ func TestStreamListener_FlushPendingMessagesSendError(t *testing.T) {
 	}
 }
 
+func TestStreamListener_FlushPendingMessagesEmpty(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+
+	listener.flushPendingMessages(ctx)
+
+	require.Empty(t, listener.messagesToSend)
+}
+
+func TestStreamListener_ReadResponseConversionError(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+
+	err := listener.splitAndRouteReadResponse(&rawtopicreader.ReadResponse{
+		PartitionData: []rawtopicreader.PartitionData{
+			{PartitionSessionID: 100},
+		},
+	})
+	require.Error(t, err)
+}
+
 func TestStreamListener_RouteStopPartitionToExistingWorker(t *testing.T) {
 	e := fixenv.New(t)
 	ctx := sf.Context(e)
