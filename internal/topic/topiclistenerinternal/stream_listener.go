@@ -451,7 +451,7 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 		if !routed {
 			// Worker missing: batch is dropped but buffer was already charged above.
 			// Return credit here; routeToWorker stays non-fatal for protocol mismatch.
-			l.ReadBufferRelease(batchReadBufferSize(batch))
+			l.ReadBufferRelease(batch.ReadBufferSize())
 		}
 	}
 

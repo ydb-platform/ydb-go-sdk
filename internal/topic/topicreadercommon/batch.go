@@ -224,6 +224,20 @@ func BatchGetPartitionSession(item *PublicBatch) *PartitionSession {
 	return item.partitionSession()
 }
 
+// ReadBufferSize returns the number of bytes occupied by the batch in the read buffer.
+func (batch *PublicBatch) ReadBufferSize() int {
+	if batch == nil {
+		return 0
+	}
+
+	size := 0
+	for i := range batch.Messages {
+		size += batch.Messages[i].bufferBytesAccount
+	}
+
+	return size
+}
+
 func BatchSetCommitRangeForTest(b *PublicBatch, commitRange CommitRange) *PublicBatch {
 	b.commitRange = commitRange
 
