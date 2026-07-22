@@ -115,6 +115,22 @@ func (c *UnboundedChan[T]) Receive(ctx context.Context) (T, bool, error) {
 	}
 }
 
+// DrainBuffered removes and returns all currently buffered messages without blocking.
+func (c *UnboundedChan[T]) DrainBuffered() []T {
+	var drained []T
+
+	c.mutex.WithLock(func() {
+		if len(c.buffer) == 0 {
+			return
+		}
+
+		drained = c.buffer
+		c.buffer = make([]T, 0, cap(drained))
+	})
+
+	return drained
+}
+
 // Close closes the channel.
 // After closing, Send and SendWithMerge operations will be ignored,
 // and Receive will return (zero_value, false) once the buffer is empty.

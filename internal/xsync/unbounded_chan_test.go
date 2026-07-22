@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
@@ -376,4 +378,17 @@ func allSendersHaveMessages(received map[int]int, numSenders int) bool {
 	}
 
 	return true
+}
+
+func TestUnboundedChanDrainBuffered(t *testing.T) {
+	ch := NewUnboundedChan[int]()
+
+	require.Nil(t, ch.DrainBuffered())
+
+	ch.Send(1)
+	ch.Send(2)
+
+	drained := ch.DrainBuffered()
+	require.Equal(t, []int{1, 2}, drained)
+	require.Nil(t, ch.DrainBuffered())
 }

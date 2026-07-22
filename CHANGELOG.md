@@ -1,3 +1,5 @@
+* Added `topicoptions.WithListenerBufferSizeBytes` option for `TopicListener` to configure the read-ahead buffer size (default 1 MiB, same as topic reader).
+
 ## v3.144.6
 * Fixed expired idle sessions being starved behind frequently reused sessions in Table and Query session pools
 
