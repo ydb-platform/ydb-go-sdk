@@ -28,28 +28,30 @@ type CreateTopicRequest struct {
 }
 
 func (req *CreateTopicRequest) ToProto() *Ydb_Topic.CreateTopicRequest {
-	proto := &Ydb_Topic.CreateTopicRequest{
+	proto := Ydb_Topic.CreateTopicRequest_builder{
 		Path:                 req.Path,
 		PartitioningSettings: req.PartitioningSettings.ToProto(),
-	}
+	}.Build()
 
 	if req.RetentionPeriod != 0 {
-		proto.RetentionPeriod = durationpb.New(req.RetentionPeriod)
+		proto.SetRetentionPeriod(durationpb.New(req.RetentionPeriod))
 	}
-	proto.RetentionStorageMb = req.RetentionStorageMB
-	proto.SupportedCodecs = req.SupportedCodecs.ToProto()
-	proto.PartitionWriteSpeedBytesPerSecond = req.PartitionWriteSpeedBytesPerSecond
-	proto.PartitionWriteBurstBytes = req.PartitionWriteBurstBytes
-	proto.Attributes = req.Attributes
+	proto.SetRetentionStorageMb(req.RetentionStorageMB)
+	proto.SetSupportedCodecs(req.SupportedCodecs.ToProto())
+	proto.SetPartitionWriteSpeedBytesPerSecond(req.PartitionWriteSpeedBytesPerSecond)
+	proto.SetPartitionWriteBurstBytes(req.PartitionWriteBurstBytes)
+	proto.SetAttributes(req.Attributes)
 
-	proto.Consumers = make([]*Ydb_Topic.Consumer, len(req.Consumers))
+	proto.SetConsumers(make([]*Ydb_Topic.Consumer, len(req.Consumers)))
 	for i := range proto.GetConsumers() {
-		proto.Consumers[i] = req.Consumers[i].ToProto()
+		proto.GetConsumers()[i] = req.Consumers[i].ToProto()
 	}
 
-	proto.MeteringMode = Ydb_Topic.MeteringMode(req.MeteringMode)
+	proto.SetMeteringMode(Ydb_Topic.MeteringMode(req.MeteringMode))
 
-	proto.MetricsLevel = req.MetricsLevel.ToProto()
+	if req.MetricsLevel.HasValue {
+		proto.SetMetricsLevel(req.MetricsLevel.Value)
+	}
 
 	return proto
 }

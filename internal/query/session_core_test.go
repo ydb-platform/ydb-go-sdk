@@ -25,10 +25,10 @@ func TestSessionCoreCancelAttachOnDone(t *testing.T) {
 		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
-		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.CreateSessionResponse_builder{
 			Status:    Ydb.StatusIds_SUCCESS,
 			SessionId: "123",
-		}, nil)
+		}.Build(), nil)
 		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
 		stubAttachStreamContext(attachStream)
 		var (
@@ -45,13 +45,13 @@ func TestSessionCoreCancelAttachOnDone(t *testing.T) {
 			}
 			stopRecv <- struct{}{}
 
-			return &Ydb_Query.SessionState{
+			return Ydb_Query.SessionState_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil
+			}.Build(), nil
 		}).AnyTimes()
-		client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
+		client.EXPECT().AttachSession(gomock.Any(), Ydb_Query.AttachSessionRequest_builder{
 			SessionId: "123",
-		}).Return(attachStream, nil)
+		}.Build()).Return(attachStream, nil)
 		core, err := Open(ctx, client)
 		require.NoError(t, err)
 		require.NotNil(t, core)
@@ -74,10 +74,10 @@ func TestSessionCoreAttachError(t *testing.T) {
 		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
-		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.CreateSessionResponse_builder{
 			Status:    Ydb.StatusIds_SUCCESS,
 			SessionId: "123",
-		}, nil)
+		}.Build(), nil)
 		client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, _ *Ydb_Query.DeleteSessionRequest, _ ...grpc.CallOption) (
 				*Ydb_Query.DeleteSessionResponse, error,
@@ -89,9 +89,9 @@ func TestSessionCoreAttachError(t *testing.T) {
 		attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
 			return nil, errSessionClosed
 		}).AnyTimes()
-		client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
+		client.EXPECT().AttachSession(gomock.Any(), Ydb_Query.AttachSessionRequest_builder{
 			SessionId: "123",
-		}).Return(attachStream, nil)
+		}.Build()).Return(attachStream, nil)
 		core, err := Open(ctx, client)
 		require.ErrorIs(t, err, errSessionClosed)
 		require.Nil(t, core)
@@ -104,10 +104,10 @@ func TestSessionCoreClose(t *testing.T) {
 		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
-		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.CreateSessionResponse_builder{
 			Status:    Ydb.StatusIds_SUCCESS,
 			SessionId: "123",
-		}, nil)
+		}.Build(), nil)
 		attachStream := NewMockQueryService_AttachSessionClient(ctrl)
 		stubAttachStreamContext(attachStream)
 		var (
@@ -136,21 +136,21 @@ func TestSessionCoreClose(t *testing.T) {
 				return nil, t.Context().Err()
 			}
 
-			return &Ydb_Query.SessionState{
+			return Ydb_Query.SessionState_builder{
 				Status: Ydb.StatusIds_SUCCESS,
-			}, nil
+			}.Build(), nil
 		}).AnyTimes()
-		client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
+		client.EXPECT().AttachSession(gomock.Any(), Ydb_Query.AttachSessionRequest_builder{
 			SessionId: "123",
-		}).Return(attachStream, nil)
+		}.Build()).Return(attachStream, nil)
 		client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, _ *Ydb_Query.DeleteSessionRequest, _ ...grpc.CallOption) (
 				*Ydb_Query.DeleteSessionResponse, error,
 			) {
 				if sessionDeletes.CompareAndSwap(0, 1) {
-					return &Ydb_Query.DeleteSessionResponse{
+					return Ydb_Query.DeleteSessionResponse_builder{
 						Status: Ydb.StatusIds_SUCCESS,
-					}, nil
+					}.Build(), nil
 				}
 				sessionDeletes.Add(1)
 
@@ -190,11 +190,11 @@ func TestSessionCoreNodeShutdownHintBansConnection(t *testing.T) {
 		ctx := t.Context()
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
-		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.CreateSessionResponse_builder{
 			Status:    Ydb.StatusIds_SUCCESS,
 			SessionId: "123",
 			NodeId:    1,
-		}, nil)
+		}.Build(), nil)
 
 		var (
 			firstRecv   atomic.Bool
@@ -214,23 +214,21 @@ func TestSessionCoreNodeShutdownHintBansConnection(t *testing.T) {
 		stubAttachStreamContextWith(ctx, attachStream)
 		attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
 			if !firstRecv.Swap(true) {
-				return &Ydb_Query.SessionState{
+				return Ydb_Query.SessionState_builder{
 					Status: Ydb.StatusIds_SUCCESS,
-				}, nil
+				}.Build(), nil
 			}
 
 			<-deliverHint
 
-			return &Ydb_Query.SessionState{
-				Status: Ydb.StatusIds_SUCCESS,
-				SessionHint: &Ydb_Query.SessionState_NodeShutdown{
-					NodeShutdown: &Ydb_Query.NodeShutdownHint{},
-				},
-			}, nil
+			return Ydb_Query.SessionState_builder{
+				Status:       Ydb.StatusIds_SUCCESS,
+				NodeShutdown: &Ydb_Query.NodeShutdownHint{},
+			}.Build(), nil
 		}).AnyTimes()
-		client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
+		client.EXPECT().AttachSession(gomock.Any(), Ydb_Query.AttachSessionRequest_builder{
 			SessionId: "123",
-		}).Return(attachStream, nil)
+		}.Build()).Return(attachStream, nil)
 
 		core, err := Open(ctx, client)
 		require.NoError(t, err)
@@ -253,10 +251,10 @@ func TestSessionCoreSessionShutdownHintClosesSession(t *testing.T) {
 
 		ctrl := gomock.NewController(t)
 		client := NewMockQueryServiceClient(ctrl)
-		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+		client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.CreateSessionResponse_builder{
 			Status:    Ydb.StatusIds_SUCCESS,
 			SessionId: "123",
-		}, nil)
+		}.Build(), nil)
 
 		var (
 			firstRecv   atomic.Bool
@@ -271,23 +269,21 @@ func TestSessionCoreSessionShutdownHintClosesSession(t *testing.T) {
 		stubAttachStreamContext(attachStream)
 		attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
 			if !firstRecv.Swap(true) {
-				return &Ydb_Query.SessionState{
+				return Ydb_Query.SessionState_builder{
 					Status: Ydb.StatusIds_SUCCESS,
-				}, nil
+				}.Build(), nil
 			}
 
 			<-deliverHint
 
-			return &Ydb_Query.SessionState{
-				Status: Ydb.StatusIds_SUCCESS,
-				SessionHint: &Ydb_Query.SessionState_SessionShutdown{
-					SessionShutdown: &Ydb_Query.SessionShutdownHint{},
-				},
-			}, nil
+			return Ydb_Query.SessionState_builder{
+				Status:          Ydb.StatusIds_SUCCESS,
+				SessionShutdown: &Ydb_Query.SessionShutdownHint{},
+			}.Build(), nil
 		}).AnyTimes()
-		client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
+		client.EXPECT().AttachSession(gomock.Any(), Ydb_Query.AttachSessionRequest_builder{
 			SessionId: "123",
-		}).Return(attachStream, nil)
+		}.Build()).Return(attachStream, nil)
 
 		core, err := Open(ctx, client)
 		require.NoError(t, err)

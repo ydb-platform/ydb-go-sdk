@@ -18,9 +18,9 @@ func TestStatement_NumInput(t *testing.T) {
 	t.Run("with params", func(t *testing.T) {
 		s := &statement{
 			params: map[string]*Ydb.Type{
-				"$param1": {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32}},
-				"$param2": {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}},
-				"$param3": {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}},
+				"$param1": Ydb.Type_builder{TypeId: Ydb.Type_INT32.Enum()}.Build(),
+				"$param2": Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build(),
+				"$param3": Ydb.Type_builder{TypeId: Ydb.Type_BOOL.Enum()}.Build(),
 			},
 		}
 		require.Equal(t, 3, s.NumInput())

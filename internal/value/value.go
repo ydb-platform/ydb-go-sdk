@@ -14,6 +14,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -89,10 +91,10 @@ func ToYDB(v Value) *Ydb.TypedValue {
 		return nil
 	}
 
-	return &Ydb.TypedValue{
+	return Ydb.TypedValue_builder{
 		Type:  v.Type().ToYDB(),
 		Value: v.toYDB(),
-	}
+	}.Build()
 }
 
 // BigEndianUint128 builds a big-endian uint128 value.
@@ -114,10 +116,10 @@ func FromYDB(t *Ydb.Type, v *Ydb.Value) Value {
 
 func nullValueFromYDB(x *Ydb.Value, t types.Type) (_ Value, ok bool) {
 	for {
-		switch xx := x.GetValue().(type) {
-		case *Ydb.Value_NestedValue:
-			x = xx.NestedValue
-		case *Ydb.Value_NullFlagValue:
+		switch x.WhichValue() {
+		case Ydb.Value_NestedValue_case:
+			x = x.GetNestedValue()
+		case Ydb.Value_NullFlagValue_case:
 			switch tt := t.(type) {
 			case types.Optional:
 				return NullValue(tt.InnerType()), true
@@ -196,13 +198,13 @@ func primitiveValueFromYDB(t types.Primitive, v *Ydb.Value) (Value, error) {
 		return TextValue(v.GetTextValue()), nil
 
 	case types.YSON:
-		switch vv := v.GetValue().(type) {
-		case *Ydb.Value_TextValue:
-			return YSONValue(xstring.ToBytes(vv.TextValue)), nil
-		case *Ydb.Value_BytesValue:
-			return YSONValue(vv.BytesValue), nil
+		switch vv := v.WhichValue(); vv {
+		case Ydb.Value_TextValue_case:
+			return YSONValue(xstring.ToBytes(v.GetTextValue())), nil
+		case Ydb.Value_BytesValue_case:
+			return YSONValue(v.GetBytesValue()), nil
 		default:
-			return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered YSON internal type: %T", vv))
+			return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered YSON internal type: %v", vv))
 		}
 
 	case types.JSON:
@@ -255,13 +257,12 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		return DecimalValue(BigEndianUint128(v.GetHigh_128(), v.GetLow_128()), ttt.Precision(), ttt.Scale()), nil
 
 	case types.Optional:
-		tt, ok := t.GetType().(*Ydb.Type_OptionalType)
-		if !ok {
-			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Type_OptionalType", tt))
+		if t.WhichType() != Ydb.Type_OptionalType_case {
+			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Type_OptionalType", t))
 		}
-		t = tt.OptionalType.GetItem()
-		if nestedValue, ok := v.GetValue().(*Ydb.Value_NestedValue); ok {
-			return OptionalValue(FromYDB(t, nestedValue.NestedValue)), nil
+		t = t.GetOptionalType().GetItem()
+		if v.WhichValue() == Ydb.Value_NestedValue_case {
+			return OptionalValue(FromYDB(t, v.GetNestedValue())), nil
 		}
 
 		return OptionalValue(FromYDB(t, v)), nil
@@ -324,15 +325,15 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 	case *types.VariantStruct:
 
-		val, ok := v.GetValue().(*Ydb.Value_NestedValue)
-		if !ok {
-			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Value_NestedValue", val))
+		if v.WhichValue() != Ydb.Value_NestedValue_case {
+			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Value_NestedValue", v))
 		}
+		val := v.GetNestedValue()
 
 		return VariantValueStruct(
 			FromYDB(
 				ttt.Struct.Field(int(v.GetVariantIndex())).T.ToYDB(),
-				val.NestedValue,
+				val,
 			),
 			ttt.Struct.Field(int(v.GetVariantIndex())).Name,
 			ttt.Struct,
@@ -340,15 +341,15 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 	case *types.VariantTuple:
 
-		val, ok := v.GetValue().(*Ydb.Value_NestedValue)
-		if !ok {
-			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Value_NestedValue", val))
+		if v.WhichValue() != Ydb.Value_NestedValue_case {
+			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Value_NestedValue", v))
 		}
+		val := v.GetNestedValue()
 
 		return VariantValueTuple(
 			FromYDB(
 				ttt.Tuple.ItemType(int(v.GetVariantIndex())).ToYDB(),
-				val.NestedValue,
+				val,
 			),
 			v.GetVariantIndex(),
 			ttt.Tuple,
@@ -405,11 +406,9 @@ func (boolValue) Type() types.Type {
 }
 
 func (v boolValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_BoolValue{
-			BoolValue: bool(v),
-		},
-	}
+	return Ydb.Value_builder{
+		BoolValue: proto.Bool(bool(v)),
+	}.Build()
 }
 
 func BoolValue(v bool) boolValue {
@@ -457,11 +456,9 @@ func (dateValue) Type() types.Type {
 }
 
 func (v dateValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Uint32Value{
-			Uint32Value: uint32(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Uint32Value: proto.Uint32(uint32(v)),
+	}.Build()
 }
 
 // DateValue returns ydb date value by given days since Epoch
@@ -514,11 +511,9 @@ func (date32Value) Type() types.Type {
 }
 
 func (v date32Value) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Int32Value{
-			Int32Value: int32(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Int32Value: proto.Int32(int32(v)),
+	}.Build()
 }
 
 // Date32Value returns ydb date value from days around epoch time
@@ -578,11 +573,9 @@ func (datetimeValue) Type() types.Type {
 }
 
 func (v datetimeValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Uint32Value{
-			Uint32Value: uint32(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Uint32Value: proto.Uint32(uint32(v)),
+	}.Build()
 }
 
 // DatetimeValue makes ydb datetime value from seconds since Epoch
@@ -627,11 +620,9 @@ func (datetime64Value) Type() types.Type {
 }
 
 func (v datetime64Value) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Int64Value{
-			Int64Value: int64(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Int64Value: proto.Int64(int64(v)),
+	}.Build()
 }
 
 // Datetime64Value makes ydb datetime value from seconds around epoch time
@@ -703,12 +694,10 @@ func (v *decimalValue) toYDB() *Ydb.Value {
 		bytes = v.value
 	}
 
-	return &Ydb.Value{
+	return Ydb.Value_builder{
 		High_128: binary.BigEndian.Uint64(bytes[0:8]),
-		Value: &Ydb.Value_Low_128{
-			Low_128: binary.BigEndian.Uint64(bytes[8:16]),
-		},
-	}
+		Low_128:  proto.Uint64(binary.BigEndian.Uint64(bytes[8:16])),
+	}.Build()
 }
 
 func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) *decimalValue {
@@ -798,15 +787,15 @@ func (v *dictValue) toYDB() *Ydb.Value {
 	}
 	pairs := make([]*Ydb.ValuePair, 0, len(values))
 	for i := range values {
-		pairs = append(pairs, &Ydb.ValuePair{
+		pairs = append(pairs, Ydb.ValuePair_builder{
 			Key:     values[i].K.toYDB(),
 			Payload: values[i].V.toYDB(),
-		})
+		}.Build())
 	}
 
-	return &Ydb.Value{
+	return Ydb.Value_builder{
 		Pairs: pairs,
-	}
+	}.Build()
 }
 
 func DictValue(values ...DictValueField) *dictValue {
@@ -876,11 +865,9 @@ func (v *doubleValue) toYDB() *Ydb.Value {
 		value = v.value
 	}
 
-	return &Ydb.Value{
-		Value: &Ydb.Value_DoubleValue{
-			DoubleValue: value,
-		},
-	}
+	return Ydb.Value_builder{
+		DoubleValue: proto.Float64(value),
+	}.Build()
 }
 
 func DoubleValue(v float64) *doubleValue {
@@ -916,11 +903,9 @@ func (dyNumberValue) Type() types.Type {
 }
 
 func (v dyNumberValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_TextValue{
-			TextValue: string(v),
-		},
-	}
+	return Ydb.Value_builder{
+		TextValue: proto.String(string(v)),
+	}.Build()
 }
 
 func DyNumberValue(v string) dyNumberValue {
@@ -975,11 +960,9 @@ func (v *floatValue) toYDB() *Ydb.Value {
 		value = v.value
 	}
 
-	return &Ydb.Value{
-		Value: &Ydb.Value_FloatValue{
-			FloatValue: value,
-		},
-	}
+	return Ydb.Value_builder{
+		FloatValue: proto.Float32(value),
+	}.Build()
 }
 
 func FloatValue(v float32) *floatValue {
@@ -1047,11 +1030,9 @@ func (int8Value) Type() types.Type {
 }
 
 func (v int8Value) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Int32Value{
-			Int32Value: int32(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Int32Value: proto.Int32(int32(v)),
+	}.Build()
 }
 
 func Int8Value(v int8) int8Value {
@@ -1111,11 +1092,9 @@ func (int16Value) Type() types.Type {
 }
 
 func (v int16Value) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Int32Value{
-			Int32Value: int32(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Int32Value: proto.Int32(int32(v)),
+	}.Build()
 }
 
 func Int16Value(v int16) int16Value {
@@ -1183,11 +1162,9 @@ func (int32Value) Type() types.Type {
 }
 
 func (v int32Value) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Int32Value{
-			Int32Value: int32(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Int32Value: proto.Int32(int32(v)),
+	}.Build()
 }
 
 func Int32Value(v int32) int32Value {
@@ -1236,11 +1213,9 @@ func (int64Value) Type() types.Type {
 }
 
 func (v int64Value) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Int64Value{
-			Int64Value: int64(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Int64Value: proto.Int64(int64(v)),
+	}.Build()
 }
 
 func Int64Value(v int64) int64Value {
@@ -1318,11 +1293,9 @@ func (intervalValue) Type() types.Type {
 }
 
 func (v intervalValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Int64Value{
-			Int64Value: int64(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Int64Value: proto.Int64(int64(v)),
+	}.Build()
 }
 
 // IntervalValue makes Value from given microseconds value
@@ -1405,11 +1378,9 @@ func (interval64Value) Type() types.Type {
 }
 
 func (v interval64Value) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Int64Value{
-			Int64Value: int64(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Int64Value: proto.Int64(int64(v)),
+	}.Build()
 }
 
 // Interval64Value makes Value from given nanoseconds around epoch time
@@ -1460,11 +1431,9 @@ func (jsonValue) Type() types.Type {
 }
 
 func (v jsonValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_TextValue{
-			TextValue: string(v),
-		},
-	}
+	return Ydb.Value_builder{
+		TextValue: proto.String(string(v)),
+	}.Build()
 }
 
 func JSONValue(v string) jsonValue {
@@ -1518,11 +1487,9 @@ func (jsonDocumentValue) Type() types.Type {
 }
 
 func (v jsonDocumentValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_TextValue{
-			TextValue: string(v),
-		},
-	}
+	return Ydb.Value_builder{
+		TextValue: proto.String(string(v)),
+	}.Build()
 }
 
 func JSONDocumentValue(v string) jsonDocumentValue {
@@ -1607,12 +1574,12 @@ func (v *listValue) toYDB() *Ydb.Value {
 	if v != nil {
 		items = v.items
 	}
-	result := &Ydb.Value{
+	result := Ydb.Value_builder{
 		Items: make([]*Ydb.Value, 0, len(items)),
-	}
+	}.Build()
 
 	for _, vv := range items {
-		result.Items = append(result.Items, vv.toYDB())
+		result.SetItems(append(result.GetItems(), vv.toYDB()))
 	}
 
 	return result
@@ -1657,11 +1624,9 @@ func (v pgValue) Type() types.Type {
 }
 
 func (v pgValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_TextValue{
-			TextValue: v.val,
-		},
-	}
+	return Ydb.Value_builder{
+		TextValue: proto.String(v.val),
+	}.Build()
 }
 
 func (v pgValue) Yql() string {
@@ -1734,15 +1699,15 @@ func (v *setValue) Type() types.Type {
 }
 
 func (v *setValue) toYDB() *Ydb.Value {
-	result := &Ydb.Value{
+	result := Ydb.Value_builder{
 		Pairs: make([]*Ydb.ValuePair, 0, len(v.items)),
-	}
+	}.Build()
 
 	for _, vv := range v.items {
-		result.Pairs = append(result.Pairs, &Ydb.ValuePair{
+		result.SetPairs(append(result.GetPairs(), Ydb.ValuePair_builder{
 			Key:     vv.toYDB(),
 			Payload: _voidValue,
-		})
+		}.Build()))
 	}
 
 	return result
@@ -1841,19 +1806,17 @@ func (v *optionalValue) Type() types.Type {
 
 func (v *optionalValue) toYDB() *Ydb.Value {
 	if _, opt := v.value.(*optionalValue); opt {
-		return &Ydb.Value{
-			Value: &Ydb.Value_NestedValue{
-				NestedValue: v.value.toYDB(),
-			},
-		}
+		return Ydb.Value_builder{
+			NestedValue: proto.ValueOrDefault(v.value.toYDB()),
+		}.Build()
 	}
 	if v.value != nil {
 		return v.value.toYDB()
 	}
 
-	return &Ydb.Value{
-		Value: &Ydb.Value_NullFlagValue{},
-	}
+	return Ydb.Value_builder{
+		NullFlagValue: structpb.NullValue_NULL_VALUE.Enum(),
+	}.Build()
 }
 
 func OptionalValue(v Value) *optionalValue {
@@ -1939,12 +1902,12 @@ func (v *structValue) Type() types.Type {
 }
 
 func (v *structValue) toYDB() *Ydb.Value {
-	result := &Ydb.Value{
+	result := Ydb.Value_builder{
 		Items: make([]*Ydb.Value, 0, len(v.fields)),
-	}
+	}.Build()
 
 	for i := range v.fields {
-		result.Items = append(result.Items, v.fields[i].V.toYDB())
+		result.SetItems(append(result.GetItems(), v.fields[i].V.toYDB()))
 	}
 
 	return result
@@ -2002,11 +1965,9 @@ func (timestampValue) Type() types.Type {
 }
 
 func (v timestampValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Uint64Value{
-			Uint64Value: uint64(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Uint64Value: proto.Uint64(uint64(v)),
+	}.Build()
 }
 
 // TimestampValue makes ydb timestamp value by given microseconds since Epoch
@@ -2051,11 +2012,9 @@ func (timestamp64Value) Type() types.Type {
 }
 
 func (v timestamp64Value) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Int64Value{
-			Int64Value: int64(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Int64Value: proto.Int64(int64(v)),
+	}.Build()
 }
 
 // Timestamp64Value makes ydb timestamp value by given signed microseconds around Epoch
@@ -2121,7 +2080,7 @@ func (v *tupleValue) toYDB() *Ydb.Value {
 	vvv := &Ydb.Value{}
 
 	for _, vv := range items {
-		vvv.Items = append(vvv.GetItems(), vv.toYDB())
+		vvv.SetItems(append(vvv.GetItems(), vv.toYDB()))
 	}
 
 	return vvv
@@ -2168,11 +2127,9 @@ func (tzDateValue) Type() types.Type {
 }
 
 func (v tzDateValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_TextValue{
-			TextValue: string(v),
-		},
-	}
+	return Ydb.Value_builder{
+		TextValue: proto.String(string(v)),
+	}.Build()
 }
 
 func TzDateValue(v string) tzDateValue {
@@ -2212,11 +2169,9 @@ func (tzDatetimeValue) Type() types.Type {
 }
 
 func (v tzDatetimeValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_TextValue{
-			TextValue: string(v),
-		},
-	}
+	return Ydb.Value_builder{
+		TextValue: proto.String(string(v)),
+	}.Build()
 }
 
 func TzDatetimeValue(v string) tzDatetimeValue {
@@ -2272,11 +2227,9 @@ func (tzTimestampValue) Type() types.Type {
 }
 
 func (v tzTimestampValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_TextValue{
-			TextValue: string(v),
-		},
-	}
+	return Ydb.Value_builder{
+		TextValue: proto.String(string(v)),
+	}.Build()
 }
 
 func TzTimestampValue(v string) tzTimestampValue {
@@ -2356,11 +2309,9 @@ func (uint8Value) Type() types.Type {
 }
 
 func (v uint8Value) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Uint32Value{
-			Uint32Value: uint32(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Uint32Value: proto.Uint32(uint32(v)),
+	}.Build()
 }
 
 func Uint8Value(v uint8) uint8Value {
@@ -2428,11 +2379,9 @@ func (uint16Value) Type() types.Type {
 }
 
 func (v uint16Value) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Uint32Value{
-			Uint32Value: uint32(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Uint32Value: proto.Uint32(uint32(v)),
+	}.Build()
 }
 
 func Uint16Value(v uint16) uint16Value {
@@ -2488,11 +2437,9 @@ func (uint32Value) Type() types.Type {
 }
 
 func (v uint32Value) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Uint32Value{
-			Uint32Value: uint32(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Uint32Value: proto.Uint32(uint32(v)),
+	}.Build()
 }
 
 func Uint32Value(v uint32) uint32Value {
@@ -2542,11 +2489,9 @@ func (uint64Value) Type() types.Type {
 }
 
 func (v uint64Value) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_Uint64Value{
-			Uint64Value: uint64(v),
-		},
-	}
+	return Ydb.Value_builder{
+		Uint64Value: proto.Uint64(uint64(v)),
+	}.Build()
 }
 
 func Uint64Value(v uint64) uint64Value {
@@ -2591,11 +2536,9 @@ func (textValue) Type() types.Type {
 }
 
 func (v textValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_TextValue{
-			TextValue: string(v),
-		},
-	}
+	return Ydb.Value_builder{
+		TextValue: proto.String(string(v)),
+	}.Build()
 }
 
 func TextValue(v string) textValue {
@@ -2723,12 +2666,10 @@ func (v *uuidValue) toYDB() *Ydb.Value {
 		low, high = UUIDToHiLoPair(v.value)
 	}
 
-	return &Ydb.Value{
+	return Ydb.Value_builder{
 		High_128: high,
-		Value: &Ydb.Value_Low_128{
-			Low_128: low,
-		},
-	}
+		Low_128:  proto.Uint64(low),
+	}.Build()
 }
 
 func UUIDToHiLoPair(id uuid.UUID) (low, high uint64) {
@@ -2745,12 +2686,10 @@ func (v *uuidValue) toYDBWithBug() *Ydb.Value {
 		bytes = v.value
 	}
 
-	return &Ydb.Value{
+	return Ydb.Value_builder{
 		High_128: binary.BigEndian.Uint64(bytes[0:8]),
-		Value: &Ydb.Value_Low_128{
-			Low_128: binary.BigEndian.Uint64(bytes[8:16]),
-		},
-	}
+		Low_128:  proto.Uint64(binary.BigEndian.Uint64(bytes[8:16])),
+	}.Build()
 }
 
 func UUIDFromYDBPair(high uint64, low uint64) *uuidValue {
@@ -2920,12 +2859,10 @@ func (v *variantValue) Type() types.Type {
 }
 
 func (v *variantValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_NestedValue{
-			NestedValue: v.value.toYDB(),
-		},
+	return Ydb.Value_builder{
+		NestedValue:  proto.ValueOrDefault(v.value.toYDB()),
 		VariantIndex: v.idx,
-	}
+	}.Build()
 }
 
 func VariantValueTuple(v Value, idx uint32, t types.Type) *variantValue {
@@ -2991,9 +2928,9 @@ func (v voidValue) Yql() string {
 
 var (
 	_voidValueType = types.Void{}
-	_voidValue     = &Ydb.Value{
-		Value: new(Ydb.Value_NullFlagValue),
-	}
+	_voidValue     = Ydb.Value_builder{
+		NullFlagValue: structpb.NullValue_NULL_VALUE.Enum(),
+	}.Build()
 )
 
 func (voidValue) Type() types.Type {
@@ -3037,11 +2974,9 @@ func (ysonValue) Type() types.Type {
 }
 
 func (v ysonValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_BytesValue{
-			BytesValue: v,
-		},
-	}
+	return Ydb.Value_builder{
+		BytesValue: proto.ValueOrDefaultBytes(v),
+	}.Build()
 }
 
 func YSONValue(v []byte) ysonValue {
@@ -3227,11 +3162,9 @@ func (bytesValue) Type() types.Type {
 }
 
 func (v bytesValue) toYDB() *Ydb.Value {
-	return &Ydb.Value{
-		Value: &Ydb.Value_BytesValue{
-			BytesValue: v,
-		},
-	}
+	return Ydb.Value_builder{
+		BytesValue: proto.ValueOrDefaultBytes(v),
+	}.Build()
 }
 
 func BytesValue(v []byte) bytesValue {
@@ -3255,8 +3188,8 @@ func (v protobufValue) Yql() string {
 func (v protobufValue) castTo(dst any) error {
 	switch x := dst.(type) {
 	case *Ydb.TypedValue:
-		x.Type = v.pb.GetType()
-		x.Value = v.pb.GetValue()
+		x.SetType(v.pb.GetType())
+		x.SetValue(v.pb.GetValue())
 
 		return nil
 	default:

@@ -32,14 +32,14 @@ func Compare(l, r value.Value) (int, error) {
 func unwrapTypedValue(v *Ydb.TypedValue) *Ydb.TypedValue {
 	typ := v.GetType()
 	val := v.GetValue()
-	for opt := typ.GetOptionalType(); opt != nil; opt = typ.GetOptionalType() {
-		typ = opt.GetItem()
-		if nested := val.GetNestedValue(); nested != nil {
-			val = nested
+	for typ.WhichType() == Ydb.Type_OptionalType_case {
+		typ = typ.GetOptionalType().GetItem()
+		if val.WhichValue() == Ydb.Value_NestedValue_case {
+			val = val.GetNestedValue()
 		}
 	}
 
-	return &Ydb.TypedValue{Type: typ, Value: val}
+	return Ydb.TypedValue_builder{Type: typ, Value: val}.Build()
 }
 
 func compare(lhs, rhs *Ydb.TypedValue) (int, error) {
@@ -65,7 +65,7 @@ func expandItems(v *Ydb.TypedValue, itemType func(i int) *Ydb.Type) []*Ydb.Typed
 	size := len(v.GetValue().GetItems())
 	values := make([]*Ydb.TypedValue, 0, size)
 	for i, val := range v.GetValue().GetItems() {
-		values = append(values, unwrapTypedValue(&Ydb.TypedValue{Type: itemType(i), Value: val}))
+		values = append(values, unwrapTypedValue(Ydb.TypedValue_builder{Type: itemType(i), Value: val}.Build()))
 	}
 
 	return values
@@ -88,7 +88,10 @@ func expandTuple(v *Ydb.TypedValue) []*Ydb.TypedValue {
 	size := len(tuple.GetElements())
 	values := make([]*Ydb.TypedValue, 0, size)
 	for idx, typ := range tuple.GetElements() {
-		values = append(values, unwrapTypedValue(&Ydb.TypedValue{Type: typ, Value: v.GetValue().GetItems()[idx]}))
+		values = append(values, unwrapTypedValue(Ydb.TypedValue_builder{
+			Type:  typ,
+			Value: v.GetValue().GetItems()[idx],
+		}.Build()))
 	}
 
 	return values
@@ -99,8 +102,8 @@ func notComparableError(lhs, rhs any) error {
 }
 
 func comparePrimitives(t Ydb.Type_PrimitiveTypeId, lhs, rhs *Ydb.Value) (int, error) {
-	_, lIsNull := lhs.GetValue().(*Ydb.Value_NullFlagValue)
-	_, rIsNull := rhs.GetValue().(*Ydb.Value_NullFlagValue)
+	lIsNull := lhs.WhichValue() == Ydb.Value_NullFlagValue_case
+	rIsNull := rhs.WhichValue() == Ydb.Value_NullFlagValue_case
 	if lIsNull {
 		if rIsNull {
 			return 0, nil

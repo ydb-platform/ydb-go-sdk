@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
@@ -17,86 +18,60 @@ import (
 )
 
 var (
-	a = &Ydb.TypedValue{
-		Type: &Ydb.Type{
-			Type: &Ydb.Type_TypeId{
-				TypeId: Ydb.Type_UINT64,
-			},
-		},
-		Value: &Ydb.Value{
-			Value: &Ydb.Value_Uint64Value{
-				Uint64Value: 123,
-			},
-		},
-	}
-	b = &Ydb.TypedValue{
-		Type: &Ydb.Type{
-			Type: &Ydb.Type_TypeId{
-				TypeId: Ydb.Type_UUID,
-			},
-		},
-		Value: &Ydb.Value{
-			Value: &Ydb.Value_Low_128{
-				Low_128: 506660481424032516,
-			},
+	a = Ydb.TypedValue_builder{
+		Type: Ydb.Type_builder{
+			TypeId: Ydb.Type_UINT64.Enum(),
+		}.Build(),
+		Value: Ydb.Value_builder{
+			Uint64Value: proto.Uint64(123),
+		}.Build(),
+	}.Build()
+	b = Ydb.TypedValue_builder{
+		Type: Ydb.Type_builder{
+			TypeId: Ydb.Type_UUID.Enum(),
+		}.Build(),
+		Value: Ydb.Value_builder{
+			Low_128:  proto.Uint64(506660481424032516),
 			High_128: 1157159078456920585,
-		},
-	}
-	c = &Ydb.TypedValue{
-		Type: &Ydb.Type{
-			Type: &Ydb.Type_OptionalType{
-				OptionalType: &Ydb.OptionalType{
-					Item: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UINT64,
-						},
-					},
-				},
-			},
-		},
-		Value: &Ydb.Value{
-			Value: &Ydb.Value_Uint64Value{
-				Uint64Value: 123,
-			},
-		},
-	}
-	d = &Ydb.TypedValue{
-		Type: &Ydb.Type{
-			Type: &Ydb.Type_ListType{
-				ListType: &Ydb.ListType{
-					Item: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UINT64,
-						},
-					},
-				},
-			},
-		},
-		Value: &Ydb.Value{
+		}.Build(),
+	}.Build()
+	c = Ydb.TypedValue_builder{
+		Type: Ydb.Type_builder{
+			OptionalType: Ydb.OptionalType_builder{
+				Item: Ydb.Type_builder{
+					TypeId: Ydb.Type_UINT64.Enum(),
+				}.Build(),
+			}.Build(),
+		}.Build(),
+		Value: Ydb.Value_builder{
+			Uint64Value: proto.Uint64(123),
+		}.Build(),
+	}.Build()
+	d = Ydb.TypedValue_builder{
+		Type: Ydb.Type_builder{
+			ListType: Ydb.ListType_builder{
+				Item: Ydb.Type_builder{
+					TypeId: Ydb.Type_UINT64.Enum(),
+				}.Build(),
+			}.Build(),
+		}.Build(),
+		Value: Ydb.Value_builder{
 			Items: []*Ydb.Value{
-				{
-					Value: &Ydb.Value_Uint64Value{
-						Uint64Value: 123,
-					},
-				},
-				{
-					Value: &Ydb.Value_Uint64Value{
-						Uint64Value: 123,
-					},
-				},
-				{
-					Value: &Ydb.Value_Uint64Value{
-						Uint64Value: 123,
-					},
-				},
-				{
-					Value: &Ydb.Value_Uint64Value{
-						Uint64Value: 123,
-					},
-				},
+				Ydb.Value_builder{
+					Uint64Value: proto.Uint64(123),
+				}.Build(),
+				Ydb.Value_builder{
+					Uint64Value: proto.Uint64(123),
+				}.Build(),
+				Ydb.Value_builder{
+					Uint64Value: proto.Uint64(123),
+				}.Build(),
+				Ydb.Value_builder{
+					Uint64Value: proto.Uint64(123),
+				}.Build(),
 			},
-		},
-	}
+		}.Build(),
+	}.Build()
 )
 
 func makeParamsUsingParamsBuilder(tb testing.TB) params.Parameters {
@@ -214,30 +189,22 @@ func TestParamsFromMap(t *testing.T) {
 		require.NoError(t, err)
 		require.EqualValues(t,
 			fmt.Sprintf("%+v", map[string]*Ydb.TypedValue{
-				"$a": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_TIMESTAMP,
-						},
-					},
-					Value: &Ydb.Value{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 123000000,
-						},
-					},
-				},
-				"$b": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_INTERVAL,
-						},
-					},
-					Value: &Ydb.Value{
-						Value: &Ydb.Value_Int64Value{
-							Int64Value: 123,
-						},
-					},
-				},
+				"$a": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						TypeId: Ydb.Type_TIMESTAMP.Enum(),
+					}.Build(),
+					Value: Ydb.Value_builder{
+						Uint64Value: proto.Uint64(123000000),
+					}.Build(),
+				}.Build(),
+				"$b": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						TypeId: Ydb.Type_INTERVAL.Enum(),
+					}.Build(),
+					Value: Ydb.Value_builder{
+						Int64Value: proto.Int64(123),
+					}.Build(),
+				}.Build(),
 			}),
 			fmt.Sprintf("%+v", pp),
 		)
@@ -251,30 +218,22 @@ func TestParamsFromMap(t *testing.T) {
 		require.NoError(t, err)
 		require.EqualValues(t,
 			fmt.Sprintf("%+v", map[string]*Ydb.TypedValue{
-				"$a": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_TIMESTAMP64,
-						},
-					},
-					Value: &Ydb.Value{
-						Value: &Ydb.Value_Int64Value{
-							Int64Value: -2208988799999877,
-						},
-					},
-				},
-				"$b": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_INTERVAL64,
-						},
-					},
-					Value: &Ydb.Value{
-						Value: &Ydb.Value_Int64Value{
-							Int64Value: 123,
-						},
-					},
-				},
+				"$a": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						TypeId: Ydb.Type_TIMESTAMP64.Enum(),
+					}.Build(),
+					Value: Ydb.Value_builder{
+						Int64Value: proto.Int64(-2208988799999877),
+					}.Build(),
+				}.Build(),
+				"$b": Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						TypeId: Ydb.Type_INTERVAL64.Enum(),
+					}.Build(),
+					Value: Ydb.Value_builder{
+						Int64Value: proto.Int64(123),
+					}.Build(),
+				}.Build(),
 			}),
 			fmt.Sprintf("%+v", pp),
 		)

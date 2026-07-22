@@ -207,9 +207,9 @@ func TestUnwrapError(t *testing.T) {
 								xerrors.Operation(
 									xerrors.WithStatusCode(Ydb.StatusIds_BAD_REQUEST),
 									xerrors.WithIssues([]*Ydb_Issue.IssueMessage{
-										{
+										Ydb_Issue.IssueMessage_builder{
 											Message: "test12_1",
-										},
+										}.Build(),
 									}),
 								),
 							),
@@ -222,9 +222,9 @@ func TestUnwrapError(t *testing.T) {
 				xerrors.Operation(
 					xerrors.WithStatusCode(Ydb.StatusIds_BAD_REQUEST),
 					xerrors.WithIssues([]*Ydb_Issue.IssueMessage{
-						{
+						Ydb_Issue.IssueMessage_builder{
 							Message: "test12_1",
-						},
+						}.Build(),
 					}),
 				),
 				errors.New("test12_2"),

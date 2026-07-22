@@ -440,7 +440,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		msg := &Ydb_Query.ExecuteQueryResponsePart{}
 		mockStream.EXPECT().RecvMsg(msg).DoAndReturn(func(m any) error {
 			resp := m.(*Ydb_Query.ExecuteQueryResponsePart)
-			resp.Status = Ydb.StatusIds_SUCCESS
+			resp.SetStatus(Ydb.StatusIds_SUCCESS)
 
 			return nil
 		})
@@ -753,7 +753,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		msg := &Ydb_Query.ExecuteQueryResponsePart{}
 		mockStream.EXPECT().RecvMsg(msg).DoAndReturn(func(m any) error {
 			resp := m.(*Ydb_Query.ExecuteQueryResponsePart)
-			resp.Status = Ydb.StatusIds_UNAVAILABLE
+			resp.SetStatus(Ydb.StatusIds_UNAVAILABLE)
 
 			return nil
 		})
@@ -785,7 +785,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		msg := &Ydb_Query.ExecuteQueryResponsePart{}
 		mockStream.EXPECT().RecvMsg(msg).DoAndReturn(func(m any) error {
 			resp := m.(*Ydb_Query.ExecuteQueryResponsePart)
-			resp.Status = Ydb.StatusIds_UNAVAILABLE
+			resp.SetStatus(Ydb.StatusIds_UNAVAILABLE)
 
 			return nil
 		})

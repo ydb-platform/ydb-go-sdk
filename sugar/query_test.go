@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
 
 	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -47,31 +48,23 @@ type rowTestStruct struct {
 // newRow return row for unmarshal to rowTestStruct
 func newRow(id uint64, str string) *internalQuery.Row {
 	return internalQuery.NewRow([]*Ydb.Column{
-		{
+		Ydb.Column_builder{
 			Name: "id",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT64,
-				},
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT64.Enum(),
+			}.Build(),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "myStr",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UTF8,
-				},
-			},
-		},
-	}, &Ydb.Value{
-		Items: []*Ydb.Value{{
-			Value: &Ydb.Value_Uint64Value{
-				Uint64Value: id,
-			},
-		}, {
-			Value: &Ydb.Value_TextValue{
-				TextValue: str,
-			},
-		}},
-	})
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UTF8.Enum(),
+			}.Build(),
+		}.Build(),
+	}, Ydb.Value_builder{
+		Items: []*Ydb.Value{Ydb.Value_builder{
+			Uint64Value: proto.Uint64(id),
+		}.Build(), Ydb.Value_builder{
+			TextValue: proto.String(str),
+		}.Build()},
+	}.Build())
 }

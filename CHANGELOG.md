@@ -1,3 +1,5 @@
+* Migrated internal protobuf usage from Struct API to Opaque API (builders, setters and getters) and bumped `ydb-go-genproto` to the hybrid-api generation
+
 ## v3.144.6
 * Fixed expired idle sessions being starved behind frequently reused sessions in Table and Query session pools
 

@@ -71,9 +71,9 @@ func fetchScriptResults(ctx context.Context,
 ) (*options.FetchScriptResult, error) {
 	r, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*options.FetchScriptResult, error) {
 		request := &options.FetchScriptResultsRequest{
-			FetchScriptResultsRequest: Ydb_Query.FetchScriptResultsRequest{
+			FetchScriptResultsRequest: Ydb_Query.FetchScriptResultsRequest_builder{
 				OperationId: opID,
-			},
+			}.Build(),
 		}
 		for _, opt := range opts {
 			if opt != nil {
@@ -81,7 +81,7 @@ func fetchScriptResults(ctx context.Context,
 			}
 		}
 
-		response, err := client.FetchScriptResults(ctx, &request.FetchScriptResultsRequest)
+		response, err := client.FetchScriptResults(ctx, request.FetchScriptResultsRequest)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}

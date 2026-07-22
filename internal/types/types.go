@@ -5,6 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
@@ -22,63 +23,72 @@ func TypeToYDB(t Type) *Ydb.Type {
 }
 
 func TypeFromYDB(x *Ydb.Type) Type {
-	switch v := x.GetType().(type) {
-	case *Ydb.Type_TypeId:
-		return primitiveTypeFromYDB(v.TypeId)
+	switch x.WhichType() {
+	case Ydb.Type_TypeId_case:
+		return primitiveTypeFromYDB(x.GetTypeId())
 
-	case *Ydb.Type_OptionalType:
-		return NewOptional(TypeFromYDB(v.OptionalType.GetItem()))
+	case Ydb.Type_OptionalType_case:
+		return NewOptional(TypeFromYDB(x.GetOptionalType().GetItem()))
 
-	case *Ydb.Type_ListType:
-		return NewList(TypeFromYDB(v.ListType.GetItem()))
+	case Ydb.Type_ListType_case:
+		return NewList(TypeFromYDB(x.GetListType().GetItem()))
 
-	case *Ydb.Type_DecimalType:
-		d := v.DecimalType
+	case Ydb.Type_DecimalType_case:
+		d := x.GetDecimalType()
 
 		return NewDecimal(d.GetPrecision(), d.GetScale())
 
-	case *Ydb.Type_TupleType:
-		t := v.TupleType
+	case Ydb.Type_TupleType_case:
+		t := x.GetTupleType()
 
 		return NewTuple(FromYDB(t.GetElements())...)
 
-	case *Ydb.Type_StructType:
-		s := v.StructType
+	case Ydb.Type_StructType_case:
+		s := x.GetStructType()
 
 		return NewStruct(StructFields(s.GetMembers())...)
 
-	case *Ydb.Type_DictType:
-		keyType, valueType := TypeFromYDB(v.DictType.GetKey()), TypeFromYDB(v.DictType.GetPayload())
+	case Ydb.Type_DictType_case:
+		keyType, valueType := TypeFromYDB(x.GetDictType().GetKey()), TypeFromYDB(x.GetDictType().GetPayload())
 		if valueType.equalsTo(NewVoid()) {
 			return NewSet(keyType)
 		}
 
 		return NewDict(keyType, valueType)
 
-	case *Ydb.Type_VariantType:
-		t := v.VariantType
-		switch x := t.GetType().(type) {
-		case *Ydb.VariantType_TupleItems:
-			return NewVariantTuple(FromYDB(x.TupleItems.GetElements())...)
-		case *Ydb.VariantType_StructItems:
-			return NewVariantStruct(StructFields(x.StructItems.GetMembers())...)
-		default:
-			panic("ydb: unknown variant type")
-		}
+	case Ydb.Type_VariantType_case:
+		return variantTypeFromYDB(x.GetVariantType())
 
-	case *Ydb.Type_VoidType:
+	case Ydb.Type_VoidType_case:
 		return NewVoid()
 
-	case *Ydb.Type_NullType:
+	case Ydb.Type_NullType_case:
 		return NewNull()
 
-	case *Ydb.Type_PgType:
+	case Ydb.Type_PgType_case:
 		return &PgType{
 			OID: x.GetPgType().GetOid(),
 		}
 
+	case Ydb.Type_EmptyListType_case:
+		return NewEmptyList()
+
+	case Ydb.Type_EmptyDictType_case:
+		return NewEmptyDict()
+
 	default:
-		panic(fmt.Sprintf("ydb: unknown type %T", x.GetType()))
+		panic(fmt.Sprintf("ydb: unknown type %v", x.WhichType()))
+	}
+}
+
+func variantTypeFromYDB(t *Ydb.VariantType) Type {
+	switch t.WhichType() {
+	case Ydb.VariantType_TupleItems_case:
+		return NewVariantTuple(FromYDB(t.GetTupleItems().GetElements())...)
+	case Ydb.VariantType_StructItems_case:
+		return NewVariantStruct(StructFields(t.GetStructItems().GetMembers())...)
+	default:
+		panic("ydb: unknown variant type")
 	}
 }
 
@@ -193,14 +203,12 @@ func (v *Decimal) equalsTo(rhs Type) bool {
 }
 
 func (v *Decimal) ToYDB() *Ydb.Type {
-	return &Ydb.Type{
-		Type: &Ydb.Type_DecimalType{
-			DecimalType: &Ydb.DecimalType{
-				Precision: v.precision,
-				Scale:     v.scale,
-			},
-		},
-	}
+	return Ydb.Type_builder{
+		DecimalType: Ydb.DecimalType_builder{
+			Precision: v.precision,
+			Scale:     v.scale,
+		}.Build(),
+	}.Build()
 }
 
 func NewDecimal(precision, scale uint32) *Decimal {
@@ -258,14 +266,12 @@ func (v *Dict) equalsTo(rhs Type) bool {
 }
 
 func (v *Dict) ToYDB() *Ydb.Type {
-	return &Ydb.Type{
-		Type: &Ydb.Type_DictType{
-			DictType: &Ydb.DictType{
-				Key:     v.keyType.ToYDB(),
-				Payload: v.valueType.ToYDB(),
-			},
-		},
-	}
+	return Ydb.Type_builder{
+		DictType: Ydb.DictType_builder{
+			Key:     v.keyType.ToYDB(),
+			Payload: v.valueType.ToYDB(),
+		}.Build(),
+	}.Build()
 }
 
 func NewDict(key, value Type) (v *Dict) {
@@ -292,10 +298,9 @@ func (EmptyList) equalsTo(rhs Type) bool {
 }
 
 func (v EmptyList) ToYDB() *Ydb.Type {
-	t := &Ydb.Type{}
-	t.Type = &Ydb.Type_EmptyListType{}
-
-	return t
+	return Ydb.Type_builder{
+		EmptyListType: structpb.NullValue_NULL_VALUE.Enum(),
+	}.Build()
 }
 
 func NewEmptyList() EmptyList {
@@ -319,10 +324,9 @@ func (EmptyDict) equalsTo(rhs Type) bool {
 }
 
 func (v EmptyDict) ToYDB() *Ydb.Type {
-	t := &Ydb.Type{}
-	t.Type = &Ydb.Type_EmptyDictType{}
-
-	return t
+	return Ydb.Type_builder{
+		EmptyDictType: structpb.NullValue_NULL_VALUE.Enum(),
+	}.Build()
 }
 
 func EmptySet() EmptyDict {
@@ -359,15 +363,11 @@ func (v *List) equalsTo(rhs Type) bool {
 }
 
 func (v *List) ToYDB() *Ydb.Type {
-	t := &Ydb.Type{}
-	list := &Ydb.ListType{
-		Item: v.itemType.ToYDB(),
-	}
-	t.Type = &Ydb.Type_ListType{
-		ListType: list,
-	}
-
-	return t
+	return Ydb.Type_builder{
+		ListType: Ydb.ListType_builder{
+			Item: v.itemType.ToYDB(),
+		}.Build(),
+	}.Build()
 }
 
 func NewList(t Type) *List {
@@ -402,16 +402,12 @@ func (v *Set) equalsTo(rhs Type) bool {
 }
 
 func (v *Set) ToYDB() *Ydb.Type {
-	t := &Ydb.Type{}
-	dict := &Ydb.DictType{
-		Key:     v.itemType.ToYDB(),
-		Payload: _voidType,
-	}
-	t.Type = &Ydb.Type_DictType{
-		DictType: dict,
-	}
-
-	return t
+	return Ydb.Type_builder{
+		DictType: Ydb.DictType_builder{
+			Key:     v.itemType.ToYDB(),
+			Payload: _voidType,
+		}.Build(),
+	}.Build()
 }
 
 func NewSet(t Type) *Set {
@@ -448,15 +444,11 @@ func (v Optional) equalsTo(rhs Type) bool {
 }
 
 func (v Optional) ToYDB() *Ydb.Type {
-	t := &Ydb.Type{}
-	optional := &Ydb.OptionalType{
-		Item: v.innerType.ToYDB(),
-	}
-	t.Type = &Ydb.Type_OptionalType{
-		OptionalType: optional,
-	}
-
-	return t
+	return Ydb.Type_builder{
+		OptionalType: Ydb.OptionalType_builder{
+			Item: v.innerType.ToYDB(),
+		}.Build(),
+	}.Build()
 }
 
 func NewOptional(t Type) Optional {
@@ -478,13 +470,9 @@ func (v PgType) Yql() string {
 }
 
 func (v PgType) ToYDB() *Ydb.Type {
-	//nolint:godox
-	// TODO: make allocator
-	return &Ydb.Type{Type: &Ydb.Type_PgType{
-		PgType: &Ydb.PgType{
-			Oid: v.OID,
-		},
-	}}
+	return Ydb.Type_builder{PgType: Ydb.PgType_builder{
+		Oid: v.OID,
+	}.Build()}.Build()
 }
 
 func (v PgType) equalsTo(rhs Type) bool {
@@ -540,35 +528,35 @@ const (
 )
 
 var primitive = [...]*Ydb.Type{
-	Bool:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}},
-	Int8:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT8}},
-	Uint8:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT8}},
-	Int16:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT16}},
-	Uint16:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT16}},
-	Int32:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32}},
-	Uint32:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT32}},
-	Int64:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64}},
-	Uint64:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}},
-	Float:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_FLOAT}},
-	Double:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DOUBLE}},
-	Date:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE}},
-	Date32:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE32}},
-	Datetime:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME}},
-	Datetime64:   {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME64}},
-	Timestamp:    {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP}},
-	Timestamp64:  {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP64}},
-	Interval:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL}},
-	Interval64:   {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL64}},
-	TzDate:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATE}},
-	TzDatetime:   {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATETIME}},
-	TzTimestamp:  {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_TIMESTAMP}},
-	Bytes:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING}},
-	Text:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}},
-	YSON:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_YSON}},
-	JSON:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON}},
-	UUID:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID}},
-	JSONDocument: {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON_DOCUMENT}},
-	DyNumber:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DYNUMBER}},
+	Bool:         Ydb.Type_builder{TypeId: Ydb.Type_BOOL.Enum()}.Build(),
+	Int8:         Ydb.Type_builder{TypeId: Ydb.Type_INT8.Enum()}.Build(),
+	Uint8:        Ydb.Type_builder{TypeId: Ydb.Type_UINT8.Enum()}.Build(),
+	Int16:        Ydb.Type_builder{TypeId: Ydb.Type_INT16.Enum()}.Build(),
+	Uint16:       Ydb.Type_builder{TypeId: Ydb.Type_UINT16.Enum()}.Build(),
+	Int32:        Ydb.Type_builder{TypeId: Ydb.Type_INT32.Enum()}.Build(),
+	Uint32:       Ydb.Type_builder{TypeId: Ydb.Type_UINT32.Enum()}.Build(),
+	Int64:        Ydb.Type_builder{TypeId: Ydb.Type_INT64.Enum()}.Build(),
+	Uint64:       Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build(),
+	Float:        Ydb.Type_builder{TypeId: Ydb.Type_FLOAT.Enum()}.Build(),
+	Double:       Ydb.Type_builder{TypeId: Ydb.Type_DOUBLE.Enum()}.Build(),
+	Date:         Ydb.Type_builder{TypeId: Ydb.Type_DATE.Enum()}.Build(),
+	Date32:       Ydb.Type_builder{TypeId: Ydb.Type_DATE32.Enum()}.Build(),
+	Datetime:     Ydb.Type_builder{TypeId: Ydb.Type_DATETIME.Enum()}.Build(),
+	Datetime64:   Ydb.Type_builder{TypeId: Ydb.Type_DATETIME64.Enum()}.Build(),
+	Timestamp:    Ydb.Type_builder{TypeId: Ydb.Type_TIMESTAMP.Enum()}.Build(),
+	Timestamp64:  Ydb.Type_builder{TypeId: Ydb.Type_TIMESTAMP64.Enum()}.Build(),
+	Interval:     Ydb.Type_builder{TypeId: Ydb.Type_INTERVAL.Enum()}.Build(),
+	Interval64:   Ydb.Type_builder{TypeId: Ydb.Type_INTERVAL64.Enum()}.Build(),
+	TzDate:       Ydb.Type_builder{TypeId: Ydb.Type_TZ_DATE.Enum()}.Build(),
+	TzDatetime:   Ydb.Type_builder{TypeId: Ydb.Type_TZ_DATETIME.Enum()}.Build(),
+	TzTimestamp:  Ydb.Type_builder{TypeId: Ydb.Type_TZ_TIMESTAMP.Enum()}.Build(),
+	Bytes:        Ydb.Type_builder{TypeId: Ydb.Type_STRING.Enum()}.Build(),
+	Text:         Ydb.Type_builder{TypeId: Ydb.Type_UTF8.Enum()}.Build(),
+	YSON:         Ydb.Type_builder{TypeId: Ydb.Type_YSON.Enum()}.Build(),
+	JSON:         Ydb.Type_builder{TypeId: Ydb.Type_JSON.Enum()}.Build(),
+	UUID:         Ydb.Type_builder{TypeId: Ydb.Type_UUID.Enum()}.Build(),
+	JSONDocument: Ydb.Type_builder{TypeId: Ydb.Type_JSON_DOCUMENT.Enum()}.Build(),
+	DyNumber:     Ydb.Type_builder{TypeId: Ydb.Type_DYNUMBER.Enum()}.Build(),
 }
 
 var primitiveString = [...]string{
@@ -684,22 +672,19 @@ func (v *Struct) equalsTo(rhs Type) bool {
 }
 
 func (v *Struct) ToYDB() *Ydb.Type {
-	t := &Ydb.Type{}
-
-	structType := &Ydb.StructType{}
+	members := make([]*Ydb.StructMember, len(v.fields))
 	for i := range v.fields {
-		member := &Ydb.StructMember{
+		members[i] = Ydb.StructMember_builder{
 			Name: v.fields[i].Name,
 			Type: v.fields[i].T.ToYDB(),
-		}
-		structType.Members = append(structType.Members, member)
+		}.Build()
 	}
 
-	t.Type = &Ydb.Type_StructType{
-		StructType: structType,
-	}
-
-	return t
+	return Ydb.Type_builder{
+		StructType: Ydb.StructType_builder{
+			Members: members,
+		}.Build(),
+	}.Build()
 }
 
 func NewStruct(fields ...StructField) (v *Struct) {
@@ -775,23 +760,18 @@ func (v *Tuple) equalsTo(rhs Type) bool {
 }
 
 func (v *Tuple) ToYDB() *Ydb.Type {
-	var items []Type
+	var items []*Ydb.Type
 	if v != nil {
-		items = v.innerTypes
+		for _, inner := range v.innerTypes {
+			items = append(items, inner.ToYDB())
+		}
 	}
 
-	t := &Ydb.Type{}
-
-	tupleType := &Ydb.TupleType{}
-	for _, vv := range items {
-		tupleType.Elements = append(tupleType.Elements, vv.ToYDB())
-	}
-
-	t.Type = &Ydb.Type_TupleType{
-		TupleType: tupleType,
-	}
-
-	return t
+	return Ydb.Type_builder{
+		TupleType: Ydb.TupleType_builder{
+			Elements: items,
+		}.Build(),
+	}.Build()
 }
 
 func NewTuple(items ...Type) (v *Tuple) {
@@ -837,17 +817,11 @@ func (v *VariantStruct) equalsTo(rhs Type) bool {
 }
 
 func (v *VariantStruct) ToYDB() *Ydb.Type {
-	t := &Ydb.Type{}
-	variantType := &Ydb.VariantType{}
-	structItems := &Ydb.VariantType_StructItems{
-		StructItems: v.Struct.ToYDB().GetStructType(),
-	}
-	variantType.Type = structItems
-	t.Type = &Ydb.Type_VariantType{
-		VariantType: variantType,
-	}
-
-	return t
+	return Ydb.Type_builder{
+		VariantType: Ydb.VariantType_builder{
+			StructItems: v.Struct.ToYDB().GetStructType(),
+		}.Build(),
+	}.Build()
 }
 
 func NewVariantStruct(fields ...StructField) *VariantStruct {
@@ -891,17 +865,11 @@ func (v *VariantTuple) equalsTo(rhs Type) bool {
 }
 
 func (v *VariantTuple) ToYDB() *Ydb.Type {
-	t := &Ydb.Type{}
-	variantType := &Ydb.VariantType{}
-	tupleItems := &Ydb.VariantType_TupleItems{
-		TupleItems: v.Tuple.ToYDB().GetTupleType(),
-	}
-	variantType.Type = tupleItems
-	t.Type = &Ydb.Type_VariantType{
-		VariantType: variantType,
-	}
-
-	return t
+	return Ydb.Type_builder{
+		VariantType: Ydb.VariantType_builder{
+			TupleItems: v.Tuple.ToYDB().GetTupleType(),
+		}.Build(),
+	}.Build()
 }
 
 func NewVariantTuple(items ...Type) *VariantTuple {
@@ -920,9 +888,9 @@ func (v Void) Yql() string {
 	return "Void"
 }
 
-var _voidType = &Ydb.Type{
-	Type: &Ydb.Type_VoidType{},
-}
+var _voidType = Ydb.Type_builder{
+	VoidType: structpb.NullValue_NULL_VALUE.Enum(),
+}.Build()
 
 func (v Void) equalsTo(rhs Type) bool {
 	_, ok := rhs.(Void)
@@ -948,9 +916,9 @@ func (v Null) Yql() string {
 	return "Null"
 }
 
-var _nullType = &Ydb.Type{
-	Type: &Ydb.Type_NullType{},
-}
+var _nullType = Ydb.Type_builder{
+	NullType: structpb.NullValue_NULL_VALUE.Enum(),
+}.Build()
 
 func (v Null) equalsTo(rhs Type) bool {
 	_, ok := rhs.(Null)

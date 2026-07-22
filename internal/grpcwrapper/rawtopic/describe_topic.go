@@ -23,12 +23,12 @@ type DescribeTopicRequest struct {
 }
 
 func (req *DescribeTopicRequest) ToProto() *Ydb_Topic.DescribeTopicRequest {
-	return &Ydb_Topic.DescribeTopicRequest{
+	return Ydb_Topic.DescribeTopicRequest_builder{
 		OperationParams: req.OperationParams.ToProto(),
 		Path:            req.Path,
 		IncludeStats:    req.IncludeStats,
 		IncludeLocation: req.IncludeLocation,
-	}
+	}.Build()
 }
 
 type DescribeTopicResult struct {
@@ -94,7 +94,12 @@ func (res *DescribeTopicResult) FromProto(response operation.Response) error {
 
 	res.MeteringMode = MeteringMode(protoResult.GetMeteringMode())
 
-	res.MetricsLevel.MustFromProto(protoResult.MetricsLevel)
+	if protoResult.HasMetricsLevel() {
+		res.MetricsLevel = rawoptional.Uint32{
+			Value:    protoResult.GetMetricsLevel(),
+			HasValue: true,
+		}
+	}
 
 	return nil
 }

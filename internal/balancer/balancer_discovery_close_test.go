@@ -54,20 +54,20 @@ func (s *dynamicDiscoveryService) ListEndpoints(
 ) (*Ydb_Discovery.ListEndpointsResponse, error) {
 	endpoints := s.srv.currentEndpoints()
 
-	return &Ydb_Discovery.ListEndpointsResponse{
-		Operation: discoveryOperationOK(&Ydb_Discovery.ListEndpointsResult{
+	return Ydb_Discovery.ListEndpointsResponse_builder{
+		Operation: discoveryOperationOK(Ydb_Discovery.ListEndpointsResult_builder{
 			Endpoints: endpoints,
-		}),
-	}, nil
+		}.Build()),
+	}.Build(), nil
 }
 
 func (s *dynamicDiscoveryService) WhoAmI(
 	_ context.Context,
 	_ *Ydb_Discovery.WhoAmIRequest,
 ) (*Ydb_Discovery.WhoAmIResponse, error) {
-	return &Ydb_Discovery.WhoAmIResponse{
+	return Ydb_Discovery.WhoAmIResponse_builder{
 		Operation: discoveryOperationOK(&emptypb.Empty{}),
-	}, nil
+	}.Build(), nil
 }
 
 func (s *dynamicDiscoveryServer) currentEndpoints() []*Ydb_Discovery.EndpointInfo {
@@ -169,14 +169,14 @@ func startDynamicDiscoveryServer(tb testing.TB, nodeIDs []uint32) *dynamicDiscov
 func mockDiscoveryEndpoints(host string, port uint32, nodeIDs []uint32) []*Ydb_Discovery.EndpointInfo {
 	endpoints := make([]*Ydb_Discovery.EndpointInfo, len(nodeIDs))
 	for i, nodeID := range nodeIDs {
-		endpoints[i] = &Ydb_Discovery.EndpointInfo{
+		endpoints[i] = Ydb_Discovery.EndpointInfo_builder{
 			Address:    host,
 			Port:       port,
 			LoadFactor: 0,
 			Ssl:        false,
 			NodeId:     nodeID,
 			IpV4:       []string{host},
-		}
+		}.Build()
 	}
 
 	return endpoints
@@ -188,11 +188,11 @@ func discoveryOperationOK(msg proto.Message) *Ydb_Operations.Operation {
 		panic(err)
 	}
 
-	return &Ydb_Operations.Operation{
+	return Ydb_Operations.Operation_builder{
 		Ready:  true,
 		Status: Ydb.StatusIds_SUCCESS,
 		Result: result,
-	}
+	}.Build()
 }
 
 type connLifeEvents struct {

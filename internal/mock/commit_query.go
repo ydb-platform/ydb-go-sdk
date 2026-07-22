@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 // CommitSelectOne is the query text used by commit-query mock routing and commit regression tests.
@@ -59,71 +60,82 @@ func (m *querySrv) executeCommitQuery(
 	case executeQueryBehaviorCommitFirstCanceledThenStatsFirstPart:
 		call := m.mock.commitQueryCalls.Add(1)
 		if call == 1 {
-			if err := stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
+			if err := stream.Send(Ydb_Query.ExecuteQueryResponsePart_builder{
 				Status:         Ydb.StatusIds_SUCCESS,
 				ResultSetIndex: 0,
 				ResultSet:      selectOneResultSet(),
-			}); err != nil {
+			}.Build()); err != nil {
 				return err
 			}
 
 			return status.Error(codes.Canceled, "mock: first commit canceled before exec stats")
 		}
 
-		return stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
+		return stream.Send(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
 			ResultSet:      selectOneResultSet(),
 			ExecStats:      commitExecStats(),
-		})
+		}.Build())
 	case executeQueryBehaviorCommitStatsDelayed:
-		if err := stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
+		if err := stream.Send(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
 			ResultSet:      selectOneResultSet(),
-		}); err != nil {
+		}.Build()); err != nil {
 			return err
 		}
 
-		return stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
+		return stream.Send(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status:    Ydb.StatusIds_SUCCESS,
 			ExecStats: commitExecStats(),
-		})
+		}.Build())
 	default:
-		return stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
+		return stream.Send(Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
 			ResultSet:      selectOneResultSet(),
 			ExecStats:      commitExecStats(),
-		})
+		}.Build())
 	}
 }
 
 func selectOneResultSet() *Ydb.ResultSet {
-	return &Ydb.ResultSet{
+	return Ydb.ResultSet_builder{
 		Columns: []*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "column0",
-				Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32}},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_INT32.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		Rows: []*Ydb.Value{
-			{Items: []*Ydb.Value{{Value: &Ydb.Value_Int32Value{Int32Value: 1}}}},
+			Ydb.Value_builder{
+				Items: []*Ydb.Value{
+					Ydb.Value_builder{
+						Int32Value: proto.Int32(1),
+					}.Build(),
+				},
+			}.Build(),
 		},
-	}
+	}.Build()
 }
 
 func commitExecStats() *Ydb_TableStats.QueryStats {
-	return &Ydb_TableStats.QueryStats{
+	return Ydb_TableStats.QueryStats_builder{
 		QueryPhases: []*Ydb_TableStats.QueryPhaseStats{
-			{
+			Ydb_TableStats.QueryPhaseStats_builder{
 				TableAccess: []*Ydb_TableStats.TableAccessStats{
-					{
-						Name:    "table",
-						Deletes: &Ydb_TableStats.OperationStats{Rows: 1, Bytes: 1},
-					},
+					Ydb_TableStats.TableAccessStats_builder{
+						Name: "table",
+						Deletes: Ydb_TableStats.OperationStats_builder{
+							Rows:  1,
+							Bytes: 1,
+						}.Build(),
+					}.Build(),
 				},
-			},
+			}.Build(),
 		},
-	}
+	}.Build()
 }

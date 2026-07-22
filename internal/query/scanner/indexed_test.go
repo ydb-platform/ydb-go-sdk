@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
@@ -22,20 +23,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_UTF8",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_UTF8,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_UTF8.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_TextValue{
-							TextValue: "test",
-						},
-					},
+					Ydb.Value_builder{
+						TextValue: proto.String("test"),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -51,20 +48,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_STRING",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_STRING,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_STRING.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_BytesValue{
-							BytesValue: []byte("test"),
-						},
-					},
+					Ydb.Value_builder{
+						BytesValue: []byte("test"),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -80,20 +73,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_YSON_TextValue",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_YSON,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_YSON.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_TextValue{
-							TextValue: "<a=1>[3;%false]",
-						},
-					},
+					Ydb.Value_builder{
+						TextValue: proto.String("<a=1>[3;%false]"),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -109,20 +98,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_YSON_BytesValue",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_YSON,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_YSON.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_BytesValue{
-							BytesValue: []byte("<a=1>[3;%false]"),
-						},
-					},
+					Ydb.Value_builder{
+						BytesValue: []byte("<a=1>[3;%false]"),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -138,20 +123,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_UINT64",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_UINT64,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_UINT64.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 123,
-						},
-					},
+					Ydb.Value_builder{
+						Uint64Value: proto.Uint64(123),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -165,20 +146,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_INT64",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_INT64,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_INT64.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_Int64Value{
-							Int64Value: 123,
-						},
-					},
+					Ydb.Value_builder{
+						Int64Value: proto.Int64(123),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -192,20 +169,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_UINT32",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_UINT32,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_UINT32.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_Uint32Value{
-							Uint32Value: 123,
-						},
-					},
+					Ydb.Value_builder{
+						Uint32Value: proto.Uint32(123),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -225,20 +198,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_INT32",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_INT32,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_INT32.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_Int32Value{
-							Int32Value: 123,
-						},
-					},
+					Ydb.Value_builder{
+						Int32Value: proto.Int32(123),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -260,20 +229,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_UINT16",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_UINT16,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_UINT16.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_Uint32Value{
-							Uint32Value: 123,
-						},
-					},
+					Ydb.Value_builder{
+						Uint32Value: proto.Uint32(123),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -297,20 +262,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_INT16",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_INT16,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_INT16.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_Int32Value{
-							Int32Value: 123,
-						},
-					},
+					Ydb.Value_builder{
+						Int32Value: proto.Int32(123),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -330,20 +291,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_UINT8",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_UINT8,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_UINT8.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_Uint32Value{
-							Uint32Value: 123,
-						},
-					},
+					Ydb.Value_builder{
+						Uint32Value: proto.Uint32(123),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -369,20 +326,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_INT8",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_INT8,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_INT8.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_Int32Value{
-							Int32Value: 123,
-						},
-					},
+					Ydb.Value_builder{
+						Int32Value: proto.Int32(123),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -404,20 +357,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_BOOL",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_BOOL,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_BOOL.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_BoolValue{
-							BoolValue: true,
-						},
-					},
+					Ydb.Value_builder{
+						BoolValue: proto.Bool(true),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -431,20 +380,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_DATE",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_DATE,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_DATE.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_Uint32Value{
-							Uint32Value: 100500,
-						},
-					},
+					Ydb.Value_builder{
+						Uint32Value: proto.Uint32(100500),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -464,20 +409,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_DATETIME",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_DATETIME,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_DATETIME.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_Uint32Value{
-							Uint32Value: 100500,
-						},
-					},
+					Ydb.Value_builder{
+						Uint32Value: proto.Uint32(100500),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -497,20 +438,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_TIMESTAMP",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_TIMESTAMP,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_TIMESTAMP.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 12345678987654321,
-						},
-					},
+					Ydb.Value_builder{
+						Uint64Value: proto.Uint64(12345678987654321),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -526,20 +463,16 @@ func TestIndexed(t *testing.T) {
 			name: "Ydb.Type_INTERVAL",
 			s: Indexed(NewData(
 				[]*Ydb.Column{
-					{
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{
-								TypeId: Ydb.Type_INTERVAL,
-							},
-						},
-					},
+					Ydb.Column_builder{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_INTERVAL.Enum(),
+						}.Build(),
+					}.Build(),
 				},
 				[]*Ydb.Value{
-					{
-						Value: &Ydb.Value_Int64Value{
-							Int64Value: 100500,
-						},
-					},
+					Ydb.Value_builder{
+						Int64Value: proto.Int64(100500),
+					}.Build(),
 				},
 			)),
 			dst: [][]any{
@@ -565,21 +498,17 @@ func TestIndexed(t *testing.T) {
 func TestIndexedIncompatibleColumnsAndDestinations(t *testing.T) {
 	scanner := &IndexedScanner{data: NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "a",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
 		},
 	)}
 	var (
@@ -593,21 +522,17 @@ func TestIndexedIncompatibleColumnsAndDestinations(t *testing.T) {
 func TestIndexedCastFailed(t *testing.T) {
 	scanner := Indexed(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "a",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
 		},
 	))
 	var A uint64
@@ -618,21 +543,17 @@ func TestIndexedCastFailed(t *testing.T) {
 func TestIndexedCastFailedErrMsg(t *testing.T) {
 	scanner := Indexed(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "a",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
 		},
 	))
 	var A uint64

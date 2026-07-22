@@ -48,10 +48,10 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 				createSessions.Add(1)
 				id := sessionSeq.Add(1)
 
-				return &Ydb_Query.CreateSessionResponse{
+				return Ydb_Query.CreateSessionResponse_builder{
 					Status:    Ydb.StatusIds_SUCCESS,
 					SessionId: fmt.Sprintf("sess-%d", id),
-				}, nil
+				}.Build(), nil
 			}).AnyTimes()
 		var attachSessions atomic.Int32
 		client.EXPECT().AttachSession(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -64,9 +64,9 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 				breakableAttach := attachSessions.Add(1) == 1
 				attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
 					if !firstRecv.Swap(true) {
-						return &Ydb_Query.SessionState{
+						return Ydb_Query.SessionState_builder{
 							Status: Ydb.StatusIds_SUCCESS,
-						}, nil
+						}.Build(), nil
 					}
 
 					if breakableAttach {
@@ -91,9 +91,9 @@ func TestExplicitSessionPoolSpoiledIdleSession(t *testing.T) {
 			) {
 				deleteSessions.Add(1)
 
-				return &Ydb_Query.DeleteSessionResponse{
+				return Ydb_Query.DeleteSessionResponse_builder{
 					Status: Ydb.StatusIds_SUCCESS,
-				}, nil
+				}.Build(), nil
 			}).AnyTimes()
 
 		p, err := testExplicitSessionPool(ctx, client)

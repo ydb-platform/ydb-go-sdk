@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -62,20 +63,22 @@ func TestClientConcurrentResultSets(t *testing.T) {
 		queryService := NewMockQueryServiceClient(ctrl)
 		setupExplicitSessionQueryService(t, ctrl, queryService)
 
-		queryService.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.BeginTransactionResponse{
+		queryService.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(Ydb_Query.BeginTransactionResponse_builder{
 			Status: Ydb.StatusIds_SUCCESS,
-			TxMeta: &Ydb_Query.TransactionMeta{Id: "tx-1"},
-		}, nil)
+			TxMeta: Ydb_Query.TransactionMeta_builder{Id: "tx-1"}.Build(),
+		}.Build(), nil)
 		queryService.EXPECT().
 			ExecuteQuery(gomock.Any(), gomock.Any()).
 			DoAndReturn(executeQueryChecker(t, false, ctrl)).
 			Times(1)
-		queryService.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
-			Status: Ydb.StatusIds_SUCCESS,
-		}, nil)
-		queryService.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.RollbackTransactionResponse{
-			Status: Ydb.StatusIds_SUCCESS,
-		}, nil).AnyTimes()
+		queryService.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(
+			Ydb_Query.CommitTransactionResponse_builder{
+				Status: Ydb.StatusIds_SUCCESS,
+			}.Build(), nil)
+		queryService.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(
+			Ydb_Query.RollbackTransactionResponse_builder{
+				Status: Ydb.StatusIds_SUCCESS,
+			}.Build(), nil).AnyTimes()
 
 		client, err := newWithQueryServiceClient(ctx, queryService, nil, explicitSessionConfig())
 		require.NoError(t, err)
@@ -201,18 +204,18 @@ func setupExplicitSessionQueryService(
 
 	attachStream := NewMockQueryService_AttachSessionClient(ctrl)
 	stubAttachStreamContext(attachStream)
-	attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
+	attachStream.EXPECT().Recv().Return(Ydb_Query.SessionState_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-	}, nil).AnyTimes()
+	}.Build(), nil).AnyTimes()
 
-	queryService.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
+	queryService.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.CreateSessionResponse_builder{
 		Status:    Ydb.StatusIds_SUCCESS,
 		SessionId: "test-session",
-	}, nil)
+	}.Build(), nil)
 	queryService.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
-	queryService.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
+	queryService.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.DeleteSessionResponse_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-	}, nil).AnyTimes()
+	}.Build(), nil).AnyTimes()
 }
 
 func executeQueryChecker(
@@ -237,36 +240,36 @@ func executeQueryChecker(
 
 func singleRowExecuteQueryStream(ctrl *gomock.Controller) *MockQueryService_ExecuteQueryClient {
 	stream := newExecuteQueryStreamMock(ctrl)
-	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+	stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-		ResultSet: &Ydb.ResultSet{
+		ResultSet: Ydb.ResultSet_builder{
 			Rows: []*Ydb.Value{{}},
-		},
-	}, nil)
+		}.Build(),
+	}.Build(), nil)
 	stream.EXPECT().Recv().Return(nil, io.EOF)
 
 	return stream
 }
 
 func interleavedMultiResultSetStream(ctrl *gomock.Controller) *MockQueryService_ExecuteQueryClient {
-	int64Type := &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64}}
+	int64Type := Ydb.Type_builder{TypeId: Ydb.Type_INT64.Enum()}.Build()
 	int64Col := func(name string) *Ydb.Column {
-		return &Ydb.Column{Name: name, Type: int64Type}
+		return Ydb.Column_builder{Name: name, Type: int64Type}.Build()
 	}
 	int64Row := func(v int64) *Ydb.Value {
-		return &Ydb.Value{Items: []*Ydb.Value{{
-			Value: &Ydb.Value_Int64Value{Int64Value: v},
-		}}}
+		return Ydb.Value_builder{Items: []*Ydb.Value{
+			Ydb.Value_builder{Int64Value: proto.Int64(v)}.Build(),
+		}}.Build()
 	}
 	respPart := func(idx int64, columns []*Ydb.Column, rows []*Ydb.Value) *Ydb_Query.ExecuteQueryResponsePart {
-		return &Ydb_Query.ExecuteQueryResponsePart{
+		return Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: idx,
-			ResultSet: &Ydb.ResultSet{
+			ResultSet: Ydb.ResultSet_builder{
 				Columns: columns,
 				Rows:    rows,
-			},
-		}
+			}.Build(),
+		}.Build()
 	}
 
 	stream := newExecuteQueryStreamMock(ctrl)

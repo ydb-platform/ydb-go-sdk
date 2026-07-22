@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -20,11 +21,11 @@ type Column struct {
 }
 
 func (c Column) toYDB() *Ydb_Table.ColumnMeta {
-	meta := &Ydb_Table.ColumnMeta{
+	meta := Ydb_Table.ColumnMeta_builder{
 		Name:   c.Name,
 		Type:   types.TypeToYDB(c.Type),
 		Family: c.Family,
-	}
+	}.Build()
 	if c.DefaultValue != nil {
 		c.DefaultValue.ToYDB(meta)
 	}
@@ -90,12 +91,12 @@ type ColumnFamily struct {
 }
 
 func (c ColumnFamily) toYDB() *Ydb_Table.ColumnFamily {
-	return &Ydb_Table.ColumnFamily{
+	return Ydb_Table.ColumnFamily_builder{
 		Name:         c.Name,
 		Data:         c.Data.toYDB(),
 		Compression:  c.Compression.toYDB(),
 		KeepInMemory: c.KeepInMemory.ToYDB(),
-	}
+	}.Build()
 }
 
 func NewColumnFamily(c *Ydb_Table.ColumnFamily) ColumnFamily {
@@ -116,9 +117,9 @@ func (s StoragePool) toYDB() *Ydb_Table.StoragePool {
 		return nil
 	}
 
-	return &Ydb_Table.StoragePool{
+	return Ydb_Table.StoragePool_builder{
 		Media: s.Media,
-	}
+	}.Build()
 }
 
 func storagePool(s *Ydb_Table.StoragePool) StoragePool {
@@ -197,18 +198,14 @@ type ReadReplicasSettings struct {
 func (rr ReadReplicasSettings) ToYDB() *Ydb_Table.ReadReplicasSettings {
 	switch rr.Type {
 	case ReadReplicasPerAzReadReplicas:
-		return &Ydb_Table.ReadReplicasSettings{
-			Settings: &Ydb_Table.ReadReplicasSettings_PerAzReadReplicasCount{
-				PerAzReadReplicasCount: rr.Count,
-			},
-		}
+		return Ydb_Table.ReadReplicasSettings_builder{
+			PerAzReadReplicasCount: proto.Uint64(rr.Count),
+		}.Build()
 
 	default:
-		return &Ydb_Table.ReadReplicasSettings{
-			Settings: &Ydb_Table.ReadReplicasSettings_AnyAzReadReplicasCount{
-				AnyAzReadReplicasCount: rr.Count,
-			},
-		}
+		return Ydb_Table.ReadReplicasSettings_builder{
+			AnyAzReadReplicasCount: proto.Uint64(rr.Count),
+		}.Build()
 	}
 }
 
@@ -243,12 +240,12 @@ type StorageSettings struct {
 }
 
 func (ss StorageSettings) ToYDB() *Ydb_Table.StorageSettings {
-	return &Ydb_Table.StorageSettings{
+	return Ydb_Table.StorageSettings_builder{
 		TabletCommitLog0:   ss.TableCommitLog0.toYDB(),
 		TabletCommitLog1:   ss.TableCommitLog1.toYDB(),
 		External:           ss.External.toYDB(),
 		StoreExternalBlobs: ss.StoreExternalBlobs.ToYDB(),
-	}
+	}.Build()
 }
 
 func NewStorageSettings(ss *Ydb_Table.StorageSettings) StorageSettings {
@@ -276,13 +273,13 @@ type PartitioningSettings struct {
 }
 
 func (ps PartitioningSettings) toYDB() *Ydb_Table.PartitioningSettings {
-	return &Ydb_Table.PartitioningSettings{
+	return Ydb_Table.PartitioningSettings_builder{
 		PartitioningBySize: ps.PartitioningBySize.ToYDB(),
 		PartitionSizeMb:    ps.PartitionSizeMb,
 		PartitioningByLoad: ps.PartitioningByLoad.ToYDB(),
 		MinPartitionsCount: ps.MinPartitionsCount,
 		MaxPartitionsCount: ps.MaxPartitionsCount,
-	}
+	}.Build()
 }
 
 func NewPartitioningSettings(ps *Ydb_Table.PartitioningSettings) PartitioningSettings {
@@ -309,17 +306,11 @@ const (
 func (t IndexType) ApplyIndexOption(d *indexDesc) {
 	switch t {
 	case IndexTypeGlobal:
-		d.Type = &Ydb_Table.TableIndex_GlobalIndex{
-			GlobalIndex: &Ydb_Table.GlobalIndex{},
-		}
+		(*Ydb_Table.TableIndex)(d).SetGlobalIndex(&Ydb_Table.GlobalIndex{})
 	case IndexTypeGlobalAsync:
-		d.Type = &Ydb_Table.TableIndex_GlobalAsyncIndex{
-			GlobalAsyncIndex: &Ydb_Table.GlobalAsyncIndex{},
-		}
+		(*Ydb_Table.TableIndex)(d).SetGlobalAsyncIndex(&Ydb_Table.GlobalAsyncIndex{})
 	case IndexTypeGlobalUnique:
-		d.Type = &Ydb_Table.TableIndex_GlobalUniqueIndex{
-			GlobalUniqueIndex: &Ydb_Table.GlobalUniqueIndex{},
-		}
+		(*Ydb_Table.TableIndex)(d).SetGlobalUniqueIndex(&Ydb_Table.GlobalUniqueIndex{})
 	}
 }
 
@@ -543,24 +534,20 @@ func (ttl *TimeToLiveSettings) ToYDB() *Ydb_Table.TtlSettings {
 	}
 	switch ttl.Mode {
 	case TimeToLiveModeValueSinceUnixEpoch:
-		return &Ydb_Table.TtlSettings{
-			Mode: &Ydb_Table.TtlSettings_ValueSinceUnixEpoch{
-				ValueSinceUnixEpoch: &Ydb_Table.ValueSinceUnixEpochModeSettings{
-					ColumnName:         ttl.ColumnName,
-					ColumnUnit:         ttl.ColumnUnit.ToYDB(),
-					ExpireAfterSeconds: ttl.ExpireAfterSeconds,
-				},
-			},
-		}
+		return Ydb_Table.TtlSettings_builder{
+			ValueSinceUnixEpoch: Ydb_Table.ValueSinceUnixEpochModeSettings_builder{
+				ColumnName:         ttl.ColumnName,
+				ColumnUnit:         ttl.ColumnUnit.ToYDB(),
+				ExpireAfterSeconds: ttl.ExpireAfterSeconds,
+			}.Build(),
+		}.Build()
 	default: // currently use TimeToLiveModeDateType mode as default
-		return &Ydb_Table.TtlSettings{
-			Mode: &Ydb_Table.TtlSettings_DateTypeColumn{
-				DateTypeColumn: &Ydb_Table.DateTypeColumnModeSettings{
-					ColumnName:         ttl.ColumnName,
-					ExpireAfterSeconds: ttl.ExpireAfterSeconds,
-				},
-			},
-		}
+		return Ydb_Table.TtlSettings_builder{
+			DateTypeColumn: Ydb_Table.DateTypeColumnModeSettings_builder{
+				ColumnName:         ttl.ColumnName,
+				ExpireAfterSeconds: ttl.ExpireAfterSeconds,
+			}.Build(),
+		}.Build()
 	}
 }
 

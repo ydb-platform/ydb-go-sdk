@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -84,26 +85,26 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %w", opErr))
 	}
 
-	switch v := grpcMsg.GetServerMessage().(type) {
-	case *Ydb_Topic.StreamWriteMessage_FromServer_InitResponse:
+	switch grpcMsg.WhichServerMessage() {
+	case Ydb_Topic.StreamWriteMessage_FromServer_InitResponse_case:
 		var res InitResult
 		res.ServerMessageMetadata = meta
-		res.mustFromProto(v.InitResponse)
+		res.mustFromProto(grpcMsg.GetInitResponse())
 		w.sessionID = res.SessionID
 
 		return &res, nil
-	case *Ydb_Topic.StreamWriteMessage_FromServer_WriteResponse:
+	case Ydb_Topic.StreamWriteMessage_FromServer_WriteResponse_case:
 		var res WriteResult
 		res.ServerMessageMetadata = meta
-		err := res.fromProto(v.WriteResponse)
+		err := res.fromProto(grpcMsg.GetWriteResponse())
 		if err != nil {
 			return nil, err
 		}
 
 		return &res, nil
-	case *Ydb_Topic.StreamWriteMessage_FromServer_UpdateTokenResponse:
+	case Ydb_Topic.StreamWriteMessage_FromServer_UpdateTokenResponse_case:
 		var res UpdateTokenResponse
-		res.MustFromProto(v.UpdateTokenResponse)
+		res.MustFromProto(grpcMsg.GetUpdateTokenResponse())
 
 		return &res, nil
 	default:
@@ -128,20 +129,18 @@ func (w *StreamWriter) Send(rawMsg ClientMessage) (err error) {
 		if initErr != nil {
 			return initErr
 		}
-		protoMsg.ClientMessage = &Ydb_Topic.StreamWriteMessage_FromClient_InitRequest{
-			InitRequest: initReqProto,
-		}
+		protoMsg.SetInitRequest(proto.ValueOrDefault(initReqProto))
 	case *WriteRequest:
 		writeReqProto, writeErr := v.toProto()
 		if writeErr != nil {
 			return writeErr
 		}
 
-		return w.Stream.Send(&Ydb_Topic.StreamWriteMessage_FromClient{ClientMessage: writeReqProto})
+		return w.Stream.Send(Ydb_Topic.StreamWriteMessage_FromClient_builder{
+			WriteRequest: proto.ValueOrDefault(writeReqProto),
+		}.Build())
 	case *UpdateTokenRequest:
-		protoMsg.ClientMessage = &Ydb_Topic.StreamWriteMessage_FromClient_UpdateTokenRequest{
-			UpdateTokenRequest: v.ToProto(),
-		}
+		protoMsg.SetUpdateTokenRequest(proto.ValueOrDefault(v.ToProto()))
 	default:
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: unexpected message type for send to raw writer stream: '%v'",

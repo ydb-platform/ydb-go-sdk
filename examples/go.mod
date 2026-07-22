@@ -70,7 +70,7 @@ require (
 	github.com/tidwall/btree v1.1.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/yandex-cloud/go-genproto v0.0.0-20220815090733-4c139c0154e2 // indirect
-	github.com/ydb-platform/ydb-go-genproto v0.0.0-20260428144813-1c07baab7f7b // indirect
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20260623105045-f5dde53f1303 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.6.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.44.0 // indirect

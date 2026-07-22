@@ -55,9 +55,9 @@ func TestRaceWgClosed(t *testing.T) {
 		p, err := New(ctx,
 			testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(any) (proto.Message, error) {
-					return &Ydb_Table.CreateSessionResult{
+					return Ydb_Table.CreateSessionResult_builder{
 						SessionId: testutil.SessionID(),
-					}, nil
+					}.Build(), nil
 				},
 			})),
 			config.New(config.WithSizeLimit(limit)),
@@ -144,18 +144,18 @@ var simpleCluster = testutil.NewBalancer(
 	testutil.WithInvokeHandlers(
 		testutil.InvokeHandlers{
 			testutil.TableExecuteDataQuery: func(any) (proto.Message, error) {
-				return &Ydb_Table.ExecuteQueryResult{
-					TxMeta: &Ydb_Table.TransactionMeta{
+				return Ydb_Table.ExecuteQueryResult_builder{
+					TxMeta: Ydb_Table.TransactionMeta_builder{
 						Id: "",
-					},
-				}, nil
+					}.Build(),
+				}.Build(), nil
 			},
 			testutil.TableBeginTransaction: func(any) (proto.Message, error) {
-				return &Ydb_Table.BeginTransactionResult{
-					TxMeta: &Ydb_Table.TransactionMeta{
+				return Ydb_Table.BeginTransactionResult_builder{
+					TxMeta: Ydb_Table.TransactionMeta_builder{
 						Id: "",
-					},
-				}, nil
+					}.Build(),
+				}.Build(), nil
 			},
 			testutil.TableExplainDataQuery: func(any) (proto.Message, error) {
 				return &Ydb_Table.ExecuteQueryResult{}, nil
@@ -164,9 +164,9 @@ var simpleCluster = testutil.NewBalancer(
 				return &Ydb_Table.PrepareQueryResult{}, nil
 			},
 			testutil.TableCreateSession: func(any) (proto.Message, error) {
-				return &Ydb_Table.CreateSessionResult{
+				return Ydb_Table.CreateSessionResult_builder{
 					SessionId: testutil.SessionID(),
-				}, nil
+				}.Build(), nil
 			},
 			testutil.TableDeleteSession: func(any) (proto.Message, error) {
 				return &Ydb_Table.DeleteSessionResponse{}, nil

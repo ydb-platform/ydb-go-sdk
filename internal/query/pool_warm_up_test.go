@@ -106,9 +106,9 @@ func newMockQueryServiceForWarmUp(ctrl *gomock.Controller, createSessions int) Y
 
 	attachStream := NewMockQueryService_AttachSessionClient(ctrl)
 	stubAttachStreamContext(attachStream)
-	attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
+	attachStream.EXPECT().Recv().Return(Ydb_Query.SessionState_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-	}, nil).AnyTimes()
+	}.Build(), nil).AnyTimes()
 
 	var sessionSeq atomic.Int32
 
@@ -118,16 +118,16 @@ func newMockQueryServiceForWarmUp(ctrl *gomock.Controller, createSessions int) Y
 		) {
 			id := sessionSeq.Add(1)
 
-			return &Ydb_Query.CreateSessionResponse{
+			return Ydb_Query.CreateSessionResponse_builder{
 				Status:    Ydb.StatusIds_SUCCESS,
 				SessionId: fmt.Sprintf("session-%d", id),
-			}, nil
+			}.Build(), nil
 		},
 	).Times(createSessions)
 	client.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil).Times(createSessions)
-	client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
+	client.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(Ydb_Query.DeleteSessionResponse_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-	}, nil).AnyTimes()
+	}.Build(), nil).AnyTimes()
 
 	return client
 }

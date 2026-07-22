@@ -55,21 +55,21 @@ func executeQueryScriptRequest(q string, cfg executeScriptConfig) (
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	request := &Ydb_Query.ExecuteScriptRequest{
-		OperationParams: &Ydb_Operations.OperationParams{
+	request := Ydb_Query.ExecuteScriptRequest_builder{
+		OperationParams: Ydb_Operations.OperationParams_builder{
 			OperationMode:    0,
 			OperationTimeout: nil,
 			CancelAfter:      nil,
 			Labels:           nil,
 			ReportCostInfo:   0,
-		},
+		}.Build(),
 		ExecMode:      Ydb_Query.ExecMode(cfg.ExecMode()),
 		ScriptContent: queryQueryContent(Ydb_Query.Syntax(cfg.Syntax()), q),
 		Parameters:    params,
 		StatsMode:     Ydb_Query.StatsMode(cfg.StatsMode()),
 		ResultsTtl:    durationpb.New(cfg.ResultsTTL()),
 		PoolId:        cfg.ResourcePool(),
-	}
+	}.Build()
 
 	return request, cfg.CallOptions(), nil
 }
@@ -84,31 +84,29 @@ func executeQueryRequest(
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	request := &Ydb_Query.ExecuteQueryRequest{
+	request := Ydb_Query.ExecuteQueryRequest_builder{
 		SessionId: sessionID,
 		ExecMode:  Ydb_Query.ExecMode(cfg.ExecMode()),
 		TxControl: cfg.TxControl().ToYdbQueryTransactionControl(),
-		Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
-			QueryContent: &Ydb_Query.QueryContent{
-				Syntax: Ydb_Query.Syntax(cfg.Syntax()),
-				Text:   q,
-			},
-		},
+		QueryContent: Ydb_Query.QueryContent_builder{
+			Syntax: Ydb_Query.Syntax(cfg.Syntax()),
+			Text:   q,
+		}.Build(),
 		Parameters:             params,
 		StatsMode:              Ydb_Query.StatsMode(cfg.StatsMode()),
 		ConcurrentResultSets:   concurrentResultSets == options.ResultSetsTypeConcurrent,
 		PoolId:                 cfg.ResourcePool(),
 		ResponsePartLimitBytes: cfg.ResponsePartLimitSizeBytes(),
-	}
+	}.Build()
 
 	return request, cfg.CallOptions(), nil
 }
 
 func queryQueryContent(syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryContent {
-	return &Ydb_Query.QueryContent{
+	return Ydb_Query.QueryContent_builder{
 		Syntax: syntax,
 		Text:   q,
-	}
+	}.Build()
 }
 
 func execute(

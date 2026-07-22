@@ -22,16 +22,16 @@ func stubDoTxExecuteQuery(t *testing.T, ctrl *gomock.Controller, client *MockQue
 
 	stream := newExecuteQueryStreamMock(ctrl)
 	stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-		client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
+		client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(Ydb_Query.CommitTransactionResponse_builder{
 			Status: Ydb.StatusIds_SUCCESS,
-		}, nil)
+		}.Build(), nil)
 
-		return &Ydb_Query.ExecuteQueryResponsePart{
+		return Ydb_Query.ExecuteQueryResponsePart_builder{
 			Status: Ydb.StatusIds_SUCCESS,
-			TxMeta: &Ydb_Query.TransactionMeta{
+			TxMeta: Ydb_Query.TransactionMeta_builder{
 				Id: "tx-1",
-			},
-		}, nil
+			}.Build(),
+		}.Build(), nil
 	})
 	stream.EXPECT().Recv().Return(nil, io.EOF)
 	client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
@@ -41,9 +41,9 @@ func stubDoExecuteQuery(t *testing.T, ctrl *gomock.Controller, client *MockQuery
 	t.Helper()
 
 	stream := newExecuteQueryStreamMock(ctrl)
-	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+	stream.EXPECT().Recv().Return(Ydb_Query.ExecuteQueryResponsePart_builder{
 		Status: Ydb.StatusIds_SUCCESS,
-	}, nil)
+	}.Build(), nil)
 	stream.EXPECT().Recv().Return(nil, io.EOF)
 	client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 }

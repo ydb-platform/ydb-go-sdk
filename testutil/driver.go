@@ -3,7 +3,6 @@ package testutil
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
@@ -102,26 +101,6 @@ var codeToString = map[MethodCode]string{
 	TableStreamExecuteScanQuery: lastSegment("/Ydb.Table.V1.TableService/StreamExecuteScanQuery"),
 }
 
-func setField(name string, dst, value any) {
-	x := reflect.ValueOf(dst).Elem()
-	t := x.Type()
-	f, ok := t.FieldByName(name)
-	if !ok {
-		panic(fmt.Sprintf(
-			"struct %s has no field %q",
-			t, name,
-		))
-	}
-	v := reflect.ValueOf(value)
-	if f.Type.Kind() != v.Type().Kind() {
-		panic(fmt.Sprintf(
-			"struct %s field %q is types of %s, not %s",
-			t, name, f.Type, v.Type(),
-		))
-	}
-	x.FieldByName(f.Name).Set(v)
-}
-
 type balancerStub struct {
 	onInvoke func(
 		ctx context.Context,
@@ -209,13 +188,15 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) balancerOption {
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}
-				setField(
-					"Operation",
-					reply,
-					&Ydb_Operations.Operation{
+				if setter, ok := reply.(interface {
+					SetOperation(operation *Ydb_Operations.Operation)
+				}); ok {
+					setter.SetOperation(Ydb_Operations.Operation_builder{
 						Result: anyResult,
-					},
-				)
+					}.Build())
+				} else {
+					return fmt.Errorf("reply type %T does not support SetOperation", reply)
+				}
 
 				return nil
 			}

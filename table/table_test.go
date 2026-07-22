@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Formats"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
@@ -78,121 +79,101 @@ func TestBulkUpsertData(t *testing.T) {
 				types.Uint64Value(123),
 				types.Uint64Value(321),
 			)),
-			request: &Ydb_Table.BulkUpsertRequest{
+			request: Ydb_Table.BulkUpsertRequest_builder{
 				Table: "test",
-				Rows: &Ydb.TypedValue{
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_ListType{
-							ListType: &Ydb.ListType{
-								Item: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}},
-							},
-						},
-					},
-					Value: &Ydb.Value{
+				Rows: Ydb.TypedValue_builder{
+					Type: Ydb.Type_builder{
+						ListType: Ydb.ListType_builder{
+							Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build(),
+						}.Build(),
+					}.Build(),
+					Value: Ydb.Value_builder{
 						Items: []*Ydb.Value{
-							{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 123,
-								},
-							},
-							{
-								Value: &Ydb.Value_Uint64Value{
-									Uint64Value: 321,
-								},
-							},
+							Ydb.Value_builder{
+								Uint64Value: proto.Uint64(123),
+							}.Build(),
+							Ydb.Value_builder{
+								Uint64Value: proto.Uint64(321),
+							}.Build(),
 						},
-					},
-				},
-			},
+					}.Build(),
+				}.Build(),
+			}.Build(),
 		},
 		{
 			name: "Csv",
 			data: table.BulkUpsertDataCsv([]byte("123")),
-			request: &Ydb_Table.BulkUpsertRequest{
-				Table: "test",
-				Data:  []byte("123"),
-				DataFormat: &Ydb_Table.BulkUpsertRequest_CsvSettings{
-					CsvSettings: &Ydb_Formats.CsvSettings{},
-				},
-			},
+			request: Ydb_Table.BulkUpsertRequest_builder{
+				Table:       "test",
+				Data:        []byte("123"),
+				CsvSettings: &Ydb_Formats.CsvSettings{},
+			}.Build(),
 		},
 		{
 			name: "CsvWithDelimeter",
 			data: table.BulkUpsertDataCsv([]byte("123"), table.WithCsvDelimiter([]byte(";"))),
-			request: &Ydb_Table.BulkUpsertRequest{
+			request: Ydb_Table.BulkUpsertRequest_builder{
 				Table: "test",
 				Data:  []byte("123"),
-				DataFormat: &Ydb_Table.BulkUpsertRequest_CsvSettings{
-					CsvSettings: &Ydb_Formats.CsvSettings{
-						Delimiter: []byte(";"),
-					},
-				},
-			},
+				CsvSettings: Ydb_Formats.CsvSettings_builder{
+					Delimiter: []byte(";"),
+				}.Build(),
+			}.Build(),
 		},
 		{
 			name: "CsvWithHeader",
 			data: table.BulkUpsertDataCsv([]byte("123"), table.WithCsvHeader()),
-			request: &Ydb_Table.BulkUpsertRequest{
+			request: Ydb_Table.BulkUpsertRequest_builder{
 				Table: "test",
 				Data:  []byte("123"),
-				DataFormat: &Ydb_Table.BulkUpsertRequest_CsvSettings{
-					CsvSettings: &Ydb_Formats.CsvSettings{
-						Header: true,
-					},
-				},
-			},
+				CsvSettings: Ydb_Formats.CsvSettings_builder{
+					Header: true,
+				}.Build(),
+			}.Build(),
 		},
 		{
 			name: "CsvWithNullValue",
 			data: table.BulkUpsertDataCsv([]byte("123"), table.WithCsvNullValue([]byte("null"))),
-			request: &Ydb_Table.BulkUpsertRequest{
+			request: Ydb_Table.BulkUpsertRequest_builder{
 				Table: "test",
 				Data:  []byte("123"),
-				DataFormat: &Ydb_Table.BulkUpsertRequest_CsvSettings{
-					CsvSettings: &Ydb_Formats.CsvSettings{
-						NullValue: []byte("null"),
-					},
-				},
-			},
+				CsvSettings: Ydb_Formats.CsvSettings_builder{
+					NullValue: []byte("null"),
+				}.Build(),
+			}.Build(),
 		},
 		{
 			name: "CsvWithNullValue",
 			data: table.BulkUpsertDataCsv([]byte("123"), table.WithCsvSkipRows(30)),
-			request: &Ydb_Table.BulkUpsertRequest{
+			request: Ydb_Table.BulkUpsertRequest_builder{
 				Table: "test",
 				Data:  []byte("123"),
-				DataFormat: &Ydb_Table.BulkUpsertRequest_CsvSettings{
-					CsvSettings: &Ydb_Formats.CsvSettings{
-						SkipRows: 30,
-					},
-				},
-			},
+				CsvSettings: Ydb_Formats.CsvSettings_builder{
+					SkipRows: 30,
+				}.Build(),
+			}.Build(),
 		},
 		{
 			name: "Arrow",
 			data: table.BulkUpsertDataArrow([]byte("123")),
-			request: &Ydb_Table.BulkUpsertRequest{
-				Table: "test",
-				Data:  []byte("123"),
-				DataFormat: &Ydb_Table.BulkUpsertRequest_ArrowBatchSettings{
-					ArrowBatchSettings: &Ydb_Formats.ArrowBatchSettings{},
-				},
-			},
+			request: Ydb_Table.BulkUpsertRequest_builder{
+				Table:              "test",
+				Data:               []byte("123"),
+				ArrowBatchSettings: &Ydb_Formats.ArrowBatchSettings{},
+			}.Build(),
 		},
 		{
 			name: "ArrowWithSchema",
 			data: table.BulkUpsertDataArrow([]byte("123"),
 				table.WithArrowSchema([]byte("schema")),
 			),
-			request: &Ydb_Table.BulkUpsertRequest{
+			request: Ydb_Table.BulkUpsertRequest_builder{
 				Table: "test",
 				Data:  []byte("123"),
-				DataFormat: &Ydb_Table.BulkUpsertRequest_ArrowBatchSettings{
-					ArrowBatchSettings: &Ydb_Formats.ArrowBatchSettings{
-						Schema: []byte("schema"),
-					},
-				},
-			},
+				ArrowBatchSettings: Ydb_Formats.ArrowBatchSettings_builder{
+					Schema: []byte("schema"),
+				}.Build(),
+			}.Build(),
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

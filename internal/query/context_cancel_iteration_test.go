@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
@@ -16,21 +17,21 @@ import (
 func testPartOneResultSetTwoRows(t *testing.T) *Ydb_Query.ExecuteQueryResponsePart {
 	t.Helper()
 
-	return &Ydb_Query.ExecuteQueryResponsePart{
+	return Ydb_Query.ExecuteQueryResponsePart_builder{
 		Status:         Ydb.StatusIds_SUCCESS,
 		ResultSetIndex: 0,
-		ResultSet: &Ydb.ResultSet{
-			Columns: []*Ydb.Column{{
+		ResultSet: Ydb.ResultSet_builder{
+			Columns: []*Ydb.Column{Ydb.Column_builder{
 				Name: "id",
-				Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64}},
-			}},
-			Rows: []*Ydb.Value{{
-				Items: []*Ydb.Value{{Value: &Ydb.Value_Int64Value{Int64Value: 10}}},
-			}, {
-				Items: []*Ydb.Value{{Value: &Ydb.Value_Int64Value{Int64Value: 20}}},
-			}},
-		},
-	}
+				Type: Ydb.Type_builder{TypeId: Ydb.Type_INT64.Enum()}.Build(),
+			}.Build()},
+			Rows: []*Ydb.Value{Ydb.Value_builder{
+				Items: []*Ydb.Value{Ydb.Value_builder{Int64Value: proto.Int64(10)}.Build()},
+			}.Build(), Ydb.Value_builder{
+				Items: []*Ydb.Value{Ydb.Value_builder{Int64Value: proto.Int64(20)}.Build()},
+			}.Build()},
+		}.Build(),
+	}.Build()
 }
 
 func TestStreamResult_NextResultSet_ContextCanceled(t *testing.T) {

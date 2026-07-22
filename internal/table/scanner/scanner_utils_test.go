@@ -17,22 +17,22 @@ func TestValueScanner_ColumnCount(t *testing.T) {
 
 	t.Run("empty columns", func(t *testing.T) {
 		s := &valueScanner{
-			set: &Ydb.ResultSet{
+			set: Ydb.ResultSet_builder{
 				Columns: []*Ydb.Column{},
-			},
+			}.Build(),
 		}
 		require.Equal(t, 0, s.ColumnCount())
 	})
 
 	t.Run("with columns", func(t *testing.T) {
 		s := &valueScanner{
-			set: &Ydb.ResultSet{
+			set: Ydb.ResultSet_builder{
 				Columns: []*Ydb.Column{
-					{Name: "col1"},
-					{Name: "col2"},
-					{Name: "col3"},
+					Ydb.Column_builder{Name: "col1"}.Build(),
+					Ydb.Column_builder{Name: "col2"}.Build(),
+					Ydb.Column_builder{Name: "col3"}.Build(),
 				},
-			},
+			}.Build(),
 		}
 		require.Equal(t, 3, s.ColumnCount())
 	})
@@ -50,22 +50,22 @@ func TestValueScanner_Columns(t *testing.T) {
 
 	t.Run("iterate over columns", func(t *testing.T) {
 		s := &valueScanner{
-			set: &Ydb.ResultSet{
+			set: Ydb.ResultSet_builder{
 				Columns: []*Ydb.Column{
-					{
+					Ydb.Column_builder{
 						Name: "id",
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
-						},
-					},
-					{
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_INT32.Enum(),
+						}.Build(),
+					}.Build(),
+					Ydb.Column_builder{
 						Name: "name",
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8},
-						},
-					},
+						Type: Ydb.Type_builder{
+							TypeId: Ydb.Type_UTF8.Enum(),
+						}.Build(),
+					}.Build(),
 				},
-			},
+			}.Build(),
 		}
 
 		var names []string
@@ -84,22 +84,22 @@ func TestValueScanner_RowCount(t *testing.T) {
 
 	t.Run("empty rows", func(t *testing.T) {
 		s := &valueScanner{
-			set: &Ydb.ResultSet{
+			set: Ydb.ResultSet_builder{
 				Rows: []*Ydb.Value{},
-			},
+			}.Build(),
 		}
 		require.Equal(t, 0, s.RowCount())
 	})
 
 	t.Run("with rows", func(t *testing.T) {
 		s := &valueScanner{
-			set: &Ydb.ResultSet{
+			set: Ydb.ResultSet_builder{
 				Rows: []*Ydb.Value{
 					{},
 					{},
 					{},
 				},
-			},
+			}.Build(),
 		}
 		require.Equal(t, 3, s.RowCount())
 	})
@@ -113,21 +113,21 @@ func TestValueScanner_ItemCount(t *testing.T) {
 
 	t.Run("empty items", func(t *testing.T) {
 		s := &valueScanner{
-			row: &Ydb.Value{
+			row: Ydb.Value_builder{
 				Items: []*Ydb.Value{},
-			},
+			}.Build(),
 		}
 		require.Equal(t, 0, s.ItemCount())
 	})
 
 	t.Run("with items", func(t *testing.T) {
 		s := &valueScanner{
-			row: &Ydb.Value{
+			row: Ydb.Value_builder{
 				Items: []*Ydb.Value{
 					{},
 					{},
 				},
-			},
+			}.Build(),
 		}
 		require.Equal(t, 2, s.ItemCount())
 	})
@@ -136,18 +136,18 @@ func TestValueScanner_ItemCount(t *testing.T) {
 func TestValueScanner_Truncated(t *testing.T) {
 	t.Run("not truncated", func(t *testing.T) {
 		s := &valueScanner{
-			set: &Ydb.ResultSet{
+			set: Ydb.ResultSet_builder{
 				Truncated: false,
-			},
+			}.Build(),
 		}
 		require.False(t, s.Truncated())
 	})
 
 	t.Run("truncated", func(t *testing.T) {
 		s := &valueScanner{
-			set: &Ydb.ResultSet{
+			set: Ydb.ResultSet_builder{
 				Truncated: true,
-			},
+			}.Build(),
 		}
 		require.True(t, s.Truncated())
 	})

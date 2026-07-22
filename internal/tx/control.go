@@ -29,9 +29,9 @@ func (ctrl *Control) ToYdbQueryTransactionControl() *Ydb_Query.TransactionContro
 		return nil
 	}
 
-	txControl := &Ydb_Query.TransactionControl{
+	txControl := Ydb_Query.TransactionControl_builder{
 		CommitTx: ctrl.commit,
-	}
+	}.Build()
 	ctrl.selector.applyQueryTxSelector(txControl)
 
 	return txControl
@@ -42,9 +42,9 @@ func (ctrl *Control) ToYdbTableTransactionControl() *Ydb_Table.TransactionContro
 		return nil
 	}
 
-	txControl := &Ydb_Table.TransactionControl{
+	txControl := Ydb_Table.TransactionControl_builder{
 		CommitTx: ctrl.commit,
-	}
+	}.Build()
 	ctrl.selector.applyTableTxSelector(txControl)
 
 	return txControl
@@ -109,27 +109,23 @@ func (opts beginTxOptions) applyTxControlOption(txControl *Control) {
 }
 
 func (opts beginTxOptions) applyQueryTxSelector(txControl *Ydb_Query.TransactionControl) {
-	selector := &Ydb_Query.TransactionControl_BeginTx{
-		BeginTx: &Ydb_Query.TransactionSettings{},
-	}
+	beginTx := &Ydb_Query.TransactionSettings{}
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyQueryTxSettingsOption(selector.BeginTx)
+			opt.ApplyQueryTxSettingsOption(beginTx)
 		}
 	}
-	txControl.TxSelector = selector
+	txControl.SetBeginTx(beginTx)
 }
 
 func (opts beginTxOptions) applyTableTxSelector(txControl *Ydb_Table.TransactionControl) {
-	selector := &Ydb_Table.TransactionControl_BeginTx{
-		BeginTx: &Ydb_Table.TransactionSettings{},
-	}
+	beginTx := &Ydb_Table.TransactionSettings{}
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyTableTxSettingsOption(selector.BeginTx)
+			opt.ApplyTableTxSettingsOption(beginTx)
 		}
 	}
-	txControl.TxSelector = selector
+	txControl.SetBeginTx(beginTx)
 }
 
 // BeginTx returns selector transaction control option
@@ -149,15 +145,11 @@ func (id txIDTxControlOption) applyTxControlOption(txControl *Control) {
 }
 
 func (id txIDTxControlOption) applyQueryTxSelector(txControl *Ydb_Query.TransactionControl) {
-	txControl.TxSelector = &Ydb_Query.TransactionControl_TxId{
-		TxId: string(id),
-	}
+	txControl.SetTxId(string(id))
 }
 
 func (id txIDTxControlOption) applyTableTxSelector(txControl *Ydb_Table.TransactionControl) {
-	txControl.TxSelector = &Ydb_Table.TransactionControl_TxId{
-		TxId: string(id),
-	}
+	txControl.SetTxId(string(id))
 }
 
 func WithTx(t Identifier) txIDTxControlOption {

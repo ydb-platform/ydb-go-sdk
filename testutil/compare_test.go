@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -18,8 +19,9 @@ func TestUnwrapOptionalValue(t *testing.T) {
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
 	}
-	textValue := val.GetValue().GetValue().(*Ydb.Value_TextValue)
-	if text := textValue.TextValue; text != "a" {
+	require.Equal(t, Ydb.Value_TextValue_case, val.GetValue().WhichValue())
+	textValue := val.GetValue().GetTextValue()
+	if text := textValue; text != "a" {
 		t.Errorf("Values are different: expected %q, actual %q", "a", text)
 	}
 }
@@ -31,8 +33,9 @@ func TestUnwrapPrimitiveValue(t *testing.T) {
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
 	}
-	textValue := val.GetValue().GetValue().(*Ydb.Value_TextValue)
-	if text := textValue.TextValue; text != "a" {
+	require.Equal(t, Ydb.Value_TextValue_case, val.GetValue().WhichValue())
+	textValue := val.GetValue().GetTextValue()
+	if text := textValue; text != "a" {
 		t.Errorf("Values are different: expected %q, actual %q", "a", text)
 	}
 }
@@ -44,9 +47,10 @@ func TestUnwrapNullValue(t *testing.T) {
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
 	}
-	nullFlagValue := val.GetValue().GetValue().(*Ydb.Value_NullFlagValue)
-	if nullFlagValue.NullFlagValue != structpb.NullValue_NULL_VALUE {
-		t.Errorf("Values are different: expected %d, actual %d", structpb.NullValue_NULL_VALUE, nullFlagValue.NullFlagValue)
+	require.Equal(t, Ydb.Value_NullFlagValue_case, val.GetValue().WhichValue())
+	nullFlagValue := val.GetValue().GetNullFlagValue()
+	if nullFlagValue != structpb.NullValue_NULL_VALUE {
+		t.Errorf("Values are different: expected %d, actual %d", structpb.NullValue_NULL_VALUE, nullFlagValue)
 	}
 }
 

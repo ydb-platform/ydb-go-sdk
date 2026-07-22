@@ -146,7 +146,7 @@ func (tx *transaction) CommitTx(
 		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
 		var (
-			request = &Ydb_Table.CommitTransactionRequest{
+			request = Ydb_Table.CommitTransactionRequest_builder{
 				SessionId: tx.s.id,
 				TxId:      tx.ID(),
 				OperationParams: operation.Params(
@@ -155,7 +155,7 @@ func (tx *transaction) CommitTx(
 					tx.s.config.OperationCancelAfter(),
 					operation.ModeSync,
 				),
-			}
+			}.Build()
 			response *Ydb_Table.CommitTransactionResponse
 			result   = new(Ydb_Table.CommitTransactionResult)
 		)
@@ -204,7 +204,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 		}()
 
 		_, err = tx.s.client.RollbackTransaction(ctx,
-			&Ydb_Table.RollbackTransactionRequest{
+			Ydb_Table.RollbackTransactionRequest_builder{
 				SessionId: tx.s.id,
 				TxId:      tx.ID(),
 				OperationParams: operation.Params(
@@ -213,7 +213,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 					tx.s.config.OperationCancelAfter(),
 					operation.ModeSync,
 				),
-			},
+			}.Build(),
 		)
 		if err != nil {
 			return xerrors.WithStackTrace(err)

@@ -14,11 +14,11 @@ type OperationParams struct {
 }
 
 func (p *OperationParams) ToProto() *Ydb_Operations.OperationParams {
-	res := &Ydb_Operations.OperationParams{
+	res := Ydb_Operations.OperationParams_builder{
 		OperationMode: p.OperationMode.ToProto(),
-	}
-	res.OperationTimeout = p.OperationTimeout.ToProto()
-	res.CancelAfter = p.CancelAfter.ToProto()
+	}.Build()
+	res.SetOperationTimeout(p.OperationTimeout.ToProto())
+	res.SetCancelAfter(p.CancelAfter.ToProto())
 
 	return res
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal"
@@ -90,366 +91,246 @@ func TestStruct(t *testing.T) {
 	}
 	var dst scanData
 	err := Struct(newScannerData(map[*Ydb.Column]*Ydb.Value{
-		{
+		Ydb.Column_builder{
 			Name: "Utf8String",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UTF8,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_TextValue{
-				TextValue: "A",
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UTF8.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			TextValue: proto.String("A"),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Utf8Bytes",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UTF8,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_TextValue{
-				TextValue: "A",
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UTF8.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			TextValue: proto.String("A"),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "StringString",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_STRING,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_BytesValue{
-				BytesValue: []byte("A"),
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_STRING.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			BytesValue: []byte("A"),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "StringBytes",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_STRING,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_BytesValue{
-				BytesValue: []byte("A"),
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_STRING.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			BytesValue: []byte("A"),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Uint64Uint64",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT64,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint64Value{
-				Uint64Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT64.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint64Value: proto.Uint64(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Int64Int64",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_INT64,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Int64Value{
-				Int64Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_INT64.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Int64Value: proto.Int64(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Uint32Uint64",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT32,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT32.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Uint32Int64",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT32,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT32.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Uint32Uint32",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT32,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT32.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Int32Int64",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_INT32,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_INT32.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Int32Value: proto.Int32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Int32Int32",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_INT32,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_INT32.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Int32Value: proto.Int32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Uint16Uint64",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Uint16Int64",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Uint16Uint32",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Uint16Int32",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Uint16Uint16",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Int16Int64",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_INT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_INT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Int32Value: proto.Int32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Int16Int32",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_INT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_INT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Int32Value: proto.Int32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Uint8Uint64",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Uint8Int64",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Uint8Uint32",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Uint8Int32",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Uint8Uint16",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_UINT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_UINT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Int8Int64",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_INT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_INT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Int32Value: proto.Int32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Int8Int32",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_INT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_INT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Int32Value: proto.Int32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "Int8Int16",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_INT16,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: 123,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_INT16.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Int32Value: proto.Int32(123),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "BoolBool",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_BOOL,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_BoolValue{
-				BoolValue: true,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_BOOL.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			BoolValue: proto.Bool(true),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "DateTime",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_DATE,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 100500,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_DATE.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(100500),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "DatetimeTime",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_DATETIME,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: 100500,
-			},
-		},
-		{
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_DATETIME.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint32Value: proto.Uint32(100500),
+		}.Build(),
+		Ydb.Column_builder{
 			Name: "TimestampTime",
-			Type: &Ydb.Type{
-				Type: &Ydb.Type_TypeId{
-					TypeId: Ydb.Type_TIMESTAMP,
-				},
-			},
-		}: {
-			Value: &Ydb.Value_Uint64Value{
-				Uint64Value: 12345678987654321,
-			},
-		},
+			Type: Ydb.Type_builder{
+				TypeId: Ydb.Type_TIMESTAMP.Enum(),
+			}.Build(),
+		}.Build(): Ydb.Value_builder{
+			Uint64Value: proto.Uint64(12345678987654321),
+		}.Build(),
 	})).ScanStruct(&dst)
 	require.NoError(t, err)
 	require.Equal(t, scanData{
@@ -489,21 +370,17 @@ func TestStruct(t *testing.T) {
 func TestStructNotAPointer(t *testing.T) {
 	scanner := Struct(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "a",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
 		},
 	))
 	var row struct {
@@ -517,21 +394,17 @@ func TestStructNotAPointer(t *testing.T) {
 func TestStructNotAPointerToStruct(t *testing.T) {
 	scanner := Struct(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "a",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
 		},
 	))
 	var row string
@@ -542,21 +415,17 @@ func TestStructNotAPointerToStruct(t *testing.T) {
 func TestStructCastFailed(t *testing.T) {
 	scanner := Struct(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "A",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
 		},
 	))
 	var row struct {
@@ -569,21 +438,17 @@ func TestStructCastFailed(t *testing.T) {
 func TestStructCastFailedErrMsg(t *testing.T) {
 	scanner := Struct(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "A",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
 		},
 	))
 	var row struct {
@@ -596,21 +461,17 @@ func TestStructCastFailedErrMsg(t *testing.T) {
 func TestStructNotFoundColumns(t *testing.T) {
 	scanner := Struct(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "a",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
 		},
 	))
 	var row struct {
@@ -624,21 +485,17 @@ func TestStructNotFoundColumns(t *testing.T) {
 func TestStructSkippedColumns(t *testing.T) {
 	scanner := Struct(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "A",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test-a",
-				},
-			},
+			Ydb.Value_builder{
+				TextValue: proto.String("test-a"),
+			}.Build(),
 		},
 	))
 
@@ -655,21 +512,17 @@ func TestStructSkippedColumns(t *testing.T) {
 func TestStructWithAllowMissingColumnsFromSelect(t *testing.T) {
 	scanner := Struct(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "A",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
 		},
 	))
 	var row struct {
@@ -689,47 +542,35 @@ func TestStructWithAllowMissingColumnsFromSelect(t *testing.T) {
 func TestStructNotFoundFields(t *testing.T) {
 	scanner := Struct(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "A",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
-			{
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
+			Ydb.Column_builder{
 				Name: "B",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
-			{
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
+			Ydb.Column_builder{
 				Name: "C",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
 		},
 	))
 	var row struct {
@@ -742,47 +583,35 @@ func TestStructNotFoundFields(t *testing.T) {
 func TestStructWithAllowMissingFieldsInStruct(t *testing.T) {
 	scanner := Struct(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "A",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
-			{
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
+			Ydb.Column_builder{
 				Name: "B",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
-			{
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
+			Ydb.Column_builder{
 				Name: "C",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "test",
-				},
-			},
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
+			Ydb.Value_builder{
+				TextValue: proto.String("test"),
+			}.Build(),
 		},
 	))
 	var row struct {
@@ -798,47 +627,35 @@ func TestStructWithAllowMissingFieldsInStruct(t *testing.T) {
 func TestStructWithTagName(t *testing.T) {
 	scanner := Struct(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "A",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
-			{
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
+			Ydb.Column_builder{
 				Name: "B",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
-			{
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
+			Ydb.Column_builder{
 				Name: "C",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "AA",
-				},
-			},
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "BB",
-				},
-			},
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "CC",
-				},
-			},
+			Ydb.Value_builder{
+				TextValue: proto.String("AA"),
+			}.Build(),
+			Ydb.Value_builder{
+				TextValue: proto.String("BB"),
+			}.Build(),
+			Ydb.Value_builder{
+				TextValue: proto.String("CC"),
+			}.Build(),
 		},
 	))
 	var row struct {
@@ -858,47 +675,35 @@ func TestStructWithTagName(t *testing.T) {
 func TestScannerStructOrdering(t *testing.T) {
 	scanner := Struct(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "B",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
-			{
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
+			Ydb.Column_builder{
 				Name: "A",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
-			{
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
+			Ydb.Column_builder{
 				Name: "C",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{
-						TypeId: Ydb.Type_UTF8,
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "B",
-				},
-			},
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "A",
-				},
-			},
-			{
-				Value: &Ydb.Value_TextValue{
-					TextValue: "C",
-				},
-			},
+			Ydb.Value_builder{
+				TextValue: proto.String("B"),
+			}.Build(),
+			Ydb.Value_builder{
+				TextValue: proto.String("A"),
+			}.Build(),
+			Ydb.Value_builder{
+				TextValue: proto.String("C"),
+			}.Build(),
 		},
 	))
 	var row struct {
@@ -916,21 +721,17 @@ func TestScannerStructOrdering(t *testing.T) {
 func TestScannerDecimal(t *testing.T) {
 	scanner := Struct(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "A",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_DecimalType{
-						DecimalType: &Ydb.DecimalType{Scale: 9, Precision: 22},
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					DecimalType: Ydb.DecimalType_builder{Scale: 9, Precision: 22}.Build(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_Low_128{
-					Low_128: 10200000000,
-				},
-			},
+			Ydb.Value_builder{
+				Low_128: proto.Uint64(10200000000),
+			}.Build(),
 		},
 	))
 	var row struct {
@@ -945,22 +746,18 @@ func TestScannerDecimal(t *testing.T) {
 func TestScannerDecimalNegative(t *testing.T) {
 	scanner := Struct(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "A",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_DecimalType{
-						DecimalType: &Ydb.DecimalType{Scale: 9, Precision: 22},
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					DecimalType: Ydb.DecimalType_builder{Scale: 9, Precision: 22}.Build(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
-				Value: &Ydb.Value_Low_128{
-					Low_128: 18446744071704551616,
-				},
+			Ydb.Value_builder{
+				Low_128:  proto.Uint64(18446744071704551616),
 				High_128: 0xffffffffffffffff,
-			},
+			}.Build(),
 		},
 	))
 	var row struct {
@@ -975,23 +772,19 @@ func TestScannerDecimalNegative(t *testing.T) {
 func TestScannerDecimalBigDecimal(t *testing.T) {
 	scanner := Struct(NewData(
 		[]*Ydb.Column{
-			{
+			Ydb.Column_builder{
 				Name: "A",
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_DecimalType{
-						DecimalType: &Ydb.DecimalType{Scale: 9, Precision: 22},
-					},
-				},
-			},
+				Type: Ydb.Type_builder{
+					DecimalType: Ydb.DecimalType_builder{Scale: 9, Precision: 22}.Build(),
+				}.Build(),
+			}.Build(),
 		},
 		[]*Ydb.Value{
-			{
+			Ydb.Value_builder{
 				// val: 1844674407370955.1615
-				Value: &Ydb.Value_Low_128{
-					Low_128: 3136633892082024448,
-				},
+				Low_128:  proto.Uint64(3136633892082024448),
 				High_128: 5421010862427522,
-			},
+			}.Build(),
 		},
 	))
 	var row struct {

@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
@@ -29,14 +30,12 @@ func TestList(t *testing.T) {
 			args:   []any{uint64(123)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Uint64Value{
-						Uint64Value: 123,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UINT64.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					Uint64Value: proto.Uint64(123),
+				}.Build(),
 			},
 		},
 		{
@@ -44,14 +43,12 @@ func TestList(t *testing.T) {
 			args:   []any{int64(123)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Int64Value{
-						Int64Value: 123,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_INT64.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					Int64Value: proto.Int64(123),
+				}.Build(),
 			},
 		},
 		{
@@ -59,14 +56,12 @@ func TestList(t *testing.T) {
 			args:   []any{uint32(123)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT32},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Uint32Value{
-						Uint32Value: 123,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UINT32.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					Uint32Value: proto.Uint32(123),
+				}.Build(),
 			},
 		},
 		{
@@ -74,14 +69,12 @@ func TestList(t *testing.T) {
 			args:   []any{int32(123)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Int32Value{
-						Int32Value: 123,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_INT32.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					Int32Value: proto.Int32(123),
+				}.Build(),
 			},
 		},
 		{
@@ -89,14 +82,12 @@ func TestList(t *testing.T) {
 			args:   []any{uint16(123)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT16},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Uint32Value{
-						Uint32Value: 123,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UINT16.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					Uint32Value: proto.Uint32(123),
+				}.Build(),
 			},
 		},
 		{
@@ -104,14 +95,12 @@ func TestList(t *testing.T) {
 			args:   []any{int16(123)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT16},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Int32Value{
-						Int32Value: 123,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_INT16.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					Int32Value: proto.Int32(123),
+				}.Build(),
 			},
 		},
 		{
@@ -119,14 +108,12 @@ func TestList(t *testing.T) {
 			args:   []any{uint8(123)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT8},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Uint32Value{
-						Uint32Value: 123,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UINT8.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					Uint32Value: proto.Uint32(123),
+				}.Build(),
 			},
 		},
 		{
@@ -134,14 +121,12 @@ func TestList(t *testing.T) {
 			args:   []any{int8(123)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT8},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Int32Value{
-						Int32Value: 123,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_INT8.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					Int32Value: proto.Int32(123),
+				}.Build(),
 			},
 		},
 		{
@@ -149,14 +134,12 @@ func TestList(t *testing.T) {
 			args:   []any{true},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_BoolValue{
-						BoolValue: true,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_BOOL.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					BoolValue: proto.Bool(true),
+				}.Build(),
 			},
 		},
 		{
@@ -164,14 +147,12 @@ func TestList(t *testing.T) {
 			args:   []any{"test"},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_TextValue{
-						TextValue: "test",
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UTF8.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					TextValue: proto.String("test"),
+				}.Build(),
 			},
 		},
 		{
@@ -179,14 +160,12 @@ func TestList(t *testing.T) {
 			args:   []any{[]byte("test")},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_BytesValue{
-						BytesValue: []byte("test"),
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_STRING.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					BytesValue: []byte("test"),
+				}.Build(),
 			},
 		},
 		{
@@ -194,14 +173,12 @@ func TestList(t *testing.T) {
 			args:   []any{float32(123)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_FLOAT},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_FloatValue{
-						FloatValue: float32(123),
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_FLOAT.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					FloatValue: proto.Float32(float32(123)),
+				}.Build(),
 			},
 		},
 		{
@@ -209,14 +186,12 @@ func TestList(t *testing.T) {
 			args:   []any{float64(123)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DOUBLE},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_DoubleValue{
-						DoubleValue: float64(123),
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_DOUBLE.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					DoubleValue: proto.Float64(float64(123)),
+				}.Build(),
 			},
 		},
 		{
@@ -224,14 +199,12 @@ func TestList(t *testing.T) {
 			args:   []any{time.Second},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Int64Value{
-						Int64Value: 1000000,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_INTERVAL.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					Int64Value: proto.Int64(1000000),
+				}.Build(),
 			},
 		},
 		{
@@ -239,14 +212,12 @@ func TestList(t *testing.T) {
 			args:   []any{time.Unix(123456789, 456)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Uint32Value{
-						Uint32Value: 123456789,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_DATETIME.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					Uint32Value: proto.Uint32(123456789),
+				}.Build(),
 			},
 		},
 		{
@@ -254,14 +225,12 @@ func TestList(t *testing.T) {
 			args:   []any{time.Unix(123456789, 456)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Uint32Value{
-						Uint32Value: 1428,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_DATE.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					Uint32Value: proto.Uint32(1428),
+				}.Build(),
 			},
 		},
 		{
@@ -269,14 +238,12 @@ func TestList(t *testing.T) {
 			args:   []any{time.Unix(123456789, 456)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Uint64Value{
-						Uint64Value: 123456789000000,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_TIMESTAMP.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					Uint64Value: proto.Uint64(123456789000000),
+				}.Build(),
 			},
 		},
 		{
@@ -284,20 +251,16 @@ func TestList(t *testing.T) {
 			args:   []any{[...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, uint32(22), uint32(9)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_DecimalType{
-						DecimalType: &Ydb.DecimalType{
-							Precision: 22,
-							Scale:     9,
-						},
-					},
-				},
-				Value: &Ydb.Value{
+				Type: Ydb.Type_builder{
+					DecimalType: Ydb.DecimalType_builder{
+						Precision: 22,
+						Scale:     9,
+					}.Build(),
+				}.Build(),
+				Value: Ydb.Value_builder{
 					High_128: 72623859790382856,
-					Value: &Ydb.Value_Low_128{
-						Low_128: 648519454493508870,
-					},
-				},
+					Low_128:  proto.Uint64(648519454493508870),
+				}.Build(),
 			},
 		},
 		{
@@ -305,14 +268,12 @@ func TestList(t *testing.T) {
 			args:   []any{`{"a": 1,"b": "B"}`},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_TextValue{
-						TextValue: `{"a": 1,"b": "B"}`,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_JSON.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					TextValue: proto.String(`{"a": 1,"b": "B"}`),
+				}.Build(),
 			},
 		},
 		{
@@ -320,14 +281,12 @@ func TestList(t *testing.T) {
 			args:   []any{`{"a": 1,"b": "B"}`},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON_DOCUMENT},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_TextValue{
-						TextValue: `{"a": 1,"b": "B"}`,
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_JSON_DOCUMENT.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					TextValue: proto.String(`{"a": 1,"b": "B"}`),
+				}.Build(),
 			},
 		},
 		{
@@ -335,14 +294,12 @@ func TestList(t *testing.T) {
 			args:   []any{[]byte(`{"a": 1,"b": "B"}`)},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_YSON},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_BytesValue{
-						BytesValue: []byte(`{"a": 1,"b": "B"}`),
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_YSON.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					BytesValue: []byte(`{"a": 1,"b": "B"}`),
+				}.Build(),
 			},
 		},
 		{
@@ -350,15 +307,13 @@ func TestList(t *testing.T) {
 			args:   []any{uuid.UUID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Low_128{
-						Low_128: 506660481424032516,
-					},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UUID.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					Low_128:  proto.Uint64(506660481424032516),
 					High_128: 1157159078456920585,
-				},
+				}.Build(),
 			},
 		},
 		{
@@ -366,15 +321,13 @@ func TestList(t *testing.T) {
 			args:   []any{[...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_Low_128{
-						Low_128: 651345242494996240,
-					},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_UUID.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					Low_128:  proto.Uint64(651345242494996240),
 					High_128: 72623859790382856,
-				},
+				}.Build(),
 			},
 		},
 		{
@@ -382,14 +335,12 @@ func TestList(t *testing.T) {
 			args:   []any{time.Unix(123456789, 456).UTC()},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATETIME},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_TextValue{
-						TextValue: "1973-11-29T21:33:09,UTC",
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_TZ_DATETIME.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					TextValue: proto.String("1973-11-29T21:33:09,UTC"),
+				}.Build(),
 			},
 		},
 		{
@@ -397,14 +348,12 @@ func TestList(t *testing.T) {
 			args:   []any{time.Unix(123456789, 456).UTC()},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATE},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_TextValue{
-						TextValue: "1973-11-29,UTC",
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_TZ_DATE.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					TextValue: proto.String("1973-11-29,UTC"),
+				}.Build(),
 			},
 		},
 		{
@@ -412,14 +361,12 @@ func TestList(t *testing.T) {
 			args:   []any{time.Unix(123456789, 456).UTC()},
 
 			expected: expected{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_TIMESTAMP},
-				},
-				Value: &Ydb.Value{
-					Value: &Ydb.Value_TextValue{
-						TextValue: "1973-11-29T21:33:09.000000,UTC",
-					},
-				},
+				Type: Ydb.Type_builder{
+					TypeId: Ydb.Type_TZ_TIMESTAMP.Enum(),
+				}.Build(),
+				Value: Ydb.Value_builder{
+					TextValue: proto.String("1973-11-29T21:33:09.000000,UTC"),
+				}.Build(),
 			},
 		},
 	}
@@ -434,20 +381,18 @@ func TestList(t *testing.T) {
 			params := result.EndList().build().toYDB()
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
-					"$x": {
-						Type: &Ydb.Type{
-							Type: &Ydb.Type_ListType{
-								ListType: &Ydb.ListType{
-									Item: tc.expected.Type,
-								},
-							},
-						},
-						Value: &Ydb.Value{
+					"$x": Ydb.TypedValue_builder{
+						Type: Ydb.Type_builder{
+							ListType: Ydb.ListType_builder{
+								Item: tc.expected.Type,
+							}.Build(),
+						}.Build(),
+						Value: Ydb.Value_builder{
 							Items: []*Ydb.Value{
 								tc.expected.Value,
 							},
-						},
-					},
+						}.Build(),
+					}.Build(),
 				}), xtest.ToJSON(params))
 		})
 	}
@@ -459,28 +404,22 @@ func TestList_AddItems(t *testing.T) {
 		EndList().build().toYDB()
 	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{
-			"$x": {
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_ListType{
-						ListType: &Ydb.ListType{
-							Item: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}},
-						},
-					},
-				},
-				Value: &Ydb.Value{
+			"$x": Ydb.TypedValue_builder{
+				Type: Ydb.Type_builder{
+					ListType: Ydb.ListType_builder{
+						Item: Ydb.Type_builder{TypeId: Ydb.Type_UINT64.Enum()}.Build(),
+					}.Build(),
+				}.Build(),
+				Value: Ydb.Value_builder{
 					Items: []*Ydb.Value{
-						{
-							Value: &Ydb.Value_Uint64Value{
-								Uint64Value: 123,
-							},
-						},
-						{
-							Value: &Ydb.Value_Uint64Value{
-								Uint64Value: 321,
-							},
-						},
+						Ydb.Value_builder{
+							Uint64Value: proto.Uint64(123),
+						}.Build(),
+						Ydb.Value_builder{
+							Uint64Value: proto.Uint64(321),
+						}.Build(),
 					},
-				},
-			},
+				}.Build(),
+			}.Build(),
 		}), xtest.ToJSON(params))
 }

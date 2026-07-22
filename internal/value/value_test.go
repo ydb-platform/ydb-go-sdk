@@ -563,60 +563,42 @@ func TestValueYql(t *testing.T) {
 			literal: `PgConst("123", PgType(705))`,
 		},
 		{
-			value: FromProtobuf(&Ydb.TypedValue{
-				Type: &Ydb.Type{
-					Type: &Ydb.Type_TupleType{
-						TupleType: &Ydb.TupleType{
-							Elements: []*Ydb.Type{
-								{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_INT32,
-									},
-								},
-								{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_INT64,
-									},
-								},
-								{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_FLOAT,
-									},
-								},
-								{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UTF8,
-									},
-								},
-							},
+			value: FromProtobuf(Ydb.TypedValue_builder{
+				Type: Ydb.Type_builder{
+					TupleType: Ydb.TupleType_builder{
+						Elements: []*Ydb.Type{
+							Ydb.Type_builder{
+								TypeId: Ydb.Type_INT32.Enum(),
+							}.Build(),
+							Ydb.Type_builder{
+								TypeId: Ydb.Type_INT64.Enum(),
+							}.Build(),
+							Ydb.Type_builder{
+								TypeId: Ydb.Type_FLOAT.Enum(),
+							}.Build(),
+							Ydb.Type_builder{
+								TypeId: Ydb.Type_UTF8.Enum(),
+							}.Build(),
 						},
-					},
-				},
-				Value: &Ydb.Value{
+					}.Build(),
+				}.Build(),
+				Value: Ydb.Value_builder{
 					Items: []*Ydb.Value{
-						{
-							Value: &Ydb.Value_Int32Value{
-								Int32Value: 0,
-							},
-						},
-						{
-							Value: &Ydb.Value_Int64Value{
-								Int64Value: 1,
-							},
-						},
-						{
-							Value: &Ydb.Value_FloatValue{
-								FloatValue: 2,
-							},
-						},
-						{
-							Value: &Ydb.Value_TextValue{
-								TextValue: "3",
-							},
-						},
+						Ydb.Value_builder{
+							Int32Value: proto.Int32(0),
+						}.Build(),
+						Ydb.Value_builder{
+							Int64Value: proto.Int64(1),
+						}.Build(),
+						Ydb.Value_builder{
+							FloatValue: proto.Float32(2),
+						}.Build(),
+						Ydb.Value_builder{
+							TextValue: proto.String("3"),
+						}.Build(),
 					},
-				},
-			}),
+				}.Build(),
+			}.Build()),
 			literal: `(0,1l,Float("2"),"3"u)`,
 		},
 	} {
@@ -1831,20 +1813,16 @@ func TestZeroValue(t *testing.T) {
 
 func TestProtobufValue(t *testing.T) {
 	t.Run("Type", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_TypeId{
-				TypeId: Ydb.Type_INT32,
-			},
-		}
-		ydbValue := &Ydb.Value{
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: 42,
-			},
-		}
-		pb := &Ydb.TypedValue{
+		ydbType := Ydb.Type_builder{
+			TypeId: Ydb.Type_INT32.Enum(),
+		}.Build()
+		ydbValue := Ydb.Value_builder{
+			Int32Value: proto.Int32(42),
+		}.Build()
+		pb := Ydb.TypedValue_builder{
 			Type:  ydbType,
 			Value: ydbValue,
-		}
+		}.Build()
 
 		v := FromProtobuf(pb)
 		require.NotNil(t, v)
@@ -1854,20 +1832,16 @@ func TestProtobufValue(t *testing.T) {
 	})
 
 	t.Run("CastTo", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_TypeId{
-				TypeId: Ydb.Type_INT32,
-			},
-		}
-		ydbValue := &Ydb.Value{
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: 42,
-			},
-		}
-		pb := &Ydb.TypedValue{
+		ydbType := Ydb.Type_builder{
+			TypeId: Ydb.Type_INT32.Enum(),
+		}.Build()
+		ydbValue := Ydb.Value_builder{
+			Int32Value: proto.Int32(42),
+		}.Build()
+		pb := Ydb.TypedValue_builder{
 			Type:  ydbType,
 			Value: ydbValue,
-		}
+		}.Build()
 
 		v := FromProtobuf(pb)
 
@@ -1879,20 +1853,16 @@ func TestProtobufValue(t *testing.T) {
 	})
 
 	t.Run("CastToInvalidType", func(t *testing.T) {
-		ydbType := &Ydb.Type{
-			Type: &Ydb.Type_TypeId{
-				TypeId: Ydb.Type_INT32,
-			},
-		}
-		ydbValue := &Ydb.Value{
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: 42,
-			},
-		}
-		pb := &Ydb.TypedValue{
+		ydbType := Ydb.Type_builder{
+			TypeId: Ydb.Type_INT32.Enum(),
+		}.Build()
+		ydbValue := Ydb.Value_builder{
+			Int32Value: proto.Int32(42),
+		}.Build()
+		pb := Ydb.TypedValue_builder{
 			Type:  ydbType,
 			Value: ydbValue,
-		}
+		}.Build()
 
 		v := FromProtobuf(pb)
 

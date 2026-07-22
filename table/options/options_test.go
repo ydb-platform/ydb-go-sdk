@@ -1,11 +1,16 @@
 package options
 
 import (
+	"bytes"
+	"compress/gzip"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -55,7 +60,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req))
-		if p, ok := req.GetPartitions().(*Ydb_Table.CreateTableRequest_UniformPartitions); !ok || p.UniformPartitions != 3 {
+		if req.WhichPartitions() != Ydb_Table.CreateTableRequest_UniformPartitions_case || req.GetUniformPartitions() != 3 {
 			t.Errorf("Uniform partitioning policy is not as expected")
 		}
 	}
@@ -67,14 +72,13 @@ func TestSessionOptionsProfile(t *testing.T) {
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req))
-		p, ok := req.GetPartitions().(*Ydb_Table.CreateTableRequest_PartitionAtKeys)
-		if !ok {
+		if req.WhichPartitions() != Ydb_Table.CreateTableRequest_PartitionAtKeys_case {
 			t.Errorf("Explicitly partitioning policy is not as expected")
 		} else {
 			require.Equal(
 				t,
 				[]*Ydb.TypedValue{value.ToYDB(value.Int64Value(1))},
-				p.PartitionAtKeys.GetSplitPoints(),
+				req.GetPartitionAtKeys().GetSplitPoints(),
 			)
 		}
 	}
@@ -244,4 +248,21 @@ func TestAlterTableOptions(t *testing.T) {
 			t.Errorf("Alter table storage settings options is not as expected")
 		}
 	}
+}
+
+func TestExecuteDataQueryDescDescriptor(t *testing.T) {
+	var d ExecuteDataQueryDesc
+	rawDescGZIP, idxPath := d.Descriptor()
+	require.NotEmpty(t, rawDescGZIP)
+
+	zr, err := gzip.NewReader(bytes.NewReader(rawDescGZIP))
+	require.NoError(t, err)
+	rawDesc, err := io.ReadAll(zr)
+	require.NoError(t, err)
+
+	fd := &descriptorpb.FileDescriptorProto{}
+	require.NoError(t, proto.Unmarshal(rawDesc, fd))
+
+	require.Len(t, idxPath, 1)
+	require.Equal(t, "ExecuteDataQueryRequest", fd.GetMessageType()[idxPath[0]].GetName())
 }

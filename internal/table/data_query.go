@@ -2,6 +2,7 @@ package table
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/protobuf/proto"
 )
 
 type (
@@ -32,11 +33,9 @@ func (q textQuery) YQL() string {
 }
 
 func (q textQuery) toYDB() *Ydb_Table.Query {
-	return &Ydb_Table.Query{
-		Query: &Ydb_Table.Query_YqlText{
-			YqlText: string(q),
-		},
-	}
+	return Ydb_Table.Query_builder{
+		YqlText: proto.String(string(q)),
+	}.Build()
 }
 
 func (q preparedQuery) String() string {
@@ -52,11 +51,9 @@ func (q preparedQuery) YQL() string {
 }
 
 func (q preparedQuery) toYDB() *Ydb_Table.Query {
-	return &Ydb_Table.Query{
-		Query: &Ydb_Table.Query_YqlText{
-			YqlText: q.sql,
-		},
-	}
+	return Ydb_Table.Query_builder{
+		YqlText: proto.String(q.sql),
+	}.Build()
 }
 
 func queryFromText(s string) Query {

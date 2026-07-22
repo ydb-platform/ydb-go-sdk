@@ -27,41 +27,41 @@ func TestDiscover(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		clock := clockwork.NewFakeClock()
 		client := NewMockDiscoveryServiceClient(ctrl)
-		client.EXPECT().ListEndpoints(gomock.Any(), &Ydb_Discovery.ListEndpointsRequest{
+		client.EXPECT().ListEndpoints(gomock.Any(), Ydb_Discovery.ListEndpointsRequest_builder{
 			Database: "test",
-		}).Return(&Ydb_Discovery.ListEndpointsResponse{
-			Operation: &Ydb_Operations.Operation{
+		}.Build()).Return(Ydb_Discovery.ListEndpointsResponse_builder{
+			Operation: Ydb_Operations.Operation_builder{
 				Ready:  true,
 				Status: Ydb.StatusIds_SUCCESS,
-				Result: xtest.Must(anypb.New(&Ydb_Discovery.ListEndpointsResult{
+				Result: xtest.Must(anypb.New(Ydb_Discovery.ListEndpointsResult_builder{
 					Endpoints: []*Ydb_Discovery.EndpointInfo{
-						{
+						Ydb_Discovery.EndpointInfo_builder{
 							Address: "node1",
 							Port:    1,
 							Ssl:     true,
-						},
-						{
+						}.Build(),
+						Ydb_Discovery.EndpointInfo_builder{
 							Address:  "node2",
 							Port:     2,
 							Location: "AZ0",
 							Ssl:      true,
-						},
-						{
+						}.Build(),
+						Ydb_Discovery.EndpointInfo_builder{
 							Address: "node3",
 							Port:    3,
 							Ssl:     false,
-						},
-						{
+						}.Build(),
+						Ydb_Discovery.EndpointInfo_builder{
 							Address:  "node4",
 							Port:     4,
 							Location: "AZ0",
 							Ssl:      false,
-						},
+						}.Build(),
 					},
 					SelfLocation: "AZ0",
-				})),
-			},
-		}, nil)
+				}.Build())),
+			}.Build(),
+		}.Build(), nil)
 		endpoints, location, err := Discover(ctx, client, config.New(
 			config.WithDatabase("test"),
 			config.WithSecure(false),
@@ -85,9 +85,9 @@ func TestDiscover(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 		client := NewMockDiscoveryServiceClient(ctrl)
-		client.EXPECT().ListEndpoints(gomock.Any(), &Ydb_Discovery.ListEndpointsRequest{
+		client.EXPECT().ListEndpoints(gomock.Any(), Ydb_Discovery.ListEndpointsRequest_builder{
 			Database: "test",
-		}).Return(nil, status.Error(grpcCodes.Unavailable, ""))
+		}.Build()).Return(nil, status.Error(grpcCodes.Unavailable, ""))
 		endpoints, location, err := Discover(ctx, client, config.New(
 			config.WithDatabase("test"),
 		))
@@ -101,14 +101,14 @@ func TestDiscover(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 		client := NewMockDiscoveryServiceClient(ctrl)
-		client.EXPECT().ListEndpoints(gomock.Any(), &Ydb_Discovery.ListEndpointsRequest{
+		client.EXPECT().ListEndpoints(gomock.Any(), Ydb_Discovery.ListEndpointsRequest_builder{
 			Database: "test",
-		}).Return(&Ydb_Discovery.ListEndpointsResponse{
-			Operation: &Ydb_Operations.Operation{
+		}.Build()).Return(Ydb_Discovery.ListEndpointsResponse_builder{
+			Operation: Ydb_Operations.Operation_builder{
 				Ready:  true,
 				Status: Ydb.StatusIds_UNAVAILABLE,
-			},
-		}, nil)
+			}.Build(),
+		}.Build(), nil)
 		endpoints, location, err := Discover(ctx, client, config.New(
 			config.WithDatabase("test"),
 		))
@@ -122,28 +122,28 @@ func TestDiscover(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		clock := clockwork.NewFakeClock()
 		client := NewMockDiscoveryServiceClient(ctrl)
-		client.EXPECT().ListEndpoints(gomock.Any(), &Ydb_Discovery.ListEndpointsRequest{
+		client.EXPECT().ListEndpoints(gomock.Any(), Ydb_Discovery.ListEndpointsRequest_builder{
 			Database: "test",
-		}).Return(&Ydb_Discovery.ListEndpointsResponse{
-			Operation: &Ydb_Operations.Operation{
+		}.Build()).Return(Ydb_Discovery.ListEndpointsResponse_builder{
+			Operation: Ydb_Operations.Operation_builder{
 				Ready:  true,
 				Status: Ydb.StatusIds_SUCCESS,
-				Result: xtest.Must(anypb.New(&Ydb_Discovery.ListEndpointsResult{
+				Result: xtest.Must(anypb.New(Ydb_Discovery.ListEndpointsResult_builder{
 					Endpoints: []*Ydb_Discovery.EndpointInfo{
-						{
+						Ydb_Discovery.EndpointInfo_builder{
 							Address: "node1",
 							Port:    1,
-						},
-						{
+						}.Build(),
+						Ydb_Discovery.EndpointInfo_builder{
 							Address:  "node2",
 							Port:     2,
 							Location: "AZ0",
-						},
+						}.Build(),
 					},
 					SelfLocation: "AZ0",
-				})),
-			},
-		}, nil)
+				}.Build())),
+			}.Build(),
+		}.Build(), nil)
 		endpoints, location, err := Discover(ctx, client, config.New(
 			config.WithDatabase("test"),
 			config.WithAddressMutator(func(address string) string {
