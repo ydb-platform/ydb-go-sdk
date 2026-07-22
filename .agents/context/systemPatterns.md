@@ -100,6 +100,17 @@ Table and query each maintain their own session pool instance inside `internal/t
 
 Query additionally has **implicit** session pool for server-side session management (see `internal/query/client.go`).
 
+### Session-pool reuse and expiration
+
+- Session expiration is lazy: idle TTL, usage TTL, and usage-limit checks run while an item is acquired from the pool. There is no background idle-session reaper in `internal/pool`.
+- LIFO reuse must not starve older sessions from expiration checks. Inspect the oldest item for configured expiry before the normal LIFO or node-hint selection, without running its liveness predicate merely for inspection.
+- The idle container supports efficient removal from both ends while preserving its length, limit, clear, LIFO, and node-specific semantics.
+
+### Session metrics: client state vs server state
+
+- SDK session and pool metrics describe client lifecycle and pool state; they do not prove that a session was deleted on the server.
+- Diagnose server-session leaks with server-side active-session metrics, correlated with SDK pool state and session RPC activity.
+
 ## Balancer and discovery (`internal/balancer/`)
 
 ```

@@ -370,7 +370,7 @@ func makeDiscoveryFunc(
 			)
 		}
 
-		ctx, err = driverConfig.Meta().Context(ctx)
+		ctx, err = driverConfig.Meta().DiscoveryContext(ctx)
 		if err != nil {
 			return endpoints, location, xerrors.WithStackTrace(
 				fmt.Errorf("failed to enrich context with meta, traceID %q: %w", traceID, err),

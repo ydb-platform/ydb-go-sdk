@@ -67,61 +67,48 @@ func WithBuildInfo(frameworkName string, frameworkVersion string) Option {
 		}
 		maps.Copy(next.frameworks, current.frameworks)
 		next.frameworks[frameworkName] = frameworkVersion
-
 		next.buildInfoHeader = next.makeHeader()
 		m.buildInfo.Store(next)
 	}
 }
 
-// makeHeader keeps backward-compatible semantics for build-info parsers:
-// - chain markers are appended after the base token using a space;
-// - tracing and metrics markers are separated with ';' when both are present;
-// - custom frameworks remain in ';framework/version' form.
+// makeHeader builds the session-facing x-ydb-sdk-build-info value:
+// base SDK token plus custom frameworks. Observability adoption chains are
+// intentionally omitted here so they do not pollute
+// `.sys/query_sessions.ClientSdkBuildInfo`.
 func (info *buildInfo) makeHeader() string {
-	builder := strings.Builder{}
-	builder.WriteString(buildInfoFirstPart)
-
-	if tracingVersion, has := info.frameworks[observability.TracingChainName]; has {
-		builder.WriteString(" ")
-		builder.WriteString(observability.TracingChainName)
-		builder.WriteString("/")
-		builder.WriteString(tracingVersion)
-	}
-
-	if metricsVersion, has := info.frameworks[observability.MetricsChainName]; has {
-		if _, hasTracing := info.frameworks[observability.TracingChainName]; hasTracing {
-			builder.WriteString(";")
-		} else {
-			builder.WriteString(" ")
-		}
-		builder.WriteString(observability.MetricsChainName)
-		builder.WriteString("/")
-		builder.WriteString(metricsVersion)
-	}
-
 	frameworkKeys := xslices.Keys(info.frameworks)
 	frameworkKeys = xslices.Filter(frameworkKeys, func(frameworkName string) bool {
 		return frameworkName != observability.TracingChainName &&
 			frameworkName != observability.MetricsChainName
 	})
-
 	if len(frameworkKeys) == 0 {
-		return builder.String()
+		return buildInfoFirstPart
 	}
 
-	builder.WriteString(";")
-	builder.WriteString(
-		strings.Join(
-			xslices.Transform(
-				frameworkKeys,
-				func(frameworkName string) string {
-					return frameworkName + "/" + info.frameworks[frameworkName]
-				},
-			), ";",
+	return buildInfoFirstPart + ";" + strings.Join(
+		xslices.Transform(
+			frameworkKeys,
+			func(frameworkName string) string {
+				return frameworkName + "/" + info.frameworks[frameworkName]
+			},
 		),
+		";",
 	)
+}
 
-	return builder.String()
+// observabilityChains returns adoption markers for Discovery only, joined with ';'.
+// Example: "ydb-sdk-tracing/0.1.0;ydb-sdk-metrics/0.1.0".
+func (info *buildInfo) observabilityChains() string {
+	var chains []string
+	if chainVersion, ok := info.frameworks[observability.TracingChainName]; ok {
+		chains = append(chains, observability.TracingChainName+"/"+chainVersion)
+	}
+	if chainVersion, ok := info.frameworks[observability.MetricsChainName]; ok {
+		chains = append(chains, observability.MetricsChainName+"/"+chainVersion)
+	}
+
+	return strings.Join(chains, ";")
 }
 
 func WithRequestTypeOption(requestType string) Option {
@@ -168,7 +155,7 @@ type (
 
 const buildInfoFirstPart = version.FullVersion
 
-func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
+func (m *Meta) meta(ctx context.Context, buildInfoHeader string) (_ metadata.MD, err error) {
 	md, has := metadata.FromOutgoingContext(ctx)
 	if !has {
 		md = metadata.MD{}
@@ -181,7 +168,7 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	}
 
 	if len(md.Get(HeaderVersion)) == 0 {
-		md.Set(HeaderVersion, m.buildInfo.Load().buildInfoHeader)
+		md.Set(HeaderVersion, buildInfoHeader)
 	}
 
 	if m.requestsType != "" {
@@ -241,7 +228,24 @@ func ValidateBuildInfo(frameworkName string, frameworkVersion string) error {
 }
 
 func (m *Meta) Context(ctx context.Context) (_ context.Context, err error) {
-	md, err := m.meta(ctx)
+	md, err := m.meta(ctx, m.buildInfo.Load().buildInfoHeader)
+	if err != nil {
+		return ctx, xerrors.WithStackTrace(err)
+	}
+
+	return metadata.NewOutgoingContext(ctx, md), nil
+}
+
+// DiscoveryContext is like Context, but appends observability adoption chains to
+// x-ydb-sdk-build-info. Use it only for Discovery.ListEndpoints.
+func (m *Meta) DiscoveryContext(ctx context.Context) (_ context.Context, err error) {
+	info := m.buildInfo.Load()
+	header := info.buildInfoHeader
+	if chains := info.observabilityChains(); chains != "" {
+		header += ";" + chains
+	}
+
+	md, err := m.meta(ctx, header)
 	if err != nil {
 		return ctx, xerrors.WithStackTrace(err)
 	}
