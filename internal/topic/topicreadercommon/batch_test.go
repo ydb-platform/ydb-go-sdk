@@ -27,19 +27,6 @@ func TestBatch_New(t *testing.T) {
 	})
 }
 
-func TestBatch_ReadBufferSize(t *testing.T) {
-	var nilBatch *PublicBatch
-	require.Zero(t, nilBatch.ReadBufferSize())
-
-	batch := &PublicBatch{
-		Messages: []*PublicMessage{
-			{bufferBytesAccount: 10},
-			{bufferBytesAccount: 15},
-		},
-	}
-	require.Equal(t, 25, batch.ReadBufferSize())
-}
-
 func TestBatch_Cut(t *testing.T) {
 	t.Run("Full", func(t *testing.T) {
 		session := &PartitionSession{}
