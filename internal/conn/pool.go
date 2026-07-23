@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
@@ -28,6 +29,8 @@ type (
 	Pool struct {
 		config      Config
 		dialOptions []grpc.DialOption
+		clock       clockwork.Clock
+		done        chan struct{}
 
 		mu     sync.Mutex
 		usages int64
@@ -81,7 +84,7 @@ func (p *Pool) get(e endpoint.Endpoint) *connValue {
 	}
 
 	value := &connValue{
-		cc: newConn(e, p),
+		cc: newConn(e, p, withUsageTracker(p.clock, p.config.ConnectionTTL() > 0)),
 	}
 
 	p.conns[key] = value
@@ -208,6 +211,7 @@ func (p *Pool) release() []closer.Closer {
 	}
 
 	p.closed.Store(true)
+	close(p.done)
 
 	toClose := make([]closer.Closer, 0, len(p.conns))
 	for _, value := range p.conns {
@@ -293,7 +297,50 @@ func (p *Pool) onResolveDone(ctx context.Context, target string, resolved []stri
 	}
 }
 
-func NewPool(ctx context.Context, config Config) *Pool {
+func (p *Pool) connsForParking() []*conn {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.conns == nil {
+		return nil
+	}
+
+	conns := make([]*conn, 0, len(p.conns))
+	for _, value := range p.conns {
+		conns = append(conns, value.cc)
+	}
+
+	return conns
+}
+
+func (p *Pool) parkIdleConnections(ctx context.Context, ttl time.Duration) {
+	for _, cc := range p.connsForParking() {
+		cc.parkIfIdle(ctx, ttl)
+	}
+}
+
+func (p *Pool) connParker(ctx context.Context, ttl time.Duration) {
+	interval := ttl / 2 //nolint:mnd
+	if interval <= 0 {
+		interval = ttl
+	}
+
+	ticker := p.clock.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-p.done:
+			return
+		case <-ticker.Chan():
+			p.parkIdleConnections(ctx, ttl)
+		}
+	}
+}
+
+type poolOption func(*Pool)
+
+func NewPool(ctx context.Context, config Config, opts ...poolOption) *Pool {
 	onDone := gtrace.DriverOnPoolNew(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.NewPool"),
 	)
@@ -303,7 +350,13 @@ func NewPool(ctx context.Context, config Config) *Pool {
 		usages:      1,
 		config:      config,
 		dialOptions: config.GrpcDialOptions(),
+		clock:       clockwork.NewRealClock(),
+		done:        make(chan struct{}),
 		conns:       make(map[endpoint.Key]*connValue),
+	}
+
+	for _, opt := range opts {
+		opt(p)
 	}
 
 	p.dialOptions = append(p.dialOptions,
@@ -311,6 +364,10 @@ func NewPool(ctx context.Context, config Config) *Pool {
 			xresolver.New("", p.onResolveDriverTrace(ctx, config.Trace())),
 		),
 	)
+
+	if ttl := config.ConnectionTTL(); ttl > 0 {
+		go p.connParker(xcontext.ValueOnly(ctx), ttl)
+	}
 
 	return p
 }
