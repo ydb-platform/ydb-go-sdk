@@ -392,6 +392,66 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	require.Equal(t, 1, events.closedCount(node2))
 }
 
+func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
+	const (
+		node1 uint32 = 1
+		node2 uint32 = 2
+		ttl          = 50 * time.Millisecond
+	)
+
+	ctx := t.Context()
+	srv := startDynamicDiscoveryServer(t, []uint32{node1, node2})
+	events := newConnLifeEvents()
+
+	cfg := config.New(
+		config.WithEndpoint(srv.endpoint()),
+		config.WithDatabase("/local"),
+		config.WithConnectionTTL(ttl),
+		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		config.WithTrace(*events.driverTrace()),
+		config.WithBalancer(&balancerConfig.Config{}),
+	)
+
+	pool := conn.NewPool(ctx, cfg)
+	defer func() {
+		require.NoError(t, pool.RemoveRef(ctx))
+	}()
+
+	b, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
+	require.NoError(t, err)
+
+	dialWhoAmI(t, b, node2)
+	node2Conn := connByNodeID(b, node2)
+	require.NotNil(t, node2Conn)
+
+	require.Eventually(t, func() bool {
+		return node2Conn.State() == state.Offline && events.parkedCount(node2) == 1
+	}, time.Second, 10*time.Millisecond, "connection TTL must park the node transport")
+	require.Equal(t, 0, events.closedCount(node2), "parking must preserve the pooled wrapper")
+
+	// Discovery #2: keep both nodes and establish the quarantine generation.
+	require.NoError(t, b.clusterDiscoveryAttemptWithDial(ctx))
+	require.Same(t, node2Conn, connByNodeID(b, node2))
+	require.Equal(t, state.Offline, node2Conn.State())
+
+	// Discovery #3: node 2 disappears but remains referenced by quarantine.
+	srv.setNodeIDs([]uint32{node1})
+	require.NoError(t, b.clusterDiscoveryAttemptWithDial(ctx))
+	require.Same(t, node2Conn, connInQuarantine(b, node2))
+	require.Equal(t, state.Offline, node2Conn.State())
+	require.Equal(t, 0, events.closedCount(node2))
+
+	// Discovery #4: release quarantine and destroy the already parked wrapper.
+	require.NoError(t, b.clusterDiscoveryAttemptWithDial(ctx))
+	require.Eventually(t, func() bool {
+		return node2Conn.State() == state.Destroyed && events.closedCount(node2) == 1
+	}, time.Second, 10*time.Millisecond, "Discovery removal must destroy a parked connection")
+	require.Equal(t, 1, events.parkedCount(node2))
+	require.Equal(t, 1, events.dialedCount(node2))
+
+	require.NoError(t, b.Close(ctx))
+}
+
 func TestBalancerConnectionTTLParksTransportsAfterNetworkLoss(t *testing.T) {
 	const (
 		nodeCount = 16
