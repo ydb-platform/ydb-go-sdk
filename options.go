@@ -214,11 +214,11 @@ func WithConnectionString(connectionString string) Option {
 	}
 }
 
-// Deprecated: connection parking was removed; this option is now a no-op.
-// Will be removed after Dec 2026.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// WithConnectionTTL configures the idle interval after which gRPC connections are parked.
 func WithConnectionTTL(ttl time.Duration) Option {
-	return func(context.Context, *Driver) error {
+	return func(_ context.Context, d *Driver) error {
+		d.options = append(d.options, config.WithConnectionTTL(ttl))
+
 		return nil
 	}
 }

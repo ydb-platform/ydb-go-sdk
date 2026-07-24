@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -66,6 +67,7 @@ type (
 		state                   atomic.Uint32
 		lastClusterAnnouncement atomic.Int64
 		childStreams            *xcontext.CancelsGuard
+		usage                   *usageTracker
 		onClose                 []func(*conn)
 	}
 )
@@ -394,6 +396,9 @@ func (c *conn) Invoke(
 	res any,
 	opts ...grpc.CallOption,
 ) (err error) {
+	stopUsage := c.startUsage()
+	defer stopUsage()
+
 	var (
 		opID   string
 		issues []trace.Issue
@@ -436,6 +441,9 @@ func (c *conn) NewStream(
 	method string,
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, finalErr error) {
+	stopUsage := c.startUsage()
+	defer stopUsage()
+
 	var (
 		onDone = gtrace.DriverOnConnNewStream(
 			c.config.Trace(), &ctx,
@@ -511,6 +519,14 @@ func withOnClose(onClose func(*conn)) option {
 	return func(c *conn) {
 		if onClose != nil {
 			c.onClose = append(c.onClose, onClose)
+		}
+	}
+}
+
+func withUsageTracker(clock clockwork.Clock, enabled bool) option {
+	return func(c *conn) {
+		if enabled {
+			c.usage = newUsageTracker(clock)
 		}
 	}
 }

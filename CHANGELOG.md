@@ -1,3 +1,5 @@
+* Fixed `WithConnectionTTL` being a no-op and restored parking of idle gRPC connections without preventing removal of nodes missing from Discovery
+
 ## v3.145.0
 * Added `topicoptions.WithListenerBufferSizeBytes` option for `TopicListener` to configure the read-ahead buffer size (default 1 MiB, same as topic reader).
 

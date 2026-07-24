@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -22,13 +23,18 @@ import (
 
 // mockConfig implements the Config interface for testing
 type mockConfig struct {
-	dialTimeout  time.Duration
-	driverTrace  *trace.Driver
-	grpcDialOpts []grpc.DialOption
+	dialTimeout   time.Duration
+	connectionTTL time.Duration
+	driverTrace   *trace.Driver
+	grpcDialOpts  []grpc.DialOption
 }
 
 func (m *mockConfig) DialTimeout() time.Duration {
 	return m.dialTimeout
+}
+
+func (m *mockConfig) ConnectionTTL() time.Duration {
+	return m.connectionTTL
 }
 
 func (m *mockConfig) Trace() *trace.Driver {
@@ -100,6 +106,13 @@ func testPoolConnUseCount(p *Pool, key endpoint.Key) (int64, bool) {
 	}
 
 	return value.useCount, true
+}
+
+func testConnGRPCConn(c *conn) grpcClientConnInterface {
+	c.mtx.RLock()
+	defer c.mtx.RUnlock()
+
+	return c.grpcConn
 }
 
 func TestPool_Get(t *testing.T) {
@@ -285,6 +298,103 @@ func TestPool_ConfigMethods(t *testing.T) {
 
 		// The pool adds additional options, so we check the length is at least the ones we provided
 		require.GreaterOrEqual(t, len(pool.GrpcDialOptions()), len(opts))
+	})
+}
+
+func TestPool_ConnectionTTL(t *testing.T) {
+	t.Run("ParksIdleTransportWithoutRemovingWrapper", func(t *testing.T) {
+		const ttl = 10 * time.Second
+
+		ctx := t.Context()
+		clock := clockwork.NewFakeClockAt(time.Unix(1, 0))
+		pool := NewPool(ctx, &mockConfig{connectionTTL: ttl}, func(p *Pool) {
+			p.clock = clock
+		})
+		defer func() {
+			require.NoError(t, pool.RemoveRef(ctx))
+		}()
+
+		e := endpoint.New("idle:2135")
+		cc := pool.Get(e).(*conn)
+		cc.mtx.Lock()
+		cc.grpcConn = &mockGrpcConn{}
+		cc.mtx.Unlock()
+		cc.setState(ctx, state.Online)
+
+		waitCtx, cancel := context.WithTimeout(ctx, time.Second)
+		defer cancel()
+		require.NoError(t, clock.BlockUntilContext(waitCtx, 1))
+		clock.Advance(ttl + time.Second)
+		require.Eventually(t, func() bool {
+			return cc.State() == state.Offline
+		}, time.Second, time.Millisecond)
+
+		require.Equal(t, state.Offline, cc.State())
+		require.Nil(t, testConnGRPCConn(cc))
+		require.True(t, testPoolHasConn(pool, e.Key()))
+		useCount, ok := testPoolConnUseCount(pool, e.Key())
+		require.True(t, ok)
+		require.Equal(t, int64(1), useCount)
+	})
+
+	t.Run("DoesNotParkActiveTransport", func(t *testing.T) {
+		const ttl = 10 * time.Second
+
+		ctx := t.Context()
+		clock := clockwork.NewFakeClockAt(time.Unix(1, 0))
+		pool := NewPool(ctx, &mockConfig{connectionTTL: ttl}, func(p *Pool) {
+			p.clock = clock
+		})
+		defer func() {
+			require.NoError(t, pool.RemoveRef(ctx))
+		}()
+
+		cc := pool.Get(endpoint.New("active:2135")).(*conn)
+		transport := &mockGrpcConn{}
+		cc.mtx.Lock()
+		cc.grpcConn = transport
+		cc.mtx.Unlock()
+		cc.setState(ctx, state.Online)
+
+		stopUsage := cc.startUsage()
+		clock.Advance(ttl + time.Second)
+		pool.parkIdleConnections(ctx, ttl)
+		require.Same(t, transport, testConnGRPCConn(cc))
+
+		stopUsage()
+		clock.Advance(ttl + time.Second)
+		pool.parkIdleConnections(ctx, ttl)
+		require.Nil(t, testConnGRPCConn(cc))
+	})
+
+	t.Run("DiscoveryReleaseDestroysParkedWrapper", func(t *testing.T) {
+		const ttl = 10 * time.Second
+
+		ctx := t.Context()
+		clock := clockwork.NewFakeClockAt(time.Unix(1, 0))
+		pool := NewPool(ctx, &mockConfig{connectionTTL: ttl}, func(p *Pool) {
+			p.clock = clock
+		})
+		defer func() {
+			require.NoError(t, pool.RemoveRef(ctx))
+		}()
+
+		e := endpoint.New("removed-from-discovery:2135")
+		cc := pool.Get(e).(*conn)
+		cc.mtx.Lock()
+		cc.grpcConn = &mockGrpcConn{}
+		cc.mtx.Unlock()
+		cc.setState(ctx, state.Online)
+
+		clock.Advance(ttl + time.Second)
+		pool.parkIdleConnections(ctx, ttl)
+		require.Equal(t, state.Offline, cc.State())
+		require.True(t, testPoolHasConn(pool, e.Key()))
+
+		pool.Put(ctx, cc)
+
+		require.Equal(t, state.Destroyed, cc.State())
+		require.False(t, testPoolHasConn(pool, e.Key()))
 	})
 }
 

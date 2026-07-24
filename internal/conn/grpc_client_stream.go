@@ -45,6 +45,9 @@ func (s *grpcClientStream) Endpoint() endpoint.Endpoint {
 }
 
 func (s *grpcClientStream) CloseSend() (err error) {
+	stopUsage := s.parentConn.startUsage()
+	defer stopUsage()
+
 	var (
 		ctx    = s.streamCtx
 		onDone = gtrace.DriverOnConnStreamCloseSend(s.parentConn.config.Trace(), &ctx,
@@ -75,6 +78,9 @@ func (s *grpcClientStream) CloseSend() (err error) {
 }
 
 func (s *grpcClientStream) SendMsg(m any) (err error) {
+	stopUsage := s.parentConn.startUsage()
+	defer stopUsage()
+
 	var (
 		ctx    = s.streamCtx
 		onDone = gtrace.DriverOnConnStreamSendMsg(s.parentConn.config.Trace(), &ctx,
@@ -122,6 +128,9 @@ func (s *grpcClientStream) finish(err error) {
 }
 
 func (s *grpcClientStream) RecvMsg(m any) (err error) {
+	stopUsage := s.parentConn.startUsage()
+	defer stopUsage()
+
 	var (
 		ctx    = s.streamCtx
 		onDone = gtrace.DriverOnConnStreamRecvMsg(s.parentConn.config.Trace(), &ctx,
