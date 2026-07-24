@@ -198,12 +198,14 @@ func discoveryOperationOK(msg proto.Message) *Ydb_Operations.Operation {
 type connLifeEvents struct {
 	mu     sync.Mutex
 	dialed map[uint32]int
+	parked map[uint32]int
 	closed map[uint32]int
 }
 
 func newConnLifeEvents() *connLifeEvents {
 	return &connLifeEvents{
 		dialed: make(map[uint32]int),
+		parked: make(map[uint32]int),
 		closed: make(map[uint32]int),
 	}
 }
@@ -231,6 +233,18 @@ func (e *connLifeEvents) driverTrace() *trace.Driver {
 				e.mu.Unlock()
 			}
 		},
+		OnConnPark: func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
+			nodeID := info.Endpoint.NodeID()
+
+			return func(done trace.DriverConnParkDoneInfo) {
+				if done.Error != nil {
+					return
+				}
+				e.mu.Lock()
+				e.parked[nodeID]++
+				e.mu.Unlock()
+			}
+		},
 	}
 }
 
@@ -246,6 +260,13 @@ func (e *connLifeEvents) closedCount(nodeID uint32) int {
 	defer e.mu.Unlock()
 
 	return e.closed[nodeID]
+}
+
+func (e *connLifeEvents) parkedCount(nodeID uint32) int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	return e.parked[nodeID]
 }
 
 func dialWhoAmI(tb testing.TB, b *Balancer, nodeID uint32) {
@@ -369,4 +390,76 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	}, time.Second, 10*time.Millisecond, "balancer close must close remaining active connections")
 
 	require.Equal(t, 1, events.closedCount(node2))
+}
+
+func TestBalancerConnectionTTLParksTransportsAfterNetworkLoss(t *testing.T) {
+	const (
+		nodeCount = 16
+		ttl       = 50 * time.Millisecond
+	)
+
+	nodeIDs := make([]uint32, nodeCount)
+	for i := range nodeIDs {
+		nodeIDs[i] = uint32(i + 1)
+	}
+
+	ctx := t.Context()
+	srv := startDynamicDiscoveryServer(t, nodeIDs)
+	events := newConnLifeEvents()
+
+	cfg := config.New(
+		config.WithEndpoint(srv.endpoint()),
+		config.WithDatabase("/local"),
+		config.WithConnectionTTL(ttl),
+		config.WithDialTimeout(ttl),
+		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		config.WithTrace(*events.driverTrace()),
+		config.WithBalancer(&balancerConfig.Config{}),
+	)
+
+	pool := conn.NewPool(ctx, cfg)
+	defer func() {
+		require.NoError(t, pool.RemoveRef(ctx))
+	}()
+
+	b, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
+	require.NoError(t, err)
+
+	dialWhoAmI(t, b, nodeIDs[0])
+	srv.Close()
+
+	for _, nodeID := range nodeIDs[1:] {
+		callCtx, cancel := context.WithTimeout(endpoint.WithNodeID(ctx, nodeID), ttl)
+		reply := &Ydb_Discovery.WhoAmIResponse{}
+		err = b.Invoke(
+			callCtx,
+			Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
+			&Ydb_Discovery.WhoAmIRequest{},
+			reply,
+		)
+		cancel()
+		require.Error(t, err)
+	}
+
+	for _, nodeID := range nodeIDs {
+		require.Equal(t, 1, events.dialedCount(nodeID))
+	}
+
+	require.Eventually(t, func() bool {
+		for _, nodeID := range nodeIDs {
+			cc := connByNodeID(b, nodeID)
+			if cc == nil || cc.State() != state.Offline || events.parkedCount(nodeID) != 1 {
+				return false
+			}
+		}
+
+		return true
+	}, 5*time.Second, 10*time.Millisecond)
+
+	require.ElementsMatch(t, nodeIDs, activeNodeIDs(b), "parking must keep Discovery wrappers in the balancer")
+	require.NoError(t, b.Close(ctx))
+
+	for _, nodeID := range nodeIDs {
+		require.Equal(t, 1, events.closedCount(nodeID))
+	}
 }
