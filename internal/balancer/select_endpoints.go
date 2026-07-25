@@ -1,6 +1,7 @@
 package balancer
 
 import (
+	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -13,18 +14,56 @@ import (
 //
 // maxConnections <= 0 means unlimited (return all discovered endpoints).
 // Banned connections are not kept in the sticky set so their slots can be reused.
+//
+// When filter is set, preferred (filter-matching) endpoints are selected first.
+// Without AllowFallback, only preferred endpoints enter the active set — matching
+// PreferNearestDC / PreferLocations routing semantics and avoiding a sticky set
+// that permanently excludes the local DC.
 func selectEndpoints(
 	previous []conn.Conn,
 	discovered []endpoint.Endpoint,
 	maxConnections int,
+	filter balancerConfig.Filter,
+	info balancerConfig.Info,
+	allowFallback bool,
 	rnd xrand.Rand,
 ) []endpoint.Endpoint {
 	if maxConnections <= 0 || len(discovered) <= maxConnections {
 		return discovered
 	}
 
-	byKey := make(map[endpoint.Key]endpoint.Endpoint, len(discovered))
-	for _, e := range discovered {
+	if filter == nil {
+		return selectEndpointsFrom(previous, discovered, maxConnections, rnd)
+	}
+
+	preferred, other := partitionEndpoints(discovered, filter, info)
+	if !allowFallback {
+		return selectEndpointsFrom(previous, preferred, maxConnections, rnd)
+	}
+
+	selected := selectEndpointsFrom(previous, preferred, maxConnections, rnd)
+	if len(selected) >= maxConnections {
+		return selected
+	}
+
+	return append(selected, selectEndpointsFrom(previous, other, maxConnections-len(selected), rnd)...)
+}
+
+func selectEndpointsFrom(
+	previous []conn.Conn,
+	candidates []endpoint.Endpoint,
+	maxConnections int,
+	rnd xrand.Rand,
+) []endpoint.Endpoint {
+	if maxConnections <= 0 || len(candidates) == 0 {
+		return nil
+	}
+	if len(candidates) <= maxConnections {
+		return candidates
+	}
+
+	byKey := make(map[endpoint.Key]endpoint.Endpoint, len(candidates))
+	for _, e := range candidates {
 		byKey[e.Key()] = e
 	}
 
@@ -50,24 +89,42 @@ func selectEndpoints(
 		}
 	}
 
-	candidates := make([]endpoint.Endpoint, 0, len(discovered)-len(kept))
-	for _, e := range discovered {
+	fill := make([]endpoint.Endpoint, 0, len(candidates)-len(kept))
+	for _, e := range candidates {
 		if _, ok := kept[e.Key()]; ok {
 			continue
 		}
-		candidates = append(candidates, e)
+		fill = append(fill, e)
 	}
 
 	if rnd == nil {
 		rnd = xrand.New(xrand.WithLock())
 	}
-	rnd.Shuffle(len(candidates), func(i, j int) {
-		candidates[i], candidates[j] = candidates[j], candidates[i]
+	rnd.Shuffle(len(fill), func(i, j int) {
+		fill[i], fill[j] = fill[j], fill[i]
 	})
 
-	need := min(maxConnections-len(keep), len(candidates))
+	need := min(maxConnections-len(keep), len(fill))
 
-	return append(keep, candidates[:need]...)
+	return append(keep, fill[:need]...)
+}
+
+func partitionEndpoints(
+	discovered []endpoint.Endpoint,
+	filter balancerConfig.Filter,
+	info balancerConfig.Info,
+) (preferred, other []endpoint.Endpoint) {
+	preferred = make([]endpoint.Endpoint, 0, len(discovered))
+	other = make([]endpoint.Endpoint, 0, len(discovered))
+	for _, e := range discovered {
+		if filter.Allow(info, e) {
+			preferred = append(preferred, e)
+		} else {
+			other = append(other, e)
+		}
+	}
+
+	return preferred, other
 }
 
 func connectionIndex(conns []conn.Conn, target conn.Conn) int {
@@ -84,15 +141,34 @@ func replacementEndpoint(
 	discovered []endpoint.Endpoint,
 	active []conn.Conn,
 	excluded endpoint.Key,
+	filter balancerConfig.Filter,
+	info balancerConfig.Info,
+	allowFallback bool,
 ) endpoint.Endpoint {
 	activeKeys := connKeys(active)
-	for _, e := range discovered {
-		if _, exists := activeKeys[e.Key()]; exists {
-			continue
+	pick := func(from []endpoint.Endpoint) endpoint.Endpoint {
+		for _, e := range from {
+			if _, exists := activeKeys[e.Key()]; exists {
+				continue
+			}
+			if e.Key() != excluded {
+				return e
+			}
 		}
-		if e.Key() != excluded {
-			return e
-		}
+
+		return nil
+	}
+
+	if filter == nil {
+		return pick(discovered)
+	}
+
+	preferred, other := partitionEndpoints(discovered, filter, info)
+	if e := pick(preferred); e != nil {
+		return e
+	}
+	if allowFallback {
+		return pick(other)
 	}
 
 	return nil

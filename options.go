@@ -359,8 +359,13 @@ func WithBalancer(balancer *balancerConfig.Config) Option {
 }
 
 // WithMaxConnections limits how many discovered YDB endpoints the client
-// balancer keeps in its active connection set (default
-// [balancers.DefaultMaxConnections]).
+// balancer keeps in its active connection set.
+//
+// The limit is opt-in: the default is unlimited (all discovered endpoints stay
+// active). Prefer applying this after [WithBalancer], or use
+// [balancers.WithMaxConnections] on the balancer config. When [WithBalancer]
+// follows [WithMaxConnections], a non-zero MaxConnections already set on the
+// driver is preserved if the incoming balancer leaves MaxConnections at zero.
 //
 // The limit is enforced in the balancer (sticky subset across discovery
 // updates). Banned connections are evicted so slots can be reused for live
@@ -372,7 +377,7 @@ func WithBalancer(balancer *balancerConfig.Config) Option {
 // CreateSession handled on node A may return a session owned by node B —
 // subsequent RPCs need a connection to B even if B was not selected.
 //
-// Zero disables the limit (all discovered endpoints stay active).
+// Zero disables the limit (unlimited). Negative values are treated as zero.
 func WithMaxConnections(n int) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.options = append(d.options, config.WithMaxConnections(n))

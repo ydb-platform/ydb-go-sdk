@@ -300,7 +300,15 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 		quarantine = state.quarantine
 	}
 
-	selected := selectEndpoints(active, endpoints, b.balancerConfig.MaxConnections, nil)
+	selected := selectEndpoints(
+		active,
+		endpoints,
+		b.balancerConfig.MaxConnections,
+		b.balancerConfig.Filter,
+		balancerConfig.Info{SelfLocation: localDC},
+		b.balancerConfig.AllowFallback,
+		nil,
+	)
 
 	defer func() {
 		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
@@ -342,7 +350,7 @@ func (b *Balancer) replaceBannedConn(ctx context.Context, banned conn.Conn) {
 		return
 	}
 
-	released, rep := b.swapBannedConnLocked(ctx, banned)
+	released, rep := b.swapBannedConn(ctx, banned)
 	if rep != nil {
 		rep.Force()
 
@@ -357,10 +365,10 @@ func (b *Balancer) replaceBannedConn(ctx context.Context, banned conn.Conn) {
 	go b.pool.Put(xcontext.ValueOnly(ctx), released)
 }
 
-// swapBannedConnLocked evicts banned from the active set when another discovered
+// swapBannedConn evicts banned from the active set when another discovered
 // endpoint can take its MaxConnections slot. Returns the connection to release
 // and an optional discovery repeater to force when no replacement exists.
-func (b *Balancer) swapBannedConnLocked(ctx context.Context, banned conn.Conn) (
+func (b *Balancer) swapBannedConn(ctx context.Context, banned conn.Conn) (
 	released conn.Conn,
 	force repeater.Repeater,
 ) {
@@ -383,7 +391,14 @@ func (b *Balancer) swapBannedConnLocked(ctx context.Context, banned conn.Conn) (
 	}
 
 	withoutBanned := append(active[:idx:idx], active[idx+1:]...)
-	replacement := replacementEndpoint(b.lastDiscovered, withoutBanned, banned.Endpoint().Key())
+	replacement := replacementEndpoint(
+		b.lastDiscovered,
+		withoutBanned,
+		banned.Endpoint().Key(),
+		b.balancerConfig.Filter,
+		balancerConfig.Info{SelfLocation: b.selfLocation},
+		b.balancerConfig.AllowFallback,
+	)
 	if replacement == nil {
 		// No other discovered endpoint can take the slot. Keep the banned
 		// connection in the active set (usable as last resort / for retry).
@@ -683,9 +698,11 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 				fmt.Errorf("%w: pinned node %d is outside balancer active set", ErrNoEndpoints, nodeID),
 			)
 		}
+		// Pin already checked above; skip a redundant preferConnection lookup.
+		c, failedCount = state.GetConnectionUnpinned(ctx)
+	} else {
+		c, failedCount = state.GetConnection(ctx)
 	}
-
-	c, failedCount = state.GetConnection(ctx)
 	if c != nil {
 		return c, nil
 	}

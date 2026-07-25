@@ -64,6 +64,80 @@ func TestApplyDiscoveredEndpointsMaxConnections(t *testing.T) {
 	}
 }
 
+func TestPreferNearestDCMaxConnectionsKeepsLocalEndpoints(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
+
+	const localDC = "local"
+	b := &Balancer{
+		driverConfig: cfg,
+		pool:         pool,
+		balancerConfig: balancerConfig.Config{
+			MaxConnections:  9,
+			DetectNearestDC: true,
+			Filter:          localDCFilter{},
+		},
+	}
+
+	endpoints := discoveredWithLocations(100, 3, localDC)
+	b.applyDiscoveredEndpoints(ctx, endpoints, localDC)
+
+	active := b.connections().All()
+	require.Len(t, active, 3)
+	for _, cc := range active {
+		require.Equal(t, localDC, cc.Endpoint().Location())
+	}
+
+	// Sticky rediscovery must not drift into remotes-only set.
+	b.applyDiscoveredEndpoints(ctx, endpoints, localDC)
+	require.Len(t, b.connections().All(), 3)
+	for _, cc := range b.connections().All() {
+		require.Equal(t, localDC, cc.Endpoint().Location())
+	}
+
+	cc, err := b.nextConn(ctx)
+	require.NoError(t, err)
+	require.Equal(t, localDC, cc.Endpoint().Location())
+}
+
+func TestPreferNearestDCWithFallbackMaxConnectionsPrefersLocal(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
+
+	const localDC = "local"
+	b := &Balancer{
+		driverConfig: cfg,
+		pool:         pool,
+		balancerConfig: balancerConfig.Config{
+			MaxConnections:  9,
+			AllowFallback:   true,
+			DetectNearestDC: true,
+			Filter:          localDCFilter{},
+		},
+	}
+
+	endpoints := discoveredWithLocations(100, 3, localDC)
+	b.applyDiscoveredEndpoints(ctx, endpoints, localDC)
+
+	active := b.connections().All()
+	require.Len(t, active, 9)
+	localCount := 0
+	for _, cc := range active {
+		if cc.Endpoint().Location() == localDC {
+			localCount++
+		}
+	}
+	require.Equal(t, 3, localCount)
+}
+
 func TestBanEvictsFromMaxConnections(t *testing.T) {
 	t.Parallel()
 
