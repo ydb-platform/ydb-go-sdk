@@ -355,35 +355,14 @@ func (b *Balancer) replaceBannedConn(ctx context.Context, banned conn.Conn) {
 	}
 
 	active := state.All()
-	idx := -1
-	for i, cc := range active {
-		if cc == banned || (cc != nil && cc.Endpoint().Key() == banned.Endpoint().Key()) {
-			idx = i
-
-			break
-		}
-	}
+	idx := connectionIndex(active, banned)
 	if idx < 0 {
 		return
 	}
 
 	active = append(active[:idx], active[idx+1:]...)
-	activeKeys := connKeys(active)
-
-	var replacement endpoint.Endpoint
-	for _, e := range b.lastDiscovered {
-		if _, exists := activeKeys[e.Key()]; exists {
-			continue
-		}
-		if e.Key() == banned.Endpoint().Key() {
-			continue
-		}
-		replacement = e
-
-		break
-	}
-
 	newActive := active
+	replacement := replacementEndpoint(b.lastDiscovered, active, banned.Endpoint().Key())
 	if replacement != nil {
 		if cc := b.pool.Get(replacement); cc != nil {
 			cc.Unban(ctx)
@@ -616,6 +595,20 @@ func (b *Balancer) connections() *connectionsState {
 	return b.connectionsState.Load()
 }
 
+func (b *Balancer) forceDiscoveryIfNeeded(failedCount *int, preferredCount int) {
+	if *failedCount*2 <= preferredCount {
+		return
+	}
+
+	b.closeMu.Lock()
+	rep := b.discoveryRepeater
+	b.closeMu.Unlock()
+
+	if rep != nil {
+		rep.Force()
+	}
+}
+
 // nextConn returns a connection for the RPC.
 //
 // When MaxConnections is set and the caller pins a node outside the active set,
@@ -651,20 +644,7 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		return nil, xerrors.WithStackTrace(ErrNoEndpoints)
 	}
 
-	preferredCount := state.PreferredCount()
-	defer func() {
-		if failedCount*2 <= preferredCount {
-			return
-		}
-
-		b.closeMu.Lock()
-		rep := b.discoveryRepeater
-		b.closeMu.Unlock()
-
-		if rep != nil {
-			rep.Force()
-		}
-	}()
+	defer b.forceDiscoveryIfNeeded(&failedCount, state.PreferredCount())
 
 	// Soft-limit overflow: pin to a node outside the active MaxConnections set.
 	if nodeID, ok := endpoint.ContextNodeID(ctx); ok {

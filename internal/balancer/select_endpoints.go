@@ -65,12 +65,37 @@ func selectEndpoints(
 		candidates[i], candidates[j] = candidates[j], candidates[i]
 	})
 
-	need := maxConnections - len(keep)
-	if need > len(candidates) {
-		need = len(candidates)
-	}
+	need := min(maxConnections-len(keep), len(candidates))
 
 	return append(keep, candidates[:need]...)
+}
+
+func connectionIndex(conns []conn.Conn, target conn.Conn) int {
+	for i, cc := range conns {
+		if cc == target || (cc != nil && cc.Endpoint().Key() == target.Endpoint().Key()) {
+			return i
+		}
+	}
+
+	return -1
+}
+
+func replacementEndpoint(
+	discovered []endpoint.Endpoint,
+	active []conn.Conn,
+	excluded endpoint.Key,
+) endpoint.Endpoint {
+	activeKeys := connKeys(active)
+	for _, e := range discovered {
+		if _, exists := activeKeys[e.Key()]; exists {
+			continue
+		}
+		if e.Key() != excluded {
+			return e
+		}
+	}
+
+	return nil
 }
 
 func endpointByNodeID(endpoints []endpoint.Endpoint, nodeID uint32) endpoint.Endpoint {

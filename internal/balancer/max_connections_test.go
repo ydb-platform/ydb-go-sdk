@@ -124,8 +124,6 @@ func TestBanWithoutReplacementShrinksActiveSet(t *testing.T) {
 }
 
 func TestReplaceBannedConnIgnoresInapplicableConnections(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	cfg := config.New()
 	pool := conn.NewPool(ctx, cfg)
@@ -190,8 +188,6 @@ func TestReplaceBannedConnIgnoresInapplicableConnections(t *testing.T) {
 }
 
 func TestPinOutsideActiveSetSoftExceedsLimit(t *testing.T) {
-	t.Parallel()
-
 	for _, fallback := range []bool{false, true} {
 		t.Run(fmt.Sprintf("fallback=%t", fallback), func(t *testing.T) {
 			ctx := context.Background()
@@ -231,8 +227,6 @@ func TestPinOutsideActiveSetSoftExceedsLimit(t *testing.T) {
 }
 
 func TestPinUnknownNode(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	cfg := config.New()
 	pool := conn.NewPool(ctx, cfg)
@@ -262,8 +256,6 @@ func TestPinUnknownNode(t *testing.T) {
 }
 
 func TestEnsurePinnedConnEdges(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	cfg := config.New()
 	pool := conn.NewPool(ctx, cfg)

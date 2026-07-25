@@ -26,8 +26,6 @@ func discoveredEndpoints(n int) []endpoint.Endpoint {
 }
 
 func TestSelectEndpoints(t *testing.T) {
-	t.Parallel()
-
 	discovered := discoveredEndpoints(20)
 
 	t.Run("Unlimited", func(t *testing.T) {
