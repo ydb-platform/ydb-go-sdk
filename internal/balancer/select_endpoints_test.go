@@ -112,3 +112,18 @@ func TestConnKeys(t *testing.T) {
 		cc.Endpoint().Key(): {},
 	}, connKeys([]conn.Conn{nil, cc}))
 }
+
+func TestReplacementEndpoint(t *testing.T) {
+	discovered := discoveredEndpoints(3)
+	active := []conn.Conn{
+		&mock.Conn{
+			AddrField:   discovered[0].Address(),
+			NodeIDField: discovered[0].NodeID(),
+		},
+	}
+
+	replacement := replacementEndpoint(discovered, active, discovered[1].Key())
+	require.Equal(t, discovered[2].Key(), replacement.Key())
+
+	require.Nil(t, replacementEndpoint(discovered[:2], active, discovered[1].Key()))
+}

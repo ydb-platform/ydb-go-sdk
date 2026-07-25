@@ -110,8 +110,9 @@ func TestBanWithoutReplacementKeepsBannedConnection(t *testing.T) {
 	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
 
 	b := &Balancer{
-		driverConfig: cfg,
-		pool:         pool,
+		driverConfig:      cfg,
+		pool:              pool,
+		discoveryRepeater: &stubRepeater{},
 		balancerConfig: balancerConfig.Config{
 			MaxConnections: 1,
 		},
