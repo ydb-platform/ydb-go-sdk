@@ -13,7 +13,8 @@ import (
 // still present in discovery, then fill free slots with newly sampled ones.
 //
 // maxConnections <= 0 means unlimited (return all discovered endpoints).
-// Banned connections are not kept in the sticky set so their slots can be reused.
+// Banned connections are not kept in the sticky set and are not re-filled from
+// discovery while still present as Banned in previous, so their slots can be reused.
 //
 // When filter is set, preferred (filter-matching) endpoints are selected first.
 // Without AllowFallback, only preferred endpoints enter the active set — matching
@@ -67,6 +68,13 @@ func selectEndpointsFrom(
 		byKey[e.Key()] = e
 	}
 
+	banned := make(map[endpoint.Key]struct{})
+	for _, cc := range previous {
+		if cc != nil && cc.State() == state.Banned {
+			banned[cc.Endpoint().Key()] = struct{}{}
+		}
+	}
+
 	keep := make([]endpoint.Endpoint, 0, maxConnections)
 	kept := make(map[endpoint.Key]struct{}, maxConnections)
 
@@ -91,7 +99,11 @@ func selectEndpointsFrom(
 
 	fill := make([]endpoint.Endpoint, 0, len(candidates)-len(kept))
 	for _, e := range candidates {
-		if _, ok := kept[e.Key()]; ok {
+		key := e.Key()
+		if _, ok := kept[key]; ok {
+			continue
+		}
+		if _, isBanned := banned[key]; isBanned {
 			continue
 		}
 		fill = append(fill, e)

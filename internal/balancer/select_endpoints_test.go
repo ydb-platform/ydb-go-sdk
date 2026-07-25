@@ -65,21 +65,20 @@ func selectAll(
 
 func TestSelectEndpoints(t *testing.T) {
 	discovered := discoveredEndpoints(20)
-	rnd := xrand.New(xrand.WithLock())
 
 	t.Run("Unlimited", func(t *testing.T) {
-		selected := selectAll(nil, discovered, 0, rnd)
+		selected := selectAll(nil, discovered, 0, xrand.New(xrand.WithSeed(1)))
 		require.Equal(t, discovered, selected)
 	})
 
 	t.Run("BelowCap", func(t *testing.T) {
 		small := discovered[:3]
-		selected := selectAll(nil, small, 10, rnd)
+		selected := selectAll(nil, small, 10, xrand.New(xrand.WithSeed(1)))
 		require.Equal(t, small, selected)
 	})
 
 	t.Run("Cap", func(t *testing.T) {
-		selected := selectAll(nil, discovered, 5, rnd)
+		selected := selectAll(nil, discovered, 5, xrand.New(xrand.WithSeed(1)))
 		require.Len(t, selected, 5)
 	})
 
@@ -89,7 +88,7 @@ func TestSelectEndpoints(t *testing.T) {
 			&mock.Conn{AddrField: "e1.example:2135", NodeIDField: 2, StateField: state.Online},
 			&mock.Conn{AddrField: "e2.example:2135", NodeIDField: 3, StateField: state.Online},
 		}
-		selected := selectAll(previous, discovered, 3, rnd)
+		selected := selectAll(previous, discovered, 3, xrand.New(xrand.WithSeed(1)))
 		require.Len(t, selected, 3)
 		require.Equal(t, "e0.example:2135", selected[0].Address())
 		require.Equal(t, "e1.example:2135", selected[1].Address())
@@ -101,11 +100,13 @@ func TestSelectEndpoints(t *testing.T) {
 			&mock.Conn{AddrField: "e0.example:2135", NodeIDField: 1, StateField: state.Banned},
 			&mock.Conn{AddrField: "e1.example:2135", NodeIDField: 2, StateField: state.Online},
 		}
-		// Cap to one slot: banned e0 must not be sticky-kept over online e1.
-		// (With a larger cap, e0 may still be re-sampled from discovery as fill.)
-		selected := selectAll(previous, discovered, 1, rnd)
-		require.Len(t, selected, 1)
+		selected := selectAll(previous, discovered, 2, xrand.New(xrand.WithSeed(1)))
+		require.Len(t, selected, 2)
 		require.Equal(t, "e1.example:2135", selected[0].Address())
+		for _, e := range selected {
+			require.NotEqual(t, "e0.example:2135", e.Address(),
+				"banned previous endpoint must not be sticky-kept or re-filled")
+		}
 	})
 
 	t.Run("FillAfterDrop", func(t *testing.T) {
@@ -113,7 +114,7 @@ func TestSelectEndpoints(t *testing.T) {
 			&mock.Conn{AddrField: "e0.example:2135", NodeIDField: 1, StateField: state.Online},
 			&mock.Conn{AddrField: "gone.example:2135", NodeIDField: 99, StateField: state.Online},
 		}
-		selected := selectAll(previous, discovered, 2, rnd)
+		selected := selectAll(previous, discovered, 2, xrand.New(xrand.WithSeed(1)))
 		require.Len(t, selected, 2)
 		require.Equal(t, "e0.example:2135", selected[0].Address())
 		require.NotEqual(t, "gone.example:2135", selected[1].Address())
@@ -129,7 +130,7 @@ func TestSelectEndpoints(t *testing.T) {
 			[]conn.Conn{nil, existing, existing},
 			discovered,
 			2,
-			rnd,
+			xrand.New(xrand.WithSeed(1)),
 		)
 
 		require.Len(t, selected, 2)
