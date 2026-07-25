@@ -52,10 +52,17 @@ func TestConnectionsState_AllReturnsEveryDiscoveredConn(t *testing.T) {
 	require.Len(t, s.prefer, 1)
 }
 
-func TestConnectionsState_AllNilReceiver(t *testing.T) {
-	var s *connectionsState
+func TestConnectionsState_GetConnectionUnpinnedCanceled(t *testing.T) {
+	s := newConnectionsState([]conn.Conn{
+		&mock.Conn{AddrField: "1", NodeIDField: 1, StateField: state.Online},
+	}, nil, balancerConfig.Info{}, false, nil)
 
-	require.Nil(t, s.All())
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	c, failed := s.GetConnectionUnpinned(ctx)
+	require.Nil(t, c)
+	require.Zero(t, failed)
 }
 
 func TestConnection_LastResortUsesPreferWhenFallbackDisabled(t *testing.T) {

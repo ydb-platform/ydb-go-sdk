@@ -101,10 +101,11 @@ func TestSelectEndpoints(t *testing.T) {
 			&mock.Conn{AddrField: "e0.example:2135", NodeIDField: 1, StateField: state.Banned},
 			&mock.Conn{AddrField: "e1.example:2135", NodeIDField: 2, StateField: state.Online},
 		}
-		selected := selectAll(previous, discovered, 2, rnd)
-		require.Len(t, selected, 2)
+		// Cap to one slot: banned e0 must not be sticky-kept over online e1.
+		// (With a larger cap, e0 may still be re-sampled from discovery as fill.)
+		selected := selectAll(previous, discovered, 1, rnd)
+		require.Len(t, selected, 1)
 		require.Equal(t, "e1.example:2135", selected[0].Address())
-		require.NotEqual(t, "e0.example:2135", selected[1].Address())
 	})
 
 	t.Run("FillAfterDrop", func(t *testing.T) {
@@ -169,6 +170,21 @@ func TestSelectEndpointsPrefersFilter(t *testing.T) {
 			}
 			require.Equal(t, 3, localCount, "all local endpoints must be included before remotes")
 		}
+	})
+
+	t.Run("WithFallbackPreferredAloneFillsCap", func(t *testing.T) {
+		manyLocal := discoveredWithLocations(5, 20, localDC)
+		selected := selectEndpoints(nil, manyLocal, 9, filter, info, true, rnd)
+		require.Len(t, selected, 9)
+		for _, e := range selected {
+			require.Equal(t, localDC, e.Location())
+		}
+	})
+
+	t.Run("NoPreferredReturnsEmptyWithoutFallback", func(t *testing.T) {
+		remoteOnly := discoveredWithLocations(10, 0, localDC)
+		selected := selectEndpoints(nil, remoteOnly, 5, filter, info, false, rnd)
+		require.Empty(t, selected)
 	})
 
 	t.Run("StickyDoesNotDisplacePreferred", func(t *testing.T) {

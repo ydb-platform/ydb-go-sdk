@@ -56,4 +56,12 @@ func TestWithMaxConnections(t *testing.T) {
 
 		require.Equal(t, 3, cfg.Balancer().MaxConnections)
 	})
+
+	t.Run("WithBalancer nil clears balancer", func(t *testing.T) {
+		cfg := &Config{}
+		WithMaxConnections(5)(cfg)
+		WithBalancer(nil)(cfg)
+
+		require.Nil(t, cfg.Balancer())
+	})
 }

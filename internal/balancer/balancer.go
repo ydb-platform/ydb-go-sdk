@@ -282,19 +282,8 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 		return
 	}
 
-	var (
-		onDone = gtrace.DriverOnBalancerUpdate(
-			b.driverConfig.Trace(), &ctx,
-			stack.FunctionID(
-				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
-			b.balancerConfig.DetectNearestDC,
-			b.driverConfig.Database(),
-		)
-		state      = b.connectionsState.Load()
-		active     []conn.Conn
-		quarantine []conn.Conn
-	)
-
+	state := b.connectionsState.Load()
+	var active, quarantine []conn.Conn
 	if state != nil {
 		active = state.All()
 		quarantine = state.quarantine
@@ -309,25 +298,12 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 		b.balancerConfig.AllowFallback,
 		nil,
 	)
-
-	defer func() {
-		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
-			return cc.Endpoint()
-		}), selected, endpoint.Compare)
-
-		onDone(
-			xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
-			xslices.Transform(added, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
-			xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
-			localDC,
-		)
-	}()
+	defer b.traceDiscoveryUpdate(ctx, active, endpoints, selected, localDC)
 
 	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selected)
 
 	b.lastDiscovered = append([]endpoint.Endpoint(nil), endpoints...)
 	b.selfLocation = localDC
-
 	b.connectionsState.Store(
 		newConnectionsState(connections,
 			b.balancerConfig.Filter,
@@ -335,6 +311,31 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 			b.balancerConfig.AllowFallback,
 			quarantine,
 		),
+	)
+}
+
+func (b *Balancer) traceDiscoveryUpdate(
+	ctx context.Context,
+	active []conn.Conn,
+	endpoints, selected []endpoint.Endpoint,
+	localDC string,
+) {
+	onDone := gtrace.DriverOnBalancerUpdate(
+		b.driverConfig.Trace(), &ctx,
+		stack.FunctionID(
+			"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
+		b.balancerConfig.DetectNearestDC,
+		b.driverConfig.Database(),
+	)
+	_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
+		return cc.Endpoint()
+	}), selected, endpoint.Compare)
+
+	onDone(
+		xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+		xslices.Transform(added, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+		xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+		localDC,
 	)
 }
 
