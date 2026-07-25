@@ -101,7 +101,136 @@ func TestBanEvictsFromMaxConnections(t *testing.T) {
 	require.NotEqual(t, state.Created, banned.State())
 }
 
+func TestBanWithoutReplacementShrinksActiveSet(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
+
+	b := &Balancer{
+		driverConfig: cfg,
+		pool:         pool,
+		balancerConfig: balancerConfig.Config{
+			MaxConnections: 1,
+		},
+	}
+	b.applyDiscoveredEndpoints(ctx, discoveredEndpoints(1), "")
+
+	b.handleBan(ctx, b.connections().All()[0], status.Error(codes.Unavailable, "down"))
+
+	require.Empty(t, b.connections().All())
+}
+
+func TestReplaceBannedConnIgnoresInapplicableConnections(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
+
+	cc := pool.Get(endpoint.New("not-active.example:2135", endpoint.WithID(404)))
+	t.Cleanup(func() { pool.Put(ctx, cc) })
+
+	for _, test := range []struct {
+		name string
+		b    *Balancer
+	}{
+		{
+			name: "unlimited",
+			b: &Balancer{
+				pool: pool,
+				balancerConfig: balancerConfig.Config{
+					MaxConnections: 0,
+				},
+			},
+		},
+		{
+			name: "closed",
+			b: &Balancer{
+				pool: pool,
+				balancerConfig: balancerConfig.Config{
+					MaxConnections: 1,
+				},
+				closed: true,
+			},
+		},
+		{
+			name: "empty state",
+			b: &Balancer{
+				pool: pool,
+				balancerConfig: balancerConfig.Config{
+					MaxConnections: 1,
+				},
+			},
+		},
+		{
+			name: "not active",
+			b: &Balancer{
+				pool: pool,
+				balancerConfig: balancerConfig.Config{
+					MaxConnections: 1,
+				},
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if test.name == "not active" {
+				test.b.connectionsState.Store(newConnectionsState(
+					nil, nil, balancerConfig.Info{}, false, nil,
+				))
+			}
+
+			test.b.replaceBannedConn(ctx, cc)
+			test.b.replaceBannedConn(ctx, nil)
+		})
+	}
+}
+
 func TestPinOutsideActiveSetSoftExceedsLimit(t *testing.T) {
+	t.Parallel()
+
+	for _, fallback := range []bool{false, true} {
+		t.Run(fmt.Sprintf("fallback=%t", fallback), func(t *testing.T) {
+			ctx := context.Background()
+			cfg := config.New()
+			pool := conn.NewPool(ctx, cfg)
+			t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
+
+			b := &Balancer{
+				driverConfig: cfg,
+				pool:         pool,
+				balancerConfig: balancerConfig.Config{
+					MaxConnections: 2,
+				},
+			}
+
+			endpoints := discoveredEndpoints(10)
+			b.applyDiscoveredEndpoints(ctx, endpoints, "")
+			require.Len(t, b.connections().All(), 2)
+
+			activeKeys := endpointKeys(b.connections().All())
+			var outside endpoint.Endpoint
+			for _, e := range endpoints {
+				if _, ok := activeKeys[e.Key()]; !ok {
+					outside = e
+
+					break
+				}
+			}
+			require.NotNil(t, outside)
+
+			cc, err := b.nextConn(endpoint.WithNodeID(ctx, outside.NodeID(), endpoint.WithFallback(fallback)))
+			require.NoError(t, err)
+			require.Equal(t, outside.Key(), cc.Endpoint().Key())
+			require.Greater(t, len(b.connections().All()), 2)
+		})
+	}
+}
+
+func TestPinUnknownNode(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -116,26 +245,69 @@ func TestPinOutsideActiveSetSoftExceedsLimit(t *testing.T) {
 			MaxConnections: 2,
 		},
 	}
+	b.applyDiscoveredEndpoints(ctx, discoveredEndpoints(3), "")
 
-	endpoints := discoveredEndpoints(10)
-	b.applyDiscoveredEndpoints(ctx, endpoints, "")
-	require.Len(t, b.connections().All(), 2)
+	t.Run("strict", func(t *testing.T) {
+		_, err := b.nextConn(endpoint.WithNodeID(ctx, 404, endpoint.WithFallback(false)))
 
-	activeKeys := endpointKeys(b.connections().All())
-	var outside endpoint.Endpoint
-	for _, e := range endpoints {
-		if _, ok := activeKeys[e.Key()]; !ok {
-			outside = e
+		require.ErrorIs(t, err, ErrNoEndpoints)
+	})
 
-			break
+	t.Run("fallback", func(t *testing.T) {
+		cc, err := b.nextConn(endpoint.WithNodeID(ctx, 404))
+
+		require.NoError(t, err)
+		require.NotNil(t, cc)
+	})
+}
+
+func TestEnsurePinnedConnEdges(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
+
+	target := endpoint.New("target.example:2135", endpoint.WithID(42))
+
+	t.Run("closed balancer", func(t *testing.T) {
+		b := &Balancer{pool: pool, closed: true}
+
+		require.Nil(t, b.ensurePinnedConn(ctx, target.NodeID()))
+	})
+
+	t.Run("unknown node", func(t *testing.T) {
+		b := &Balancer{pool: pool}
+
+		require.Nil(t, b.ensurePinnedConn(ctx, target.NodeID()))
+	})
+
+	t.Run("without previous state", func(t *testing.T) {
+		b := &Balancer{
+			pool:           pool,
+			lastDiscovered: []endpoint.Endpoint{target},
 		}
-	}
-	require.NotNil(t, outside)
 
-	cc, err := b.nextConn(endpoint.WithNodeID(ctx, outside.NodeID(), endpoint.WithFallback(false)))
-	require.NoError(t, err)
-	require.Equal(t, outside.Key(), cc.Endpoint().Key())
-	require.Greater(t, len(b.connections().All()), 2)
+		cc := b.ensurePinnedConn(ctx, target.NodeID())
+		require.NotNil(t, cc)
+		require.Equal(t, target.Key(), cc.Endpoint().Key())
+		require.Same(t, cc, b.ensurePinnedConn(ctx, target.NodeID()))
+
+		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
+	})
+
+	t.Run("closed pool", func(t *testing.T) {
+		closedPool := conn.NewPool(ctx, cfg)
+		require.NoError(t, closedPool.RemoveRef(ctx))
+
+		b := &Balancer{
+			pool:           closedPool,
+			lastDiscovered: []endpoint.Endpoint{target},
+		}
+
+		require.Nil(t, b.ensurePinnedConn(ctx, target.NodeID()))
+	})
 }
 
 // TestMaxConnectionsLimitsGrpcCallbackSerializerGoroutines reproduces the class
@@ -144,8 +316,6 @@ func TestPinOutsideActiveSetSoftExceedsLimit(t *testing.T) {
 // each ClientConn. Capping MaxConnections bounds how many such dials the
 // balancer keeps, so goroutine growth stays limited.
 func TestMaxConnectionsLimitsGrpcCallbackSerializerGoroutines(t *testing.T) {
-	t.Parallel()
-
 	const (
 		endpointCount = 40
 		maxConns      = 5

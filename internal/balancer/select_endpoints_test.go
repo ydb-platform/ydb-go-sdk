@@ -80,4 +80,37 @@ func TestSelectEndpoints(t *testing.T) {
 		require.Equal(t, "e0.example:2135", selected[0].Address())
 		require.NotEqual(t, "gone.example:2135", selected[1].Address())
 	})
+
+	t.Run("IgnoreNilAndDuplicatePrevious", func(t *testing.T) {
+		existing := &mock.Conn{
+			AddrField:   "e0.example:2135",
+			NodeIDField: 1,
+			StateField:  state.Online,
+		}
+		selected := selectEndpoints(
+			[]conn.Conn{nil, existing, existing},
+			discovered,
+			2,
+			xrand.New(xrand.WithLock()),
+		)
+
+		require.Len(t, selected, 2)
+		require.Equal(t, existing.Endpoint().Key(), selected[0].Key())
+		require.NotEqual(t, selected[0].Key(), selected[1].Key())
+	})
+}
+
+func TestEndpointByNodeID(t *testing.T) {
+	endpoints := discoveredEndpoints(3)
+
+	require.Equal(t, endpoints[1], endpointByNodeID(endpoints, endpoints[1].NodeID()))
+	require.Nil(t, endpointByNodeID(endpoints, 404))
+}
+
+func TestConnKeys(t *testing.T) {
+	cc := &mock.Conn{AddrField: "e0.example:2135", NodeIDField: 1}
+
+	require.Equal(t, map[endpoint.Key]struct{}{
+		cc.Endpoint().Key(): {},
+	}, connKeys([]conn.Conn{nil, cc}))
 }

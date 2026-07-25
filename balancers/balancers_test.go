@@ -58,6 +58,26 @@ func TestPreferLocationsWithFallback(t *testing.T) {
 	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferFilter(balancerConfig.Info{}, rr, conns))
 }
 
+func TestWithMaxConnections(t *testing.T) {
+	t.Run("positive", func(t *testing.T) {
+		cfg := WithMaxConnections(RandomChoice(), 17)
+
+		require.Equal(t, 17, cfg.MaxConnections)
+	})
+
+	t.Run("zero", func(t *testing.T) {
+		cfg := WithMaxConnections(RandomChoice(), 0)
+
+		require.Zero(t, cfg.MaxConnections)
+	})
+
+	t.Run("negative means unlimited", func(t *testing.T) {
+		cfg := WithMaxConnections(RandomChoice(), -1)
+
+		require.Zero(t, cfg.MaxConnections)
+	})
+}
+
 func applyPreferFilter(info balancerConfig.Info, b *balancerConfig.Config, conns []conn.Conn) []conn.Conn {
 	if b.Filter == nil {
 		b.Filter = filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool { return true })

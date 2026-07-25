@@ -666,13 +666,11 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		}
 	}()
 
-	c, failedCount = state.GetConnection(ctx)
-	if c != nil {
-		return c, nil
-	}
-
 	// Soft-limit overflow: pin to a node outside the active MaxConnections set.
 	if nodeID, ok := endpoint.ContextNodeID(ctx); ok {
+		if cc := state.preferConnection(ctx); cc != nil {
+			return cc, nil
+		}
 		if cc := b.ensurePinnedConn(ctx, nodeID); cc != nil {
 			return cc, nil
 		}
@@ -681,6 +679,11 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 				fmt.Errorf("%w: pinned node %d is outside balancer active set", ErrNoEndpoints, nodeID),
 			)
 		}
+	}
+
+	c, failedCount = state.GetConnection(ctx)
+	if c != nil {
+		return c, nil
 	}
 
 	return nil, xerrors.WithStackTrace(
@@ -701,30 +704,14 @@ func (b *Balancer) ensurePinnedConn(ctx context.Context, nodeID uint32) conn.Con
 
 	connState := b.connectionsState.Load()
 	if connState != nil {
-		if cc := connState.connByNodeID[nodeID]; cc != nil {
-			if isOkConnection(cc, true) {
-				if cc.State() == state.Banned {
-					cc.Unban(ctx)
-				}
-
-				return cc
-			}
+		if cc := connState.connByNodeID[nodeID]; cc != nil && isOkConnection(cc, false) {
+			return cc
 		}
 	}
 
 	e := endpointByNodeID(b.lastDiscovered, nodeID)
 	if e == nil {
 		return nil
-	}
-
-	if connState != nil {
-		for _, existing := range connState.All() {
-			if existing != nil && existing.Endpoint().Key() == e.Key() {
-				existing.Unban(ctx)
-
-				return existing
-			}
-		}
 	}
 
 	cc := b.pool.Get(e)
