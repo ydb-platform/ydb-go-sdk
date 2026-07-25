@@ -10,13 +10,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
 
-// DefaultMaxConnections is the default balancer cap on active connections to
+// defaultMaxConnections is the default balancer cap on active connections to
 // discovered YDB nodes. Matching the ydb-python-sdk connection pool idea
 // (hardcoded 9 there), this limits resource use on large clusters.
 //
 // Use [WithMaxConnections] or [ydb.WithMaxConnections] to change it.
 // Zero disables the limit (all discovered endpoints stay in the active set).
-const DefaultMaxConnections = 10
+const defaultMaxConnections = 9
 
 // Deprecated: RoundRobin is an alias to RandomChoice now
 // Will be removed after Oct 2024.
@@ -27,7 +27,7 @@ func RoundRobin() *balancerConfig.Config {
 
 func RandomChoice() *balancerConfig.Config {
 	return &balancerConfig.Config{
-		MaxConnections: DefaultMaxConnections,
+		MaxConnections: defaultMaxConnections,
 	}
 }
 

@@ -42,26 +42,26 @@ func TestFromConfig(t *testing.T) {
 		{
 			name:   "round_robin",
 			config: `round_robin`,
-			res:    balancerConfig.Config{MaxConnections: DefaultMaxConnections},
+			res:    balancerConfig.Config{MaxConnections: defaultMaxConnections},
 		},
 		{
 			name: "round_robin/JSON",
 			config: `{
 				"type": "round_robin"
 			}`,
-			res: balancerConfig.Config{MaxConnections: DefaultMaxConnections},
+			res: balancerConfig.Config{MaxConnections: defaultMaxConnections},
 		},
 		{
 			name:   "random_choice",
 			config: `random_choice`,
-			res:    balancerConfig.Config{MaxConnections: DefaultMaxConnections},
+			res:    balancerConfig.Config{MaxConnections: defaultMaxConnections},
 		},
 		{
 			name: "random_choice/JSON",
 			config: `{
 				"type": "random_choice"
 			}`,
-			res: balancerConfig.Config{MaxConnections: DefaultMaxConnections},
+			res: balancerConfig.Config{MaxConnections: defaultMaxConnections},
 		},
 		{
 			name: "prefer_local_dc",
@@ -70,7 +70,7 @@ func TestFromConfig(t *testing.T) {
 				"prefer": "local_dc"
 			}`,
 			res: balancerConfig.Config{
-				MaxConnections:  DefaultMaxConnections,
+				MaxConnections:  defaultMaxConnections,
 				DetectNearestDC: true,
 				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
 					// some non nil func
@@ -85,7 +85,7 @@ func TestFromConfig(t *testing.T) {
 				"prefer": "nearest_dc"
 			}`,
 			res: balancerConfig.Config{
-				MaxConnections:  DefaultMaxConnections,
+				MaxConnections:  defaultMaxConnections,
 				DetectNearestDC: true,
 				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
 					// some non nil func
@@ -109,7 +109,7 @@ func TestFromConfig(t *testing.T) {
 				"fallback": true
 			}`,
 			res: balancerConfig.Config{
-				MaxConnections:  DefaultMaxConnections,
+				MaxConnections:  defaultMaxConnections,
 				AllowFallback:   true,
 				DetectNearestDC: true,
 				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
@@ -126,7 +126,7 @@ func TestFromConfig(t *testing.T) {
 				"fallback": true
 			}`,
 			res: balancerConfig.Config{
-				MaxConnections:  DefaultMaxConnections,
+				MaxConnections:  defaultMaxConnections,
 				AllowFallback:   true,
 				DetectNearestDC: true,
 				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
@@ -143,7 +143,7 @@ func TestFromConfig(t *testing.T) {
 				"locations": ["AAA", "BBB", "CCC"]
 			}`,
 			res: balancerConfig.Config{
-				MaxConnections: DefaultMaxConnections,
+				MaxConnections: defaultMaxConnections,
 				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
 					// some non nil func
 					return false
@@ -159,7 +159,7 @@ func TestFromConfig(t *testing.T) {
 				"fallback": true
 			}`,
 			res: balancerConfig.Config{
-				MaxConnections: DefaultMaxConnections,
+				MaxConnections: defaultMaxConnections,
 				AllowFallback:  true,
 				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
 					// some non nil func
