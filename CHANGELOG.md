@@ -1,3 +1,5 @@
+* Added opt-in balancer `MaxConnections` limit (`ydb.WithMaxConnections` / `balancers.WithMaxConnections`; default unlimited / `0`) to keep a sticky subset of discovered endpoints active — similar to ydb-python-sdk — reducing gRPC connection/goroutine growth on large clusters after `connParker` removal. Selection prefers location-filter matches (`PreferNearestDC` / `PreferLocations`). Banned connections are evicted from the limited set so slots can be reused; pin/`WithNodeID`/session affinity may soft-exceed the limit.
+
 ## v3.145.1
 * Fixed a TopicListener read buffer credit leak when a batch raced with partition worker shutdown
 * Fixed `WithConnectionTTL` being a no-op and restored parking of idle gRPC connections without preventing removal of nodes missing from Discovery

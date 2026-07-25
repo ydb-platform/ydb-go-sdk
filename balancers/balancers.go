@@ -10,21 +10,54 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
 
+// DefaultMaxConnections is the default balancer cap on active connections to
+// discovered YDB nodes. Matching the ydb-python-sdk connection pool idea
+// (hardcoded 9 there), this limits resource use on large clusters.
+//
+// Use [WithMaxConnections] or [ydb.WithMaxConnections] to change it.
+// Zero disables the limit (all discovered endpoints stay in the active set).
+const DefaultMaxConnections = 10
+
 // Deprecated: RoundRobin is an alias to RandomChoice now
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func RoundRobin() *balancerConfig.Config {
-	return &balancerConfig.Config{}
+	return RandomChoice()
 }
 
 func RandomChoice() *balancerConfig.Config {
-	return &balancerConfig.Config{}
+	return &balancerConfig.Config{
+		MaxConnections: DefaultMaxConnections,
+	}
 }
 
 func SingleConn() *balancerConfig.Config {
 	return &balancerConfig.Config{
-		SingleConn: true,
+		SingleConn:     true,
+		MaxConnections: 1,
 	}
+}
+
+// WithMaxConnections sets the maximum number of discovered endpoints the
+// balancer keeps in its active connection set.
+//
+// The limit is sticky across discovery updates (existing healthy endpoints are
+// preferred). Banned connections are evicted from the set so slots can be
+// reused for live endpoints.
+//
+// Soft limit: [WithNodeID], table/query session affinity, or topic pin to a
+// node outside the active set may open additional connections. CreateSession
+// handled on node A may return a session on node B — subsequent RPCs require
+// a connection to B even if B was not selected into the limited set.
+//
+// Zero means unlimited. Negative values are treated as zero.
+func WithMaxConnections(balancer *balancerConfig.Config, n int) *balancerConfig.Config {
+	if n < 0 {
+		n = 0
+	}
+	balancer.MaxConnections = n
+
+	return balancer
 }
 
 type filterLocalDC struct{}
