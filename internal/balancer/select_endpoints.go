@@ -50,6 +50,7 @@ func selectEndpoints(
 	return append(selected, selectEndpointsFrom(previous, other, maxConnections-len(selected), rnd)...)
 }
 
+//nolint:funlen
 func selectEndpointsFrom(
 	previous []conn.Conn,
 	candidates []endpoint.Endpoint,
