@@ -342,37 +342,59 @@ func (b *Balancer) replaceBannedConn(ctx context.Context, banned conn.Conn) {
 		return
 	}
 
+	released, rep := b.swapBannedConnLocked(ctx, banned)
+	if rep != nil {
+		rep.Force()
+
+		return
+	}
+	if released == nil {
+		return
+	}
+
+	// Release outside the lock and asynchronously: Ban may run from stream
+	// RecvMsg, and a synchronous pool.Put/Close can deadlock waiting for that Recv.
+	go b.pool.Put(xcontext.ValueOnly(ctx), released)
+}
+
+// swapBannedConnLocked evicts banned from the active set when another discovered
+// endpoint can take its MaxConnections slot. Returns the connection to release
+// and an optional discovery repeater to force when no replacement exists.
+func (b *Balancer) swapBannedConnLocked(ctx context.Context, banned conn.Conn) (
+	released conn.Conn,
+	force repeater.Repeater,
+) {
 	b.closeMu.Lock()
 	defer b.closeMu.Unlock()
 
 	if b.closed {
-		return
+		return nil, nil
 	}
 
 	state := b.connectionsState.Load()
 	if state == nil {
-		return
+		return nil, nil
 	}
 
 	active := state.All()
 	idx := connectionIndex(active, banned)
 	if idx < 0 {
-		return
+		return nil, nil
 	}
 
-	active = append(active[:idx], active[idx+1:]...)
-	newActive := active
-	replacement := replacementEndpoint(b.lastDiscovered, active, banned.Endpoint().Key())
-	if replacement != nil {
-		if cc := b.pool.Get(replacement); cc != nil {
-			cc.Unban(ctx)
-			newActive = append(newActive, cc)
-		}
+	withoutBanned := append(active[:idx:idx], active[idx+1:]...)
+	replacement := replacementEndpoint(b.lastDiscovered, withoutBanned, banned.Endpoint().Key())
+	if replacement == nil {
+		// No other discovered endpoint can take the slot. Keep the banned
+		// connection in the active set (usable as last resort / for retry).
+		return nil, b.discoveryRepeater
 	}
 
-	// Release discovery ref of the banned connection immediately so gRPC can
-	// close and stop reconnecting (avoids leaked CallbackSerializer goroutines).
-	b.pool.Put(ctx, banned)
+	newActive := withoutBanned
+	if cc := b.pool.Get(replacement); cc != nil {
+		cc.Unban(ctx)
+		newActive = append(newActive, cc)
+	}
 
 	b.connectionsState.Store(
 		newConnectionsState(newActive,
@@ -382,6 +404,8 @@ func (b *Balancer) replaceBannedConn(ctx context.Context, banned conn.Conn) {
 			state.quarantine,
 		),
 	)
+
+	return banned, nil
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {

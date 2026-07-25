@@ -95,15 +95,15 @@ func TestBanEvictsFromMaxConnections(t *testing.T) {
 		require.NotEqual(t, bannedKey, cc.Endpoint().Key())
 	}
 	require.NotEqual(t, before, endpointKeys(after))
-	// Ban + eviction releases the discovery ref and closes gRPC (Offline/Destroyed),
-	// so the connection no longer occupies a MaxConnections slot.
-	require.NotEqual(t, state.Online, banned.State())
-	require.NotEqual(t, state.Created, banned.State())
+	// Banned connection is released asynchronously after a replacement is taken.
+	require.Eventually(t, func() bool {
+		s := banned.State()
+
+		return s != state.Online && s != state.Created && s != state.Banned
+	}, time.Second, 10*time.Millisecond)
 }
 
-func TestBanWithoutReplacementShrinksActiveSet(t *testing.T) {
-	t.Parallel()
-
+func TestBanWithoutReplacementKeepsBannedConnection(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.New()
 	pool := conn.NewPool(ctx, cfg)
@@ -118,9 +118,12 @@ func TestBanWithoutReplacementShrinksActiveSet(t *testing.T) {
 	}
 	b.applyDiscoveredEndpoints(ctx, discoveredEndpoints(1), "")
 
-	b.handleBan(ctx, b.connections().All()[0], status.Error(codes.Unavailable, "down"))
+	banned := b.connections().All()[0]
+	b.handleBan(ctx, banned, status.Error(codes.Unavailable, "down"))
 
-	require.Empty(t, b.connections().All())
+	require.Len(t, b.connections().All(), 1)
+	require.Equal(t, banned.Endpoint().Key(), b.connections().All()[0].Endpoint().Key())
+	require.Equal(t, state.Banned, banned.State())
 }
 
 func TestReplaceBannedConnIgnoresInapplicableConnections(t *testing.T) {
