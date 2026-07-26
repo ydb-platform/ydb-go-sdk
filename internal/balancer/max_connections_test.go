@@ -19,6 +19,7 @@ import (
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
+	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
@@ -236,6 +237,128 @@ func TestBanWithoutReplacementKeepsBannedConnection(t *testing.T) {
 	require.Len(t, b.connections().All(), 1)
 	require.Equal(t, banned.Endpoint().Key(), b.connections().All()[0].Endpoint().Key())
 	require.Equal(t, state.Banned, banned.State())
+}
+
+func TestApplyBalancerConfigNil(t *testing.T) {
+	b := &Balancer{}
+	b.applyBalancerConfig(nil)
+	require.Equal(t, balancerConfig.Config{}, b.balancerConfig)
+	require.Nil(t, b.releaseCh)
+}
+
+func TestNewSingleConnStartsReleaseWorker(t *testing.T) {
+	ctx := context.Background()
+	cfg := config.New(
+		config.WithEndpoint("127.0.0.1:2135"),
+		config.WithBalancer(&balancerConfig.Config{
+			SingleConn:     true,
+			MaxConnections: 1,
+		}),
+	)
+	pool := conn.NewPool(ctx, cfg)
+	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
+
+	b, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
+	require.NoError(t, err)
+	require.NotNil(t, b.releaseCh)
+	require.NotNil(t, b.releaseStop)
+	require.NotNil(t, b.releaseDone)
+
+	require.NoError(t, b.Close(ctx))
+	require.ErrorIs(t, b.Close(ctx), errBalancerClosed)
+}
+
+func TestBanEvictsViaReleaseWorker(t *testing.T) {
+	ctx := context.Background()
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
+
+	b := &Balancer{
+		driverConfig: cfg,
+		pool:         pool,
+		rnd:          testBalancerRand(),
+	}
+	b.applyBalancerConfig(&balancerConfig.Config{MaxConnections: 3})
+	t.Cleanup(func() { require.NoError(t, b.Close(ctx)) })
+
+	endpoints := discoveredEndpoints(10)
+	b.applyDiscoveredEndpoints(ctx, endpoints, "")
+	require.Len(t, b.connections().All(), 3)
+
+	banned := b.connections().All()[0]
+	bannedKey := banned.Endpoint().Key()
+	b.handleBan(ctx, banned, status.Error(codes.Unavailable, "down"))
+
+	require.Eventually(t, func() bool {
+		st := banned.State()
+
+		return st != state.Online && st != state.Created && st != state.Banned
+	}, time.Second, 10*time.Millisecond)
+
+	for _, cc := range b.connections().All() {
+		require.NotEqual(t, bannedKey, cc.Endpoint().Key())
+	}
+}
+
+func TestEnqueueReleaseEdges(t *testing.T) {
+	ctx := context.Background()
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
+
+	t.Run("nil conn", func(t *testing.T) {
+		b := &Balancer{pool: pool}
+		b.enqueueRelease(ctx, nil)
+	})
+
+	t.Run("after stop with full buffer", func(t *testing.T) {
+		b := &Balancer{pool: pool}
+		ch := make(chan conn.Conn, 1)
+		stop := make(chan struct{})
+		close(stop)
+		b.releaseCh = ch
+		b.releaseStop = stop
+
+		filler := pool.Get(endpoint.New("filler.example:2135", endpoint.WithID(1)))
+		require.NotNil(t, filler)
+		ch <- filler
+
+		released := pool.Get(endpoint.New("released.example:2135", endpoint.WithID(2)))
+		require.NotNil(t, released)
+		b.enqueueRelease(ctx, released)
+		require.NotEqual(t, state.Online, released.State())
+		require.NotEqual(t, state.Created, released.State())
+
+		pool.Put(ctx, filler)
+	})
+}
+
+func TestReleaseLoopDrainsBufferedOnStop(t *testing.T) {
+	ctx := context.Background()
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
+
+	b := &Balancer{pool: pool}
+	ch := make(chan conn.Conn, 2)
+	stop := make(chan struct{})
+	b.releaseDone = make(chan struct{})
+
+	cc1 := pool.Get(endpoint.New("drain-a.example:2135", endpoint.WithID(1)))
+	cc2 := pool.Get(endpoint.New("drain-b.example:2135", endpoint.WithID(2)))
+	require.NotNil(t, cc1)
+	require.NotNil(t, cc2)
+	ch <- cc1
+	ch <- cc2
+	close(stop)
+
+	b.releaseLoop(ch, stop)
+
+	require.NotEqual(t, state.Online, cc1.State())
+	require.NotEqual(t, state.Created, cc1.State())
+	require.NotEqual(t, state.Online, cc2.State())
+	require.NotEqual(t, state.Created, cc2.State())
 }
 
 func TestReplaceBannedConnIgnoresInapplicableConnections(t *testing.T) {

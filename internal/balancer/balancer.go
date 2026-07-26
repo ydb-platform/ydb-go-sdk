@@ -91,6 +91,7 @@ type Balancer struct {
 	// waits for in-flight RPCs, which deadlocks if called from RecvMsg itself.
 	// A single worker avoids spawning an unbounded goroutine per ban.
 	releaseCh   chan conn.Conn
+	releaseStop chan struct{}
 	releaseDone chan struct{}
 
 	closeMu sync.Mutex
@@ -379,10 +380,11 @@ func (b *Balancer) enqueueRelease(ctx context.Context, cc conn.Conn) {
 
 	b.closeMu.Lock()
 	ch := b.releaseCh
+	stop := b.releaseStop
 	closed := b.closed
 	b.closeMu.Unlock()
 
-	if closed || ch == nil {
+	if closed || ch == nil || stop == nil {
 		b.pool.Put(xcontext.ValueOnly(ctx), cc)
 
 		return
@@ -390,16 +392,29 @@ func (b *Balancer) enqueueRelease(ctx context.Context, cc conn.Conn) {
 
 	select {
 	case ch <- cc:
-	case <-b.releaseDone:
+	case <-stop:
+		// Close already asked the worker to stop; finish release synchronously.
 		b.pool.Put(xcontext.ValueOnly(ctx), cc)
 	}
 }
 
-func (b *Balancer) releaseLoop(ch <-chan conn.Conn) {
+func (b *Balancer) releaseLoop(ch <-chan conn.Conn, stop <-chan struct{}) {
 	defer close(b.releaseDone)
 
-	for cc := range ch {
-		b.pool.Put(context.Background(), cc)
+	for {
+		select {
+		case <-stop:
+			for {
+				select {
+				case cc := <-ch:
+					b.pool.Put(context.Background(), cc)
+				default:
+					return
+				}
+			}
+		case cc := <-ch:
+			b.pool.Put(context.Background(), cc)
+		}
 	}
 }
 
@@ -477,8 +492,9 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	b.discoveryRepeater = nil
 
 	discoveryCC := b.cc.Swap(nil)
-	releaseCh := b.releaseCh
+	releaseStop := b.releaseStop
 	b.releaseCh = nil
+	b.releaseStop = nil
 
 	b.closeMu.Unlock()
 
@@ -490,8 +506,8 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	if releaseCh != nil {
-		close(releaseCh)
+	if releaseStop != nil {
+		close(releaseStop)
 		<-b.releaseDone
 	}
 
@@ -609,9 +625,11 @@ func (b *Balancer) applyBalancerConfig(config *balancerConfig.Config) {
 	// full active-set ban burst so RecvMsg does not block on a full channel.
 	if n := b.balancerConfig.MaxConnections; n > 0 {
 		ch := make(chan conn.Conn, n)
+		stop := make(chan struct{})
 		b.releaseCh = ch
+		b.releaseStop = stop
 		b.releaseDone = make(chan struct{})
-		go b.releaseLoop(ch)
+		go b.releaseLoop(ch, stop)
 	}
 }
 
