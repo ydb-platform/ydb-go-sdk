@@ -110,9 +110,6 @@ func selectEndpointsFrom(
 		fill = append(fill, e)
 	}
 
-	if rnd == nil {
-		rnd = xrand.New(xrand.WithLock())
-	}
 	rnd.Shuffle(len(fill), func(i, j int) {
 		fill[i], fill[j] = fill[j], fill[i]
 	})
