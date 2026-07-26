@@ -86,6 +86,13 @@ type Balancer struct {
 	lastDiscovered []endpoint.Endpoint
 	selfLocation   string
 
+	// releaseCh serializes pool.Put of connections evicted after Ban.
+	// Put/Close must not run on the stream RecvMsg stack: grpc.ClientConn.Close
+	// waits for in-flight RPCs, which deadlocks if called from RecvMsg itself.
+	// A single worker avoids spawning an unbounded goroutine per ban.
+	releaseCh   chan conn.Conn
+	releaseDone chan struct{}
+
 	closeMu sync.Mutex
 	closed  bool
 }
@@ -359,9 +366,41 @@ func (b *Balancer) replaceBannedConn(ctx context.Context, banned conn.Conn) {
 		return
 	}
 
-	// Release outside the lock and asynchronously: Ban may run from stream
-	// RecvMsg, and a synchronous pool.Put/Close can deadlock waiting for that Recv.
-	go b.pool.Put(xcontext.ValueOnly(ctx), released)
+	b.enqueueRelease(ctx, released)
+}
+
+// enqueueRelease releases a balancer-owned pool ref outside the Ban/RecvMsg
+// call stack. Production balancers use a single release worker; test-constructed
+// balancers without a worker fall back to a synchronous Put.
+func (b *Balancer) enqueueRelease(ctx context.Context, cc conn.Conn) {
+	if cc == nil {
+		return
+	}
+
+	b.closeMu.Lock()
+	ch := b.releaseCh
+	closed := b.closed
+	b.closeMu.Unlock()
+
+	if closed || ch == nil {
+		b.pool.Put(xcontext.ValueOnly(ctx), cc)
+
+		return
+	}
+
+	select {
+	case ch <- cc:
+	case <-b.releaseDone:
+		b.pool.Put(xcontext.ValueOnly(ctx), cc)
+	}
+}
+
+func (b *Balancer) releaseLoop() {
+	defer close(b.releaseDone)
+
+	for cc := range b.releaseCh {
+		b.pool.Put(context.Background(), cc)
+	}
 }
 
 // swapBannedConn evicts banned from the active set when another discovered
@@ -438,6 +477,8 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	b.discoveryRepeater = nil
 
 	discoveryCC := b.cc.Swap(nil)
+	releaseCh := b.releaseCh
+	b.releaseCh = nil
 
 	b.closeMu.Unlock()
 
@@ -448,6 +489,11 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	defer func() {
 		onDone(err)
 	}()
+
+	if releaseCh != nil {
+		close(releaseCh)
+		<-b.releaseDone
+	}
 
 	if rep != nil {
 		rep.Stop()
@@ -514,6 +560,8 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		driverConfig: driverConfig,
 		pool:         pool,
 		rnd:          xrand.New(xrand.WithLock(), xrand.WithCryptoSeed()),
+		releaseCh:    make(chan conn.Conn, 16),
+		releaseDone:  make(chan struct{}),
 		address:      "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),
@@ -524,6 +572,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		)...),
 		localDCDetector: detectLocalDC,
 	}
+	go b.releaseLoop()
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
 
@@ -540,6 +589,8 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	} else {
 		// initialization of balancer state
 		if err := b.clusterDiscovery(ctx); err != nil {
+			_ = b.Close(xcontext.ValueOnly(ctx))
+
 			return nil, xerrors.WithStackTrace(err)
 		}
 		// run background discovering

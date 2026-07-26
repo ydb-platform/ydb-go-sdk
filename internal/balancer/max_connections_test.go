@@ -207,12 +207,10 @@ func TestBanEvictsFromMaxConnections(t *testing.T) {
 		require.NotEqual(t, bannedKey, cc.Endpoint().Key())
 	}
 	require.NotEqual(t, before, endpointKeys(after))
-	// Banned connection is released asynchronously after a replacement is taken.
-	require.Eventually(t, func() bool {
-		s := banned.State()
-
-		return s != state.Online && s != state.Created && s != state.Banned
-	}, time.Second, 10*time.Millisecond)
+	// Test-constructed balancers release via synchronous Put (no release worker).
+	require.NotEqual(t, state.Online, banned.State())
+	require.NotEqual(t, state.Created, banned.State())
+	require.NotEqual(t, state.Banned, banned.State())
 }
 
 func TestBanWithoutReplacementKeepsBannedConnection(t *testing.T) {
