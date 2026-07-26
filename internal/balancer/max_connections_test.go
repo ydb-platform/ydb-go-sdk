@@ -34,6 +34,7 @@ func TestApplyDiscoveredEndpointsMaxConnections(t *testing.T) {
 	b := &Balancer{
 		driverConfig: cfg,
 		pool:         pool,
+		rnd:          testBalancerRand(),
 		balancerConfig: balancerConfig.Config{
 			MaxConnections: 3,
 		},
@@ -110,6 +111,7 @@ func TestPreferNearestDCMaxConnectionsKeepsLocalEndpoints(t *testing.T) {
 	b := &Balancer{
 		driverConfig: cfg,
 		pool:         pool,
+		rnd:          testBalancerRand(),
 		balancerConfig: balancerConfig.Config{
 			MaxConnections:  9,
 			DetectNearestDC: true,
@@ -150,6 +152,7 @@ func TestPreferNearestDCWithFallbackMaxConnectionsPrefersLocal(t *testing.T) {
 	b := &Balancer{
 		driverConfig: cfg,
 		pool:         pool,
+		rnd:          testBalancerRand(),
 		balancerConfig: balancerConfig.Config{
 			MaxConnections:  9,
 			AllowFallback:   true,
@@ -183,6 +186,7 @@ func TestBanEvictsFromMaxConnections(t *testing.T) {
 	b := &Balancer{
 		driverConfig: cfg,
 		pool:         pool,
+		rnd:          testBalancerRand(),
 		balancerConfig: balancerConfig.Config{
 			MaxConnections: 3,
 		},
@@ -220,6 +224,7 @@ func TestBanWithoutReplacementKeepsBannedConnection(t *testing.T) {
 	b := &Balancer{
 		driverConfig:      cfg,
 		pool:              pool,
+		rnd:               testBalancerRand(),
 		discoveryRepeater: &stubRepeater{},
 		balancerConfig: balancerConfig.Config{
 			MaxConnections: 1,
@@ -299,6 +304,25 @@ func TestReplaceBannedConnIgnoresInapplicableConnections(t *testing.T) {
 	}
 }
 
+func TestForceDiscoveryIfNeeded(t *testing.T) {
+	forced := 0
+	b := &Balancer{
+		discoveryRepeater: &stubRepeater{
+			forceFn: func() {
+				forced++
+			},
+		},
+	}
+
+	failedCount := 1
+	b.forceDiscoveryIfNeeded(&failedCount, 2)
+	require.Zero(t, forced, "half or fewer failed preferred connections must not force discovery")
+
+	failedCount = 2
+	b.forceDiscoveryIfNeeded(&failedCount, 2)
+	require.Equal(t, 1, forced, "more than half failed preferred connections must force discovery")
+}
+
 func TestPinOutsideActiveSetSoftExceedsLimit(t *testing.T) {
 	for _, fallback := range []bool{false, true} {
 		t.Run(fmt.Sprintf("fallback=%t", fallback), func(t *testing.T) {
@@ -310,6 +334,7 @@ func TestPinOutsideActiveSetSoftExceedsLimit(t *testing.T) {
 			b := &Balancer{
 				driverConfig: cfg,
 				pool:         pool,
+				rnd:          testBalancerRand(),
 				balancerConfig: balancerConfig.Config{
 					MaxConnections: 2,
 				},
@@ -347,6 +372,7 @@ func TestPinUnknownNode(t *testing.T) {
 	b := &Balancer{
 		driverConfig: cfg,
 		pool:         pool,
+		rnd:          testBalancerRand(),
 		balancerConfig: balancerConfig.Config{
 			MaxConnections: 2,
 		},
@@ -458,6 +484,7 @@ func countCallbackSerializersAfterDialStorm(tb testing.TB, endpointCount, maxCon
 	b := &Balancer{
 		driverConfig: cfg,
 		pool:         pool,
+		rnd:          testBalancerRand(),
 		balancerConfig: balancerConfig.Config{
 			MaxConnections: maxConnections,
 		},
@@ -509,6 +536,10 @@ func endpointKeysFromEndpoints(endpoints []endpoint.Endpoint) map[endpoint.Key]s
 	}
 
 	return keys
+}
+
+func testBalancerRand() xrand.Rand {
+	return xrand.New(xrand.WithSeed(1), xrand.WithLock())
 }
 
 func countGoroutinesWith(substr string) int {
