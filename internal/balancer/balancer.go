@@ -560,8 +560,6 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		driverConfig: driverConfig,
 		pool:         pool,
 		rnd:          xrand.New(xrand.WithLock(), xrand.WithCryptoSeed()),
-		releaseCh:    make(chan conn.Conn, 16),
-		releaseDone:  make(chan struct{}),
 		address:      "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),
@@ -572,15 +570,9 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		)...),
 		localDCDetector: detectLocalDC,
 	}
-	go b.releaseLoop()
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
-
-	if config := driverConfig.Balancer(); config == nil {
-		b.balancerConfig = balancerConfig.Config{}
-	} else {
-		b.balancerConfig = *config
-	}
+	b.applyBalancerConfig(driverConfig.Balancer())
 
 	if b.balancerConfig.SingleConn {
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
@@ -604,6 +596,22 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	}
 
 	return b, nil
+}
+
+func (b *Balancer) applyBalancerConfig(config *balancerConfig.Config) {
+	if config == nil {
+		b.balancerConfig = balancerConfig.Config{}
+	} else {
+		b.balancerConfig = *config
+	}
+
+	// Ban eviction is used only with MaxConnections; size the release queue for a
+	// full active-set ban burst so RecvMsg does not block on a full channel.
+	if n := b.balancerConfig.MaxConnections; n > 0 {
+		b.releaseCh = make(chan conn.Conn, n)
+		b.releaseDone = make(chan struct{})
+		go b.releaseLoop()
+	}
 }
 
 func (b *Balancer) Invoke(
