@@ -395,10 +395,10 @@ func (b *Balancer) enqueueRelease(ctx context.Context, cc conn.Conn) {
 	}
 }
 
-func (b *Balancer) releaseLoop() {
+func (b *Balancer) releaseLoop(ch <-chan conn.Conn) {
 	defer close(b.releaseDone)
 
-	for cc := range b.releaseCh {
+	for cc := range ch {
 		b.pool.Put(context.Background(), cc)
 	}
 }
@@ -608,9 +608,10 @@ func (b *Balancer) applyBalancerConfig(config *balancerConfig.Config) {
 	// Ban eviction is used only with MaxConnections; size the release queue for a
 	// full active-set ban burst so RecvMsg does not block on a full channel.
 	if n := b.balancerConfig.MaxConnections; n > 0 {
-		b.releaseCh = make(chan conn.Conn, n)
+		ch := make(chan conn.Conn, n)
+		b.releaseCh = ch
 		b.releaseDone = make(chan struct{})
-		go b.releaseLoop()
+		go b.releaseLoop(ch)
 	}
 }
 
