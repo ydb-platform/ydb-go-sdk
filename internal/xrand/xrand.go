@@ -1,6 +1,9 @@
 package xrand
 
 import (
+	cryptorand "crypto/rand"
+	"encoding/binary"
+	"io"
 	"math/rand"
 	"sync"
 	"time"
@@ -42,6 +45,23 @@ func New(opts ...option) Rand {
 	}
 
 	return r
+}
+
+// NewCryptoSeeded creates a pseudo-random generator with a seed obtained from
+// crypto/rand. It is suitable for independently distributing choices made by
+// different processes while retaining the efficient Rand implementation.
+func NewCryptoSeeded(opts ...option) (Rand, error) {
+	return newCryptoSeeded(cryptorand.Reader, opts...)
+}
+
+func newCryptoSeeded(reader io.Reader, opts ...option) (Rand, error) {
+	var seed [8]byte
+	if _, err := io.ReadFull(reader, seed[:]); err != nil {
+		return nil, err
+	}
+	opts = append(opts, WithSeed(int64(binary.LittleEndian.Uint64(seed[:]))))
+
+	return New(opts...), nil
 }
 
 func (r *r) int64n(max int64) int64 {

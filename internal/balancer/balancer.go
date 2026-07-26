@@ -26,6 +26,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -69,6 +70,7 @@ type Balancer struct {
 	discoveryConfig   *discoveryConfig.Config
 	pool              *conn.Pool
 	discoveryRepeater repeater.Repeater
+	rnd               xrand.Rand
 
 	address string
 	cc      atomic.Pointer[grpc.ClientConn]
@@ -319,7 +321,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 		b.balancerConfig.Filter,
 		balancerConfig.Info{SelfLocation: localDC},
 		b.balancerConfig.AllowFallback,
-		nil,
+		b.rnd,
 	)
 	quarantine, connections = nextState(ctx, b.pool, quarantine, active, selected)
 
@@ -500,6 +502,11 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	}
 
+	rnd, err := xrand.NewCryptoSeeded(xrand.WithLock())
+	if err != nil {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("initialize balancer random generator: %w", err))
+	}
+
 	onDone := gtrace.DriverOnBalancerInit(driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.New"),
 		driverConfig.Balancer().String(),
@@ -511,6 +518,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	b = &Balancer{
 		driverConfig: driverConfig,
 		pool:         pool,
+		rnd:          rnd,
 		address:      "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),

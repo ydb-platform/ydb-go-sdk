@@ -20,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
 func TestApplyDiscoveredEndpointsMaxConnections(t *testing.T) {
@@ -62,6 +63,39 @@ func TestApplyDiscoveredEndpointsMaxConnections(t *testing.T) {
 	for _, cc := range b.connections().All() {
 		require.NotEqual(t, dropped.Key(), cc.Endpoint().Key())
 	}
+}
+
+func TestApplyDiscoveredEndpointsUsesBalancerRand(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
+
+	const seed = 42
+	b := &Balancer{
+		driverConfig: cfg,
+		pool:         pool,
+		rnd:          xrand.New(xrand.WithSeed(seed), xrand.WithLock()),
+		balancerConfig: balancerConfig.Config{
+			MaxConnections: 3,
+		},
+	}
+	endpoints := discoveredEndpoints(20)
+	expected := selectEndpoints(
+		nil,
+		endpoints,
+		b.balancerConfig.MaxConnections,
+		nil,
+		balancerConfig.Info{},
+		false,
+		xrand.New(xrand.WithSeed(seed), xrand.WithLock()),
+	)
+
+	b.applyDiscoveredEndpoints(ctx, endpoints, "")
+
+	require.Equal(t, endpointKeysFromEndpoints(expected), endpointKeys(b.connections().All()))
 }
 
 func TestPreferNearestDCMaxConnectionsKeepsLocalEndpoints(t *testing.T) {
@@ -463,6 +497,15 @@ func endpointKeys(conns []conn.Conn) map[endpoint.Key]struct{} {
 	keys := make(map[endpoint.Key]struct{}, len(conns))
 	for _, cc := range conns {
 		keys[cc.Endpoint().Key()] = struct{}{}
+	}
+
+	return keys
+}
+
+func endpointKeysFromEndpoints(endpoints []endpoint.Endpoint) map[endpoint.Key]struct{} {
+	keys := make(map[endpoint.Key]struct{}, len(endpoints))
+	for _, e := range endpoints {
+		keys[e.Key()] = struct{}{}
 	}
 
 	return keys
