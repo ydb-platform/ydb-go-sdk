@@ -502,11 +502,6 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	}
 
-	rnd, err := xrand.NewCryptoSeeded(xrand.WithLock())
-	if err != nil {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("initialize balancer random generator: %w", err))
-	}
-
 	onDone := gtrace.DriverOnBalancerInit(driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.New"),
 		driverConfig.Balancer().String(),
@@ -518,7 +513,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	b = &Balancer{
 		driverConfig: driverConfig,
 		pool:         pool,
-		rnd:          rnd,
+		rnd:          xrand.New(xrand.WithLock(), xrand.WithCryptoSeed()),
 		address:      "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),

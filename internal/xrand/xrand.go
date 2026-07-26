@@ -34,6 +34,27 @@ func WithSeed(seed int64) option {
 	}
 }
 
+// WithCryptoSeed initializes the generator from crypto/rand entropy.
+// It is suitable for independently distributing choices made by different
+// processes while retaining the efficient Rand implementation.
+//
+// If crypto/rand is unavailable, falls back to time-based seeding.
+func WithCryptoSeed() option {
+	return withCryptoSeed(cryptorand.Reader)
+}
+
+func withCryptoSeed(reader io.Reader) option {
+	return func(r *r) {
+		var seed [8]byte
+		if _, err := io.ReadFull(reader, seed[:]); err != nil {
+			r.r = rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
+
+			return
+		}
+		r.r = rand.New(rand.NewSource(int64(binary.LittleEndian.Uint64(seed[:])))) //nolint:gosec
+	}
+}
+
 func New(opts ...option) Rand {
 	r := &r{
 		r: rand.New(rand.NewSource(time.Now().Unix())), //nolint:gosec
@@ -45,23 +66,6 @@ func New(opts ...option) Rand {
 	}
 
 	return r
-}
-
-// NewCryptoSeeded creates a pseudo-random generator with a seed obtained from
-// crypto/rand. It is suitable for independently distributing choices made by
-// different processes while retaining the efficient Rand implementation.
-func NewCryptoSeeded(opts ...option) (Rand, error) {
-	return newCryptoSeeded(cryptorand.Reader, opts...)
-}
-
-func newCryptoSeeded(reader io.Reader, opts ...option) (Rand, error) {
-	var seed [8]byte
-	if _, err := io.ReadFull(reader, seed[:]); err != nil {
-		return nil, err
-	}
-	opts = append(opts, WithSeed(int64(binary.LittleEndian.Uint64(seed[:]))))
-
-	return New(opts...), nil
 }
 
 func (r *r) int64n(max int64) int64 {

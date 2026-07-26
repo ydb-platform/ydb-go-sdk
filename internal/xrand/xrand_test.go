@@ -3,17 +3,16 @@ package xrand
 import (
 	"bytes"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewCryptoSeeded(t *testing.T) {
+func TestWithCryptoSeed(t *testing.T) {
 	t.Run("DifferentEntropyProducesDifferentSequence", func(t *testing.T) {
-		first, err := newCryptoSeeded(bytes.NewReader([]byte{1, 0, 0, 0, 0, 0, 0, 0}))
-		require.NoError(t, err)
-		second, err := newCryptoSeeded(bytes.NewReader([]byte{2, 0, 0, 0, 0, 0, 0, 0}))
-		require.NoError(t, err)
+		first := New(withCryptoSeed(bytes.NewReader([]byte{1, 0, 0, 0, 0, 0, 0, 0})))
+		second := New(withCryptoSeed(bytes.NewReader([]byte{2, 0, 0, 0, 0, 0, 0, 0})))
 
 		firstSequence := []int{0, 1, 2, 3, 4, 5, 6, 7, 8}
 		secondSequence := append([]int(nil), firstSequence...)
@@ -27,13 +26,18 @@ func TestNewCryptoSeeded(t *testing.T) {
 		require.NotEqual(t, firstSequence, secondSequence)
 	})
 
-	t.Run("EntropyError", func(t *testing.T) {
-		expectedErr := errors.New("entropy unavailable")
+	t.Run("EntropyErrorFallsBack", func(t *testing.T) {
+		rnd := New(withCryptoSeed(errorReader{err: errors.New("entropy unavailable")}))
 
-		rnd, err := newCryptoSeeded(errorReader{err: expectedErr})
+		require.NotNil(t, rnd)
+		require.GreaterOrEqual(t, rnd.Int(10), 0)
+	})
 
-		require.Nil(t, rnd)
-		require.ErrorIs(t, err, expectedErr)
+	t.Run("PublicOption", func(t *testing.T) {
+		rnd := New(WithLock(), WithCryptoSeed())
+
+		require.NotNil(t, rnd)
+		require.GreaterOrEqual(t, rnd.Int(10), 0)
 	})
 }
 
@@ -44,3 +48,5 @@ type errorReader struct {
 func (r errorReader) Read([]byte) (int, error) {
 	return 0, r.err
 }
+
+var _ io.Reader = errorReader{}
