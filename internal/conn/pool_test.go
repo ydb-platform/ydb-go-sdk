@@ -302,6 +302,23 @@ func TestPool_ConfigMethods(t *testing.T) {
 }
 
 func TestPool_ConnectionTTL(t *testing.T) {
+	t.Run("DoesNotTraceNoOpParking", func(t *testing.T) {
+		var parkEvents atomic.Int64
+		cfg := &mockConfig{
+			driverTrace: &trace.Driver{
+				OnConnPark: func(trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
+					parkEvents.Add(1)
+
+					return func(trace.DriverConnParkDoneInfo) {}
+				},
+			},
+		}
+		cc := newConn(endpoint.New("not-dialed:2135"), cfg)
+
+		require.NoError(t, cc.park(t.Context()))
+		require.Zero(t, parkEvents.Load())
+	})
+
 	t.Run("ParksIdleTransportWithoutRemovingWrapper", func(t *testing.T) {
 		const ttl = 10 * time.Second
 

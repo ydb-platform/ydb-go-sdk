@@ -34,6 +34,13 @@ func (c *conn) parkIfIdle(ctx context.Context, ttl time.Duration) {
 }
 
 func (c *conn) park(ctx context.Context) (err error) {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	if c.closed || c.grpcConn == nil {
+		return nil
+	}
+
 	onDone := gtrace.DriverOnConnPark(
 		c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).park"),
@@ -42,13 +49,6 @@ func (c *conn) park(ctx context.Context) (err error) {
 	defer func() {
 		onDone(err)
 	}()
-
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-
-	if c.closed || c.grpcConn == nil {
-		return nil
-	}
 
 	if err = c.close(ctx); err != nil {
 		return xerrors.WithStackTrace(err)
