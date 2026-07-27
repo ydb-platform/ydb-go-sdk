@@ -103,3 +103,32 @@ func TestNewStreamListener_SeedsInitialReadRequest(t *testing.T) {
 		return grpcStream.readRequestBytes.Load() == bufferSize
 	}, time.Second, 10*time.Millisecond)
 }
+
+func TestStreamListenerReceiveMessagesLoopIgnoresRecvErrorWhileClosing(t *testing.T) {
+	recvCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	unexpectedClose := make(chan error, 1)
+	listener := &streamListener{
+		stream: rawtopicreader.StreamReader{
+			Stream: &testInitGrpcStream{
+				initSent:    true,
+				recvContext: recvCtx,
+			},
+			Tracer: &trace.Topic{},
+		},
+		streamClose: func(reason error) {
+			unexpectedClose <- reason
+		},
+		tracer: &trace.Topic{},
+	}
+	listener.closing.Store(true)
+
+	listener.receiveMessagesLoop(context.Background())
+
+	select {
+	case reason := <-unexpectedClose:
+		t.Fatalf("receive loop initiated duplicate close during shutdown: %v", reason)
+	default:
+	}
+}

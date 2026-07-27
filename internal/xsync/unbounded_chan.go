@@ -54,8 +54,9 @@ func (c *UnboundedChan[T]) Send(msg T) {
 // SendWithMerge adds a message to the channel with optional merging.
 // If mergeFunc returns true, the new message will be merged with the last message.
 // The merge operation is atomic and preserves message order.
-func (c *UnboundedChan[T]) SendWithMerge(msg T, mergeFunc func(last, new T) (T, bool)) {
-	var notify bool
+// It returns false when the channel is already closed and the message was rejected.
+func (c *UnboundedChan[T]) SendWithMerge(msg T, mergeFunc func(last, new T) (T, bool)) bool {
+	var accepted bool
 	c.mutex.WithLock(func() {
 		if c.closed {
 			return
@@ -64,19 +65,21 @@ func (c *UnboundedChan[T]) SendWithMerge(msg T, mergeFunc func(last, new T) (T, 
 		if len(c.buffer) > 0 {
 			if merged, shouldMerge := mergeFunc(c.buffer[len(c.buffer)-1], msg); shouldMerge {
 				c.buffer[len(c.buffer)-1] = merged
-				notify = true
+				accepted = true
 
 				return
 			}
 		}
 
 		c.buffer = append(c.buffer, msg)
-		notify = true
+		accepted = true
 	})
 
-	if notify {
+	if accepted {
 		c.notify()
 	}
+
+	return accepted
 }
 
 // Receive retrieves a message from the channel with context support.

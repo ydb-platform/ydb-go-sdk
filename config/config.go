@@ -23,6 +23,7 @@ type Config struct {
 
 	trace              *trace.Driver
 	dialTimeout        time.Duration
+	connectionTTL      time.Duration
 	balancerConfig     *balancerConfig.Config
 	secure             bool
 	endpoint           string
@@ -73,11 +74,11 @@ func (c *Config) Meta() *meta.Meta {
 	return c.meta
 }
 
-// Deprecated: connection parking was removed; ConnectionTTL always returns 0.
-// Will be removed after Dec 2026
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// ConnectionTTL defines the idle interval after which a gRPC connection is parked.
+//
+// If ConnectionTTL is zero, connections are not parked.
 func (c *Config) ConnectionTTL() time.Duration {
-	return 0
+	return c.connectionTTL
 }
 
 // Secure is a flag for secure connection
@@ -221,11 +222,11 @@ func WithUserAgent(userAgent string) Option {
 	}
 }
 
-// Deprecated: connection parking was removed; this option is now a no-op.
-// Will be removed after Dec 2026
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// WithConnectionTTL configures the idle interval after which gRPC connections are parked.
 func WithConnectionTTL(ttl time.Duration) Option {
-	return func(*Config) {}
+	return func(c *Config) {
+		c.connectionTTL = ttl
+	}
 }
 
 func WithCredentials(credentials credentials.Credentials) Option {

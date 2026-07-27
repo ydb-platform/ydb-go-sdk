@@ -357,6 +357,10 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 
 		logCtx := ctx
 		if err != nil {
+			if l.closing.Load() || ctx.Err() != nil {
+				return
+			}
+
 			gtrace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, "", 0, err)
 			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
 			l.goClose(ctx, xerrors.WithStackTrace(xerrors.Wrap(

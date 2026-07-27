@@ -122,7 +122,8 @@ func TestUnboundedChanSendAfterClose(t *testing.T) {
 
 	// Must not panic when sending after close (e.g. race with partition worker shutdown).
 	ch.Send(1)
-	ch.SendWithMerge(2, func(last, new int) (int, bool) { return last + new, true })
+	accepted := ch.SendWithMerge(2, func(last, new int) (int, bool) { return last + new, true })
+	require.False(t, accepted)
 }
 
 func TestUnboundedChanSendCloseConcurrent(t *testing.T) {
