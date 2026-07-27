@@ -320,6 +320,7 @@ func (p *Pool) parkIdleConnections(ctx context.Context, ttl time.Duration) {
 }
 
 func (p *Pool) connParker(ctx context.Context, ttl time.Duration) {
+	// Check twice per TTL to park within about 1.5×TTL after last use without excessive polling.
 	interval := ttl / 2 //nolint:mnd
 	if interval <= 0 {
 		interval = ttl
