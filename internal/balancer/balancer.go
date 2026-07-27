@@ -451,6 +451,7 @@ func (b *Balancer) swapBannedConn(ctx context.Context, banned conn.Conn) (
 		b.balancerConfig.Filter,
 		balancerConfig.Info{SelfLocation: b.selfLocation},
 		b.balancerConfig.AllowFallback,
+		b.rnd,
 	)
 	if replacement == nil {
 		// No other discovered endpoint can take the slot. Keep the banned
@@ -621,9 +622,9 @@ func (b *Balancer) applyBalancerConfig(config *balancerConfig.Config) {
 		b.balancerConfig = *config
 	}
 
-	// Ban eviction is used only with MaxConnections; size the release queue for a
-	// full active-set ban burst so RecvMsg does not block on a full channel.
-	if n := b.balancerConfig.MaxConnections; n > 0 {
+	// Ban eviction is used only with MaxConnections>0 and a multi-endpoint sticky
+	// set. SingleConn never replaces the sole endpoint, so skip the release worker.
+	if n := b.balancerConfig.MaxConnections; n > 0 && !b.balancerConfig.SingleConn {
 		ch := make(chan conn.Conn, n)
 		stop := make(chan struct{})
 		b.releaseCh = ch
@@ -768,8 +769,13 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		if cc := state.preferConnection(ctx); cc != nil {
 			return cc, nil
 		}
-		if cc := b.ensurePinnedConn(ctx, nodeID); cc != nil {
-			return cc, nil
+		// Soft-exceed / revive under MaxConnections only. Unlimited mode keeps
+		// historical ban behavior for WithNodeID (banned pin → ErrNoEndpoints /
+		// fallback), matching pre-MaxConnections clients.
+		if b.balancerConfig.MaxConnections > 0 {
+			if cc := b.ensurePinnedConn(ctx, nodeID); cc != nil {
+				return cc, nil
+			}
 		}
 		if !endpoint.ContextFallback(ctx) {
 			return nil, xerrors.WithStackTrace(
@@ -793,6 +799,10 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 // ensurePinnedConn adds a discovered endpoint for nodeID to the active set when
 // it is missing (soft-exceeding MaxConnections). Discovery sticky select will
 // shrink the set back on the next update when possible.
+//
+// If the node is already in the active set but not currently usable (e.g. Banned),
+// it is Unban'd in place — never appended again — so the set does not gain a
+// duplicate reference / double weight in random selection.
 func (b *Balancer) ensurePinnedConn(ctx context.Context, nodeID uint32) conn.Conn {
 	b.closeMu.Lock()
 	defer b.closeMu.Unlock()
@@ -803,7 +813,11 @@ func (b *Balancer) ensurePinnedConn(ctx context.Context, nodeID uint32) conn.Con
 
 	connState := b.connectionsState.Load()
 	if connState != nil {
-		if cc := connState.connByNodeID[nodeID]; cc != nil && isOkConnection(cc, false) {
+		if cc := connState.connByNodeID[nodeID]; cc != nil {
+			if !isOkConnection(cc, false) {
+				cc.Unban(ctx)
+			}
+
 			return cc
 		}
 	}

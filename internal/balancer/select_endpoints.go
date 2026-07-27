@@ -154,19 +154,31 @@ func replacementEndpoint(
 	filter balancerConfig.Filter,
 	info balancerConfig.Info,
 	allowFallback bool,
+	rnd xrand.Rand,
 ) endpoint.Endpoint {
 	activeKeys := connKeys(active)
 	pick := func(from []endpoint.Endpoint) endpoint.Endpoint {
+		candidates := make([]endpoint.Endpoint, 0, len(from))
 		for _, e := range from {
 			if _, exists := activeKeys[e.Key()]; exists {
 				continue
 			}
 			if e.Key() != excluded {
-				return e
+				candidates = append(candidates, e)
 			}
 		}
+		switch len(candidates) {
+		case 0:
+			return nil
+		case 1:
+			return candidates[0]
+		default:
+			if rnd == nil {
+				return candidates[0]
+			}
 
-		return nil
+			return candidates[rnd.Int(len(candidates))]
+		}
 	}
 
 	if filter == nil {

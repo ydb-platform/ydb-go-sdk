@@ -215,6 +215,8 @@ func TestBanEvictsFromMaxConnections(t *testing.T) {
 }
 
 func TestBanWithoutReplacementKeepsBannedConnection(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	cfg := config.New()
 	pool := conn.NewPool(ctx, cfg)
@@ -246,7 +248,7 @@ func TestApplyBalancerConfigNil(t *testing.T) {
 	require.Nil(t, b.releaseCh)
 }
 
-func TestNewSingleConnStartsReleaseWorker(t *testing.T) {
+func TestNewSingleConnDoesNotStartReleaseWorker(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.New(
 		config.WithEndpoint("127.0.0.1:2135"),
@@ -260,9 +262,8 @@ func TestNewSingleConnStartsReleaseWorker(t *testing.T) {
 
 	b, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
 	require.NoError(t, err)
-	require.NotNil(t, b.releaseCh)
-	require.NotNil(t, b.releaseStop)
-	require.NotNil(t, b.releaseDone)
+	require.Nil(t, b.releaseCh, "SingleConn never replaces its sole endpoint")
+	require.Nil(t, b.releaseStop)
 
 	require.NoError(t, b.Close(ctx))
 	require.ErrorIs(t, b.Close(ctx), errBalancerClosed)
@@ -559,6 +560,61 @@ func TestEnsurePinnedConnEdges(t *testing.T) {
 
 		require.Nil(t, b.ensurePinnedConn(ctx, target.NodeID()))
 	})
+
+	t.Run("banned in active set is unbanned in place", func(t *testing.T) {
+		b := &Balancer{
+			driverConfig: cfg,
+			pool:         pool,
+			rnd:          testBalancerRand(),
+			balancerConfig: balancerConfig.Config{
+				MaxConnections: 2,
+			},
+		}
+		endpoints := discoveredEndpoints(3)
+		b.applyDiscoveredEndpoints(ctx, endpoints, "")
+		require.Len(t, b.connections().All(), 2)
+
+		banned := b.connections().All()[0]
+		pool.Ban(ctx, banned, status.Error(codes.Unavailable, "down"))
+		require.Equal(t, state.Banned, banned.State())
+
+		cc := b.ensurePinnedConn(ctx, banned.Endpoint().NodeID())
+		require.Same(t, banned, cc)
+		require.NotEqual(t, state.Banned, cc.State())
+
+		active := b.connections().All()
+		require.Len(t, active, 2)
+		keys := endpointKeys(active)
+		require.Len(t, keys, 2, "must not append a duplicate conn for the same endpoint")
+	})
+}
+
+func TestUnlimitedPinDoesNotUnbanBannedConnection(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
+
+	b := &Balancer{
+		driverConfig: cfg,
+		pool:         pool,
+		rnd:          testBalancerRand(),
+		balancerConfig: balancerConfig.Config{
+			MaxConnections: 0,
+		},
+	}
+	endpoints := discoveredEndpoints(3)
+	b.applyDiscoveredEndpoints(ctx, endpoints, "")
+
+	banned := b.connections().All()[0]
+	pool.Ban(ctx, banned, status.Error(codes.Unavailable, "down"))
+	require.Equal(t, state.Banned, banned.State())
+
+	_, err := b.nextConn(endpoint.WithNodeID(ctx, banned.Endpoint().NodeID(), endpoint.WithFallback(false)))
+	require.ErrorIs(t, err, ErrNoEndpoints)
+	require.Equal(t, state.Banned, banned.State())
 }
 
 // TestMaxConnectionsLimitsGrpcCallbackSerializerGoroutines reproduces the class

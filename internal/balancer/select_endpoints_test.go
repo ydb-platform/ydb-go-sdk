@@ -231,10 +231,10 @@ func TestReplacementEndpoint(t *testing.T) {
 		},
 	}
 
-	replacement := replacementEndpoint(discovered, active, discovered[1].Key(), nil, balancerConfig.Info{}, false)
+	replacement := replacementEndpoint(discovered, active, discovered[1].Key(), nil, balancerConfig.Info{}, false, nil)
 	require.Equal(t, discovered[2].Key(), replacement.Key())
 
-	require.Nil(t, replacementEndpoint(discovered[:2], active, discovered[1].Key(), nil, balancerConfig.Info{}, false))
+	require.Nil(t, replacementEndpoint(discovered[:2], active, discovered[1].Key(), nil, balancerConfig.Info{}, false, nil))
 }
 
 func TestReplacementEndpointPrefersFilter(t *testing.T) {
@@ -249,7 +249,7 @@ func TestReplacementEndpointPrefersFilter(t *testing.T) {
 		},
 	}
 
-	replacement := replacementEndpoint(discovered, active, discovered[5].Key(), localDCFilter{}, info, false)
+	replacement := replacementEndpoint(discovered, active, discovered[5].Key(), localDCFilter{}, info, false, nil)
 	require.NotNil(t, replacement)
 	require.Equal(t, localDC, replacement.Location())
 	require.Equal(t, discovered[6].Key(), replacement.Key())
@@ -261,9 +261,32 @@ func TestReplacementEndpointPrefersFilter(t *testing.T) {
 	}
 	withoutBanned := activeBothLocal[1:] // local1 still active
 	require.Nil(t, replacementEndpoint(
-		discovered, withoutBanned, discovered[5].Key(), localDCFilter{}, info, false,
+		discovered, withoutBanned, discovered[5].Key(), localDCFilter{}, info, false, nil,
 	))
 	require.Equal(t, "remote", replacementEndpoint(
-		discovered, withoutBanned, discovered[5].Key(), localDCFilter{}, info, true,
+		discovered, withoutBanned, discovered[5].Key(), localDCFilter{}, info, true, nil,
 	).Location())
+}
+
+func TestReplacementEndpointPicksRandomCandidate(t *testing.T) {
+	discovered := discoveredEndpoints(5)
+	active := []conn.Conn{
+		&mock.Conn{AddrField: discovered[0].Address(), NodeIDField: discovered[0].NodeID()},
+	}
+	// Seeded RNG that returns index 1 among 3 eligible candidates (e1,e2,e3 after
+	// excluding active e0 and banned e4) → e2.
+	rnd := xrand.New(xrand.WithSeed(1), xrand.WithLock())
+	got := replacementEndpoint(
+		discovered, active, discovered[4].Key(), nil, balancerConfig.Info{}, false, rnd,
+	)
+	require.NotNil(t, got)
+	require.NotEqual(t, discovered[0].Key(), got.Key())
+	require.NotEqual(t, discovered[4].Key(), got.Key())
+
+	// With a fixed seed, two calls with fresh RNGs of the same seed agree.
+	again := replacementEndpoint(
+		discovered, active, discovered[4].Key(), nil, balancerConfig.Info{}, false,
+		xrand.New(xrand.WithSeed(1), xrand.WithLock()),
+	)
+	require.Equal(t, got.Key(), again.Key())
 }

@@ -369,7 +369,7 @@ func WithBalancer(balancer *balancerConfig.Config) Option {
 //
 // The limit is enforced in the balancer (sticky subset across discovery
 // updates). Banned connections are evicted so slots can be reused for live
-// endpoints. [internal/conn.Pool] remains an unbounded cache: child drivers
+// endpoints. The underlying connection cache remains unbounded: child drivers
 // created via [Driver.With] may still hold additional connections.
 //
 // Soft limit: [balancers.WithNodeID], table/query session affinity, or topic
