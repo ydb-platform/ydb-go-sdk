@@ -773,6 +773,28 @@ func TestPartitionWorkerInterface_BatchAfterHandlerErrorFreesBuffer(t *testing.T
 	require.ElementsMatch(t, []int{firstBatchSize, lateBatchSize}, messageSender.GetFreedBuffer())
 }
 
+func TestPartitionWorkerInterface_RawMessageAfterCloseDoesNotReleaseBuffer(t *testing.T) {
+	ctx := xtest.Context(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	messageSender := newSyncMessageSender()
+	worker := NewPartitionWorker(
+		123,
+		createTestPartitionSession(),
+		messageSender,
+		NewMockEventHandler(ctrl),
+		func(rawtopicreader.PartitionSessionID, error) {},
+		&trace.Topic{},
+		"test-listener",
+	)
+
+	require.NoError(t, worker.Close(ctx, nil))
+	worker.AddRawServerMessage(&rawtopicreader.StartPartitionSessionRequest{})
+
+	require.Empty(t, messageSender.GetFreedBuffer())
+}
+
 func TestPartitionWorkerInterface_BadBatchMetadataFreesBuffer(t *testing.T) {
 	ctx := xtest.Context(t)
 	ctrl := gomock.NewController(t)
