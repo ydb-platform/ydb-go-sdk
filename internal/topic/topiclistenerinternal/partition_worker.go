@@ -126,7 +126,9 @@ func (w *PartitionWorker) Start(ctx context.Context) {
 
 // AddUnifiedMessage adds a unified message to the processing queue
 func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) {
-	w.messageQueue.SendWithMerge(msg, w.tryMergeMessages)
+	if !w.messageQueue.SendWithMerge(msg, w.tryMergeMessages) {
+		w.freeBatchCredit(msg)
+	}
 }
 
 // AddRawServerMessage sends a raw server message
@@ -166,10 +168,9 @@ func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
 		}
 	}()
 
-	// On stop (Close, handler error, panic) batches may still sit in the queue buffer
-	// without reaching processBatchMessage. Drain them here instead of Close(): only
-	// this goroutine knows processing is finished and must not use blocking Receive.
-	defer w.freeBufferedBatchCredits()
+	// Close before the final drain so a concurrent sender either queues before the
+	// drain or observes the closed queue and releases its own buffer credit.
+	defer w.closeQueueAndFreeBufferedBatchCredits()
 
 	for {
 		// Use context-aware Receive method
@@ -354,10 +355,19 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 // partition queue. In-flight batch is freed by processBatchMessage defer, not here.
 func (w *PartitionWorker) freeBufferedBatchCredits() {
 	for _, msg := range w.messageQueue.DrainBuffered() {
-		// StartPartition / StopPartition do not consume read-ahead data bytes.
-		if msg.BatchMessage != nil {
-			w.readBufferReleaser.ReadBufferRelease(batchReadBufferSize(msg.BatchMessage.Batch))
-		}
+		w.freeBatchCredit(msg)
+	}
+}
+
+func (w *PartitionWorker) closeQueueAndFreeBufferedBatchCredits() {
+	w.messageQueue.Close()
+	w.freeBufferedBatchCredits()
+}
+
+func (w *PartitionWorker) freeBatchCredit(msg unifiedMessage) {
+	// StartPartition / StopPartition do not consume read-ahead data bytes.
+	if msg.BatchMessage != nil {
+		w.readBufferReleaser.ReadBufferRelease(batchReadBufferSize(msg.BatchMessage.Batch))
 	}
 }
 
