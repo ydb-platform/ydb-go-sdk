@@ -234,7 +234,9 @@ func TestReplacementEndpoint(t *testing.T) {
 	replacement := replacementEndpoint(discovered, active, discovered[1].Key(), nil, balancerConfig.Info{}, false, nil)
 	require.Equal(t, discovered[2].Key(), replacement.Key())
 
-	require.Nil(t, replacementEndpoint(discovered[:2], active, discovered[1].Key(), nil, balancerConfig.Info{}, false, nil))
+	require.Nil(t, replacementEndpoint(
+		discovered[:2], active, discovered[1].Key(), nil, balancerConfig.Info{}, false, nil),
+	)
 }
 
 func TestReplacementEndpointPrefersFilter(t *testing.T) {

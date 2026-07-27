@@ -765,7 +765,7 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 	defer b.forceDiscoveryIfNeeded(&failedCount, state.PreferredCount())
 
 	// Soft-limit overflow: pin to a node outside the active MaxConnections set.
-	if nodeID, ok := endpoint.ContextNodeID(ctx); ok {
+	if nodeID, ok := endpoint.ContextNodeID(ctx); ok { //nolint:nestif
 		if cc := state.preferConnection(ctx); cc != nil {
 			return cc, nil
 		}
