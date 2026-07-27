@@ -1,3 +1,4 @@
+## v3.145.1
 * Fixed a TopicListener read buffer credit leak when a batch raced with partition worker shutdown
 * Fixed `WithConnectionTTL` being a no-op and restored parking of idle gRPC connections without preventing removal of nodes missing from Discovery
 
