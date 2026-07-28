@@ -1,4 +1,3 @@
-## Unreleased
 * Added Coordination `DescribeSemaphore` one-shot watch via `options.WithSemaphoreWatch` ([#2257](https://github.com/ydb-platform/ydb-go-sdk/issues/2257))
 
 ## v3.146.0
