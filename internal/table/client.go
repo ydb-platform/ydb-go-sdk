@@ -234,10 +234,13 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 		onDone(safe.SessionInfo(s), attempts, err)
 	}()
 
+	config := c.retryOptions(append(
+		[]table.Option{table.WithIdempotent(true)},
+		opts...,
+	)...)
 	s, err = retry.RetryWithResult(ctx, createSession,
 		append(
 			[]retry.Option{
-				retry.WithIdempotent(true),
 				retry.WithTrace(&trace.Retry{
 					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 						return func(info trace.RetryLoopDoneInfo) {
@@ -245,7 +248,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 						}
 					},
 				}),
-			}, c.retryOptions(opts...).RetryOptions...,
+			}, config.RetryOptions...,
 		)...,
 	)
 	if err != nil {
@@ -379,10 +382,12 @@ func (c *Client) BulkUpsert(
 		return xerrors.WithStackTrace(errClosedClient)
 	}
 
-	attempts, config := 0, c.retryOptions(opts...)
+	attempts, config := 0, c.retryOptions(append(
+		[]table.Option{table.WithIdempotent(true)},
+		opts...,
+	)...)
 	config.RetryOptions = append(
 		[]retry.Option{
-			retry.WithIdempotent(true),
 			retry.WithTrace(&trace.Retry{
 				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 					return func(info trace.RetryLoopDoneInfo) {
@@ -555,10 +560,12 @@ func (c *Client) ReadRows(
 
 	client := Ydb_Table_V1.NewTableServiceClient(c.cc)
 
-	attempts, config := 0, c.retryOptions(retryOptions...)
+	attempts, config := 0, c.retryOptions(append(
+		[]table.Option{table.WithIdempotent(true)},
+		retryOptions...,
+	)...)
 	config.RetryOptions = append(
 		[]retry.Option{
-			retry.WithIdempotent(true),
 			retry.WithTrace(&trace.Retry{
 				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 					return func(info trace.RetryLoopDoneInfo) {

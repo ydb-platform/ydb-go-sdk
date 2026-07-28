@@ -348,6 +348,20 @@ func do(
 	return nil
 }
 
+func (c *Client) withDefaultRetryOptions(opts ...retry.Option) []retry.Option {
+	return append(
+		[]retry.Option{retry.WithIdempotent(c.config.DefaultIdempotent())},
+		opts...,
+	)
+}
+
+func (c *Client) withDefaultExecuteOptions(opts ...options.Execute) []options.Execute {
+	return append(
+		[]options.Execute{options.WithIdempotent(c.config.DefaultIdempotent())},
+		opts...,
+	)
+}
+
 func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) (finalErr error) {
 	ctx, leave, err := c.enter(ctx)
 	if err != nil {
@@ -367,24 +381,27 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 		onDone(attempts, finalErr)
 	}()
 
+	retryOpts := c.withDefaultRetryOptions(
+		// Driver-level trace.Retry (e.g. spans.WithTraces) so retry
+		// callers see ydb.RunWithRetry / ydb.Try spans for Do().
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithTrace(&trace.Retry{
+			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+				return func(info trace.RetryLoopDoneInfo) {
+					attempts = info.Attempts
+				}
+			},
+		}),
+	)
+	retryOpts = append(retryOpts, settings.RetryOpts()...)
+
 	err = do(ctx, c.explicitSessionPool,
 		func(ctx context.Context, s *Session) error {
 			return withSessionTrace(s, settings.CallTrace(), func() error {
 				return op(ctx, s)
 			})
 		},
-		append([]retry.Option{
-			// Driver-level trace.Retry (e.g. spans.WithTraces) so retry
-			// callers see ydb.RunWithRetry / ydb.Try spans for Do().
-			retry.WithTrace(c.config.TraceRetry()),
-			retry.WithTrace(&trace.Retry{
-				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-					return func(info trace.RetryLoopDoneInfo) {
-						attempts = info.Attempts
-					}
-				},
-			}),
-		}, settings.RetryOpts()...)...,
+		retryOpts...,
 	)
 
 	return err
@@ -485,7 +502,7 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 	}
 	defer leave()
 
-	settings := options.ExecuteSettings(opts...)
+	settings := options.ExecuteSettings(c.withDefaultExecuteOptions(opts...)...)
 
 	onDone := gtrace.QueryOnQueryRow(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryRow"),
@@ -544,6 +561,7 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 	}
 	defer leave()
 
+	opts = c.withDefaultExecuteOptions(opts...)
 	settings := options.ExecuteSettings(opts...)
 	onDone := gtrace.QueryOnExec(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Exec"),
@@ -602,6 +620,7 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (
 	}
 	defer leave()
 
+	opts = c.withDefaultExecuteOptions(opts...)
 	settings := options.ExecuteSettings(opts...)
 	onDone := gtrace.QueryOnQuery(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Query"),
@@ -660,7 +679,7 @@ func (c *Client) QueryResultSet(
 	defer leave()
 
 	var (
-		settings  = options.ExecuteSettings(opts...)
+		settings  = options.ExecuteSettings(c.withDefaultExecuteOptions(opts...)...)
 		rowsCount int
 	)
 
@@ -717,24 +736,24 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 		ctx = tx.WithLazyTx(ctx, *lazyTx)
 	}
 
+	retryOpts := c.withDefaultRetryOptions(
+		// Driver-level trace.Retry (e.g. spans.WithTraces) so retry
+		// callers see ydb.RunWithRetry / ydb.Try spans for DoTx().
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithTrace(&trace.Retry{
+			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+				return func(info trace.RetryLoopDoneInfo) {
+					attempts = info.Attempts
+				}
+			},
+		}),
+	)
+	retryOpts = append(retryOpts, settings.RetryOpts()...)
+
 	err = doTx(ctx, c.explicitSessionPool, op,
 		settings.TxSettings(),
 		settings.CallTrace(),
-		append(
-			[]retry.Option{
-				// Driver-level trace.Retry (e.g. spans.WithTraces) so retry
-				// callers see ydb.RunWithRetry / ydb.Try spans for DoTx().
-				retry.WithTrace(c.config.TraceRetry()),
-				retry.WithTrace(&trace.Retry{
-					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-						return func(info trace.RetryLoopDoneInfo) {
-							attempts = info.Attempts
-						}
-					},
-				}),
-			},
-			settings.RetryOpts()...,
-		)...,
+		retryOpts...,
 	)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
