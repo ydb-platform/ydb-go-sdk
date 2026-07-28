@@ -3,6 +3,7 @@ package coordination_test
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
@@ -144,4 +145,100 @@ func Example_semaphore() {
 		return
 	}
 	fmt.Printf("deleted semaphore my-semaphore\n")
+}
+
+func Example_semaphoreWatch() {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		fmt.Printf("failed to connect: %v", err)
+
+		return
+	}
+	defer db.Close(ctx)
+
+	const nodePath = "/local/test-watch"
+
+	err = db.Coordination().CreateNode(ctx, nodePath, coordination.NodeConfig{
+		SelfCheckPeriodMillis:    1000,
+		SessionGracePeriodMillis: 1000,
+		ReadConsistencyMode:      coordination.ConsistencyModeStrict,
+		AttachConsistencyMode:    coordination.ConsistencyModeStrict,
+		RatelimiterCountersMode:  coordination.RatelimiterCountersModeDetailed,
+	})
+	if err != nil {
+		fmt.Printf("failed to create node: %v", err)
+
+		return
+	}
+	defer func() {
+		_ = db.Coordination().DropNode(ctx, nodePath)
+	}()
+
+	s, err := db.Coordination().Session(ctx, nodePath)
+	if err != nil {
+		fmt.Printf("failed to create session: %v\n", err)
+
+		return
+	}
+	defer s.Close(ctx)
+
+	const semaphoreName = "watched-semaphore"
+
+	err = s.CreateSemaphore(ctx, semaphoreName, 1, options.WithCreateData([]byte("initial")))
+	if err != nil {
+		fmt.Printf("failed to create semaphore: %v", err)
+
+		return
+	}
+	defer func() {
+		_ = s.DeleteSemaphore(ctx, semaphoreName, options.WithForceDelete(true))
+	}()
+
+	changed := make(chan bool, 1)
+	desc, err := s.DescribeSemaphore(
+		ctx,
+		semaphoreName,
+		options.WithWatchData(true),
+		options.WithOnChanged(func(triggered bool) {
+			changed <- triggered
+		}),
+	)
+	if err != nil {
+		fmt.Printf("failed to watch semaphore: %v", err)
+
+		return
+	}
+	fmt.Printf("watching semaphore %q, data=%q\n", desc.Name, desc.Data)
+
+	// Update semaphore data in parallel; the watch callback should observe the change.
+	go func() {
+		updateErr := s.UpdateSemaphore(
+			ctx,
+			semaphoreName,
+			options.WithUpdateData([]byte("updated-by-watcher-example")),
+		)
+		if updateErr != nil {
+			fmt.Printf("failed to update semaphore: %v\n", updateErr)
+		}
+	}()
+
+	select {
+	case triggered := <-changed:
+		fmt.Printf("watcher notified: triggered=%v\n", triggered)
+	case <-ctx.Done():
+		fmt.Printf("watch timed out: %v\n", ctx.Err())
+
+		return
+	}
+
+	desc, err = s.DescribeSemaphore(ctx, semaphoreName)
+	if err != nil {
+		fmt.Printf("failed to describe semaphore after watch: %v", err)
+
+		return
+	}
+	fmt.Printf("semaphore data after watch: %q\n", desc.Data)
 }
