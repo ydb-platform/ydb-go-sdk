@@ -454,6 +454,19 @@ func WithRetryBudget(b budget.Budget) Option {
 	}
 }
 
+// WithDefaultIdempotent sets the default idempotency flag for retrying operations
+// in the native Table and Query clients and in database/sql retry helpers.
+// Per-call idempotency options override this default.
+func WithDefaultIdempotent(idempotent bool) Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.tableOptions = append(d.tableOptions, tableConfig.WithDefaultIdempotent(idempotent))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithDefaultIdempotent(idempotent))
+		d.databaseSQLOptions = append(d.databaseSQLOptions, xsql.WithDefaultIdempotent(idempotent))
+
+		return nil
+	}
+}
+
 // WithTraceDriver appends trace.Driver into driver traces
 func WithTraceDriver(t trace.Driver) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {

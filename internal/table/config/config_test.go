@@ -252,6 +252,7 @@ func TestConfigGetters(t *testing.T) {
 			WithIgnoreTruncated(),
 			WithMaxRequestMessageSize(2048),
 			ExecuteDataQueryOverQueryService(true),
+			WithDefaultIdempotent(true),
 		)
 
 		require.Equal(t, 100, c.SizeLimit())
@@ -263,6 +264,7 @@ func TestConfigGetters(t *testing.T) {
 		require.Equal(t, 2048, c.MaxRequestMessageSize())
 		require.True(t, c.ExecuteDataQueryOverQueryService())
 		require.True(t, c.UseQuerySession())
+		require.True(t, c.DefaultIdempotent())
 		require.NotNil(t, c.Trace())
 		require.NotNil(t, c.Clock())
 	})
