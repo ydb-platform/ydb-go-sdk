@@ -93,6 +93,12 @@ func WithLazyTx(lazyTx bool) Option {
 	}
 }
 
+func WithDefaultIdempotent(idempotent bool) Option {
+	return func(c *Config) {
+		c.defaultIdempotent = idempotent
+	}
+}
+
 func WithDisableSessionBalancer() Option {
 	return func(c *Config) {
 		c.SetDisableSessionBalancer()

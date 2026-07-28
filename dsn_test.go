@@ -179,6 +179,30 @@ func TestParse(t *testing.T) {
 			err: nil,
 		},
 		{
+			dsn: "grpc://localhost:2135/local?go_default_idempotent=true",
+			opts: []config.Option{
+				config.WithSecure(false),
+				config.WithEndpoint("localhost:2135"),
+				config.WithDatabase("/local"),
+			},
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultIdempotent(true),
+			},
+			err: nil,
+		},
+		{
+			dsn: "grpc://localhost:2135/local?go_default_idempotent=false",
+			opts: []config.Option{
+				config.WithSecure(false),
+				config.WithEndpoint("localhost:2135"),
+				config.WithDatabase("/local"),
+			},
+			connectorOpts: []xsql.Option{
+				xsql.WithDefaultIdempotent(false),
+			},
+			err: nil,
+		},
+		{
 			dsn: "grpc://localhost:2135/local?query_mode=scripting&go_query_bind=positional,declare,wide_time_types", //nolint:lll
 			opts: []config.Option{
 				config.WithSecure(false),
@@ -239,6 +263,12 @@ func TestParseInvalidPrefetchQueryResultParts(t *testing.T) {
 	_, err := parseConnectionString("grpc://localhost:2135/local?prefetch_query_result_parts=bad")
 	require.Error(t, err)
 	require.ErrorContains(t, err, "invalid prefetch_query_result_parts: bad")
+}
+
+func TestParseInvalidDefaultIdempotent(t *testing.T) {
+	_, err := parseConnectionString("grpc://localhost:2135/local?go_default_idempotent=bad")
+	require.Error(t, err)
+	require.ErrorContains(t, err, "invalid go_default_idempotent: bad")
 }
 
 func TestExtractTablePathPrefixFromBinderName(t *testing.T) {

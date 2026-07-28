@@ -84,6 +84,9 @@ func (c *Client) retryOptions(opts ...table.Option) *table.Options {
 			retry.WithBudget(c.config.RetryBudget()),
 		},
 	}
+	if c.config.DefaultIdempotent() {
+		options.RetryOptions = append(options.RetryOptions, retry.WithIdempotent(true))
+	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyTableOption(options)

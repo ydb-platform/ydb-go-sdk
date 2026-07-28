@@ -22,6 +22,7 @@ func TestNew(t *testing.T) {
 		require.Equal(t, time.Duration(0), cfg.PoolSessionUsageTTL())
 		require.Equal(t, time.Duration(0), cfg.SessionIdleTimeToLive())
 		require.False(t, cfg.LazyTx())
+		require.False(t, cfg.DefaultIdempotent())
 		require.Equal(t, 0, cfg.PoolWarmUpSize())
 	})
 
@@ -88,6 +89,11 @@ func TestNew(t *testing.T) {
 	t.Run("WithLazyTx", func(t *testing.T) {
 		cfg := New(WithLazyTx(true))
 		require.True(t, cfg.LazyTx())
+	})
+
+	t.Run("WithDefaultIdempotent", func(t *testing.T) {
+		cfg := New(WithDefaultIdempotent(true))
+		require.True(t, cfg.DefaultIdempotent())
 	})
 
 	t.Run("WithTrace", func(t *testing.T) {

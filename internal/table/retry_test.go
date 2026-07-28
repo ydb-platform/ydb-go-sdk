@@ -12,6 +12,7 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -209,6 +210,36 @@ func TestDoImmediateReturn(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRetryOptionsDefaultIdempotent(t *testing.T) {
+	client := &Client{
+		config: config.New(config.WithDefaultIdempotent(true)),
+	}
+
+	t.Run("disabled client default", func(t *testing.T) {
+		settings := (&Client{config: config.New()}).retryOptions()
+
+		attempts, err := runTableIdempotentRetry(settings.RetryOptions...)
+		require.Error(t, err)
+		require.Equal(t, 1, attempts)
+	})
+
+	t.Run("uses client default", func(t *testing.T) {
+		settings := client.retryOptions()
+
+		attempts, err := runTableIdempotentRetry(settings.RetryOptions...)
+		require.NoError(t, err)
+		require.Equal(t, 2, attempts)
+	})
+
+	t.Run("per-call false overrides client default", func(t *testing.T) {
+		settings := client.retryOptions(table.WithIdempotent(false))
+
+		attempts, err := runTableIdempotentRetry(settings.RetryOptions...)
+		require.Error(t, err)
+		require.Equal(t, 1, attempts)
+	})
 }
 
 // We are testing all suspentions of custom operation func against to all deadline
@@ -485,4 +516,39 @@ func (s *singleSession) With(ctx context.Context,
 	return retry.Retry(ctx, func(ctx context.Context) error {
 		return f(ctx, s.s)
 	}, opts...)
+}
+
+func runTableIdempotentRetry(opts ...retry.Option) (attempts int, err error) {
+	err = retry.Retry(context.Background(), func(context.Context) error {
+		attempts++
+		if attempts == 1 {
+			return tableIdempotentRetryableError{}
+		}
+
+		return nil
+	}, opts...)
+
+	return attempts, err
+}
+
+type tableIdempotentRetryableError struct{}
+
+func (tableIdempotentRetryableError) Error() string {
+	return "idempotent retryable error"
+}
+
+func (tableIdempotentRetryableError) Code() int32 {
+	return -1
+}
+
+func (tableIdempotentRetryableError) Name() string {
+	return "idempotent retryable error"
+}
+
+func (tableIdempotentRetryableError) Type() xerrors.Type {
+	return xerrors.TypeConditionallyRetryable
+}
+
+func (tableIdempotentRetryableError) BackoffType() backoff.Type {
+	return backoff.TypeInstant
 }
