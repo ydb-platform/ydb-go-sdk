@@ -681,7 +681,7 @@ func (s *session) DeleteSemaphore(
 	return nil
 }
 
-func (s *session) DescribeSemaphore(
+func (s *session) DescribeSemaphore( //nolint:funlen
 	ctx context.Context,
 	name string,
 	opts ...options.DescribeSemaphoreOption,
