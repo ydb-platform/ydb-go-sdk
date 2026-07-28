@@ -1,4 +1,3 @@
-## v3.146.0
 * Added Coordination semaphore watch support for `DescribeSemaphore`: `options.WithWatchData`, `options.WithWatchOwners`, and `options.WithOnChanged` ([#2257](https://github.com/ydb-platform/ydb-go-sdk/issues/2257))
 
 ## v3.145.1
