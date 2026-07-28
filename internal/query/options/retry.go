@@ -130,8 +130,17 @@ func WithLazyTx(lazyTx bool) lazyTxOption {
 	return lazyTxOption{lazyTx: lazyTx}
 }
 
-func WithIdempotent() RetryOptionsOption {
-	return []retry.Option{retry.WithIdempotent(true)}
+func WithIdempotent(bb ...bool) RetryOptionsOption {
+	idempotent := true
+	switch len(bb) {
+	case 0:
+	case 1:
+		idempotent = bb[0]
+	default:
+		panic("only one bool arg allowed")
+	}
+
+	return []retry.Option{retry.WithIdempotent(idempotent)}
 }
 
 func WithLabel(lbl string) LabelOption {

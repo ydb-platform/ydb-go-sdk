@@ -1,5 +1,8 @@
 * Added Coordination semaphore watch support for `DescribeSemaphore`: `options.WithWatchData`, `options.WithWatchOwners`, and `options.WithOnChanged` ([#2257](https://github.com/ydb-platform/ydb-go-sdk/issues/2257))
 
+## v3.146.0
+* Added `ydb.WithDefaultIdempotent(bool)` driver option
+
 ## v3.145.1
 * Fixed a TopicListener read buffer credit leak when a batch raced with partition worker shutdown
 * Fixed `WithConnectionTTL` being a no-op and restored parking of idle gRPC connections without preventing removal of nodes missing from Discovery
