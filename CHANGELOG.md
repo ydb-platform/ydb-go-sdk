@@ -1,3 +1,4 @@
+## v3.146.0
 * Added `ydb.WithDefaultIdempotent(bool)` driver option
 
 ## v3.145.1
