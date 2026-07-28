@@ -686,32 +686,76 @@ func (s *session) DescribeSemaphore(
 	name string,
 	opts ...options.DescribeSemaphoreOption,
 ) (*coordination.SemaphoreDescription, error) {
-	req := conversation.NewConversation(
-		func() *Ydb_Coordination.SessionRequest {
-			describeSemaphore := Ydb_Coordination.SessionRequest_DescribeSemaphore{
-				ReqId: newReqID(),
-				Name:  name,
-			}
-			for _, o := range opts {
-				if o != nil {
-					o(&describeSemaphore)
-				}
-			}
+	cfg := &options.DescribeSemaphoreConfig{}
+	for _, o := range opts {
+		if o != nil {
+			o(cfg)
+		}
+	}
 
-			return &Ydb_Coordination.SessionRequest{
-				Request: &Ydb_Coordination.SessionRequest_DescribeSemaphore_{
-					DescribeSemaphore: &describeSemaphore,
-				},
-			}
-		},
+	watch := cfg.WatchData || cfg.WatchOwners
+	conversationOpts := []conversation.Option{
 		conversation.WithResponseFilter(func(
 			request *Ydb_Coordination.SessionRequest,
 			response *Ydb_Coordination.SessionResponse,
 		) bool {
-			return response.GetDescribeSemaphoreResult().GetReqId() == request.GetDescribeSemaphore().GetReqId()
+			result := response.GetDescribeSemaphoreResult()
+
+			return result != nil && result.GetReqId() == request.GetDescribeSemaphore().GetReqId()
 		}),
 		conversation.WithConflictKey(name),
 		conversation.WithIdempotence(true),
+	}
+
+	if watch {
+		conversationOpts = append(conversationOpts,
+			conversation.WithKeepAlive(func(response *Ydb_Coordination.SessionResponse) bool {
+				return response.GetDescribeSemaphoreResult().GetWatchAdded()
+			}),
+			conversation.WithNotifyFilter(
+				func(
+					request *Ydb_Coordination.SessionRequest,
+					response *Ydb_Coordination.SessionResponse,
+				) bool {
+					changed := response.GetDescribeSemaphoreChanged()
+
+					return changed != nil && changed.GetReqId() == request.GetDescribeSemaphore().GetReqId()
+				},
+				func(response *Ydb_Coordination.SessionResponse) {
+					if cfg.OnChanged == nil {
+						return
+					}
+
+					changed := response.GetDescribeSemaphoreChanged()
+					triggered := (cfg.WatchData && changed.GetDataChanged()) ||
+						(cfg.WatchOwners && changed.GetOwnersChanged())
+					cfg.OnChanged(triggered)
+				},
+			),
+			conversation.WithOnAbandoned(func() {
+				if cfg.OnChanged != nil {
+					cfg.OnChanged(false)
+				}
+			}),
+		)
+	}
+
+	req := conversation.NewConversation(
+		func() *Ydb_Coordination.SessionRequest {
+			return &Ydb_Coordination.SessionRequest{
+				Request: &Ydb_Coordination.SessionRequest_DescribeSemaphore_{
+					DescribeSemaphore: &Ydb_Coordination.SessionRequest_DescribeSemaphore{
+						ReqId:          newReqID(),
+						Name:           name,
+						IncludeOwners:  cfg.IncludeOwners,
+						IncludeWaiters: cfg.IncludeWaiters,
+						WatchData:      cfg.WatchData,
+						WatchOwners:    cfg.WatchOwners,
+					},
+				},
+			}
+		},
+		conversationOpts...,
 	)
 	if err := s.controller.PushBack(req); err != nil {
 		return nil, err

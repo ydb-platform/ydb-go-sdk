@@ -156,7 +156,7 @@ type UpdateSemaphoreOption func(c *Ydb_Coordination.SessionRequest_UpdateSemapho
 // WithDescribeOwners return a DescribeSemaphoreOption which causes server send the list of owners in the response
 // to the DescribeSemaphore request.
 func WithDescribeOwners(describeOwners bool) DescribeSemaphoreOption {
-	return func(c *Ydb_Coordination.SessionRequest_DescribeSemaphore) {
+	return func(c *DescribeSemaphoreConfig) {
 		c.IncludeOwners = describeOwners
 	}
 }
@@ -164,10 +164,49 @@ func WithDescribeOwners(describeOwners bool) DescribeSemaphoreOption {
 // WithDescribeWaiters return a DescribeSemaphoreOption which causes server send the list of waiters in the response
 // to the DescribeSemaphore request.
 func WithDescribeWaiters(describeWaiters bool) DescribeSemaphoreOption {
-	return func(c *Ydb_Coordination.SessionRequest_DescribeSemaphore) {
+	return func(c *DescribeSemaphoreConfig) {
 		c.IncludeWaiters = describeWaiters
 	}
 }
 
-// DescribeSemaphoreOption configures how we update a semaphore.
-type DescribeSemaphoreOption func(c *Ydb_Coordination.SessionRequest_DescribeSemaphore)
+// WithWatchData returns a DescribeSemaphoreOption which creates a one-shot watch for semaphore data changes.
+// When the data changes (or the watch is invalidated), OnChanged is called if configured via WithOnChanged.
+func WithWatchData(watchData bool) DescribeSemaphoreOption {
+	return func(c *DescribeSemaphoreConfig) {
+		c.WatchData = watchData
+	}
+}
+
+// WithWatchOwners returns a DescribeSemaphoreOption which creates a one-shot watch for semaphore owners changes.
+// When owners change (or the watch is invalidated), OnChanged is called if configured via WithOnChanged.
+func WithWatchOwners(watchOwners bool) DescribeSemaphoreOption {
+	return func(c *DescribeSemaphoreConfig) {
+		c.WatchOwners = watchOwners
+	}
+}
+
+// WithOnChanged returns a DescribeSemaphoreOption which registers a callback for a semaphore watch created by
+// WithWatchData and/or WithWatchOwners.
+//
+// The callback is invoked at most once:
+//   - triggered=true: watched data and/or owners changed;
+//   - triggered=false: false wake (subscription replaced, stream lost, leader change, etc.).
+//
+// After the callback, call DescribeSemaphore again with watch options to restore the subscription.
+func WithOnChanged(onChanged func(triggered bool)) DescribeSemaphoreOption {
+	return func(c *DescribeSemaphoreConfig) {
+		c.OnChanged = onChanged
+	}
+}
+
+// DescribeSemaphoreConfig configures a DescribeSemaphore call, including optional watch settings.
+type DescribeSemaphoreConfig struct {
+	IncludeOwners  bool
+	IncludeWaiters bool
+	WatchData      bool
+	WatchOwners    bool
+	OnChanged      func(triggered bool)
+}
+
+// DescribeSemaphoreOption configures how we describe a semaphore.
+type DescribeSemaphoreOption func(c *DescribeSemaphoreConfig)

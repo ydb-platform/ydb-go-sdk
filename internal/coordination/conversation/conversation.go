@@ -120,6 +120,10 @@ type Conversation struct {
 	message           func() *Ydb_Coordination.SessionRequest
 	responseFilter    ResponseFilter
 	acknowledgeFilter ResponseFilter
+	keepAlive         func(response *Ydb_Coordination.SessionResponse) bool
+	notifyFilter      ResponseFilter
+	onNotify          func(response *Ydb_Coordination.SessionResponse)
+	onAbandoned       func()
 	cancelMessage     func(req *Ydb_Coordination.SessionRequest) *Ydb_Coordination.SessionRequest
 	cancelFilter      ResponseFilter
 	conflictKey       string
@@ -130,6 +134,7 @@ type Conversation struct {
 	done              chan struct{}
 	idempotent        bool
 	canceled          bool
+	resultDelivered   bool
 }
 
 // NewController creates a new conversation controller. You usually have one controller per one session.
@@ -143,9 +148,38 @@ func NewController() *Controller {
 // WithResponseFilter returns an Option that specifies the filter function that is used to detect the last response
 // message in the conversation. If such a message was found, the conversation is immediately ended and the response
 // becomes available by the Conversation.Await method.
+//
+// When used together with WithKeepAlive, Await still completes on the matching response, but the conversation may stay
+// in the queue until a later notify message (see WithNotifyFilter) or until it is abandoned.
 func WithResponseFilter(filter ResponseFilter) Option {
 	return func(c *Conversation) {
 		c.responseFilter = filter
+	}
+}
+
+// WithKeepAlive returns an Option that keeps the conversation in the queue after a responseFilter match when keepAlive
+// returns true for that response. The conflict key is cleared either way so a superseding conversation with the same
+// key can be sent. Await completes on the responseFilter match regardless of keepAlive.
+func WithKeepAlive(keepAlive func(response *Ydb_Coordination.SessionResponse) bool) Option {
+	return func(c *Conversation) {
+		c.keepAlive = keepAlive
+	}
+}
+
+// WithNotifyFilter returns an Option that handles a post-result notification for a conversation kept alive after its
+// responseFilter match. When the filter matches, onNotify is invoked (if non-nil) and the conversation is removed.
+func WithNotifyFilter(filter ResponseFilter, onNotify func(response *Ydb_Coordination.SessionResponse)) Option {
+	return func(c *Conversation) {
+		c.notifyFilter = filter
+		c.onNotify = onNotify
+	}
+}
+
+// WithOnAbandoned returns an Option that registers a callback invoked when a conversation that already delivered its
+// Await result is removed without a notify match (for example on session close or stream detach).
+func WithOnAbandoned(onAbandoned func()) Option {
+	return func(c *Conversation) {
+		c.onAbandoned = onAbandoned
 	}
 }
 
@@ -276,7 +310,7 @@ func (c *Controller) sendFront() *Ydb_Coordination.SessionRequest {
 		if req.conflictKey != "" {
 			c.conflicts[req.conflictKey] = struct{}{}
 		}
-		if req.responseFilter == nil && req.acknowledgeFilter == nil {
+		if req.responseFilter == nil && req.acknowledgeFilter == nil && req.notifyFilter == nil {
 			c.queue = append(c.queue[:i], c.queue[i+1:]...)
 		}
 		c.notify()
@@ -337,6 +371,24 @@ func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool {
 					notify = true
 				}
 
+				if req.keepAlive == nil || !req.keepAlive(resp) {
+					c.queue = append(c.queue[:i], c.queue[i+1:]...)
+				}
+			}
+
+			handled = true
+		case req.notifyFilter != nil && req.notifyFilter(req.requestSent, resp):
+			if !req.canceled {
+				if req.onNotify != nil {
+					req.onNotify(resp)
+				}
+				req.onAbandoned = nil
+
+				if req.conflictKey != "" {
+					delete(c.conflicts, req.conflictKey)
+					notify = true
+				}
+
 				c.queue = append(c.queue[:i], c.queue[i+1:]...)
 			}
 
@@ -369,12 +421,22 @@ func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool {
 
 // OnDetach fails all non-idempotent conversations if there are any in the queue. You should call this method when the
 // underlying gRPC stream of the session is closed.
+//
+// Conversations that already delivered an Await result and are waiting for a notify (for example an active semaphore
+// watch) are abandoned: onAbandoned is invoked and they are removed instead of being retried on the next attach.
 func (c *Controller) OnDetach() {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	for i := len(c.queue) - 1; i >= 0; i-- {
 		req := c.queue[i]
+		if req.resultDelivered && req.notifyFilter != nil {
+			c.abandon(req)
+			c.queue = append(c.queue[:i], c.queue[i+1:]...)
+
+			continue
+		}
+
 		if !req.idempotent {
 			req.fail(coordination.ErrOperationStatusUnknown)
 
@@ -397,6 +459,12 @@ func (c *Controller) Close(byeConversation *Conversation) {
 
 	for i := len(c.queue) - 1; i >= 0; i-- {
 		req := c.queue[i]
+		if req.resultDelivered {
+			c.abandon(req)
+
+			continue
+		}
+
 		if !req.canceled {
 			req.fail(coordination.ErrSessionClosed)
 		}
@@ -408,6 +476,17 @@ func (c *Controller) Close(byeConversation *Conversation) {
 	}
 
 	c.notify()
+}
+
+func (c *Controller) abandon(req *Conversation) {
+	if req.onAbandoned != nil {
+		req.onAbandoned()
+		req.onAbandoned = nil
+	}
+
+	if req.requestSent != nil && req.conflictKey != "" {
+		delete(c.conflicts, req.conflictKey)
+	}
 }
 
 // OnAttach retries all idempotent conversations if there are any in the queue. You should call this method when the
@@ -507,16 +586,31 @@ func (c *Conversation) sendCancel() {
 }
 
 func (c *Conversation) succeed(response *Ydb_Coordination.SessionResponse) {
+	if c.resultDelivered {
+		return
+	}
+
+	c.resultDelivered = true
 	c.response = response
 	close(c.done)
 }
 
 func (c *Conversation) fail(err error) {
+	if c.resultDelivered {
+		return
+	}
+
 	c.responseErr = err
 	close(c.done)
 }
 
 func (c *Conversation) cancel() {
+	if c.resultDelivered {
+		c.canceled = true
+
+		return
+	}
+
 	c.canceled = true
 	close(c.done)
 }

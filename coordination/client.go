@@ -90,7 +90,13 @@ type Session interface {
 
 	// DescribeSemaphore returns the state of the semaphore.
 	//
-	// This method is idempotent. The client will automatically retry in the case of network or server failure.
+	// Optionally create a one-shot watch with options.WithWatchData / options.WithWatchOwners and receive a
+	// notification via options.WithOnChanged. After OnChanged (including false wakes), call DescribeSemaphore again
+	// to restore the subscription. See coordination service docs for watch semantics.
+	//
+	// This method is idempotent. The client will automatically retry in the case of network or server failure until
+	// the describe result is received. An active watch is not automatically restored after stream loss; OnChanged is
+	// invoked with triggered=false instead.
 	DescribeSemaphore(
 		ctx context.Context,
 		name string,
