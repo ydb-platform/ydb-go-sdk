@@ -1012,4 +1012,51 @@ func TestDescribeSemaphoreWatch(t *testing.T) {
 		})
 		require.False(t, handled)
 	})
+
+	t.Run("SucceedFailCancelAfterResultDelivered", func(t *testing.T) {
+		controller := NewController()
+		var onChanged []bool
+		conv := newDescribeConversation(8, &onChanged)
+		require.NoError(t, controller.PushBack(conv))
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		_, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.True(t, controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult_{
+				DescribeSemaphoreResult: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult{
+					ReqId:      8,
+					WatchAdded: true,
+				},
+			},
+		}))
+		_, err = controller.Await(ctx, conv)
+		require.NoError(t, err)
+
+		// Duplicate result must be ignored after Await completed.
+		require.True(t, controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult_{
+				DescribeSemaphoreResult: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult{
+					ReqId:      8,
+					WatchAdded: true,
+				},
+			},
+		}))
+
+		conv.fail(coordination.ErrSessionClosed) // no-op after resultDelivered
+		conv.cancel()                            // marks canceled without closing done twice
+		require.True(t, conv.canceled)
+
+		require.True(t, controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged_{
+				DescribeSemaphoreChanged: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged{
+					ReqId:       8,
+					DataChanged: true,
+				},
+			},
+		}))
+		require.Empty(t, onChanged) // canceled watch does not invoke onNotify
+	})
 }
