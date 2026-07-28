@@ -19,6 +19,15 @@ func TestDefaultIdempotentOptions(t *testing.T) {
 		config: config.New(config.WithDefaultIdempotent(true)),
 	}
 
+	t.Run("disabled default does not add options", func(t *testing.T) {
+		client := &Client{
+			config: config.New(),
+		}
+
+		require.Empty(t, client.withDefaultRetryOptions())
+		require.Empty(t, client.withDefaultExecuteOptions())
+	})
+
 	t.Run("Do uses client default", func(t *testing.T) {
 		attempts, err := runIdempotentRetry(client.withDefaultRetryOptions()...)
 		require.NoError(t, err)

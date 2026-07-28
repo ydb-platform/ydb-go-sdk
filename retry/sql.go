@@ -262,8 +262,8 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 func appendDefaultIdempotentOption(db *sql.DB, options []Option) []Option {
 	if provider, has := db.Driver().(interface {
 		DefaultIdempotent() bool
-	}); has {
-		return append(options, WithIdempotent(provider.DefaultIdempotent()))
+	}); has && provider.DefaultIdempotent() {
+		return append(options, WithIdempotent(true))
 	}
 
 	return options

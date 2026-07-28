@@ -217,6 +217,14 @@ func TestRetryOptionsDefaultIdempotent(t *testing.T) {
 		config: config.New(config.WithDefaultIdempotent(true)),
 	}
 
+	t.Run("disabled client default", func(t *testing.T) {
+		settings := (&Client{config: config.New()}).retryOptions()
+
+		attempts, err := runTableIdempotentRetry(settings.RetryOptions...)
+		require.Error(t, err)
+		require.Equal(t, 1, attempts)
+	})
+
 	t.Run("uses client default", func(t *testing.T) {
 		settings := client.retryOptions()
 

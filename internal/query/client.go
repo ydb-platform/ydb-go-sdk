@@ -349,15 +349,23 @@ func do(
 }
 
 func (c *Client) withDefaultRetryOptions(opts ...retry.Option) []retry.Option {
+	if !c.config.DefaultIdempotent() {
+		return opts
+	}
+
 	return append(
-		[]retry.Option{retry.WithIdempotent(c.config.DefaultIdempotent())},
+		[]retry.Option{retry.WithIdempotent(true)},
 		opts...,
 	)
 }
 
 func (c *Client) withDefaultExecuteOptions(opts ...options.Execute) []options.Execute {
+	if !c.config.DefaultIdempotent() {
+		return opts
+	}
+
 	return append(
-		[]options.Execute{options.WithIdempotent(c.config.DefaultIdempotent())},
+		[]options.Execute{options.WithIdempotent(true)},
 		opts...,
 	)
 }
