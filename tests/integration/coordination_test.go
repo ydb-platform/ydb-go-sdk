@@ -160,13 +160,12 @@ func TestCoordinationSemaphoreWatch(sourceTest *testing.T) {
 			require.NoError(t, s.DeleteSemaphore(ctx, semaphoreName, options.WithForceDelete(true)))
 		}()
 
-		changed := make(chan bool, 1)
+		changed := make(chan options.SemaphoreWatchEvent, 1)
 		desc, err := s.DescribeSemaphore(
 			ctx,
 			semaphoreName,
-			options.WithWatchData(true),
-			options.WithOnChanged(func(triggered bool) {
-				changed <- triggered
+			options.WithSemaphoreWatch(options.WatchData, func(event options.SemaphoreWatchEvent) {
+				changed <- event
 			}),
 		)
 		require.NoError(t, err)
@@ -176,8 +175,8 @@ func TestCoordinationSemaphoreWatch(sourceTest *testing.T) {
 		lease, err := s.AcquireSemaphore(ctx, semaphoreName, 1)
 		require.NoError(t, err)
 		select {
-		case triggered := <-changed:
-			t.Fatalf("unexpected watch notification after acquire: triggered=%v", triggered)
+		case event := <-changed:
+			t.Fatalf("unexpected watch notification after acquire: %+v", event)
 		case <-time.After(50 * time.Millisecond):
 		}
 
@@ -190,8 +189,10 @@ func TestCoordinationSemaphoreWatch(sourceTest *testing.T) {
 		}()
 
 		select {
-		case triggered := <-changed:
-			require.True(t, triggered)
+		case event := <-changed:
+			require.True(t, event.DataChanged)
+			require.False(t, event.OwnersChanged)
+			require.False(t, event.Lost)
 		case <-time.After(5 * time.Second):
 			t.Fatal("timed out waiting for WatchData notification")
 		}
@@ -210,13 +211,12 @@ func TestCoordinationSemaphoreWatch(sourceTest *testing.T) {
 			require.NoError(t, s.DeleteSemaphore(ctx, semaphoreName, options.WithForceDelete(true)))
 		}()
 
-		changed := make(chan bool, 1)
+		changed := make(chan options.SemaphoreWatchEvent, 1)
 		desc, err := s.DescribeSemaphore(
 			ctx,
 			semaphoreName,
-			options.WithWatchOwners(true),
-			options.WithOnChanged(func(triggered bool) {
-				changed <- triggered
+			options.WithSemaphoreWatch(options.WatchOwners, func(event options.SemaphoreWatchEvent) {
+				changed <- event
 			}),
 		)
 		require.NoError(t, err)
@@ -229,8 +229,8 @@ func TestCoordinationSemaphoreWatch(sourceTest *testing.T) {
 			options.WithUpdateData([]byte("some data")),
 		))
 		select {
-		case triggered := <-changed:
-			t.Fatalf("unexpected watch notification after update: triggered=%v", triggered)
+		case event := <-changed:
+			t.Fatalf("unexpected watch notification after update: %+v", event)
 		case <-time.After(50 * time.Millisecond):
 		}
 
@@ -241,8 +241,10 @@ func TestCoordinationSemaphoreWatch(sourceTest *testing.T) {
 		}()
 
 		select {
-		case triggered := <-changed:
-			require.True(t, triggered)
+		case event := <-changed:
+			require.True(t, event.OwnersChanged)
+			require.False(t, event.DataChanged)
+			require.False(t, event.Lost)
 		case <-time.After(5 * time.Second):
 			t.Fatal("timed out waiting for WatchOwners notification")
 		}
@@ -251,31 +253,31 @@ func TestCoordinationSemaphoreWatch(sourceTest *testing.T) {
 	t.Run("WatchReplace", func(t *testing.T) {
 		require.NoError(t, s.CreateSemaphore(ctx, semaphoreName, 5))
 
-		changed1 := make(chan bool, 1)
+		changed1 := make(chan options.SemaphoreWatchEvent, 1)
 		_, err := s.DescribeSemaphore(
 			ctx,
 			semaphoreName,
-			options.WithWatchOwners(true),
-			options.WithOnChanged(func(triggered bool) {
-				changed1 <- triggered
+			options.WithSemaphoreWatch(options.WatchOwners, func(event options.SemaphoreWatchEvent) {
+				changed1 <- event
 			}),
 		)
 		require.NoError(t, err)
 
-		changed2 := make(chan bool, 1)
+		changed2 := make(chan options.SemaphoreWatchEvent, 1)
 		_, err = s.DescribeSemaphore(
 			ctx,
 			semaphoreName,
-			options.WithWatchOwners(true),
-			options.WithOnChanged(func(triggered bool) {
-				changed2 <- triggered
+			options.WithSemaphoreWatch(options.WatchOwners, func(event options.SemaphoreWatchEvent) {
+				changed2 <- event
 			}),
 		)
 		require.NoError(t, err)
 
 		select {
-		case triggered := <-changed1:
-			require.False(t, triggered, "replaced watch must get a false wake")
+		case event := <-changed1:
+			require.True(t, event.Lost, "replaced watch must get a lost/false wake")
+			require.False(t, event.DataChanged)
+			require.False(t, event.OwnersChanged)
 		case <-time.After(5 * time.Second):
 			t.Fatal("timed out waiting for replaced watch false wake")
 		}
@@ -285,8 +287,9 @@ func TestCoordinationSemaphoreWatch(sourceTest *testing.T) {
 		}()
 
 		select {
-		case triggered := <-changed2:
-			require.True(t, triggered)
+		case event := <-changed2:
+			require.True(t, event.OwnersChanged)
+			require.False(t, event.Lost)
 		case <-time.After(5 * time.Second):
 			t.Fatal("timed out waiting for second watch notification after delete")
 		}

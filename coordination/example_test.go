@@ -197,13 +197,12 @@ func Example_semaphoreWatch() {
 		_ = s.DeleteSemaphore(ctx, semaphoreName, options.WithForceDelete(true))
 	}()
 
-	changed := make(chan bool, 1)
+	changed := make(chan options.SemaphoreWatchEvent, 1)
 	desc, err := s.DescribeSemaphore(
 		ctx,
 		semaphoreName,
-		options.WithWatchData(true),
-		options.WithOnChanged(func(triggered bool) {
-			changed <- triggered
+		options.WithSemaphoreWatch(options.WatchData, func(event options.SemaphoreWatchEvent) {
+			changed <- event
 		}),
 	)
 	if err != nil {
@@ -213,7 +212,7 @@ func Example_semaphoreWatch() {
 	}
 	fmt.Printf("watching semaphore %q, data=%q\n", desc.Name, desc.Data)
 
-	// Update semaphore data in parallel; the watch callback should observe the change.
+	// Update semaphore data in parallel; the one-shot watch handler should observe the change.
 	go func() {
 		updateErr := s.UpdateSemaphore(
 			ctx,
@@ -226,8 +225,9 @@ func Example_semaphoreWatch() {
 	}()
 
 	select {
-	case triggered := <-changed:
-		fmt.Printf("watcher notified: triggered=%v\n", triggered)
+	case event := <-changed:
+		fmt.Printf("watcher notified: dataChanged=%v ownersChanged=%v lost=%v\n",
+			event.DataChanged, event.OwnersChanged, event.Lost)
 	case <-ctx.Done():
 		fmt.Printf("watch timed out: %v\n", ctx.Err())
 

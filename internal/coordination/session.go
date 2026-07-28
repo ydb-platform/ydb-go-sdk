@@ -693,7 +693,7 @@ func (s *session) DescribeSemaphore(
 		}
 	}
 
-	watch := cfg.WatchData || cfg.WatchOwners
+	watch := cfg.OneShotHandler != nil && (cfg.WatchData || cfg.WatchOwners)
 	conversationOpts := []conversation.Option{
 		conversation.WithResponseFilter(func(
 			request *Ydb_Coordination.SessionRequest,
@@ -708,6 +708,7 @@ func (s *session) DescribeSemaphore(
 	}
 
 	if watch {
+		oneShotHandler := cfg.OneShotHandler
 		conversationOpts = append(conversationOpts,
 			conversation.WithKeepAlive(func(response *Ydb_Coordination.SessionResponse) bool {
 				return response.GetDescribeSemaphoreResult().GetWatchAdded()
@@ -722,20 +723,17 @@ func (s *session) DescribeSemaphore(
 					return changed != nil && changed.GetReqId() == request.GetDescribeSemaphore().GetReqId()
 				},
 				func(response *Ydb_Coordination.SessionResponse) {
-					if cfg.OnChanged == nil {
-						return
-					}
-
 					changed := response.GetDescribeSemaphoreChanged()
-					triggered := (cfg.WatchData && changed.GetDataChanged()) ||
-						(cfg.WatchOwners && changed.GetOwnersChanged())
-					cfg.OnChanged(triggered)
+					event := options.SemaphoreWatchEvent{
+						DataChanged:   cfg.WatchData && changed.GetDataChanged(),
+						OwnersChanged: cfg.WatchOwners && changed.GetOwnersChanged(),
+					}
+					event.Lost = !event.DataChanged && !event.OwnersChanged
+					oneShotHandler(event)
 				},
 			),
 			conversation.WithOnAbandoned(func() {
-				if cfg.OnChanged != nil {
-					cfg.OnChanged(false)
-				}
+				oneShotHandler(options.SemaphoreWatchEvent{Lost: true})
 			}),
 		)
 	}
@@ -749,8 +747,8 @@ func (s *session) DescribeSemaphore(
 						Name:           name,
 						IncludeOwners:  cfg.IncludeOwners,
 						IncludeWaiters: cfg.IncludeWaiters,
-						WatchData:      cfg.WatchData,
-						WatchOwners:    cfg.WatchOwners,
+						WatchData:      watch && cfg.WatchData,
+						WatchOwners:    watch && cfg.WatchOwners,
 					},
 				},
 			}

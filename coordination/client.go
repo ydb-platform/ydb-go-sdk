@@ -90,13 +90,13 @@ type Session interface {
 
 	// DescribeSemaphore returns the state of the semaphore.
 	//
-	// Optionally create a one-shot watch with options.WithWatchData / options.WithWatchOwners and receive a
-	// notification via options.WithOnChanged. After OnChanged (including false wakes), call DescribeSemaphore again
-	// to restore the subscription. See coordination service docs for watch semantics.
+	// Optionally create a one-shot watch with options.WithSemaphoreWatch. The registered oneShotHandler is invoked
+	// at most once; after it runs (including on Lost), call DescribeSemaphore again with WithSemaphoreWatch to
+	// restore the subscription. See coordination service docs for watch semantics.
 	//
 	// This method is idempotent. The client will automatically retry in the case of network or server failure until
-	// the describe result is received. An active watch is not automatically restored after stream loss; OnChanged is
-	// invoked with triggered=false instead.
+	// the describe result is received. An active watch is not automatically restored after stream loss; oneShotHandler
+	// is invoked with SemaphoreWatchEvent.Lost=true instead.
 	DescribeSemaphore(
 		ctx context.Context,
 		name string,
