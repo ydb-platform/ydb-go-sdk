@@ -180,13 +180,15 @@ func TestCoordinationSemaphoreWatch(sourceTest *testing.T) {
 		case <-time.After(50 * time.Millisecond):
 		}
 
-		go func() {
-			require.NoError(t, s.UpdateSemaphore(
-				ctx,
-				semaphoreName,
-				options.WithUpdateData([]byte("some data")),
-			))
-		}()
+		// Trigger the watch synchronously from the test goroutine. The watch
+		// notification is delivered by the session receive loop into the
+		// buffered channel independently, so this cannot deadlock, and keeping
+		// require out of a goroutine avoids failing the test after it returns.
+		require.NoError(t, s.UpdateSemaphore(
+			ctx,
+			semaphoreName,
+			options.WithUpdateData([]byte("some data")),
+		))
 
 		select {
 		case event := <-changed:
@@ -234,11 +236,12 @@ func TestCoordinationSemaphoreWatch(sourceTest *testing.T) {
 		case <-time.After(50 * time.Millisecond):
 		}
 
-		go func() {
-			lease, acquireErr := s.AcquireSemaphore(ctx, semaphoreName, 1)
-			require.NoError(t, acquireErr)
-			require.NoError(t, lease.Release())
-		}()
+		// The owners watch is one-shot: Acquire fires it once, and Release does
+		// not fire it again, so running this synchronously keeps require in the
+		// test goroutine without blocking the session receive loop.
+		lease, err := s.AcquireSemaphore(ctx, semaphoreName, 1)
+		require.NoError(t, err)
+		require.NoError(t, lease.Release())
 
 		select {
 		case event := <-changed:
@@ -282,9 +285,10 @@ func TestCoordinationSemaphoreWatch(sourceTest *testing.T) {
 			t.Fatal("timed out waiting for replaced watch false wake")
 		}
 
-		go func() {
-			require.NoError(t, s.DeleteSemaphore(ctx, semaphoreName, options.WithForceDelete(true)))
-		}()
+		// Delete synchronously so the require stays in the test goroutine; the
+		// resulting owners-changed notification is delivered into changed2 by
+		// the session receive loop.
+		require.NoError(t, s.DeleteSemaphore(ctx, semaphoreName, options.WithForceDelete(true)))
 
 		select {
 		case event := <-changed2:
