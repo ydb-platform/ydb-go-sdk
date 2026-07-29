@@ -14,6 +14,7 @@ type Config struct {
 	AllowFallback   bool
 	SingleConn      bool
 	DetectNearestDC bool
+	MaxConnections  int // 0 means unlimited
 }
 
 func (c Config) String() string {

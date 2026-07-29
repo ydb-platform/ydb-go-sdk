@@ -26,6 +26,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -77,6 +78,15 @@ type Balancer struct {
 	localDCDetector func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
 	connectionsState atomic.Pointer[connectionsState]
+
+	// rnd is used for random selection of endpoints
+	rnd xrand.Rand
+
+	// lastDiscovered stores the last discovered endpoints for reference
+	lastDiscovered []endpoint.Endpoint
+
+	// selfLocation stores the detected local DC
+	selfLocation string
 
 	closeMu sync.Mutex
 	closed  bool
@@ -223,31 +233,6 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 	return nil
 }
 
-func nextState(ctx context.Context, pool interface {
-	Get(e endpoint.Endpoint) conn.Conn
-	Put(ctx context.Context, cc conn.Conn)
-}, quarantine []conn.Conn, active []conn.Conn, endpoints []endpoint.Endpoint) (
-	newQuarantine []conn.Conn,
-	newActive []conn.Conn,
-) {
-	newActive = xslices.Filter(
-		xslices.Transform(endpoints, func(e endpoint.Endpoint) conn.Conn {
-			return pool.Get(e)
-		}),
-		func(cc conn.Conn) bool { return cc != nil },
-	)
-
-	for _, cc := range quarantine {
-		pool.Put(ctx, cc)
-	}
-
-	for _, cc := range newActive {
-		cc.Unban(ctx)
-	}
-
-	return active, newActive
-}
-
 // releaseStateConns releases connections from state
 //
 // quarantine refs were acquired in discovery round N-1,
@@ -267,15 +252,6 @@ func (b *Balancer) releaseStateConns(ctx context.Context, state *connectionsStat
 }
 
 func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
-	b.closeMu.Lock()
-	defer b.closeMu.Unlock()
-
-	if b.closed {
-		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
-
-		return
-	}
-
 	var (
 		onDone = gtrace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
@@ -284,20 +260,13 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 			b.balancerConfig.DetectNearestDC,
 			b.driverConfig.Database(),
 		)
-		state      = b.connectionsState.Load()
-		active     []conn.Conn
-		quarantine []conn.Conn
+		active, quarantine, connections []conn.Conn
+		selected                        []endpoint.Endpoint
 	)
-
-	if state != nil {
-		active = state.All()
-		quarantine = state.quarantine
-	}
-
 	defer func() {
 		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
 			return cc.Endpoint()
-		}), endpoints, endpoint.Compare)
+		}), selected, endpoint.Compare)
 
 		onDone(
 			xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
@@ -307,8 +276,34 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 		)
 	}()
 
-	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
 
+	if b.closed {
+		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
+
+		return
+	}
+
+	state := b.connectionsState.Load()
+	if state != nil {
+		active = state.All()
+		quarantine = state.quarantine
+	}
+
+	selected = selectEndpoints(
+		active,
+		endpoints,
+		b.balancerConfig.MaxConnections,
+		b.balancerConfig.Filter,
+		balancerConfig.Info{SelfLocation: localDC},
+		b.balancerConfig.AllowFallback,
+		b.rnd,
+	)
+	quarantine, connections = state.ApplyDiscovery(ctx, b.pool, selected, quarantine)
+
+	b.lastDiscovered = append([]endpoint.Endpoint(nil), endpoints...)
+	b.selfLocation = localDC
 	b.connectionsState.Store(
 		newConnectionsState(connections,
 			b.balancerConfig.Filter,
@@ -428,6 +423,9 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	} else {
 		b.balancerConfig = *config
 	}
+
+	// Initialize random generator for endpoint selection
+	b.rnd = xrand.New(xrand.WithLock())
 
 	if b.balancerConfig.SingleConn {
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{

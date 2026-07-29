@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 )
 
 type connectionsState struct {
@@ -66,6 +67,16 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 		return c, 0
 	}
 	if _, hasNode := endpoint.ContextNodeID(ctx); hasNode && !endpoint.ContextFallback(ctx) {
+		return nil, 0
+	}
+
+	return s.GetConnectionUnpinned(ctx)
+}
+
+// GetConnectionUnpinned selects a connection without checking context node pin.
+// Use when the caller already handled (or skipped) pin affinity.
+func (s *connectionsState) GetConnectionUnpinned(ctx context.Context) (_ conn.Conn, failedCount int) {
+	if err := ctx.Err(); err != nil {
 		return nil, 0
 	}
 
@@ -137,6 +148,39 @@ func (s *connectionsState) selectRandomConnection(conns []conn.Conn, allowBanned
 	return nil, failedConns
 }
 
+// ApplyDiscovery updates the connection state after a discovery round.
+// It gets connections for selected endpoints, puts quarantined ones back,
+// and unbans the new active connections.
+func (s *connectionsState) ApplyDiscovery(
+	ctx context.Context,
+	pool poolInterface,
+	selected []endpoint.Endpoint,
+	quarantine []conn.Conn,
+) (newQuarantine []conn.Conn, newActive []conn.Conn) {
+	newActive = xslices.Filter(
+		xslices.Transform(selected, func(e endpoint.Endpoint) conn.Conn {
+			return pool.Get(e)
+		}),
+		func(cc conn.Conn) bool { return cc != nil },
+	)
+
+	for _, cc := range quarantine {
+		pool.Put(ctx, cc)
+	}
+
+	for _, cc := range newActive {
+		cc.Unban(ctx)
+	}
+
+	return quarantine, newActive
+}
+
+// poolInterface abstracts conn.Pool for testing and discovery state updates.
+type poolInterface interface {
+	Get(e endpoint.Endpoint) conn.Conn
+	Put(ctx context.Context, cc conn.Conn)
+}
+
 func connsToNodeIDMap(conns []conn.Conn) (nodes map[uint32]conn.Conn) {
 	if len(conns) == 0 {
 		return nil
@@ -149,6 +193,8 @@ func connsToNodeIDMap(conns []conn.Conn) (nodes map[uint32]conn.Conn) {
 	return nodes
 }
 
+// sortPreferConnections sorts connections into preferred (matching filter) and fallback.
+// Uses partition() from select_endpoints.go to avoid duplication.
 func sortPreferConnections(
 	conns []conn.Conn,
 	filter balancerConfig.Filter,
@@ -159,20 +205,37 @@ func sortPreferConnections(
 		return conns, nil
 	}
 
-	prefer = make([]conn.Conn, 0, len(conns))
-	if allowFallback {
-		fallback = make([]conn.Conn, 0, len(conns))
+	// Convert connections to endpoints for partition
+	endpoints := make([]endpoint.Endpoint, len(conns))
+	for i, c := range conns {
+		endpoints[i] = c.Endpoint()
 	}
 
-	for _, c := range conns {
-		if filter.Allow(info, c.Endpoint()) {
-			prefer = append(prefer, c)
-		} else if allowFallback {
-			fallback = append(fallback, c)
+	preferred, other := partition(endpoints, filter, info)
+
+	// Convert back to connections
+	prefer = make([]conn.Conn, 0, len(preferred))
+	for _, e := range preferred {
+		prefer = append(prefer, findConnByEndpoint(conns, e))
+	}
+
+	if allowFallback {
+		fallback = make([]conn.Conn, 0, len(other))
+		for _, e := range other {
+			fallback = append(fallback, findConnByEndpoint(conns, e))
 		}
 	}
 
 	return prefer, fallback
+}
+
+func findConnByEndpoint(conns []conn.Conn, e endpoint.Endpoint) conn.Conn {
+	for _, c := range conns {
+		if c != nil && c.Endpoint().Key() == e.Key() {
+			return c
+		}
+	}
+	return nil
 }
 
 func isOkConnection(c conn.Conn, bannedIsOk bool) bool {
