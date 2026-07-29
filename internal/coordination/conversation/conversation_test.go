@@ -763,9 +763,12 @@ func TestOnRecvWithFailure(t *testing.T) {
 }
 
 func TestDescribeSemaphoreWatch(t *testing.T) {
+	// The watch handlers (onNotify/onAbandoned) are dispatched on a dedicated goroutine, so tests
+	// synchronize on a buffered channel instead of asserting a slice appended in-place. The buffer
+	// keeps the handler goroutine from blocking when a test does not consume the event.
 	newDescribeConversation := func(
 		reqID uint64,
-		onChanged *[]bool,
+		events chan<- bool,
 	) *Conversation {
 		return NewConversation(
 			func() *Ydb_Coordination.SessionRequest {
@@ -802,22 +805,44 @@ func TestDescribeSemaphoreWatch(t *testing.T) {
 				},
 				func(response *Ydb_Coordination.SessionResponse) {
 					changed := response.GetDescribeSemaphoreChanged()
-					triggered := changed.GetDataChanged() || changed.GetOwnersChanged()
-					*onChanged = append(*onChanged, triggered)
+					events <- changed.GetDataChanged() || changed.GetOwnersChanged()
 				},
 			),
 			WithOnAbandoned(func() {
-				*onChanged = append(*onChanged, false)
+				events <- false
 			}),
 			WithConflictKey("sem"),
 			WithIdempotence(true),
 		)
 	}
 
+	// recvEvent waits for a single async watch callback.
+	recvEvent := func(t *testing.T, events <-chan bool) bool {
+		t.Helper()
+		select {
+		case v := <-events:
+			return v
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for watch callback")
+
+			return false
+		}
+	}
+
+	// requireNoEvent asserts that no watch callback fires within a short window.
+	requireNoEvent := func(t *testing.T, events <-chan bool) {
+		t.Helper()
+		select {
+		case v := <-events:
+			t.Fatalf("unexpected watch callback: %v", v)
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+
 	t.Run("ResultWithoutWatchRemovesConversation", func(t *testing.T) {
 		controller := NewController()
-		var onChanged []bool
-		conv := newDescribeConversation(1, &onChanged)
+		events := make(chan bool, 8)
+		conv := newDescribeConversation(1, events)
 		require.NoError(t, controller.PushBack(conv))
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -847,13 +872,13 @@ func TestDescribeSemaphoreWatch(t *testing.T) {
 		controller.mutex.Unlock()
 		require.Equal(t, 0, queueLen)
 		require.False(t, hasConflict)
-		require.Empty(t, onChanged)
+		requireNoEvent(t, events)
 	})
 
 	t.Run("WatchAddedThenChanged", func(t *testing.T) {
 		controller := NewController()
-		var onChanged []bool
-		conv := newDescribeConversation(2, &onChanged)
+		events := make(chan bool, 8)
+		conv := newDescribeConversation(2, events)
 		require.NoError(t, controller.PushBack(conv))
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -884,8 +909,8 @@ func TestDescribeSemaphoreWatch(t *testing.T) {
 		require.False(t, hasConflict)
 
 		// Conflict cleared: a superseding describe can be sent.
-		var secondChanged []bool
-		second := newDescribeConversation(3, &secondChanged)
+		secondEvents := make(chan bool, 8)
+		second := newDescribeConversation(3, secondEvents)
 		require.NoError(t, controller.PushBack(second))
 		msg, err := controller.OnSend(ctx)
 		require.NoError(t, err)
@@ -901,7 +926,7 @@ func TestDescribeSemaphoreWatch(t *testing.T) {
 			},
 		})
 		require.True(t, handled)
-		require.Equal(t, []bool{true}, onChanged)
+		require.True(t, recvEvent(t, events))
 
 		controller.mutex.Lock()
 		queueLen = len(controller.queue)
@@ -911,8 +936,8 @@ func TestDescribeSemaphoreWatch(t *testing.T) {
 
 	t.Run("FalseWakeOnChanged", func(t *testing.T) {
 		controller := NewController()
-		var onChanged []bool
-		conv := newDescribeConversation(4, &onChanged)
+		events := make(chan bool, 8)
+		conv := newDescribeConversation(4, events)
 		require.NoError(t, controller.PushBack(conv))
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -940,13 +965,13 @@ func TestDescribeSemaphoreWatch(t *testing.T) {
 				},
 			},
 		}))
-		require.Equal(t, []bool{false}, onChanged)
+		require.False(t, recvEvent(t, events))
 	})
 
 	t.Run("AbandonedOnDetach", func(t *testing.T) {
 		controller := NewController()
-		var onChanged []bool
-		conv := newDescribeConversation(5, &onChanged)
+		events := make(chan bool, 8)
+		conv := newDescribeConversation(5, events)
 		require.NoError(t, controller.PushBack(conv))
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -971,13 +996,13 @@ func TestDescribeSemaphoreWatch(t *testing.T) {
 		queueLen := len(controller.queue)
 		controller.mutex.Unlock()
 		require.Equal(t, 0, queueLen)
-		require.Equal(t, []bool{false}, onChanged)
+		require.False(t, recvEvent(t, events))
 	})
 
 	t.Run("AbandonedOnClose", func(t *testing.T) {
 		controller := NewController()
-		var onChanged []bool
-		conv := newDescribeConversation(6, &onChanged)
+		events := make(chan bool, 8)
+		conv := newDescribeConversation(6, events)
 		require.NoError(t, controller.PushBack(conv))
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -997,7 +1022,14 @@ func TestDescribeSemaphoreWatch(t *testing.T) {
 		require.NoError(t, err)
 
 		controller.Close(nil)
-		require.Equal(t, []bool{false}, onChanged)
+		require.False(t, recvEvent(t, events))
+
+		// The abandoned conversation is removed from the queue, so a late OnRecv cannot fire the
+		// handler a second time.
+		controller.mutex.Lock()
+		queueLen := len(controller.queue)
+		controller.mutex.Unlock()
+		require.Equal(t, 0, queueLen)
 	})
 
 	t.Run("UnexpectedChangedNotHandledWithoutWatch", func(t *testing.T) {
@@ -1015,8 +1047,8 @@ func TestDescribeSemaphoreWatch(t *testing.T) {
 
 	t.Run("SucceedFailCancelAfterResultDelivered", func(t *testing.T) {
 		controller := NewController()
-		var onChanged []bool
-		conv := newDescribeConversation(8, &onChanged)
+		events := make(chan bool, 8)
+		conv := newDescribeConversation(8, events)
 		require.NoError(t, controller.PushBack(conv))
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -1057,6 +1089,94 @@ func TestDescribeSemaphoreWatch(t *testing.T) {
 				},
 			},
 		}))
-		require.Empty(t, onChanged) // canceled watch does not invoke onNotify
+		requireNoEvent(t, events) // canceled watch does not invoke onNotify
+	})
+
+	t.Run("HandlerReSubscribesWithoutDeadlock", func(t *testing.T) {
+		// Regression: a handler that re-subscribes by calling back into the controller must not
+		// deadlock. If onNotify ran under c.mutex (or on the receive goroutine), the PushBack below
+		// would block forever and OnRecv would never return.
+		controller := NewController()
+		secondEvents := make(chan bool, 8)
+		resubscribed := make(chan error, 1)
+
+		conv := NewConversation(
+			func() *Ydb_Coordination.SessionRequest {
+				return &Ydb_Coordination.SessionRequest{
+					Request: &Ydb_Coordination.SessionRequest_DescribeSemaphore_{
+						DescribeSemaphore: &Ydb_Coordination.SessionRequest_DescribeSemaphore{
+							ReqId:     9,
+							Name:      "sem",
+							WatchData: true,
+						},
+					},
+				}
+			},
+			WithResponseFilter(func(
+				request *Ydb_Coordination.SessionRequest,
+				response *Ydb_Coordination.SessionResponse,
+			) bool {
+				result := response.GetDescribeSemaphoreResult()
+
+				return result != nil && result.GetReqId() == request.GetDescribeSemaphore().GetReqId()
+			}),
+			WithKeepAlive(func(response *Ydb_Coordination.SessionResponse) bool {
+				return response.GetDescribeSemaphoreResult().GetWatchAdded()
+			}),
+			WithNotifyFilter(
+				func(
+					request *Ydb_Coordination.SessionRequest,
+					response *Ydb_Coordination.SessionResponse,
+				) bool {
+					changed := response.GetDescribeSemaphoreChanged()
+
+					return changed != nil && changed.GetReqId() == request.GetDescribeSemaphore().GetReqId()
+				},
+				func(response *Ydb_Coordination.SessionResponse) {
+					// Re-subscribe from inside the handler.
+					resubscribed <- controller.PushBack(newDescribeConversation(10, secondEvents))
+				},
+			),
+			WithConflictKey("sem"),
+			WithIdempotence(true),
+		)
+		require.NoError(t, controller.PushBack(conv))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		_, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.True(t, controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult_{
+				DescribeSemaphoreResult: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult{
+					ReqId:      9,
+					WatchAdded: true,
+				},
+			},
+		}))
+		_, err = controller.Await(ctx, conv)
+		require.NoError(t, err)
+
+		require.True(t, controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged_{
+				DescribeSemaphoreChanged: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged{
+					ReqId:       9,
+					DataChanged: true,
+				},
+			},
+		}))
+
+		select {
+		case err := <-resubscribed:
+			require.NoError(t, err)
+		case <-time.After(5 * time.Second):
+			t.Fatal("re-subscribe from watch handler deadlocked")
+		}
+
+		// The re-subscribed conversation is queued and can be sent.
+		msg, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(10), msg.GetDescribeSemaphore().GetReqId())
 	})
 }

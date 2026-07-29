@@ -197,6 +197,10 @@ type SemaphoreWatchEvent struct {
 // (including when SemaphoreWatchEvent.Lost is true), call DescribeSemaphore again with WithSemaphoreWatch to restore
 // the subscription. Continuous observation requires an explicit re-subscribe loop in application code.
 //
+// oneShotHandler runs on a dedicated goroutine, so it may re-subscribe by calling DescribeSemaphore directly from
+// inside the handler without deadlocking. A slow handler does not block the session, but it delays only its own
+// re-subscription.
+//
 // flags must include WatchData and/or WatchOwners; oneShotHandler must be non-nil. Otherwise the option is ignored.
 //
 // Lost may be delivered even when only WatchData or only WatchOwners was requested: it reports client/server

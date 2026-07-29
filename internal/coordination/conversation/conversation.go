@@ -168,6 +168,9 @@ func WithKeepAlive(keepAlive func(response *Ydb_Coordination.SessionResponse) bo
 
 // WithNotifyFilter returns an Option that handles a post-result notification for a conversation kept alive after its
 // responseFilter match. When the filter matches, onNotify is invoked (if non-nil) and the conversation is removed.
+//
+// onNotify is invoked on a dedicated goroutine, not on the receive goroutine and not under the controller lock, so it
+// is safe for the handler to call back into the controller (for example to re-subscribe).
 func WithNotifyFilter(filter ResponseFilter, onNotify func(response *Ydb_Coordination.SessionResponse)) Option {
 	return func(c *Conversation) {
 		c.notifyFilter = filter
@@ -177,6 +180,9 @@ func WithNotifyFilter(filter ResponseFilter, onNotify func(response *Ydb_Coordin
 
 // WithOnAbandoned returns an Option that registers a callback invoked when a conversation that already delivered its
 // Await result is removed without a notify match (for example on session close or stream detach).
+//
+// Like onNotify, onAbandoned is invoked on a dedicated goroutine, not under the controller lock, so it is safe for the
+// handler to call back into the controller.
 func WithOnAbandoned(onAbandoned func()) Option {
 	return func(c *Conversation) {
 		c.onAbandoned = onAbandoned
@@ -380,7 +386,12 @@ func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool { //nol
 		case req.notifyFilter != nil && req.notifyFilter(req.requestSent, resp):
 			if !req.canceled {
 				if req.onNotify != nil {
-					req.onNotify(resp)
+					// Dispatch the user handler on a separate goroutine. It must not run on the
+					// receive goroutine nor under c.mutex: the handler may call back into the
+					// session (e.g. re-subscribe via DescribeSemaphore -> PushBack), which would
+					// deadlock on c.mutex or on a nested Await waiting for this same goroutine to
+					// receive the reply. A slow handler must not stall keep-alive/reconnect/close.
+					go req.onNotify(resp)
 				}
 				req.onAbandoned = nil
 
@@ -461,6 +472,10 @@ func (c *Controller) Close(byeConversation *Conversation) {
 		req := c.queue[i]
 		if req.resultDelivered {
 			c.abandon(req)
+			// Remove abandoned conversations from the queue, same as OnDetach. Otherwise a late
+			// OnRecv racing with Close could still match notifyFilter and fire onNotify after
+			// onAbandoned already ran, violating the at-most-once guarantee.
+			c.queue = append(c.queue[:i], c.queue[i+1:]...)
 
 			continue
 		}
@@ -480,7 +495,10 @@ func (c *Controller) Close(byeConversation *Conversation) {
 
 func (c *Controller) abandon(req *Conversation) {
 	if req.onAbandoned != nil {
-		req.onAbandoned()
+		// Dispatch asynchronously for the same reason as onNotify in OnRecv: the handler may
+		// call back into the session and must not run under c.mutex or block the caller
+		// (OnDetach/Close).
+		go req.onAbandoned()
 		req.onAbandoned = nil
 	}
 
@@ -600,6 +618,9 @@ func (c *Conversation) fail(err error) {
 		return
 	}
 
+	// Set resultDelivered before closing done, mirroring succeed. Otherwise a fail -> succeed
+	// sequence on the same conversation would pass both guards and close done twice (panic).
+	c.resultDelivered = true
 	c.responseErr = err
 	close(c.done)
 }

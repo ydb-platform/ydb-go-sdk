@@ -91,8 +91,9 @@ type Session interface {
 	// DescribeSemaphore returns the state of the semaphore.
 	//
 	// Optionally create a one-shot watch with options.WithSemaphoreWatch. The registered oneShotHandler is invoked
-	// at most once; after it runs (including on Lost), call DescribeSemaphore again with WithSemaphoreWatch to
-	// restore the subscription. See coordination service docs for watch semantics.
+	// at most once, on a dedicated goroutine; after it runs (including on Lost), call DescribeSemaphore again with
+	// WithSemaphoreWatch to restore the subscription (re-subscribing from inside the handler is allowed). See
+	// coordination service docs for watch semantics.
 	//
 	// This method is idempotent. The client will automatically retry in the case of network or server failure until
 	// the describe result is received. An active watch is not automatically restored after stream loss; oneShotHandler
