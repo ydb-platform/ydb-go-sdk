@@ -156,14 +156,29 @@ type issueWithChildren interface {
 	GetIssues() []*Ydb_Issue.IssueMessage
 }
 
+const (
+	// maxIssueLogEntries limits real issues per top-level tree; the truncation marker is additional.
+	maxIssueLogEntries = 20
+	moreIssuesMessage  = "more issues omitted"
+)
+
 type issueLog struct {
-	Message  string     `json:"message"`
-	Code     uint32     `json:"code"`
-	Severity uint32     `json:"severity"`
-	Issues   []issueLog `json:"issues,omitempty"`
+	Message   string     `json:"message"`
+	Code      uint32     `json:"code"`
+	Severity  uint32     `json:"severity"`
+	Issues    []issueLog `json:"issues,omitempty"`
+	Truncated bool       `json:"truncated,omitempty"`
 }
 
-func makeIssueLog(i trace.Issue) (result issueLog) {
+func makeIssueLog(i trace.Issue) issueLog {
+	remaining := maxIssueLogEntries
+	result, _ := makeIssueLogWithLimit(i, &remaining)
+
+	return result
+}
+
+func makeIssueLogWithLimit(i trace.Issue, remaining *int) (result issueLog, truncated bool) {
+	*remaining = *remaining - 1
 	result.Message = safeIssueMessage(i)
 	result.Code = safeIssueCode(i)
 	if !isNil(i) {
@@ -171,11 +186,26 @@ func makeIssueLog(i trace.Issue) (result issueLog) {
 	}
 	if issue, ok := i.(issueWithChildren); ok {
 		for _, child := range issue.GetIssues() {
-			result.Issues = append(result.Issues, makeIssueLog(child))
+			if isNil(child) {
+				continue
+			}
+			if *remaining == 0 {
+				result.Issues = append(result.Issues, issueLog{
+					Message:   moreIssuesMessage,
+					Truncated: true,
+				})
+
+				return result, true
+			}
+			childLog, childTruncated := makeIssueLogWithLimit(child, remaining)
+			result.Issues = append(result.Issues, childLog)
+			if childTruncated {
+				return result, true
+			}
 		}
 	}
 
-	return result
+	return result, false
 }
 
 func safeConnState(s trace.ConnState) string {

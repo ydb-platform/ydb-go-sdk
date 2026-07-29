@@ -55,6 +55,25 @@ func TestDriverLogsYQLIssueWithChildren(t *testing.T) {
 	require.Len(t, records[0].fields, 3)
 }
 
+func TestMakeIssueLogLimit(t *testing.T) {
+	children := make([]*Ydb_Issue.IssueMessage, maxIssueLogEntries)
+	for i := range children {
+		children[i] = &Ydb_Issue.IssueMessage{Message: "child"}
+	}
+
+	actual := makeIssueLog(&Ydb_Issue.IssueMessage{
+		Message: "root",
+		Issues:  children,
+	})
+
+	require.Len(t, actual.Issues, maxIssueLogEntries)
+	require.Equal(t, "child", actual.Issues[maxIssueLogEntries-2].Message)
+	require.Equal(t, issueLog{
+		Message:   moreIssuesMessage,
+		Truncated: true,
+	}, actual.Issues[maxIssueLogEntries-1])
+}
+
 type logRecord struct {
 	message string
 	fields  []Field
