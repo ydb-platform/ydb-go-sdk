@@ -1,6 +1,8 @@
 package log
 
 import (
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiface"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -146,6 +148,30 @@ func safeIssueCode(i trace.Issue) uint32 {
 	}
 
 	return i.GetIssueCode()
+}
+
+type issueLog struct {
+	Message  string     `json:"message"`
+	Code     uint32     `json:"code"`
+	Severity uint32     `json:"severity"`
+	Issues   []issueLog `json:"issues,omitempty"`
+}
+
+func makeIssueLog(i trace.Issue) (result issueLog) {
+	result.Message = safeIssueMessage(i)
+	result.Code = safeIssueCode(i)
+	if !isNil(i) {
+		result.Severity = i.GetSeverity()
+	}
+	if issue, ok := i.(interface {
+		GetIssues() []*Ydb_Issue.IssueMessage
+	}); ok {
+		for _, child := range issue.GetIssues() {
+			result.Issues = append(result.Issues, makeIssueLog(child))
+		}
+	}
+
+	return result
 }
 
 func safeConnState(s trace.ConnState) string {
