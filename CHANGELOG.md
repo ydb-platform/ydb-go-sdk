@@ -1,4 +1,4 @@
-* Added opt-in balancer `MaxConnections` limit (`ydb.WithMaxConnections` / `balancers.WithMaxConnections`; default unlimited / `0`) to keep a sticky subset of discovered endpoints active — similar to ydb-python-sdk — reducing gRPC connection/goroutine growth on large clusters after `connParker` removal. Selection prefers location-filter matches (`PreferNearestDC` / `PreferLocations`). Banned connections are evicted from the limited set so slots can be reused; pin/`WithNodeID`/session affinity may soft-exceed the limit.
+* Supported the soft limit of gRPC-connections via `ydb.WithMaxConnections` / `balancers.WithMaxConnections` options. The `WithNodeID` session affinity may temporarily exceed this limit.
 
 ## v3.146.0
 * Added `ydb.WithDefaultIdempotent(bool)` driver option
