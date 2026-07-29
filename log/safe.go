@@ -1,6 +1,8 @@
 package log
 
 import (
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiface"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -146,6 +148,87 @@ func safeIssueCode(i trace.Issue) uint32 {
 	}
 
 	return i.GetIssueCode()
+}
+
+// issueWithChildren matches YDB protobuf issues carried by driver traces.
+// Other trace.Issue implementations are logged as leaf issues.
+type issueWithChildren interface {
+	GetIssues() []*Ydb_Issue.IssueMessage
+}
+
+const (
+	// maxIssueLogEntries limits all entries per top-level tree, including the truncation marker.
+	maxIssueLogEntries = 20
+	moreIssuesMessage  = "more issues omitted"
+)
+
+type issueLog struct {
+	Message   string     `json:"message"`
+	Code      uint32     `json:"code"`
+	Severity  uint32     `json:"severity"`
+	Issues    []issueLog `json:"issues,omitempty"`
+	Truncated bool       `json:"truncated,omitempty"`
+}
+
+func makeIssueLog(i trace.Issue) issueLog {
+	remaining := maxIssueLogEntries
+	countRemaining := maxIssueLogEntries
+	if issueLogExceedsLimit(i, &countRemaining) {
+		remaining--
+	}
+	result, _ := makeIssueLogWithLimit(i, &remaining)
+
+	return result
+}
+
+func issueLogExceedsLimit(i trace.Issue, remaining *int) bool {
+	if isNil(i) {
+		return false
+	}
+	if *remaining == 0 {
+		return true
+	}
+	*remaining = *remaining - 1
+	if issue, ok := i.(issueWithChildren); ok {
+		for _, child := range issue.GetIssues() {
+			if issueLogExceedsLimit(child, remaining) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func makeIssueLogWithLimit(i trace.Issue, remaining *int) (result issueLog, truncated bool) {
+	*remaining = *remaining - 1
+	result.Message = safeIssueMessage(i)
+	result.Code = safeIssueCode(i)
+	if !isNil(i) {
+		result.Severity = i.GetSeverity()
+	}
+	if issue, ok := i.(issueWithChildren); ok {
+		for _, child := range issue.GetIssues() {
+			if isNil(child) {
+				continue
+			}
+			if *remaining == 0 {
+				result.Issues = append(result.Issues, issueLog{
+					Message:   moreIssuesMessage,
+					Truncated: true,
+				})
+
+				return result, true
+			}
+			childLog, childTruncated := makeIssueLogWithLimit(child, remaining)
+			result.Issues = append(result.Issues, childLog)
+			if childTruncated {
+				return result, true
+			}
+		}
+	}
+
+	return result, false
 }
 
 func safeConnState(s trace.ConnState) string {

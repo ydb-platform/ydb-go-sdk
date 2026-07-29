@@ -1,5 +1,8 @@
 * Supported the soft limit of gRPC-connections via `ydb.WithMaxConnections` / `balancers.WithMaxConnections` options. The `WithNodeID` session affinity may temporarily exceed this limit.
 
+## v3.146.1
+* Fixed YQL issue logs to preserve the event message and include bounded nested issue details
+
 ## v3.146.0
 * Added `ydb.WithDefaultIdempotent(bool)` driver option
 
