@@ -157,7 +157,7 @@ type issueWithChildren interface {
 }
 
 const (
-	// maxIssueLogEntries limits real issues per top-level tree; the truncation marker is additional.
+	// maxIssueLogEntries limits all entries per top-level tree, including the truncation marker.
 	maxIssueLogEntries = 20
 	moreIssuesMessage  = "more issues omitted"
 )
@@ -172,9 +172,32 @@ type issueLog struct {
 
 func makeIssueLog(i trace.Issue) issueLog {
 	remaining := maxIssueLogEntries
+	countRemaining := maxIssueLogEntries
+	if issueLogExceedsLimit(i, &countRemaining) {
+		remaining--
+	}
 	result, _ := makeIssueLogWithLimit(i, &remaining)
 
 	return result
+}
+
+func issueLogExceedsLimit(i trace.Issue, remaining *int) bool {
+	if isNil(i) {
+		return false
+	}
+	if *remaining == 0 {
+		return true
+	}
+	*remaining = *remaining - 1
+	if issue, ok := i.(issueWithChildren); ok {
+		for _, child := range issue.GetIssues() {
+			if issueLogExceedsLimit(child, remaining) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func makeIssueLogWithLimit(i trace.Issue, remaining *int) (result issueLog, truncated bool) {

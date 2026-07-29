@@ -61,17 +61,24 @@ func TestMakeIssueLogLimit(t *testing.T) {
 		children[i] = &Ydb_Issue.IssueMessage{Message: "child"}
 	}
 
-	actual := makeIssueLog(&Ydb_Issue.IssueMessage{
+	atLimit := makeIssueLog(&Ydb_Issue.IssueMessage{
+		Message: "root",
+		Issues:  children[:maxIssueLogEntries-1],
+	})
+	require.Len(t, atLimit.Issues, maxIssueLogEntries-1)
+	require.Equal(t, "child", atLimit.Issues[maxIssueLogEntries-2].Message)
+
+	overLimit := makeIssueLog(&Ydb_Issue.IssueMessage{
 		Message: "root",
 		Issues:  children,
 	})
 
-	require.Len(t, actual.Issues, maxIssueLogEntries)
-	require.Equal(t, "child", actual.Issues[maxIssueLogEntries-2].Message)
+	require.Len(t, overLimit.Issues, maxIssueLogEntries-1)
+	require.Equal(t, "child", overLimit.Issues[maxIssueLogEntries-3].Message)
 	require.Equal(t, issueLog{
 		Message:   moreIssuesMessage,
 		Truncated: true,
-	}, actual.Issues[maxIssueLogEntries-1])
+	}, overLimit.Issues[maxIssueLogEntries-2])
 }
 
 type logRecord struct {
