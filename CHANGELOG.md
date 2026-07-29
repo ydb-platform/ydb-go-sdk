@@ -1,5 +1,8 @@
 * Added Coordination `DescribeSemaphore` one-shot watch via `options.WithSemaphoreWatch` ([#2257](https://github.com/ydb-platform/ydb-go-sdk/issues/2257))
 
+## v3.146.1
+* Fixed YQL issue logs to preserve the event message and include bounded nested issue details
+
 ## v3.146.0
 * Added `ydb.WithDefaultIdempotent(bool)` driver option
 

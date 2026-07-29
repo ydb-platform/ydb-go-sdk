@@ -218,8 +218,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 					l.Log(WithLevel(ctx, WARN), "YQL issue",
 						kv.String("method", method),
 						kv.String("endpoint", endpoint),
-						kv.String("message", safeIssueMessage(issue)),
-						kv.Int("code", int(safeIssueCode(issue))),
+						kv.Any("issue", makeIssueLog(issue)),
 					)
 				}
 			}
