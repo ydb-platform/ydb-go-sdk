@@ -1,3 +1,4 @@
+## v3.146.1
 * Fixed YQL issue logs to preserve the event message and include bounded nested issue details
 
 ## v3.146.0
