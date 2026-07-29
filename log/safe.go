@@ -150,6 +150,12 @@ func safeIssueCode(i trace.Issue) uint32 {
 	return i.GetIssueCode()
 }
 
+// issueWithChildren matches YDB protobuf issues carried by driver traces.
+// Other trace.Issue implementations are logged as leaf issues.
+type issueWithChildren interface {
+	GetIssues() []*Ydb_Issue.IssueMessage
+}
+
 type issueLog struct {
 	Message  string     `json:"message"`
 	Code     uint32     `json:"code"`
@@ -163,9 +169,7 @@ func makeIssueLog(i trace.Issue) (result issueLog) {
 	if !isNil(i) {
 		result.Severity = i.GetSeverity()
 	}
-	if issue, ok := i.(interface {
-		GetIssues() []*Ydb_Issue.IssueMessage
-	}); ok {
+	if issue, ok := i.(issueWithChildren); ok {
 		for _, child := range issue.GetIssues() {
 			result.Issues = append(result.Issues, makeIssueLog(child))
 		}
