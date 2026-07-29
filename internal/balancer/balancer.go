@@ -576,7 +576,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	b = &Balancer{
 		driverConfig: driverConfig,
 		pool:         pool,
-		rnd:          xrand.New(xrand.WithLock(), xrand.WithCryptoSeed()),
+		rnd:          xrand.New(xrand.WithLock()),
 		address:      "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),
