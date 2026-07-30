@@ -2,6 +2,7 @@ package xsync
 
 import (
 	"context"
+	"reflect"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
@@ -41,6 +42,10 @@ func (v *Once[T]) Close(ctx context.Context) (err error) {
 		v.mutex.RLock()
 		defer v.mutex.RUnlock()
 
+		if isNil(v.t) {
+			return nil
+		}
+
 		return v.t.Close(ctx)
 	}
 
@@ -68,4 +73,18 @@ func (v *Once[T]) Must() T {
 	}
 
 	return t
+}
+
+func isNil[T any](v T) bool {
+	value := reflect.ValueOf(v)
+	if !value.IsValid() {
+		return true
+	}
+
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
 }

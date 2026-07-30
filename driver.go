@@ -157,6 +157,24 @@ func (c *driverDiscoveryClient) Close(ctx context.Context) error {
 	return c.Client.Close(ctx)
 }
 
+func (d *Driver) cleanupConnectFailure(ctx context.Context) {
+	ctx = xcontext.ValueOnly(ctx)
+	d.ctxCancel()
+
+	if d.table != nil {
+		_ = d.table.Close(ctx)
+	}
+	if d.query != nil {
+		_ = d.query.Close(ctx)
+	}
+	if d.metaBalancer != nil && d.metaBalancer.close != nil {
+		_ = d.metaBalancer.Close(ctx)
+	}
+	if d.pool != nil {
+		_ = d.pool.RemoveRef(ctx)
+	}
+}
+
 // Close closes Driver and clear resources
 //
 //nolint:nonamedreturns
@@ -325,9 +343,7 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 	}()
 
 	if err = d.connect(ctx); err != nil {
-		if d.pool != nil {
-			_ = d.pool.RemoveRef(ctx)
-		}
+		d.cleanupConnectFailure(ctx)
 
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -367,6 +383,8 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:
 	}()
 
 	if err = d.connect(ctx); err != nil {
+		d.cleanupConnectFailure(ctx)
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -484,35 +502,37 @@ func (d *Driver) connect(ctx context.Context) error {
 	}
 	d.metaBalancer.meta = d.config.Meta()
 
+	tableClientConfig := tableConfig.New(
+		append(
+			// prepend common params from root config
+			[]tableConfig.Option{
+				tableConfig.With(d.config.Common),
+
+				tableConfig.WithMaxRequestMessageSize(d.config.GrpcMaxMessageSize()),
+			},
+			d.tableOptions...,
+		)...,
+	)
 	d.table = xsync.OnceValue(func() (*internalTable.Client, error) {
 		return internalTable.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
-			tableConfig.New(
-				append(
-					// prepend common params from root config
-					[]tableConfig.Option{
-						tableConfig.With(d.config.Common),
-
-						tableConfig.WithMaxRequestMessageSize(d.config.GrpcMaxMessageSize()),
-					},
-					d.tableOptions...,
-				)...,
-			),
+			tableClientConfig,
 		)
 	})
 
+	queryClientConfig := queryConfig.New(
+		append(
+			// prepend common params from root config
+			[]queryConfig.Option{
+				queryConfig.With(d.config.Common),
+			},
+			d.queryOptions...,
+		)...,
+	)
 	d.query = xsync.OnceValue(func() (*internalQuery.Client, error) {
 		return internalQuery.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
-			queryConfig.New(
-				append(
-					// prepend common params from root config
-					[]queryConfig.Option{
-						queryConfig.With(d.config.Common),
-					},
-					d.queryOptions...,
-				)...,
-			),
+			queryClientConfig,
 		)
 	})
 
@@ -630,6 +650,54 @@ func (d *Driver) connect(ctx context.Context) error {
 			)...,
 		), nil
 	})
+
+	err := d.warmUpSessionPools(
+		tableClientConfig.PoolWarmUpSize() > 0,
+		queryClientConfig.PoolWarmUpSize() > 0,
+	)
+	if err != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("warm up session pools: %w", err))
+	}
+
+	return nil
+}
+
+func (d *Driver) warmUpSessionPools(warmUpTable, warmUpQuery bool) error {
+	var (
+		waitGroup sync.WaitGroup
+		tableErr  error
+		queryErr  error
+	)
+	if warmUpTable {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+
+			_, tableErr = d.table.Get()
+		}()
+	}
+	if warmUpQuery {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+
+			_, queryErr = d.query.Get()
+		}()
+	}
+	waitGroup.Wait()
+
+	if tableErr != nil && queryErr != nil {
+		return xerrors.WithStackTrace(xerrors.Join(
+			fmt.Errorf("table client: %w", tableErr),
+			fmt.Errorf("query client: %w", queryErr),
+		))
+	}
+	if tableErr != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("table client: %w", tableErr))
+	}
+	if queryErr != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("query client: %w", queryErr))
+	}
 
 	return nil
 }

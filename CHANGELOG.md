@@ -1,3 +1,5 @@
+* Fixed `WithSessionPoolWarmUpSessions` to initialize table and query clients before driver initialization completes
+
 ## v3.146.2
 * Fixed server-side gRPC stream errors being incorrectly classified as client-side context cancellation
 
