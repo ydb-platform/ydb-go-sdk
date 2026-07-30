@@ -639,6 +639,7 @@ func WithSessionPoolWarmUpSessions(warmUpSessions int) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.tableOptions = append(d.tableOptions, tableConfig.WithSessionPoolWarmUpSessions(warmUpSessions))
 		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionPoolWarmUpSessions(warmUpSessions))
+		d.warmUpSessionPools = warmUpSessions > 0
 
 		return nil
 	}

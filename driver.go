@@ -83,6 +83,8 @@ type (
 		query        *xsync.Once[*internalQuery.Client]
 		queryOptions []queryConfig.Option
 
+		warmUpSessionPools bool
+
 		scripting        *xsync.Once[*internalScripting.Client]
 		scriptingOptions []scriptingConfig.Option
 
@@ -630,6 +632,15 @@ func (d *Driver) connect(ctx context.Context) error {
 			)...,
 		), nil
 	})
+
+	if d.warmUpSessionPools {
+		if _, err := d.table.Get(); err != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("failed to warm up table client: %w", err))
+		}
+		if _, err := d.query.Get(); err != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("failed to warm up query client: %w", err))
+		}
+	}
 
 	return nil
 }
