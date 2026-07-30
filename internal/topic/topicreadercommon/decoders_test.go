@@ -30,6 +30,16 @@ func TestMultiDecoder(t *testing.T) {
 		return buf
 	}
 
+	t.Run("CustomRawDecoder", func(t *testing.T) {
+		testMultiDecoder := NewMultiDecoder()
+		testMultiDecoder.AddDecoder(rawtopiccommon.CodecRaw, func(io.Reader) (io.Reader, error) {
+			return nil, io.ErrUnexpectedEOF
+		})
+
+		_, err := testMultiDecoder.Decode(rawtopiccommon.CodecRaw, bytes.NewReader(nil))
+		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
+	})
+
 	t.Run("NotResettableReader", func(t *testing.T) {
 		testMultiDecoder := NewMultiDecoder()
 		require.Len(t, testMultiDecoder.m, defaultDecodersCount)

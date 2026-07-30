@@ -115,12 +115,12 @@ func (d *MultiDecoder) AddDecoder(codec rawtopiccommon.Codec, createFunc PublicC
 }
 
 func (d *MultiDecoder) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.Reader, error) {
-	if codec == rawtopiccommon.CodecRaw {
-		return input, nil
-	}
-
 	if creator, ok := d.m[codec]; ok {
 		return creator.getDecoder(input)
+	}
+
+	if codec == rawtopiccommon.CodecRaw {
+		return input, nil
 	}
 
 	return nil, xerrors.WithStackTrace(xerrors.Wrap(
