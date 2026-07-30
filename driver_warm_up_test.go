@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -15,6 +17,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -30,27 +34,13 @@ func TestSessionPoolWarmUpAtDriverInitialization(t *testing.T) {
 		queryCreateCalls atomic.Int32
 	)
 
-	listener := bufconn.Listen(1024 * 1024)
-	server := grpc.NewServer()
-	Ydb_Table_V1.RegisterTableServiceServer(server, &warmUpTableService{
-		createCalls: &tableCreateCalls,
-	})
-	Ydb_Query_V1.RegisterQueryServiceServer(server, &warmUpQueryService{
-		createCalls: &queryCreateCalls,
-	})
-	go func() {
-		_ = server.Serve(listener)
-	}()
-	t.Cleanup(server.Stop)
-
-	db, err := Open(t.Context(), "grpc://warm-up-test:2135/local",
-		WithBalancer(balancers.SingleConn()),
-		With(config.WithGrpcOptions(
-			grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
-				return listener.Dial()
-			}),
-		)),
-		WithSessionPoolWarmUpSessions(warmUpSessions),
+	db, err := openWarmUpDriver(t.Context(), t, warmUpSessions,
+		&warmUpTableService{
+			createCalls: &tableCreateCalls,
+		},
+		&warmUpQueryService{
+			createCalls: &queryCreateCalls,
+		},
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -61,16 +51,137 @@ func TestSessionPoolWarmUpAtDriverInitialization(t *testing.T) {
 	require.Equal(t, int32(warmUpSessions), queryCreateCalls.Load())
 }
 
+func TestSessionPoolWarmUpRunsClientsInParallel(t *testing.T) {
+	const warmUpSessions = 3
+
+	var (
+		tableCreateCalls atomic.Int32
+		queryCreateCalls atomic.Int32
+		tableStarted     = make(chan struct{})
+		queryStarted     = make(chan struct{})
+		tableStartOnce   sync.Once
+		queryStartOnce   sync.Once
+	)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	db, err := openWarmUpDriver(ctx, t, warmUpSessions,
+		&warmUpTableService{
+			createCalls: &tableCreateCalls,
+			beforeCreate: func(ctx context.Context) error {
+				tableStartOnce.Do(func() {
+					close(tableStarted)
+				})
+
+				select {
+				case <-queryStarted:
+					return nil
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			},
+		},
+		&warmUpQueryService{
+			createCalls: &queryCreateCalls,
+			beforeCreate: func(ctx context.Context) error {
+				queryStartOnce.Do(func() {
+					close(queryStarted)
+				})
+
+				select {
+				case <-tableStarted:
+					return nil
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			},
+		},
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, db.Close(t.Context()))
+	})
+
+	require.Equal(t, int32(warmUpSessions), tableCreateCalls.Load())
+	require.Equal(t, int32(warmUpSessions), queryCreateCalls.Load())
+}
+
+func TestSessionPoolWarmUpCleansUpOnPartialFailure(t *testing.T) {
+	const warmUpSessions = 3
+
+	var (
+		tableCreateCalls atomic.Int32
+		tableDeleteCalls atomic.Int32
+		queryCreateCalls atomic.Int32
+	)
+
+	db, err := openWarmUpDriver(t.Context(), t, warmUpSessions,
+		&warmUpTableService{
+			createCalls: &tableCreateCalls,
+			deleteCalls: &tableDeleteCalls,
+		},
+		&warmUpQueryService{
+			createCalls: &queryCreateCalls,
+			beforeCreate: func(context.Context) error {
+				return status.Error(codes.InvalidArgument, "query warm-up failed")
+			},
+		},
+	)
+	require.Nil(t, db)
+	require.ErrorContains(t, err, "warm up session pools: query client")
+	require.Equal(t, int32(warmUpSessions), tableCreateCalls.Load())
+	require.Equal(t, int32(warmUpSessions), tableDeleteCalls.Load())
+	require.Equal(t, int32(warmUpSessions), queryCreateCalls.Load())
+}
+
+func openWarmUpDriver(
+	ctx context.Context,
+	t *testing.T,
+	warmUpSessions int,
+	tableService *warmUpTableService,
+	queryService *warmUpQueryService,
+) (*Driver, error) {
+	t.Helper()
+
+	listener := bufconn.Listen(1024 * 1024)
+	server := grpc.NewServer()
+	Ydb_Table_V1.RegisterTableServiceServer(server, tableService)
+	Ydb_Query_V1.RegisterQueryServiceServer(server, queryService)
+	go func() {
+		_ = server.Serve(listener)
+	}()
+	t.Cleanup(server.Stop)
+
+	return Open(ctx, "grpc://warm-up-test:2135/local",
+		WithBalancer(balancers.SingleConn()),
+		With(config.WithGrpcOptions(
+			grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+				return listener.Dial()
+			}),
+		)),
+		WithSessionPoolWarmUpSessions(warmUpSessions),
+	)
+}
+
 type warmUpTableService struct {
 	Ydb_Table_V1.UnimplementedTableServiceServer
 
-	createCalls *atomic.Int32
+	createCalls  *atomic.Int32
+	deleteCalls  *atomic.Int32
+	beforeCreate func(context.Context) error
 }
 
 func (s *warmUpTableService) CreateSession(
-	_ context.Context, _ *Ydb_Table.CreateSessionRequest,
+	ctx context.Context, _ *Ydb_Table.CreateSessionRequest,
 ) (*Ydb_Table.CreateSessionResponse, error) {
 	sessionID := s.createCalls.Add(1)
+	if s.beforeCreate != nil {
+		if err := s.beforeCreate(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	result, err := anypb.New(&Ydb_Table.CreateSessionResult{
 		SessionId: fmt.Sprintf("table-session-%d", sessionID),
 	})
@@ -90,19 +201,29 @@ func (s *warmUpTableService) CreateSession(
 func (s *warmUpTableService) DeleteSession(
 	context.Context, *Ydb_Table.DeleteSessionRequest,
 ) (*Ydb_Table.DeleteSessionResponse, error) {
+	if s.deleteCalls != nil {
+		s.deleteCalls.Add(1)
+	}
+
 	return &Ydb_Table.DeleteSessionResponse{}, nil
 }
 
 type warmUpQueryService struct {
 	Ydb_Query_V1.UnimplementedQueryServiceServer
 
-	createCalls *atomic.Int32
+	createCalls  *atomic.Int32
+	beforeCreate func(context.Context) error
 }
 
 func (s *warmUpQueryService) CreateSession(
-	context.Context, *Ydb_Query.CreateSessionRequest,
+	ctx context.Context, _ *Ydb_Query.CreateSessionRequest,
 ) (*Ydb_Query.CreateSessionResponse, error) {
 	sessionID := s.createCalls.Add(1)
+	if s.beforeCreate != nil {
+		if err := s.beforeCreate(ctx); err != nil {
+			return nil, err
+		}
+	}
 
 	return &Ydb_Query.CreateSessionResponse{
 		Status:    Ydb.StatusIds_SUCCESS,
