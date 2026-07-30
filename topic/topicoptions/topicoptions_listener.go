@@ -27,6 +27,11 @@ func WithListenerBufferSizeBytes(size int) ListenerOption {
 // WithListenerAddDecoder add decoder for a codec.
 // It allows to set decoders fabric for custom codec and replace internal decoders.
 //
+// Replacing the decoder for topictypes.CodecRaw is discouraged because raw payloads are
+// expected to pass through unchanged. Use a custom codec ID, or decode raw messages at
+// the application level, for example using helpers from topic/topicsugar.
+// A future release will reject custom decoders for topictypes.CodecRaw with an error.
+//
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithListenerAddDecoder(codec topictypes.Codec, decoderCreate CreateDecoderFunc) ListenerOption {
 	return func(cfg *topiclistenerinternal.StreamListenerConfig) {

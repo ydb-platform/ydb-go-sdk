@@ -1,4 +1,4 @@
-* Fixed custom topic decoders registered for the raw codec being ignored
+* Fixed custom topic decoders registered for the raw codec being ignored; raw decoder overrides are discouraged and will be rejected in a future release
 
 ## v3.146.2
 * Fixed server-side gRPC stream errors being incorrectly classified as client-side context cancellation

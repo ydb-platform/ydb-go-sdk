@@ -167,6 +167,11 @@ type CreateDecoderFunc = topicreadercommon.PublicCreateDecoderFunc
 
 // WithAddDecoder add decoder for a codec.
 // It allows to set decoders fabric for custom codec and replace internal decoders.
+//
+// Replacing the decoder for topictypes.CodecRaw is discouraged because raw payloads are
+// expected to pass through unchanged. Use a custom codec ID, or decode raw messages at
+// the application level, for example using helpers from topic/topicsugar.
+// A future release will reject custom decoders for topictypes.CodecRaw with an error.
 func WithAddDecoder(codec topictypes.Codec, decoderCreate CreateDecoderFunc) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.Decoders.AddDecoder(rawtopiccommon.Codec(codec), decoderCreate)
