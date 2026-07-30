@@ -41,6 +41,10 @@ func (v *Once[T]) Close(ctx context.Context) (err error) {
 		v.mutex.RLock()
 		defer v.mutex.RUnlock()
 
+		if v.err != nil {
+			return nil
+		}
+
 		return v.t.Close(ctx)
 	}
 
