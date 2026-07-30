@@ -15,3 +15,11 @@ type (
 		WarmUp int
 	}
 )
+
+func (s *dynamicStats) add(other dynamicStats) {
+	s.Size += other.Size
+	s.Idle += other.Idle
+	s.CreateInProgress += other.CreateInProgress
+	s.Concurrency += other.Concurrency
+	s.InUse += other.InUse
+}

@@ -49,6 +49,11 @@ type (
 		lastUsage  time.Time
 		useCounter uint64
 	}
+	createItemResult[PT ItemConstraint[T], T any] struct {
+		item         PT
+		batchChanges dynamicStats
+		err          error
+	}
 	Pool[PT ItemConstraint[T], T any] struct {
 		config *Config[PT, T]
 
@@ -324,6 +329,55 @@ func (p *Pool[PT, T]) createItem(ctx context.Context, batchChanges *dynamicStats
 	return item, nil
 }
 
+func (p *Pool[PT, T]) startCreateItem(ctx context.Context) <-chan createItemResult[PT, T] {
+	result := make(chan createItemResult[PT, T], 1)
+
+	go func() {
+		var batchChanges dynamicStats
+		item, err := p.createItem(ctx, &batchChanges)
+		result <- createItemResult[PT, T]{
+			item:         item,
+			batchChanges: batchChanges,
+			err:          err,
+		}
+	}()
+
+	return result
+}
+
+func (p *Pool[PT, T]) newItemInfo(item PT) *itemInfo[PT, T] {
+	now := p.config.clock.Now()
+
+	return &itemInfo[PT, T]{
+		item:      item,
+		created:   now,
+		lastUsage: now,
+	}
+}
+
+// finishCreateItem completes a creation whose caller stopped waiting.
+// It owns the semaphore slot until the item is stored or discarded.
+func (p *Pool[PT, T]) finishCreateItem(ctx context.Context, res createItemResult[PT, T]) {
+	defer func() {
+		p.sema <- struct{}{}
+	}()
+
+	defer p.applyBatchStats(&res.batchChanges)
+
+	if res.err != nil {
+		return
+	}
+
+	_ = p.putIdleItem(ctx, p.newItemInfo(res.item), &res.batchChanges)
+}
+
+func (p *Pool[PT, T]) waitCreateItemInBackground(
+	ctx context.Context,
+	result <-chan createItemResult[PT, T],
+) {
+	p.finishCreateItem(ctx, <-result)
+}
+
 // closeItem closes the item with timeout handling
 // closeItem called only under p.sema lock
 func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT, batchChanges *dynamicStats) {
@@ -387,6 +441,8 @@ func (p *Pool[PT, T]) try(ctx context.Context,
 		}
 	}
 
+	releaseSlot := true
+
 	select {
 	case <-ctx.Done():
 		return xerrors.WithStackTrace(ctx.Err())
@@ -401,11 +457,16 @@ func (p *Pool[PT, T]) try(ctx context.Context,
 		// pick this case while Close() has already closed p.done but tokens remain.
 		// try() may then run until user callback returns; Close() waits for sema drain.
 		defer func() {
-			p.sema <- struct{}{}
+			if releaseSlot {
+				p.sema <- struct{}{}
+			}
 		}()
 	}
 
-	info, err := p.getItem(ctx, batchChanges)
+	info, slotTransferred, err := p.getItem(ctx, batchChanges)
+	if slotTransferred {
+		releaseSlot = false
+	}
 	if err != nil {
 		if isRetriable(err) {
 			return xerrors.WithStackTrace(xerrors.Retryable(err))
@@ -423,6 +484,7 @@ func (p *Pool[PT, T]) try(ctx context.Context,
 	}
 
 	batchChanges.InUse++
+	itemUsed := false
 
 	defer func() {
 		batchChanges.InUse--
@@ -433,9 +495,20 @@ func (p *Pool[PT, T]) try(ctx context.Context,
 			return
 		}
 
-		_ = p.putItem(ctx, info, batchChanges)
+		if itemUsed {
+			_ = p.putItem(ctx, info, batchChanges)
+
+			return
+		}
+
+		_ = p.putIdleItem(ctx, info, batchChanges)
 	}()
 
+	if err := ctx.Err(); err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	itemUsed = true
 	err = f(ctx, info.item)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -683,10 +756,14 @@ func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID, checkOldest bool, batchC
 	return p.idle.Pop()
 }
 
-// getItem called only under p.sema lock
+// getItem is called only under the p.sema lock.
+// slotTransferred reports that background item creation owns the current semaphore slot.
 //
 //nolint:funlen
-func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (info *itemInfo[PT, T], finalErr error) {
+func (p *Pool[PT, T]) getItem(
+	ctx context.Context,
+	batchChanges *dynamicStats,
+) (info *itemInfo[PT, T], slotTransferred bool, finalErr error) {
 	nodeID, hasPreferredNodeID := endpoint.ContextNodeID(ctx)
 
 	var attempts int
@@ -721,7 +798,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 		case needCloseItem(p.config, info):
 			p.closeItem(ctx, info.item, batchChanges)
 		default:
-			return info, nil
+			return info, false, nil
 		}
 	}
 
@@ -732,7 +809,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 			// Free a slot before createItem: full concurrent load or pool already at limit.
 			info, err := p.popItem(0, false, false, batchChanges)
 			if err != nil {
-				return nil, errNothingIdleItems
+				return nil, false, errNothingIdleItems
 			}
 
 			p.closeItem(ctx, info.item, batchChanges)
@@ -742,27 +819,49 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 	attempts++
 
 	// create item after two fails
-	item, err := p.createItem(ctx, batchChanges)
-	if err != nil {
+	select {
+	case <-ctx.Done():
+		return nil, false, xerrors.WithStackTrace(ctx.Err())
+	case <-p.done:
+		return nil, false, xerrors.WithStackTrace(errClosedPool)
+	default:
+	}
+
+	result := p.startCreateItem(ctx)
+
+	var res createItemResult[PT, T]
+	select {
+	case <-ctx.Done():
+		go p.waitCreateItemInBackground(xcontext.ValueOnly(ctx), result)
+
+		return nil, true, xerrors.WithStackTrace(ctx.Err())
+	case <-p.done:
+		go p.waitCreateItemInBackground(xcontext.ValueOnly(ctx), result)
+
+		return nil, true, xerrors.WithStackTrace(errClosedPool)
+	case res = <-result:
+		if err := ctx.Err(); err != nil {
+			go p.finishCreateItem(xcontext.ValueOnly(ctx), res)
+
+			return nil, true, xerrors.WithStackTrace(err)
+		}
+	}
+	batchChanges.add(res.batchChanges)
+
+	if res.err != nil {
+		err := res.err
 		if isRetriable(err) {
-			return nil, xerrors.Retryable(err)
+			return nil, false, xerrors.Retryable(err)
 		}
 
-		return nil, err
+		return nil, false, err
 	}
 
-	if item == nil {
-		return nil, errNilItem
+	if res.item == nil {
+		return nil, false, errNilItem
 	}
 
-	now := p.config.clock.Now()
-
-	return &itemInfo[PT, T]{
-		item:       item,
-		created:    now,
-		lastUsage:  now,
-		useCounter: 0,
-	}, nil
+	return p.newItemInfo(res.item), false, nil
 }
 
 // putItem called only under p.sema lock
@@ -788,6 +887,23 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T], batchC
 		info.useCounter++
 		info.lastUsage = p.config.clock.Now()
 
+		return p.putIdleItem(ctx, info, batchChanges)
+	}
+}
+
+// putIdleItem stores an item without counting it as used.
+// It is called only under the p.sema lock.
+func (p *Pool[PT, T]) putIdleItem(
+	ctx context.Context,
+	info *itemInfo[PT, T],
+	batchChanges *dynamicStats,
+) error {
+	select {
+	case <-p.done:
+		p.closeItem(ctx, info.item, batchChanges)
+
+		return xerrors.WithStackTrace(errClosedPool)
+	default:
 		if err := p.idle.PutWithCheckLimit(info, p.config.limit); err != nil {
 			p.closeItem(ctx, info.item, batchChanges)
 
