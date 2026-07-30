@@ -1182,7 +1182,10 @@ func requireConnKeys(t *testing.T, expected []endpoint.Endpoint, actual []conn.C
 }
 
 // nextState simulates the discovery state transition for testing.
-// It replaces the real Balancer.applyDiscoveredEndpoints logic.
+// It mirrors the 2-round quarantine-cycle semantics of
+// connectionsState.ApplyDiscovery: on every round all previously active
+// connections move to quarantine, connections for all discovered endpoints are
+// re-acquired, and the previous-round quarantine is released back to the pool.
 func nextState(
 	ctx context.Context,
 	pool poolInterface,
@@ -1190,20 +1193,10 @@ func nextState(
 	active []conn.Conn,
 	discovered []endpoint.Endpoint,
 ) (newQuarantine []conn.Conn, newActive []conn.Conn) {
-	// Build set of discovered endpoint keys
-	discoveredKeys := make(map[endpoint.Key]struct{}, len(discovered))
-	for _, e := range discovered {
-		discoveredKeys[e.Key()] = struct{}{}
-	}
+	// All previously active connections move to quarantine for one round.
+	newQuarantine = active
 
-	// Move active connections that are no longer discovered to quarantine
-	for _, cc := range active {
-		if _, ok := discoveredKeys[cc.Endpoint().Key()]; !ok {
-			quarantine = append(quarantine, cc)
-		}
-	}
-
-	// Get connections for discovered endpoints
+	// Acquire connections for all discovered endpoints (bumps refcount).
 	newActive = make([]conn.Conn, 0, len(discovered))
 	for _, e := range discovered {
 		if cc := pool.Get(e); cc != nil {
@@ -1211,12 +1204,12 @@ func nextState(
 		}
 	}
 
-	// Put quarantined connections back to pool
+	// Release the previous-round quarantine — it completed the 2-round cycle.
 	for _, cc := range quarantine {
 		pool.Put(ctx, cc)
 	}
 
-	return quarantine, newActive
+	return newQuarantine, newActive
 }
 
 func TestNextState(t *testing.T) {

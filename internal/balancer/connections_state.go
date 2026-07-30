@@ -149,8 +149,12 @@ func (s *connectionsState) selectRandomConnection(conns []conn.Conn, allowBanned
 }
 
 // ApplyDiscovery updates the connection state after a discovery round.
-// It moves old active connections that are no longer in selected to quarantine,
-// puts old quarantine back to pool (after 2-round cycle), and unbans new active.
+//
+// It implements a 2-round quarantine cycle: on every round all previously
+// active connections are moved to quarantine, and the quarantine accumulated
+// on the previous round is released back to the pool. This guarantees that a
+// node dropped from discovery keeps its connection alive for exactly one extra
+// round before its refcount drops (and the underlying gRPC transport closes).
 func (s *connectionsState) ApplyDiscovery(
 	ctx context.Context,
 	pool poolInterface,
@@ -158,21 +162,10 @@ func (s *connectionsState) ApplyDiscovery(
 	active []conn.Conn,
 	quarantine []conn.Conn,
 ) (newQuarantine []conn.Conn, newActive []conn.Conn) {
-	// Build set of selected endpoint keys
-	selectedKeys := make(map[endpoint.Key]struct{}, len(selected))
-	for _, e := range selected {
-		selectedKeys[e.Key()] = struct{}{}
-	}
+	// All previously active connections move to quarantine for one round.
+	newQuarantine = active
 
-	// Move old active connections that are no longer selected to quarantine
-	newQuarantine = quarantine
-	for _, cc := range active {
-		if _, ok := selectedKeys[cc.Endpoint().Key()]; !ok {
-			newQuarantine = append(newQuarantine, cc)
-		}
-	}
-
-	// Get connections for selected endpoints
+	// Acquire connections for all selected endpoints (bumps refcount).
 	newActive = xslices.Filter(
 		xslices.Transform(selected, func(e endpoint.Endpoint) conn.Conn {
 			return pool.Get(e)
@@ -180,12 +173,12 @@ func (s *connectionsState) ApplyDiscovery(
 		func(cc conn.Conn) bool { return cc != nil },
 	)
 
-	// Put old quarantine back to pool (they completed the 2-round cycle)
+	// Release the previous-round quarantine — it completed the 2-round cycle.
 	for _, cc := range quarantine {
 		pool.Put(ctx, cc)
 	}
 
-	// Unban new active connections
+	// Unban new active connections.
 	for _, cc := range newActive {
 		cc.Unban(ctx)
 	}
