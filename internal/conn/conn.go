@@ -469,7 +469,7 @@ func (c *conn) NewStream(
 
 	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
-	ctx, cancel := c.childStreams.WithCancel(ctx)
+	grpcCtx, cancel := c.childStreams.WithCancel(ctx)
 	defer func() {
 		if finalErr != nil {
 			cancel()
@@ -477,15 +477,15 @@ func (c *conn) NewStream(
 	}()
 
 	s := &grpcClientStream{
-		parentConn:   c,
-		streamCtx:    ctx,
-		streamCancel: cancel,
-		wrapping:     useWrapping,
-		traceID:      traceID,
-		sentMark:     sentMark,
+		parentConn: c,
+		requestCtx: ctx,
+		grpcCancel: cancel,
+		wrapping:   useWrapping,
+		traceID:    traceID,
+		sentMark:   sentMark,
 	}
 
-	s.stream, err = cc.NewStream(ctx, desc, method, append(opts, grpc.OnFinish(s.finish))...)
+	s.stream, err = cc.NewStream(grpcCtx, desc, method, append(opts, grpc.OnFinish(s.finish))...)
 	if err != nil {
 		if xerrors.IsContextError(err) {
 			return nil, xerrors.WithStackTrace(err)

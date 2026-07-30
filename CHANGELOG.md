@@ -1,3 +1,5 @@
+* Fixed server-side gRPC stream errors being incorrectly classified as client-side context cancellation
+
 ## v3.146.1
 * Fixed YQL issue logs to preserve the event message and include bounded nested issue details
 
