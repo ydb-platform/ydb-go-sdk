@@ -1,3 +1,4 @@
+## v3.146.2
 * Fixed server-side gRPC stream errors being incorrectly classified as client-side context cancellation
 
 ## v3.146.1
