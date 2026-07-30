@@ -235,6 +235,7 @@ func findConnByEndpoint(conns []conn.Conn, e endpoint.Endpoint) conn.Conn {
 			return c
 		}
 	}
+
 	return nil
 }
 
