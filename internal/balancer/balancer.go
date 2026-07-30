@@ -300,7 +300,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 		b.balancerConfig.AllowFallback,
 		b.rnd,
 	)
-	quarantine, connections = state.ApplyDiscovery(ctx, b.pool, selected, quarantine)
+	quarantine, connections = state.ApplyDiscovery(ctx, b.pool, selected, active, quarantine)
 
 	b.lastDiscovered = append([]endpoint.Endpoint(nil), endpoints...)
 	b.selfLocation = localDC

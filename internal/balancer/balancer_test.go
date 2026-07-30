@@ -1216,7 +1216,7 @@ func nextState(
 		pool.Put(ctx, cc)
 	}
 
-	return nil, newActive
+	return quarantine, newActive
 }
 
 func TestNextState(t *testing.T) {
