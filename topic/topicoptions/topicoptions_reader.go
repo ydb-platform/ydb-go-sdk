@@ -167,6 +167,15 @@ type CreateDecoderFunc = topicreadercommon.PublicCreateDecoderFunc
 
 // WithAddDecoder add decoder for a codec.
 // It allows to set decoders fabric for custom codec and replace internal decoders.
+//
+// Replacing the decoder for topictypes.CodecRaw is discouraged because raw payloads are
+// expected to pass through unchanged. Use a user-defined codec ID in the [10000, 19999]
+// range reserved by the protocol:
+// https://github.com/ydb-platform/ydb-api-protos/blob/d9841fab/protos/ydb_topic.proto#L27
+// This link refers to commit d9841fab4f5e7851294efd4801478e5b1a100799.
+// Alternatively, decode raw messages at the application level, for example using helpers
+// from topic/topicsugar.
+// A future release will reject custom decoders for topictypes.CodecRaw with an error.
 func WithAddDecoder(codec topictypes.Codec, decoderCreate CreateDecoderFunc) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.Decoders.AddDecoder(rawtopiccommon.Codec(codec), decoderCreate)
