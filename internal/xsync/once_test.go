@@ -92,6 +92,18 @@ func TestOnceValue(t *testing.T) {
 			require.NoError(t, once.Close(ctx))
 		})
 	})
+	t.Run("GetValueAndErrorBeforeClose", func(t *testing.T) {
+		constInitErr := errors.New("")
+		value := &testCloser{inited: true}
+		once := OnceValue(func() (*testCloser, error) {
+			return value, constInitErr
+		})
+		v, err := once.Get()
+		require.Same(t, value, v)
+		require.ErrorIs(t, err, constInitErr)
+		require.NoError(t, once.Close(ctx))
+		require.True(t, value.closed)
+	})
 	t.Run("CloseBeforeGet", func(t *testing.T) {
 		constCloseErr := errors.New("")
 		once := OnceValue(func() (*testCloser, error) {

@@ -166,6 +166,83 @@ func TestSessionPoolWarmUpCleansUpOnPartialFailure(t *testing.T) {
 	}
 }
 
+func TestSessionPoolWarmUpCleansUpQueryOnTableFailure(t *testing.T) {
+	const warmUpSessions = 3
+
+	var (
+		tableCreateCalls atomic.Int32
+		queryCreateCalls atomic.Int32
+		queryDeleteCalls atomic.Int32
+	)
+
+	db, err := openWarmUpDriver(t.Context(), t, warmUpSessions,
+		&warmUpTableService{
+			createCalls: &tableCreateCalls,
+			beforeCreate: func(context.Context) error {
+				return status.Error(codes.InvalidArgument, "table warm-up failed")
+			},
+		},
+		&warmUpQueryService{
+			createCalls: &queryCreateCalls,
+			deleteCalls: &queryDeleteCalls,
+		},
+		Open,
+	)
+	require.Nil(t, db)
+	require.ErrorContains(t, err, "warm up session pools: table client")
+	require.Equal(t, int32(warmUpSessions), tableCreateCalls.Load())
+	require.Equal(t, int32(warmUpSessions), queryCreateCalls.Load())
+	require.Equal(t, int32(warmUpSessions), queryDeleteCalls.Load())
+}
+
+func TestSessionPoolWarmUpCleansUpWithFailure(t *testing.T) {
+	const warmUpSessions = 3
+
+	var (
+		tableCreateCalls   atomic.Int32
+		tableDeleteCalls   atomic.Int32
+		queryCreateCalls   atomic.Int32
+		balancerCloseCalls atomic.Int32
+	)
+
+	db, err := openWarmUpDriver(t.Context(), t, 0,
+		&warmUpTableService{
+			createCalls: &tableCreateCalls,
+			deleteCalls: &tableDeleteCalls,
+		},
+		&warmUpQueryService{
+			createCalls: &queryCreateCalls,
+			beforeCreate: func(context.Context) error {
+				return status.Error(codes.InvalidArgument, "query warm-up failed")
+			},
+		},
+		Open,
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, db.Close(t.Context()))
+	})
+
+	child, err := db.With(t.Context(),
+		WithSessionPoolWarmUpSessions(warmUpSessions),
+		WithTraceDriver(trace.Driver{
+			OnBalancerClose: func(
+				trace.DriverBalancerCloseStartInfo,
+			) func(trace.DriverBalancerCloseDoneInfo) {
+				balancerCloseCalls.Add(1)
+
+				return func(trace.DriverBalancerCloseDoneInfo) {}
+			},
+		}),
+	)
+	require.Nil(t, child)
+	require.ErrorContains(t, err, "warm up session pools: query client")
+	require.Equal(t, int32(warmUpSessions), tableCreateCalls.Load())
+	require.Equal(t, int32(warmUpSessions), tableDeleteCalls.Load())
+	require.Equal(t, int32(warmUpSessions), queryCreateCalls.Load())
+	require.Equal(t, int32(1), balancerCloseCalls.Load())
+}
+
 func TestSessionPoolWarmUpReportsBothClientFailures(t *testing.T) {
 	const warmUpSessions = 3
 
@@ -286,6 +363,7 @@ type warmUpQueryService struct {
 	Ydb_Query_V1.UnimplementedQueryServiceServer
 
 	createCalls  *atomic.Int32
+	deleteCalls  *atomic.Int32
 	beforeCreate func(context.Context) error
 }
 
@@ -322,6 +400,10 @@ func (s *warmUpQueryService) AttachSession(
 func (s *warmUpQueryService) DeleteSession(
 	context.Context, *Ydb_Query.DeleteSessionRequest,
 ) (*Ydb_Query.DeleteSessionResponse, error) {
+	if s.deleteCalls != nil {
+		s.deleteCalls.Add(1)
+	}
+
 	return &Ydb_Query.DeleteSessionResponse{
 		Status: Ydb.StatusIds_SUCCESS,
 	}, nil

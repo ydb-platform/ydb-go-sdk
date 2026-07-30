@@ -57,6 +57,8 @@ func (d *Driver) With(ctx context.Context, opts ...Option) (*Driver, error) {
 	}()
 
 	if err = child.connect(ctx); err != nil {
+		child.cleanupConnectFailure(ctx)
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
