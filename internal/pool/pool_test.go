@@ -126,7 +126,12 @@ func getItemWithFlush[PT ItemConstraint[T], T any](
 	var batchChanges dynamicStats
 	defer p.applyBatchStats(&batchChanges)
 
-	return p.getItem(ctx, &batchChanges)
+	info, slotTransferred, err := p.getItem(ctx, &batchChanges)
+	if slotTransferred {
+		return nil, errors.New("unexpected semaphore slot transfer")
+	}
+
+	return info, err
 }
 
 func putItemWithFlush[PT ItemConstraint[T], T any](
@@ -2251,6 +2256,204 @@ func TestPoolWith_doesNotRetryOnNothingIdleItemsWhenContextCanceled(t *testing.T
 	case <-time.After(time.Second):
 		t.Fatal("pool.With did not finish after context cancel")
 	}
+}
+
+func TestPoolWithCallerContextStopsWaitingForItemCreation(t *testing.T) {
+	for _, tt := range []struct {
+		name             string
+		timeout          time.Duration
+		cancelAfterStart bool
+		wantErr          error
+	}{
+		{
+			name:             "Canceled",
+			cancelAfterStart: true,
+			wantErr:          context.Canceled,
+		},
+		{
+			name:    "DeadlineExceeded",
+			timeout: 100 * time.Millisecond,
+			wantErr: context.DeadlineExceeded,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var (
+				createCalls  atomic.Int32
+				callbackRuns atomic.Int32
+				releaseOnce  sync.Once
+			)
+			createStarted := make(chan context.Context, 1)
+			releaseCreate := make(chan struct{})
+			release := func() {
+				releaseOnce.Do(func() {
+					close(releaseCreate)
+				})
+			}
+
+			p := mustNewPool[*testItem, testItem](t,
+				WithLimit[*testItem, testItem](1),
+				WithItemUsageLimit[*testItem, testItem](1),
+				WithCreateItemTimeout[*testItem, testItem](time.Second),
+				WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+					id := createCalls.Add(1)
+					createStarted <- ctx
+
+					select {
+					case <-releaseCreate:
+						return &testItem{v: id}, nil
+					case <-ctx.Done():
+						return nil, ctx.Err()
+					}
+				}),
+			)
+			t.Cleanup(func() {
+				_ = p.Close(t.Context())
+			})
+			t.Cleanup(release)
+
+			var (
+				ctx    context.Context
+				cancel context.CancelFunc
+			)
+			if tt.timeout > 0 {
+				ctx, cancel = context.WithTimeout(t.Context(), tt.timeout)
+			} else {
+				ctx, cancel = context.WithCancel(t.Context())
+			}
+			defer cancel()
+
+			result := make(chan error, 1)
+			go func() {
+				result <- p.With(ctx, func(context.Context, *testItem) error {
+					callbackRuns.Add(1)
+
+					return nil
+				})
+			}()
+
+			var createCtx context.Context
+			select {
+			case createCtx = <-createStarted:
+			case <-time.After(time.Second):
+				t.Fatal("item creation did not start")
+			}
+
+			if tt.cancelAfterStart {
+				cancel()
+			}
+
+			select {
+			case err := <-result:
+				require.ErrorIs(t, err, tt.wantErr)
+			case <-time.After(time.Second):
+				t.Fatal("pool.With did not return after caller context finished")
+			}
+
+			require.Equal(t, int32(0), callbackRuns.Load())
+			require.NoError(t, createCtx.Err(), "caller context must not cancel item creation")
+			require.Eventually(t, func() bool {
+				stats := p.Stats()
+
+				return stats.Concurrency == 0 && stats.CreateInProgress == 1
+			}, time.Second, time.Millisecond)
+
+			blockedCtx, cancelBlocked := context.WithCancel(t.Context())
+			blockedResult := make(chan error, 1)
+			go func() {
+				blockedResult <- p.With(blockedCtx, func(context.Context, *testItem) error {
+					return nil
+				})
+			}()
+			require.Eventually(t, func() bool {
+				return p.Stats().Concurrency == 1
+			}, time.Second, time.Millisecond)
+			require.Equal(t, int32(1), createCalls.Load(), "detached creation must retain the pool slot")
+
+			cancelBlocked()
+			select {
+			case err := <-blockedResult:
+				require.ErrorIs(t, err, context.Canceled)
+			case <-time.After(time.Second):
+				t.Fatal("second pool.With did not return after caller context cancellation")
+			}
+
+			release()
+
+			require.Eventually(t, func() bool {
+				stats := p.Stats()
+
+				return stats.Size == 1 && stats.Idle == 1 && stats.CreateInProgress == 0
+			}, time.Second, time.Millisecond)
+
+			err := p.With(t.Context(), func(_ context.Context, item *testItem) error {
+				require.Equal(t, int32(1), item.v)
+
+				return nil
+			})
+			require.NoError(t, err)
+			require.Equal(t, int32(1), createCalls.Load())
+		})
+	}
+}
+
+func TestPoolCloseCancelsDetachedItemCreation(t *testing.T) {
+	createStarted := make(chan struct{})
+	createCanceled := make(chan struct{})
+
+	p := mustNewPool[*testItem, testItem](t,
+		WithLimit[*testItem, testItem](1),
+		WithCreateItemTimeout[*testItem, testItem](time.Minute),
+		WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+			close(createStarted)
+			<-ctx.Done()
+			close(createCanceled)
+
+			return nil, ctx.Err()
+		}),
+	)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	result := make(chan error, 1)
+	go func() {
+		result <- p.With(ctx, func(context.Context, *testItem) error {
+			return nil
+		})
+	}()
+
+	select {
+	case <-createStarted:
+	case <-time.After(time.Second):
+		t.Fatal("item creation did not start")
+	}
+
+	cancel()
+
+	select {
+	case err := <-result:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("pool.With did not return after caller context cancellation")
+	}
+
+	closeResult := make(chan error, 1)
+	go func() {
+		closeResult <- p.Close(t.Context())
+	}()
+
+	select {
+	case <-createCanceled:
+	case <-time.After(time.Second):
+		t.Fatal("pool close did not cancel detached item creation")
+	}
+
+	select {
+	case err := <-closeResult:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("pool close did not wait for detached item creation")
+	}
+
+	requirePoolStats(t, p, poolStats(1, nil))
 }
 
 func TestNothingIdleItems_isFastRetryable(t *testing.T) {

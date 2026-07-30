@@ -1,3 +1,5 @@
+* Fixed session pool waits for in-progress session creation to return on caller context cancellation while preserving the created session for reuse
+
 ## v3.146.1
 * Fixed YQL issue logs to preserve the event message and include bounded nested issue details
 
