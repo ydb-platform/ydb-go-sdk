@@ -24,6 +24,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestSessionPoolWarmUpAtDriverInitialization(t *testing.T) {
@@ -41,6 +42,7 @@ func TestSessionPoolWarmUpAtDriverInitialization(t *testing.T) {
 		&warmUpQueryService{
 			createCalls: &queryCreateCalls,
 		},
+		Open,
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -97,6 +99,7 @@ func TestSessionPoolWarmUpRunsClientsInParallel(t *testing.T) {
 				}
 			},
 		},
+		Open,
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -110,16 +113,73 @@ func TestSessionPoolWarmUpRunsClientsInParallel(t *testing.T) {
 func TestSessionPoolWarmUpCleansUpOnPartialFailure(t *testing.T) {
 	const warmUpSessions = 3
 
+	for _, test := range []struct {
+		name string
+		open warmUpDriverOpener
+	}{
+		{
+			name: "Open",
+			open: Open,
+		},
+		{
+			name: "New",
+			open: newWarmUpDriver,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				tableCreateCalls   atomic.Int32
+				tableDeleteCalls   atomic.Int32
+				queryCreateCalls   atomic.Int32
+				balancerCloseCalls atomic.Int32
+			)
+
+			db, err := openWarmUpDriver(t.Context(), t, warmUpSessions,
+				&warmUpTableService{
+					createCalls: &tableCreateCalls,
+					deleteCalls: &tableDeleteCalls,
+				},
+				&warmUpQueryService{
+					createCalls: &queryCreateCalls,
+					beforeCreate: func(context.Context) error {
+						return status.Error(codes.InvalidArgument, "query warm-up failed")
+					},
+				},
+				test.open,
+				WithTraceDriver(trace.Driver{
+					OnBalancerClose: func(
+						trace.DriverBalancerCloseStartInfo,
+					) func(trace.DriverBalancerCloseDoneInfo) {
+						balancerCloseCalls.Add(1)
+
+						return func(trace.DriverBalancerCloseDoneInfo) {}
+					},
+				}),
+			)
+			require.Nil(t, db)
+			require.ErrorContains(t, err, "warm up session pools: query client")
+			require.Equal(t, int32(warmUpSessions), tableCreateCalls.Load())
+			require.Equal(t, int32(warmUpSessions), tableDeleteCalls.Load())
+			require.Equal(t, int32(warmUpSessions), queryCreateCalls.Load())
+			require.Equal(t, int32(1), balancerCloseCalls.Load())
+		})
+	}
+}
+
+func TestSessionPoolWarmUpReportsBothClientFailures(t *testing.T) {
+	const warmUpSessions = 3
+
 	var (
 		tableCreateCalls atomic.Int32
-		tableDeleteCalls atomic.Int32
 		queryCreateCalls atomic.Int32
 	)
 
 	db, err := openWarmUpDriver(t.Context(), t, warmUpSessions,
 		&warmUpTableService{
 			createCalls: &tableCreateCalls,
-			deleteCalls: &tableDeleteCalls,
+			beforeCreate: func(context.Context) error {
+				return status.Error(codes.InvalidArgument, "table warm-up failed")
+			},
 		},
 		&warmUpQueryService{
 			createCalls: &queryCreateCalls,
@@ -127,12 +187,21 @@ func TestSessionPoolWarmUpCleansUpOnPartialFailure(t *testing.T) {
 				return status.Error(codes.InvalidArgument, "query warm-up failed")
 			},
 		},
+		Open,
 	)
 	require.Nil(t, db)
-	require.ErrorContains(t, err, "warm up session pools: query client")
+	require.ErrorContains(t, err, "table client")
+	require.ErrorContains(t, err, "table warm-up failed")
+	require.ErrorContains(t, err, "query client")
+	require.ErrorContains(t, err, "query warm-up failed")
 	require.Equal(t, int32(warmUpSessions), tableCreateCalls.Load())
-	require.Equal(t, int32(warmUpSessions), tableDeleteCalls.Load())
 	require.Equal(t, int32(warmUpSessions), queryCreateCalls.Load())
+}
+
+type warmUpDriverOpener func(context.Context, string, ...Option) (*Driver, error)
+
+func newWarmUpDriver(ctx context.Context, dsn string, opts ...Option) (*Driver, error) {
+	return New(ctx, append([]Option{WithConnectionString(dsn)}, opts...)...)
 }
 
 func openWarmUpDriver(
@@ -141,6 +210,8 @@ func openWarmUpDriver(
 	warmUpSessions int,
 	tableService *warmUpTableService,
 	queryService *warmUpQueryService,
+	open warmUpDriverOpener,
+	extraOptions ...Option,
 ) (*Driver, error) {
 	t.Helper()
 
@@ -153,7 +224,7 @@ func openWarmUpDriver(
 	}()
 	t.Cleanup(server.Stop)
 
-	return Open(ctx, "grpc://warm-up-test:2135/local",
+	options := []Option{
 		WithBalancer(balancers.SingleConn()),
 		With(config.WithGrpcOptions(
 			grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
@@ -161,7 +232,10 @@ func openWarmUpDriver(
 			}),
 		)),
 		WithSessionPoolWarmUpSessions(warmUpSessions),
-	)
+	}
+	options = append(options, extraOptions...)
+
+	return open(ctx, "grpc://warm-up-test:2135/local", options...)
 }
 
 type warmUpTableService struct {

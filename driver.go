@@ -157,6 +157,24 @@ func (c *driverDiscoveryClient) Close(ctx context.Context) error {
 	return c.Client.Close(ctx)
 }
 
+func (d *Driver) cleanupConnectFailure(ctx context.Context) {
+	ctx = xcontext.ValueOnly(ctx)
+	d.ctxCancel()
+
+	if d.table != nil {
+		_ = d.table.Close(ctx)
+	}
+	if d.query != nil {
+		_ = d.query.Close(ctx)
+	}
+	if d.metaBalancer != nil && d.metaBalancer.close != nil {
+		_ = d.metaBalancer.Close(ctx)
+	}
+	if d.pool != nil {
+		_ = d.pool.RemoveRef(ctx)
+	}
+}
+
 // Close closes Driver and clear resources
 //
 //nolint:nonamedreturns
@@ -325,9 +343,7 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 	}()
 
 	if err = d.connect(ctx); err != nil {
-		if d.pool != nil {
-			_ = d.pool.RemoveRef(ctx)
-		}
+		d.cleanupConnectFailure(ctx)
 
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -367,6 +383,8 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:
 	}()
 
 	if err = d.connect(ctx); err != nil {
+		d.cleanupConnectFailure(ctx)
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -634,7 +652,6 @@ func (d *Driver) connect(ctx context.Context) error {
 	})
 
 	err := d.warmUpSessionPools(
-		ctx,
 		tableClientConfig.PoolWarmUpSize() > 0,
 		queryClientConfig.PoolWarmUpSize() > 0,
 	)
@@ -645,20 +662,18 @@ func (d *Driver) connect(ctx context.Context) error {
 	return nil
 }
 
-func (d *Driver) warmUpSessionPools(ctx context.Context, warmUpTable, warmUpQuery bool) error {
+func (d *Driver) warmUpSessionPools(warmUpTable, warmUpQuery bool) error {
 	var (
-		waitGroup   sync.WaitGroup
-		tableClient *internalTable.Client
-		queryClient *internalQuery.Client
-		tableErr    error
-		queryErr    error
+		waitGroup sync.WaitGroup
+		tableErr  error
+		queryErr  error
 	)
 	if warmUpTable {
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
 
-			tableClient, tableErr = d.table.Get()
+			_, tableErr = d.table.Get()
 		}()
 	}
 	if warmUpQuery {
@@ -666,23 +681,21 @@ func (d *Driver) warmUpSessionPools(ctx context.Context, warmUpTable, warmUpQuer
 		go func() {
 			defer waitGroup.Done()
 
-			queryClient, queryErr = d.query.Get()
+			_, queryErr = d.query.Get()
 		}()
 	}
 	waitGroup.Wait()
 
+	if tableErr != nil && queryErr != nil {
+		return xerrors.WithStackTrace(xerrors.Join(
+			fmt.Errorf("table client: %w", tableErr),
+			fmt.Errorf("query client: %w", queryErr),
+		))
+	}
 	if tableErr != nil {
-		if queryClient != nil {
-			_ = queryClient.Close(ctx)
-		}
-
 		return xerrors.WithStackTrace(fmt.Errorf("table client: %w", tableErr))
 	}
 	if queryErr != nil {
-		if tableClient != nil {
-			_ = tableClient.Close(ctx)
-		}
-
 		return xerrors.WithStackTrace(fmt.Errorf("query client: %w", queryErr))
 	}
 
