@@ -136,7 +136,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   true,
 			traceID:    "test-trace-id",
 		}
@@ -160,7 +160,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   true,
 			traceID:    "test-trace-id",
 		}
@@ -192,7 +192,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  cancelledCtx,
+			requestCtx: cancelledCtx,
 			wrapping:   true,
 			traceID:    "test-trace-id",
 		}
@@ -220,7 +220,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   true,
 			traceID:    "test-trace-id",
 		}
@@ -246,7 +246,7 @@ func TestGrpcClientStream_CloseSend(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   false,
 		}
 
@@ -273,7 +273,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   true,
 			sentMark:   &modificationMark{},
 		}
@@ -298,7 +298,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   true,
 			sentMark:   &modificationMark{},
 		}
@@ -331,7 +331,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  cancelledCtx,
+			requestCtx: cancelledCtx,
 			wrapping:   true,
 			traceID:    "test-trace-id",
 			sentMark:   &modificationMark{},
@@ -361,7 +361,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   true,
 			traceID:    "test-trace-id",
 			sentMark:   &modificationMark{},
@@ -392,7 +392,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   true,
 			traceID:    "test-trace-id",
 			sentMark:   mark,
@@ -421,7 +421,7 @@ func TestGrpcClientStream_SendMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   false,
 			sentMark:   &modificationMark{},
 		}
@@ -454,7 +454,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   true,
 			sentMark:   &modificationMark{},
 		}
@@ -480,7 +480,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   true,
 			sentMark:   &modificationMark{},
 		}
@@ -507,7 +507,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 			s := &grpcClientStream{
 				parentConn: parentConn,
 				stream:     mockStream,
-				streamCtx:  t.Context(),
+				requestCtx: t.Context(),
 				wrapping:   true,
 				sentMark:   &modificationMark{},
 			}
@@ -536,7 +536,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 			s := &grpcClientStream{
 				parentConn: parentConn,
 				stream:     mockStream,
-				streamCtx:  ctx,
+				requestCtx: ctx,
 				wrapping:   true,
 				sentMark:   &modificationMark{},
 			}
@@ -572,7 +572,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  cancelledCtx,
+			requestCtx: cancelledCtx,
 			wrapping:   true,
 			traceID:    "test-trace-id",
 			sentMark:   &modificationMark{},
@@ -605,7 +605,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 			s := &grpcClientStream{
 				parentConn: parentConn,
 				stream:     mockStream,
-				streamCtx:  t.Context(),
+				requestCtx: t.Context(),
 				wrapping:   true,
 				traceID:    "test-trace-id",
 				sentMark:   &modificationMark{},
@@ -637,10 +637,10 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 						config:   &mockConfig{},
 						endpoint: endpoint.New("test-endpoint:2135"),
 					},
-					stream:    mockStream,
-					streamCtx: ctx,
-					wrapping:  true,
-					sentMark:  mark,
+					stream:     mockStream,
+					requestCtx: ctx,
+					wrapping:   true,
+					sentMark:   mark,
 				}
 
 				err := s.RecvMsg(msg)
@@ -668,10 +668,10 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 						config:   &mockConfig{},
 						endpoint: endpoint.New("test-endpoint:2135"),
 					},
-					stream:    mockStream,
-					streamCtx: ctx,
-					wrapping:  true,
-					sentMark:  &modificationMark{},
+					stream:     mockStream,
+					requestCtx: ctx,
+					wrapping:   true,
+					sentMark:   &modificationMark{},
 				}
 
 				err := s.RecvMsg(msg)
@@ -706,7 +706,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   true,
 			traceID:    "test-trace-id",
 			sentMark:   mark,
@@ -736,7 +736,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   false,
 			sentMark:   &modificationMark{},
 		}
@@ -768,7 +768,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   true,
 			sentMark:   &modificationMark{},
 		}
@@ -799,7 +799,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
-			streamCtx:  t.Context(),
+			requestCtx: t.Context(),
 			wrapping:   false,
 			sentMark:   &modificationMark{},
 		}
@@ -829,10 +829,10 @@ func TestGrpcClientStream_Finish(t *testing.T) {
 		}
 
 		s := &grpcClientStream{
-			parentConn:   parentConn,
-			stream:       mockStream,
-			streamCtx:    ctx,
-			streamCancel: wrappedCancel,
+			parentConn: parentConn,
+			stream:     mockStream,
+			requestCtx: ctx,
+			grpcCancel: wrappedCancel,
 		}
 
 		s.finish(nil)
@@ -853,10 +853,10 @@ func TestGrpcClientStream_Finish(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 
 		s := &grpcClientStream{
-			parentConn:   parentConn,
-			stream:       mockStream,
-			streamCtx:    ctx,
-			streamCancel: cancel,
+			parentConn: parentConn,
+			stream:     mockStream,
+			requestCtx: ctx,
+			grpcCancel: cancel,
 		}
 
 		testErr := fmt.Errorf("test error")
