@@ -1181,6 +1181,44 @@ func requireConnKeys(t *testing.T, expected []endpoint.Endpoint, actual []conn.C
 	}
 }
 
+// nextState simulates the discovery state transition for testing.
+// It replaces the real Balancer.applyDiscoveredEndpoints logic.
+func nextState(
+	ctx context.Context,
+	pool poolInterface,
+	quarantine []conn.Conn,
+	active []conn.Conn,
+	discovered []endpoint.Endpoint,
+) (newQuarantine []conn.Conn, newActive []conn.Conn) {
+	// Build set of discovered endpoint keys
+	discoveredKeys := make(map[endpoint.Key]struct{}, len(discovered))
+	for _, e := range discovered {
+		discoveredKeys[e.Key()] = struct{}{}
+	}
+
+	// Move active connections that are no longer discovered to quarantine
+	for _, cc := range active {
+		if _, ok := discoveredKeys[cc.Endpoint().Key()]; !ok {
+			quarantine = append(quarantine, cc)
+		}
+	}
+
+	// Get connections for discovered endpoints
+	newActive = make([]conn.Conn, 0, len(discovered))
+	for _, e := range discovered {
+		if cc := pool.Get(e); cc != nil {
+			newActive = append(newActive, cc)
+		}
+	}
+
+	// Put quarantined connections back to pool
+	for _, cc := range quarantine {
+		pool.Put(ctx, cc)
+	}
+
+	return nil, newActive
+}
+
 func TestNextState(t *testing.T) {
 	var (
 		ctx        = t.Context()
