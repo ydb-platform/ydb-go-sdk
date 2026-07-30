@@ -49,6 +49,13 @@ func WithExecuteQueryPartDelay(delay time.Duration) ServerOption {
 	}
 }
 
+// WithExecuteQuery runs f before QueryService.ExecuteQuery sends its response.
+func WithExecuteQuery(f func(context.Context) error) ServerOption {
+	return func(m *server) {
+		m.executeQuery = f
+	}
+}
+
 // server is a local gRPC mock (Discovery + Table + Query).
 type server struct {
 	listener   net.Listener
@@ -77,6 +84,7 @@ type server struct {
 	// executeQueryPartDelay is inserted before each ExecuteQuery response part
 	// send to simulate network latency between stream parts in benchmarks.
 	executeQueryPartDelay time.Duration
+	executeQuery          func(context.Context) error
 
 	// bulkUpsertFailFirst is the number of initial BulkUpsert calls that return
 	// bulkUpsertFailStatus before succeeding.
@@ -351,6 +359,12 @@ func (m *querySrv) ExecuteQuery(
 	stream Ydb_Query_V1.QueryService_ExecuteQueryServer,
 ) error {
 	m.mock.executeQueryCalls.Add(1)
+
+	if m.mock.executeQuery != nil {
+		if err := m.mock.executeQuery(stream.Context()); err != nil {
+			return err
+		}
+	}
 
 	if isCommitQuery(req) && m.mock.executeQueryBehavior != executeQueryBehaviorDefault {
 		return m.executeCommitQuery(req, stream)
