@@ -28,8 +28,12 @@ func WithListenerBufferSizeBytes(size int) ListenerOption {
 // It allows to set decoders fabric for custom codec and replace internal decoders.
 //
 // Replacing the decoder for topictypes.CodecRaw is discouraged because raw payloads are
-// expected to pass through unchanged. Use a custom codec ID, or decode raw messages at
-// the application level, for example using helpers from topic/topicsugar.
+// expected to pass through unchanged. Use a user-defined codec ID in the [10000, 19999]
+// range reserved by the protocol:
+// https://github.com/ydb-platform/ydb-api-protos/blob/d9841fab/protos/ydb_topic.proto#L27
+// This link refers to commit d9841fab4f5e7851294efd4801478e5b1a100799.
+// Alternatively, decode raw messages at the application level, for example using helpers
+// from topic/topicsugar.
 // A future release will reject custom decoders for topictypes.CodecRaw with an error.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
