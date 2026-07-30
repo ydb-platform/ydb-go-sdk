@@ -83,9 +83,6 @@ type (
 		query        *xsync.Once[*internalQuery.Client]
 		queryOptions []queryConfig.Option
 
-		warmUpTableClient bool
-		warmUpQueryClient bool
-
 		scripting        *xsync.Once[*internalScripting.Client]
 		scriptingOptions []scriptingConfig.Option
 
@@ -487,35 +484,37 @@ func (d *Driver) connect(ctx context.Context) error {
 	}
 	d.metaBalancer.meta = d.config.Meta()
 
+	tableClientConfig := tableConfig.New(
+		append(
+			// prepend common params from root config
+			[]tableConfig.Option{
+				tableConfig.With(d.config.Common),
+
+				tableConfig.WithMaxRequestMessageSize(d.config.GrpcMaxMessageSize()),
+			},
+			d.tableOptions...,
+		)...,
+	)
 	d.table = xsync.OnceValue(func() (*internalTable.Client, error) {
 		return internalTable.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
-			tableConfig.New(
-				append(
-					// prepend common params from root config
-					[]tableConfig.Option{
-						tableConfig.With(d.config.Common),
-
-						tableConfig.WithMaxRequestMessageSize(d.config.GrpcMaxMessageSize()),
-					},
-					d.tableOptions...,
-				)...,
-			),
+			tableClientConfig,
 		)
 	})
 
+	queryClientConfig := queryConfig.New(
+		append(
+			// prepend common params from root config
+			[]queryConfig.Option{
+				queryConfig.With(d.config.Common),
+			},
+			d.queryOptions...,
+		)...,
+	)
 	d.query = xsync.OnceValue(func() (*internalQuery.Client, error) {
 		return internalQuery.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
-			queryConfig.New(
-				append(
-					// prepend common params from root config
-					[]queryConfig.Option{
-						queryConfig.With(d.config.Common),
-					},
-					d.queryOptions...,
-				)...,
-			),
+			queryClientConfig,
 		)
 	})
 
@@ -634,12 +633,12 @@ func (d *Driver) connect(ctx context.Context) error {
 		), nil
 	})
 
-	if d.warmUpTableClient {
+	if tableClientConfig.PoolWarmUpSize() > 0 {
 		if _, err := d.table.Get(); err != nil {
 			return xerrors.WithStackTrace(fmt.Errorf("failed to warm up table client: %w", err))
 		}
 	}
-	if d.warmUpQueryClient {
+	if queryClientConfig.PoolWarmUpSize() > 0 {
 		if _, err := d.query.Get(); err != nil {
 			return xerrors.WithStackTrace(fmt.Errorf("failed to warm up query client: %w", err))
 		}
