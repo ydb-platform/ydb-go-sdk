@@ -24,6 +24,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	internalScheme "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -273,6 +275,23 @@ func TestSessionPoolWarmUpReportsBothClientFailures(t *testing.T) {
 	require.ErrorContains(t, err, "query warm-up failed")
 	require.Equal(t, int32(warmUpSessions), tableCreateCalls.Load())
 	require.Equal(t, int32(warmUpSessions), queryCreateCalls.Load())
+}
+
+func TestCleanupConnectFailureClosesLazyClients(t *testing.T) {
+	var schemeInitCalls atomic.Int32
+	d := &Driver{
+		ctxCancel: func() {},
+		scheme: xsync.OnceValue(func() (*internalScheme.Client, error) {
+			schemeInitCalls.Add(1)
+
+			return nil, context.Canceled
+		}),
+	}
+
+	d.cleanupConnectFailure(t.Context())
+	_, _ = d.scheme.Get()
+
+	require.Zero(t, schemeInitCalls.Load())
 }
 
 type warmUpDriverOpener func(context.Context, string, ...Option) (*Driver, error)

@@ -13,30 +13,33 @@ import (
 
 func TestOnceFunc(t *testing.T) {
 	var (
-		ctx = xtest.Context(t)
-		cnt = 0
+		ctx      = xtest.Context(t)
+		cnt      = 0
+		constErr = errors.New("")
 	)
 	f := OnceFunc(func(ctx context.Context) error {
 		cnt++
 
-		return nil
+		return constErr
 	})
 	require.Equal(t, 0, cnt)
-	require.NoError(t, f(ctx))
+	require.ErrorIs(t, f(ctx), constErr)
 	require.Equal(t, 1, cnt)
-	require.NoError(t, f(ctx))
+	require.ErrorIs(t, f(ctx), constErr)
 	require.Equal(t, 1, cnt)
 }
 
 type testCloser struct {
-	value    int
-	inited   bool
-	closed   bool
-	closeErr error
+	value      int
+	inited     bool
+	closed     bool
+	closeCalls int
+	closeErr   error
 }
 
 func (c *testCloser) Close(ctx context.Context) error {
 	c.closed = true
+	c.closeCalls++
 
 	return c.closeErr
 }
@@ -103,6 +106,21 @@ func TestOnceValue(t *testing.T) {
 		require.ErrorIs(t, err, constInitErr)
 		require.NoError(t, once.Close(ctx))
 		require.True(t, value.closed)
+	})
+	t.Run("CloseIsIdempotent", func(t *testing.T) {
+		constCloseErr := errors.New("")
+		value := &testCloser{
+			inited:   true,
+			closeErr: constCloseErr,
+		}
+		once := OnceValue(func() (*testCloser, error) {
+			return value, nil
+		})
+		_, err := once.Get()
+		require.NoError(t, err)
+		require.ErrorIs(t, once.Close(ctx), constCloseErr)
+		require.ErrorIs(t, once.Close(ctx), constCloseErr)
+		require.Equal(t, 1, value.closeCalls)
 	})
 	t.Run("CloseBeforeGet", func(t *testing.T) {
 		constCloseErr := errors.New("")

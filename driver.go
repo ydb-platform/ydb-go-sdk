@@ -159,13 +159,35 @@ func (c *driverDiscoveryClient) Close(ctx context.Context) error {
 
 func (d *Driver) cleanupConnectFailure(ctx context.Context) {
 	ctx = xcontext.ValueOnly(ctx)
+	// Cancel background work before tearing down the clients it may use.
 	d.ctxCancel()
 
+	if d.ratelimiter != nil {
+		_ = d.ratelimiter.Close(ctx)
+	}
+	if d.coordination != nil {
+		_ = d.coordination.Close(ctx)
+	}
+	if d.scheme != nil {
+		_ = d.scheme.Close(ctx)
+	}
+	if d.scripting != nil {
+		_ = d.scripting.Close(ctx)
+	}
 	if d.table != nil {
 		_ = d.table.Close(ctx)
 	}
+	if d.operation != nil {
+		_ = d.operation.Close(ctx)
+	}
 	if d.query != nil {
 		_ = d.query.Close(ctx)
+	}
+	if d.topic != nil {
+		_ = d.topic.Close(ctx)
+	}
+	if d.discovery != nil {
+		_ = d.discovery.Close(ctx)
 	}
 	if d.metaBalancer != nil && d.metaBalancer.close != nil {
 		_ = d.metaBalancer.Close(ctx)

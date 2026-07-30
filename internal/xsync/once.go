@@ -9,9 +9,12 @@ import (
 )
 
 func OnceFunc(f func(ctx context.Context) error) func(ctx context.Context) error {
-	var once sync.Once
+	var (
+		once sync.Once
+		err  error
+	)
 
-	return func(ctx context.Context) (err error) {
+	return func(ctx context.Context) error {
 		once.Do(func() {
 			err = f(ctx)
 		})
@@ -20,50 +23,51 @@ func OnceFunc(f func(ctx context.Context) error) func(ctx context.Context) error
 	}
 }
 
+type onceResult[T closer.Closer] struct {
+	value   T
+	initErr error
+	close   func(context.Context) error
+}
+
 type Once[T closer.Closer] struct {
-	f     func() (T, error)
-	once  sync.Once
-	mutex sync.RWMutex
-	t     T
-	err   error
+	f      func() (T, error)
+	once   sync.Once
+	result *onceResult[T]
 }
 
 func OnceValue[T closer.Closer](f func() (T, error)) *Once[T] {
 	return &Once[T]{f: f}
 }
 
-func (v *Once[T]) Close(ctx context.Context) (err error) {
-	has := true
-	v.once.Do(func() {
-		has = false
-	})
+func (v *Once[T]) Close(ctx context.Context) error {
+	v.once.Do(func() {})
 
-	if has {
-		v.mutex.RLock()
-		defer v.mutex.RUnlock()
-
-		if isNil(v.t) {
-			return nil
-		}
-
-		return v.t.Close(ctx)
+	if v.result == nil || v.result.close == nil {
+		return nil
 	}
 
-	return nil
+	return v.result.close(ctx)
 }
 
 func (v *Once[T]) Get() (T, error) {
 	v.once.Do(func() {
-		v.mutex.Lock()
-		defer v.mutex.Unlock()
-
-		v.t, v.err = v.f()
+		value, err := v.f()
+		v.result = &onceResult[T]{
+			value:   value,
+			initErr: err,
+		}
+		if !isNil(value) {
+			v.result.close = OnceFunc(value.Close)
+		}
 	})
 
-	v.mutex.RLock()
-	defer v.mutex.RUnlock()
+	if v.result == nil {
+		var zero T
 
-	return v.t, v.err
+		return zero, nil
+	}
+
+	return v.result.value, v.result.initErr
 }
 
 func (v *Once[T]) Must() T {
