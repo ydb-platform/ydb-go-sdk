@@ -71,29 +71,31 @@ func (c *selectionCtx) selectEndpoints() []endpoint.Endpoint {
 	}
 
 	if c.filter == nil {
-		return c.selectFrom(c.discovered)
+		return c.selectFrom(c.discovered, c.maxConnections)
 	}
 
 	preferred, other := partition(c.discovered, c.filter, c.info)
 	if !c.allowFallback {
-		return c.selectFrom(preferred)
+		return c.selectFrom(preferred, c.maxConnections)
 	}
 
-	selected := c.selectFrom(preferred)
+	selected := c.selectFrom(preferred, c.maxConnections)
 	if len(selected) >= c.maxConnections {
 		return selected
 	}
 
-	return append(selected, c.selectFrom(other)...)
+	// Fill only the remaining budget from fallback endpoints so that the total
+	// never exceeds maxConnections.
+	return append(selected, c.selectFrom(other, c.maxConnections-len(selected))...)
 }
 
-// selectFrom selects up to maxConnections endpoints from candidates,
+// selectFrom selects up to limit endpoints from candidates,
 // keeping existing healthy connections and filling remaining slots randomly.
-func (c *selectionCtx) selectFrom(candidates []endpoint.Endpoint) []endpoint.Endpoint {
-	if c.maxConnections <= 0 || len(candidates) == 0 {
+func (c *selectionCtx) selectFrom(candidates []endpoint.Endpoint, limit int) []endpoint.Endpoint {
+	if limit <= 0 || len(candidates) == 0 {
 		return nil
 	}
-	if len(candidates) <= c.maxConnections {
+	if len(candidates) <= limit {
 		return candidates
 	}
 
@@ -102,7 +104,7 @@ func (c *selectionCtx) selectFrom(candidates []endpoint.Endpoint) []endpoint.End
 	bannedKeys := bannedKeysFrom(c.previous)
 
 	// Step 2: keep existing healthy connections that are still in candidates
-	kept := c.keepExisting(candidateKeys)
+	kept := c.keepExisting(candidateKeys, limit)
 
 	// Step 3: fill remaining slots with new candidates
 	fill := c.fillCandidates(candidates, kept, bannedKeys)
@@ -110,14 +112,14 @@ func (c *selectionCtx) selectFrom(candidates []endpoint.Endpoint) []endpoint.End
 		fill[i], fill[j] = fill[j], fill[i]
 	})
 
-	need := min(c.maxConnections-len(kept), len(fill))
+	need := min(limit-len(kept), len(fill))
 
 	return append(kept, fill[:need]...)
 }
 
-// keepExisting returns endpoints from previous that are still in candidates.
-func (c *selectionCtx) keepExisting(candidateKeys map[endpoint.Key]struct{}) []endpoint.Endpoint {
-	kept := make([]endpoint.Endpoint, 0, min(len(c.previous), c.maxConnections))
+// keepExisting returns up to limit endpoints from previous that are still in candidates.
+func (c *selectionCtx) keepExisting(candidateKeys map[endpoint.Key]struct{}, limit int) []endpoint.Endpoint {
+	kept := make([]endpoint.Endpoint, 0, min(len(c.previous), limit))
 	for _, cc := range c.previous {
 		if cc == nil || cc.State() == state.Banned {
 			continue
@@ -127,7 +129,7 @@ func (c *selectionCtx) keepExisting(candidateKeys map[endpoint.Key]struct{}) []e
 			continue
 		}
 		kept = append(kept, cc.Endpoint())
-		if len(kept) >= c.maxConnections {
+		if len(kept) >= limit {
 			break
 		}
 	}
