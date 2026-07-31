@@ -1,5 +1,8 @@
 * Added Coordination `DescribeSemaphore` one-shot watch via `options.WithSemaphoreWatch` ([#2257](https://github.com/ydb-platform/ydb-go-sdk/issues/2257))
 
+## v3.146.3
+* Fixed custom topic decoders registered for the raw codec being ignored; raw decoder overrides are discouraged and will be rejected in a future release
+
 ## v3.146.2
 * Fixed server-side gRPC stream errors being incorrectly classified as client-side context cancellation
 
