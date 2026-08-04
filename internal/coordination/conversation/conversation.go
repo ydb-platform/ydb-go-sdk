@@ -127,6 +127,7 @@ type Conversation struct {
 	cancelMessage     func(req *Ydb_Coordination.SessionRequest) *Ydb_Coordination.SessionRequest
 	cancelFilter      ResponseFilter
 	conflictKey       string
+	conflictHeld      bool
 	requestSent       *Ydb_Coordination.SessionRequest
 	cancelRequestSent *Ydb_Coordination.SessionRequest
 	response          *Ydb_Coordination.SessionResponse
@@ -315,6 +316,7 @@ func (c *Controller) sendFront() *Ydb_Coordination.SessionRequest {
 
 		if req.conflictKey != "" {
 			c.conflicts[req.conflictKey] = struct{}{}
+			req.conflictHeld = true
 		}
 		if req.responseFilter == nil && req.acknowledgeFilter == nil && req.notifyFilter == nil {
 			c.queue = append(c.queue[:i], c.queue[i+1:]...)
@@ -372,8 +374,7 @@ func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool { //nol
 			if !req.canceled {
 				req.succeed(resp)
 
-				if req.conflictKey != "" {
-					delete(c.conflicts, req.conflictKey)
+				if c.releaseConflict(req) {
 					notify = true
 				}
 
@@ -395,8 +396,7 @@ func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool { //nol
 				}
 				req.onAbandoned = nil
 
-				if req.conflictKey != "" {
-					delete(c.conflicts, req.conflictKey)
+				if c.releaseConflict(req) {
 					notify = true
 				}
 
@@ -406,16 +406,14 @@ func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool { //nol
 			handled = true
 		case req.acknowledgeFilter != nil && req.acknowledgeFilter(req.requestSent, resp):
 			if !req.canceled {
-				if req.conflictKey != "" {
-					delete(c.conflicts, req.conflictKey)
+				if c.releaseConflict(req) {
 					notify = true
 				}
 			}
 
 			handled = true
 		case req.cancelRequestSent != nil && req.cancelFilter(req.cancelRequestSent, resp):
-			if req.conflictKey != "" {
-				delete(c.conflicts, req.conflictKey)
+			if c.releaseConflict(req) {
 				notify = true
 			}
 			c.queue = append(c.queue[:i], c.queue[i+1:]...)
@@ -451,9 +449,7 @@ func (c *Controller) OnDetach() {
 		if !req.idempotent {
 			req.fail(coordination.ErrOperationStatusUnknown)
 
-			if req.requestSent != nil && req.conflictKey != "" {
-				delete(c.conflicts, req.conflictKey)
-			}
+			c.releaseConflict(req)
 
 			c.queue = append(c.queue[:i], c.queue[i+1:]...)
 		}
@@ -502,9 +498,18 @@ func (c *Controller) abandon(req *Conversation) {
 		req.onAbandoned = nil
 	}
 
-	if req.requestSent != nil && req.conflictKey != "" {
-		delete(c.conflicts, req.conflictKey)
+	c.releaseConflict(req)
+}
+
+func (c *Controller) releaseConflict(req *Conversation) bool {
+	if !req.conflictHeld {
+		return false
 	}
+
+	delete(c.conflicts, req.conflictKey)
+	req.conflictHeld = false
+
+	return true
 }
 
 // OnAttach retries all idempotent conversations if there are any in the queue. You should call this method when the
@@ -517,9 +522,7 @@ func (c *Controller) OnAttach() {
 	for i := len(c.queue) - 1; i >= 0; i-- {
 		req := c.queue[i]
 		if req.idempotent && req.requestSent != nil {
-			if req.conflictKey != "" {
-				delete(c.conflicts, req.conflictKey)
-			}
+			c.releaseConflict(req)
 
 			// If the request has been canceled, re-send the cancellation message, otherwise re-send the original one.
 			if req.canceled {

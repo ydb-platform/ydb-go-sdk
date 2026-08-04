@@ -930,8 +930,10 @@ func TestDescribeSemaphoreWatch(t *testing.T) {
 
 		controller.mutex.Lock()
 		queueLen = len(controller.queue)
+		_, hasConflict = controller.conflicts["sem"]
 		controller.mutex.Unlock()
 		require.Equal(t, 1, queueLen) // only second conversation remains
+		require.True(t, hasConflict)  // first watch must not release the second conversation's key
 	})
 
 	t.Run("FalseWakeOnChanged", func(t *testing.T) {
