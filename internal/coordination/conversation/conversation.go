@@ -384,7 +384,7 @@ func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool { //nol
 			}
 
 			handled = true
-		case req.notifyFilter != nil && req.notifyFilter(req.requestSent, resp):
+		case req.resultDelivered && req.notifyFilter != nil && req.notifyFilter(req.requestSent, resp):
 			if !req.canceled {
 				if req.onNotify != nil {
 					// Dispatch the user handler on a separate goroutine. It must not run on the
