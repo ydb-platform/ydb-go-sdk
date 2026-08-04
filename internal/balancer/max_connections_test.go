@@ -520,12 +520,8 @@ func countCallbackSerializersAfterDialStorm(tb testing.TB, endpointCount, maxCon
 	time.Sleep(50 * time.Millisecond)
 
 	after := countGoroutinesWith("CallbackSerializer")
-	grown := after - before
-	if grown < 0 {
-		grown = after
-	}
 
-	return grown
+	return max(0, after-before)
 }
 
 func endpointKeys(conns []conn.Conn) map[endpoint.Key]struct{} {
