@@ -338,6 +338,7 @@ func TestOnRecv(t *testing.T) {
 			) bool {
 				return response.GetAcquireSemaphorePending().GetReqId() == request.GetAcquireSemaphore().GetReqId()
 			}),
+			WithConflictKey("test"),
 		)
 		err := controller.PushBack(conv)
 		require.NoError(t, err)
@@ -360,6 +361,129 @@ func TestOnRecv(t *testing.T) {
 		}
 		handled := controller.OnRecv(ackResponse)
 		require.True(t, handled)
+
+		controller.mutex.Lock()
+		_, hasConflict := controller.conflicts["test"]
+		controller.mutex.Unlock()
+		require.False(t, hasConflict)
+		require.False(t, conv.conflictHeld)
+	})
+	t.Run("NotifyBeforeResultIsIgnored", func(t *testing.T) {
+		controller := NewController()
+		conv := NewConversation(
+			func() *Ydb_Coordination.SessionRequest {
+				return &Ydb_Coordination.SessionRequest{
+					Request: &Ydb_Coordination.SessionRequest_DescribeSemaphore_{
+						DescribeSemaphore: &Ydb_Coordination.SessionRequest_DescribeSemaphore{
+							ReqId: 123,
+							Name:  "test",
+						},
+					},
+				}
+			},
+			WithNotifyFilter(func(
+				request *Ydb_Coordination.SessionRequest,
+				response *Ydb_Coordination.SessionResponse,
+			) bool {
+				return response.GetDescribeSemaphoreChanged().GetReqId() ==
+					request.GetDescribeSemaphore().GetReqId()
+			}, nil),
+			WithConflictKey("test"),
+		)
+		require.NoError(t, controller.PushBack(conv))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+		_, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+
+		handled := controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged_{
+				DescribeSemaphoreChanged: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged{
+					ReqId: 123,
+				},
+			},
+		})
+		require.False(t, handled)
+
+		controller.mutex.Lock()
+		_, hasConflict := controller.conflicts["test"]
+		queueLen := len(controller.queue)
+		controller.mutex.Unlock()
+		require.True(t, hasConflict)
+		require.True(t, conv.conflictHeld)
+		require.Equal(t, 1, queueLen)
+	})
+	t.Run("CancelResponseReleasesConflict", func(t *testing.T) {
+		controller := NewController()
+		conv := NewConversation(
+			func() *Ydb_Coordination.SessionRequest {
+				return &Ydb_Coordination.SessionRequest{
+					Request: &Ydb_Coordination.SessionRequest_AcquireSemaphore_{
+						AcquireSemaphore: &Ydb_Coordination.SessionRequest_AcquireSemaphore{
+							ReqId: 123,
+							Name:  "test",
+							Count: 1,
+						},
+					},
+				}
+			},
+			WithResponseFilter(func(
+				request *Ydb_Coordination.SessionRequest,
+				response *Ydb_Coordination.SessionResponse,
+			) bool {
+				return response.GetAcquireSemaphoreResult().GetReqId() ==
+					request.GetAcquireSemaphore().GetReqId()
+			}),
+			WithCancelMessage(
+				func(request *Ydb_Coordination.SessionRequest) *Ydb_Coordination.SessionRequest {
+					return &Ydb_Coordination.SessionRequest{
+						Request: &Ydb_Coordination.SessionRequest_ReleaseSemaphore_{
+							ReleaseSemaphore: &Ydb_Coordination.SessionRequest_ReleaseSemaphore{
+								ReqId: 456,
+								Name:  request.GetAcquireSemaphore().GetName(),
+							},
+						},
+					}
+				},
+				func(
+					request *Ydb_Coordination.SessionRequest,
+					response *Ydb_Coordination.SessionResponse,
+				) bool {
+					return response.GetReleaseSemaphoreResult().GetReqId() ==
+						request.GetReleaseSemaphore().GetReqId()
+				},
+			),
+			WithConflictKey("test"),
+		)
+		require.NoError(t, controller.PushBack(conv))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+		_, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.True(t, controller.cancel(conv))
+
+		cancelRequest, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(456), cancelRequest.GetReleaseSemaphore().GetReqId())
+
+		handled := controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_ReleaseSemaphoreResult_{
+				ReleaseSemaphoreResult: &Ydb_Coordination.SessionResponse_ReleaseSemaphoreResult{
+					ReqId: 456,
+				},
+			},
+		})
+		require.True(t, handled)
+
+		controller.mutex.Lock()
+		_, hasConflict := controller.conflicts["test"]
+		queueLen := len(controller.queue)
+		controller.mutex.Unlock()
+		require.False(t, hasConflict)
+		require.False(t, conv.conflictHeld)
+		require.Zero(t, queueLen)
 	})
 }
 

@@ -396,10 +396,6 @@ func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool { //nol
 				}
 				req.onAbandoned = nil
 
-				if c.releaseConflict(req) {
-					notify = true
-				}
-
 				c.queue = append(c.queue[:i], c.queue[i+1:]...)
 			}
 
