@@ -1181,37 +1181,6 @@ func requireConnKeys(t *testing.T, expected []endpoint.Endpoint, actual []conn.C
 	}
 }
 
-// nextState simulates the discovery state transition for testing.
-// It mirrors the 2-round quarantine-cycle semantics of
-// connectionsState.ApplyDiscovery: on every round all previously active
-// connections move to quarantine, connections for all discovered endpoints are
-// re-acquired, and the previous-round quarantine is released back to the pool.
-func nextState(
-	ctx context.Context,
-	pool poolInterface,
-	quarantine []conn.Conn,
-	active []conn.Conn,
-	discovered []endpoint.Endpoint,
-) (newQuarantine []conn.Conn, newActive []conn.Conn) {
-	// All previously active connections move to quarantine for one round.
-	newQuarantine = active
-
-	// Acquire connections for all discovered endpoints (bumps refcount).
-	newActive = make([]conn.Conn, 0, len(discovered))
-	for _, e := range discovered {
-		if cc := pool.Get(e); cc != nil {
-			newActive = append(newActive, cc)
-		}
-	}
-
-	// Release the previous-round quarantine — it completed the 2-round cycle.
-	for _, cc := range quarantine {
-		pool.Put(ctx, cc)
-	}
-
-	return newQuarantine, newActive
-}
-
 func TestNextState(t *testing.T) {
 	var (
 		ctx        = t.Context()
