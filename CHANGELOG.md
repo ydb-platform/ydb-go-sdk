@@ -1,4 +1,4 @@
-* Added Coordination `DescribeSemaphore` one-shot watch via `options.WithSemaphoreWatch` ([#2257](https://github.com/ydb-platform/ydb-go-sdk/issues/2257))
+* Added Coordination `DescribeSemaphore` one-shot watch via `options.WithSemaphoreWatch`
 
 ## v3.146.3
 * Fixed custom topic decoders registered for the raw codec being ignored; raw decoder overrides are discouraged and will be rejected in a future release
