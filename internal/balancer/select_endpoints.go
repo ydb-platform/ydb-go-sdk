@@ -16,10 +16,10 @@ import (
 // Banned connections are not kept in the sticky set and are not re-filled from
 // discovery while still present as Banned in previous, so their slots can be reused.
 //
-// When filter is set, preferred (filter-matching) endpoints are selected first.
-// Without AllowFallback, only preferred endpoints enter the active set — matching
-// PreferNearestDC / PreferLocations routing semantics and avoiding a sticky set
-// that permanently excludes the local DC.
+// When a discovery result is capped and filter is set, preferred
+// (filter-matching) endpoints are selected first. Without AllowFallback, only
+// preferred endpoints enter the limited set, avoiding a sticky set that
+// permanently excludes the local DC.
 func selectEndpoints(
 	previous []conn.Conn,
 	discovered []endpoint.Endpoint,

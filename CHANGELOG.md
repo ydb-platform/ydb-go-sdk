@@ -1,4 +1,4 @@
-* Supported the soft limit of gRPC-connections via `ydb.WithMaxConnections` / `balancers.WithMaxConnections` options. The `WithNodeID` session affinity may temporarily exceed this limit.
+* Added support for a soft limit on gRPC connections via `ydb.WithMaxConnections` / `balancers.WithMaxConnections` options. The `WithNodeID` session affinity may temporarily exceed this limit.
 
 ## v3.146.3
 * Fixed custom topic decoders registered for the raw codec being ignored; raw decoder overrides are discouraged and will be rejected in a future release

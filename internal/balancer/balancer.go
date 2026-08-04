@@ -6,6 +6,7 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"google.golang.org/grpc"
@@ -438,7 +439,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	b = &Balancer{
 		driverConfig: driverConfig,
 		pool:         pool,
-		rnd:          xrand.New(xrand.WithLock()),
+		rnd:          xrand.New(xrand.WithLock(), xrand.WithSeed(time.Now().UnixNano())),
 		address:      "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),

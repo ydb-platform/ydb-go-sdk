@@ -461,6 +461,9 @@ func TestMaxConnectionsLimitsGrpcCallbackSerializerGoroutines(t *testing.T) {
 
 	t.Logf("CallbackSerializer goroutines: unlimited=%d maxConnections=%d -> %d",
 		withoutLimit, maxConns, withLimit)
+	if withoutLimit == 0 {
+		t.Skip("gRPC CallbackSerializer goroutines are not observable in runtime.Stack")
+	}
 
 	require.Greater(t, withoutLimit, withLimit,
 		"without MaxConnections dial storm should leave more CallbackSerializer goroutines")
