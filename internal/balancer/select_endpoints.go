@@ -137,65 +137,6 @@ func partitionEndpoints(
 	return preferred, other
 }
 
-func connectionIndex(conns []conn.Conn, target conn.Conn) int {
-	for i, cc := range conns {
-		if cc == target || (cc != nil && cc.Endpoint().Key() == target.Endpoint().Key()) {
-			return i
-		}
-	}
-
-	return -1
-}
-
-func replacementEndpoint(
-	discovered []endpoint.Endpoint,
-	active []conn.Conn,
-	excluded endpoint.Key,
-	filter balancerConfig.Filter,
-	info balancerConfig.Info,
-	allowFallback bool,
-	rnd xrand.Rand,
-) endpoint.Endpoint {
-	activeKeys := connKeys(active)
-	pick := func(from []endpoint.Endpoint) endpoint.Endpoint {
-		candidates := make([]endpoint.Endpoint, 0, len(from))
-		for _, e := range from {
-			if _, exists := activeKeys[e.Key()]; exists {
-				continue
-			}
-			if e.Key() != excluded {
-				candidates = append(candidates, e)
-			}
-		}
-		switch len(candidates) {
-		case 0:
-			return nil
-		case 1:
-			return candidates[0]
-		default:
-			if rnd == nil {
-				return candidates[0]
-			}
-
-			return candidates[rnd.Int(len(candidates))]
-		}
-	}
-
-	if filter == nil {
-		return pick(discovered)
-	}
-
-	preferred, other := partitionEndpoints(discovered, filter, info)
-	if e := pick(preferred); e != nil {
-		return e
-	}
-	if allowFallback {
-		return pick(other)
-	}
-
-	return nil
-}
-
 func endpointByNodeID(endpoints []endpoint.Endpoint, nodeID uint32) endpoint.Endpoint {
 	for _, e := range endpoints {
 		if e.NodeID() == nodeID {
@@ -204,16 +145,4 @@ func endpointByNodeID(endpoints []endpoint.Endpoint, nodeID uint32) endpoint.End
 	}
 
 	return nil
-}
-
-func connKeys(conns []conn.Conn) map[endpoint.Key]struct{} {
-	keys := make(map[endpoint.Key]struct{}, len(conns))
-	for _, cc := range conns {
-		if cc == nil {
-			continue
-		}
-		keys[cc.Endpoint().Key()] = struct{}{}
-	}
-
-	return keys
 }

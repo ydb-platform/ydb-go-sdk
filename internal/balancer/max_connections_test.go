@@ -19,7 +19,6 @@ import (
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
-	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
@@ -176,7 +175,7 @@ func TestPreferNearestDCWithFallbackMaxConnectionsPrefersLocal(t *testing.T) {
 	require.Equal(t, 3, localCount)
 }
 
-func TestBanEvictsFromMaxConnections(t *testing.T) {
+func TestBanForcesDiscoveryForMaxConnections(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -184,10 +183,14 @@ func TestBanEvictsFromMaxConnections(t *testing.T) {
 	pool := conn.NewPool(ctx, cfg)
 	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
 
+	forced := 0
 	b := &Balancer{
 		driverConfig: cfg,
 		pool:         pool,
 		rnd:          testBalancerRand(),
+		discoveryRepeater: &stubRepeater{forceFn: func() {
+			forced++
+		}},
 		balancerConfig: balancerConfig.Config{
 			MaxConnections: 3,
 		},
@@ -197,233 +200,43 @@ func TestBanEvictsFromMaxConnections(t *testing.T) {
 	b.applyDiscoveredEndpoints(ctx, endpoints, "")
 	require.Len(t, b.connections().All(), 3)
 
-	before := endpointKeys(b.connections().All())
 	banned := b.connections().All()[0]
 	bannedKey := banned.Endpoint().Key()
 	b.handleBan(ctx, banned, fmt.Errorf("transport: %w", status.Error(codes.Unavailable, "down")))
 
-	after := b.connections().All()
-	require.Len(t, after, 3)
-	for _, cc := range after {
-		require.NotEqual(t, bannedKey, cc.Endpoint().Key())
-	}
-	require.NotEqual(t, before, endpointKeys(after))
-	// Test-constructed balancers release via synchronous Put (no release worker).
-	require.NotEqual(t, state.Online, banned.State())
-	require.NotEqual(t, state.Created, banned.State())
-	require.NotEqual(t, state.Banned, banned.State())
-}
-
-func TestBanWithoutReplacementKeepsBannedConnection(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	cfg := config.New()
-	pool := conn.NewPool(ctx, cfg)
-	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
-
-	b := &Balancer{
-		driverConfig:      cfg,
-		pool:              pool,
-		rnd:               testBalancerRand(),
-		discoveryRepeater: &stubRepeater{},
-		balancerConfig: balancerConfig.Config{
-			MaxConnections: 1,
-		},
-	}
-	b.applyDiscoveredEndpoints(ctx, discoveredEndpoints(1), "")
-
-	banned := b.connections().All()[0]
-	b.handleBan(ctx, banned, status.Error(codes.Unavailable, "down"))
-
-	require.Len(t, b.connections().All(), 1)
-	require.Equal(t, banned.Endpoint().Key(), b.connections().All()[0].Endpoint().Key())
+	require.Equal(t, 1, forced)
+	require.Len(t, b.connections().All(), 3)
+	require.Contains(t, endpointKeys(b.connections().All()), bannedKey)
 	require.Equal(t, state.Banned, banned.State())
-}
 
-func TestApplyBalancerConfigNil(t *testing.T) {
-	b := &Balancer{}
-	b.applyBalancerConfig(nil)
-	require.Equal(t, balancerConfig.Config{}, b.balancerConfig)
-	require.Nil(t, b.releaseCh)
-}
-
-func TestNewSingleConnDoesNotStartReleaseWorker(t *testing.T) {
-	ctx := context.Background()
-	cfg := config.New(
-		config.WithEndpoint("127.0.0.1:2135"),
-		config.WithBalancer(&balancerConfig.Config{
-			SingleConn:     true,
-			MaxConnections: 1,
-		}),
-	)
-	pool := conn.NewPool(ctx, cfg)
-	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
-
-	b, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
-	require.NoError(t, err)
-	require.Nil(t, b.releaseCh, "SingleConn never replaces its sole endpoint")
-	require.Nil(t, b.releaseStop)
-
-	require.NoError(t, b.Close(ctx))
-	require.ErrorIs(t, b.Close(ctx), errBalancerClosed)
-}
-
-func TestBanEvictsViaReleaseWorker(t *testing.T) {
-	ctx := context.Background()
-	cfg := config.New()
-	pool := conn.NewPool(ctx, cfg)
-	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
-
-	b := &Balancer{
-		driverConfig: cfg,
-		pool:         pool,
-		rnd:          testBalancerRand(),
-	}
-	b.applyBalancerConfig(&balancerConfig.Config{MaxConnections: 3})
-	t.Cleanup(func() { require.NoError(t, b.Close(ctx)) })
-
-	endpoints := discoveredEndpoints(10)
+	// The discovery loop is the only owner of active-set changes. Its sticky
+	// selection skips the banned endpoint and fills the released slot.
 	b.applyDiscoveredEndpoints(ctx, endpoints, "")
 	require.Len(t, b.connections().All(), 3)
-
-	banned := b.connections().All()[0]
-	bannedKey := banned.Endpoint().Key()
-	b.handleBan(ctx, banned, status.Error(codes.Unavailable, "down"))
-
-	require.Eventually(t, func() bool {
-		st := banned.State()
-
-		return st != state.Online && st != state.Created && st != state.Banned
-	}, time.Second, 10*time.Millisecond)
-
 	for _, cc := range b.connections().All() {
 		require.NotEqual(t, bannedKey, cc.Endpoint().Key())
 	}
 }
 
-func TestEnqueueReleaseEdges(t *testing.T) {
+func TestHandleBanUnlimitedDoesNotForceDiscovery(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.New()
 	pool := conn.NewPool(ctx, cfg)
 	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
-
-	t.Run("nil conn", func(t *testing.T) {
-		b := &Balancer{pool: pool}
-		b.enqueueRelease(ctx, nil)
-	})
-
-	t.Run("after stop with full buffer", func(t *testing.T) {
-		b := &Balancer{pool: pool}
-		ch := make(chan conn.Conn, 1)
-		stop := make(chan struct{})
-		close(stop)
-		b.releaseCh = ch
-		b.releaseStop = stop
-
-		filler := pool.Get(endpoint.New("filler.example:2135", endpoint.WithID(1)))
-		require.NotNil(t, filler)
-		ch <- filler
-
-		released := pool.Get(endpoint.New("released.example:2135", endpoint.WithID(2)))
-		require.NotNil(t, released)
-		b.enqueueRelease(ctx, released)
-		require.NotEqual(t, state.Online, released.State())
-		require.NotEqual(t, state.Created, released.State())
-
-		pool.Put(ctx, filler)
-	})
-}
-
-func TestReleaseLoopDrainsBufferedOnStop(t *testing.T) {
-	ctx := context.Background()
-	cfg := config.New()
-	pool := conn.NewPool(ctx, cfg)
-	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
-
-	b := &Balancer{pool: pool}
-	ch := make(chan conn.Conn, 2)
-	stop := make(chan struct{})
-	b.releaseDone = make(chan struct{})
-
-	cc1 := pool.Get(endpoint.New("drain-a.example:2135", endpoint.WithID(1)))
-	cc2 := pool.Get(endpoint.New("drain-b.example:2135", endpoint.WithID(2)))
-	require.NotNil(t, cc1)
-	require.NotNil(t, cc2)
-	ch <- cc1
-	ch <- cc2
-	close(stop)
-
-	b.releaseLoop(ch, stop)
-
-	require.NotEqual(t, state.Online, cc1.State())
-	require.NotEqual(t, state.Created, cc1.State())
-	require.NotEqual(t, state.Online, cc2.State())
-	require.NotEqual(t, state.Created, cc2.State())
-}
-
-func TestReplaceBannedConnIgnoresInapplicableConnections(t *testing.T) {
-	ctx := context.Background()
-	cfg := config.New()
-	pool := conn.NewPool(ctx, cfg)
-	t.Cleanup(func() { _ = pool.RemoveRef(ctx) })
-
-	cc := pool.Get(endpoint.New("not-active.example:2135", endpoint.WithID(404)))
+	cc := pool.Get(endpoint.New("example:2135", endpoint.WithID(1)))
+	require.NotNil(t, cc)
 	t.Cleanup(func() { pool.Put(ctx, cc) })
 
-	for _, test := range []struct {
-		name string
-		b    *Balancer
-	}{
-		{
-			name: "unlimited",
-			b: &Balancer{
-				pool: pool,
-				balancerConfig: balancerConfig.Config{
-					MaxConnections: 0,
-				},
-			},
-		},
-		{
-			name: "closed",
-			b: &Balancer{
-				pool: pool,
-				balancerConfig: balancerConfig.Config{
-					MaxConnections: 1,
-				},
-				closed: true,
-			},
-		},
-		{
-			name: "empty state",
-			b: &Balancer{
-				pool: pool,
-				balancerConfig: balancerConfig.Config{
-					MaxConnections: 1,
-				},
-			},
-		},
-		{
-			name: "not active",
-			b: &Balancer{
-				pool: pool,
-				balancerConfig: balancerConfig.Config{
-					MaxConnections: 1,
-				},
-			},
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			if test.name == "not active" {
-				test.b.connectionsState.Store(newConnectionsState(
-					nil, nil, balancerConfig.Info{}, false, nil,
-				))
-			}
-
-			test.b.replaceBannedConn(ctx, cc)
-			test.b.replaceBannedConn(ctx, nil)
-		})
+	forced := 0
+	b := &Balancer{
+		pool:              pool,
+		discoveryRepeater: &stubRepeater{forceFn: func() { forced++ }},
+		balancerConfig:    balancerConfig.Config{MaxConnections: 0},
 	}
+
+	b.handleBan(ctx, cc, status.Error(codes.Unavailable, "down"))
+
+	require.Zero(t, forced)
 }
 
 func TestForceDiscoveryIfNeeded(t *testing.T) {

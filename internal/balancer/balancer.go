@@ -86,14 +86,6 @@ type Balancer struct {
 	lastDiscovered []endpoint.Endpoint
 	selfLocation   string
 
-	// releaseCh serializes pool.Put of connections evicted after Ban.
-	// Put/Close must not run on the stream RecvMsg stack: grpc.ClientConn.Close
-	// waits for in-flight RPCs, which deadlocks if called from RecvMsg itself.
-	// A single worker avoids spawning an unbounded goroutine per ban.
-	releaseCh   chan conn.Conn
-	releaseStop chan struct{}
-	releaseDone chan struct{}
-
 	closeMu sync.Mutex
 	closed  bool
 }
@@ -345,136 +337,15 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	)
 }
 
-// handleBan pessimizes the connection and, when MaxConnections is set, evicts it
-// from the active set so a live discovered endpoint can take its slot.
+// handleBan pessimizes the connection and asks the discovery loop to rebuild the
+// limited active set. Discovery skips banned connections while selecting the
+// sticky subset and owns all connection reference changes, so pool.Put never
+// runs from a stream RecvMsg callback.
 func (b *Balancer) handleBan(ctx context.Context, cc conn.Conn, cause error) {
 	b.pool.Ban(ctx, cc, cause)
-	b.replaceBannedConn(ctx, cc)
-}
-
-func (b *Balancer) replaceBannedConn(ctx context.Context, banned conn.Conn) {
-	if b.balancerConfig.MaxConnections <= 0 || banned == nil {
-		return
+	if b.balancerConfig.MaxConnections > 0 {
+		b.forceDiscovery()
 	}
-
-	released, rep := b.swapBannedConn(ctx, banned)
-	if rep != nil {
-		rep.Force()
-
-		return
-	}
-	if released == nil {
-		return
-	}
-
-	b.enqueueRelease(ctx, released)
-}
-
-// enqueueRelease releases a balancer-owned pool ref outside the Ban/RecvMsg
-// call stack. Production balancers use a single release worker; test-constructed
-// balancers without a worker fall back to a synchronous Put.
-func (b *Balancer) enqueueRelease(ctx context.Context, cc conn.Conn) {
-	if cc == nil {
-		return
-	}
-
-	b.closeMu.Lock()
-	ch := b.releaseCh
-	stop := b.releaseStop
-	closed := b.closed
-	b.closeMu.Unlock()
-
-	if closed || ch == nil || stop == nil {
-		b.pool.Put(xcontext.ValueOnly(ctx), cc)
-
-		return
-	}
-
-	select {
-	case ch <- cc:
-	case <-stop:
-		// Close already asked the worker to stop; finish release synchronously.
-		b.pool.Put(xcontext.ValueOnly(ctx), cc)
-	}
-}
-
-func (b *Balancer) releaseLoop(ch <-chan conn.Conn, stop <-chan struct{}) {
-	defer close(b.releaseDone)
-
-	for {
-		select {
-		case <-stop:
-			for {
-				select {
-				case cc := <-ch:
-					b.pool.Put(context.Background(), cc)
-				default:
-					return
-				}
-			}
-		case cc := <-ch:
-			b.pool.Put(context.Background(), cc)
-		}
-	}
-}
-
-// swapBannedConn evicts banned from the active set when another discovered
-// endpoint can take its MaxConnections slot. Returns the connection to release
-// and an optional discovery repeater to force when no replacement exists.
-func (b *Balancer) swapBannedConn(ctx context.Context, banned conn.Conn) (
-	released conn.Conn,
-	force repeater.Repeater,
-) {
-	b.closeMu.Lock()
-	defer b.closeMu.Unlock()
-
-	if b.closed {
-		return nil, nil
-	}
-
-	state := b.connectionsState.Load()
-	if state == nil {
-		return nil, nil
-	}
-
-	active := state.All()
-	idx := connectionIndex(active, banned)
-	if idx < 0 {
-		return nil, nil
-	}
-
-	withoutBanned := append(active[:idx:idx], active[idx+1:]...)
-	replacement := replacementEndpoint(
-		b.lastDiscovered,
-		withoutBanned,
-		banned.Endpoint().Key(),
-		b.balancerConfig.Filter,
-		balancerConfig.Info{SelfLocation: b.selfLocation},
-		b.balancerConfig.AllowFallback,
-		b.rnd,
-	)
-	if replacement == nil {
-		// No other discovered endpoint can take the slot. Keep the banned
-		// connection in the active set (usable as last resort / for retry).
-		return nil, b.discoveryRepeater
-	}
-
-	newActive := withoutBanned
-	if cc := b.pool.Get(replacement); cc != nil {
-		cc.Unban(ctx)
-		newActive = append(newActive, cc)
-	}
-
-	b.connectionsState.Store(
-		newConnectionsState(newActive,
-			b.balancerConfig.Filter,
-			balancerConfig.Info{SelfLocation: b.selfLocation},
-			b.balancerConfig.AllowFallback,
-			state.quarantine,
-		),
-	)
-
-	return banned, nil
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
@@ -493,10 +364,6 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	b.discoveryRepeater = nil
 
 	discoveryCC := b.cc.Swap(nil)
-	releaseStop := b.releaseStop
-	b.releaseCh = nil
-	b.releaseStop = nil
-
 	b.closeMu.Unlock()
 
 	onDone := gtrace.DriverOnBalancerClose(
@@ -506,11 +373,6 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	defer func() {
 		onDone(err)
 	}()
-
-	if releaseStop != nil {
-		close(releaseStop)
-		<-b.releaseDone
-	}
 
 	if rep != nil {
 		rep.Stop()
@@ -621,17 +483,6 @@ func (b *Balancer) applyBalancerConfig(config *balancerConfig.Config) {
 	} else {
 		b.balancerConfig = *config
 	}
-
-	// Ban eviction is used only with MaxConnections>0 and a multi-endpoint sticky
-	// set. SingleConn never replaces the sole endpoint, so skip the release worker.
-	if n := b.balancerConfig.MaxConnections; n > 0 && !b.balancerConfig.SingleConn {
-		ch := make(chan conn.Conn, n)
-		stop := make(chan struct{})
-		b.releaseCh = ch
-		b.releaseStop = stop
-		b.releaseDone = make(chan struct{})
-		go b.releaseLoop(ch, stop)
-	}
 }
 
 func (b *Balancer) Invoke(
@@ -718,6 +569,10 @@ func (b *Balancer) forceDiscoveryIfNeeded(failedCount *int, preferredCount int) 
 		return
 	}
 
+	b.forceDiscovery()
+}
+
+func (b *Balancer) forceDiscovery() {
 	b.closeMu.Lock()
 	rep := b.discoveryRepeater
 	b.closeMu.Unlock()

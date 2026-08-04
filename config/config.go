@@ -294,19 +294,7 @@ func WithGrpcMaxMessageSize(sizeBytes int) Option {
 
 func WithBalancer(balancer *balancerConfig.Config) Option {
 	return func(c *Config) {
-		if balancer == nil {
-			c.balancerConfig = nil
-
-			return
-		}
-		cfg := *balancer
-		// Preserve a non-zero MaxConnections already applied via WithMaxConnections
-		// when the incoming balancer preset leaves MaxConnections at zero
-		// (unlimited / unset on RandomChoice and similar presets).
-		if cfg.MaxConnections == 0 && c.balancerConfig != nil && c.balancerConfig.MaxConnections != 0 {
-			cfg.MaxConnections = c.balancerConfig.MaxConnections
-		}
-		c.balancerConfig = &cfg
+		c.balancerConfig = balancer
 	}
 }
 

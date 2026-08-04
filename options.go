@@ -362,10 +362,8 @@ func WithBalancer(balancer *balancerConfig.Config) Option {
 // balancer keeps in its active connection set.
 //
 // The limit is opt-in: the default is unlimited (all discovered endpoints stay
-// active). Prefer applying this after [WithBalancer], or use
-// [balancers.WithMaxConnections] on the balancer config. When [WithBalancer]
-// follows [WithMaxConnections], a non-zero MaxConnections already set on the
-// driver is preserved if the incoming balancer leaves MaxConnections at zero.
+// active). Apply this after [WithBalancer], or use [balancers.WithMaxConnections]
+// on the balancer config.
 //
 // The limit is enforced in the balancer (sticky subset across discovery
 // updates). Banned connections are evicted so slots can be reused for live
