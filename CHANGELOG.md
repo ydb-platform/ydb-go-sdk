@@ -1,5 +1,11 @@
 * Supported the soft limit of gRPC-connections via `ydb.WithMaxConnections` / `balancers.WithMaxConnections` options. The `WithNodeID` session affinity may temporarily exceed this limit.
 
+## v3.146.3
+* Fixed custom topic decoders registered for the raw codec being ignored; raw decoder overrides are discouraged and will be rejected in a future release
+
+## v3.146.2
+* Fixed server-side gRPC stream errors being incorrectly classified as client-side context cancellation
+
 ## v3.146.1
 * Fixed YQL issue logs to preserve the event message and include bounded nested issue details
 
