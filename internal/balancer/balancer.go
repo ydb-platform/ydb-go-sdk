@@ -482,6 +482,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 
 	return b, nil
 }
+
 func (b *Balancer) Invoke(
 	ctx context.Context,
 	method string,
