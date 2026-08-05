@@ -21,10 +21,14 @@ func RandomChoice() *balancerConfig.Config {
 	return &balancerConfig.Config{}
 }
 
-func SingleConn() *balancerConfig.Config {
+func NoDiscovery() *balancerConfig.Config {
 	return &balancerConfig.Config{
-		SingleConn: true,
+		NoDiscovery: true,
 	}
+}
+
+func SingleConn() *balancerConfig.Config {
+	return NoDiscovery()
 }
 
 type filterLocalDC struct{}
