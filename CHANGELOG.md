@@ -1,3 +1,5 @@
+* Added Coordination `DescribeSemaphore` one-shot watch via `options.WithSemaphoreWatch`
+
 ## v3.146.3
 * Fixed custom topic decoders registered for the raw codec being ignored; raw decoder overrides are discouraged and will be rejected in a future release
 
