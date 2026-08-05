@@ -428,19 +428,25 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	}
 
+	balancerCfg := balancerConfig.Config{}
+	if configured := driverConfig.Balancer(); configured != nil {
+		balancerCfg = *configured
+	}
+
 	onDone := gtrace.DriverOnBalancerInit(driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.New"),
-		driverConfig.Balancer().String(),
+		balancerCfg.String(),
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 
 	b = &Balancer{
-		driverConfig: driverConfig,
-		pool:         pool,
-		rnd:          xrand.New(xrand.WithLock(), xrand.WithSeed(time.Now().UnixNano())),
-		address:      "ydb:///" + driverConfig.Endpoint(),
+		driverConfig:   driverConfig,
+		balancerConfig: balancerCfg,
+		pool:           pool,
+		rnd:            xrand.New(xrand.WithLock(), xrand.WithSeed(time.Now().UnixNano())),
+		address:        "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),
 			discoveryConfig.WithEndpoint(driverConfig.Endpoint()),
@@ -452,7 +458,6 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	}
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
-	b.applyBalancerConfig(driverConfig.Balancer())
 
 	if b.balancerConfig.SingleConn {
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
@@ -477,15 +482,6 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 
 	return b, nil
 }
-
-func (b *Balancer) applyBalancerConfig(config *balancerConfig.Config) {
-	if config == nil {
-		b.balancerConfig = balancerConfig.Config{}
-	} else {
-		b.balancerConfig = *config
-	}
-}
-
 func (b *Balancer) Invoke(
 	ctx context.Context,
 	method string,

@@ -392,6 +392,26 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	require.Equal(t, 1, events.closedCount(node2))
 }
 
+func TestNewWithNilBalancerConfig(t *testing.T) {
+	ctx := t.Context()
+	srv := startDynamicDiscoveryServer(t, []uint32{1})
+	cfg := config.New(
+		config.WithEndpoint(srv.endpoint()),
+		config.WithDatabase("/local"),
+		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		config.WithBalancer(nil),
+	)
+	pool := conn.NewPool(ctx, cfg)
+	t.Cleanup(func() {
+		require.NoError(t, pool.RemoveRef(ctx))
+	})
+
+	b, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
+	require.NoError(t, err)
+	require.Equal(t, balancerConfig.Config{}, b.balancerConfig)
+	require.NoError(t, b.Close(ctx))
+}
+
 func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
 	const (
 		node1 uint32 = 1

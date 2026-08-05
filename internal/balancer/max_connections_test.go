@@ -262,17 +262,6 @@ func TestForceDiscoveryIfNeeded(t *testing.T) {
 	}, "forcing discovery without a background repeater must be a no-op")
 }
 
-func TestApplyBalancerConfig(t *testing.T) {
-	b := &Balancer{}
-
-	b.applyBalancerConfig(nil)
-	require.Equal(t, balancerConfig.Config{}, b.balancerConfig)
-
-	expected := balancerConfig.Config{MaxConnections: 3, AllowFallback: true}
-	b.applyBalancerConfig(&expected)
-	require.Equal(t, expected, b.balancerConfig)
-}
-
 func TestPinOutsideActiveSetSoftExceedsLimit(t *testing.T) {
 	for _, fallback := range []bool{false, true} {
 		t.Run(fmt.Sprintf("fallback=%t", fallback), func(t *testing.T) {
