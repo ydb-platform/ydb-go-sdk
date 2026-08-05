@@ -69,6 +69,16 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 		return nil, 0
 	}
 
+	return s.GetConnectionUnpinned(ctx)
+}
+
+// GetConnectionUnpinned selects a connection without checking context node pin.
+// Use when the caller already handled (or skipped) pin affinity.
+func (s *connectionsState) GetConnectionUnpinned(ctx context.Context) (_ conn.Conn, failedCount int) {
+	if err := ctx.Err(); err != nil {
+		return nil, 0
+	}
+
 	try := func(conns []conn.Conn) conn.Conn {
 		c, tryFailed := s.selectRandomConnection(conns, false)
 		failedCount += tryFailed

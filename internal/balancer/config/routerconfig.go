@@ -14,6 +14,16 @@ type Config struct {
 	AllowFallback   bool
 	SingleConn      bool
 	DetectNearestDC bool
+
+	// MaxConnections limits how many discovered endpoints the balancer keeps
+	// dialed/active at once (sticky subset, similar to ydb-python-sdk).
+	//
+	// Zero means unlimited.
+	//
+	// Soft limit: balancers.WithNodeID / session affinity to a node outside the
+	// active set, or CreateSession returning a different node than the one that
+	// handled the RPC, may open additional connections beyond MaxConnections.
+	MaxConnections int
 }
 
 func (c Config) String() string {
@@ -31,6 +41,9 @@ func (c Config) String() string {
 
 	buffer.WriteString(",AllowFallback=")
 	fmt.Fprintf(buffer, "%t", c.AllowFallback)
+
+	buffer.WriteString(",MaxConnections=")
+	fmt.Fprintf(buffer, "%d", c.MaxConnections)
 
 	if c.Filter != nil {
 		buffer.WriteString(",Filter=")

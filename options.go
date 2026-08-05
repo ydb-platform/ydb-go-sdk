@@ -358,6 +358,33 @@ func WithBalancer(balancer *balancerConfig.Config) Option {
 	}
 }
 
+// WithMaxConnections limits how many discovered YDB endpoints the client
+// balancer keeps in its active connection set.
+//
+// The limit is opt-in: the default is unlimited (all discovered endpoints stay
+// active). Apply this after [WithBalancer], or use [balancers.WithMaxConnections]
+// on the balancer config.
+//
+// The limit is enforced in the balancer (sticky subset across discovery
+// updates). Banned connections are excluded from the limited active set on the
+// next successful discovery update, allowing their slots to be reused. The
+// underlying connection cache remains unbounded: child drivers created via
+// [Driver.With] may still hold additional connections.
+//
+// Soft limit: [balancers.WithNodeID], table/query session affinity, or topic
+// pin to a node outside the active set may open extra connections.
+// CreateSession handled on node A may return a session owned by node B —
+// subsequent RPCs need a connection to B even if B was not selected.
+//
+// Zero disables the limit (unlimited). Negative values are treated as zero.
+func WithMaxConnections(n int) Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.options = append(d.options, config.WithMaxConnections(n))
+
+		return nil
+	}
+}
+
 // WithDialTimeout sets timeout for establishing new Driver to cluster
 //
 // Default dial timeout is config.DefaultDialTimeout

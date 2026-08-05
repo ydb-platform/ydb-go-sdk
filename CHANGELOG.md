@@ -1,3 +1,5 @@
+* Added support for a soft limit on gRPC connections via `ydb.WithMaxConnections` / `balancers.WithMaxConnections` options. The `WithNodeID` session affinity may temporarily exceed this limit.
+
 ## v3.147.0
 * Added Coordination `DescribeSemaphore` one-shot watch via `options.WithSemaphoreWatch`
 

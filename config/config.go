@@ -298,6 +298,24 @@ func WithBalancer(balancer *balancerConfig.Config) Option {
 	}
 }
 
+// WithMaxConnections sets balancer MaxConnections. See ydb.WithMaxConnections.
+// Negative values are treated as zero (unlimited).
+func WithMaxConnections(n int) Option {
+	return func(c *Config) {
+		if n < 0 {
+			n = 0
+		}
+		if c.balancerConfig == nil {
+			c.balancerConfig = &balancerConfig.Config{MaxConnections: n}
+
+			return
+		}
+		cfg := *c.balancerConfig
+		cfg.MaxConnections = n
+		c.balancerConfig = &cfg
+	}
+}
+
 func WithRequestsType(requestsType string) Option {
 	return func(c *Config) {
 		c.metaOptions = append(c.metaOptions, meta.WithRequestTypeOption(requestsType))

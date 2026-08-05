@@ -6,6 +6,7 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"google.golang.org/grpc"
@@ -26,6 +27,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -69,6 +71,7 @@ type Balancer struct {
 	discoveryConfig   *discoveryConfig.Config
 	pool              *conn.Pool
 	discoveryRepeater repeater.Repeater
+	rnd               xrand.Rand
 
 	address string
 	cc      atomic.Pointer[grpc.ClientConn]
@@ -77,6 +80,12 @@ type Balancer struct {
 	localDCDetector func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
 	connectionsState atomic.Pointer[connectionsState]
+
+	// lastDiscovered is the full endpoint list from the latest discovery (before
+	// MaxConnections sticky selection). Used to replace banned connections and
+	// to dial pin/overflow targets outside the active set.
+	lastDiscovered []endpoint.Endpoint
+	selfLocation   string
 
 	closeMu sync.Mutex
 	closed  bool
@@ -267,15 +276,6 @@ func (b *Balancer) releaseStateConns(ctx context.Context, state *connectionsStat
 }
 
 func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
-	b.closeMu.Lock()
-	defer b.closeMu.Unlock()
-
-	if b.closed {
-		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
-
-		return
-	}
-
 	var (
 		onDone = gtrace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
@@ -284,20 +284,13 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 			b.balancerConfig.DetectNearestDC,
 			b.driverConfig.Database(),
 		)
-		state      = b.connectionsState.Load()
-		active     []conn.Conn
-		quarantine []conn.Conn
+		active, quarantine, connections []conn.Conn
+		selected                        []endpoint.Endpoint
 	)
-
-	if state != nil {
-		active = state.All()
-		quarantine = state.quarantine
-	}
-
 	defer func() {
 		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
 			return cc.Endpoint()
-		}), endpoints, endpoint.Compare)
+		}), selected, endpoint.Compare)
 
 		onDone(
 			xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
@@ -307,8 +300,34 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 		)
 	}()
 
-	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
 
+	if b.closed {
+		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
+
+		return
+	}
+
+	state := b.connectionsState.Load()
+	if state != nil {
+		active = state.All()
+		quarantine = state.quarantine
+	}
+
+	selected = selectEndpoints(
+		active,
+		endpoints,
+		b.balancerConfig.MaxConnections,
+		b.balancerConfig.Filter,
+		balancerConfig.Info{SelfLocation: localDC},
+		b.balancerConfig.AllowFallback,
+		b.rnd,
+	)
+	quarantine, connections = nextState(ctx, b.pool, quarantine, active, selected)
+
+	b.lastDiscovered = append([]endpoint.Endpoint(nil), endpoints...)
+	b.selfLocation = localDC
 	b.connectionsState.Store(
 		newConnectionsState(connections,
 			b.balancerConfig.Filter,
@@ -317,6 +336,17 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 			quarantine,
 		),
 	)
+}
+
+// handleBan pessimizes the connection and asks the discovery loop to rebuild the
+// limited active set. Discovery skips banned connections while selecting the
+// sticky subset and owns all connection reference changes, so pool.Put never
+// runs from a stream RecvMsg callback.
+func (b *Balancer) handleBan(ctx context.Context, cc conn.Conn, cause error) {
+	b.pool.Ban(ctx, cc, cause)
+	if b.balancerConfig.MaxConnections > 0 {
+		b.forceDiscovery()
+	}
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
@@ -335,7 +365,6 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	b.discoveryRepeater = nil
 
 	discoveryCC := b.cc.Swap(nil)
-
 	b.closeMu.Unlock()
 
 	onDone := gtrace.DriverOnBalancerClose(
@@ -399,18 +428,25 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	}
 
+	balancerCfg := balancerConfig.Config{}
+	if configured := driverConfig.Balancer(); configured != nil {
+		balancerCfg = *configured
+	}
+
 	onDone := gtrace.DriverOnBalancerInit(driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.New"),
-		driverConfig.Balancer().String(),
+		balancerCfg.String(),
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 
 	b = &Balancer{
-		driverConfig: driverConfig,
-		pool:         pool,
-		address:      "ydb:///" + driverConfig.Endpoint(),
+		driverConfig:   driverConfig,
+		balancerConfig: balancerCfg,
+		pool:           pool,
+		rnd:            xrand.New(xrand.WithLock(), xrand.WithSeed(time.Now().UnixNano())),
+		address:        "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),
 			discoveryConfig.WithEndpoint(driverConfig.Endpoint()),
@@ -423,12 +459,6 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
 
-	if config := driverConfig.Balancer(); config == nil {
-		b.balancerConfig = balancerConfig.Config{}
-	} else {
-		b.balancerConfig = *config
-	}
-
 	if b.balancerConfig.SingleConn {
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
 			endpoint.New(driverConfig.Endpoint()),
@@ -436,6 +466,8 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	} else {
 		// initialization of balancer state
 		if err := b.clusterDiscovery(ctx); err != nil {
+			_ = b.Close(xcontext.ValueOnly(ctx))
+
 			return nil, xerrors.WithStackTrace(err)
 		}
 		// run background discovering
@@ -479,7 +511,7 @@ func (b *Balancer) NewStream(
 			ClientStream: inner,
 			onErr: func(err error) {
 				if IsBadConn(ctx, err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
-					b.pool.Ban(ctx, cc, err)
+					b.handleBan(ctx, cc, err)
 				}
 			},
 		}
@@ -501,12 +533,12 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 	defer func() {
 		if err != nil && cc.State() != state.Banned &&
 			IsBadConn(ctx, err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
-			b.pool.Ban(ctx, cc, err)
+			b.handleBan(ctx, cc, err)
 		}
 	}()
 
 	if err = f(conn.WithBanCallback(ctx, func(cause error) {
-		b.pool.Ban(ctx, cc, cause)
+		b.handleBan(ctx, cc, cause)
 	}), cc); err != nil {
 		if conn.UseWrapping(ctx) {
 			if credentials.IsAccessError(err) {
@@ -530,6 +562,29 @@ func (b *Balancer) connections() *connectionsState {
 	return b.connectionsState.Load()
 }
 
+func (b *Balancer) forceDiscoveryIfNeeded(failedCount *int, preferredCount int) {
+	if *failedCount*2 <= preferredCount {
+		return
+	}
+
+	b.forceDiscovery()
+}
+
+func (b *Balancer) forceDiscovery() {
+	b.closeMu.Lock()
+	rep := b.discoveryRepeater
+	b.closeMu.Unlock()
+
+	if rep != nil {
+		rep.Force()
+	}
+}
+
+// nextConn returns a connection for the RPC.
+//
+// When MaxConnections is set and the caller pins a node outside the active set,
+// the balancer may soft-exceed the limit by adding that endpoint to the active
+// set (needed for session/topic affinity and long-lived streams).
 func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 	onDone := gtrace.DriverOnBalancerChooseEndpoint(
 		b.driverConfig.Trace(), &ctx,
@@ -560,27 +615,92 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		return nil, xerrors.WithStackTrace(ErrNoEndpoints)
 	}
 
-	preferredCount := state.PreferredCount()
-	defer func() {
-		if failedCount*2 <= preferredCount {
-			return
+	defer b.forceDiscoveryIfNeeded(&failedCount, state.PreferredCount())
+
+	// Soft-limit overflow: pin to a node outside the active MaxConnections set.
+	if nodeID, ok := endpoint.ContextNodeID(ctx); ok { //nolint:nestif
+		if cc := state.preferConnection(ctx); cc != nil {
+			return cc, nil
 		}
-
-		b.closeMu.Lock()
-		rep := b.discoveryRepeater
-		b.closeMu.Unlock()
-
-		if rep != nil {
-			rep.Force()
+		// Soft-exceed / revive under MaxConnections only. Unlimited mode keeps
+		// historical ban behavior for WithNodeID (banned pin → ErrNoEndpoints /
+		// fallback), matching pre-MaxConnections clients.
+		if b.balancerConfig.MaxConnections > 0 {
+			if cc := b.ensurePinnedConn(ctx, nodeID); cc != nil {
+				return cc, nil
+			}
 		}
-	}()
-
-	c, failedCount = state.GetConnection(ctx)
-	if c == nil {
-		return nil, xerrors.WithStackTrace(
-			fmt.Errorf("%w: cannot get connection from Balancer after %d attempts", ErrNoEndpoints, failedCount),
-		)
+		if !endpoint.ContextFallback(ctx) {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("%w: pinned node %d is outside balancer active set", ErrNoEndpoints, nodeID),
+			)
+		}
+		// Pin already checked above; skip a redundant preferConnection lookup.
+		c, failedCount = state.GetConnectionUnpinned(ctx)
+	} else {
+		c, failedCount = state.GetConnection(ctx)
+	}
+	if c != nil {
+		return c, nil
 	}
 
-	return c, nil
+	return nil, xerrors.WithStackTrace(
+		fmt.Errorf("%w: cannot get connection from Balancer after %d attempts", ErrNoEndpoints, failedCount),
+	)
+}
+
+// ensurePinnedConn adds a discovered endpoint for nodeID to the active set when
+// it is missing (soft-exceeding MaxConnections). Discovery sticky select will
+// shrink the set back on the next update when possible.
+//
+// If the node is already in the active set but not currently usable (e.g. Banned),
+// it is Unban'd in place — never appended again — so the set does not gain a
+// duplicate reference / double weight in random selection.
+func (b *Balancer) ensurePinnedConn(ctx context.Context, nodeID uint32) conn.Conn {
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+
+	if b.closed {
+		return nil
+	}
+
+	connState := b.connectionsState.Load()
+	if connState != nil {
+		if cc := connState.connByNodeID[nodeID]; cc != nil {
+			if !isOkConnection(cc, false) {
+				cc.Unban(ctx)
+			}
+
+			return cc
+		}
+	}
+
+	e := endpointByNodeID(b.lastDiscovered, nodeID)
+	if e == nil {
+		return nil
+	}
+
+	cc := b.pool.Get(e)
+	if cc == nil {
+		return nil
+	}
+	cc.Unban(ctx)
+
+	active := []conn.Conn{cc}
+	quarantine := []conn.Conn(nil)
+	if connState != nil {
+		active = append(connState.All(), cc)
+		quarantine = connState.quarantine
+	}
+
+	b.connectionsState.Store(
+		newConnectionsState(active,
+			b.balancerConfig.Filter,
+			balancerConfig.Info{SelfLocation: b.selfLocation},
+			b.balancerConfig.AllowFallback,
+			quarantine,
+		),
+	)
+
+	return cc
 }
