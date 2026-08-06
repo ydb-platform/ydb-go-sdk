@@ -3,6 +3,7 @@ package xcontext
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -41,11 +42,68 @@ func TestWithDone(t *testing.T) {
 		require.Error(t, ctx.Err())
 		cancel()
 	})
+	t.Run("WithClosedDoneErrShouldNotChangeAfterParentTimeout", func(t *testing.T) {
+		done := make(chan struct{})
+		close(done)
+
+		parent, cancelParent := context.WithTimeout(context.Background(), time.Millisecond)
+		t.Cleanup(cancelParent)
+
+		ctx, cancel := WithDone(parent, done)
+		t.Cleanup(cancel)
+		require.ErrorIs(t, ctx.Err(), context.Canceled)
+
+		<-parent.Done()
+		require.ErrorIs(t, parent.Err(), context.DeadlineExceeded)
+		require.ErrorIs(t, ctx.Err(), context.Canceled)
+	})
 	t.Run("WithNilDone", func(t *testing.T) {
 		var done chan struct{}
 		ctx, cancel := WithDone(context.Background(), done)
 		require.NoError(t, ctx.Err())
 		cancel()
 		require.Error(t, ctx.Err())
+	})
+}
+
+// BenchmarkWithDone/AlreadyClosed-12         	  60969152	19.75 ns/op	   16 B/op	  1 allocs/op
+// BenchmarkWithDone/Open_CancelImmediately-12    2763906	433.9 ns/op	   312 B/op	  7 allocs/op
+// BenchmarkWithDone/Open_CloseDoneThenCancel-12  673682	1707 ns/op	   536 B/op	  9 allocs/op
+func BenchmarkWithDone(b *testing.B) {
+	b.Run("AlreadyClosed", func(b *testing.B) {
+		done := make(chan struct{})
+		close(done)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for b.Loop() {
+			ctx, cancel := WithDone(b.Context(), done)
+			cancel()
+			_ = ctx
+		}
+	})
+
+	b.Run("Open_CancelImmediately", func(b *testing.B) {
+		done := make(chan struct{})
+		b.ReportAllocs()
+		b.ResetTimer()
+		for b.Loop() {
+			ctx, cancel := WithDone(b.Context(), done)
+			cancel()
+			_ = ctx
+		}
+	})
+
+	b.Run("Open_CloseDoneThenCancel", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for b.Loop() {
+			b.StopTimer()
+			done := make(chan struct{})
+			b.StartTimer()
+			ctx, cancel := WithDone(b.Context(), done)
+			close(done)
+			<-ctx.Done()
+			cancel()
+		}
 	})
 }
