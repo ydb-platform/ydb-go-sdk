@@ -1,6 +1,7 @@
 package bind
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -23,6 +24,11 @@ func (m AutoDeclare) ToYdb(sql string, args ...any) (
 
 	if len(params) == 0 {
 		return sql, args, nil
+	}
+
+	const maxParams = 10000
+	if len(params) > maxParams {
+		return "", nil, xerrors.WithStackTrace(fmt.Errorf("too many parameters: %d > %d", len(params), maxParams))
 	}
 
 	var (
