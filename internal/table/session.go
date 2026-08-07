@@ -323,8 +323,14 @@ func newTableSession(
 
 func closeTableSession(c Ydb_Table_V1.TableServiceClient, cfg *config.Config, id string) func(context.Context) error {
 	return func(ctx context.Context) error {
-		if err := ctx.Err(); err != nil {
-			return xerrors.WithStackTrace(err)
+		// The caller context may already be done: the pool closes in-flight sessions
+		// after its done channel is closed, and Pool.Close passes the caller context
+		// straight through. The session id is known here, so detach from the caller
+		// cancellation and still send DeleteSession - otherwise the session stays on
+		// the server until the server-side idle timeout expires.
+		// The query service session core does the same (see query.(*sessionCore).deleteSession).
+		if ctx.Err() != nil {
+			ctx = xcontext.ValueOnly(ctx)
 		}
 
 		if t := cfg.DeleteTimeout(); t > 0 {
