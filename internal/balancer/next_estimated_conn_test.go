@@ -97,6 +97,17 @@ func TestNextEstimatedConnStopsWhenBalancerClosesDuringSelection(t *testing.T) {
 	require.Nil(t, balancer.connections())
 }
 
+func TestNextEstimatedConnStopsWhenElectionSnapshotIsEmpty(t *testing.T) {
+	connections := newConnectionsStateWithEstimates(nil, nil, nil, nil, nil, nil)
+	balancer := &Balancer{}
+	balancer.connectionsState.Store(connections)
+
+	selected, failedCount := balancer.nextEstimatedConn(t.Context(), connections)
+
+	require.Nil(t, selected)
+	require.Zero(t, failedCount)
+}
+
 type snapshotSwappingConn struct {
 	conn.Conn
 
