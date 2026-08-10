@@ -15,20 +15,26 @@ import (
 func TestMaxConnectionsSelectsStickyActiveSet(t *testing.T) {
 	endpoints := maxConnectionEndpoints(1, 2, 3, 4)
 	balancer := WithMaxConnections(RandomChoice(), 2)
-	ctx := SelectContext{Rand: testRand{}}
+	ctx := SelectContext{Endpoints: endpoints, Rand: testRand{}}
 
-	selected := balancer.Select(ctx, endpoints)
+	selected := balancer.Select(ctx, [][]endpoint.Endpoint{endpoints})
 	require.Len(t, selected, 2)
 
 	previous := []conn.Conn{
 		maxConnectionConn(selected[0], state.Online),
 		maxConnectionConn(selected[1], state.Online),
 	}
-	selectedAgain := balancer.Select(SelectContext{Previous: previous, Rand: testRand{}}, endpoints)
+	selectedAgain := balancer.Select(
+		SelectContext{Endpoints: endpoints, Previous: previous, Rand: testRand{}},
+		[][]endpoint.Endpoint{endpoints},
+	)
 	require.Equal(t, selected, selectedAgain)
 
 	previous[0].Ban(t.Context())
-	selectedAfterBan := balancer.Select(SelectContext{Previous: previous, Rand: testRand{}}, endpoints)
+	selectedAfterBan := balancer.Select(
+		SelectContext{Endpoints: endpoints, Previous: previous, Rand: testRand{}},
+		[][]endpoint.Endpoint{endpoints},
+	)
 	require.Len(t, selectedAfterBan, 2)
 	require.NotContains(t, endpointKeys(selectedAfterBan), previous[0].Endpoint().Key())
 }
@@ -43,7 +49,8 @@ func TestMaxConnectionsUsesChildPreference(t *testing.T) {
 	child := Prefer(RandomChoice(), locationFilter("local"), true)
 	balancer := WithMaxConnections(child, 3)
 
-	selected := balancer.Select(SelectContext{Rand: testRand{}}, endpoints)
+	groups := balancer.Filter(Info{}, endpoints)
+	selected := balancer.Select(SelectContext{Endpoints: endpoints, Rand: testRand{}}, groups)
 	require.Len(t, selected, 3)
 	require.Equal(t, "local", selected[0].Location())
 	require.Equal(t, "local", selected[1].Location())
@@ -62,8 +69,10 @@ func TestMaxConnectionsUsesChildPreference(t *testing.T) {
 func TestMaxConnectionsNonPositiveLimitIsUnlimited(t *testing.T) {
 	endpoints := maxConnectionEndpoints(1, 2, 3)
 
-	require.Equal(t, endpoints, WithMaxConnections(RandomChoice(), 0).Select(SelectContext{}, endpoints))
-	require.Equal(t, endpoints, WithMaxConnections(RandomChoice(), -1).Select(SelectContext{}, endpoints))
+	groups := [][]endpoint.Endpoint{endpoints}
+	ctx := SelectContext{Endpoints: endpoints}
+	require.Equal(t, endpoints, WithMaxConnections(RandomChoice(), 0).Select(ctx, groups))
+	require.Equal(t, endpoints, WithMaxConnections(RandomChoice(), -1).Select(ctx, groups))
 }
 
 func TestMaxConnectionsPreservesChildLifecycle(t *testing.T) {

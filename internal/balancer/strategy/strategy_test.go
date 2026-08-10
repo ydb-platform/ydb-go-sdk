@@ -71,7 +71,10 @@ func TestSingleConn(t *testing.T) {
 
 	require.Equal(t, "SingleConn", balancer.String())
 	require.Equal(t, []endpoint.Endpoint{connection.Endpoint()},
-		balancer.Select(SelectContext{}, []endpoint.Endpoint{connection.Endpoint()}),
+		balancer.Select(
+			SelectContext{Endpoints: []endpoint.Endpoint{connection.Endpoint()}},
+			[][]endpoint.Endpoint{{connection.Endpoint()}},
+		),
 	)
 	require.Equal(t, [][]endpoint.Endpoint{{connection.Endpoint()}},
 		balancer.Filter(Info{}, []endpoint.Endpoint{connection.Endpoint()}),

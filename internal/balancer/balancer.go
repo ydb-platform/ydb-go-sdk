@@ -334,13 +334,15 @@ func (b *Balancer) selectDiscoveredEndpoints(
 		b.rnd = xrand.New(xrand.WithLock())
 	}
 	info := strategy.Info{SelfLocation: resolvedLocation.SelfLocation}
+	groups := b.policy().Filter(info, endpoints)
 	selected := b.policy().Select(strategy.SelectContext{
-		Info:     info,
-		Previous: active,
-		Rand:     b.rnd,
-	}, endpoints)
+		Endpoints: endpoints,
+		Info:      info,
+		Previous:  active,
+		Rand:      b.rnd,
+	}, groups)
 
-	return info, selected, b.policy().Filter(info, selected)
+	return info, selected, groups
 }
 
 func (b *Balancer) traceBalancerUpdate(

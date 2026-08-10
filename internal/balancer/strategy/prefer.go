@@ -18,8 +18,8 @@ type nearestDC struct {
 	Balancer
 }
 
-func (p prefer) Select(ctx SelectContext, endpoints []endpoint.Endpoint) []endpoint.Endpoint {
-	return p.child.Select(ctx, endpoints)
+func (p prefer) Select(ctx SelectContext, groups [][]endpoint.Endpoint) []endpoint.Endpoint {
+	return p.child.Select(ctx, groups)
 }
 
 func (p prefer) Filter(info Info, endpoints []endpoint.Endpoint) [][]endpoint.Endpoint {

@@ -64,3 +64,46 @@ func TestMaxConnectionsWithNodeIDSoftlyExceedsLimit(t *testing.T) {
 	_, err = balancer.nextConn(endpoint.WithNodeID(ctx, 404, endpoint.WithFallback(false)))
 	require.ErrorIs(t, err, ErrNoEndpoints)
 }
+
+func TestMaxConnectionsFiltersFullSnapshotOnlyOnce(t *testing.T) {
+	filter := &countingLocalFilter{}
+	policy := strategy.WithMaxConnections(
+		strategy.Prefer(strategy.RandomChoice(), filter, true), 2,
+	)
+	balancer := &Balancer{
+		balancer: policy,
+		rnd:      xrand.New(xrand.WithSeed(1), xrand.WithLock()),
+	}
+	endpoints := []endpoint.Endpoint{
+		endpoint.New("local-1", endpoint.WithLocation("local")),
+		endpoint.New("local-2", endpoint.WithLocation("local")),
+		endpoint.New("local-3", endpoint.WithLocation("local")),
+		endpoint.New("remote-1", endpoint.WithLocation("remote")),
+	}
+
+	_, selected, groups := balancer.selectDiscoveredEndpoints(
+		nil, endpoints, strategy.ResolvedLocation{},
+	)
+
+	require.Equal(t, len(endpoints), filter.calls,
+		"a snapshot-dependent filter must not be reevaluated on the capped endpoint set",
+	)
+	require.Len(t, selected, 2)
+	require.Len(t, groups, 2)
+	require.Equal(t, "local", selected[0].Location())
+	require.Equal(t, "local", selected[1].Location())
+}
+
+type countingLocalFilter struct {
+	calls int
+}
+
+func (f *countingLocalFilter) Allow(_ strategy.Info, candidate endpoint.Info) bool {
+	f.calls++
+
+	return candidate.Location() == "local"
+}
+
+func (*countingLocalFilter) String() string {
+	return "CountingLocal"
+}

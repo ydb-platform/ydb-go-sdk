@@ -24,21 +24,20 @@ func WithMaxConnections(child Balancer, limit int) Balancer {
 	}
 }
 
-func (m maxConnections) Select(ctx SelectContext, endpoints []endpoint.Endpoint) []endpoint.Endpoint {
-	candidates := m.child.Select(ctx, endpoints)
+func (m maxConnections) Select(ctx SelectContext, groups [][]endpoint.Endpoint) []endpoint.Endpoint {
+	candidates := m.child.Select(ctx, groups)
 	if m.limit == 0 {
 		return candidates
 	}
 
-	if len(candidates) <= m.limit {
-		return selectEndpoints(ctx.Previous, candidates, m.limit, ctx.Rand)
+	candidateKeys := make(map[endpoint.Key]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		candidateKeys[candidate.Key()] = struct{}{}
 	}
-
-	groups := m.child.Filter(ctx.Info, candidates)
-	selected := make([]endpoint.Endpoint, 0, m.limit)
+	selected := make([]endpoint.Endpoint, 0, min(m.limit, len(candidates)))
 	for _, group := range groups {
 		selected = append(selected, selectEndpoints(
-			ctx.Previous, group, m.limit-len(selected), ctx.Rand,
+			ctx.Previous, endpointCandidates(group, candidateKeys), m.limit-len(selected), ctx.Rand,
 		)...)
 		if len(selected) == m.limit {
 			break
@@ -46,6 +45,20 @@ func (m maxConnections) Select(ctx SelectContext, endpoints []endpoint.Endpoint)
 	}
 
 	return selected
+}
+
+func endpointCandidates(
+	group []endpoint.Endpoint,
+	candidates map[endpoint.Key]struct{},
+) []endpoint.Endpoint {
+	result := make([]endpoint.Endpoint, 0, len(group))
+	for _, candidate := range group {
+		if _, ok := candidates[candidate.Key()]; ok {
+			result = append(result, candidate)
+		}
+	}
+
+	return result
 }
 
 func (m maxConnections) Filter(info Info, endpoints []endpoint.Endpoint) [][]endpoint.Endpoint {
