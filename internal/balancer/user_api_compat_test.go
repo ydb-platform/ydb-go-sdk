@@ -119,6 +119,89 @@ func TestUserBalancerConfigurations(t *testing.T) {
 	}
 }
 
+func TestUserBalancerConfigDeserializationCompatibility(t *testing.T) {
+	tests := []struct {
+		name            string
+		serialized      string
+		preferred       []uint32
+		fallback        []uint32
+		detectNearestDC bool
+		singleConn      bool
+	}{
+		{name: "disable", serialized: `disable`, preferred: []uint32{1, 2, 3}, singleConn: true},
+		{name: "single", serialized: `single`, preferred: []uint32{1, 2, 3}, singleConn: true},
+		{name: "single JSON", serialized: `{"type":"single"}`, preferred: []uint32{1, 2, 3}, singleConn: true},
+		{name: "round robin", serialized: `round_robin`, preferred: []uint32{1, 2, 3}},
+		{name: "round robin JSON", serialized: `{"type":"round_robin"}`, preferred: []uint32{1, 2, 3}},
+		{name: "random choice", serialized: `random_choice`, preferred: []uint32{1, 2, 3}},
+		{name: "random choice JSON", serialized: `{"type":"random_choice"}`, preferred: []uint32{1, 2, 3}},
+		{
+			name:            "legacy local DC",
+			serialized:      `{"type":"random_choice","prefer":"local_dc"}`,
+			preferred:       []uint32{1},
+			detectNearestDC: true,
+		},
+		{
+			name:            "nearest DC",
+			serialized:      `{"type":"random_choice","prefer":"nearest_dc"}`,
+			preferred:       []uint32{1},
+			detectNearestDC: true,
+		},
+		{
+			name:            "legacy local DC with fallback",
+			serialized:      `{"type":"random_choice","prefer":"local_dc","fallback":true}`,
+			preferred:       []uint32{1},
+			fallback:        []uint32{2, 3},
+			detectNearestDC: true,
+		},
+		{
+			name:            "nearest DC with fallback",
+			serialized:      `{"type":"random_choice","prefer":"nearest_dc","fallback":true}`,
+			preferred:       []uint32{1},
+			fallback:        []uint32{2, 3},
+			detectNearestDC: true,
+		},
+		{
+			name:       "locations",
+			serialized: `{"type":"random_choice","prefer":"locations","locations":["a","c"]}`,
+			preferred:  []uint32{1, 3},
+		},
+		{
+			name:       "locations with fallback",
+			serialized: `{"type":"random_choice","prefer":"locations","locations":["a","c"],"fallback":true}`,
+			preferred:  []uint32{1, 3},
+			fallback:   []uint32{2},
+		},
+		{
+			name:       "unknown preference remains random choice",
+			serialized: `{"type":"random_choice","prefer":"unknown"}`,
+			preferred:  []uint32{1, 2, 3},
+		},
+	}
+	connections := []conn.Conn{
+		userBalancerConn(1, "a", state.Online),
+		userBalancerConn(2, "b", state.Online),
+		userBalancerConn(3, "c", state.Online),
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			policy := userBalancers.FromConfig(test.serialized)
+			state := newConnectionsStateWithBalancer(
+				connections,
+				policy,
+				strategy.Info{SelfLocation: "a"},
+				nil,
+			)
+
+			require.Equal(t, test.preferred, userBalancerNodeIDs(state.prefer))
+			require.Equal(t, test.fallback, userBalancerNodeIDs(state.fallback))
+			require.Equal(t, test.detectNearestDC, policy.Requirements().DetectNearestDC)
+			require.Equal(t, test.singleConn, policy.Requirements().SingleConn)
+		})
+	}
+}
+
 func TestUserBalancerWithNodeIDBypassesSelectionPolicies(t *testing.T) {
 	connections := []conn.Conn{
 		userBalancerConn(1, "preferred", state.Online),
@@ -166,6 +249,19 @@ func nodeIDSet(nodeIDs ...uint32) map[uint32]struct{} {
 	result := make(map[uint32]struct{}, len(nodeIDs))
 	for _, nodeID := range nodeIDs {
 		result[nodeID] = struct{}{}
+	}
+
+	return result
+}
+
+func userBalancerNodeIDs(connections []conn.Conn) []uint32 {
+	if len(connections) == 0 {
+		return nil
+	}
+
+	result := make([]uint32, len(connections))
+	for i, connection := range connections {
+		result[i] = connection.Endpoint().NodeID()
 	}
 
 	return result
