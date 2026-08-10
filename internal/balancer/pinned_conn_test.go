@@ -40,6 +40,16 @@ func TestTryEnsurePinnedConnReturnsNothingAfterClose(t *testing.T) {
 	require.Nil(t, rejected)
 }
 
+func TestTryEnsurePinnedConnReturnsNothingForUnknownEndpoint(t *testing.T) {
+	balancer := &Balancer{}
+	balancer.connectionsState.Store(newConnectionsStateWithEstimates(nil, nil, nil, nil, nil, nil))
+
+	selected, rejected := balancer.tryEnsureEndpointConn(endpoint.New("unknown", endpoint.WithID(42)).Key())
+
+	require.Nil(t, selected)
+	require.Nil(t, rejected)
+}
+
 func TestTryEnsurePinnedConnReturnsNothingFromClosedPool(t *testing.T) {
 	ctx := t.Context()
 	pool := conn.NewPool(ctx, config.New())
