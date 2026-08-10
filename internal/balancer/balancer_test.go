@@ -25,6 +25,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
+	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -571,7 +572,8 @@ func (c *blockingStateConn) State() state.State {
 }
 
 type stubRepeater struct {
-	stopFn func()
+	stopFn  func()
+	forceFn func()
 }
 
 func (s *stubRepeater) Stop() {
@@ -580,7 +582,11 @@ func (s *stubRepeater) Stop() {
 	}
 }
 
-func (s *stubRepeater) Force() {}
+func (s *stubRepeater) Force() {
+	if s.forceFn != nil {
+		s.forceFn()
+	}
+}
 
 // Mock resolver
 //
@@ -615,6 +621,38 @@ func TestNew(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 		assert.Regexp(t, "^context canceled at", err.Error())
 	})
+	t.Run("nil policy defaults to random choice", func(t *testing.T) {
+		ctx := t.Context()
+		srv := startDynamicDiscoveryServer(t, []uint32{1})
+		cfg := config.New(
+			config.WithEndpoint(srv.endpoint()),
+			config.WithDatabase("/local"),
+			config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+			config.WithBalancer(nil),
+		)
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
+
+		b, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
+		require.NoError(t, err)
+		require.Equal(t, "RandomChoice", b.policy().String())
+		require.NoError(t, b.Close(ctx))
+	})
+}
+
+func TestBalancerForceDiscovery(t *testing.T) {
+	forceCalled := false
+	b := &Balancer{
+		discoveryRepeater: &stubRepeater{
+			forceFn: func() {
+				forceCalled = true
+			},
+		},
+	}
+
+	b.forceDiscovery()
+
+	require.True(t, forceCalled)
 }
 
 // TestPessimizationOnOverloaded verifies that calling Invoke with a context tagged via
