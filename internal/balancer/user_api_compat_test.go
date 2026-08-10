@@ -7,7 +7,7 @@ import (
 
 	userBalancers "github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
@@ -163,14 +163,13 @@ func TestUserBalancerHandlesBanAndUnban(t *testing.T) {
 func userConfiguredBalancer(option config.Option, connections []conn.Conn, selfLocation string) *Balancer {
 	cfg := config.New(option)
 	b := &Balancer{
-		driverConfig:   cfg,
-		balancerConfig: *cfg.Balancer(),
+		driverConfig: cfg,
+		balancer:     cfg.Balancer(),
 	}
-	b.connectionsState.Store(newConnectionsState(
+	b.connectionsState.Store(newConnectionsStateWithBalancer(
 		connections,
-		b.balancerConfig.Filter,
-		balancerConfig.Info{SelfLocation: selfLocation},
-		b.balancerConfig.AllowFallback,
+		b.balancer,
+		strategy.Info{SelfLocation: selfLocation},
 		nil,
 	))
 

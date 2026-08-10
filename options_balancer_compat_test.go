@@ -10,6 +10,10 @@ import (
 )
 
 func TestUserBalancerConfigurationExpressionsCompile(t *testing.T) {
+	configured := balancers.RandomChoice()
+	configured = balancers.PreferNearestDCWithFallBack(configured)
+	configured = balancers.WithMaxConnections(configured, 9)
+
 	options := []ydb.Option{
 		ydb.WithBalancer(balancers.RandomChoice()),
 		ydb.WithBalancer(balancers.SingleConn()),
@@ -19,7 +23,14 @@ func TestUserBalancerConfigurationExpressionsCompile(t *testing.T) {
 		ydb.WithBalancer(balancers.PreferLocationsWithFallback(
 			balancers.RandomChoice(), "a", "b",
 		)),
+		ydb.WithBalancer(balancers.WithMaxConnections(
+			balancers.PreferNearestDCWithFallback(
+				balancers.RandomChoice(),
+			),
+			9,
+		)),
+		ydb.WithBalancer(configured),
 	}
 
-	require.Len(t, options, 4)
+	require.Len(t, options, 6)
 }

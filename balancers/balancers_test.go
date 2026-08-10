@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -19,8 +19,9 @@ func TestPreferLocalDC(t *testing.T) {
 		&mock.Conn{AddrField: "3", StateField: state.Online, LocationField: "2"},
 	}
 	rr := PreferNearestDC(RandomChoice())
-	require.False(t, rr.AllowFallback)
-	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(balancerConfig.Info{SelfLocation: "2"}, rr, conns))
+	require.True(t, rr.Requirements().DetectNearestDC)
+	require.Len(t, rr.Filter(strategy.Info{SelfLocation: "2"}, connEndpoints(conns)), 1)
+	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(strategy.Info{SelfLocation: "2"}, rr, conns))
 }
 
 func TestPreferLocalDCWithFallBack(t *testing.T) {
@@ -30,8 +31,9 @@ func TestPreferLocalDCWithFallBack(t *testing.T) {
 		&mock.Conn{AddrField: "3", StateField: state.Online, LocationField: "2"},
 	}
 	rr := PreferNearestDCWithFallBack(RandomChoice())
-	require.True(t, rr.AllowFallback)
-	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(balancerConfig.Info{SelfLocation: "2"}, rr, conns))
+	require.True(t, rr.Requirements().DetectNearestDC)
+	require.Len(t, rr.Filter(strategy.Info{SelfLocation: "2"}, connEndpoints(conns)), 2)
+	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(strategy.Info{SelfLocation: "2"}, rr, conns))
 }
 
 func TestPreferLocations(t *testing.T) {
@@ -42,8 +44,8 @@ func TestPreferLocations(t *testing.T) {
 	}
 
 	rr := PreferLocations(RandomChoice(), "zero", "two")
-	require.False(t, rr.AllowFallback)
-	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferFilter(balancerConfig.Info{}, rr, conns))
+	require.Len(t, rr.Filter(strategy.Info{}, connEndpoints(conns)), 1)
+	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferFilter(strategy.Info{}, rr, conns))
 }
 
 func TestPreferLocationsWithFallback(t *testing.T) {
@@ -54,20 +56,36 @@ func TestPreferLocationsWithFallback(t *testing.T) {
 	}
 
 	rr := PreferLocationsWithFallback(RandomChoice(), "zero", "two")
-	require.True(t, rr.AllowFallback)
-	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferFilter(balancerConfig.Info{}, rr, conns))
+	require.Len(t, rr.Filter(strategy.Info{}, connEndpoints(conns)), 2)
+	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferFilter(strategy.Info{}, rr, conns))
 }
 
-func applyPreferFilter(info balancerConfig.Info, b *balancerConfig.Config, conns []conn.Conn) []conn.Conn {
-	if b.Filter == nil {
-		b.Filter = filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool { return true })
+func applyPreferFilter(info strategy.Info, b Balancer, conns []conn.Conn) []conn.Conn {
+	groups := b.Filter(info, connEndpoints(conns))
+	if len(groups) == 0 {
+		return nil
 	}
-	res := make([]conn.Conn, 0, len(conns))
+
+	allowed := make(map[endpoint.Key]struct{}, len(groups[0]))
+	for _, candidate := range groups[0] {
+		allowed[candidate.Key()] = struct{}{}
+	}
+
+	res := make([]conn.Conn, 0, len(groups[0]))
 	for _, c := range conns {
-		if b.Filter.Allow(info, c.Endpoint()) {
+		if _, ok := allowed[c.Endpoint().Key()]; ok {
 			res = append(res, c)
 		}
 	}
 
 	return res
+}
+
+func connEndpoints(conns []conn.Conn) []endpoint.Endpoint {
+	result := make([]endpoint.Endpoint, 0, len(conns))
+	for _, connection := range conns {
+		result = append(result, connection.Endpoint())
+	}
+
+	return result
 }

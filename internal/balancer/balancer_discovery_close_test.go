@@ -21,8 +21,8 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
@@ -329,7 +329,7 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 		config.WithDatabase("/local"),
 		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
 		config.WithTrace(*events.driverTrace()),
-		config.WithBalancer(&balancerConfig.Config{}),
+		config.WithBalancer(balancers.RandomChoice()),
 	)
 
 	pool := conn.NewPool(ctx, cfg)
@@ -409,7 +409,7 @@ func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
 		config.WithConnectionTTL(ttl),
 		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
 		config.WithTrace(*events.driverTrace()),
-		config.WithBalancer(&balancerConfig.Config{}),
+		config.WithBalancer(balancers.RandomChoice()),
 	)
 
 	pool := conn.NewPool(ctx, cfg)
@@ -474,7 +474,7 @@ func TestBalancerConnectionTTLParksTransportsAfterNetworkLoss(t *testing.T) {
 		config.WithDialTimeout(ttl),
 		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
 		config.WithTrace(*events.driverTrace()),
-		config.WithBalancer(&balancerConfig.Config{}),
+		config.WithBalancer(balancers.RandomChoice()),
 	)
 
 	pool := conn.NewPool(ctx, cfg)

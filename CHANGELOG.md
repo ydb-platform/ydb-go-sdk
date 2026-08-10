@@ -1,3 +1,5 @@
+* Added composable balancer strategies and `balancers.WithMaxConnections` while preserving existing nested balancer configuration call sites
+
 ## v3.147.2
 * Updated ydb-go-genproto and added bridge pile state to discovered endpoint metadata
 

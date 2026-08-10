@@ -4,194 +4,87 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
 func TestFromConfig(t *testing.T) {
-	for _, tt := range []struct {
-		name   string
-		config string
-		res    balancerConfig.Config
-		fail   bool
+	tests := []struct {
+		name            string
+		config          string
+		expected        string
+		detectNearestDC bool
+		fail            bool
 	}{
+		{name: "empty", config: ``, fail: true},
+		{name: "disable", config: `disable`, expected: "SingleConn"},
+		{name: "single", config: `single`, expected: "SingleConn"},
+		{name: "single/JSON", config: `{"type":"single"}`, expected: "SingleConn"},
+		{name: "round_robin", config: `round_robin`, expected: "RandomChoice"},
+		{name: "round_robin/JSON", config: `{"type":"round_robin"}`, expected: "RandomChoice"},
+		{name: "random_choice", config: `random_choice`, expected: "RandomChoice"},
+		{name: "random_choice/JSON", config: `{"type":"random_choice"}`, expected: "RandomChoice"},
 		{
-			name:   "empty",
-			config: ``,
-			res:    balancerConfig.Config{},
+			name:            "prefer_local_dc",
+			config:          `{"type":"random_choice","prefer":"local_dc"}`,
+			expected:        "Prefer{Filter=LocalDC,AllowFallback=false,Child=RandomChoice}",
+			detectNearestDC: true,
+		},
+		{
+			name:            "prefer_nearest_dc",
+			config:          `{"type":"random_choice","prefer":"nearest_dc"}`,
+			expected:        "Prefer{Filter=LocalDC,AllowFallback=false,Child=RandomChoice}",
+			detectNearestDC: true,
+		},
+		{
+			name:   "prefer_unknown_type",
+			config: `{"type":"unknown_type","prefer":"local_dc"}`,
 			fail:   true,
 		},
 		{
-			name:   "disable",
-			config: `disable`,
-			res:    balancerConfig.Config{SingleConn: true},
+			name:            "prefer_local_dc_with_fallback",
+			config:          `{"type":"random_choice","prefer":"local_dc","fallback":true}`,
+			expected:        "Prefer{Filter=LocalDC,AllowFallback=true,Child=RandomChoice}",
+			detectNearestDC: true,
 		},
 		{
-			name:   "single",
-			config: `single`,
-			res:    balancerConfig.Config{SingleConn: true},
+			name:            "prefer_nearest_dc_with_fallback",
+			config:          `{"type":"random_choice","prefer":"nearest_dc","fallback":true}`,
+			expected:        "Prefer{Filter=LocalDC,AllowFallback=true,Child=RandomChoice}",
+			detectNearestDC: true,
 		},
 		{
-			name: "single/JSON",
-			config: `{
-				"type": "single"
-			}`,
-			res: balancerConfig.Config{SingleConn: true},
+			name:     "prefer_locations",
+			config:   `{"type":"random_choice","prefer":"locations","locations":["AAA","BBB","CCC"]}`,
+			expected: "Prefer{Filter=Locations{AAA,BBB,CCC},AllowFallback=false,Child=RandomChoice}",
 		},
 		{
-			name:   "round_robin",
-			config: `round_robin`,
-			res:    balancerConfig.Config{},
+			name:     "prefer_locations_with_fallback",
+			config:   `{"type":"random_choice","prefer":"locations","locations":["AAA","BBB","CCC"],"fallback":true}`,
+			expected: "Prefer{Filter=Locations{AAA,BBB,CCC},AllowFallback=true,Child=RandomChoice}",
 		},
-		{
-			name: "round_robin/JSON",
-			config: `{
-				"type": "round_robin"
-			}`,
-			res: balancerConfig.Config{},
-		},
-		{
-			name:   "random_choice",
-			config: `random_choice`,
-			res:    balancerConfig.Config{},
-		},
-		{
-			name: "random_choice/JSON",
-			config: `{
-				"type": "random_choice"
-			}`,
-			res: balancerConfig.Config{},
-		},
-		{
-			name: "prefer_local_dc",
-			config: `{
-				"type": "random_choice",
-				"prefer": "local_dc"
-			}`,
-			res: balancerConfig.Config{
-				DetectNearestDC: true,
-				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
-					// some non nil func
-					return false
-				}),
-			},
-		},
-		{
-			name: "prefer_nearest_dc",
-			config: `{
-				"type": "random_choice",
-				"prefer": "nearest_dc"
-			}`,
-			res: balancerConfig.Config{
-				DetectNearestDC: true,
-				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
-					// some non nil func
-					return false
-				}),
-			},
-		},
-		{
-			name: "prefer_unknown_type",
-			config: `{
-				"type": "unknown_type",
-				"prefer": "local_dc"
-			}`,
-			fail: true,
-		},
-		{
-			name: "prefer_local_dc_with_fallback",
-			config: `{
-				"type": "random_choice",
-				"prefer": "local_dc",
-				"fallback": true
-			}`,
-			res: balancerConfig.Config{
-				AllowFallback:   true,
-				DetectNearestDC: true,
-				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
-					// some non nil func
-					return false
-				}),
-			},
-		},
-		{
-			name: "prefer_nearest_dc_with_fallback",
-			config: `{
-				"type": "random_choice",
-				"prefer": "nearest_dc",
-				"fallback": true
-			}`,
-			res: balancerConfig.Config{
-				AllowFallback:   true,
-				DetectNearestDC: true,
-				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
-					// some non nil func
-					return false
-				}),
-			},
-		},
-		{
-			name: "prefer_locations",
-			config: `{
-				"type": "random_choice",
-				"prefer": "locations",
-				"locations": ["AAA", "BBB", "CCC"]
-			}`,
-			res: balancerConfig.Config{
-				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
-					// some non nil func
-					return false
-				}),
-			},
-		},
-		{
-			name: "prefer_locations_with_fallback",
-			config: `{
-				"type": "random_choice",
-				"prefer": "locations",
-				"locations": ["AAA", "BBB", "CCC"],
-				"fallback": true
-			}`,
-			res: balancerConfig.Config{
-				AllowFallback: true,
-				Filter: filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
-					// some non nil func
-					return false
-				}),
-			},
-		},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			var (
-				actErr   error
-				fallback = &balancerConfig.Config{}
-			)
-			b := FromConfig(
-				tt.config,
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var actualErr error
+			fallback := SingleConn()
+			balancer := FromConfig(
+				test.config,
 				WithParseErrorFallbackBalancer(fallback),
 				WithParseErrorHandler(func(err error) {
-					actErr = err
+					actualErr = err
 				}),
 			)
-			if tt.fail && actErr == nil {
-				t.Fatalf("expected error, but it not hanled")
-			}
-			if !tt.fail && actErr != nil {
-				t.Fatalf("unexpected error: %v", actErr)
-			}
-			if tt.fail && b != fallback {
-				t.Fatalf("unexpected balancer: %v", b)
+
+			if test.fail {
+				require.Error(t, actualErr)
+				require.Equal(t, fallback, balancer)
+
+				return
 			}
 
-			// function pointers can check equal to nil only
-			if tt.res.Filter != nil {
-				require.NotNil(t, b.Filter)
-				b.Filter = nil
-				tt.res.Filter = nil
-			}
-
-			require.Equal(t, tt.res, *b)
+			require.NoError(t, actualErr)
+			require.Equal(t, test.expected, balancer.String())
+			require.Equal(t, test.detectNearestDC, balancer.Requirements().DetectNearestDC)
 		})
 	}
 }

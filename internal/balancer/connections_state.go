@@ -5,10 +5,12 @@ import (
 	"slices"
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 )
 
 type connectionsState struct {
@@ -21,26 +23,41 @@ type connectionsState struct {
 	quarantine []conn.Conn
 
 	allowFallback bool
+	balancer      strategy.Balancer
+	info          strategy.Info
 
 	rand xrand.Rand
 }
 
-func newConnectionsState(
+func newConnectionsStateWithBalancer(
 	conns []conn.Conn,
-	filter balancerConfig.Filter,
-	info balancerConfig.Info,
-	allowFallback bool,
+	balancer strategy.Balancer,
+	info strategy.Info,
 	quarantine []conn.Conn,
 ) *connectionsState {
-	res := &connectionsState{
-		connByNodeID:  connsToNodeIDMap(conns),
-		rand:          xrand.New(xrand.WithLock()),
-		quarantine:    quarantine,
-		allowFallback: allowFallback,
+	if balancer == nil {
+		balancer = strategy.RandomChoice()
 	}
 
-	res.prefer, res.fallback = sortPreferConnections(conns, filter, info, allowFallback)
+	res := &connectionsState{
+		connByNodeID: connsToNodeIDMap(conns),
+		rand:         xrand.New(xrand.WithLock()),
+		quarantine:   quarantine,
+		balancer:     balancer,
+		info:         info,
+	}
+
 	res.all = conns
+	groups := balancer.Filter(info, xslices.Transform(conns, func(connection conn.Conn) endpoint.Endpoint {
+		return connection.Endpoint()
+	}))
+	if len(groups) > 0 {
+		res.prefer = connectionsForEndpoints(conns, groups[0])
+	}
+	for _, group := range groups[1:] {
+		res.fallback = append(res.fallback, connectionsForEndpoints(conns, group)...)
+	}
+	res.allowFallback = len(groups) > 1
 
 	return res
 }
@@ -69,27 +86,13 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 		return nil, 0
 	}
 
-	try := func(conns []conn.Conn) conn.Conn {
-		c, tryFailed := s.selectRandomConnection(conns, false)
-		failedCount += tryFailed
-
-		return c
-	}
-
-	if c := try(s.prefer); c != nil {
+	nextCtx := strategy.NextContext{Info: s.info, Rand: s.rand}
+	c, failedCount := s.balancer.Next(ctx, nextCtx, s.all, false)
+	if c != nil {
 		return c, failedCount
 	}
 
-	if c := try(s.fallback); c != nil {
-		return c, failedCount
-	}
-
-	lastResort := s.all
-	if !s.allowFallback && len(s.prefer) != len(s.all) {
-		lastResort = s.prefer
-	}
-
-	c, _ := s.selectRandomConnection(lastResort, true)
+	c, _ = s.balancer.Next(ctx, nextCtx, s.all, true)
 
 	return c, failedCount
 }
@@ -147,6 +150,26 @@ func connsToNodeIDMap(conns []conn.Conn) (nodes map[uint32]conn.Conn) {
 	}
 
 	return nodes
+}
+
+func connectionsForEndpoints(conns []conn.Conn, endpoints []endpoint.Endpoint) []conn.Conn {
+	if len(endpoints) == 0 {
+		return nil
+	}
+
+	byKey := make(map[endpoint.Key]conn.Conn, len(conns))
+	for _, connection := range conns {
+		byKey[connection.Endpoint().Key()] = connection
+	}
+
+	result := make([]conn.Conn, 0, len(endpoints))
+	for _, candidate := range endpoints {
+		if connection := byKey[candidate.Key()]; connection != nil {
+			result = append(result, connection)
+		}
+	}
+
+	return result
 }
 
 func sortPreferConnections(

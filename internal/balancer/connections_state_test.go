@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -451,6 +452,8 @@ func TestNewState(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require.NotNil(t, test.state.rand)
 			test.state.rand = nil
+			test.state.balancer = nil
+			test.state.info = balancerConfig.Info{}
 			require.Equal(t, test.res, test.state)
 		})
 	}
@@ -578,9 +581,9 @@ func TestDiscoveryReuseIpAndHostName(t *testing.T) {
 	cfg := config.New()
 	e := mock.Endpoint{AddrField: "::1:123", NodeIDField: 1, OverrideHostField: "dyn-node-1.svc.cluster.local"}
 	r := &Balancer{
-		driverConfig:   cfg,
-		balancerConfig: *cfg.Balancer(),
-		pool:           conn.NewPool(context.Background(), cfg),
+		driverConfig: cfg,
+		balancer:     cfg.Balancer(),
+		pool:         conn.NewPool(context.Background(), cfg),
 		discover: func(ctx context.Context, _ *grpc.ClientConn) (endpoints []endpoint.Endpoint, location string, err error) {
 			ee := e
 
@@ -606,4 +609,19 @@ func TestDiscoveryReuseIpAndHostName(t *testing.T) {
 
 	e.OverrideHostField = "dyn-node-2.svc.cluster.local"
 	check()
+}
+
+func newConnectionsState(
+	conns []conn.Conn,
+	filter balancerConfig.Filter,
+	info balancerConfig.Info,
+	allowFallback bool,
+	quarantine []conn.Conn,
+) *connectionsState {
+	balancer := strategy.RandomChoice()
+	if filter != nil {
+		balancer = strategy.Prefer(balancer, filter, allowFallback, false)
+	}
+
+	return newConnectionsStateWithBalancer(conns, balancer, info, quarantine)
 }

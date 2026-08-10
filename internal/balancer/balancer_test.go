@@ -22,6 +22,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -118,14 +119,11 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	defer func() { _ = pool.RemoveRef(ctx) }()
 
 	b := &Balancer{
-		driverConfig:   cfg,
-		pool:           pool,
-		balancerConfig: balancerConfig.Config{},
+		driverConfig: cfg,
+		pool:         pool,
 	}
 
-	initial := newConnectionsState(nil,
-		b.balancerConfig.Filter, balancerConfig.Info{}, b.balancerConfig.AllowFallback, nil,
-	)
+	initial := newConnectionsState(nil, nil, balancerConfig.Info{}, false, nil)
 	b.connectionsState.Store(initial)
 
 	e1 := endpoint.New("e1.example:2135", endpoint.WithIPV6([]string{"2001:db8::1"}), endpoint.WithID(1))
@@ -180,10 +178,9 @@ func TestApplyDiscoveredEndpointsReleasesFilteredOutConns(t *testing.T) {
 	b := &Balancer{
 		driverConfig: cfg,
 		pool:         pool,
-		balancerConfig: balancerConfig.Config{
-			AllowFallback: false,
-			Filter:        allowNodeIDFilter{nodeID: 1},
-		},
+		balancer: strategy.Prefer(
+			strategy.RandomChoice(), allowNodeIDFilter{nodeID: 1}, false, false,
+		),
 	}
 
 	e1 := endpoint.New("e1.example:2135", endpoint.WithID(1))
@@ -206,9 +203,8 @@ func TestApplyDiscoveredEndpointsClosedPool(t *testing.T) {
 	require.NoError(t, pool.RemoveRef(ctx))
 
 	b := &Balancer{
-		driverConfig:   config.New(),
-		pool:           pool,
-		balancerConfig: balancerConfig.Config{},
+		driverConfig: config.New(),
+		pool:         pool,
 	}
 
 	require.NotPanics(t, func() {
@@ -232,9 +228,8 @@ func TestBalancer_Close(t *testing.T) {
 		}
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(
 			[]conn.Conn{cc},
@@ -258,9 +253,8 @@ func TestBalancer_Close(t *testing.T) {
 		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
 			nil, balancerConfig.Info{}, true, nil,
@@ -300,9 +294,8 @@ func TestBalancer_Close(t *testing.T) {
 		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
 			nil, balancerConfig.Info{}, true, nil,
@@ -331,9 +324,8 @@ func TestBalancer_Close(t *testing.T) {
 		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
 			nil, balancerConfig.Info{}, true, nil,
@@ -379,9 +371,8 @@ func TestBalancer_Close(t *testing.T) {
 		t.Cleanup(func() { _ = cc.Close() })
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
 			nil, balancerConfig.Info{}, true, nil,
@@ -399,9 +390,8 @@ func TestBalancer_Close(t *testing.T) {
 		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(
 			nil,
@@ -425,10 +415,9 @@ func TestBalancer_Close(t *testing.T) {
 		c := pool.Get(e)
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
-			closed:         true,
+			driverConfig: cfg,
+			pool:         pool,
+			closed:       true,
 		}
 		b.connectionsState.Store(newConnectionsState(
 			[]conn.Conn{c},
@@ -467,7 +456,6 @@ func TestBalancer_CloseRacesWithNextConnRepeater(t *testing.T) {
 	b := &Balancer{
 		driverConfig:      cfg,
 		pool:              pool,
-		balancerConfig:    balancerConfig.Config{},
 		discoveryRepeater: &stubRepeater{},
 	}
 	b.connectionsState.Store(newConnectionsState(
@@ -529,10 +517,9 @@ func TestBalancer_CloseWhileDiscoveryDialInFlight(t *testing.T) {
 	defer func() { _ = pool.RemoveRef(ctx) }()
 
 	b := &Balancer{
-		address:        "passthrough:///test",
-		driverConfig:   cfg,
-		pool:           pool,
-		balancerConfig: balancerConfig.Config{},
+		address:      "passthrough:///test",
+		driverConfig: cfg,
+		pool:         pool,
 	}
 	b.connectionsState.Store(newConnectionsState(
 		nil,
@@ -584,7 +571,8 @@ func (c *blockingStateConn) State() state.State {
 }
 
 type stubRepeater struct {
-	stopFn func()
+	stopFn  func()
+	forceFn func()
 }
 
 func (s *stubRepeater) Stop() {
@@ -593,7 +581,11 @@ func (s *stubRepeater) Stop() {
 	}
 }
 
-func (s *stubRepeater) Force() {}
+func (s *stubRepeater) Force() {
+	if s.forceFn != nil {
+		s.forceFn()
+	}
+}
 
 // Mock resolver
 //
@@ -678,9 +670,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			}
 
 			b := &Balancer{
-				driverConfig:   cfg,
-				pool:           pool,
-				balancerConfig: balancerConfig.Config{},
+				driverConfig: cfg,
+				pool:         pool,
 			}
 			s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false, nil)
 			b.connectionsState.Store(s)
@@ -728,9 +719,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
@@ -768,9 +758,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
@@ -810,9 +799,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
@@ -861,9 +849,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
@@ -908,9 +895,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
@@ -957,9 +943,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
@@ -1002,9 +987,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
@@ -1055,9 +1039,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
@@ -1109,9 +1092,8 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 		defer func() { _ = pool.RemoveRef(ctx) }()
 
 		b := &Balancer{
-			driverConfig:   cfg,
-			pool:           pool,
-			balancerConfig: balancerConfig.Config{},
+			driverConfig: cfg,
+			pool:         pool,
 		}
 		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
 		b.connectionsState.Store(s)
