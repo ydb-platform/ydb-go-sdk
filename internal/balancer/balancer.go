@@ -311,7 +311,7 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selected)
 
 	b.connectionsState.Store(newConnectionsStateWithEstimates(
-		connections, endpoints, estimates, quarantine, info.Rand,
+		connections, endpoints, estimates, endpointKeySet(selected), quarantine, info.Rand,
 	))
 }
 
@@ -782,8 +782,10 @@ func (b *Balancer) tryEnsureEndpointConn(key endpoint.Key) (selected, rejected c
 	}
 
 	active := append([]conn.Conn{cc}, current.All()...)
+	activeKeys := current.ActiveKeys()
+	activeKeys[key] = struct{}{}
 	b.connectionsState.Store(newConnectionsStateWithEstimates(
-		active, current.Endpoints(), current.Estimations(), current.quarantine, current.rand,
+		active, current.Endpoints(), current.Estimations(), activeKeys, current.quarantine, current.rand,
 	))
 
 	return cc, nil

@@ -51,7 +51,7 @@ func TestTryEnsurePinnedConnReturnsNothingFromClosedPool(t *testing.T) {
 	candidate := endpoint.New("pinned", endpoint.WithID(42))
 	estimates := strategy.RandomChoice().Estimate(strategy.Info{}, []endpoint.Endpoint{candidate})
 	balancer.connectionsState.Store(newConnectionsStateWithEstimates(
-		nil, []endpoint.Endpoint{candidate}, estimates, nil, nil,
+		nil, []endpoint.Endpoint{candidate}, estimates, endpointKeySet([]endpoint.Endpoint{candidate}), nil, nil,
 	))
 
 	selected, rejected := balancer.tryEnsureEndpointConn(candidate.Key())
@@ -74,7 +74,7 @@ func TestEnsurePinnedConnReturnsRejectedConnectionToPool(t *testing.T) {
 	}
 	estimates := strategy.RandomChoice().Estimate(strategy.Info{}, []endpoint.Endpoint{candidate})
 	balancer.connectionsState.Store(newConnectionsStateWithEstimates(
-		nil, []endpoint.Endpoint{candidate}, estimates, nil, nil,
+		nil, []endpoint.Endpoint{candidate}, estimates, endpointKeySet([]endpoint.Endpoint{candidate}), nil, nil,
 	))
 
 	selected := balancer.ensurePinnedConn(ctx, 42)

@@ -40,6 +40,13 @@ func TestMaxConnectionsWithNodeIDSoftlyExceedsLimit(t *testing.T) {
 	require.Len(t, balancer.connections().All(), 2)
 
 	active := connsToNodeIDMap(balancer.connections().All())
+	for range 20 {
+		selected, err := balancer.nextConn(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, active[selected.Endpoint().NodeID()],
+			"normal selection must not acquire a connection outside the healthy active set",
+		)
+	}
 	var outside endpoint.Endpoint
 	for _, candidate := range endpoints {
 		if active[candidate.NodeID()] == nil {

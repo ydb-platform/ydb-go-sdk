@@ -40,6 +40,7 @@ type endpointElector struct {
 
 	estimates   []strategy.Estimation
 	connections map[endpoint.Key]conn.Conn
+	active      map[endpoint.Key]struct{}
 	penalties   map[endpoint.Key]uint64
 	rand        xrand.Rand
 
@@ -49,6 +50,7 @@ type endpointElector struct {
 func newEndpointElector(
 	estimates []strategy.Estimation,
 	connections map[endpoint.Key]conn.Conn,
+	active map[endpoint.Key]struct{},
 	rand xrand.Rand,
 ) *endpointElector {
 	if rand == nil {
@@ -57,6 +59,7 @@ func newEndpointElector(
 	elector := &endpointElector{
 		estimates:   append([]strategy.Estimation(nil), estimates...),
 		connections: connections,
+		active:      active,
 		penalties:   make(map[endpoint.Key]uint64),
 		rand:        rand,
 	}
@@ -138,6 +141,7 @@ func (e *endpointElector) rebuildLocked() {
 func (e *endpointElector) bestCandidates() ([]electionCandidate, uint64) {
 	candidates := make([]electionCandidate, 0, len(e.estimates))
 	minimum := uint64(math.MaxUint64)
+	inactiveBase, tierInactive := e.inactivePenaltyBase()
 	for _, estimation := range e.estimates {
 		if estimation.Weight == 0 {
 			continue
@@ -150,7 +154,11 @@ func (e *endpointElector) bestCandidates() ([]electionCandidate, uint64) {
 		if connection != nil && connection.State() == state.Banned {
 			runtimePenalty = bannedPenalty
 		}
-		penalty := saturatingPenalty(estimation.Penalty, runtimePenalty)
+		policyPenalty := estimation.Penalty
+		if _, active := e.active[estimation.Key]; tierInactive && !active {
+			policyPenalty = saturatingPenalty(inactiveBase, policyPenalty)
+		}
+		penalty := saturatingPenalty(policyPenalty, runtimePenalty)
 		minimum = min(minimum, penalty)
 		candidates = append(candidates, electionCandidate{
 			key:     estimation.Key,
@@ -167,6 +175,30 @@ func (e *endpointElector) bestCandidates() ([]electionCandidate, uint64) {
 	}
 
 	return best, minimum
+}
+
+func (e *endpointElector) inactivePenaltyBase() (uint64, bool) {
+	if e.active == nil {
+		return 0, false
+	}
+	var (
+		maximum uint64
+		found   bool
+	)
+	for _, estimation := range e.estimates {
+		if estimation.Weight == 0 {
+			continue
+		}
+		if _, active := e.active[estimation.Key]; active {
+			maximum = max(maximum, estimation.Penalty)
+			found = true
+		}
+	}
+	if !found {
+		return 0, false
+	}
+
+	return saturatingPenalty(maximum, 1), true
 }
 
 func saturatingPenalty(policy, runtime uint64) uint64 {

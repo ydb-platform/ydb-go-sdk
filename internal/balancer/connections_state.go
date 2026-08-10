@@ -16,6 +16,7 @@ type connectionsState struct {
 	connByNodeID  map[uint32]conn.Conn
 	connByKey     map[endpoint.Key]conn.Conn
 	endpointByKey map[endpoint.Key]endpoint.Endpoint
+	activeKeys    map[endpoint.Key]struct{}
 
 	estimates []strategy.Estimation
 	elector   *endpointElector
@@ -42,7 +43,7 @@ func newConnectionsStateWithBalancer(
 	}
 
 	return newConnectionsStateWithEstimates(
-		conns, endpoints, estimator.Estimate(info, endpoints), quarantine, info.Rand,
+		conns, endpoints, estimator.Estimate(info, endpoints), endpointKeySet(endpoints), quarantine, info.Rand,
 	)
 }
 
@@ -50,16 +51,21 @@ func newConnectionsStateWithEstimates(
 	conns []conn.Conn,
 	endpoints []endpoint.Endpoint,
 	estimates []strategy.Estimation,
+	activeKeys map[endpoint.Key]struct{},
 	quarantine []conn.Conn,
 	rand xrand.Rand,
 ) *connectionsState {
 	if rand == nil {
 		rand = xrand.New(xrand.WithLock())
 	}
+	if activeKeys == nil {
+		activeKeys = endpointKeySet(endpoints)
+	}
 	result := &connectionsState{
 		connByNodeID:  connsToNodeIDMap(conns),
 		connByKey:     make(map[endpoint.Key]conn.Conn, len(conns)),
 		endpointByKey: make(map[endpoint.Key]endpoint.Endpoint, len(endpoints)),
+		activeKeys:    cloneEndpointKeySet(activeKeys),
 		estimates:     append([]strategy.Estimation(nil), estimates...),
 		all:           append([]conn.Conn(nil), conns...),
 		quarantine:    quarantine,
@@ -71,10 +77,39 @@ func newConnectionsStateWithEstimates(
 	for _, candidate := range endpoints {
 		result.endpointByKey[candidate.Key()] = candidate
 	}
-	result.elector = newEndpointElector(result.estimates, result.connByKey, rand)
+	result.elector = newEndpointElector(result.estimates, result.connByKey, result.activeKeys, rand)
 	result.preferredCount = preferredConnectionCount(result.estimates, result.connByKey)
 
 	return result
+}
+
+func endpointKeySet(endpoints []endpoint.Endpoint) map[endpoint.Key]struct{} {
+	result := make(map[endpoint.Key]struct{}, len(endpoints))
+	for _, candidate := range endpoints {
+		result[candidate.Key()] = struct{}{}
+	}
+
+	return result
+}
+
+func cloneEndpointKeySet(keys map[endpoint.Key]struct{}) map[endpoint.Key]struct{} {
+	if keys == nil {
+		return nil
+	}
+	result := make(map[endpoint.Key]struct{}, len(keys))
+	for key := range keys {
+		result[key] = struct{}{}
+	}
+
+	return result
+}
+
+func (s *connectionsState) ActiveKeys() map[endpoint.Key]struct{} {
+	if s == nil {
+		return nil
+	}
+
+	return cloneEndpointKeySet(s.activeKeys)
 }
 
 func preferredConnectionCount(
@@ -185,7 +220,7 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 		return nil, 0
 	}
 
-	for range len(s.estimates) + 1 {
+	for {
 		key, connection, allowBanned, ok := s.NextEndpoint(ctx)
 		if !ok || connection == nil {
 			return nil, failedCount
@@ -196,8 +231,6 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 		failedCount++
 		s.Pessimize(key)
 	}
-
-	return nil, failedCount
 }
 
 func (s *connectionsState) preferConnection(ctx context.Context) conn.Conn {

@@ -20,7 +20,7 @@ func TestEndpointElectorUniformAndWeightedSelection(t *testing.T) {
 	elector := newEndpointElector([]strategy.Estimation{
 		{Key: first.Key(), Weight: 1},
 		{Key: second.Key(), Weight: 1},
-	}, nil, rand)
+	}, nil, nil, rand)
 
 	key, allowBanned, ok := elector.Next()
 	require.True(t, ok)
@@ -32,7 +32,7 @@ func TestEndpointElectorUniformAndWeightedSelection(t *testing.T) {
 	elector = newEndpointElector([]strategy.Estimation{
 		{Key: first.Key(), Weight: 1},
 		{Key: second.Key(), Weight: 3},
-	}, nil, rand)
+	}, nil, nil, rand)
 	key, allowBanned, ok = elector.Next()
 	require.True(t, ok)
 	require.False(t, allowBanned)
@@ -51,12 +51,41 @@ func TestEndpointElectorUsesBestPenaltyBucket(t *testing.T) {
 	elector := newEndpointElector([]strategy.Estimation{
 		{Key: first.Key(), Penalty: 2, Weight: 1},
 		{Key: second.Key(), Penalty: 1, Weight: 1},
-	}, nil, &electorRand{})
+	}, nil, nil, &electorRand{})
 
 	key, allowBanned, ok := elector.Next()
 	require.True(t, ok)
 	require.False(t, allowBanned)
 	require.Equal(t, second.Key(), key)
+}
+
+func TestEndpointElectorKeepsInactiveEndpointsAsFallback(t *testing.T) {
+	active := endpoint.New("active", endpoint.WithID(1))
+	inactive := endpoint.New("inactive", endpoint.WithID(2))
+	estimates := []strategy.Estimation{
+		{Key: active.Key(), Penalty: 2, Weight: 1},
+		{Key: inactive.Key(), Weight: 1},
+		{Key: endpoint.New("disabled").Key(), Weight: 0},
+	}
+	elector := newEndpointElector(
+		estimates, nil, map[endpoint.Key]struct{}{active.Key(): {}}, &electorRand{},
+	)
+
+	key, allowBanned, ok := elector.Next()
+	require.True(t, ok)
+	require.False(t, allowBanned)
+	require.Equal(t, active.Key(), key, "resource tier must precede a better-policy inactive endpoint")
+
+	elector.Pessimize(active.Key())
+	key, allowBanned, ok = elector.Next()
+	require.True(t, ok)
+	require.False(t, allowBanned)
+	require.Equal(t, inactive.Key(), key)
+
+	withoutActive := newEndpointElector(estimates, nil, map[endpoint.Key]struct{}{}, &electorRand{})
+	key, _, ok = withoutActive.Next()
+	require.True(t, ok)
+	require.Equal(t, inactive.Key(), key)
 }
 
 func TestEndpointElectorPessimizeAndUnpessimize(t *testing.T) {
@@ -65,7 +94,7 @@ func TestEndpointElectorPessimizeAndUnpessimize(t *testing.T) {
 	elector := newEndpointElector([]strategy.Estimation{
 		{Key: first.Key(), Weight: 1},
 		{Key: second.Key(), Weight: 1},
-	}, nil, &electorRand{})
+	}, nil, nil, &electorRand{})
 
 	elector.Pessimize(first.Key())
 	elector.Pessimize(first.Key())
@@ -110,7 +139,7 @@ func TestEndpointElectorCombinesConnectionStateAndPolicy(t *testing.T) {
 		{Key: missing.Key(), Weight: 1},
 		{Key: endpoint.New("zero-weight").Key(), Weight: 0},
 	}
-	elector := newEndpointElector(estimates, connections, &electorRand{})
+	elector := newEndpointElector(estimates, connections, nil, &electorRand{})
 
 	key, allowBanned, ok := elector.Next()
 	require.True(t, ok)
@@ -129,7 +158,7 @@ func TestEndpointElectorEmptyAndLargeWeights(t *testing.T) {
 	_, _, ok := zero.Next()
 	require.False(t, ok)
 
-	empty := newEndpointElector([]strategy.Estimation{{Weight: 0}}, nil, nil)
+	empty := newEndpointElector([]strategy.Estimation{{Weight: 0}}, nil, nil, nil)
 	_, _, ok = empty.Next()
 	require.False(t, ok)
 	require.NotNil(t, empty.snapshot.Load())
@@ -139,7 +168,7 @@ func TestEndpointElectorEmptyAndLargeWeights(t *testing.T) {
 	large := newEndpointElector([]strategy.Estimation{
 		{Key: first.Key(), Weight: math.MaxUint64},
 		{Key: second.Key(), Weight: math.MaxUint64},
-	}, nil, &electorRand{intValue: 1})
+	}, nil, nil, &electorRand{intValue: 1})
 	key, _, ok := large.Next()
 	require.True(t, ok)
 	require.Equal(t, second.Key(), key)

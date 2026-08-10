@@ -31,6 +31,9 @@ func TestConnectionsStateDefensiveViews(t *testing.T) {
 	require.Equal(t, uint64(1), s.Estimations()[0].Weight)
 
 	require.Len(t, s.Endpoints(), 2)
+	activeKeys := s.ActiveKeys()
+	delete(activeKeys, connections[0].Endpoint().Key())
+	require.Len(t, s.ActiveKeys(), 2)
 	require.Same(t, connections[0], s.Connection(connections[0].Endpoint().Key()))
 	require.Equal(t, connections[0].Endpoint().Key(), s.Endpoint(connections[0].Endpoint().Key()).Key())
 	require.Equal(t, 2, s.PreferredCount())
@@ -41,8 +44,15 @@ func TestConnectionsStateDefensiveViews(t *testing.T) {
 	require.Nil(t, nilState.Estimations())
 	require.Nil(t, nilState.Endpoint(endpoint.Key{}))
 	require.Nil(t, nilState.Connection(endpoint.Key{}))
+	require.Nil(t, nilState.ActiveKeys())
 	nilState.Pessimize(endpoint.Key{})
 	nilState.Unpessimize(endpoint.Key{})
+	require.Nil(t, cloneEndpointKeySet(nil))
+
+	defaultState := newConnectionsStateWithBalancer(connections, nil, strategy.Info{}, nil)
+	require.Equal(t, 2, defaultState.PreferredCount())
+	empty := newConnectionsStateWithEstimates(nil, nil, nil, nil, nil, nil)
+	require.NotNil(t, empty.ActiveKeys())
 }
 
 func TestConnectionsStatePolicyGroups(t *testing.T) {
@@ -64,6 +74,14 @@ func TestConnectionsStatePolicyGroups(t *testing.T) {
 		{Key: connections[1].Endpoint().Key(), Penalty: 1, Weight: 1},
 	}, s.Estimations())
 	require.Zero(t, preferredConnectionCount(nil, nil))
+	require.Equal(t, 1, preferredConnectionCount(
+		[]strategy.Estimation{
+			{Key: connections[0].Endpoint().Key(), Penalty: ^uint64(0), Weight: 1},
+			{Key: connections[0].Endpoint().Key(), Penalty: ^uint64(0), Weight: 1},
+			{Key: connections[1].Endpoint().Key(), Weight: 0},
+		},
+		map[endpoint.Key]conn.Conn{connections[0].Endpoint().Key(): connections[0]},
+	))
 }
 
 func TestConnectionsStateHandlesBanAndUnban(t *testing.T) {
