@@ -156,7 +156,7 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	require.Equal(t, e3.NodeID(), all[1].Endpoint().NodeID())
 }
 
-func TestApplyDiscoveredEndpointsReleasesFilteredOutConns(t *testing.T) {
+func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem(t *testing.T) {
 	ctx := context.Background()
 
 	cfg := config.New()
@@ -166,7 +166,6 @@ func TestApplyDiscoveredEndpointsReleasesFilteredOutConns(t *testing.T) {
 	b := &Balancer{
 		driverConfig: cfg,
 		pool:         pool,
-		balancer:     strategy.RandomChoice(),
 	}
 
 	e1 := endpoint.New("e1.example:2135", endpoint.WithID(1))
@@ -176,12 +175,18 @@ func TestApplyDiscoveredEndpointsReleasesFilteredOutConns(t *testing.T) {
 	require.Len(t, b.connections().All(), 2)
 	require.Equal(t, 2, b.connections().PreferredCount())
 
-	b.balancer = strategy.Prefer(
+	b.plan = strategy.Compile(strategy.Prefer(
 		strategy.RandomChoice(), "NodeID(1)",
 		func(_ strategy.Info, candidate endpoint.Info) bool {
 			return candidate.NodeID() == 1
 		}, false,
-	)
+	))
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, strategy.ResolvedLocation{})
+	require.Len(t, b.connections().All(), 2, "selection policy must not change connection ownership")
+	require.Equal(t, 1, b.connections().PreferredCount())
+	selected, err := b.nextConn(endpoint.WithNodeID(ctx, 2))
+	require.NoError(t, err)
+	require.Equal(t, e2.Key(), selected.Endpoint().Key())
 
 	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1}, strategy.ResolvedLocation{})
 	require.NotNil(t, connInQuarantine(b, 2), "filtered-out conn must stay in quarantine until released")
@@ -633,7 +638,7 @@ func TestNew(t *testing.T) {
 
 		b, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(-time.Nanosecond))
 		require.NoError(t, err)
-		require.Equal(t, "RandomChoice", b.policy().String())
+		require.Equal(t, "RandomChoice", b.plan.Estimator().String())
 		require.NoError(t, b.Close(ctx))
 	})
 	t.Run("single connection policy skips discovery", func(t *testing.T) {
@@ -665,6 +670,37 @@ func TestBalancerForceDiscovery(t *testing.T) {
 
 	b.forceDiscovery()
 
+	require.True(t, forceCalled)
+}
+
+func TestBalancerForcesDiscoveryWhenPreferredTierIsUnavailable(t *testing.T) {
+	preferred := &mock.Conn{
+		AddrField: "preferred", NodeIDField: 1, LocationField: "preferred", StateField: state.Banned,
+	}
+	fallback := &mock.Conn{
+		AddrField: "fallback", NodeIDField: 2, LocationField: "fallback", StateField: state.Online,
+	}
+	estimator := strategy.Prefer(
+		strategy.RandomChoice(), "preferred",
+		func(_ strategy.Info, candidate endpoint.Info) bool {
+			return candidate.Location() == "preferred"
+		}, true,
+	)
+	forceCalled := false
+	balancer := &Balancer{
+		driverConfig: config.New(),
+		discoveryController: &stubRepeater{forceFn: func() {
+			forceCalled = true
+		}},
+	}
+	balancer.connectionsState.Store(newConnectionsStateWithBalancer(
+		[]conn.Conn{preferred, fallback}, estimator, strategy.Info{}, nil,
+	))
+
+	selected, err := balancer.nextConn(t.Context())
+
+	require.NoError(t, err)
+	require.Same(t, fallback, selected)
 	require.True(t, forceCalled)
 }
 

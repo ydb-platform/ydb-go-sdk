@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
 func TestWithNodeIDBypassesSelectionPolicies(t *testing.T) {
@@ -28,6 +29,19 @@ func TestWithNodeIDBypassesSelectionPolicies(t *testing.T) {
 	selected, err := balancer.nextConn(userBalancers.WithNodeID(t.Context(), 2))
 	require.NoError(t, err)
 	require.Same(t, connections[1], selected)
+}
+
+func TestPinnedNodeIDDoesNotFallbackToAnotherConnection(t *testing.T) {
+	balancer := userConfiguredBalancer(
+		config.WithBalancer(userBalancers.RandomChoice()),
+		[]conn.Conn{userBalancerConn(1, "available", state.Online)},
+		"",
+	)
+
+	ctx := endpoint.WithNodeID(t.Context(), 2, endpoint.WithFallback(false))
+	selected, err := balancer.nextConn(ctx)
+	require.ErrorIs(t, err, ErrNoEndpoints)
+	require.Nil(t, selected)
 }
 
 func TestBalancerHandlesBanAndUnban(t *testing.T) {

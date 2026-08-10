@@ -2,7 +2,6 @@ package strategy
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
 const defaultWeight uint64 = 1
@@ -21,17 +20,9 @@ type Estimator interface {
 	String() string
 }
 
-// PreviousEndpoint describes an endpoint from the previously published active set.
-type PreviousEndpoint struct {
-	Key    endpoint.Key
-	Banned bool
-}
-
 // Info contains immutable data shared by estimators during one discovery refresh.
 type Info struct {
-	SelfLocation   string
-	PreviousActive []PreviousEndpoint
-	Rand           xrand.Rand
+	SelfLocation string
 }
 
 func RandomChoice() Estimator {

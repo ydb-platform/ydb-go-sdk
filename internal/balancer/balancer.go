@@ -66,8 +66,7 @@ func (s *streamWrapper) RecvMsg(m any) error {
 
 type Balancer struct {
 	driverConfig        *config.Config
-	balancer            strategy.Estimator
-	compiledPlan        *strategy.Plan
+	plan                strategy.Plan
 	discoveryConfig     *discoveryConfig.Config
 	pool                *conn.Pool
 	discoveryController strategy.Controller
@@ -83,22 +82,6 @@ type Balancer struct {
 
 	closeMu sync.Mutex
 	closed  bool
-}
-
-func (b *Balancer) policy() strategy.Estimator {
-	if b.balancer == nil {
-		return strategy.RandomChoice()
-	}
-
-	return b.balancer
-}
-
-func (b *Balancer) plan() strategy.Plan {
-	if b.compiledPlan != nil {
-		return *b.compiledPlan
-	}
-
-	return strategy.Compile(b.policy())
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -228,7 +211,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 		return xerrors.WithStackTrace(err)
 	}
 
-	resolvedLocation, err := b.plan().ResolveLocation(ctx, endpoints, location, b.localDCDetector)
+	resolvedLocation, err := b.plan.ResolveLocation(ctx, endpoints, location, b.localDCDetector)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -306,50 +289,13 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	}
 	defer b.traceBalancerUpdate(&ctx, active, endpoints, resolvedLocation)()
 
-	info, selected, estimates := b.selectDiscoveredEndpoints(active, endpoints, resolvedLocation)
-
-	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selected)
+	info := strategy.Info{SelfLocation: resolvedLocation.SelfLocation}
+	estimates := b.plan.Estimator().Estimate(info, endpoints)
+	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
 
 	b.connectionsState.Store(newConnectionsStateWithEstimates(
-		connections, endpoints, estimates, endpointKeySet(selected), quarantine, info.Rand,
+		connections, estimates, quarantine, b.rnd,
 	))
-}
-
-func (b *Balancer) selectDiscoveredEndpoints(
-	active []conn.Conn,
-	endpoints []endpoint.Endpoint,
-	resolvedLocation strategy.ResolvedLocation,
-) (strategy.Info, []endpoint.Endpoint, []strategy.Estimation) {
-	if b.rnd == nil {
-		b.rnd = xrand.New(xrand.WithLock())
-	}
-	info := strategy.Info{
-		SelfLocation:   resolvedLocation.SelfLocation,
-		PreviousActive: previousEndpoints(active),
-		Rand:           b.rnd,
-	}
-	estimates := b.plan().Estimator().Estimate(info, endpoints)
-	selected := endpointsForEstimates(endpoints, b.plan().Active(info, estimates))
-
-	return info, selected, estimates
-}
-
-func endpointsForEstimates(
-	endpoints []endpoint.Endpoint,
-	estimates []strategy.Estimation,
-) []endpoint.Endpoint {
-	byKey := make(map[endpoint.Key]endpoint.Endpoint, len(endpoints))
-	for _, candidate := range endpoints {
-		byKey[candidate.Key()] = candidate
-	}
-	result := make([]endpoint.Endpoint, 0, len(estimates))
-	for _, estimation := range estimates {
-		if candidate := byKey[estimation.Key]; candidate != nil {
-			result = append(result, candidate)
-		}
-	}
-
-	return result
 }
 
 func (b *Balancer) traceBalancerUpdate(
@@ -361,7 +307,7 @@ func (b *Balancer) traceBalancerUpdate(
 	onDone := gtrace.DriverOnBalancerUpdate(
 		b.driverConfig.Trace(), ctx,
 		stack.FunctionID(
-			"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).traceBalancerUpdate"),
+			"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
 		resolvedLocation.NeedLocalDC,
 		b.driverConfig.Database(),
 	)
@@ -476,8 +422,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	plan := strategy.Compile(configuredEstimator)
 	b = &Balancer{
 		driverConfig: driverConfig,
-		balancer:     plan.Estimator(),
-		compiledPlan: &plan,
+		plan:         plan,
 		pool:         pool,
 		address:      "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
@@ -647,9 +592,6 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		if cc := state.preferConnection(ctx); cc != nil {
 			return cc, nil
 		}
-		if cc := b.ensurePinnedConn(ctx, nodeID); cc != nil {
-			return cc, nil
-		}
 		if !endpoint.ContextFallback(ctx) {
 			return nil, xerrors.WithStackTrace(
 				fmt.Errorf("%w: pinned node %d is not available", ErrNoEndpoints, nodeID),
@@ -661,8 +603,9 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 	}
 
 	preferredCount := state.PreferredCount()
+	unavailablePreferred := state.UnavailablePreferredCount()
 	defer func() {
-		if failedCount*2 <= preferredCount {
+		if max(failedCount, unavailablePreferred)*2 <= preferredCount {
 			return
 		}
 
@@ -686,9 +629,6 @@ func (b *Balancer) nextEstimatedConn(ctx context.Context, state *connectionsStat
 		if !ok {
 			break
 		}
-		if selected == nil {
-			selected = b.ensureEndpointConn(ctx, key)
-		}
 		if selected != nil && isOkConnection(selected, allowBanned) {
 			return selected, failedCount
 		}
@@ -711,82 +651,4 @@ func (b *Balancer) ban(ctx context.Context, connection conn.Conn, cause error) {
 	if current := b.connections(); current != nil {
 		current.Pessimize(connection.Endpoint().Key())
 	}
-}
-
-// ensurePinnedConn adds a discovered endpoint omitted from the active set.
-// This is the soft-limit escape hatch required by session and topic affinity.
-func (b *Balancer) ensurePinnedConn(ctx context.Context, nodeID uint32) conn.Conn {
-	var (
-		key   endpoint.Key
-		found bool
-	)
-	if current := b.connections(); current != nil {
-		for _, candidate := range current.endpointByKey {
-			if candidate.NodeID() == nodeID {
-				key = candidate.Key()
-				found = true
-
-				break
-			}
-		}
-	}
-	if !found {
-		return nil
-	}
-
-	return b.ensureEndpointConn(ctx, key)
-}
-
-func (b *Balancer) ensureEndpointConn(ctx context.Context, key endpoint.Key) conn.Conn {
-	selected, rejected := b.tryEnsureEndpointConn(key)
-	if rejected != nil {
-		b.pool.Put(ctx, rejected)
-	}
-
-	return selected
-}
-
-func (b *Balancer) tryEnsureEndpointConn(key endpoint.Key) (selected, rejected conn.Conn) {
-	b.closeMu.Lock()
-	defer b.closeMu.Unlock()
-
-	if b.closed {
-		return nil, nil
-	}
-
-	current := b.connectionsState.Load()
-	if current != nil {
-		if cc := current.Connection(key); cc != nil {
-			if !isOkConnection(cc, false) {
-				return nil, nil
-			}
-
-			return cc, nil
-		}
-	}
-
-	var target endpoint.Endpoint
-	if current != nil {
-		target = current.Endpoint(key)
-	}
-	if target == nil {
-		return nil, nil
-	}
-
-	cc := b.pool.Get(target)
-	if cc == nil {
-		return nil, nil
-	}
-	if !isOkConnection(cc, false) {
-		return nil, cc
-	}
-
-	active := append([]conn.Conn{cc}, current.All()...)
-	activeKeys := current.ActiveKeys()
-	activeKeys[key] = struct{}{}
-	b.connectionsState.Store(newConnectionsStateWithEstimates(
-		active, current.Endpoints(), current.Estimations(), activeKeys, current.quarantine, current.rand,
-	))
-
-	return cc, nil
 }

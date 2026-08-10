@@ -2,7 +2,7 @@ package strategy
 
 import (
 	"fmt"
-	"math"
+	"slices"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
@@ -19,19 +19,13 @@ type nearestDC struct {
 }
 
 func (p prefer) Estimate(info Info, endpoints []endpoint.Endpoint) []Estimation {
-	preferred, fallback := partitionEndpoints(endpoints, p.match, info)
-	result := p.child.Estimate(info, preferred)
+	estimates := p.child.Estimate(info, endpoints)
+	preferred, fallback := partitionEstimates(endpoints, estimates, p.match, info)
 	if !p.allowFallback {
-		return result
+		return preferred
 	}
 
-	fallbackEstimates := p.child.Estimate(info, fallback)
-	shift := fallbackPenaltyShift(result)
-	for i := range fallbackEstimates {
-		fallbackEstimates[i].Penalty = addPenalty(fallbackEstimates[i].Penalty, shift)
-	}
-
-	return append(result, fallbackEstimates...)
+	return append(preferred, shiftFallbackPenalties(preferred, fallback)...)
 }
 
 func (p prefer) String() string {
@@ -48,48 +42,78 @@ func (n nearestDC) String() string {
 	return n.child.String()
 }
 
-func partitionEndpoints(
+func partitionEstimates(
 	endpoints []endpoint.Endpoint,
+	estimates []Estimation,
 	match func(info Info, candidate endpoint.Info) bool,
 	info Info,
-) (preferred, fallback []endpoint.Endpoint) {
+) (preferred, fallback []Estimation) {
 	if match == nil {
-		return endpoints, nil
+		return estimates, nil
 	}
 
-	preferred = make([]endpoint.Endpoint, 0, len(endpoints))
-	fallback = make([]endpoint.Endpoint, 0, len(endpoints))
+	preferredKeys := make(map[endpoint.Key]struct{}, len(endpoints))
 	for _, candidate := range endpoints {
 		if match(info, candidate) {
-			preferred = append(preferred, candidate)
+			preferredKeys[candidate.Key()] = struct{}{}
+		}
+	}
+
+	preferred = make([]Estimation, 0, len(estimates))
+	fallback = make([]Estimation, 0, len(estimates))
+	for _, estimation := range estimates {
+		if _, ok := preferredKeys[estimation.Key]; ok {
+			preferred = append(preferred, estimation)
 		} else {
-			fallback = append(fallback, candidate)
+			fallback = append(fallback, estimation)
 		}
 	}
 
 	return preferred, fallback
 }
 
-func fallbackPenaltyShift(preferred []Estimation) uint64 {
-	if len(preferred) == 0 {
-		return 0
+func shiftFallbackPenalties(preferred, fallback []Estimation) []Estimation {
+	if len(preferred) == 0 || len(fallback) == 0 {
+		return fallback
 	}
 
-	var maximum uint64
-	for _, estimation := range preferred {
-		maximum = max(maximum, estimation.Penalty)
+	penalties := make([]uint64, 0, len(preferred)+len(fallback))
+	for _, estimations := range [][]Estimation{preferred, fallback} {
+		for _, estimation := range estimations {
+			penalties = append(penalties, estimation.Penalty)
+		}
 	}
-	if maximum == math.MaxUint64 {
-		return maximum
+	slices.Sort(penalties)
+	penalties = compactPenalties(penalties)
+	ranks := make(map[uint64]uint64, len(penalties))
+	for rank, penalty := range penalties {
+		ranks[penalty] = uint64(rank)
 	}
 
-	return maximum + 1
+	var maximumPreferred uint64
+	for i := range preferred {
+		preferred[i].Penalty = ranks[preferred[i].Penalty]
+		maximumPreferred = max(maximumPreferred, preferred[i].Penalty)
+	}
+	shift := maximumPreferred + 1
+	for i := range fallback {
+		fallback[i].Penalty = ranks[fallback[i].Penalty] + shift
+	}
+
+	return fallback
 }
 
-func addPenalty(left, right uint64) uint64 {
-	if math.MaxUint64-left < right {
-		return math.MaxUint64
+func compactPenalties(penalties []uint64) []uint64 {
+	if len(penalties) == 0 {
+		return nil
 	}
 
-	return left + right
+	result := penalties[:1]
+	for _, penalty := range penalties[1:] {
+		if penalty != result[len(result)-1] {
+			result = append(result, penalty)
+		}
+	}
+
+	return result
 }

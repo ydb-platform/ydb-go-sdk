@@ -111,7 +111,6 @@ func TestUserBalancerConfigurations(t *testing.T) {
 
 			for index := range len(test.allowed) {
 				rand := userAPITestRand{index: index}
-				b.connectionsState.Load().rand = rand
 				b.connectionsState.Load().elector.rand = rand
 				selected, err := b.nextConn(t.Context())
 				require.NoError(t, err)
@@ -235,11 +234,11 @@ func userConfiguredBalancer(option config.Option, connections []conn.Conn, selfL
 	cfg := config.New(option)
 	b := &Balancer{
 		driverConfig: cfg,
-		balancer:     cfg.Balancer(),
+		plan:         strategy.Compile(cfg.Balancer()),
 	}
 	b.connectionsState.Store(newConnectionsStateWithBalancer(
 		connections,
-		b.balancer,
+		b.plan.Estimator(),
 		strategy.Info{SelfLocation: selfLocation},
 		nil,
 	))

@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
 func TestConnectionsStateDefensiveViews(t *testing.T) {
@@ -25,34 +26,14 @@ func TestConnectionsStateDefensiveViews(t *testing.T) {
 	all := s.All()
 	all[0] = &mock.Conn{AddrField: "mutated"}
 	require.Equal(t, "1", s.All()[0].Endpoint().Address())
-
-	estimates := s.Estimations()
-	estimates[0].Weight = 99
-	require.Equal(t, uint64(1), s.Estimations()[0].Weight)
-
-	require.Len(t, s.Endpoints(), 2)
-	activeKeys := s.ActiveKeys()
-	delete(activeKeys, connections[0].Endpoint().Key())
-	require.Len(t, s.ActiveKeys(), 2)
-	require.Same(t, connections[0], s.Connection(connections[0].Endpoint().Key()))
-	require.Equal(t, connections[0].Endpoint().Key(), s.Endpoint(connections[0].Endpoint().Key()).Key())
 	require.Equal(t, 2, s.PreferredCount())
+	require.Zero(t, s.UnavailablePreferredCount())
 
 	var nilState *connectionsState
 	require.Nil(t, nilState.All())
-	require.Nil(t, nilState.Endpoints())
-	require.Nil(t, nilState.Estimations())
-	require.Nil(t, nilState.Endpoint(endpoint.Key{}))
-	require.Nil(t, nilState.Connection(endpoint.Key{}))
-	require.Nil(t, nilState.ActiveKeys())
+	require.Zero(t, nilState.PreferredCount())
+	require.Zero(t, nilState.UnavailablePreferredCount())
 	nilState.Pessimize(endpoint.Key{})
-	nilState.Unpessimize(endpoint.Key{})
-	require.Nil(t, cloneEndpointKeySet(nil))
-
-	defaultState := newConnectionsStateWithBalancer(connections, nil, strategy.Info{}, nil)
-	require.Equal(t, 2, defaultState.PreferredCount())
-	empty := newConnectionsStateWithEstimates(nil, nil, nil, nil, nil, nil)
-	require.NotNil(t, empty.ActiveKeys())
 }
 
 func TestConnectionsStatePolicyGroups(t *testing.T) {
@@ -72,47 +53,7 @@ func TestConnectionsStatePolicyGroups(t *testing.T) {
 	require.Equal(t, []strategy.Estimation{
 		{Key: connections[0].Endpoint().Key(), Weight: 1},
 		{Key: connections[1].Endpoint().Key(), Penalty: 1, Weight: 1},
-	}, s.Estimations())
-	require.Zero(t, preferredConnectionCount(nil, nil))
-	require.Equal(t, 1, preferredConnectionCount(
-		[]strategy.Estimation{
-			{Key: connections[0].Endpoint().Key(), Penalty: ^uint64(0), Weight: 1},
-			{Key: connections[0].Endpoint().Key(), Penalty: ^uint64(0), Weight: 1},
-			{Key: connections[1].Endpoint().Key(), Weight: 0},
-		},
-		map[endpoint.Key]conn.Conn{connections[0].Endpoint().Key(): connections[0]},
-	))
-}
-
-func TestConnectionsStateHandlesBanAndUnban(t *testing.T) {
-	preferred := &mock.Conn{
-		AddrField: "preferred", NodeIDField: 1, LocationField: "preferred", StateField: state.Online,
-	}
-	fallback := &mock.Conn{
-		AddrField: "fallback", NodeIDField: 2, LocationField: "fallback", StateField: state.Online,
-	}
-	estimator := strategy.Prefer(
-		strategy.RandomChoice(), "preferred",
-		func(_ strategy.Info, candidate endpoint.Info) bool {
-			return candidate.Location() == "preferred"
-		}, true,
-	)
-	s := newConnectionsStateWithBalancer([]conn.Conn{preferred, fallback}, estimator, strategy.Info{}, nil)
-
-	selected, failed := s.GetConnection(t.Context())
-	require.Same(t, preferred, selected)
-	require.Zero(t, failed)
-
-	preferred.Ban(t.Context())
-	selected, failed = s.GetConnection(t.Context())
-	require.Same(t, fallback, selected)
-	require.Equal(t, 1, failed)
-
-	preferred.Unban(t.Context())
-	s.Unpessimize(preferred.Endpoint().Key())
-	selected, failed = s.GetConnection(t.Context())
-	require.Same(t, preferred, selected)
-	require.Zero(t, failed)
+	}, s.estimates)
 }
 
 func TestConnectionsStatePinnedNodeContract(t *testing.T) {
@@ -122,14 +63,9 @@ func TestConnectionsStatePinnedNodeContract(t *testing.T) {
 	}
 	s := newConnectionsState(connections, nil, strategy.Info{}, false, nil)
 
-	selected, failed := s.GetConnection(endpoint.WithNodeID(t.Context(), 2))
-	require.Same(t, connections[1], selected)
-	require.Zero(t, failed)
-
+	require.Same(t, connections[1], s.preferConnection(endpoint.WithNodeID(t.Context(), 2)))
 	connections[1].Ban(t.Context())
-	selected, failed = s.GetConnection(endpoint.WithNodeID(t.Context(), 2, endpoint.WithFallback(false)))
-	require.Nil(t, selected)
-	require.Zero(t, failed)
+	require.Nil(t, s.preferConnection(endpoint.WithNodeID(t.Context(), 2)))
 }
 
 func TestConnectionsStateLastResort(t *testing.T) {
@@ -137,18 +73,21 @@ func TestConnectionsStateLastResort(t *testing.T) {
 		&mock.Conn{AddrField: "1", NodeIDField: 1, StateField: state.Banned},
 		&mock.Conn{AddrField: "2", NodeIDField: 2, StateField: state.Banned},
 	}
-	s := newConnectionsState(connections, nil, strategy.Info{Rand: deterministicRand{}}, false, nil)
+	s := newConnectionsStateWithBalancerAndRand(
+		connections, strategy.RandomChoice(), strategy.Info{}, nil, deterministicRand{},
+	)
 
-	selected, failed := s.GetConnection(t.Context())
+	_, selected, allowBanned, ok := s.NextEndpoint(t.Context())
+	require.True(t, ok)
+	require.True(t, allowBanned)
 	require.Same(t, connections[0], selected)
-	require.Zero(t, failed)
 }
 
 func TestConnectionsStateEmptyAndCanceled(t *testing.T) {
 	s := newConnectionsState(nil, nil, strategy.Info{}, false, nil)
-	selected, failed := s.GetConnection(t.Context())
-	require.Nil(t, selected)
-	require.Zero(t, failed)
+	_, connection, _, ok := s.NextEndpoint(t.Context())
+	require.False(t, ok)
+	require.Nil(t, connection)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -157,34 +96,6 @@ func TestConnectionsStateEmptyAndCanceled(t *testing.T) {
 	require.Equal(t, endpoint.Key{}, key)
 	require.Nil(t, connection)
 	require.False(t, allowBanned)
-	selected, failed = s.GetConnection(ctx)
-	require.Nil(t, selected)
-	require.Zero(t, failed)
-}
-
-func TestSelectRandomConnection(t *testing.T) {
-	s := newConnectionsState(nil, nil, strategy.Info{Rand: deterministicRand{}}, false, nil)
-
-	selected, failed := s.selectRandomConnection(nil, false)
-	require.Nil(t, selected)
-	require.Zero(t, failed)
-
-	good := &mock.Conn{AddrField: "good", StateField: state.Online}
-	selected, failed = s.selectRandomConnection([]conn.Conn{good}, false)
-	require.Same(t, good, selected)
-	require.Zero(t, failed)
-
-	banned := &mock.Conn{AddrField: "banned", StateField: state.Banned}
-	selected, failed = s.selectRandomConnection([]conn.Conn{banned}, false)
-	require.Nil(t, selected)
-	require.Equal(t, 1, failed)
-	selected, failed = s.selectRandomConnection([]conn.Conn{banned}, true)
-	require.Same(t, banned, selected)
-	require.Zero(t, failed)
-
-	selected, failed = s.selectRandomConnection([]conn.Conn{banned, good}, false)
-	require.Same(t, good, selected)
-	require.Zero(t, failed)
 }
 
 func TestConnsToNodeIDMap(t *testing.T) {
@@ -194,15 +105,6 @@ func TestConnsToNodeIDMap(t *testing.T) {
 		&mock.Conn{NodeIDField: 10},
 	}
 	require.Equal(t, map[uint32]conn.Conn{0: connections[0], 10: connections[1]}, connsToNodeIDMap(connections))
-}
-
-func TestPreviousEndpoints(t *testing.T) {
-	online := &mock.Conn{AddrField: "online", StateField: state.Online}
-	banned := &mock.Conn{AddrField: "banned", StateField: state.Banned}
-	require.Equal(t, []strategy.PreviousEndpoint{
-		{Key: online.Endpoint().Key()},
-		{Key: banned.Endpoint().Key(), Banned: true},
-	}, previousEndpoints([]conn.Conn{nil, online, banned}))
 }
 
 func TestIsOKConnection(t *testing.T) {
@@ -222,7 +124,7 @@ func TestDiscoveryReuseIPAndHostName(t *testing.T) {
 	}
 	balancer := &Balancer{
 		driverConfig: cfg,
-		balancer:     cfg.Balancer(),
+		plan:         strategy.Compile(cfg.Balancer()),
 		pool:         conn.NewPool(ctx, cfg),
 		discover: func(context.Context, *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
 			copy := discovered
@@ -234,7 +136,8 @@ func TestDiscoveryReuseIPAndHostName(t *testing.T) {
 
 	check := func() {
 		require.NoError(t, balancer.clusterDiscoveryAttempt(ctx, nil))
-		selected, _ := balancer.connections().GetConnection(ctx)
+		selected, err := balancer.nextConn(ctx)
+		require.NoError(t, err)
 		require.Equal(t, discovered.AddrField, selected.Endpoint().Address())
 		require.Equal(t, discovered.NodeIDField, selected.Endpoint().NodeID())
 		require.Equal(t, discovered.OverrideHostField, selected.Endpoint().OverrideHost())
@@ -262,6 +165,35 @@ func newConnectionsState(
 	}
 
 	return newConnectionsStateWithBalancer(connections, estimator, info, quarantine)
+}
+
+func newConnectionsStateWithBalancer(
+	connections []conn.Conn,
+	estimator strategy.Estimator,
+	info strategy.Info,
+	quarantine []conn.Conn,
+) *connectionsState {
+	return newConnectionsStateWithBalancerAndRand(connections, estimator, info, quarantine, nil)
+}
+
+func newConnectionsStateWithBalancerAndRand(
+	connections []conn.Conn,
+	estimator strategy.Estimator,
+	info strategy.Info,
+	quarantine []conn.Conn,
+	rand xrand.Rand,
+) *connectionsState {
+	if estimator == nil {
+		estimator = strategy.RandomChoice()
+	}
+	endpoints := make([]endpoint.Endpoint, 0, len(connections))
+	for _, connection := range connections {
+		endpoints = append(endpoints, connection.Endpoint())
+	}
+
+	return newConnectionsStateWithEstimates(
+		connections, estimator.Estimate(info, endpoints), quarantine, rand,
+	)
 }
 
 type deterministicRand struct{}

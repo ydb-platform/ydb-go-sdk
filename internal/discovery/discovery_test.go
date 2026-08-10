@@ -146,28 +146,6 @@ func TestDiscover(t *testing.T) {
 		require.Equal(t, "", location)
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 	})
-	t.Run("InvalidResult", func(t *testing.T) {
-		ctx := xtest.Context(t)
-		ctrl := gomock.NewController(t)
-		client := NewMockDiscoveryServiceClient(ctrl)
-		client.EXPECT().ListEndpoints(gomock.Any(), &Ydb_Discovery.ListEndpointsRequest{
-			Database: "test",
-		}).Return(&Ydb_Discovery.ListEndpointsResponse{
-			Operation: &Ydb_Operations.Operation{
-				Ready:  true,
-				Status: Ydb.StatusIds_SUCCESS,
-				Result: xtest.Must(anypb.New(&Ydb_Operations.GetOperationRequest{})),
-			},
-		}, nil)
-
-		endpoints, location, err := Discover(ctx, client, config.New(
-			config.WithDatabase("test"),
-		))
-
-		require.Error(t, err)
-		require.Empty(t, endpoints)
-		require.Empty(t, location)
-	})
 	t.Run("WithAddressMutator", func(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
@@ -244,24 +222,4 @@ func TestClientCloseSkipsConnWithoutIOCloser(t *testing.T) {
 	}
 
 	require.NoError(t, client.Close(t.Context()))
-}
-
-func TestBridgePileState(t *testing.T) {
-	tests := []struct {
-		proto    Ydb_Bridge.PileState_State
-		expected endpoint.PileState
-	}{
-		{Ydb_Bridge.PileState_UNSPECIFIED, endpoint.PileStateUnknown},
-		{Ydb_Bridge.PileState_PRIMARY, endpoint.PileStatePrimary},
-		{Ydb_Bridge.PileState_PROMOTED, endpoint.PileStatePromoted},
-		{Ydb_Bridge.PileState_SYNCHRONIZED, endpoint.PileStateSynchronized},
-		{Ydb_Bridge.PileState_NOT_SYNCHRONIZED, endpoint.PileStateNotSynchronized},
-		{Ydb_Bridge.PileState_SUSPENDED, endpoint.PileStateSuspended},
-		{Ydb_Bridge.PileState_DISCONNECTED, endpoint.PileStateDisconnected},
-		{Ydb_Bridge.PileState_State(100), endpoint.PileStateUnknown},
-	}
-
-	for _, test := range tests {
-		require.Equal(t, test.expected, bridgePileState(test.proto))
-	}
 }

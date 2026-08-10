@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
@@ -136,7 +137,7 @@ func TestLocalDCDiscovery(t *testing.T) {
 	)
 	r := &Balancer{
 		driverConfig: cfg,
-		balancer:     cfg.Balancer(),
+		plan:         strategy.Compile(cfg.Balancer()),
 		pool:         conn.NewPool(context.Background(), cfg),
 		discover: func(ctx context.Context, _ *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
 			return []endpoint.Endpoint{
@@ -154,9 +155,10 @@ func TestLocalDCDiscovery(t *testing.T) {
 	require.NoError(t, err)
 
 	for range 100 {
-		conn, _ := r.connections().GetConnection(ctx)
-		require.Equal(t, "b:234", conn.Endpoint().Address())
-		require.Equal(t, "b", conn.Endpoint().Location())
+		selected, selectErr := r.nextConn(ctx)
+		require.NoError(t, selectErr)
+		require.Equal(t, "b:234", selected.Endpoint().Address())
+		require.Equal(t, "b", selected.Endpoint().Location())
 	}
 }
 

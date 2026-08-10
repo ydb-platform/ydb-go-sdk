@@ -20,11 +20,11 @@ func TestEstimatorUsesFreshDiscoveryMetadataBeforePoolGet(t *testing.T) {
 		strategy.RandomChoice(), "PrimaryPile",
 		func(_ strategy.Info, candidate endpoint.Info) bool {
 			return candidate.Metadata().BridgePileState == endpoint.PileStatePrimary
-		}, false,
+		}, true,
 	)
 	balancer := &Balancer{
 		driverConfig: cfg,
-		balancer:     policy,
+		plan:         strategy.Compile(policy),
 		pool:         pool,
 	}
 	t.Cleanup(func() {
@@ -34,35 +34,19 @@ func TestEstimatorUsesFreshDiscoveryMetadataBeforePoolGet(t *testing.T) {
 
 	first := bridgeEndpoints(endpoint.PileStatePrimary, endpoint.PileStateSynchronized)
 	balancer.applyDiscoveredEndpoints(ctx, first, strategy.ResolvedLocation{})
-	require.Equal(t, uint32(1), preferredConnection(balancer.connections()).Endpoint().NodeID())
+	reused := balancer.connections().connByKey[first[1].Key()]
+	require.NotNil(t, reused)
 
 	second := bridgeEndpoints(endpoint.PileStateSynchronized, endpoint.PileStatePrimary)
 	balancer.applyDiscoveredEndpoints(ctx, second, strategy.ResolvedLocation{})
-	preferred := preferredConnection(balancer.connections())
-	require.Equal(t, uint32(2), preferred.Endpoint().NodeID())
-	require.Equal(t, endpoint.PileStatePrimary,
-		preferred.Endpoint().Metadata().BridgePileState,
-		"the connection must expose metadata from the latest discovery snapshot",
-	)
 
 	selected, err := balancer.nextConn(ctx)
 	require.NoError(t, err)
 	require.Equal(t, uint32(2), selected.Endpoint().NodeID())
-}
-
-func preferredConnection(connections *connectionsState) conn.Conn {
-	estimates := connections.Estimations()
-	if len(estimates) == 0 {
-		return nil
-	}
-	minimum := estimates[0]
-	for _, estimation := range estimates[1:] {
-		if estimation.Penalty < minimum.Penalty {
-			minimum = estimation
-		}
-	}
-
-	return connections.Connection(minimum.Key)
+	require.Same(t, reused, selected, "the pool must reuse the existing connection wrapper")
+	require.Equal(t, endpoint.PileStateSynchronized, selected.Endpoint().Metadata().BridgePileState,
+		"selection must use fresh discovery metadata rather than metadata retained by the pooled connection",
+	)
 }
 
 func bridgeEndpoints(first, second endpoint.PileState) []endpoint.Endpoint {

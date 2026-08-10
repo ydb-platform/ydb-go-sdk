@@ -13,8 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
-const bannedPenalty = math.MaxUint64
-
 type electionEntry struct {
 	key        endpoint.Key
 	cumulative int64
@@ -25,6 +23,9 @@ type electionSnapshot struct {
 	totalWeight int64
 	uniform     bool
 	allowBanned bool
+
+	preferredCount       int
+	unavailablePreferred int
 }
 
 type electionCandidate struct {
@@ -33,15 +34,14 @@ type electionCandidate struct {
 	weight  uint64
 }
 
-// endpointElector keeps mutable health penalties outside the immutable estimator tree.
-// Discovery and Ban/Unban rebuild a snapshot; the request hot path only loads it atomically.
+// endpointElector keeps mutable health state outside the immutable estimator tree.
+// Discovery and pessimization rebuild a snapshot; the request hot path only loads it atomically.
 type endpointElector struct {
 	mu sync.Mutex
 
 	estimates   []strategy.Estimation
 	connections map[endpoint.Key]conn.Conn
-	active      map[endpoint.Key]struct{}
-	penalties   map[endpoint.Key]uint64
+	pessimized  map[endpoint.Key]struct{}
 	rand        xrand.Rand
 
 	snapshot atomic.Pointer[electionSnapshot]
@@ -50,7 +50,6 @@ type endpointElector struct {
 func newEndpointElector(
 	estimates []strategy.Estimation,
 	connections map[endpoint.Key]conn.Conn,
-	active map[endpoint.Key]struct{},
 	rand xrand.Rand,
 ) *endpointElector {
 	if rand == nil {
@@ -59,8 +58,7 @@ func newEndpointElector(
 	elector := &endpointElector{
 		estimates:   append([]strategy.Estimation(nil), estimates...),
 		connections: connections,
-		active:      active,
-		penalties:   make(map[endpoint.Key]uint64),
+		pessimized:  make(map[endpoint.Key]struct{}),
 		rand:        rand,
 	}
 	elector.rebuildLocked()
@@ -91,39 +89,41 @@ func (e *endpointElector) Pessimize(key endpoint.Key) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	if e.penalties[key] == bannedPenalty {
+	if _, ok := e.pessimized[key]; ok {
 		return
 	}
-	e.penalties[key] = bannedPenalty
+	e.pessimized[key] = struct{}{}
 	e.rebuildLocked()
 }
 
-func (e *endpointElector) Unpessimize(key endpoint.Key) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	if _, ok := e.penalties[key]; !ok {
-		return
+func (e *endpointElector) PreferenceHealth() (preferred, unavailable int) {
+	snapshot := e.snapshot.Load()
+	if snapshot == nil {
+		return 0, 0
 	}
-	delete(e.penalties, key)
-	e.rebuildLocked()
+
+	return snapshot.preferredCount, snapshot.unavailablePreferred
 }
 
 func (e *endpointElector) rebuildLocked() {
-	best, minimum := e.bestCandidates()
-	snapshot := &electionSnapshot{allowBanned: len(best) > 0 && minimum == bannedPenalty}
+	best, allowBanned, preferredCount, unavailablePreferred := e.bestCandidates()
+	snapshot := &electionSnapshot{
+		allowBanned:          allowBanned,
+		preferredCount:       preferredCount,
+		unavailablePreferred: unavailablePreferred,
+	}
 	if len(best) == 0 {
 		e.snapshot.Store(snapshot)
 
 		return
 	}
 
-	maxWeight := uint64(math.MaxInt64 / len(best))
+	weights := normalizeElectionWeights(best)
 	snapshot.entries = make([]electionEntry, len(best))
 	snapshot.uniform = true
 	var firstWeight int64
 	for i, candidate := range best {
-		weight := int64(min(candidate.weight, maxWeight))
+		weight := int64(weights[i])
 		if i == 0 {
 			firstWeight = weight
 		} else if weight != firstWeight {
@@ -138,80 +138,112 @@ func (e *endpointElector) rebuildLocked() {
 	e.snapshot.Store(snapshot)
 }
 
-func (e *endpointElector) bestCandidates() ([]electionCandidate, uint64) {
-	candidates := make([]electionCandidate, 0, len(e.estimates))
-	minimum := uint64(math.MaxUint64)
-	inactiveBase, tierInactive := e.inactivePenaltyBase()
+func (e *endpointElector) bestCandidates() (
+	best []electionCandidate,
+	allowBanned bool,
+	preferredCount int,
+	unavailablePreferred int,
+) {
+	healthy, banned, preferredCount, unavailablePreferred := e.candidatesByHealth()
+	if len(healthy) == 0 {
+		return banned, len(banned) > 0, preferredCount, unavailablePreferred
+	}
+
+	minimumHealthyPenalty := uint64(math.MaxUint64)
+	for _, candidate := range healthy {
+		minimumHealthyPenalty = min(minimumHealthyPenalty, candidate.penalty)
+	}
+	best = make([]electionCandidate, 0, len(healthy))
+	for _, candidate := range healthy {
+		if candidate.penalty == minimumHealthyPenalty {
+			best = append(best, candidate)
+		}
+	}
+
+	return best, false, preferredCount, unavailablePreferred
+}
+
+func (e *endpointElector) candidatesByHealth() (
+	healthy []electionCandidate,
+	banned []electionCandidate,
+	preferredCount int,
+	unavailablePreferred int,
+) {
+	minimumPolicy := e.minimumPolicyPenalty()
+	healthy = make([]electionCandidate, 0, len(e.estimates))
+	banned = make([]electionCandidate, 0, len(e.estimates))
 	for _, estimation := range e.estimates {
 		if estimation.Weight == 0 {
 			continue
 		}
 		connection := e.connections[estimation.Key]
-		if connection != nil && !isKnownConnection(connection) {
+		if connection == nil {
 			continue
 		}
-		runtimePenalty := e.penalties[estimation.Key]
-		if connection != nil && connection.State() == state.Banned {
-			runtimePenalty = bannedPenalty
+
+		_, pessimized := e.pessimized[estimation.Key]
+		connectionState := connection.State()
+		healthyCandidate := !pessimized && isHealthyConnectionState(connectionState)
+		bannedCandidate := pessimized || connectionState == state.Banned
+		if estimation.Penalty == minimumPolicy {
+			preferredCount++
+			if !healthyCandidate {
+				unavailablePreferred++
+			}
 		}
-		policyPenalty := estimation.Penalty
-		if _, active := e.active[estimation.Key]; tierInactive && !active {
-			policyPenalty = saturatingPenalty(inactiveBase, policyPenalty)
-		}
-		penalty := saturatingPenalty(policyPenalty, runtimePenalty)
-		minimum = min(minimum, penalty)
-		candidates = append(candidates, electionCandidate{
+
+		candidate := electionCandidate{
 			key:     estimation.Key,
-			penalty: penalty,
+			penalty: estimation.Penalty,
 			weight:  estimation.Weight,
-		})
-	}
-
-	best := make([]electionCandidate, 0, len(candidates))
-	for _, candidate := range candidates {
-		if candidate.penalty == minimum {
-			best = append(best, candidate)
+		}
+		switch {
+		case healthyCandidate:
+			healthy = append(healthy, candidate)
+		case bannedCandidate:
+			banned = append(banned, candidate)
 		}
 	}
 
-	return best, minimum
+	return healthy, banned, preferredCount, unavailablePreferred
 }
 
-func (e *endpointElector) inactivePenaltyBase() (uint64, bool) {
-	if e.active == nil {
-		return 0, false
-	}
-	var (
-		maximum uint64
-		found   bool
-	)
+func (e *endpointElector) minimumPolicyPenalty() uint64 {
+	minimumPolicy := uint64(math.MaxUint64)
 	for _, estimation := range e.estimates {
-		if estimation.Weight == 0 {
-			continue
-		}
-		if _, active := e.active[estimation.Key]; active {
-			maximum = max(maximum, estimation.Penalty)
-			found = true
+		if estimation.Weight != 0 && e.connections[estimation.Key] != nil {
+			minimumPolicy = min(minimumPolicy, estimation.Penalty)
 		}
 	}
-	if !found {
-		return 0, false
-	}
 
-	return saturatingPenalty(maximum, 1), true
+	return minimumPolicy
 }
 
-func saturatingPenalty(policy, runtime uint64) uint64 {
-	if math.MaxUint64-policy < runtime {
-		return math.MaxUint64
+func normalizeElectionWeights(candidates []electionCandidate) []uint64 {
+	weights := make([]uint64, len(candidates))
+	if len(candidates) == 0 {
+		return weights
 	}
 
-	return policy + runtime
+	maximumPerCandidate := uint64(math.MaxInt64 / len(candidates))
+	var maximum uint64
+	for _, candidate := range candidates {
+		maximum = max(maximum, candidate.weight)
+	}
+	scale := maximum / maximumPerCandidate
+	if maximum%maximumPerCandidate != 0 {
+		scale++
+	}
+	for i, candidate := range candidates {
+		weights[i] = max(uint64(1), candidate.weight/scale)
+	}
+
+	return weights
 }
 
-func isKnownConnection(connection conn.Conn) bool {
-	switch connection.State() {
-	case state.Created, state.Online, state.Offline, state.Banned:
+func isHealthyConnectionState(connectionState state.State) bool {
+	switch connectionState {
+	case state.Created, state.Online, state.Offline:
 		return true
 	default:
 		return false

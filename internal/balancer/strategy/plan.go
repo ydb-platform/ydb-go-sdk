@@ -27,37 +27,30 @@ type ResolvedLocation struct {
 // LocalDCDetector detects the nearest data center for discovered endpoints.
 type LocalDCDetector func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
-// Plan contains root lifecycle and resource decisions compiled from an estimator tree.
+// Plan contains endpoint-source and location-resolution decisions compiled from an estimator tree.
 // Endpoint policy itself remains represented by the immutable Estimator interface.
 type Plan struct {
-	estimator      Estimator
-	source         endpointSource
-	resolver       locationResolver
-	maxConnections int
+	estimator Estimator
+	source    endpointSource
+	resolver  locationResolver
 }
 
-// Compile extracts root lifecycle and resource settings from an estimator tree.
+// Compile extracts lifecycle settings from an estimator tree.
 func Compile(estimator Estimator) Plan {
 	return compile(normalize(estimator))
 }
 
 // Estimator returns the configured endpoint estimator tree.
 func (p Plan) Estimator() Estimator {
-	return p.estimator
-}
-
-// Active applies root resource limits to endpoint estimates.
-func (p Plan) Active(info Info, estimates []Estimation) []Estimation {
-	return selectActiveEstimates(info, estimates, p.maxConnections)
-}
-
-// MaxConnections returns the compiled soft limit. Zero means unlimited.
-func (p Plan) MaxConnections() int {
-	return p.maxConnections
+	return normalize(p.estimator)
 }
 
 // Start starts the endpoint source selected by the estimator tree.
 func (p Plan) Start(ctx context.Context, runtime Runtime) (Controller, error) {
+	if p.source == nil {
+		return clusterEndpointSource{}.Start(ctx, runtime)
+	}
+
 	return p.source.Start(ctx, runtime)
 }
 
@@ -68,6 +61,10 @@ func (p Plan) ResolveLocation(
 	discoveredLocation string,
 	detector LocalDCDetector,
 ) (ResolvedLocation, error) {
+	if p.resolver == nil {
+		return discoveredLocationResolver{}.Resolve(ctx, endpoints, discoveredLocation, detector)
+	}
+
 	return p.resolver.Resolve(ctx, endpoints, discoveredLocation, detector)
 }
 

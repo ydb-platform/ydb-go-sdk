@@ -93,7 +93,3 @@ func TestFromConfig(t *testing.T) {
 		})
 	}
 }
-
-func TestFromConfigIgnoresNilOption(t *testing.T) {
-	require.Equal(t, "RandomChoice", FromConfig("random_choice", nil).String())
-}

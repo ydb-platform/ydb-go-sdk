@@ -5,40 +5,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 )
-
-func TestNextEstimatedConnLazilyCreatesConnection(t *testing.T) {
-	ctx := t.Context()
-	cfg := config.New()
-	pool := conn.NewPool(ctx, cfg)
-	candidate := endpoint.New("lazy:2135", endpoint.WithID(42))
-	estimates := strategy.RandomChoice().Estimate(strategy.Info{}, []endpoint.Endpoint{candidate})
-	connections := newConnectionsStateWithEstimates(
-		nil, []endpoint.Endpoint{candidate}, estimates, endpointKeySet([]endpoint.Endpoint{candidate}), nil, nil,
-	)
-	balancer := &Balancer{
-		driverConfig: cfg,
-		pool:         pool,
-	}
-	balancer.connectionsState.Store(connections)
-	t.Cleanup(func() {
-		balancer.releaseStateConns(ctx, balancer.connections())
-		require.NoError(t, pool.RemoveRef(ctx))
-	})
-
-	selected, failedCount := balancer.nextEstimatedConn(ctx, connections)
-
-	require.NotNil(t, selected)
-	require.Equal(t, candidate.Key(), selected.Endpoint().Key())
-	require.Zero(t, failedCount)
-	require.Same(t, selected, balancer.connections().Connection(candidate.Key()))
-}
 
 func TestNextEstimatedConnContinuesWithLatestSnapshot(t *testing.T) {
 	replacement := &mock.Conn{
@@ -98,7 +69,7 @@ func TestNextEstimatedConnStopsWhenBalancerClosesDuringSelection(t *testing.T) {
 }
 
 func TestNextEstimatedConnStopsWhenElectionSnapshotIsEmpty(t *testing.T) {
-	connections := newConnectionsStateWithEstimates(nil, nil, nil, nil, nil, nil)
+	connections := newConnectionsStateWithEstimates(nil, nil, nil, nil)
 	balancer := &Balancer{}
 	balancer.connectionsState.Store(connections)
 

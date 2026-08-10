@@ -69,24 +69,43 @@ func TestPreferPenaltyComposition(t *testing.T) {
 	estimator := Prefer(child, "local", locationMatch("local"), true)
 
 	require.Equal(t, []Estimation{
-		{Key: endpoints[0].Key(), Penalty: 2, Weight: 3},
-		{Key: endpoints[1].Key(), Penalty: 8, Weight: 4},
+		{Key: endpoints[0].Key(), Weight: 3},
+		{Key: endpoints[1].Key(), Penalty: 2, Weight: 4},
 	}, estimator.Estimate(Info{}, endpoints))
 
-	require.Equal(t, uint64(math.MaxUint64), addPenalty(math.MaxUint64, 1))
-	require.Equal(t, uint64(math.MaxUint64), fallbackPenaltyShift([]Estimation{{Penalty: math.MaxUint64}}))
+	overflowSafe := Prefer(fixedEstimator{estimates: []Estimation{
+		{Key: endpoints[0].Key(), Penalty: math.MaxUint64, Weight: 1},
+		{Key: endpoints[1].Key(), Weight: 1},
+	}}, "local", locationMatch("local"), true)
+	require.Equal(t, []Estimation{
+		{Key: endpoints[0].Key(), Penalty: 1, Weight: 1},
+		{Key: endpoints[1].Key(), Penalty: 2, Weight: 1},
+	}, overflowSafe.Estimate(Info{}, endpoints))
 }
 
-func TestPartitionEndpoints(t *testing.T) {
+func TestPreferCallsChildOnceWithFullSnapshot(t *testing.T) {
 	endpoints := strategyEndpoints("local", "remote")
+	child := &recordingEstimator{}
+	estimator := Prefer(child, "local", locationMatch("local"), true)
 
-	preferred, fallback := partitionEndpoints(endpoints, nil, Info{})
-	require.Equal(t, endpoints, preferred)
+	estimator.Estimate(Info{}, endpoints)
+
+	require.Equal(t, 1, child.calls)
+	require.Equal(t, endpoints, child.endpoints)
+}
+
+func TestPartitionEstimates(t *testing.T) {
+	endpoints := strategyEndpoints("local", "remote")
+	estimates := RandomChoice().Estimate(Info{}, endpoints)
+
+	preferred, fallback := partitionEstimates(endpoints, estimates, nil, Info{})
+	require.Equal(t, estimates, preferred)
 	require.Nil(t, fallback)
 
-	preferred, fallback = partitionEndpoints(endpoints, locationMatch("local"), Info{})
-	require.Equal(t, endpoints[:1], preferred)
-	require.Equal(t, endpoints[1:], fallback)
+	preferred, fallback = partitionEstimates(endpoints, estimates, locationMatch("local"), Info{})
+	require.Equal(t, estimates[:1], preferred)
+	require.Equal(t, estimates[1:], fallback)
+	require.Nil(t, compactPenalties(nil))
 }
 
 func TestEstimatorCanUseEndpointMetadata(t *testing.T) {
@@ -122,6 +141,22 @@ func locationMatch(location string) func(Info, endpoint.Info) bool {
 
 type fixedEstimator struct {
 	estimates []Estimation
+}
+
+type recordingEstimator struct {
+	calls     int
+	endpoints []endpoint.Endpoint
+}
+
+func (r *recordingEstimator) Estimate(_ Info, endpoints []endpoint.Endpoint) []Estimation {
+	r.calls++
+	r.endpoints = endpoints
+
+	return randomChoice{}.Estimate(Info{}, endpoints)
+}
+
+func (*recordingEstimator) String() string {
+	return "Recording"
 }
 
 func (f fixedEstimator) Estimate(_ Info, endpoints []endpoint.Endpoint) []Estimation {

@@ -45,7 +45,7 @@ func TestClusterDiscoveryAttemptReturnsLocationResolverError(t *testing.T) {
 	)
 	balancer := &Balancer{
 		driverConfig: config.New(),
-		balancer:     policy,
+		plan:         strategy.Compile(policy),
 		discover: func(context.Context, *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
 			return []endpoint.Endpoint{endpoint.New("node:2135")}, "", nil
 		},

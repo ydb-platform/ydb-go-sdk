@@ -106,7 +106,20 @@ func TestCompileDefaultsUnknownBalancerToDynamicDiscovery(t *testing.T) {
 		[]Estimation{{Key: strategyEndpoints("local")[0].Key(), Weight: 1}},
 		plan.Estimator().Estimate(Info{}, strategyEndpoints("local")),
 	)
-	require.Zero(t, plan.MaxConnections())
+}
+
+func TestZeroPlanUsesDynamicDiscoveryDefaults(t *testing.T) {
+	var plan Plan
+	runtime := &recordingRuntime{}
+
+	_, err := plan.Start(t.Context(), runtime)
+	require.NoError(t, err)
+	require.Equal(t, "cluster", runtime.source)
+	require.Equal(t, "RandomChoice", plan.Estimator().String())
+
+	resolved, err := plan.ResolveLocation(t.Context(), nil, "discovered", nil)
+	require.NoError(t, err)
+	require.Equal(t, ResolvedLocation{SelfLocation: "discovered"}, resolved)
 }
 
 func TestNearestDCResolverReturnsDetectorError(t *testing.T) {
