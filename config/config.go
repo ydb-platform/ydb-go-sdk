@@ -8,8 +8,8 @@ import (
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
@@ -24,7 +24,7 @@ type Config struct {
 	trace              *trace.Driver
 	dialTimeout        time.Duration
 	connectionTTL      time.Duration
-	balancerConfig     balancers.Balancer
+	balancerConfig     strategy.Balancer
 	secure             bool
 	endpoint           string
 	database           string
@@ -115,7 +115,7 @@ func (c *Config) Trace() *trace.Driver {
 }
 
 // Balancer returns the configured endpoint-selection strategy.
-func (c *Config) Balancer() balancers.Balancer {
+func (c *Config) Balancer() strategy.Balancer {
 	return c.balancerConfig
 }
 
@@ -291,7 +291,7 @@ func WithGrpcMaxMessageSize(sizeBytes int) Option {
 	}
 }
 
-func WithBalancer(balancer balancers.Balancer) Option {
+func WithBalancer(balancer strategy.Balancer) Option {
 	return func(c *Config) {
 		c.balancerConfig = balancer
 	}

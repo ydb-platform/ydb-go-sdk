@@ -10,34 +10,19 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
 
-// Balancer describes an immutable, composable endpoint-selection strategy.
-type Balancer = strategy.Balancer
-
 // Deprecated: RoundRobin is an alias to RandomChoice now
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func RoundRobin() Balancer {
+func RoundRobin() strategy.Balancer {
 	return RandomChoice()
 }
 
-func RandomChoice() Balancer {
+func RandomChoice() strategy.Balancer {
 	return strategy.RandomChoice()
 }
 
-func SingleConn() Balancer {
+func SingleConn() strategy.Balancer {
 	return strategy.SingleConn()
-}
-
-// WithMaxConnections sets the maximum number of discovered endpoints kept in
-// the active connection set. Existing healthy endpoints are preferred across
-// discovery updates and banned endpoints are replaced.
-//
-// The limit is soft: [WithNodeID] and session or stream affinity may require a
-// connection to an endpoint outside the active set.
-//
-// Zero and negative values mean unlimited.
-func WithMaxConnections(balancer Balancer, limit int) Balancer {
-	return strategy.WithMaxConnections(balancer, limit)
 }
 
 type filterLocalDC struct{}
@@ -53,34 +38,29 @@ func (filterLocalDC) String() string {
 // Deprecated: use PreferNearestDC instead
 // Will be removed after March 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func PreferLocalDC(balancer Balancer) Balancer {
+func PreferLocalDC(balancer strategy.Balancer) strategy.Balancer {
 	return PreferNearestDC(balancer)
 }
 
 // PreferNearestDC creates balancer which use endpoints only in location such as initial endpoint location
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // PreferNearestDC balancer try to autodetect local DC from client side.
-func PreferNearestDC(balancer Balancer) Balancer {
+func PreferNearestDC(balancer strategy.Balancer) strategy.Balancer {
 	return strategy.Prefer(balancer, filterLocalDC{}, false, true)
 }
 
 // Deprecated: use PreferNearestDCWithFallBack instead
 // Will be removed after March 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func PreferLocalDCWithFallBack(balancer Balancer) Balancer {
+func PreferLocalDCWithFallBack(balancer strategy.Balancer) strategy.Balancer {
 	return PreferNearestDCWithFallBack(balancer)
 }
 
 // PreferNearestDCWithFallBack creates balancer which use endpoints only in location such as initial endpoint location
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferNearestDCWithFallBack(balancer Balancer) Balancer {
+func PreferNearestDCWithFallBack(balancer strategy.Balancer) strategy.Balancer {
 	return strategy.Prefer(balancer, filterLocalDC{}, true, true)
-}
-
-// PreferNearestDCWithFallback is an alias for [PreferNearestDCWithFallBack].
-func PreferNearestDCWithFallback(balancer Balancer) Balancer {
-	return PreferNearestDCWithFallBack(balancer)
 }
 
 type filterLocations []string
@@ -109,7 +89,7 @@ func (locations filterLocations) String() string {
 
 // PreferLocations creates balancer which use endpoints only in selected locations (such as "ABC", "DEF", etc.)
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-func PreferLocations(balancer Balancer, locations ...string) Balancer {
+func PreferLocations(balancer strategy.Balancer, locations ...string) strategy.Balancer {
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
@@ -128,7 +108,7 @@ func PreferLocations(balancer Balancer, locations ...string) Balancer {
 // PreferLocationsWithFallback creates balancer which use endpoints only in selected locations
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferLocationsWithFallback(balancer Balancer, locations ...string) Balancer {
+func PreferLocationsWithFallback(balancer strategy.Balancer, locations ...string) strategy.Balancer {
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
@@ -166,7 +146,7 @@ func (p filterFunc) String() string {
 
 // Prefer creates balancer which use endpoints by filter
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter
-func Prefer(balancer Balancer, filter func(endpoint Endpoint) bool) Balancer {
+func Prefer(balancer strategy.Balancer, filter func(endpoint Endpoint) bool) strategy.Balancer {
 	return strategy.Prefer(balancer, filterFunc(func(_ strategy.Info, e endpoint.Info) bool {
 		return filter(e)
 	}), false, false)
@@ -175,13 +155,13 @@ func Prefer(balancer Balancer, filter func(endpoint Endpoint) bool) Balancer {
 // PreferWithFallback creates balancer which use endpoints by filter
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferWithFallback(balancer Balancer, filter func(endpoint Endpoint) bool) Balancer {
+func PreferWithFallback(balancer strategy.Balancer, filter func(endpoint Endpoint) bool) strategy.Balancer {
 	return strategy.Prefer(balancer, filterFunc(func(_ strategy.Info, e endpoint.Info) bool {
 		return filter(e)
 	}), true, false)
 }
 
 // Default balancer used by default
-func Default() Balancer {
+func Default() strategy.Balancer {
 	return RandomChoice()
 }

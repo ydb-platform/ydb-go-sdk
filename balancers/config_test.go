@@ -15,6 +15,7 @@ func TestFromConfig(t *testing.T) {
 		fail            bool
 	}{
 		{name: "empty", config: ``, fail: true},
+		{name: "invalid JSON", config: `{`, fail: true},
 		{name: "disable", config: `disable`, expected: "SingleConn"},
 		{name: "single", config: `single`, expected: "SingleConn"},
 		{name: "single/JSON", config: `{"type":"single"}`, expected: "SingleConn"},
@@ -40,6 +41,11 @@ func TestFromConfig(t *testing.T) {
 			fail:   true,
 		},
 		{
+			name:     "unknown preference",
+			config:   `{"type":"random_choice","prefer":"unknown"}`,
+			expected: "RandomChoice",
+		},
+		{
 			name:            "prefer_local_dc_with_fallback",
 			config:          `{"type":"random_choice","prefer":"local_dc","fallback":true}`,
 			expected:        "Prefer{Filter=LocalDC,AllowFallback=true,Child=RandomChoice}",
@@ -60,6 +66,11 @@ func TestFromConfig(t *testing.T) {
 			name:     "prefer_locations_with_fallback",
 			config:   `{"type":"random_choice","prefer":"locations","locations":["AAA","BBB","CCC"],"fallback":true}`,
 			expected: "Prefer{Filter=Locations{AAA,BBB,CCC},AllowFallback=true,Child=RandomChoice}",
+		},
+		{
+			name:   "prefer_locations_without_locations",
+			config: `{"type":"random_choice","prefer":"locations"}`,
+			fail:   true,
 		},
 	}
 
@@ -87,4 +98,8 @@ func TestFromConfig(t *testing.T) {
 			require.Equal(t, test.detectNearestDC, balancer.Requirements().DetectNearestDC)
 		})
 	}
+}
+
+func TestFromConfigIgnoresNilOption(t *testing.T) {
+	require.Equal(t, "RandomChoice", FromConfig("random_choice", nil).String())
 }

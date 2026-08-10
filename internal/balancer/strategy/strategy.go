@@ -12,16 +12,10 @@ import (
 // Balancer is an immutable, composable endpoint-selection strategy.
 // Connection ownership and discovery lifecycle remain outside the strategy.
 type Balancer interface {
-	// Filter returns endpoint groups in the order in which admission policies
-	// should consider them. Groups omitted from the result are not eligible for
-	// admission by an outer limiting strategy.
+	// Filter returns endpoint groups in selection order.
 	Filter(info Info, endpoints []endpoint.Endpoint) [][]endpoint.Endpoint
 
-	// Select returns the endpoints which should be held in the active connection
-	// state for a discovery generation.
-	Select(ctx SelectContext, endpoints []endpoint.Endpoint) []endpoint.Endpoint
-
-	// Next selects a connection from an already reconciled connection state.
+	// Next selects a connection from the current connection state.
 	Next(ctx context.Context, nextCtx NextContext, connections []conn.Conn, allowBanned bool) (
 		connection conn.Conn,
 		failed int,
@@ -33,18 +27,11 @@ type Balancer interface {
 
 type Requirements struct {
 	DetectNearestDC bool
-	Limited         bool
 	SingleConn      bool
 }
 
 type Info struct {
 	SelfLocation string
-}
-
-type SelectContext struct {
-	Previous []conn.Conn
-	Info     Info
-	Rand     xrand.Rand
 }
 
 type NextContext struct {
@@ -74,17 +61,6 @@ func Prefer(child Balancer, filter Filter, allowFallback, detectNearestDC bool) 
 	}
 }
 
-func WithMaxConnections(child Balancer, limit int) Balancer {
-	if limit < 0 {
-		limit = 0
-	}
-
-	return maxConnections{
-		child: normalize(child),
-		limit: limit,
-	}
-}
-
 func normalize(balancer Balancer) Balancer {
 	if balancer == nil {
 		return RandomChoice()
@@ -97,10 +73,6 @@ type randomChoice struct{}
 
 func (randomChoice) Filter(_ Info, endpoints []endpoint.Endpoint) [][]endpoint.Endpoint {
 	return [][]endpoint.Endpoint{endpoints}
-}
-
-func (randomChoice) Select(_ SelectContext, endpoints []endpoint.Endpoint) []endpoint.Endpoint {
-	return endpoints
 }
 
 func (randomChoice) Next(
@@ -149,10 +121,6 @@ type singleConn struct{}
 
 func (singleConn) Filter(_ Info, endpoints []endpoint.Endpoint) [][]endpoint.Endpoint {
 	return [][]endpoint.Endpoint{endpoints}
-}
-
-func (singleConn) Select(_ SelectContext, endpoints []endpoint.Endpoint) []endpoint.Endpoint {
-	return endpoints
 }
 
 func (singleConn) Next(

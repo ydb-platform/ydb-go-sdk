@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
@@ -350,7 +350,7 @@ func WithCredentials(c credentials.Credentials) Option {
 	})
 }
 
-func WithBalancer(balancer balancers.Balancer) Option {
+func WithBalancer(balancer strategy.Balancer) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.options = append(d.options, config.WithBalancer(balancer))
 

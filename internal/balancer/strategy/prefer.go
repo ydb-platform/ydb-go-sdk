@@ -25,10 +25,6 @@ func (p prefer) Filter(info Info, endpoints []endpoint.Endpoint) [][]endpoint.En
 	return groups
 }
 
-func (p prefer) Select(ctx SelectContext, endpoints []endpoint.Endpoint) []endpoint.Endpoint {
-	return p.child.Select(ctx, endpoints)
-}
-
 func (p prefer) Next(
 	ctx context.Context,
 	nextCtx NextContext,

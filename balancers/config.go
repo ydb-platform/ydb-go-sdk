@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -36,13 +37,13 @@ type balancersConfig struct {
 }
 
 type fromConfigOptionsHolder struct {
-	fallbackBalancer Balancer
+	fallbackBalancer strategy.Balancer
 	errorHandler     func(error)
 }
 
 type fromConfigOption func(h *fromConfigOptionsHolder)
 
-func WithParseErrorFallbackBalancer(b Balancer) fromConfigOption {
+func WithParseErrorFallbackBalancer(b strategy.Balancer) fromConfigOption {
 	return func(h *fromConfigOptionsHolder) {
 		h.fallbackBalancer = b
 	}
@@ -54,7 +55,7 @@ func WithParseErrorHandler(errorHandler func(error)) fromConfigOption {
 	}
 }
 
-func createByType(t balancerType) (Balancer, error) {
+func createByType(t balancerType) (strategy.Balancer, error) {
 	switch t {
 	case typeDisable:
 		return SingleConn(), nil
@@ -69,14 +70,14 @@ func createByType(t balancerType) (Balancer, error) {
 	}
 }
 
-func CreateFromConfig(s string) (Balancer, error) {
+func CreateFromConfig(s string) (strategy.Balancer, error) {
 	// try to parse s as identifier of balancer
 	if c, err := createByType(balancerType(s)); err == nil {
 		return c, nil
 	}
 
 	var (
-		b   Balancer
+		b   strategy.Balancer
 		err error
 		c   balancersConfig
 	)
@@ -118,12 +119,12 @@ func CreateFromConfig(s string) (Balancer, error) {
 	}
 }
 
-func FromConfig(config string, opts ...fromConfigOption) Balancer {
+func FromConfig(config string, opts ...fromConfigOption) strategy.Balancer {
 	var (
 		h = fromConfigOptionsHolder{
 			fallbackBalancer: Default(),
 		}
-		b   Balancer
+		b   strategy.Balancer
 		err error
 	)
 	for _, opt := range opts {

@@ -59,6 +59,17 @@ func TestConnectionsState_AllNilReceiver(t *testing.T) {
 	require.Nil(t, s.All())
 }
 
+func TestConnectionsStateDefaultsToRandomChoice(t *testing.T) {
+	connection := &mock.Conn{AddrField: "1", StateField: state.Online}
+	s := newConnectionsStateWithBalancer(
+		[]conn.Conn{connection}, nil, strategy.Info{}, nil,
+	)
+
+	selected, failed := s.GetConnection(t.Context())
+	require.Same(t, connection, selected)
+	require.Zero(t, failed)
+}
+
 func TestConnection_LastResortUsesPreferWhenFallbackDisabled(t *testing.T) {
 	filter := filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
 		return info.SelfLocation == e.Location()

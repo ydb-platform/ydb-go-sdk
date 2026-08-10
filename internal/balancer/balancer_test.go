@@ -571,8 +571,7 @@ func (c *blockingStateConn) State() state.State {
 }
 
 type stubRepeater struct {
-	stopFn  func()
-	forceFn func()
+	stopFn func()
 }
 
 func (s *stubRepeater) Stop() {
@@ -581,11 +580,7 @@ func (s *stubRepeater) Stop() {
 	}
 }
 
-func (s *stubRepeater) Force() {
-	if s.forceFn != nil {
-		s.forceFn()
-	}
-}
+func (s *stubRepeater) Force() {}
 
 // Mock resolver
 //
