@@ -89,7 +89,6 @@ func TestConnectionsStateHandlesBanAndUnban(t *testing.T) {
 			return candidate.Location() == "preferred"
 		}),
 		true,
-		false,
 	)
 	connections := newConnectionsStateWithBalancer(
 		[]conn.Conn{preferred, fallback}, balancer, strategy.Info{}, nil,
@@ -671,7 +670,7 @@ func newConnectionsState(
 ) *connectionsState {
 	balancer := strategy.RandomChoice()
 	if filter != nil {
-		balancer = strategy.Prefer(balancer, filter, allowFallback, false)
+		balancer = strategy.Prefer(balancer, filter, allowFallback)
 	}
 
 	return newConnectionsStateWithBalancer(conns, balancer, info, quarantine)

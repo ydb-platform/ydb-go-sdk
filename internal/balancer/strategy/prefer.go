@@ -9,10 +9,13 @@ import (
 )
 
 type prefer struct {
-	child           Balancer
-	filter          Filter
-	allowFallback   bool
-	detectNearestDC bool
+	child         Balancer
+	filter        Filter
+	allowFallback bool
+}
+
+type nearestDC struct {
+	Balancer
 }
 
 func (p prefer) Filter(info Info, endpoints []endpoint.Endpoint) [][]endpoint.Endpoint {
@@ -48,13 +51,6 @@ func (p prefer) Next(
 	connection, fallbackFailed := p.child.Next(ctx, nextCtx, fallback, false)
 
 	return connection, failed + fallbackFailed
-}
-
-func (p prefer) Requirements() Requirements {
-	requirements := p.child.Requirements()
-	requirements.DetectNearestDC = requirements.DetectNearestDC || p.detectNearestDC
-
-	return requirements
 }
 
 func (p prefer) String() string {

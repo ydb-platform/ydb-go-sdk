@@ -1,6 +1,7 @@
 package balancer
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 )
 
@@ -125,41 +127,41 @@ func TestUserBalancerConfigDeserializationCompatibility(t *testing.T) {
 		serialized      string
 		preferred       []uint32
 		fallback        []uint32
-		detectNearestDC bool
-		singleConn      bool
+		nearestDC       bool
+		bootstrapSource bool
 	}{
-		{name: "disable", serialized: `disable`, preferred: []uint32{1, 2, 3}, singleConn: true},
-		{name: "single", serialized: `single`, preferred: []uint32{1, 2, 3}, singleConn: true},
-		{name: "single JSON", serialized: `{"type":"single"}`, preferred: []uint32{1, 2, 3}, singleConn: true},
+		{name: "disable", serialized: `disable`, preferred: []uint32{1, 2, 3}, bootstrapSource: true},
+		{name: "single", serialized: `single`, preferred: []uint32{1, 2, 3}, bootstrapSource: true},
+		{name: "single JSON", serialized: `{"type":"single"}`, preferred: []uint32{1, 2, 3}, bootstrapSource: true},
 		{name: "round robin", serialized: `round_robin`, preferred: []uint32{1, 2, 3}},
 		{name: "round robin JSON", serialized: `{"type":"round_robin"}`, preferred: []uint32{1, 2, 3}},
 		{name: "random choice", serialized: `random_choice`, preferred: []uint32{1, 2, 3}},
 		{name: "random choice JSON", serialized: `{"type":"random_choice"}`, preferred: []uint32{1, 2, 3}},
 		{
-			name:            "legacy local DC",
-			serialized:      `{"type":"random_choice","prefer":"local_dc"}`,
-			preferred:       []uint32{1},
-			detectNearestDC: true,
+			name:       "legacy local DC",
+			serialized: `{"type":"random_choice","prefer":"local_dc"}`,
+			preferred:  []uint32{1},
+			nearestDC:  true,
 		},
 		{
-			name:            "nearest DC",
-			serialized:      `{"type":"random_choice","prefer":"nearest_dc"}`,
-			preferred:       []uint32{1},
-			detectNearestDC: true,
+			name:       "nearest DC",
+			serialized: `{"type":"random_choice","prefer":"nearest_dc"}`,
+			preferred:  []uint32{1},
+			nearestDC:  true,
 		},
 		{
-			name:            "legacy local DC with fallback",
-			serialized:      `{"type":"random_choice","prefer":"local_dc","fallback":true}`,
-			preferred:       []uint32{1},
-			fallback:        []uint32{2, 3},
-			detectNearestDC: true,
+			name:       "legacy local DC with fallback",
+			serialized: `{"type":"random_choice","prefer":"local_dc","fallback":true}`,
+			preferred:  []uint32{1},
+			fallback:   []uint32{2, 3},
+			nearestDC:  true,
 		},
 		{
-			name:            "nearest DC with fallback",
-			serialized:      `{"type":"random_choice","prefer":"nearest_dc","fallback":true}`,
-			preferred:       []uint32{1},
-			fallback:        []uint32{2, 3},
-			detectNearestDC: true,
+			name:       "nearest DC with fallback",
+			serialized: `{"type":"random_choice","prefer":"nearest_dc","fallback":true}`,
+			preferred:  []uint32{1},
+			fallback:   []uint32{2, 3},
+			nearestDC:  true,
 		},
 		{
 			name:       "locations",
@@ -196,8 +198,36 @@ func TestUserBalancerConfigDeserializationCompatibility(t *testing.T) {
 
 			require.Equal(t, test.preferred, userBalancerNodeIDs(state.prefer))
 			require.Equal(t, test.fallback, userBalancerNodeIDs(state.fallback))
-			require.Equal(t, test.detectNearestDC, policy.Requirements().DetectNearestDC)
-			require.Equal(t, test.singleConn, policy.Requirements().SingleConn)
+
+			plan := strategy.Compile(policy)
+			runtime := &userAPIPlanRuntime{}
+			_, err := plan.Start(t.Context(), runtime)
+			require.NoError(t, err)
+			if test.bootstrapSource {
+				require.Equal(t, "bootstrap", runtime.source)
+			} else {
+				require.Equal(t, "cluster", runtime.source)
+			}
+
+			detectorCalls := 0
+			resolvedLocation, err := plan.ResolveLocation(
+				t.Context(), nil, "discovered",
+				func(context.Context, []endpoint.Endpoint) (string, error) {
+					detectorCalls++
+
+					return "detected", nil
+				},
+			)
+			require.NoError(t, err)
+			if test.nearestDC {
+				require.Equal(t, "detected", resolvedLocation.SelfLocation)
+				require.True(t, resolvedLocation.NeedLocalDC)
+				require.Equal(t, 1, detectorCalls)
+			} else {
+				require.Equal(t, "discovered", resolvedLocation.SelfLocation)
+				require.False(t, resolvedLocation.NeedLocalDC)
+				require.Zero(t, detectorCalls)
+			}
 		})
 	}
 }
@@ -280,3 +310,24 @@ func (r userAPITestRand) Int(max int) int {
 }
 
 func (userAPITestRand) Shuffle(int, func(int, int)) {}
+
+type userAPIPlanRuntime struct {
+	source string
+}
+
+func (r *userAPIPlanRuntime) StartClusterDiscovery(context.Context) (strategy.Controller, error) {
+	r.source = "cluster"
+
+	return userAPIPlanController{}, nil
+}
+
+func (r *userAPIPlanRuntime) UseBootstrapEndpoint(context.Context) (strategy.Controller, error) {
+	r.source = "bootstrap"
+
+	return userAPIPlanController{}, nil
+}
+
+type userAPIPlanController struct{}
+
+func (userAPIPlanController) Force() {}
+func (userAPIPlanController) Stop()  {}

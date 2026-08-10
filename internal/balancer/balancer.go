@@ -64,11 +64,12 @@ func (s *streamWrapper) RecvMsg(m any) error {
 }
 
 type Balancer struct {
-	driverConfig      *config.Config
-	balancer          strategy.Balancer
-	discoveryConfig   *discoveryConfig.Config
-	pool              *conn.Pool
-	discoveryRepeater repeater.Repeater
+	driverConfig        *config.Config
+	balancer            strategy.Balancer
+	compiledPlan        *strategy.Plan
+	discoveryConfig     *discoveryConfig.Config
+	pool                *conn.Pool
+	discoveryController strategy.Controller
 
 	address string
 	cc      atomic.Pointer[grpc.ClientConn]
@@ -88,6 +89,14 @@ func (b *Balancer) policy() strategy.Balancer {
 	}
 
 	return b.balancer
+}
+
+func (b *Balancer) plan() strategy.Plan {
+	if b.compiledPlan != nil {
+		return *b.compiledPlan
+	}
+
+	return strategy.Compile(b.policy())
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -217,16 +226,11 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 		return xerrors.WithStackTrace(err)
 	}
 
-	if b.policy().Requirements().DetectNearestDC {
-		location, err := b.localDCDetector(ctx, endpoints)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
-		b.applyDiscoveredEndpoints(ctx, endpoints, location)
-	} else {
-		b.applyDiscoveredEndpoints(ctx, endpoints, location)
+	resolvedLocation, err := b.plan().ResolveLocation(ctx, endpoints, location, b.localDCDetector)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
 	}
+	b.applyDiscoveredEndpoints(ctx, endpoints, resolvedLocation)
 
 	return nil
 }
@@ -274,7 +278,11 @@ func (b *Balancer) releaseStateConns(ctx context.Context, state *connectionsStat
 	}
 }
 
-func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
+func (b *Balancer) applyDiscoveredEndpoints(
+	ctx context.Context,
+	endpoints []endpoint.Endpoint,
+	resolvedLocation strategy.ResolvedLocation,
+) {
 	b.closeMu.Lock()
 	defer b.closeMu.Unlock()
 
@@ -289,7 +297,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 			b.driverConfig.Trace(), &ctx,
 			stack.FunctionID(
 				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
-			b.policy().Requirements().DetectNearestDC,
+			resolvedLocation.NeedLocalDC,
 			b.driverConfig.Database(),
 		)
 		state      = b.connectionsState.Load()
@@ -311,7 +319,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 			xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
 			xslices.Transform(added, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
 			xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
-			localDC,
+			resolvedLocation.SelfLocation,
 		)
 	}()
 
@@ -320,7 +328,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	b.connectionsState.Store(
 		newConnectionsStateWithBalancer(connections,
 			b.policy(),
-			strategy.Info{SelfLocation: localDC},
+			strategy.Info{SelfLocation: resolvedLocation.SelfLocation},
 			quarantine,
 		),
 	)
@@ -338,8 +346,8 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 
 	oldState := b.connectionsState.Swap(nil)
 
-	rep := b.discoveryRepeater
-	b.discoveryRepeater = nil
+	controller := b.discoveryController
+	b.discoveryController = nil
 
 	discoveryCC := b.cc.Swap(nil)
 
@@ -353,8 +361,8 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	if rep != nil {
-		rep.Stop()
+	if controller != nil {
+		controller.Stop()
 	}
 
 	b.releaseStateConns(ctx, oldState)
@@ -419,9 +427,11 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		onDone(finalErr)
 	}()
 
+	plan := strategy.Compile(configuredBalancer)
 	b = &Balancer{
 		driverConfig: driverConfig,
-		balancer:     configuredBalancer,
+		balancer:     plan.Balancer(),
+		compiledPlan: &plan,
 		pool:         pool,
 		address:      "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
@@ -436,26 +446,39 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
 
-	if b.policy().Requirements().SingleConn {
-		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
-			endpoint.New(driverConfig.Endpoint()),
-		}, "")
-	} else {
-		// initialization of balancer state
-		if err := b.clusterDiscovery(ctx); err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-		// run background discovering
-		if d := b.discoveryConfig.Interval(); d > 0 {
-			b.discoveryRepeater = repeater.New(xcontext.ValueOnly(ctx),
-				d, b.clusterDiscoveryAttemptWithDial,
-				repeater.WithName("discovery"),
-				repeater.WithTrace(b.driverConfig.Trace()),
-			)
-		}
+	controller, err := plan.Start(ctx, b)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
 	}
+	b.discoveryController = controller
 
 	return b, nil
+}
+
+// StartClusterDiscovery initializes dynamic discovery and starts its background refresh.
+func (b *Balancer) StartClusterDiscovery(ctx context.Context) (strategy.Controller, error) {
+	if err := b.clusterDiscovery(ctx); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if interval := b.discoveryConfig.Interval(); interval > 0 {
+		return repeater.New(xcontext.ValueOnly(ctx),
+			interval, b.clusterDiscoveryAttemptWithDial,
+			repeater.WithName("discovery"),
+			repeater.WithTrace(b.driverConfig.Trace()),
+		), nil
+	}
+
+	return nil, nil //nolint:nilnil // Disabled background discovery does not need a controller.
+}
+
+// UseBootstrapEndpoint initializes a static balancer from the configured endpoint.
+func (b *Balancer) UseBootstrapEndpoint(ctx context.Context) (strategy.Controller, error) {
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
+		endpoint.New(b.driverConfig.Endpoint()),
+	}, strategy.ResolvedLocation{})
+
+	return nil, nil //nolint:nilnil // A static endpoint source does not need a controller.
 }
 
 func (b *Balancer) Invoke(
@@ -539,11 +562,11 @@ func (b *Balancer) connections() *connectionsState {
 
 func (b *Balancer) forceDiscovery() {
 	b.closeMu.Lock()
-	repeater := b.discoveryRepeater
+	controller := b.discoveryController
 	b.closeMu.Unlock()
 
-	if repeater != nil {
-		repeater.Force()
+	if controller != nil {
+		controller.Force()
 	}
 }
 

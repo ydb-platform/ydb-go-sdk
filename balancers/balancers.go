@@ -46,7 +46,7 @@ func PreferLocalDC(balancer strategy.Balancer) strategy.Balancer {
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // PreferNearestDC balancer try to autodetect local DC from client side.
 func PreferNearestDC(balancer strategy.Balancer) strategy.Balancer {
-	return strategy.Prefer(balancer, filterLocalDC{}, false, true)
+	return strategy.PreferNearestDC(balancer, filterLocalDC{}, false)
 }
 
 // Deprecated: use PreferNearestDCWithFallBack instead
@@ -60,7 +60,7 @@ func PreferLocalDCWithFallBack(balancer strategy.Balancer) strategy.Balancer {
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
 func PreferNearestDCWithFallBack(balancer strategy.Balancer) strategy.Balancer {
-	return strategy.Prefer(balancer, filterLocalDC{}, true, true)
+	return strategy.PreferNearestDC(balancer, filterLocalDC{}, true)
 }
 
 type filterLocations []string
@@ -102,7 +102,7 @@ func PreferLocations(balancer strategy.Balancer, locations ...string) strategy.B
 	}
 	sort.Strings(locations)
 
-	return strategy.Prefer(balancer, filterLocations(locations), false, false)
+	return strategy.Prefer(balancer, filterLocations(locations), false)
 }
 
 // PreferLocationsWithFallback creates balancer which use endpoints only in selected locations
@@ -119,7 +119,7 @@ func PreferLocationsWithFallback(balancer strategy.Balancer, locations ...string
 	}
 	sort.Strings(locations)
 
-	return strategy.Prefer(balancer, filterLocations(locations), true, false)
+	return strategy.Prefer(balancer, filterLocations(locations), true)
 }
 
 type Endpoint interface {
@@ -149,7 +149,7 @@ func (p filterFunc) String() string {
 func Prefer(balancer strategy.Balancer, filter func(endpoint Endpoint) bool) strategy.Balancer {
 	return strategy.Prefer(balancer, filterFunc(func(_ strategy.Info, e endpoint.Info) bool {
 		return filter(e)
-	}), false, false)
+	}), false)
 }
 
 // PreferWithFallback creates balancer which use endpoints by filter
@@ -158,7 +158,7 @@ func Prefer(balancer strategy.Balancer, filter func(endpoint Endpoint) bool) str
 func PreferWithFallback(balancer strategy.Balancer, filter func(endpoint Endpoint) bool) strategy.Balancer {
 	return strategy.Prefer(balancer, filterFunc(func(_ strategy.Info, e endpoint.Info) bool {
 		return filter(e)
-	}), true, false)
+	}), true)
 }
 
 // Default balancer used by default

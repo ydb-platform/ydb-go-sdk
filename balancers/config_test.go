@@ -8,11 +8,10 @@ import (
 
 func TestFromConfig(t *testing.T) {
 	tests := []struct {
-		name            string
-		config          string
-		expected        string
-		detectNearestDC bool
-		fail            bool
+		name     string
+		config   string
+		expected string
+		fail     bool
 	}{
 		{name: "empty", config: ``, fail: true},
 		{name: "invalid JSON", config: `{`, fail: true},
@@ -24,16 +23,14 @@ func TestFromConfig(t *testing.T) {
 		{name: "random_choice", config: `random_choice`, expected: "RandomChoice"},
 		{name: "random_choice/JSON", config: `{"type":"random_choice"}`, expected: "RandomChoice"},
 		{
-			name:            "prefer_local_dc",
-			config:          `{"type":"random_choice","prefer":"local_dc"}`,
-			expected:        "Prefer{Filter=LocalDC,AllowFallback=false,Child=RandomChoice}",
-			detectNearestDC: true,
+			name:     "prefer_local_dc",
+			config:   `{"type":"random_choice","prefer":"local_dc"}`,
+			expected: "Prefer{Filter=LocalDC,AllowFallback=false,Child=RandomChoice}",
 		},
 		{
-			name:            "prefer_nearest_dc",
-			config:          `{"type":"random_choice","prefer":"nearest_dc"}`,
-			expected:        "Prefer{Filter=LocalDC,AllowFallback=false,Child=RandomChoice}",
-			detectNearestDC: true,
+			name:     "prefer_nearest_dc",
+			config:   `{"type":"random_choice","prefer":"nearest_dc"}`,
+			expected: "Prefer{Filter=LocalDC,AllowFallback=false,Child=RandomChoice}",
 		},
 		{
 			name:   "prefer_unknown_type",
@@ -46,16 +43,14 @@ func TestFromConfig(t *testing.T) {
 			expected: "RandomChoice",
 		},
 		{
-			name:            "prefer_local_dc_with_fallback",
-			config:          `{"type":"random_choice","prefer":"local_dc","fallback":true}`,
-			expected:        "Prefer{Filter=LocalDC,AllowFallback=true,Child=RandomChoice}",
-			detectNearestDC: true,
+			name:     "prefer_local_dc_with_fallback",
+			config:   `{"type":"random_choice","prefer":"local_dc","fallback":true}`,
+			expected: "Prefer{Filter=LocalDC,AllowFallback=true,Child=RandomChoice}",
 		},
 		{
-			name:            "prefer_nearest_dc_with_fallback",
-			config:          `{"type":"random_choice","prefer":"nearest_dc","fallback":true}`,
-			expected:        "Prefer{Filter=LocalDC,AllowFallback=true,Child=RandomChoice}",
-			detectNearestDC: true,
+			name:     "prefer_nearest_dc_with_fallback",
+			config:   `{"type":"random_choice","prefer":"nearest_dc","fallback":true}`,
+			expected: "Prefer{Filter=LocalDC,AllowFallback=true,Child=RandomChoice}",
 		},
 		{
 			name:     "prefer_locations",
@@ -95,7 +90,6 @@ func TestFromConfig(t *testing.T) {
 
 			require.NoError(t, actualErr)
 			require.Equal(t, test.expected, balancer.String())
-			require.Equal(t, test.detectNearestDC, balancer.Requirements().DetectNearestDC)
 		})
 	}
 }

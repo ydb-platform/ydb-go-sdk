@@ -20,7 +20,6 @@ func TestRandomChoice(t *testing.T) {
 	balancer := RandomChoice()
 
 	require.Equal(t, "RandomChoice", balancer.String())
-	require.Equal(t, Requirements{}, balancer.Requirements())
 	require.Equal(t, [][]endpoint.Endpoint{connectionEndpoints(connections)},
 		balancer.Filter(Info{}, connectionEndpoints(connections)),
 	)
@@ -71,7 +70,6 @@ func TestSingleConn(t *testing.T) {
 	connection := strategyConn(1, "local", state.Created)
 
 	require.Equal(t, "SingleConn", balancer.String())
-	require.Equal(t, Requirements{SingleConn: true}, balancer.Requirements())
 	require.Equal(t, [][]endpoint.Endpoint{{connection.Endpoint()}},
 		balancer.Filter(Info{}, []endpoint.Endpoint{connection.Endpoint()}),
 	)
@@ -117,20 +115,18 @@ func TestPreferFilter(t *testing.T) {
 	}
 	filter := locationFilter("local")
 
-	withoutFallback := Prefer(RandomChoice(), filter, false, true)
-	require.Equal(t, Requirements{DetectNearestDC: true}, withoutFallback.Requirements())
+	withoutFallback := PreferNearestDC(RandomChoice(), filter, false)
 	require.Equal(t, "Prefer{Filter=Location(local),AllowFallback=false,Child=RandomChoice}",
 		withoutFallback.String(),
 	)
 	require.Equal(t, [][]endpoint.Endpoint{{endpoints[0]}}, withoutFallback.Filter(Info{}, endpoints))
 
-	withFallback := Prefer(SingleConn(), filter, true, false)
-	require.Equal(t, Requirements{SingleConn: true}, withFallback.Requirements())
+	withFallback := Prefer(SingleConn(), filter, true)
 	require.Equal(t, [][]endpoint.Endpoint{{endpoints[0]}, {endpoints[1]}},
 		withFallback.Filter(Info{}, endpoints),
 	)
 
-	normalized := Prefer(nil, filter, false, false)
+	normalized := Prefer(nil, filter, false)
 	require.Equal(t, "Prefer{Filter=Location(local),AllowFallback=false,Child=RandomChoice}", normalized.String())
 }
 
@@ -140,7 +136,7 @@ func TestPreferNext(t *testing.T) {
 	bannedPreferred := strategyConn(3, "local", state.Banned)
 	nextCtx := NextContext{Rand: testRand{}}
 
-	withoutFallback := Prefer(RandomChoice(), locationFilter("local"), false, false)
+	withoutFallback := Prefer(RandomChoice(), locationFilter("local"), false)
 	selected, failed := withoutFallback.Next(
 		t.Context(), nextCtx, []conn.Conn{preferred, fallback}, false,
 	)
@@ -159,7 +155,7 @@ func TestPreferNext(t *testing.T) {
 	require.Same(t, bannedPreferred, selected)
 	require.Zero(t, failed)
 
-	withFallback := Prefer(RandomChoice(), locationFilter("local"), true, false)
+	withFallback := Prefer(RandomChoice(), locationFilter("local"), true)
 	selected, failed = withFallback.Next(
 		t.Context(), nextCtx, []conn.Conn{bannedPreferred, fallback}, false,
 	)

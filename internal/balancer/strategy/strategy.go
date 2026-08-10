@@ -21,13 +21,7 @@ type Balancer interface {
 		failed int,
 	)
 
-	Requirements() Requirements
 	String() string
-}
-
-type Requirements struct {
-	DetectNearestDC bool
-	SingleConn      bool
 }
 
 type Info struct {
@@ -52,13 +46,16 @@ func SingleConn() Balancer {
 	return singleConn{}
 }
 
-func Prefer(child Balancer, filter Filter, allowFallback, detectNearestDC bool) Balancer {
+func Prefer(child Balancer, filter Filter, allowFallback bool) Balancer {
 	return prefer{
-		child:           normalize(child),
-		filter:          filter,
-		allowFallback:   allowFallback,
-		detectNearestDC: detectNearestDC,
+		child:         normalize(child),
+		filter:        filter,
+		allowFallback: allowFallback,
 	}
+}
+
+func PreferNearestDC(child Balancer, filter Filter, allowFallback bool) Balancer {
+	return nearestDC{Balancer: Prefer(child, filter, allowFallback)}
 }
 
 func normalize(balancer Balancer) Balancer {
@@ -109,10 +106,6 @@ func (randomChoice) Next(
 	return nil, failed
 }
 
-func (randomChoice) Requirements() Requirements {
-	return Requirements{}
-}
-
 func (randomChoice) String() string {
 	return "RandomChoice"
 }
@@ -137,10 +130,6 @@ func (singleConn) Next(
 	}
 
 	return nil, 1
-}
-
-func (singleConn) Requirements() Requirements {
-	return Requirements{SingleConn: true}
 }
 
 func (singleConn) String() string {

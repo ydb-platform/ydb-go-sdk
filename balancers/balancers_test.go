@@ -20,7 +20,6 @@ func TestPreferLocalDC(t *testing.T) {
 		&mock.Conn{AddrField: "3", StateField: state.Online, LocationField: "2"},
 	}
 	rr := PreferNearestDC(RandomChoice())
-	require.True(t, rr.Requirements().DetectNearestDC)
 	require.Len(t, rr.Filter(strategy.Info{SelfLocation: "2"}, connEndpoints(conns)), 1)
 	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(strategy.Info{SelfLocation: "2"}, rr, conns))
 }
@@ -32,7 +31,6 @@ func TestPreferLocalDCWithFallBack(t *testing.T) {
 		&mock.Conn{AddrField: "3", StateField: state.Online, LocationField: "2"},
 	}
 	rr := PreferNearestDCWithFallBack(RandomChoice())
-	require.True(t, rr.Requirements().DetectNearestDC)
 	require.Len(t, rr.Filter(strategy.Info{SelfLocation: "2"}, connEndpoints(conns)), 2)
 	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(strategy.Info{SelfLocation: "2"}, rr, conns))
 }
