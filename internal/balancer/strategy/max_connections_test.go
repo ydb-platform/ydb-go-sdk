@@ -56,6 +56,24 @@ func TestMaxConnectionsUsesChildPenalties(t *testing.T) {
 	)
 }
 
+func TestMaxConnectionsFillsWithLowestPenaltyBannedEndpoint(t *testing.T) {
+	endpoints := maxConnectionEndpoints(1, 2, 3)
+	estimates := []Estimation{
+		{Key: endpoints[0].Key(), Penalty: 5, Weight: 1},
+		{Key: endpoints[1].Key(), Penalty: 1, Weight: 1},
+		{Key: endpoints[2].Key(), Weight: 1},
+	}
+
+	selected := selectActiveEstimates(Info{
+		PreviousActive: []PreviousEndpoint{
+			{Key: endpoints[0].Key(), Banned: true},
+			{Key: endpoints[1].Key(), Banned: true},
+		},
+	}, estimates, 2)
+
+	require.Equal(t, []Estimation{estimates[2], estimates[1]}, selected)
+}
+
 func TestMaxConnectionsNonPositiveAndNestedLimits(t *testing.T) {
 	endpoints := maxConnectionEndpoints(1, 2, 3)
 	estimates := RandomChoice().Estimate(Info{}, endpoints)

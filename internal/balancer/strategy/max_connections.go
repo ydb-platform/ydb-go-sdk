@@ -73,12 +73,25 @@ func selectActiveEstimates(info Info, estimates []Estimation, limit int) []Estim
 		}
 	}
 
-	sort.SliceStable(nonBanned, func(i, j int) bool {
-		if nonBanned[i].Penalty != nonBanned[j].Penalty {
-			return nonBanned[i].Penalty < nonBanned[j].Penalty
+	sortByPenaltyAndPreviousOrder(nonBanned, previousOrder)
+	sortByPenaltyAndPreviousOrder(bannedEstimates, previousOrder)
+	shuffleEqualPenaltyRuns(info, nonBanned, previousOrder)
+	shuffleEqualPenaltyRuns(info, bannedEstimates, previousOrder)
+	result := append(make([]Estimation, 0, limit), nonBanned[:min(limit, len(nonBanned))]...)
+	if len(result) < limit {
+		result = append(result, bannedEstimates[:min(limit-len(result), len(bannedEstimates))]...)
+	}
+
+	return result
+}
+
+func sortByPenaltyAndPreviousOrder(estimates []Estimation, previousOrder map[endpoint.Key]int) {
+	sort.SliceStable(estimates, func(i, j int) bool {
+		if estimates[i].Penalty != estimates[j].Penalty {
+			return estimates[i].Penalty < estimates[j].Penalty
 		}
-		left, leftOK := previousOrder[nonBanned[i].Key]
-		right, rightOK := previousOrder[nonBanned[j].Key]
+		left, leftOK := previousOrder[estimates[i].Key]
+		right, rightOK := previousOrder[estimates[j].Key]
 		if leftOK != rightOK {
 			return leftOK
 		}
@@ -88,14 +101,6 @@ func selectActiveEstimates(info Info, estimates []Estimation, limit int) []Estim
 
 		return false
 	})
-
-	shuffleEqualPenaltyRuns(info, nonBanned, previousOrder)
-	result := append(make([]Estimation, 0, limit), nonBanned[:min(limit, len(nonBanned))]...)
-	if len(result) < limit {
-		result = append(result, bannedEstimates[:min(limit-len(result), len(bannedEstimates))]...)
-	}
-
-	return result
 }
 
 func shuffleEqualPenaltyRuns(info Info, estimates []Estimation, previousOrder map[endpoint.Key]int) {
