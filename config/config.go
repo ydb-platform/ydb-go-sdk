@@ -24,7 +24,7 @@ type Config struct {
 	trace              *trace.Driver
 	dialTimeout        time.Duration
 	connectionTTL      time.Duration
-	balancerConfig     strategy.Estimator
+	balancerEstimator  strategy.Estimator
 	secure             bool
 	endpoint           string
 	database           string
@@ -116,7 +116,7 @@ func (c *Config) Trace() *trace.Driver {
 
 // Balancer returns the configured endpoint-selection strategy.
 func (c *Config) Balancer() strategy.Estimator {
-	return c.balancerConfig
+	return c.balancerEstimator
 }
 
 type Option func(c *Config)
@@ -293,7 +293,7 @@ func WithGrpcMaxMessageSize(sizeBytes int) Option {
 
 func WithBalancer(estimator strategy.Estimator) Option {
 	return func(c *Config) {
-		c.balancerConfig = estimator
+		c.balancerEstimator = estimator
 	}
 }
 
