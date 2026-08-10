@@ -638,6 +638,21 @@ func TestNew(t *testing.T) {
 		require.Equal(t, "RandomChoice", b.policy().String())
 		require.NoError(t, b.Close(ctx))
 	})
+	t.Run("single connection policy skips discovery", func(t *testing.T) {
+		ctx := t.Context()
+		cfg := config.New(
+			config.WithEndpoint("bootstrap:2135"),
+			config.WithBalancer(strategy.SingleConn()),
+		)
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
+
+		b, err := New(ctx, cfg, pool)
+		require.NoError(t, err)
+		require.Len(t, b.connections().All(), 1)
+		require.Equal(t, "bootstrap:2135", b.connections().All()[0].Endpoint().Address())
+		require.NoError(t, b.Close(ctx))
+	})
 }
 
 func TestBalancerForceDiscovery(t *testing.T) {
