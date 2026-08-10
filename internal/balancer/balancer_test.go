@@ -21,7 +21,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
@@ -124,7 +123,7 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 		pool:         pool,
 	}
 
-	initial := newConnectionsState(nil, nil, balancerConfig.Info{}, false, nil)
+	initial := newConnectionsState(nil, nil, strategy.Info{}, false, nil)
 	b.connectionsState.Store(initial)
 
 	e1 := endpoint.New("e1.example:2135", endpoint.WithIPV6([]string{"2001:db8::1"}), endpoint.WithID(1))
@@ -157,18 +156,6 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	require.Equal(t, e3.NodeID(), all[1].Endpoint().NodeID())
 }
 
-type allowNodeIDFilter struct {
-	nodeID uint32
-}
-
-func (f allowNodeIDFilter) Allow(_ balancerConfig.Info, e endpoint.Info) bool {
-	return e.NodeID() == f.nodeID
-}
-
-func (f allowNodeIDFilter) String() string {
-	return "allowNodeID"
-}
-
 func TestApplyDiscoveredEndpointsReleasesFilteredOutConns(t *testing.T) {
 	ctx := context.Background()
 
@@ -179,9 +166,7 @@ func TestApplyDiscoveredEndpointsReleasesFilteredOutConns(t *testing.T) {
 	b := &Balancer{
 		driverConfig: cfg,
 		pool:         pool,
-		balancer: strategy.Prefer(
-			strategy.RandomChoice(), allowNodeIDFilter{nodeID: 1}, false,
-		),
+		balancer:     strategy.RandomChoice(),
 	}
 
 	e1 := endpoint.New("e1.example:2135", endpoint.WithID(1))
@@ -189,7 +174,14 @@ func TestApplyDiscoveredEndpointsReleasesFilteredOutConns(t *testing.T) {
 
 	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, strategy.ResolvedLocation{})
 	require.Len(t, b.connections().All(), 2)
-	require.Len(t, b.connections().prefer, 1)
+	require.Equal(t, 2, b.connections().PreferredCount())
+
+	b.balancer = strategy.Prefer(
+		strategy.RandomChoice(), "NodeID(1)",
+		func(_ strategy.Info, candidate endpoint.Info) bool {
+			return candidate.NodeID() == 1
+		}, false,
+	)
 
 	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1}, strategy.ResolvedLocation{})
 	require.NotNil(t, connInQuarantine(b, 2), "filtered-out conn must stay in quarantine until released")
@@ -235,7 +227,7 @@ func TestBalancer_Close(t *testing.T) {
 		b.connectionsState.Store(newConnectionsState(
 			[]conn.Conn{cc},
 			nil,
-			balancerConfig.Info{},
+			strategy.Info{},
 			true,
 			nil,
 		))
@@ -258,7 +250,7 @@ func TestBalancer_Close(t *testing.T) {
 			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
-			nil, balancerConfig.Info{}, true, nil,
+			nil, strategy.Info{}, true, nil,
 		))
 
 		var wg sync.WaitGroup
@@ -299,7 +291,7 @@ func TestBalancer_Close(t *testing.T) {
 			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
-			nil, balancerConfig.Info{}, true, nil,
+			nil, strategy.Info{}, true, nil,
 		))
 
 		closeStarted := make(chan struct{})
@@ -329,7 +321,7 @@ func TestBalancer_Close(t *testing.T) {
 			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
-			nil, balancerConfig.Info{}, true, nil,
+			nil, strategy.Info{}, true, nil,
 		))
 
 		stopCalled := make(chan struct{})
@@ -376,7 +368,7 @@ func TestBalancer_Close(t *testing.T) {
 			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
-			nil, balancerConfig.Info{}, true, nil,
+			nil, strategy.Info{}, true, nil,
 		))
 		b.cc.Store(cc)
 
@@ -397,7 +389,7 @@ func TestBalancer_Close(t *testing.T) {
 		b.connectionsState.Store(newConnectionsState(
 			nil,
 			nil,
-			balancerConfig.Info{},
+			strategy.Info{},
 			true,
 			nil,
 		))
@@ -423,7 +415,7 @@ func TestBalancer_Close(t *testing.T) {
 		b.connectionsState.Store(newConnectionsState(
 			[]conn.Conn{c},
 			nil,
-			balancerConfig.Info{},
+			strategy.Info{},
 			true,
 			nil,
 		))
@@ -445,11 +437,13 @@ func TestBalancer_CloseRacesWithNextConnRepeater(t *testing.T) {
 
 	stateEntered := make(chan struct{})
 	releaseState := make(chan struct{})
+	baseConn := &mock.Conn{
+		AddrField:   "blocked:2135",
+		NodeIDField: 1,
+		StateField:  state.Online,
+	}
 	blockingConn := &blockingStateConn{
-		Conn: &mock.Conn{
-			AddrField:   "blocked:2135",
-			NodeIDField: 1,
-		},
+		Conn:         baseConn,
 		stateEntered: stateEntered,
 		releaseState: releaseState,
 	}
@@ -459,13 +453,17 @@ func TestBalancer_CloseRacesWithNextConnRepeater(t *testing.T) {
 		pool:                pool,
 		discoveryController: &stubRepeater{},
 	}
-	b.connectionsState.Store(newConnectionsState(
-		[]conn.Conn{blockingConn},
+	connections := newConnectionsState(
+		[]conn.Conn{baseConn},
 		nil,
-		balancerConfig.Info{},
+		strategy.Info{},
 		true,
 		nil,
-	))
+	)
+	connections.all[0] = blockingConn
+	connections.connByKey[baseConn.Endpoint().Key()] = blockingConn
+	connections.connByNodeID[baseConn.Endpoint().NodeID()] = blockingConn
+	b.connectionsState.Store(connections)
 
 	nextConnDone := make(chan error, 1)
 	go func() {
@@ -525,7 +523,7 @@ func TestBalancer_CloseWhileDiscoveryDialInFlight(t *testing.T) {
 	b.connectionsState.Store(newConnectionsState(
 		nil,
 		nil,
-		balancerConfig.Info{},
+		strategy.Info{},
 		true,
 		nil,
 	))
@@ -734,7 +732,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 				driverConfig: cfg,
 				pool:         pool,
 			}
-			s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false, nil)
+			s := newConnectionsState([]conn.Conn{cc1}, nil, strategy.Info{}, false, nil)
 			b.connectionsState.Store(s)
 
 			nodeCtx := endpoint.WithNodeID(ctx, e1.NodeID())
@@ -783,7 +781,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, strategy.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		err := b.Invoke(endpoint.WithNodeID(ctx, cc1.NodeIDField), "/test.Service/Method", nil, nil)
@@ -822,7 +820,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false, nil)
+		s := newConnectionsState([]conn.Conn{cc1}, nil, strategy.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		err := b.Invoke(ctx, "/test.Service/Method", nil, nil)
@@ -863,7 +861,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, strategy.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		// Call Invoke targeting cc1 with OVERLOADED tagged in context — wrapCall must ban cc1.
@@ -913,7 +911,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1}, nil, balancerConfig.Info{}, false, nil)
+		s := newConnectionsState([]conn.Conn{cc1}, nil, strategy.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		// Context only bans on OVERLOADED — a NOT_FOUND error must not ban.
@@ -959,7 +957,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, strategy.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		invokeCtx := BanOnSessionCreate(endpoint.WithNodeID(ctx, cc1.NodeIDField))
@@ -1007,7 +1005,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, strategy.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		invokeCtx := BanOnSessionCreate(endpoint.WithNodeID(ctx, cc1.NodeIDField))
@@ -1051,7 +1049,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, strategy.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		// Sequentially pessimize cc1 then cc2 via the normal Invoke+BanOnOperationError flow.
@@ -1103,7 +1101,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, strategy.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		streamCtx := BanOnOperationError(
@@ -1156,7 +1154,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, balancerConfig.Info{}, false, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, strategy.Info{}, false, nil)
 		b.connectionsState.Store(s)
 
 		streamCtx := BanOnOperationError(

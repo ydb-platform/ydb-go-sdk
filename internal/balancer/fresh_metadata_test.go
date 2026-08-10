@@ -12,11 +12,16 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
-func TestFilterUsesFreshDiscoveryMetadataBeforePoolGet(t *testing.T) {
+func TestEstimatorUsesFreshDiscoveryMetadataBeforePoolGet(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.New()
 	pool := conn.NewPool(ctx, cfg)
-	policy := strategy.Prefer(strategy.RandomChoice(), bridgePrimaryPileFilter{}, false)
+	policy := strategy.Prefer(
+		strategy.RandomChoice(), "PrimaryPile",
+		func(_ strategy.Info, candidate endpoint.Info) bool {
+			return candidate.Metadata().BridgePileState == endpoint.PileStatePrimary
+		}, false,
+	)
 	balancer := &Balancer{
 		driverConfig: cfg,
 		balancer:     policy,
@@ -29,19 +34,35 @@ func TestFilterUsesFreshDiscoveryMetadataBeforePoolGet(t *testing.T) {
 
 	first := bridgeEndpoints(endpoint.PileStatePrimary, endpoint.PileStateSynchronized)
 	balancer.applyDiscoveredEndpoints(ctx, first, strategy.ResolvedLocation{})
-	require.Equal(t, uint32(1), balancer.connections().prefer[0].Endpoint().NodeID())
+	require.Equal(t, uint32(1), preferredConnection(balancer.connections()).Endpoint().NodeID())
 
 	second := bridgeEndpoints(endpoint.PileStateSynchronized, endpoint.PileStatePrimary)
 	balancer.applyDiscoveredEndpoints(ctx, second, strategy.ResolvedLocation{})
-	require.Equal(t, uint32(2), balancer.connections().prefer[0].Endpoint().NodeID())
-	require.Equal(t, endpoint.PileStateSynchronized,
-		balancer.connections().prefer[0].Endpoint().Metadata().BridgePileState,
-		"the pool deliberately returns the existing conn with stale endpoint metadata",
+	preferred := preferredConnection(balancer.connections())
+	require.Equal(t, uint32(2), preferred.Endpoint().NodeID())
+	require.Equal(t, endpoint.PileStatePrimary,
+		preferred.Endpoint().Metadata().BridgePileState,
+		"the connection must expose metadata from the latest discovery snapshot",
 	)
 
 	selected, err := balancer.nextConn(ctx)
 	require.NoError(t, err)
 	require.Equal(t, uint32(2), selected.Endpoint().NodeID())
+}
+
+func preferredConnection(connections *connectionsState) conn.Conn {
+	estimates := connections.Estimations()
+	if len(estimates) == 0 {
+		return nil
+	}
+	minimum := estimates[0]
+	for _, estimation := range estimates[1:] {
+		if estimation.Penalty < minimum.Penalty {
+			minimum = estimation
+		}
+	}
+
+	return connections.Connection(minimum.Key)
 }
 
 func bridgeEndpoints(first, second endpoint.PileState) []endpoint.Endpoint {
@@ -53,14 +74,4 @@ func bridgeEndpoints(first, second endpoint.PileState) []endpoint.Endpoint {
 			BridgePileState: second,
 		})),
 	}
-}
-
-type bridgePrimaryPileFilter struct{}
-
-func (bridgePrimaryPileFilter) Allow(_ strategy.Info, candidate endpoint.Info) bool {
-	return candidate.Metadata().BridgePileState == endpoint.PileStatePrimary
-}
-
-func (bridgePrimaryPileFilter) String() string {
-	return "PrimaryPile"
 }

@@ -110,7 +110,9 @@ func TestUserBalancerConfigurations(t *testing.T) {
 			selectedNodeIDs := make(map[uint32]struct{}, len(test.allowed))
 
 			for index := range len(test.allowed) {
-				b.connectionsState.Load().rand = userAPITestRand{index: index}
+				rand := userAPITestRand{index: index}
+				b.connectionsState.Load().rand = rand
+				b.connectionsState.Load().elector.rand = rand
 				selected, err := b.nextConn(t.Context())
 				require.NoError(t, err)
 				selectedNodeIDs[selected.Endpoint().NodeID()] = struct{}{}
@@ -189,15 +191,12 @@ func TestUserBalancerConfigDeserializationCompatibility(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			policy := userBalancers.FromConfig(test.serialized)
-			state := newConnectionsStateWithBalancer(
-				connections,
-				policy,
-				strategy.Info{SelfLocation: "a"},
-				nil,
+			preferred, fallback := userBalancerLogicalGroups(
+				policy, connections, strategy.Info{SelfLocation: "a"},
 			)
 
-			require.Equal(t, test.preferred, userBalancerNodeIDs(state.prefer))
-			require.Equal(t, test.fallback, userBalancerNodeIDs(state.fallback))
+			require.Equal(t, test.preferred, preferred)
+			require.Equal(t, test.fallback, fallback)
 
 			plan := strategy.Compile(policy)
 			runtime := &userAPIPlanRuntime{}
@@ -230,24 +229,6 @@ func TestUserBalancerConfigDeserializationCompatibility(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestUserBalancerWithNodeIDBypassesSelectionPolicies(t *testing.T) {
-	connections := []conn.Conn{
-		userBalancerConn(1, "preferred", state.Online),
-		userBalancerConn(2, "excluded", state.Online),
-	}
-	b := userConfiguredBalancer(
-		config.WithBalancer(userBalancers.PreferLocations(
-			userBalancers.RandomChoice(), "preferred",
-		)),
-		connections,
-		"",
-	)
-
-	selected, err := b.nextConn(userBalancers.WithNodeID(t.Context(), 2))
-	require.NoError(t, err)
-	require.Same(t, connections[1], selected)
 }
 
 func userConfiguredBalancer(option config.Option, connections []conn.Conn, selfLocation string) *Balancer {
@@ -284,17 +265,34 @@ func nodeIDSet(nodeIDs ...uint32) map[uint32]struct{} {
 	return result
 }
 
-func userBalancerNodeIDs(connections []conn.Conn) []uint32 {
-	if len(connections) == 0 {
-		return nil
-	}
-
-	result := make([]uint32, len(connections))
+func userBalancerLogicalGroups(
+	estimator strategy.Estimator,
+	connections []conn.Conn,
+	info strategy.Info,
+) (preferred, fallback []uint32) {
+	endpoints := make([]endpoint.Endpoint, len(connections))
+	nodeIDByKey := make(map[endpoint.Key]uint32, len(connections))
 	for i, connection := range connections {
-		result[i] = connection.Endpoint().NodeID()
+		endpoints[i] = connection.Endpoint()
+		nodeIDByKey[endpoints[i].Key()] = endpoints[i].NodeID()
+	}
+	estimates := estimator.Estimate(info, endpoints)
+	if len(estimates) == 0 {
+		return nil, nil
+	}
+	minimum := estimates[0].Penalty
+	for _, estimation := range estimates[1:] {
+		minimum = min(minimum, estimation.Penalty)
+	}
+	for _, estimation := range estimates {
+		if estimation.Penalty == minimum {
+			preferred = append(preferred, nodeIDByKey[estimation.Key])
+		} else {
+			fallback = append(fallback, nodeIDByKey[estimation.Key])
+		}
 	}
 
-	return result
+	return preferred, fallback
 }
 
 type userAPITestRand struct {

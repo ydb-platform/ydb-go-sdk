@@ -1,124 +1,87 @@
 package strategy
 
 import (
-	"context"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
-// Balancer is an immutable, composable endpoint-selection strategy.
-// Connection ownership and discovery lifecycle remain outside the strategy.
-type Balancer interface {
-	// Filter returns endpoint groups in selection order.
-	Filter(info Info, endpoints []endpoint.Endpoint) [][]endpoint.Endpoint
+const defaultWeight uint64 = 1
 
-	// Select returns endpoints that should have active connection wrappers.
-	// It receives groups from Filter for priority and runs before the connection pool is accessed.
-	Select(ctx SelectContext, groups [][]endpoint.Endpoint) []endpoint.Endpoint
+// Estimation describes endpoint selection policy independent of connection state.
+type Estimation struct {
+	Key     endpoint.Key
+	Penalty uint64
+	Weight  uint64
+}
 
-	// Next selects a connection from the current connection state.
-	Next(ctx context.Context, nextCtx NextContext, connections []conn.Conn, allowBanned bool) (
-		connection conn.Conn,
-		failed int,
-	)
-
+// Estimator is an immutable, composable endpoint estimation policy.
+// Connection ownership, health penalties, and discovery lifecycle remain outside the estimator tree.
+type Estimator interface {
+	Estimate(info Info, endpoints []endpoint.Endpoint) []Estimation
 	String() string
 }
 
+// PreviousEndpoint describes an endpoint from the previously published active set.
+type PreviousEndpoint struct {
+	Key    endpoint.Key
+	Banned bool
+}
+
+// Info contains immutable data shared by estimators during one discovery refresh.
 type Info struct {
-	SelfLocation string
+	SelfLocation   string
+	PreviousActive []PreviousEndpoint
+	Rand           xrand.Rand
 }
 
-type SelectContext struct {
-	Endpoints []endpoint.Endpoint
-	Info      Info
-	Previous  []conn.Conn
-	Rand      xrand.Rand
-}
-
-type NextContext struct {
-	Info Info
-	Rand xrand.Rand
-}
-
-type Filter interface {
-	Allow(info Info, endpoint endpoint.Info) bool
-	String() string
-}
-
-func RandomChoice() Balancer {
+func RandomChoice() Estimator {
 	return randomChoice{}
 }
 
-func SingleConn() Balancer {
+func SingleConn() Estimator {
 	return singleConn{}
 }
 
-func Prefer(child Balancer, filter Filter, allowFallback bool) Balancer {
+func Prefer(
+	child Estimator,
+	name string,
+	match func(info Info, candidate endpoint.Info) bool,
+	allowFallback bool,
+) Estimator {
 	return prefer{
 		child:         normalize(child),
-		filter:        filter,
+		name:          name,
+		match:         match,
 		allowFallback: allowFallback,
 	}
 }
 
-func PreferNearestDC(child Balancer, filter Filter, allowFallback bool) Balancer {
-	return nearestDC{Balancer: Prefer(child, filter, allowFallback)}
+func PreferNearestDC(
+	child Estimator,
+	name string,
+	match func(info Info, candidate endpoint.Info) bool,
+	allowFallback bool,
+) Estimator {
+	return nearestDC{child: Prefer(child, name, match, allowFallback)}
 }
 
-func normalize(balancer Balancer) Balancer {
-	if balancer == nil {
+func normalize(estimator Estimator) Estimator {
+	if estimator == nil {
 		return RandomChoice()
 	}
 
-	return balancer
+	return estimator
 }
 
 type randomChoice struct{}
 
-func (randomChoice) Select(ctx SelectContext, _ [][]endpoint.Endpoint) []endpoint.Endpoint {
-	return ctx.Endpoints
-}
-
-func (randomChoice) Filter(_ Info, endpoints []endpoint.Endpoint) [][]endpoint.Endpoint {
-	return [][]endpoint.Endpoint{endpoints}
-}
-
-func (randomChoice) Next(
-	ctx context.Context,
-	nextCtx NextContext,
-	connections []conn.Conn,
-	allowBanned bool,
-) (conn.Conn, int) {
-	if ctx.Err() != nil || len(connections) == 0 {
-		return nil, 0
+func (randomChoice) Estimate(_ Info, endpoints []endpoint.Endpoint) []Estimation {
+	result := make([]Estimation, len(endpoints))
+	for i, candidate := range endpoints {
+		result[i] = Estimation{Key: candidate.Key(), Weight: defaultWeight}
 	}
 
-	if connection := connections[nextCtx.Rand.Int(len(connections))]; isUsable(connection, allowBanned) {
-		return connection, 0
-	}
-
-	indexes := make([]int, len(connections))
-	for index := range indexes {
-		indexes[index] = index
-	}
-	nextCtx.Rand.Shuffle(len(indexes), func(i, j int) {
-		indexes[i], indexes[j] = indexes[j], indexes[i]
-	})
-
-	failed := 0
-	for _, index := range indexes {
-		connection := connections[index]
-		if isUsable(connection, allowBanned) {
-			return connection, 0
-		}
-		failed++
-	}
-
-	return nil, failed
+	return result
 }
 
 func (randomChoice) String() string {
@@ -127,45 +90,10 @@ func (randomChoice) String() string {
 
 type singleConn struct{}
 
-func (singleConn) Select(ctx SelectContext, _ [][]endpoint.Endpoint) []endpoint.Endpoint {
-	return ctx.Endpoints
-}
-
-func (singleConn) Filter(_ Info, endpoints []endpoint.Endpoint) [][]endpoint.Endpoint {
-	return [][]endpoint.Endpoint{endpoints}
-}
-
-func (singleConn) Next(
-	ctx context.Context,
-	_ NextContext,
-	connections []conn.Conn,
-	allowBanned bool,
-) (conn.Conn, int) {
-	if ctx.Err() != nil || len(connections) == 0 {
-		return nil, 0
-	}
-	if isUsable(connections[0], allowBanned) {
-		return connections[0], 0
-	}
-
-	return nil, 1
+func (singleConn) Estimate(_ Info, endpoints []endpoint.Endpoint) []Estimation {
+	return randomChoice{}.Estimate(Info{}, endpoints)
 }
 
 func (singleConn) String() string {
 	return "SingleConn"
-}
-
-func isUsable(connection conn.Conn, bannedIsUsable bool) bool {
-	if connection == nil {
-		return false
-	}
-
-	switch connection.State() {
-	case state.Online, state.Created, state.Offline:
-		return true
-	case state.Banned:
-		return bannedIsUsable
-	default:
-		return false
-	}
 }

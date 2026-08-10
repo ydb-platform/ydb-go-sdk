@@ -13,65 +13,51 @@ import (
 // Deprecated: RoundRobin is an alias to RandomChoice now
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func RoundRobin() strategy.Balancer {
+func RoundRobin() strategy.Estimator {
 	return RandomChoice()
 }
 
-func RandomChoice() strategy.Balancer {
+func RandomChoice() strategy.Estimator {
 	return strategy.RandomChoice()
 }
 
-func SingleConn() strategy.Balancer {
+func SingleConn() strategy.Estimator {
 	return strategy.SingleConn()
-}
-
-type filterLocalDC struct{}
-
-func (filterLocalDC) Allow(info strategy.Info, e endpoint.Info) bool {
-	return e.Location() == info.SelfLocation
-}
-
-func (filterLocalDC) String() string {
-	return "LocalDC"
 }
 
 // Deprecated: use PreferNearestDC instead
 // Will be removed after March 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func PreferLocalDC(balancer strategy.Balancer) strategy.Balancer {
-	return PreferNearestDC(balancer)
+func PreferLocalDC(estimator strategy.Estimator) strategy.Estimator {
+	return PreferNearestDC(estimator)
 }
 
 // PreferNearestDC creates balancer which use endpoints only in location such as initial endpoint location
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // PreferNearestDC balancer try to autodetect local DC from client side.
-func PreferNearestDC(balancer strategy.Balancer) strategy.Balancer {
-	return strategy.PreferNearestDC(balancer, filterLocalDC{}, false)
+func PreferNearestDC(estimator strategy.Estimator) strategy.Estimator {
+	return strategy.PreferNearestDC(estimator, "LocalDC", func(info strategy.Info, candidate endpoint.Info) bool {
+		return candidate.Location() == info.SelfLocation
+	}, false)
 }
 
 // Deprecated: use PreferNearestDCWithFallBack instead
 // Will be removed after March 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func PreferLocalDCWithFallBack(balancer strategy.Balancer) strategy.Balancer {
-	return PreferNearestDCWithFallBack(balancer)
+func PreferLocalDCWithFallBack(estimator strategy.Estimator) strategy.Estimator {
+	return PreferNearestDCWithFallBack(estimator)
 }
 
 // PreferNearestDCWithFallBack creates balancer which use endpoints only in location such as initial endpoint location
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferNearestDCWithFallBack(balancer strategy.Balancer) strategy.Balancer {
-	return strategy.PreferNearestDC(balancer, filterLocalDC{}, true)
+func PreferNearestDCWithFallBack(estimator strategy.Estimator) strategy.Estimator {
+	return strategy.PreferNearestDC(estimator, "LocalDC", func(info strategy.Info, candidate endpoint.Info) bool {
+		return candidate.Location() == info.SelfLocation
+	}, true)
 }
 
-type filterLocations []string
-
-func (locations filterLocations) Allow(_ strategy.Info, e endpoint.Info) bool {
-	location := strings.ToUpper(e.Location())
-
-	return slices.Contains(locations, location)
-}
-
-func (locations filterLocations) String() string {
+func locationsString(locations []string) string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 
@@ -89,7 +75,7 @@ func (locations filterLocations) String() string {
 
 // PreferLocations creates balancer which use endpoints only in selected locations (such as "ABC", "DEF", etc.)
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-func PreferLocations(balancer strategy.Balancer, locations ...string) strategy.Balancer {
+func PreferLocations(estimator strategy.Estimator, locations ...string) strategy.Estimator {
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
@@ -102,13 +88,15 @@ func PreferLocations(balancer strategy.Balancer, locations ...string) strategy.B
 	}
 	sort.Strings(locations)
 
-	return strategy.Prefer(balancer, filterLocations(locations), false)
+	return strategy.Prefer(estimator, locationsString(locations), func(_ strategy.Info, candidate endpoint.Info) bool {
+		return slices.Contains(locations, strings.ToUpper(candidate.Location()))
+	}, false)
 }
 
 // PreferLocationsWithFallback creates balancer which use endpoints only in selected locations
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferLocationsWithFallback(balancer strategy.Balancer, locations ...string) strategy.Balancer {
+func PreferLocationsWithFallback(estimator strategy.Estimator, locations ...string) strategy.Estimator {
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
@@ -119,7 +107,9 @@ func PreferLocationsWithFallback(balancer strategy.Balancer, locations ...string
 	}
 	sort.Strings(locations)
 
-	return strategy.Prefer(balancer, filterLocations(locations), true)
+	return strategy.Prefer(estimator, locationsString(locations), func(_ strategy.Info, candidate endpoint.Info) bool {
+		return slices.Contains(locations, strings.ToUpper(candidate.Location()))
+	}, true)
 }
 
 type Endpoint interface {
@@ -134,34 +124,24 @@ type Endpoint interface {
 	LocalDC() bool
 }
 
-type filterFunc func(info strategy.Info, e endpoint.Info) bool
-
-func (p filterFunc) Allow(info strategy.Info, e endpoint.Info) bool {
-	return p(info, e)
-}
-
-func (p filterFunc) String() string {
-	return "Custom"
-}
-
 // Prefer creates balancer which use endpoints by filter
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter
-func Prefer(balancer strategy.Balancer, filter func(endpoint Endpoint) bool) strategy.Balancer {
-	return strategy.Prefer(balancer, filterFunc(func(_ strategy.Info, e endpoint.Info) bool {
-		return filter(e)
-	}), false)
+func Prefer(child strategy.Estimator, filter func(endpoint Endpoint) bool) strategy.Estimator {
+	return strategy.Prefer(child, "Custom", func(_ strategy.Info, candidate endpoint.Info) bool {
+		return filter(candidate)
+	}, false)
 }
 
 // PreferWithFallback creates balancer which use endpoints by filter
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferWithFallback(balancer strategy.Balancer, filter func(endpoint Endpoint) bool) strategy.Balancer {
-	return strategy.Prefer(balancer, filterFunc(func(_ strategy.Info, e endpoint.Info) bool {
-		return filter(e)
-	}), true)
+func PreferWithFallback(child strategy.Estimator, filter func(endpoint Endpoint) bool) strategy.Estimator {
+	return strategy.Prefer(child, "Custom", func(_ strategy.Info, candidate endpoint.Info) bool {
+		return filter(candidate)
+	}, true)
 }
 
 // Default balancer used by default
-func Default() strategy.Balancer {
+func Default() strategy.Estimator {
 	return RandomChoice()
 }

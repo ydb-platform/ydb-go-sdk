@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -67,7 +66,7 @@ func (s *streamWrapper) RecvMsg(m any) error {
 
 type Balancer struct {
 	driverConfig        *config.Config
-	balancer            strategy.Balancer
+	balancer            strategy.Estimator
 	compiledPlan        *strategy.Plan
 	discoveryConfig     *discoveryConfig.Config
 	pool                *conn.Pool
@@ -81,14 +80,12 @@ type Balancer struct {
 	rnd             xrand.Rand
 
 	connectionsState atomic.Pointer[connectionsState]
-	lastDiscovered   []endpoint.Endpoint
-	selectionInfo    strategy.Info
 
 	closeMu sync.Mutex
 	closed  bool
 }
 
-func (b *Balancer) policy() strategy.Balancer {
+func (b *Balancer) policy() strategy.Estimator {
 	if b.balancer == nil {
 		return strategy.RandomChoice()
 	}
@@ -309,40 +306,50 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	}
 	defer b.traceBalancerUpdate(&ctx, active, endpoints, resolvedLocation)()
 
-	info, selected, groups := b.selectDiscoveredEndpoints(active, endpoints, resolvedLocation)
+	info, selected, estimates := b.selectDiscoveredEndpoints(active, endpoints, resolvedLocation)
 
 	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selected)
-	b.lastDiscovered = slices.Clone(endpoints)
-	b.selectionInfo = info
 
-	b.connectionsState.Store(
-		newConnectionsStateWithBalancerGroups(connections,
-			b.policy(),
-			info,
-			groups,
-			quarantine,
-		),
-	)
+	b.connectionsState.Store(newConnectionsStateWithEstimates(
+		connections, endpoints, estimates, quarantine, info.Rand,
+	))
 }
 
 func (b *Balancer) selectDiscoveredEndpoints(
 	active []conn.Conn,
 	endpoints []endpoint.Endpoint,
 	resolvedLocation strategy.ResolvedLocation,
-) (strategy.Info, []endpoint.Endpoint, [][]endpoint.Endpoint) {
+) (strategy.Info, []endpoint.Endpoint, []strategy.Estimation) {
 	if b.rnd == nil {
 		b.rnd = xrand.New(xrand.WithLock())
 	}
-	info := strategy.Info{SelfLocation: resolvedLocation.SelfLocation}
-	groups := b.policy().Filter(info, endpoints)
-	selected := b.policy().Select(strategy.SelectContext{
-		Endpoints: endpoints,
-		Info:      info,
-		Previous:  active,
-		Rand:      b.rnd,
-	}, groups)
+	info := strategy.Info{
+		SelfLocation:   resolvedLocation.SelfLocation,
+		PreviousActive: previousEndpoints(active),
+		Rand:           b.rnd,
+	}
+	estimates := b.plan().Estimator().Estimate(info, endpoints)
+	selected := endpointsForEstimates(endpoints, b.plan().Active(info, estimates))
 
-	return info, selected, groups
+	return info, selected, estimates
+}
+
+func endpointsForEstimates(
+	endpoints []endpoint.Endpoint,
+	estimates []strategy.Estimation,
+) []endpoint.Endpoint {
+	byKey := make(map[endpoint.Key]endpoint.Endpoint, len(endpoints))
+	for _, candidate := range endpoints {
+		byKey[candidate.Key()] = candidate
+	}
+	result := make([]endpoint.Endpoint, 0, len(estimates))
+	for _, estimation := range estimates {
+		if candidate := byKey[estimation.Key]; candidate != nil {
+			result = append(result, candidate)
+		}
+	}
+
+	return result
 }
 
 func (b *Balancer) traceBalancerUpdate(
@@ -453,23 +460,23 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	}
 
-	configuredBalancer := driverConfig.Balancer()
-	if configuredBalancer == nil {
-		configuredBalancer = strategy.RandomChoice()
+	configuredEstimator := driverConfig.Balancer()
+	if configuredEstimator == nil {
+		configuredEstimator = strategy.RandomChoice()
 	}
 
 	onDone := gtrace.DriverOnBalancerInit(driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.New"),
-		configuredBalancer.String(),
+		configuredEstimator.String(),
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	plan := strategy.Compile(configuredBalancer)
+	plan := strategy.Compile(configuredEstimator)
 	b = &Balancer{
 		driverConfig: driverConfig,
-		balancer:     plan.Balancer(),
+		balancer:     plan.Estimator(),
 		compiledPlan: &plan,
 		pool:         pool,
 		address:      "ydb:///" + driverConfig.Endpoint(),
@@ -549,7 +556,7 @@ func (b *Balancer) NewStream(
 			ClientStream: inner,
 			onErr: func(err error) {
 				if IsBadConn(ctx, err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
-					b.pool.Ban(ctx, cc, err)
+					b.ban(ctx, cc, err)
 				}
 			},
 		}
@@ -571,12 +578,12 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 	defer func() {
 		if err != nil && cc.State() != state.Banned &&
 			IsBadConn(ctx, err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
-			b.pool.Ban(ctx, cc, err)
+			b.ban(ctx, cc, err)
 		}
 	}()
 
 	if err = f(conn.WithBanCallback(ctx, func(cause error) {
-		b.pool.Ban(ctx, cc, cause)
+		b.ban(ctx, cc, cause)
 	}), cc); err != nil {
 		if conn.UseWrapping(ctx) {
 			if credentials.IsAccessError(err) {
@@ -649,7 +656,7 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 			)
 		}
 	}
-	if len(state.all) == 0 {
+	if len(state.estimates) == 0 {
 		return nil, xerrors.WithStackTrace(ErrNoEndpoints)
 	}
 
@@ -662,20 +669,76 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		b.forceDiscovery()
 	}()
 
-	c, failedCount = state.GetConnection(ctx)
-	if c == nil {
-		return nil, xerrors.WithStackTrace(
-			fmt.Errorf("%w: cannot get connection from Balancer after %d attempts", ErrNoEndpoints, failedCount),
-		)
+	c, failedCount = b.nextEstimatedConn(ctx, state)
+	if c != nil {
+		return c, nil
 	}
 
-	return c, nil
+	return nil, xerrors.WithStackTrace(
+		fmt.Errorf("%w: cannot get connection from Balancer after %d attempts", ErrNoEndpoints, failedCount),
+	)
+}
+
+func (b *Balancer) nextEstimatedConn(ctx context.Context, state *connectionsState) (conn.Conn, int) {
+	failedCount := 0
+	for range len(state.estimates) + 1 {
+		key, selected, allowBanned, ok := state.NextEndpoint(ctx)
+		if !ok {
+			break
+		}
+		if selected == nil {
+			selected = b.ensureEndpointConn(ctx, key)
+		}
+		if selected != nil && isOkConnection(selected, allowBanned) {
+			return selected, failedCount
+		}
+		failedCount++
+		state.Pessimize(key)
+		if current := b.connections(); current != state {
+			if current == nil {
+				break
+			}
+			current.Pessimize(key)
+			state = current
+		}
+	}
+
+	return nil, failedCount
+}
+
+func (b *Balancer) ban(ctx context.Context, connection conn.Conn, cause error) {
+	b.pool.Ban(ctx, connection, cause)
+	if current := b.connections(); current != nil {
+		current.Pessimize(connection.Endpoint().Key())
+	}
 }
 
 // ensurePinnedConn adds a discovered endpoint omitted from the active set.
 // This is the soft-limit escape hatch required by session and topic affinity.
 func (b *Balancer) ensurePinnedConn(ctx context.Context, nodeID uint32) conn.Conn {
-	selected, rejected := b.tryEnsurePinnedConn(nodeID)
+	var (
+		key   endpoint.Key
+		found bool
+	)
+	if current := b.connections(); current != nil {
+		for _, candidate := range current.endpointByKey {
+			if candidate.NodeID() == nodeID {
+				key = candidate.Key()
+				found = true
+
+				break
+			}
+		}
+	}
+	if !found {
+		return nil
+	}
+
+	return b.ensureEndpointConn(ctx, key)
+}
+
+func (b *Balancer) ensureEndpointConn(ctx context.Context, key endpoint.Key) conn.Conn {
+	selected, rejected := b.tryEnsureEndpointConn(key)
 	if rejected != nil {
 		b.pool.Put(ctx, rejected)
 	}
@@ -683,7 +746,7 @@ func (b *Balancer) ensurePinnedConn(ctx context.Context, nodeID uint32) conn.Con
 	return selected
 }
 
-func (b *Balancer) tryEnsurePinnedConn(nodeID uint32) (selected, rejected conn.Conn) {
+func (b *Balancer) tryEnsureEndpointConn(key endpoint.Key) (selected, rejected conn.Conn) {
 	b.closeMu.Lock()
 	defer b.closeMu.Unlock()
 
@@ -693,7 +756,7 @@ func (b *Balancer) tryEnsurePinnedConn(nodeID uint32) (selected, rejected conn.C
 
 	current := b.connectionsState.Load()
 	if current != nil {
-		if cc := current.connByNodeID[nodeID]; cc != nil {
+		if cc := current.Connection(key); cc != nil {
 			if !isOkConnection(cc, false) {
 				return nil, nil
 			}
@@ -703,12 +766,8 @@ func (b *Balancer) tryEnsurePinnedConn(nodeID uint32) (selected, rejected conn.C
 	}
 
 	var target endpoint.Endpoint
-	for _, candidate := range b.lastDiscovered {
-		if candidate.NodeID() == nodeID {
-			target = candidate
-
-			break
-		}
+	if current != nil {
+		target = current.Endpoint(key)
 	}
 	if target == nil {
 		return nil, nil
@@ -722,16 +781,9 @@ func (b *Balancer) tryEnsurePinnedConn(nodeID uint32) (selected, rejected conn.C
 		return nil, cc
 	}
 
-	active := []conn.Conn{cc}
-	var quarantine []conn.Conn
-	if current != nil {
-		active = append(active, current.All()...)
-		quarantine = current.quarantine
-	}
-	freshEndpoints := endpointsForConnections(active, b.lastDiscovered)
-	b.connectionsState.Store(newConnectionsStateWithBalancerGroups(
-		active, b.policy(), b.selectionInfo,
-		b.policy().Filter(b.selectionInfo, freshEndpoints), quarantine,
+	active := append([]conn.Conn{cc}, current.All()...)
+	b.connectionsState.Store(newConnectionsStateWithEstimates(
+		active, current.Endpoints(), current.Estimations(), current.quarantine, current.rand,
 	))
 
 	return cc, nil

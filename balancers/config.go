@@ -37,13 +37,13 @@ type balancersConfig struct {
 }
 
 type fromConfigOptionsHolder struct {
-	fallbackBalancer strategy.Balancer
+	fallbackBalancer strategy.Estimator
 	errorHandler     func(error)
 }
 
 type fromConfigOption func(h *fromConfigOptionsHolder)
 
-func WithParseErrorFallbackBalancer(b strategy.Balancer) fromConfigOption {
+func WithParseErrorFallbackBalancer(b strategy.Estimator) fromConfigOption {
 	return func(h *fromConfigOptionsHolder) {
 		h.fallbackBalancer = b
 	}
@@ -55,7 +55,7 @@ func WithParseErrorHandler(errorHandler func(error)) fromConfigOption {
 	}
 }
 
-func createByType(t balancerType) (strategy.Balancer, error) {
+func createByType(t balancerType) (strategy.Estimator, error) {
 	switch t {
 	case typeDisable:
 		return SingleConn(), nil
@@ -70,14 +70,14 @@ func createByType(t balancerType) (strategy.Balancer, error) {
 	}
 }
 
-func CreateFromConfig(s string) (strategy.Balancer, error) {
+func CreateFromConfig(s string) (strategy.Estimator, error) {
 	// try to parse s as identifier of balancer
 	if c, err := createByType(balancerType(s)); err == nil {
 		return c, nil
 	}
 
 	var (
-		b   strategy.Balancer
+		b   strategy.Estimator
 		err error
 		c   balancersConfig
 	)
@@ -119,12 +119,12 @@ func CreateFromConfig(s string) (strategy.Balancer, error) {
 	}
 }
 
-func FromConfig(config string, opts ...fromConfigOption) strategy.Balancer {
+func FromConfig(config string, opts ...fromConfigOption) strategy.Estimator {
 	var (
 		h = fromConfigOptionsHolder{
 			fallbackBalancer: Default(),
 		}
-		b   strategy.Balancer
+		b   strategy.Estimator
 		err error
 	)
 	for _, opt := range opts {

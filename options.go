@@ -350,9 +350,9 @@ func WithCredentials(c credentials.Credentials) Option {
 	})
 }
 
-func WithBalancer(balancer strategy.Balancer) Option {
+func WithBalancer(estimator strategy.Estimator) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.options = append(d.options, config.WithBalancer(balancer))
+		d.options = append(d.options, config.WithBalancer(estimator))
 
 		return nil
 	}

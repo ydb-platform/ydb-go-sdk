@@ -27,29 +27,41 @@ type ResolvedLocation struct {
 // LocalDCDetector detects the nearest data center for discovered endpoints.
 type LocalDCDetector func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
-// Plan is an executable representation of a balancer tree.
+// Plan contains root lifecycle and resource decisions compiled from an estimator tree.
+// Endpoint policy itself remains represented by the immutable Estimator interface.
 type Plan struct {
-	balancer Balancer
-	source   endpointSource
-	resolver locationResolver
+	estimator      Estimator
+	source         endpointSource
+	resolver       locationResolver
+	maxConnections int
 }
 
-// Compile converts a balancer tree into endpoint selection and lifecycle behavior.
-func Compile(balancer Balancer) Plan {
-	return compile(normalize(balancer))
+// Compile extracts root lifecycle and resource settings from an estimator tree.
+func Compile(estimator Estimator) Plan {
+	return compile(normalize(estimator))
 }
 
-// Balancer returns the endpoint selection part of the plan.
-func (p Plan) Balancer() Balancer {
-	return p.balancer
+// Estimator returns the configured endpoint estimator tree.
+func (p Plan) Estimator() Estimator {
+	return p.estimator
 }
 
-// Start starts the endpoint source selected by the balancer tree.
+// Active applies root resource limits to endpoint estimates.
+func (p Plan) Active(info Info, estimates []Estimation) []Estimation {
+	return selectActiveEstimates(info, estimates, p.maxConnections)
+}
+
+// MaxConnections returns the compiled soft limit. Zero means unlimited.
+func (p Plan) MaxConnections() int {
+	return p.maxConnections
+}
+
+// Start starts the endpoint source selected by the estimator tree.
 func (p Plan) Start(ctx context.Context, runtime Runtime) (Controller, error) {
 	return p.source.Start(ctx, runtime)
 }
 
-// ResolveLocation resolves the location used by endpoint filters.
+// ResolveLocation resolves the location used by endpoint estimators.
 func (p Plan) ResolveLocation(
 	ctx context.Context,
 	endpoints []endpoint.Endpoint,
@@ -63,15 +75,15 @@ type compiler interface {
 	compile() Plan
 }
 
-func compile(balancer Balancer) Plan {
-	if c, ok := balancer.(compiler); ok {
+func compile(estimator Estimator) Plan {
+	if c, ok := estimator.(compiler); ok {
 		return c.compile()
 	}
 
 	return Plan{
-		balancer: balancer,
-		source:   clusterEndpointSource{},
-		resolver: discoveredLocationResolver{},
+		estimator: estimator,
+		source:    clusterEndpointSource{},
+		resolver:  discoveredLocationResolver{},
 	}
 }
 
@@ -132,30 +144,30 @@ func (nearestDCLocationResolver) Resolve(
 
 func (b randomChoice) compile() Plan {
 	return Plan{
-		balancer: b,
-		source:   clusterEndpointSource{},
-		resolver: discoveredLocationResolver{},
+		estimator: b,
+		source:    clusterEndpointSource{},
+		resolver:  discoveredLocationResolver{},
 	}
 }
 
 func (b singleConn) compile() Plan {
 	return Plan{
-		balancer: b,
-		source:   configuredEndpointSource{},
-		resolver: discoveredLocationResolver{},
+		estimator: b,
+		source:    configuredEndpointSource{},
+		resolver:  discoveredLocationResolver{},
 	}
 }
 
 func (p prefer) compile() Plan {
 	plan := compile(p.child)
-	plan.balancer = p
+	plan.estimator = p
 
 	return plan
 }
 
 func (n nearestDC) compile() Plan {
-	plan := compile(n.Balancer)
-	plan.balancer = n
+	plan := compile(n.child)
+	plan.estimator = n
 	plan.resolver = nearestDCLocationResolver{}
 
 	return plan

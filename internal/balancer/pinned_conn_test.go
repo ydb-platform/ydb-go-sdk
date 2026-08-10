@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -21,9 +22,10 @@ func TestTryEnsurePinnedConnReturnsCurrentConnection(t *testing.T) {
 	balancer := &Balancer{}
 	balancer.connectionsState.Store(&connectionsState{
 		connByNodeID: map[uint32]conn.Conn{42: current},
+		connByKey:    map[endpoint.Key]conn.Conn{current.Endpoint().Key(): current},
 	})
 
-	selected, rejected := balancer.tryEnsurePinnedConn(42)
+	selected, rejected := balancer.tryEnsureEndpointConn(current.Endpoint().Key())
 
 	require.Same(t, current, selected)
 	require.Nil(t, rejected)
@@ -32,7 +34,7 @@ func TestTryEnsurePinnedConnReturnsCurrentConnection(t *testing.T) {
 func TestTryEnsurePinnedConnReturnsNothingAfterClose(t *testing.T) {
 	balancer := &Balancer{closed: true}
 
-	selected, rejected := balancer.tryEnsurePinnedConn(42)
+	selected, rejected := balancer.tryEnsureEndpointConn(endpoint.New("pinned", endpoint.WithID(42)).Key())
 
 	require.Nil(t, selected)
 	require.Nil(t, rejected)
@@ -45,12 +47,14 @@ func TestTryEnsurePinnedConnReturnsNothingFromClosedPool(t *testing.T) {
 
 	balancer := &Balancer{
 		pool: pool,
-		lastDiscovered: []endpoint.Endpoint{
-			endpoint.New("pinned", endpoint.WithID(42)),
-		},
 	}
+	candidate := endpoint.New("pinned", endpoint.WithID(42))
+	estimates := strategy.RandomChoice().Estimate(strategy.Info{}, []endpoint.Endpoint{candidate})
+	balancer.connectionsState.Store(newConnectionsStateWithEstimates(
+		nil, []endpoint.Endpoint{candidate}, estimates, nil, nil,
+	))
 
-	selected, rejected := balancer.tryEnsurePinnedConn(42)
+	selected, rejected := balancer.tryEnsureEndpointConn(candidate.Key())
 
 	require.Nil(t, selected)
 	require.Nil(t, rejected)
@@ -66,9 +70,12 @@ func TestEnsurePinnedConnReturnsRejectedConnectionToPool(t *testing.T) {
 	pooled := pool.Get(candidate)
 	pooled.Ban(ctx)
 	balancer := &Balancer{
-		pool:           pool,
-		lastDiscovered: []endpoint.Endpoint{candidate},
+		pool: pool,
 	}
+	estimates := strategy.RandomChoice().Estimate(strategy.Info{}, []endpoint.Endpoint{candidate})
+	balancer.connectionsState.Store(newConnectionsStateWithEstimates(
+		nil, []endpoint.Endpoint{candidate}, estimates, nil, nil,
+	))
 
 	selected := balancer.ensurePinnedConn(ctx, 42)
 

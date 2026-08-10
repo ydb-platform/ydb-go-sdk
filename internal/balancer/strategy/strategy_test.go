@@ -1,168 +1,95 @@
 package strategy
 
 import (
-	"context"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 )
 
-func TestRandomChoice(t *testing.T) {
-	connections := []conn.Conn{
-		strategyConn(1, "local", state.Unknown),
-		strategyConn(2, "local", state.Online),
+func TestIdentityEstimators(t *testing.T) {
+	endpoints := strategyEndpoints("local", "remote")
+	expected := []Estimation{
+		{Key: endpoints[0].Key(), Weight: 1},
+		{Key: endpoints[1].Key(), Weight: 1},
 	}
-	balancer := RandomChoice()
 
-	require.Equal(t, "RandomChoice", balancer.String())
-	require.Equal(t, [][]endpoint.Endpoint{connectionEndpoints(connections)},
-		balancer.Filter(Info{}, connectionEndpoints(connections)),
-	)
-
-	selected, failed := balancer.Next(t.Context(), NextContext{Rand: testRand{index: 1}}, connections, false)
-	require.Same(t, connections[1], selected)
-	require.Zero(t, failed)
-
-	selected, failed = balancer.Next(t.Context(), NextContext{Rand: testRand{}}, connections, false)
-	require.Same(t, connections[1], selected)
-	require.Zero(t, failed)
-}
-
-func TestRandomChoiceNoUsableConnections(t *testing.T) {
-	connections := []conn.Conn{
-		strategyConn(1, "local", state.Unknown),
-		strategyConn(2, "local", state.Destroyed),
+	tests := []struct {
+		name      string
+		estimator Estimator
+		expected  string
+	}{
+		{name: "random choice", estimator: RandomChoice(), expected: "RandomChoice"},
+		{name: "single connection", estimator: SingleConn(), expected: "SingleConn"},
 	}
-	balancer := RandomChoice()
 
-	selected, failed := balancer.Next(t.Context(), NextContext{Rand: testRand{}}, connections, false)
-	require.Nil(t, selected)
-	require.Equal(t, len(connections), failed)
-
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	selected, failed = balancer.Next(ctx, NextContext{Rand: testRand{}}, connections, false)
-	require.Nil(t, selected)
-	require.Zero(t, failed)
-
-	selected, failed = balancer.Next(t.Context(), NextContext{Rand: testRand{}}, nil, false)
-	require.Nil(t, selected)
-	require.Zero(t, failed)
-}
-
-func TestRandomChoiceCanUseBannedConnectionAsLastResort(t *testing.T) {
-	banned := strategyConn(1, "local", state.Banned)
-	selected, failed := RandomChoice().Next(
-		t.Context(), NextContext{Rand: testRand{}}, []conn.Conn{banned}, true,
-	)
-
-	require.Same(t, banned, selected)
-	require.Zero(t, failed)
-}
-
-func TestSingleConn(t *testing.T) {
-	balancer := SingleConn()
-	connection := strategyConn(1, "local", state.Created)
-
-	require.Equal(t, "SingleConn", balancer.String())
-	require.Equal(t, []endpoint.Endpoint{connection.Endpoint()},
-		balancer.Select(
-			SelectContext{Endpoints: []endpoint.Endpoint{connection.Endpoint()}},
-			[][]endpoint.Endpoint{{connection.Endpoint()}},
-		),
-	)
-	require.Equal(t, [][]endpoint.Endpoint{{connection.Endpoint()}},
-		balancer.Filter(Info{}, []endpoint.Endpoint{connection.Endpoint()}),
-	)
-
-	selected, failed := balancer.Next(t.Context(), NextContext{}, []conn.Conn{connection}, false)
-	require.Same(t, connection, selected)
-	require.Zero(t, failed)
-
-	banned := strategyConn(2, "local", state.Banned)
-	selected, failed = balancer.Next(t.Context(), NextContext{}, []conn.Conn{banned}, false)
-	require.Nil(t, selected)
-	require.Equal(t, 1, failed)
-
-	selected, failed = balancer.Next(t.Context(), NextContext{}, []conn.Conn{banned}, true)
-	require.Same(t, banned, selected)
-	require.Zero(t, failed)
-
-	selected, failed = balancer.Next(t.Context(), NextContext{}, nil, false)
-	require.Nil(t, selected)
-	require.Zero(t, failed)
-
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	selected, failed = balancer.Next(ctx, NextContext{}, []conn.Conn{connection}, false)
-	require.Nil(t, selected)
-	require.Zero(t, failed)
-}
-
-func TestIsUsableStates(t *testing.T) {
-	for _, connectionState := range []state.State{state.Created, state.Online, state.Offline} {
-		require.True(t, isUsable(strategyConn(1, "", connectionState), false))
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.expected, test.estimator.String())
+			require.Equal(t, expected, test.estimator.Estimate(Info{}, endpoints))
+		})
 	}
-	require.False(t, isUsable(nil, true))
-	require.False(t, isUsable(strategyConn(1, "", state.Banned), false))
-	require.True(t, isUsable(strategyConn(1, "", state.Banned), true))
-	require.False(t, isUsable(strategyConn(1, "", state.Destroyed), true))
 }
 
-func TestPreferFilter(t *testing.T) {
-	endpoints := []endpoint.Endpoint{
-		strategyConn(1, "local", state.Online).Endpoint(),
-		strategyConn(2, "remote", state.Online).Endpoint(),
-	}
-	filter := locationFilter("local")
+func TestPreferEstimator(t *testing.T) {
+	endpoints := strategyEndpoints("local", "remote")
+	withoutFallback := PreferNearestDC(RandomChoice(), "Location(local)", locationMatch("local"), false)
 
-	withoutFallback := PreferNearestDC(RandomChoice(), filter, false)
 	require.Equal(t, "Prefer{Filter=Location(local),AllowFallback=false,Child=RandomChoice}",
 		withoutFallback.String(),
 	)
-	require.Equal(t, [][]endpoint.Endpoint{{endpoints[0]}}, withoutFallback.Filter(Info{}, endpoints))
-
-	withFallback := Prefer(SingleConn(), filter, true)
-	require.Equal(t, [][]endpoint.Endpoint{{endpoints[0]}, {endpoints[1]}},
-		withFallback.Filter(Info{}, endpoints),
+	require.Equal(t, []Estimation{{Key: endpoints[0].Key(), Weight: 1}},
+		withoutFallback.Estimate(Info{}, endpoints),
 	)
 
-	normalized := Prefer(nil, filter, false)
+	withFallback := Prefer(SingleConn(), "Location(local)", locationMatch("local"), true)
+	require.Equal(t, []Estimation{
+		{Key: endpoints[0].Key(), Weight: 1},
+		{Key: endpoints[1].Key(), Penalty: 1, Weight: 1},
+	}, withFallback.Estimate(Info{}, endpoints))
+
+	noPreferred := Prefer(RandomChoice(), "missing", locationMatch("missing"), true)
+	require.Equal(t, []Estimation{
+		{Key: endpoints[0].Key(), Weight: 1},
+		{Key: endpoints[1].Key(), Weight: 1},
+	}, noPreferred.Estimate(Info{}, endpoints))
+
+	normalized := Prefer(nil, "Location(local)", locationMatch("local"), false)
 	require.Equal(t, "Prefer{Filter=Location(local),AllowFallback=false,Child=RandomChoice}", normalized.String())
 }
 
-func TestPreferNextDelegatesSelectionToChild(t *testing.T) {
-	preferred := strategyConn(1, "local", state.Online)
-	fallback := strategyConn(2, "remote", state.Online)
-	bannedPreferred := strategyConn(3, "local", state.Banned)
+func TestPreferPenaltyComposition(t *testing.T) {
+	endpoints := strategyEndpoints("local", "remote", "other")
+	child := fixedEstimator{estimates: []Estimation{
+		{Key: endpoints[0].Key(), Penalty: 2, Weight: 3},
+		{Key: endpoints[1].Key(), Penalty: 5, Weight: 4},
+	}}
+	estimator := Prefer(child, "local", locationMatch("local"), true)
 
-	withFallback := Prefer(RandomChoice(), locationFilter("local"), true)
-	selected, failed := withFallback.Next(
-		t.Context(), testRandContext(1), []conn.Conn{bannedPreferred, fallback}, false,
-	)
-	require.Same(t, fallback, selected)
-	require.Zero(t, failed)
+	require.Equal(t, []Estimation{
+		{Key: endpoints[0].Key(), Penalty: 2, Weight: 3},
+		{Key: endpoints[1].Key(), Penalty: 8, Weight: 4},
+	}, estimator.Estimate(Info{}, endpoints))
 
-	selected, failed = withFallback.Next(
-		t.Context(), testRandContext(0), []conn.Conn{preferred, fallback}, false,
-	)
-	require.Same(t, preferred, selected)
-	require.Zero(t, failed)
+	require.Equal(t, uint64(math.MaxUint64), addPenalty(math.MaxUint64, 1))
+	require.Equal(t, uint64(math.MaxUint64), fallbackPenaltyShift([]Estimation{{Penalty: math.MaxUint64}}))
 }
 
-func TestPartitionWithoutFilter(t *testing.T) {
-	endpoints := []endpoint.Endpoint{strategyConn(1, "local", state.Online).Endpoint()}
-	preferredEndpoints, fallbackEndpoints := partitionEndpoints(endpoints, nil, Info{})
-	require.Equal(t, endpoints, preferredEndpoints)
-	require.Nil(t, fallbackEndpoints)
+func TestPartitionEndpoints(t *testing.T) {
+	endpoints := strategyEndpoints("local", "remote")
+
+	preferred, fallback := partitionEndpoints(endpoints, nil, Info{})
+	require.Equal(t, endpoints, preferred)
+	require.Nil(t, fallback)
+
+	preferred, fallback = partitionEndpoints(endpoints, locationMatch("local"), Info{})
+	require.Equal(t, endpoints[:1], preferred)
+	require.Equal(t, endpoints[1:], fallback)
 }
 
-func TestFilterCanUseDiscoveryAndEndpointMetadata(t *testing.T) {
+func TestEstimatorCanUseEndpointMetadata(t *testing.T) {
 	endpoints := []endpoint.Endpoint{
 		endpoint.New("primary", endpoint.WithMetadata(endpoint.Metadata{
 			BridgePileState: endpoint.PileStatePrimary,
@@ -171,47 +98,49 @@ func TestFilterCanUseDiscoveryAndEndpointMetadata(t *testing.T) {
 			BridgePileState: endpoint.PileStateSynchronized,
 		})),
 	}
-	balancer := Prefer(RandomChoice(), primaryPileFilter{}, false)
+	estimator := Prefer(RandomChoice(), "PrimaryPile", func(_ Info, candidate endpoint.Info) bool {
+		return candidate.Metadata().BridgePileState == endpoint.PileStatePrimary
+	}, false)
 
-	require.Equal(t, [][]endpoint.Endpoint{{endpoints[0]}}, balancer.Filter(Info{}, endpoints))
+	require.Equal(t, []Estimation{{Key: endpoints[0].Key(), Weight: 1}}, estimator.Estimate(Info{}, endpoints))
 }
 
-func strategyConn(nodeID uint32, location string, connectionState state.State) conn.Conn {
-	return &mock.Conn{
-		AddrField:     location,
-		LocationField: location,
-		NodeIDField:   nodeID,
-		StateField:    connectionState,
-	}
-}
-
-func connectionEndpoints(connections []conn.Conn) []endpoint.Endpoint {
-	result := make([]endpoint.Endpoint, 0, len(connections))
-	for _, connection := range connections {
-		result = append(result, connection.Endpoint())
+func strategyEndpoints(locations ...string) []endpoint.Endpoint {
+	result := make([]endpoint.Endpoint, len(locations))
+	for i, location := range locations {
+		result[i] = endpoint.New(location, endpoint.WithID(uint32(i+1)), endpoint.WithLocation(location))
 	}
 
 	return result
 }
 
-type locationFilter string
-
-func (f locationFilter) Allow(_ Info, candidate endpoint.Info) bool {
-	return candidate.Location() == string(f)
+func locationMatch(location string) func(Info, endpoint.Info) bool {
+	return func(_ Info, candidate endpoint.Info) bool {
+		return candidate.Location() == location
+	}
 }
 
-type primaryPileFilter struct{}
-
-func (primaryPileFilter) Allow(_ Info, candidate endpoint.Info) bool {
-	return candidate.Metadata().BridgePileState == endpoint.PileStatePrimary
+type fixedEstimator struct {
+	estimates []Estimation
 }
 
-func (primaryPileFilter) String() string {
-	return "PrimaryPile"
+func (f fixedEstimator) Estimate(_ Info, endpoints []endpoint.Endpoint) []Estimation {
+	keys := make(map[endpoint.Key]struct{}, len(endpoints))
+	for _, candidate := range endpoints {
+		keys[candidate.Key()] = struct{}{}
+	}
+	result := make([]Estimation, 0, len(f.estimates))
+	for _, estimation := range f.estimates {
+		if _, ok := keys[estimation.Key]; ok {
+			result = append(result, estimation)
+		}
+	}
+
+	return result
 }
 
-func (f locationFilter) String() string {
-	return "Location(" + string(f) + ")"
+func (fixedEstimator) String() string {
+	return "Fixed"
 }
 
 type testRand struct {
@@ -222,16 +151,12 @@ func (testRand) Int64(int64) int64 {
 	return 0
 }
 
-func (r testRand) Int(max int) int {
-	return r.index % max
+func (r testRand) Int(maximum int) int {
+	return r.index % maximum
 }
 
 func (testRand) Shuffle(n int, swap func(i, j int)) {
 	if n > 1 {
 		swap(0, n-1)
 	}
-}
-
-func testRandContext(index int) NextContext {
-	return NextContext{Rand: testRand{index: index}}
 }

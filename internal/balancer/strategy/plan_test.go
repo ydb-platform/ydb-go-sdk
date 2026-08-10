@@ -13,27 +13,27 @@ import (
 func TestCompilePlanBehavior(t *testing.T) {
 	tests := []struct {
 		name              string
-		balancer          Balancer
+		estimator         Estimator
 		expectedSource    string
 		expectedLocation  string
 		expectedDetection bool
 	}{
 		{
 			name:             "random choice uses cluster discovery location",
-			balancer:         RandomChoice(),
+			estimator:        RandomChoice(),
 			expectedSource:   "cluster",
 			expectedLocation: "discovered",
 		},
 		{
 			name:             "single connection uses configured endpoint",
-			balancer:         SingleConn(),
+			estimator:        SingleConn(),
 			expectedSource:   "configured",
 			expectedLocation: "discovered",
 		},
 		{
 			name: "nearest DC decorates cluster discovery",
-			balancer: PreferNearestDC(
-				RandomChoice(), locationFilter("local"), false,
+			estimator: PreferNearestDC(
+				RandomChoice(), "Location(local)", locationMatch("local"), false,
 			),
 			expectedSource:    "cluster",
 			expectedLocation:  "detected",
@@ -41,8 +41,8 @@ func TestCompilePlanBehavior(t *testing.T) {
 		},
 		{
 			name: "nearest DC preserves nested configured source",
-			balancer: PreferNearestDC(
-				SingleConn(), locationFilter("local"), true,
+			estimator: PreferNearestDC(
+				SingleConn(), "Location(local)", locationMatch("local"), true,
 			),
 			expectedSource:    "configured",
 			expectedLocation:  "detected",
@@ -50,9 +50,9 @@ func TestCompilePlanBehavior(t *testing.T) {
 		},
 		{
 			name: "outer location preference preserves nearest DC resolver",
-			balancer: Prefer(
-				PreferNearestDC(RandomChoice(), locationFilter("local"), true),
-				locationFilter("remote"), false,
+			estimator: Prefer(
+				PreferNearestDC(RandomChoice(), "Location(local)", locationMatch("local"), true),
+				"Location(remote)", locationMatch("remote"), false,
 			),
 			expectedSource:    "cluster",
 			expectedLocation:  "detected",
@@ -62,7 +62,7 @@ func TestCompilePlanBehavior(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			plan := Compile(test.balancer)
+			plan := Compile(test.estimator)
 			runtime := &recordingRuntime{}
 
 			controller, err := plan.Start(t.Context(), runtime)
@@ -94,19 +94,24 @@ func TestCompilePlanBehavior(t *testing.T) {
 }
 
 func TestCompileDefaultsUnknownBalancerToDynamicDiscovery(t *testing.T) {
-	balancer := externalStyleBalancer{Balancer: RandomChoice()}
-	plan := Compile(balancer)
+	estimator := externalStyleEstimator{Estimator: RandomChoice()}
+	plan := Compile(estimator)
 	runtime := &recordingRuntime{}
 
 	_, err := plan.Start(t.Context(), runtime)
 	require.NoError(t, err)
 	require.Equal(t, "cluster", runtime.source)
-	require.Equal(t, balancer, plan.Balancer())
+	require.Equal(t, estimator, plan.Estimator())
+	require.Equal(t,
+		[]Estimation{{Key: strategyEndpoints("local")[0].Key(), Weight: 1}},
+		plan.Estimator().Estimate(Info{}, strategyEndpoints("local")),
+	)
+	require.Zero(t, plan.MaxConnections())
 }
 
 func TestNearestDCResolverReturnsDetectorError(t *testing.T) {
 	expectedErr := errors.New("detector failed")
-	plan := Compile(PreferNearestDC(RandomChoice(), locationFilter("local"), false))
+	plan := Compile(PreferNearestDC(RandomChoice(), "Location(local)", locationMatch("local"), false))
 
 	resolved, err := plan.ResolveLocation(
 		t.Context(), nil, "discovered",
@@ -140,6 +145,6 @@ type recordingController struct{}
 func (recordingController) Force() {}
 func (recordingController) Stop()  {}
 
-type externalStyleBalancer struct {
-	Balancer
+type externalStyleEstimator struct {
+	Estimator
 }

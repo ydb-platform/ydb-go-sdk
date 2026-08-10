@@ -5,100 +5,96 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
-func TestMaxConnectionsSelectsStickyActiveSet(t *testing.T) {
+func TestMaxConnectionsKeepsStickyActiveSet(t *testing.T) {
 	endpoints := maxConnectionEndpoints(1, 2, 3, 4)
-	balancer := WithMaxConnections(RandomChoice(), 2)
-	ctx := SelectContext{Endpoints: endpoints, Rand: testRand{}}
-
-	selected := balancer.Select(ctx, [][]endpoint.Endpoint{endpoints})
+	estimator := WithMaxConnections(RandomChoice(), 2)
+	plan := Compile(estimator)
+	estimates := estimator.Estimate(Info{}, endpoints)
+	selected := plan.Active(Info{Rand: testRand{}}, estimates)
 	require.Len(t, selected, 2)
+	require.Equal(t, endpoints[len(endpoints)-1].Key(), selected[0].Key)
 
-	previous := []conn.Conn{
-		maxConnectionConn(selected[0], state.Online),
-		maxConnectionConn(selected[1], state.Online),
-	}
-	selectedAgain := balancer.Select(
-		SelectContext{Endpoints: endpoints, Previous: previous, Rand: testRand{}},
-		[][]endpoint.Endpoint{endpoints},
-	)
-	require.Equal(t, selected, selectedAgain)
+	selectedAgain := plan.Active(Info{
+		PreviousActive: previousEstimationKeys(selected...),
+		Rand:           testRand{},
+	}, estimator.Estimate(Info{}, maxConnectionEndpoints(1, 2, 3, 4)))
+	require.Equal(t, estimationKeys(selected), estimationKeys(selectedAgain))
 
-	previous[0].Ban(t.Context())
-	selectedAfterBan := balancer.Select(
-		SelectContext{Endpoints: endpoints, Previous: previous, Rand: testRand{}},
-		[][]endpoint.Endpoint{endpoints},
-	)
+	selectedAfterBan := plan.Active(Info{
+		PreviousActive: []PreviousEndpoint{
+			{Key: selected[0].Key, Banned: true},
+			{Key: selected[1].Key},
+		},
+		Rand: testRand{},
+	}, estimates)
 	require.Len(t, selectedAfterBan, 2)
-	require.NotContains(t, endpointKeys(selectedAfterBan), previous[0].Endpoint().Key())
+	require.NotContains(t, estimationKeys(selectedAfterBan), selected[0].Key)
 }
 
-func TestMaxConnectionsUsesChildPreference(t *testing.T) {
+func TestMaxConnectionsUsesChildPenalties(t *testing.T) {
 	endpoints := []endpoint.Endpoint{
 		endpoint.New("local-1", endpoint.WithID(1), endpoint.WithLocation("local")),
 		endpoint.New("remote-1", endpoint.WithID(2), endpoint.WithLocation("remote")),
 		endpoint.New("local-2", endpoint.WithID(3), endpoint.WithLocation("local")),
 		endpoint.New("remote-2", endpoint.WithID(4), endpoint.WithLocation("remote")),
 	}
-	child := Prefer(RandomChoice(), locationFilter("local"), true)
-	balancer := WithMaxConnections(child, 3)
+	child := Prefer(RandomChoice(), "Location(local)", locationMatch("local"), true)
+	estimator := WithMaxConnections(child, 3)
+	plan := Compile(estimator)
+	estimates := estimator.Estimate(Info{}, endpoints)
+	selected := plan.Active(Info{}, estimates)
 
-	groups := balancer.Filter(Info{}, endpoints)
-	selected := balancer.Select(SelectContext{Endpoints: endpoints, Rand: testRand{}}, groups)
+	require.Equal(t, "MaxConnections{Limit=3,Child="+child.String()+"}", estimator.String())
+	require.Equal(t, 3, plan.MaxConnections())
 	require.Len(t, selected, 3)
-	require.Equal(t, "local", selected[0].Location())
-	require.Equal(t, "local", selected[1].Location())
-
-	require.Equal(t, child.Filter(Info{}, selected), balancer.Filter(Info{}, selected))
-	require.Equal(t, "MaxConnections{Limit=3,Child="+child.String()+"}", balancer.String())
-
-	selectedConn, failed := balancer.Next(
-		t.Context(), NextContext{Rand: testRand{}},
-		[]conn.Conn{strategyConn(1, "local", state.Online)}, false,
+	require.Equal(t, []endpoint.Key{endpoints[0].Key(), endpoints[2].Key(), endpoints[1].Key()},
+		[]endpoint.Key{selected[0].Key, selected[1].Key, selected[2].Key},
 	)
-	require.NotNil(t, selectedConn)
-	require.Zero(t, failed)
 }
 
-func TestMaxConnectionsNonPositiveLimitIsUnlimited(t *testing.T) {
+func TestMaxConnectionsNonPositiveAndNestedLimits(t *testing.T) {
 	endpoints := maxConnectionEndpoints(1, 2, 3)
+	estimates := RandomChoice().Estimate(Info{}, endpoints)
 
-	groups := [][]endpoint.Endpoint{endpoints}
-	ctx := SelectContext{Endpoints: endpoints}
-	require.Equal(t, endpoints, WithMaxConnections(RandomChoice(), 0).Select(ctx, groups))
-	require.Equal(t, endpoints, WithMaxConnections(RandomChoice(), -1).Select(ctx, groups))
+	require.Equal(t, estimates, Compile(WithMaxConnections(RandomChoice(), 0)).Active(Info{}, estimates))
+	require.Equal(t, estimates, Compile(WithMaxConnections(RandomChoice(), -1)).Active(Info{}, estimates))
+	require.Equal(t, 2, Compile(WithMaxConnections(WithMaxConnections(RandomChoice(), 3), 2)).MaxConnections())
+	require.Equal(t, 2, Compile(WithMaxConnections(WithMaxConnections(RandomChoice(), 2), 0)).MaxConnections())
 }
 
-func TestSelectEndpointsReturnsNilWithoutCapacityOrCandidates(t *testing.T) {
-	endpoints := maxConnectionEndpoints(1, 2)
+func TestSelectActiveEstimatesEdgeCases(t *testing.T) {
+	endpoints := maxConnectionEndpoints(1, 2, 3, 4)
+	estimates := RandomChoice().Estimate(Info{}, endpoints)
+	estimates[3].Weight = 0
 
-	require.Nil(t, selectEndpoints(nil, endpoints, 0, nil))
-	require.Nil(t, selectEndpoints(nil, nil, 1, nil))
-}
+	require.Nil(t, selectActiveEstimates(Info{}, nil, 1))
+	require.Equal(t, estimates, selectActiveEstimates(Info{}, estimates, 0))
+	require.Equal(t, estimates, selectActiveEstimates(Info{}, estimates, len(estimates)))
 
-func TestSelectEndpointsSkipsNonCandidatesAndDuplicatePreviousConnections(t *testing.T) {
-	endpoints := maxConnectionEndpoints(1, 2, 3)
-	sticky := maxConnectionConn(endpoints[0], state.Online)
-	previous := []conn.Conn{
-		maxConnectionConn(endpoint.New("outside", endpoint.WithID(4)), state.Online),
-		sticky,
-		sticky,
-	}
+	selected := selectActiveEstimates(Info{
+		PreviousActive: []PreviousEndpoint{
+			{Key: endpoint.New("outside", endpoint.WithID(9)).Key()},
+			{Key: endpoints[0].Key()},
+			{Key: endpoints[0].Key()},
+			{Key: endpoints[2].Key(), Banned: true},
+		},
+	}, estimates, 3)
+	require.Equal(t, []endpoint.Key{endpoints[0].Key(), endpoints[1].Key(), endpoints[2].Key()},
+		[]endpoint.Key{selected[0].Key, selected[1].Key, selected[2].Key},
+	)
 
-	require.Equal(t, endpoints[:2], selectEndpoints(previous, endpoints, 2, nil))
+	shuffleEqualPenaltyRuns(Info{}, estimates, nil)
 }
 
 func TestMaxConnectionsPreservesChildLifecycle(t *testing.T) {
-	balancer := WithMaxConnections(
-		PreferNearestDC(SingleConn(), locationFilter("local"), true), 2,
+	estimator := WithMaxConnections(
+		PreferNearestDC(SingleConn(), "Location(local)", locationMatch("local"), true), 2,
 	)
-	plan := Compile(balancer)
+	plan := Compile(estimator)
 	runtime := &recordingRuntime{}
 
 	_, err := plan.Start(t.Context(), runtime)
@@ -125,46 +121,20 @@ func maxConnectionEndpoints(nodeIDs ...uint32) []endpoint.Endpoint {
 	return result
 }
 
-func maxConnectionConn(candidate endpoint.Endpoint, connectionState state.State) conn.Conn {
-	return &maxConnectionStub{endpoint: candidate, connectionState: connectionState}
-}
-
-func endpointKeys(endpoints []endpoint.Endpoint) map[endpoint.Key]struct{} {
-	result := make(map[endpoint.Key]struct{}, len(endpoints))
-	for _, candidate := range endpoints {
-		result[candidate.Key()] = struct{}{}
+func previousEstimationKeys(estimates ...Estimation) []PreviousEndpoint {
+	result := make([]PreviousEndpoint, len(estimates))
+	for i, estimation := range estimates {
+		result[i] = PreviousEndpoint{Key: estimation.Key}
 	}
 
 	return result
 }
 
-type maxConnectionStub struct {
-	endpoint        endpoint.Endpoint
-	connectionState state.State
-}
+func estimationKeys(estimates []Estimation) map[endpoint.Key]struct{} {
+	result := make(map[endpoint.Key]struct{}, len(estimates))
+	for _, estimation := range estimates {
+		result[estimation.Key] = struct{}{}
+	}
 
-func (c *maxConnectionStub) Endpoint() endpoint.Endpoint {
-	return c.endpoint
-}
-
-func (c *maxConnectionStub) State() state.State {
-	return c.connectionState
-}
-
-func (c *maxConnectionStub) Ban(context.Context) {
-	c.connectionState = state.Banned
-}
-
-func (c *maxConnectionStub) Unban(context.Context) {
-	c.connectionState = state.Online
-}
-
-func (*maxConnectionStub) Invoke(context.Context, string, any, any, ...grpc.CallOption) error {
-	return nil
-}
-
-func (*maxConnectionStub) NewStream(
-	context.Context, *grpc.StreamDesc, string, ...grpc.CallOption,
-) (grpc.ClientStream, error) {
-	panic("not implemented")
+	return result
 }

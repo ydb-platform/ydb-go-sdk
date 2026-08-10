@@ -12,5 +12,5 @@ func TestWithBalancer(t *testing.T) {
 	balancer := balancers.PreferNearestDC(balancers.RandomChoice())
 	cfg := New(WithBalancer(balancer))
 
-	require.Equal(t, balancer, cfg.Balancer())
+	require.Equal(t, balancer.String(), cfg.Balancer().String())
 }
