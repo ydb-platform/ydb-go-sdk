@@ -352,7 +352,7 @@ func (b *Balancer) traceBalancerUpdate(
 	onDone := gtrace.DriverOnBalancerUpdate(
 		b.driverConfig.Trace(), ctx,
 		stack.FunctionID(
-			"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
+			"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).traceBalancerUpdate"),
 		resolvedLocation.NeedLocalDC,
 		b.driverConfig.Database(),
 	)
