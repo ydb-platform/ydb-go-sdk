@@ -223,3 +223,23 @@ func TestClientCloseSkipsConnWithoutIOCloser(t *testing.T) {
 
 	require.NoError(t, client.Close(t.Context()))
 }
+
+func TestBridgePileState(t *testing.T) {
+	tests := []struct {
+		proto    Ydb_Bridge.PileState_State
+		expected endpoint.PileState
+	}{
+		{Ydb_Bridge.PileState_UNSPECIFIED, endpoint.PileStateUnknown},
+		{Ydb_Bridge.PileState_PRIMARY, endpoint.PileStatePrimary},
+		{Ydb_Bridge.PileState_PROMOTED, endpoint.PileStatePromoted},
+		{Ydb_Bridge.PileState_SYNCHRONIZED, endpoint.PileStateSynchronized},
+		{Ydb_Bridge.PileState_NOT_SYNCHRONIZED, endpoint.PileStateNotSynchronized},
+		{Ydb_Bridge.PileState_SUSPENDED, endpoint.PileStateSuspended},
+		{Ydb_Bridge.PileState_DISCONNECTED, endpoint.PileStateDisconnected},
+		{Ydb_Bridge.PileState_State(100), endpoint.PileStateUnknown},
+	}
+
+	for _, test := range tests {
+		require.Equal(t, test.expected, bridgePileState(test.proto))
+	}
+}

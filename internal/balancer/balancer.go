@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -76,8 +78,11 @@ type Balancer struct {
 
 	discover        func(context.Context, *grpc.ClientConn) (endpoints []endpoint.Endpoint, location string, err error)
 	localDCDetector func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
+	rnd             xrand.Rand
 
 	connectionsState atomic.Pointer[connectionsState]
+	lastDiscovered   []endpoint.Endpoint
+	selectionInfo    strategy.Info
 
 	closeMu sync.Mutex
 	closed  bool
@@ -293,13 +298,6 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	}
 
 	var (
-		onDone = gtrace.DriverOnBalancerUpdate(
-			b.driverConfig.Trace(), &ctx,
-			stack.FunctionID(
-				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
-			resolvedLocation.NeedLocalDC,
-			b.driverConfig.Database(),
-		)
 		state      = b.connectionsState.Load()
 		active     []conn.Conn
 		quarantine []conn.Conn
@@ -309,8 +307,57 @@ func (b *Balancer) applyDiscoveredEndpoints(
 		active = state.All()
 		quarantine = state.quarantine
 	}
+	defer b.traceBalancerUpdate(&ctx, active, endpoints, resolvedLocation)()
 
-	defer func() {
+	info, selected, groups := b.selectDiscoveredEndpoints(active, endpoints, resolvedLocation)
+
+	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selected)
+	b.lastDiscovered = slices.Clone(endpoints)
+	b.selectionInfo = info
+
+	b.connectionsState.Store(
+		newConnectionsStateWithBalancerGroups(connections,
+			b.policy(),
+			info,
+			groups,
+			quarantine,
+		),
+	)
+}
+
+func (b *Balancer) selectDiscoveredEndpoints(
+	active []conn.Conn,
+	endpoints []endpoint.Endpoint,
+	resolvedLocation strategy.ResolvedLocation,
+) (strategy.Info, []endpoint.Endpoint, [][]endpoint.Endpoint) {
+	if b.rnd == nil {
+		b.rnd = xrand.New(xrand.WithLock())
+	}
+	info := strategy.Info{SelfLocation: resolvedLocation.SelfLocation}
+	selected := b.policy().Select(strategy.SelectContext{
+		Info:     info,
+		Previous: active,
+		Rand:     b.rnd,
+	}, endpoints)
+
+	return info, selected, b.policy().Filter(info, selected)
+}
+
+func (b *Balancer) traceBalancerUpdate(
+	ctx *context.Context,
+	active []conn.Conn,
+	endpoints []endpoint.Endpoint,
+	resolvedLocation strategy.ResolvedLocation,
+) func() {
+	onDone := gtrace.DriverOnBalancerUpdate(
+		b.driverConfig.Trace(), ctx,
+		stack.FunctionID(
+			"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
+		resolvedLocation.NeedLocalDC,
+		b.driverConfig.Database(),
+	)
+
+	return func() {
 		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
 			return cc.Endpoint()
 		}), endpoints, endpoint.Compare)
@@ -321,17 +368,7 @@ func (b *Balancer) applyDiscoveredEndpoints(
 			xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
 			resolvedLocation.SelfLocation,
 		)
-	}()
-
-	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
-
-	b.connectionsState.Store(
-		newConnectionsStateWithBalancer(connections,
-			b.policy(),
-			strategy.Info{SelfLocation: resolvedLocation.SelfLocation},
-			quarantine,
-		),
-	)
+	}
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
@@ -380,14 +417,14 @@ func makeDiscoveryFunc(
 	return func(ctx context.Context, cc *grpc.ClientConn) (endpoints []endpoint.Endpoint, location string, err error) {
 		ctx, traceID, err := meta.TraceID(ctx)
 		if err != nil {
-			return endpoints, location, xerrors.WithStackTrace(
+			return nil, "", xerrors.WithStackTrace(
 				fmt.Errorf("failed to enrich context with meta, traceID %q: %w", traceID, err),
 			)
 		}
 
 		ctx, err = driverConfig.Meta().DiscoveryContext(ctx)
 		if err != nil {
-			return endpoints, location, xerrors.WithStackTrace(
+			return nil, "", xerrors.WithStackTrace(
 				fmt.Errorf("failed to enrich context with meta, traceID %q: %w", traceID, err),
 			)
 		}
@@ -396,7 +433,7 @@ func makeDiscoveryFunc(
 			Ydb_Discovery_V1.NewDiscoveryServiceClient(cc), discoveryConfig,
 		)
 		if err != nil {
-			return endpoints, location, xerrors.WithStackTrace(
+			return nil, "", xerrors.WithStackTrace(
 				fmt.Errorf("failed to discover database %q (address %q, traceID %q): %w",
 					driverConfig.Database(), driverConfig.Endpoint(), traceID, err,
 				),
@@ -442,6 +479,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 			discoveryConfig.WithMeta(driverConfig.Meta()),
 		)...),
 		localDCDetector: detectLocalDC,
+		rnd:             xrand.New(xrand.WithLock()),
 	}
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
@@ -472,8 +510,8 @@ func (b *Balancer) StartClusterDiscovery(ctx context.Context) (strategy.Controll
 	return nil, nil //nolint:nilnil // Disabled background discovery does not need a controller.
 }
 
-// UseBootstrapEndpoint initializes a static balancer from the configured endpoint.
-func (b *Balancer) UseBootstrapEndpoint(ctx context.Context) (strategy.Controller, error) {
+// UseConfiguredEndpoint initializes a static balancer from the configured endpoint.
+func (b *Balancer) UseConfiguredEndpoint(ctx context.Context) (strategy.Controller, error) {
 	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
 		endpoint.New(b.driverConfig.Endpoint()),
 	}, strategy.ResolvedLocation{})
@@ -596,6 +634,19 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		return nil, xerrors.WithStackTrace(errBalancerClosed)
 	}
 
+	if nodeID, ok := endpoint.ContextNodeID(ctx); ok {
+		if cc := state.preferConnection(ctx); cc != nil {
+			return cc, nil
+		}
+		if cc := b.ensurePinnedConn(ctx, nodeID); cc != nil {
+			return cc, nil
+		}
+		if !endpoint.ContextFallback(ctx) {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("%w: pinned node %d is not available", ErrNoEndpoints, nodeID),
+			)
+		}
+	}
 	if len(state.all) == 0 {
 		return nil, xerrors.WithStackTrace(ErrNoEndpoints)
 	}
@@ -617,4 +668,69 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 	}
 
 	return c, nil
+}
+
+// ensurePinnedConn adds a discovered endpoint omitted from the active set.
+// This is the soft-limit escape hatch required by session and topic affinity.
+func (b *Balancer) ensurePinnedConn(ctx context.Context, nodeID uint32) conn.Conn {
+	selected, rejected := b.tryEnsurePinnedConn(nodeID)
+	if rejected != nil {
+		b.pool.Put(ctx, rejected)
+	}
+
+	return selected
+}
+
+func (b *Balancer) tryEnsurePinnedConn(nodeID uint32) (selected, rejected conn.Conn) {
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+
+	if b.closed {
+		return nil, nil
+	}
+
+	current := b.connectionsState.Load()
+	if current != nil {
+		if cc := current.connByNodeID[nodeID]; cc != nil {
+			if !isOkConnection(cc, false) {
+				return nil, nil
+			}
+
+			return cc, nil
+		}
+	}
+
+	var target endpoint.Endpoint
+	for _, candidate := range b.lastDiscovered {
+		if candidate.NodeID() == nodeID {
+			target = candidate
+
+			break
+		}
+	}
+	if target == nil {
+		return nil, nil
+	}
+
+	cc := b.pool.Get(target)
+	if cc == nil {
+		return nil, nil
+	}
+	if !isOkConnection(cc, false) {
+		return nil, cc
+	}
+
+	active := []conn.Conn{cc}
+	var quarantine []conn.Conn
+	if current != nil {
+		active = append(active, current.All()...)
+		quarantine = current.quarantine
+	}
+	freshEndpoints := endpointsForConnections(active, b.lastDiscovered)
+	b.connectionsState.Store(newConnectionsStateWithBalancerGroups(
+		active, b.policy(), b.selectionInfo,
+		b.policy().Filter(b.selectionInfo, freshEndpoints), quarantine,
+	))
+
+	return cc, nil
 }

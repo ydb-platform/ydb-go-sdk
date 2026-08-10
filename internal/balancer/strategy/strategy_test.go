@@ -70,6 +70,9 @@ func TestSingleConn(t *testing.T) {
 	connection := strategyConn(1, "local", state.Created)
 
 	require.Equal(t, "SingleConn", balancer.String())
+	require.Equal(t, []endpoint.Endpoint{connection.Endpoint()},
+		balancer.Select(SelectContext{}, []endpoint.Endpoint{connection.Endpoint()}),
+	)
 	require.Equal(t, [][]endpoint.Endpoint{{connection.Endpoint()}},
 		balancer.Filter(Info{}, []endpoint.Endpoint{connection.Endpoint()}),
 	)
@@ -130,42 +133,22 @@ func TestPreferFilter(t *testing.T) {
 	require.Equal(t, "Prefer{Filter=Location(local),AllowFallback=false,Child=RandomChoice}", normalized.String())
 }
 
-func TestPreferNext(t *testing.T) {
+func TestPreferNextDelegatesSelectionToChild(t *testing.T) {
 	preferred := strategyConn(1, "local", state.Online)
 	fallback := strategyConn(2, "remote", state.Online)
 	bannedPreferred := strategyConn(3, "local", state.Banned)
-	nextCtx := NextContext{Rand: testRand{}}
-
-	withoutFallback := Prefer(RandomChoice(), locationFilter("local"), false)
-	selected, failed := withoutFallback.Next(
-		t.Context(), nextCtx, []conn.Conn{preferred, fallback}, false,
-	)
-	require.Same(t, preferred, selected)
-	require.Zero(t, failed)
-
-	selected, failed = withoutFallback.Next(
-		t.Context(), nextCtx, []conn.Conn{bannedPreferred, fallback}, false,
-	)
-	require.Nil(t, selected)
-	require.Equal(t, 1, failed)
-
-	selected, failed = withoutFallback.Next(
-		t.Context(), nextCtx, []conn.Conn{bannedPreferred, fallback}, true,
-	)
-	require.Same(t, bannedPreferred, selected)
-	require.Zero(t, failed)
 
 	withFallback := Prefer(RandomChoice(), locationFilter("local"), true)
-	selected, failed = withFallback.Next(
-		t.Context(), nextCtx, []conn.Conn{bannedPreferred, fallback}, false,
+	selected, failed := withFallback.Next(
+		t.Context(), testRandContext(1), []conn.Conn{bannedPreferred, fallback}, false,
 	)
 	require.Same(t, fallback, selected)
-	require.Equal(t, 1, failed)
+	require.Zero(t, failed)
 
 	selected, failed = withFallback.Next(
-		t.Context(), testRandContext(1), []conn.Conn{bannedPreferred, fallback}, true,
+		t.Context(), testRandContext(0), []conn.Conn{preferred, fallback}, false,
 	)
-	require.Same(t, fallback, selected)
+	require.Same(t, preferred, selected)
 	require.Zero(t, failed)
 }
 
@@ -174,11 +157,20 @@ func TestPartitionWithoutFilter(t *testing.T) {
 	preferredEndpoints, fallbackEndpoints := partitionEndpoints(endpoints, nil, Info{})
 	require.Equal(t, endpoints, preferredEndpoints)
 	require.Nil(t, fallbackEndpoints)
+}
 
-	connections := []conn.Conn{strategyConn(1, "local", state.Online)}
-	preferredConnections, fallbackConnections := partitionConnections(connections, nil, Info{})
-	require.Equal(t, connections, preferredConnections)
-	require.Nil(t, fallbackConnections)
+func TestFilterCanUseDiscoveryAndEndpointMetadata(t *testing.T) {
+	endpoints := []endpoint.Endpoint{
+		endpoint.New("primary", endpoint.WithMetadata(endpoint.Metadata{
+			BridgePileState: endpoint.PileStatePrimary,
+		})),
+		endpoint.New("secondary", endpoint.WithMetadata(endpoint.Metadata{
+			BridgePileState: endpoint.PileStateSynchronized,
+		})),
+	}
+	balancer := Prefer(RandomChoice(), primaryPileFilter{}, false)
+
+	require.Equal(t, [][]endpoint.Endpoint{{endpoints[0]}}, balancer.Filter(Info{}, endpoints))
 }
 
 func strategyConn(nodeID uint32, location string, connectionState state.State) conn.Conn {
@@ -203,6 +195,16 @@ type locationFilter string
 
 func (f locationFilter) Allow(_ Info, candidate endpoint.Info) bool {
 	return candidate.Location() == string(f)
+}
+
+type primaryPileFilter struct{}
+
+func (primaryPileFilter) Allow(_ Info, candidate endpoint.Info) bool {
+	return candidate.Metadata().BridgePileState == endpoint.PileStatePrimary
+}
+
+func (primaryPileFilter) String() string {
+	return "PrimaryPile"
 }
 
 func (f locationFilter) String() string {

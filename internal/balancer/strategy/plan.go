@@ -15,7 +15,7 @@ type Controller interface {
 // Runtime provides operations needed to start an endpoint source.
 type Runtime interface {
 	StartClusterDiscovery(ctx context.Context) (Controller, error)
-	UseBootstrapEndpoint(ctx context.Context) (Controller, error)
+	UseConfiguredEndpoint(ctx context.Context) (Controller, error)
 }
 
 // ResolvedLocation carries location selection data and trace metadata.
@@ -85,10 +85,10 @@ func (clusterEndpointSource) Start(ctx context.Context, runtime Runtime) (Contro
 	return runtime.StartClusterDiscovery(ctx)
 }
 
-type bootstrapEndpointSource struct{}
+type configuredEndpointSource struct{}
 
-func (bootstrapEndpointSource) Start(ctx context.Context, runtime Runtime) (Controller, error) {
-	return runtime.UseBootstrapEndpoint(ctx)
+func (configuredEndpointSource) Start(ctx context.Context, runtime Runtime) (Controller, error) {
+	return runtime.UseConfiguredEndpoint(ctx)
 }
 
 type locationResolver interface {
@@ -141,7 +141,7 @@ func (b randomChoice) compile() Plan {
 func (b singleConn) compile() Plan {
 	return Plan{
 		balancer: b,
-		source:   bootstrapEndpointSource{},
+		source:   configuredEndpointSource{},
 		resolver: discoveredLocationResolver{},
 	}
 }

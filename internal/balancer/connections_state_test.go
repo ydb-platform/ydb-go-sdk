@@ -504,6 +504,7 @@ func TestNewState(t *testing.T) {
 			test.state.rand = nil
 			test.state.balancer = nil
 			test.state.info = balancerConfig.Info{}
+			test.state.groups = nil
 			require.Equal(t, test.res, test.state)
 		})
 	}
@@ -634,12 +635,10 @@ func TestDiscoveryReuseIpAndHostName(t *testing.T) {
 		driverConfig: cfg,
 		balancer:     cfg.Balancer(),
 		pool:         conn.NewPool(context.Background(), cfg),
-		discover: func(ctx context.Context, _ *grpc.ClientConn) (endpoints []endpoint.Endpoint, location string, err error) {
+		discover: func(ctx context.Context, _ *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
 			ee := e
 
-			return []endpoint.Endpoint{
-				&ee,
-			}, "", nil
+			return []endpoint.Endpoint{&ee}, "", nil
 		},
 	}
 

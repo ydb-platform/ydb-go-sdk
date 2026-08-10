@@ -12,6 +12,10 @@ import (
 // Balancer is an immutable, composable endpoint-selection strategy.
 // Connection ownership and discovery lifecycle remain outside the strategy.
 type Balancer interface {
+	// Select returns endpoints that should have active connection wrappers.
+	// It runs after discovery and before the connection pool is accessed.
+	Select(ctx SelectContext, endpoints []endpoint.Endpoint) []endpoint.Endpoint
+
 	// Filter returns endpoint groups in selection order.
 	Filter(info Info, endpoints []endpoint.Endpoint) [][]endpoint.Endpoint
 
@@ -26,6 +30,12 @@ type Balancer interface {
 
 type Info struct {
 	SelfLocation string
+}
+
+type SelectContext struct {
+	Info     Info
+	Previous []conn.Conn
+	Rand     xrand.Rand
 }
 
 type NextContext struct {
@@ -67,6 +77,10 @@ func normalize(balancer Balancer) Balancer {
 }
 
 type randomChoice struct{}
+
+func (randomChoice) Select(_ SelectContext, endpoints []endpoint.Endpoint) []endpoint.Endpoint {
+	return endpoints
+}
 
 func (randomChoice) Filter(_ Info, endpoints []endpoint.Endpoint) [][]endpoint.Endpoint {
 	return [][]endpoint.Endpoint{endpoints}
@@ -111,6 +125,10 @@ func (randomChoice) String() string {
 }
 
 type singleConn struct{}
+
+func (singleConn) Select(_ SelectContext, endpoints []endpoint.Endpoint) []endpoint.Endpoint {
+	return endpoints
+}
 
 func (singleConn) Filter(_ Info, endpoints []endpoint.Endpoint) [][]endpoint.Endpoint {
 	return [][]endpoint.Endpoint{endpoints}

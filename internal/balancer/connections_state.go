@@ -18,6 +18,7 @@ type connectionsState struct {
 
 	prefer   []conn.Conn
 	fallback []conn.Conn
+	groups   [][]conn.Conn
 	all      []conn.Conn
 
 	quarantine []conn.Conn
@@ -38,6 +39,23 @@ func newConnectionsStateWithBalancer(
 	if balancer == nil {
 		balancer = strategy.RandomChoice()
 	}
+	groups := balancer.Filter(info, xslices.Transform(conns, func(connection conn.Conn) endpoint.Endpoint {
+		return connection.Endpoint()
+	}))
+
+	return newConnectionsStateWithBalancerGroups(conns, balancer, info, groups, quarantine)
+}
+
+func newConnectionsStateWithBalancerGroups(
+	conns []conn.Conn,
+	balancer strategy.Balancer,
+	info strategy.Info,
+	endpointGroups [][]endpoint.Endpoint,
+	quarantine []conn.Conn,
+) *connectionsState {
+	if balancer == nil {
+		balancer = strategy.RandomChoice()
+	}
 
 	res := &connectionsState{
 		connByNodeID: connsToNodeIDMap(conns),
@@ -48,16 +66,22 @@ func newConnectionsStateWithBalancer(
 	}
 
 	res.all = conns
-	groups := balancer.Filter(info, xslices.Transform(conns, func(connection conn.Conn) endpoint.Endpoint {
-		return connection.Endpoint()
-	}))
-	if len(groups) > 0 {
-		res.prefer = connectionsForEndpoints(conns, groups[0])
+	res.groups = make([][]conn.Conn, 0, len(endpointGroups))
+	for _, group := range endpointGroups {
+		connections := connectionsForEndpoints(conns, group)
+		if len(connections) > 0 {
+			res.groups = append(res.groups, connections)
+		}
 	}
-	for _, group := range groups[1:] {
-		res.fallback = append(res.fallback, connectionsForEndpoints(conns, group)...)
+	if len(res.groups) > 0 {
+		res.prefer = res.groups[0]
 	}
-	res.allowFallback = len(groups) > 1
+	if len(res.groups) > 1 {
+		for _, group := range res.groups[1:] {
+			res.fallback = append(res.fallback, group...)
+		}
+	}
+	res.allowFallback = len(res.groups) > 1
 
 	return res
 }
@@ -87,12 +111,19 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 	}
 
 	nextCtx := strategy.NextContext{Info: s.info, Rand: s.rand}
-	c, failedCount := s.balancer.Next(ctx, nextCtx, s.all, false)
-	if c != nil {
-		return c, failedCount
+	for _, group := range s.groups {
+		c, failed := s.balancer.Next(ctx, nextCtx, group, false)
+		failedCount += failed
+		if c != nil {
+			return c, failedCount
+		}
 	}
 
-	c, _ = s.balancer.Next(ctx, nextCtx, s.all, true)
+	candidates := make([]conn.Conn, 0, len(s.prefer)+len(s.fallback))
+	for _, group := range s.groups {
+		candidates = append(candidates, group...)
+	}
+	c, _ := s.balancer.Next(ctx, nextCtx, candidates, true)
 
 	return c, failedCount
 }
@@ -166,6 +197,26 @@ func connectionsForEndpoints(conns []conn.Conn, endpoints []endpoint.Endpoint) [
 	for _, candidate := range endpoints {
 		if connection := byKey[candidate.Key()]; connection != nil {
 			result = append(result, connection)
+		}
+	}
+
+	return result
+}
+
+func endpointsForConnections(conns []conn.Conn, endpoints []endpoint.Endpoint) []endpoint.Endpoint {
+	if len(conns) == 0 || len(endpoints) == 0 {
+		return nil
+	}
+
+	byKey := make(map[endpoint.Key]endpoint.Endpoint, len(endpoints))
+	for _, candidate := range endpoints {
+		byKey[candidate.Key()] = candidate
+	}
+
+	result := make([]endpoint.Endpoint, 0, len(conns))
+	for _, connection := range conns {
+		if candidate := byKey[connection.Endpoint().Key()]; candidate != nil {
+			result = append(result, candidate)
 		}
 	}
 

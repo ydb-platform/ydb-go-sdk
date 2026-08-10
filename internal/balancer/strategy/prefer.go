@@ -18,6 +18,10 @@ type nearestDC struct {
 	Balancer
 }
 
+func (p prefer) Select(ctx SelectContext, endpoints []endpoint.Endpoint) []endpoint.Endpoint {
+	return p.child.Select(ctx, endpoints)
+}
+
 func (p prefer) Filter(info Info, endpoints []endpoint.Endpoint) [][]endpoint.Endpoint {
 	preferred, fallback := partitionEndpoints(endpoints, p.filter, info)
 	groups := p.child.Filter(info, preferred)
@@ -34,23 +38,7 @@ func (p prefer) Next(
 	connections []conn.Conn,
 	allowBanned bool,
 ) (conn.Conn, int) {
-	preferred, fallback := partitionConnections(connections, p.filter, nextCtx.Info)
-	if allowBanned {
-		if p.allowFallback {
-			return p.child.Next(ctx, nextCtx, connections, true)
-		}
-
-		return p.child.Next(ctx, nextCtx, preferred, true)
-	}
-
-	connection, failed := p.child.Next(ctx, nextCtx, preferred, false)
-	if connection != nil || !p.allowFallback {
-		return connection, failed
-	}
-
-	connection, fallbackFailed := p.child.Next(ctx, nextCtx, fallback, false)
-
-	return connection, failed + fallbackFailed
+	return p.child.Next(ctx, nextCtx, connections, allowBanned)
 }
 
 func (p prefer) String() string {
@@ -72,28 +60,6 @@ func partitionEndpoints(
 	fallback = make([]endpoint.Endpoint, 0, len(endpoints))
 	for _, candidate := range endpoints {
 		if filter.Allow(info, candidate) {
-			preferred = append(preferred, candidate)
-		} else {
-			fallback = append(fallback, candidate)
-		}
-	}
-
-	return preferred, fallback
-}
-
-func partitionConnections(
-	connections []conn.Conn,
-	filter Filter,
-	info Info,
-) (preferred, fallback []conn.Conn) {
-	if filter == nil {
-		return connections, nil
-	}
-
-	preferred = make([]conn.Conn, 0, len(connections))
-	fallback = make([]conn.Conn, 0, len(connections))
-	for _, candidate := range connections {
-		if filter.Allow(info, candidate.Endpoint()) {
 			preferred = append(preferred, candidate)
 		} else {
 			fallback = append(fallback, candidate)

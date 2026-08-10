@@ -36,7 +36,7 @@ func TestUserBalancerConfigurations(t *testing.T) {
 			name:   "single connection",
 			option: config.WithBalancer(userBalancers.SingleConn()),
 			connections: []conn.Conn{
-				userBalancerConn(1, "bootstrap", state.Online),
+				userBalancerConn(1, "configured", state.Online),
 			},
 			allowed: nodeIDSet(1),
 		},
@@ -123,16 +123,16 @@ func TestUserBalancerConfigurations(t *testing.T) {
 
 func TestUserBalancerConfigDeserializationCompatibility(t *testing.T) {
 	tests := []struct {
-		name            string
-		serialized      string
-		preferred       []uint32
-		fallback        []uint32
-		nearestDC       bool
-		bootstrapSource bool
+		name             string
+		serialized       string
+		preferred        []uint32
+		fallback         []uint32
+		nearestDC        bool
+		configuredSource bool
 	}{
-		{name: "disable", serialized: `disable`, preferred: []uint32{1, 2, 3}, bootstrapSource: true},
-		{name: "single", serialized: `single`, preferred: []uint32{1, 2, 3}, bootstrapSource: true},
-		{name: "single JSON", serialized: `{"type":"single"}`, preferred: []uint32{1, 2, 3}, bootstrapSource: true},
+		{name: "disable", serialized: `disable`, preferred: []uint32{1, 2, 3}, configuredSource: true},
+		{name: "single", serialized: `single`, preferred: []uint32{1, 2, 3}, configuredSource: true},
+		{name: "single JSON", serialized: `{"type":"single"}`, preferred: []uint32{1, 2, 3}, configuredSource: true},
 		{name: "round robin", serialized: `round_robin`, preferred: []uint32{1, 2, 3}},
 		{name: "round robin JSON", serialized: `{"type":"round_robin"}`, preferred: []uint32{1, 2, 3}},
 		{name: "random choice", serialized: `random_choice`, preferred: []uint32{1, 2, 3}},
@@ -203,8 +203,8 @@ func TestUserBalancerConfigDeserializationCompatibility(t *testing.T) {
 			runtime := &userAPIPlanRuntime{}
 			_, err := plan.Start(t.Context(), runtime)
 			require.NoError(t, err)
-			if test.bootstrapSource {
-				require.Equal(t, "bootstrap", runtime.source)
+			if test.configuredSource {
+				require.Equal(t, "configured", runtime.source)
 			} else {
 				require.Equal(t, "cluster", runtime.source)
 			}
@@ -321,8 +321,8 @@ func (r *userAPIPlanRuntime) StartClusterDiscovery(context.Context) (strategy.Co
 	return userAPIPlanController{}, nil
 }
 
-func (r *userAPIPlanRuntime) UseBootstrapEndpoint(context.Context) (strategy.Controller, error) {
-	r.source = "bootstrap"
+func (r *userAPIPlanRuntime) UseConfiguredEndpoint(context.Context) (strategy.Controller, error) {
+	r.source = "configured"
 
 	return userAPIPlanController{}, nil
 }

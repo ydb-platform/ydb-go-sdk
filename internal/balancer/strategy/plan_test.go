@@ -25,9 +25,9 @@ func TestCompilePlanBehavior(t *testing.T) {
 			expectedLocation: "discovered",
 		},
 		{
-			name:             "single connection uses bootstrap endpoint",
+			name:             "single connection uses configured endpoint",
 			balancer:         SingleConn(),
-			expectedSource:   "bootstrap",
+			expectedSource:   "configured",
 			expectedLocation: "discovered",
 		},
 		{
@@ -40,11 +40,11 @@ func TestCompilePlanBehavior(t *testing.T) {
 			expectedDetection: true,
 		},
 		{
-			name: "nearest DC preserves nested bootstrap source",
+			name: "nearest DC preserves nested configured source",
 			balancer: PreferNearestDC(
 				SingleConn(), locationFilter("local"), true,
 			),
-			expectedSource:    "bootstrap",
+			expectedSource:    "configured",
 			expectedLocation:  "detected",
 			expectedDetection: true,
 		},
@@ -129,8 +129,8 @@ func (r *recordingRuntime) StartClusterDiscovery(context.Context) (Controller, e
 	return recordingController{}, nil
 }
 
-func (r *recordingRuntime) UseBootstrapEndpoint(context.Context) (Controller, error) {
-	r.source = "bootstrap"
+func (r *recordingRuntime) UseConfiguredEndpoint(context.Context) (Controller, error) {
+	r.source = "configured"
 
 	return recordingController{}, nil
 }
