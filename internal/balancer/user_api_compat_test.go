@@ -105,13 +105,16 @@ func TestUserBalancerConfigurations(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			b := userConfiguredBalancer(test.option, test.connections, test.selfLocation)
+			selectedNodeIDs := make(map[uint32]struct{}, len(test.allowed))
 
-			for range 20 {
+			for index := range len(test.allowed) {
+				b.connectionsState.Load().rand = userAPITestRand{index: index}
 				selected, err := b.nextConn(t.Context())
 				require.NoError(t, err)
-				_, ok := test.allowed[selected.Endpoint().NodeID()]
-				require.Truef(t, ok, "node %d is not allowed", selected.Endpoint().NodeID())
+				selectedNodeIDs[selected.Endpoint().NodeID()] = struct{}{}
 			}
+
+			require.Equal(t, test.allowed, selectedNodeIDs)
 		})
 	}
 }
@@ -132,32 +135,6 @@ func TestUserBalancerWithNodeIDBypassesSelectionPolicies(t *testing.T) {
 	selected, err := b.nextConn(userBalancers.WithNodeID(t.Context(), 2))
 	require.NoError(t, err)
 	require.Same(t, connections[1], selected)
-}
-
-func TestUserBalancerHandlesBanAndUnban(t *testing.T) {
-	preferred := userBalancerConn(1, "preferred", state.Online)
-	fallback := userBalancerConn(2, "fallback", state.Online)
-	b := userConfiguredBalancer(
-		config.WithBalancer(userBalancers.PreferLocationsWithFallback(
-			userBalancers.RandomChoice(), "preferred",
-		)),
-		[]conn.Conn{preferred, fallback},
-		"",
-	)
-
-	selected, err := b.nextConn(t.Context())
-	require.NoError(t, err)
-	require.Same(t, preferred, selected)
-
-	preferred.Ban(t.Context())
-	selected, err = b.nextConn(t.Context())
-	require.NoError(t, err)
-	require.Same(t, fallback, selected)
-
-	preferred.Unban(t.Context())
-	selected, err = b.nextConn(t.Context())
-	require.NoError(t, err)
-	require.Same(t, preferred, selected)
 }
 
 func userConfiguredBalancer(option config.Option, connections []conn.Conn, selfLocation string) *Balancer {
@@ -193,3 +170,17 @@ func nodeIDSet(nodeIDs ...uint32) map[uint32]struct{} {
 
 	return result
 }
+
+type userAPITestRand struct {
+	index int
+}
+
+func (userAPITestRand) Int64(int64) int64 {
+	return 0
+}
+
+func (r userAPITestRand) Int(max int) int {
+	return r.index % max
+}
+
+func (userAPITestRand) Shuffle(int, func(int, int)) {}

@@ -70,6 +70,46 @@ func TestConnectionsStateDefaultsToRandomChoice(t *testing.T) {
 	require.Zero(t, failed)
 }
 
+func TestConnectionsStateHandlesBanAndUnban(t *testing.T) {
+	preferred := &mock.Conn{
+		AddrField:     "preferred",
+		LocationField: "preferred",
+		NodeIDField:   1,
+		StateField:    state.Online,
+	}
+	fallback := &mock.Conn{
+		AddrField:     "fallback",
+		LocationField: "fallback",
+		NodeIDField:   2,
+		StateField:    state.Online,
+	}
+	balancer := strategy.Prefer(
+		strategy.RandomChoice(),
+		filterFunc(func(_ balancerConfig.Info, candidate endpoint.Info) bool {
+			return candidate.Location() == "preferred"
+		}),
+		true,
+		false,
+	)
+	connections := newConnectionsStateWithBalancer(
+		[]conn.Conn{preferred, fallback}, balancer, strategy.Info{}, nil,
+	)
+
+	selected, failed := connections.GetConnection(t.Context())
+	require.Same(t, preferred, selected)
+	require.Zero(t, failed)
+
+	preferred.Ban(t.Context())
+	selected, failed = connections.GetConnection(t.Context())
+	require.Same(t, fallback, selected)
+	require.Equal(t, 1, failed)
+
+	preferred.Unban(t.Context())
+	selected, failed = connections.GetConnection(t.Context())
+	require.Same(t, preferred, selected)
+	require.Zero(t, failed)
+}
+
 func TestConnection_LastResortUsesPreferWhenFallbackDisabled(t *testing.T) {
 	filter := filterFunc(func(info balancerConfig.Info, e endpoint.Info) bool {
 		return info.SelfLocation == e.Location()
