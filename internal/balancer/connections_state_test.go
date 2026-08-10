@@ -70,6 +70,26 @@ func TestConnectionsStateDefaultsToRandomChoice(t *testing.T) {
 	require.Zero(t, failed)
 }
 
+func TestConnectionsStateWithGroupsDefaultsToRandomChoice(t *testing.T) {
+	connection := &mock.Conn{AddrField: "1", StateField: state.Online}
+	s := newConnectionsStateWithBalancerGroups(
+		[]conn.Conn{connection}, nil, strategy.Info{},
+		[][]endpoint.Endpoint{{connection.Endpoint()}}, nil,
+	)
+
+	selected, failed := s.GetConnection(t.Context())
+	require.Same(t, connection, selected)
+	require.Zero(t, failed)
+}
+
+func TestEndpointsForConnectionsEmptyInput(t *testing.T) {
+	connection := &mock.Conn{AddrField: "1"}
+	candidate := endpoint.New("1")
+
+	require.Nil(t, endpointsForConnections(nil, []endpoint.Endpoint{candidate}))
+	require.Nil(t, endpointsForConnections([]conn.Conn{connection}, nil))
+}
+
 func TestConnectionsStateHandlesBanAndUnban(t *testing.T) {
 	preferred := &mock.Conn{
 		AddrField:     "preferred",

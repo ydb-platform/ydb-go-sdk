@@ -75,6 +75,25 @@ func TestMaxConnectionsNonPositiveLimitIsUnlimited(t *testing.T) {
 	require.Equal(t, endpoints, WithMaxConnections(RandomChoice(), -1).Select(ctx, groups))
 }
 
+func TestSelectEndpointsReturnsNilWithoutCapacityOrCandidates(t *testing.T) {
+	endpoints := maxConnectionEndpoints(1, 2)
+
+	require.Nil(t, selectEndpoints(nil, endpoints, 0, nil))
+	require.Nil(t, selectEndpoints(nil, nil, 1, nil))
+}
+
+func TestSelectEndpointsSkipsNonCandidatesAndDuplicatePreviousConnections(t *testing.T) {
+	endpoints := maxConnectionEndpoints(1, 2, 3)
+	sticky := maxConnectionConn(endpoints[0], state.Online)
+	previous := []conn.Conn{
+		maxConnectionConn(endpoint.New("outside", endpoint.WithID(4)), state.Online),
+		sticky,
+		sticky,
+	}
+
+	require.Equal(t, endpoints[:2], selectEndpoints(previous, endpoints, 2, nil))
+}
+
 func TestMaxConnectionsPreservesChildLifecycle(t *testing.T) {
 	balancer := WithMaxConnections(
 		PreferNearestDC(SingleConn(), locationFilter("local"), true), 2,

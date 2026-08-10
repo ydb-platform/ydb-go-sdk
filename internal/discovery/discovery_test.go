@@ -146,6 +146,28 @@ func TestDiscover(t *testing.T) {
 		require.Equal(t, "", location)
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 	})
+	t.Run("InvalidResult", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		client := NewMockDiscoveryServiceClient(ctrl)
+		client.EXPECT().ListEndpoints(gomock.Any(), &Ydb_Discovery.ListEndpointsRequest{
+			Database: "test",
+		}).Return(&Ydb_Discovery.ListEndpointsResponse{
+			Operation: &Ydb_Operations.Operation{
+				Ready:  true,
+				Status: Ydb.StatusIds_SUCCESS,
+				Result: xtest.Must(anypb.New(&Ydb_Operations.GetOperationRequest{})),
+			},
+		}, nil)
+
+		endpoints, location, err := Discover(ctx, client, config.New(
+			config.WithDatabase("test"),
+		))
+
+		require.Error(t, err)
+		require.Empty(t, endpoints)
+		require.Empty(t, location)
+	})
 	t.Run("WithAddressMutator", func(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)

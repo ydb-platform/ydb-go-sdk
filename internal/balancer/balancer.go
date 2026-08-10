@@ -419,14 +419,14 @@ func makeDiscoveryFunc(
 	return func(ctx context.Context, cc *grpc.ClientConn) (endpoints []endpoint.Endpoint, location string, err error) {
 		ctx, traceID, err := meta.TraceID(ctx)
 		if err != nil {
-			return nil, "", xerrors.WithStackTrace(
+			return endpoints, location, xerrors.WithStackTrace(
 				fmt.Errorf("failed to enrich context with meta, traceID %q: %w", traceID, err),
 			)
 		}
 
 		ctx, err = driverConfig.Meta().DiscoveryContext(ctx)
 		if err != nil {
-			return nil, "", xerrors.WithStackTrace(
+			return endpoints, location, xerrors.WithStackTrace(
 				fmt.Errorf("failed to enrich context with meta, traceID %q: %w", traceID, err),
 			)
 		}
@@ -435,7 +435,7 @@ func makeDiscoveryFunc(
 			Ydb_Discovery_V1.NewDiscoveryServiceClient(cc), discoveryConfig,
 		)
 		if err != nil {
-			return nil, "", xerrors.WithStackTrace(
+			return endpoints, location, xerrors.WithStackTrace(
 				fmt.Errorf("failed to discover database %q (address %q, traceID %q): %w",
 					driverConfig.Database(), driverConfig.Endpoint(), traceID, err,
 				),
