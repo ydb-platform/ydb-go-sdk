@@ -118,8 +118,9 @@ func (syntax Syntax) applyExecuteOption(s *executeSettings) {
 }
 
 const (
-	SyntaxYQL        = Syntax(Ydb_Query.Syntax_SYNTAX_YQL_V1)
-	SyntaxPostgreSQL = Syntax(Ydb_Query.Syntax_SYNTAX_PG)
+	SyntaxYQL = Syntax(Ydb_Query.Syntax_SYNTAX_YQL_V1)
+	// Keep the legacy enum mapping for public API compatibility.
+	SyntaxPostgreSQL = Syntax(Ydb_Query.Syntax_SYNTAX_PG) //nolint:staticcheck
 )
 
 func (opt parametersOption) applyExecuteOption(s *executeSettings) {

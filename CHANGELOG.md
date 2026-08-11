@@ -1,3 +1,5 @@
+* Updated ydb-go-genproto and added bridge pile state to discovered endpoint metadata
+
 ## v3.147.1
 * Fixed table session not being deleted on the server when `Session.Close` is called with an already canceled or expired context (pool shutdown, expired caller deadline); `DeleteSession` is now sent on a detached context, as the query service session already does
 

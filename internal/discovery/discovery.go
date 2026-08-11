@@ -8,6 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Bridge"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 	"google.golang.org/grpc"
 
@@ -70,28 +71,73 @@ func Discover(
 	}
 
 	location = result.GetSelfLocation()
-	endpoints = make([]endpoint.Endpoint, 0, len(result.GetEndpoints()))
-	for _, e := range result.GetEndpoints() {
-		if e.GetSsl() == config.Secure() {
-			endpoints = append(endpoints, endpoint.New(
-				net.JoinHostPort(
-					config.MutateAddress(e.GetAddress()),
-					strconv.Itoa(int(e.GetPort())),
-				),
-				endpoint.WithLocation(e.GetLocation()),
-				endpoint.WithID(e.GetNodeId()),
-				endpoint.WithLoadFactor(e.GetLoadFactor()),
-				endpoint.WithLocalDC(e.GetLocation() == location),
-				endpoint.WithServices(e.GetService()),
-				endpoint.WithLastUpdated(config.Clock().Now()),
-				endpoint.WithIPV4(e.GetIpV4()),
-				endpoint.WithIPV6(e.GetIpV6()),
-				endpoint.WithSslTargetNameOverride(e.GetSslTargetNameOverride()),
+	endpoints = endpointsFromDiscovery(&result, config)
+
+	return endpoints, location, nil
+}
+
+func endpointsFromDiscovery(result *Ydb_Discovery.ListEndpointsResult, config *config.Config) []endpoint.Endpoint {
+	pileStates := make(map[string]endpoint.PileState, len(result.GetPileStates()))
+	for _, pile := range result.GetPileStates() {
+		pileStates[pile.GetPileName()] = bridgePileState(pile.GetState())
+	}
+
+	endpoints := make([]endpoint.Endpoint, 0, len(result.GetEndpoints()))
+	for _, candidate := range result.GetEndpoints() {
+		if candidate.GetSsl() == config.Secure() {
+			endpoints = append(endpoints, endpointFromDiscovery(
+				candidate, result.GetSelfLocation(), pileStates, config,
 			))
 		}
 	}
 
-	return endpoints, result.GetSelfLocation(), nil
+	return endpoints
+}
+
+func endpointFromDiscovery(
+	candidate *Ydb_Discovery.EndpointInfo,
+	selfLocation string,
+	pileStates map[string]endpoint.PileState,
+	config *config.Config,
+) endpoint.Endpoint {
+	metadata := endpoint.Metadata{LocalDC: candidate.GetLocation() == selfLocation}
+	if pileName := candidate.GetBridgePileName(); pileName != "" {
+		metadata.BridgePileState = pileStates[pileName]
+	}
+
+	return endpoint.New(
+		net.JoinHostPort(config.MutateAddress(candidate.GetAddress()), strconv.Itoa(int(candidate.GetPort()))),
+		endpoint.WithLocation(candidate.GetLocation()),
+		endpoint.WithID(candidate.GetNodeId()),
+		endpoint.WithLoadFactor(candidate.GetLoadFactor()),
+		endpoint.WithMetadata(metadata),
+		endpoint.WithServices(candidate.GetService()),
+		endpoint.WithLastUpdated(config.Clock().Now()),
+		endpoint.WithIPV4(candidate.GetIpV4()),
+		endpoint.WithIPV6(candidate.GetIpV6()),
+		endpoint.WithSslTargetNameOverride(candidate.GetSslTargetNameOverride()),
+	)
+}
+
+func bridgePileState(state Ydb_Bridge.PileState_State) endpoint.PileState {
+	switch state {
+	case Ydb_Bridge.PileState_PRIMARY:
+		return endpoint.PileStatePrimary
+	case Ydb_Bridge.PileState_PROMOTED:
+		return endpoint.PileStatePromoted
+	case Ydb_Bridge.PileState_SYNCHRONIZED:
+		return endpoint.PileStateSynchronized
+	case Ydb_Bridge.PileState_NOT_SYNCHRONIZED:
+		return endpoint.PileStateNotSynchronized
+	case Ydb_Bridge.PileState_SUSPENDED:
+		return endpoint.PileStateSuspended
+	case Ydb_Bridge.PileState_DISCONNECTED:
+		return endpoint.PileStateDisconnected
+	case Ydb_Bridge.PileState_UNSPECIFIED:
+		return endpoint.PileStateUnknown
+	default:
+		return endpoint.PileStateUnknown
+	}
 }
 
 // Discover cluster endpoints
