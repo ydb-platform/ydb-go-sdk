@@ -1530,6 +1530,52 @@ func TestNextEstimatedConnContinuesWithLatestSnapshot(t *testing.T) {
 	require.Same(t, next, balancer.connections())
 }
 
+func TestNextEstimatedConnExtendsAttemptsForLargerSnapshot(t *testing.T) {
+	firstUnavailable := &stateSequenceConn{
+		Conn: &mock.Conn{AddrField: "first-unavailable:2135", NodeIDField: 2, StateField: state.Online},
+		states: []state.State{
+			state.Online,
+			state.Online,
+			state.Destroyed,
+		},
+	}
+	secondUnavailable := &stateSequenceConn{
+		Conn: &mock.Conn{AddrField: "second-unavailable:2135", NodeIDField: 3, StateField: state.Online},
+		states: []state.State{
+			state.Online,
+			state.Online,
+			state.Online,
+			state.Destroyed,
+		},
+	}
+	available := &mock.Conn{
+		AddrField:   "available:2135",
+		NodeIDField: 4,
+		StateField:  state.Online,
+	}
+	next := newConnectionsStateWithBalancerAndRand(
+		[]conn.Conn{firstUnavailable, secondUnavailable, available},
+		strategy.RandomChoice(), strategy.Info{}, nil, userAPITestRand{},
+	)
+	balancer := &Balancer{}
+	stale := &snapshotSwappingConn{
+		Conn:      &mock.Conn{AddrField: "stale:2135", NodeIDField: 1, StateField: state.Online},
+		balancer:  balancer,
+		nextState: next,
+	}
+	previous := newConnectionsStateWithBalancer(
+		[]conn.Conn{stale}, strategy.RandomChoice(), strategy.Info{}, nil,
+	)
+	balancer.connectionsState.Store(previous)
+	stale.armed = true
+
+	selected, failedCount := balancer.nextEstimatedConn(t.Context(), previous)
+
+	require.Same(t, available, selected)
+	require.Equal(t, 3, failedCount)
+	require.Same(t, next, balancer.connections())
+}
+
 func TestNextEstimatedConnStopsWhenBalancerClosesDuringSelection(t *testing.T) {
 	balancer := &Balancer{}
 	staleBase := &mock.Conn{
@@ -1611,6 +1657,24 @@ func (c *snapshotSwappingConn) State() state.State {
 		c.balancer.connectionsState.Store(c.nextState)
 
 		return state.Destroyed
+	}
+
+	return c.Conn.State()
+}
+
+type stateSequenceConn struct {
+	conn.Conn
+
+	states []state.State
+	index  int
+}
+
+func (c *stateSequenceConn) State() state.State {
+	if c.index < len(c.states) {
+		connectionState := c.states[c.index]
+		c.index++
+
+		return connectionState
 	}
 
 	return c.Conn.State()

@@ -618,8 +618,10 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 }
 
 func (b *Balancer) nextEstimatedConn(ctx context.Context, state *connectionsState) (conn.Conn, int) {
-	failedCount := 0
-	for range state.elector.CandidateCount() + 1 {
+	var failedCount int
+	attemptsLeft := state.elector.CandidateCount() + 1
+	for attemptsLeft > 0 {
+		attemptsLeft--
 		if ctx.Err() != nil {
 			break
 		}
@@ -638,6 +640,7 @@ func (b *Balancer) nextEstimatedConn(ctx context.Context, state *connectionsStat
 			}
 			current.elector.Pessimize(key)
 			state = current
+			attemptsLeft = max(attemptsLeft, state.elector.CandidateCount())
 		}
 	}
 
