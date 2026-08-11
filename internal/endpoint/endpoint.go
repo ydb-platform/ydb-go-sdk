@@ -16,6 +16,7 @@ type (
 		Address() string
 		Location() string
 		LoadFactor() float32
+		Metadata() Metadata
 		OverrideHost() string
 
 		// Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
@@ -38,6 +39,21 @@ type (
 
 		Copy(opts ...Option) Endpoint
 	}
+	Metadata struct {
+		LocalDC         bool
+		BridgePileState PileState
+	}
+	PileState uint8
+)
+
+const (
+	PileStateUnknown PileState = iota
+	PileStatePrimary
+	PileStatePromoted
+	PileStateSynchronized
+	PileStateNotSynchronized
+	PileStateSuspended
+	PileStateDisconnected
 )
 
 type endpoint struct {
@@ -49,11 +65,10 @@ type endpoint struct {
 	ipv4            []string
 	ipv6            []string
 	sslNameOverride string
+	metadata        Metadata
 
 	loadFactor  float32
 	lastUpdated time.Time
-
-	local bool
 }
 
 func (e *endpoint) Key() Key {
@@ -76,8 +91,8 @@ func (e *endpoint) Copy(opts ...Option) Endpoint {
 		ipv4:            append(make([]string, 0, len(e.ipv4)), e.ipv4...),
 		ipv6:            append(make([]string, 0, len(e.ipv6)), e.ipv6...),
 		sslNameOverride: e.sslNameOverride,
+		metadata:        e.metadata,
 		loadFactor:      e.loadFactor,
-		local:           e.local,
 		lastUpdated:     e.lastUpdated,
 	}
 
@@ -97,7 +112,7 @@ func (e *endpoint) String() string {
 	return fmt.Sprintf(`{id:%d,address:%q,local:%t,location:%q,loadFactor:%f,lastUpdated:%q}`,
 		e.id,
 		e.getAddress(), // Use getAddress() to avoid deadlock from nested RLock in Address()
-		e.local,
+		e.metadata.LocalDC,
 		e.location,
 		e.loadFactor,
 		e.lastUpdated.Format(time.RFC3339),
@@ -165,6 +180,13 @@ func (e *endpoint) Location() string {
 	return e.location
 }
 
+func (e *endpoint) Metadata() Metadata {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	return e.metadata
+}
+
 // Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
 // It work good only if connection url always point to local dc.
 // Will be removed after Oct 2024.
@@ -173,7 +195,7 @@ func (e *endpoint) LocalDC() bool {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	return e.local
+	return e.metadata.LocalDC
 }
 
 func (e *endpoint) LoadFactor() float32 {
@@ -206,7 +228,7 @@ func WithLocation(location string) Option {
 
 func WithLocalDC(local bool) Option {
 	return func(e *endpoint) {
-		e.local = local
+		e.metadata.LocalDC = local
 	}
 }
 
@@ -243,6 +265,12 @@ func WithIPV6(ipv6 []string) Option {
 func WithSslTargetNameOverride(nameOverride string) Option {
 	return func(e *endpoint) {
 		e.sslNameOverride = nameOverride
+	}
+}
+
+func WithMetadata(metadata Metadata) Option {
+	return func(e *endpoint) {
+		e.metadata = metadata
 	}
 }
 
