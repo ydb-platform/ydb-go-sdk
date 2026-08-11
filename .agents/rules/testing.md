@@ -8,6 +8,8 @@ go test -race ./...
 
 Within a test file, place test functions first. Put helper functions, fixtures, recording implementations, mocks, and other support code after the tests.
 
+Name unit-test files after the production file they cover: tests for declarations in `foo.go` belong in `foo_test.go`. Do not create files named after a scenario, code path, method, or compatibility concern when the tested implementation lives in another file (for example, tests for `nextConn` from `balancer.go` belong in `balancer_test.go`, not `next_conn_test.go`). Split tests when one test file covers declarations from multiple production files. Separate filenames are reserved for suites with an independent boundary, such as integration or end-to-end tests; document that exception in the file.
+
 Integration tests in `tests/integration/` are excluded automatically (`//go:build integration`).
 
 > Note: `CONTRIBUTING.md` documents `-tags fast` for unit-only runs, but that build tag does not exist. Default `go test ./...` is correct.

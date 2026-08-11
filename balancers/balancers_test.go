@@ -1,7 +1,6 @@
 package balancers
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -97,13 +96,6 @@ func TestCustomPrefer(t *testing.T) {
 
 	withFallback := PreferWithFallback(RandomChoice(), filter)
 	require.Equal(t, 2, estimationGroupCount(withFallback.Estimate(strategy.Info{}, connEndpoints(conns))))
-}
-
-func TestWithNodeID(t *testing.T) {
-	ctx := WithNodeID(context.Background(), 42)
-	nodeID, ok := endpoint.ContextNodeID(ctx)
-	require.True(t, ok)
-	require.Equal(t, uint32(42), nodeID)
 }
 
 func applyPreferEstimator(info strategy.Info, estimator strategy.Estimator, conns []conn.Conn) []conn.Conn {

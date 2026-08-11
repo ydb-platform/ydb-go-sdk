@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -12,14 +13,22 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/resolver"
+	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/emptypb"
 
+	userBalancers "github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -29,6 +38,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var errNodeShutdownHint = errors.New("received node shutdown hint")
@@ -1352,4 +1362,1059 @@ func TestNextStateClosedPool(t *testing.T) {
 
 	require.Empty(t, newQuarantine)
 	require.Empty(t, newActive)
+}
+
+func TestNewReturnsDiscoveryStartError(t *testing.T) {
+	ctx := t.Context()
+	expectedErr := errors.New("credentials failed")
+	srv := startDynamicDiscoveryServer(t, []uint32{1})
+	cfg := config.New(
+		config.WithEndpoint(srv.endpoint()),
+		config.WithDatabase("/local"),
+		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		config.WithCredentials(errorCredentials{err: expectedErr}),
+	)
+	pool := conn.NewPool(ctx, cfg)
+	t.Cleanup(func() {
+		require.NoError(t, pool.RemoveRef(ctx))
+	})
+
+	balancer, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(-time.Nanosecond))
+
+	require.ErrorIs(t, err, expectedErr)
+	require.Nil(t, balancer)
+}
+
+func TestClusterDiscoveryAttemptReturnsLocalDCDetectorError(t *testing.T) {
+	expectedErr := errors.New("local DC detection failed")
+	policy := strategy.PreferNearestDC(
+		strategy.RandomChoice(), "LocalDC", func(strategy.Info, endpoint.Info) bool { return true }, false,
+	)
+	balancer := &Balancer{
+		driverConfig:    config.New(),
+		estimator:       policy,
+		detectNearestDC: true,
+		discover: func(context.Context, *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
+			return []endpoint.Endpoint{endpoint.New("node:2135")}, "", nil
+		},
+		localDCDetector: func(context.Context, []endpoint.Endpoint) (string, error) {
+			return "", expectedErr
+		},
+	}
+
+	err := balancer.clusterDiscoveryAttempt(t.Context(), nil)
+
+	require.ErrorIs(t, err, expectedErr)
+}
+
+func TestEstimatorUsesFreshDiscoveryMetadataBeforePoolGet(t *testing.T) {
+	ctx := context.Background()
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	policy := strategy.Prefer(
+		strategy.RandomChoice(), "PrimaryPile",
+		func(_ strategy.Info, candidate endpoint.Info) bool {
+			return candidate.Metadata().BridgePileState == endpoint.PileStatePrimary
+		}, true,
+	)
+	balancer := &Balancer{
+		driverConfig: cfg,
+		estimator:    policy,
+		pool:         pool,
+	}
+	t.Cleanup(func() {
+		require.NoError(t, balancer.Close(ctx))
+		require.NoError(t, pool.RemoveRef(ctx))
+	})
+
+	first := bridgeEndpoints(endpoint.PileStatePrimary, endpoint.PileStateSynchronized)
+	balancer.applyDiscoveredEndpoints(ctx, first, "")
+	reused := balancer.connections().elector.connections[first[1].Key()]
+	require.NotNil(t, reused)
+
+	second := bridgeEndpoints(endpoint.PileStateSynchronized, endpoint.PileStatePrimary)
+	balancer.applyDiscoveredEndpoints(ctx, second, "")
+
+	selected, err := balancer.nextConn(ctx)
+	require.NoError(t, err)
+	require.Equal(t, uint32(2), selected.Endpoint().NodeID())
+	require.Same(t, reused, selected, "the pool must reuse the existing connection wrapper")
+	require.Equal(t, endpoint.PileStateSynchronized, selected.Endpoint().Metadata().BridgePileState,
+		"selection must use fresh discovery metadata rather than metadata retained by the pooled connection",
+	)
+}
+
+func TestDiscoveryReuseIPAndHostName(t *testing.T) {
+	ctx := t.Context()
+	cfg := config.New()
+	discovered := mock.Endpoint{
+		AddrField: "::1:123", NodeIDField: 1, OverrideHostField: "dyn-node-1.svc.cluster.local",
+	}
+	balancer := &Balancer{
+		driverConfig: cfg,
+		estimator:    cfg.Balancer(),
+		pool:         conn.NewPool(ctx, cfg),
+		discover: func(context.Context, *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
+			copy := discovered
+
+			return []endpoint.Endpoint{&copy}, "", nil
+		},
+	}
+	t.Cleanup(func() { require.NoError(t, balancer.pool.RemoveRef(ctx)) })
+
+	check := func() {
+		require.NoError(t, balancer.clusterDiscoveryAttempt(ctx, nil))
+		selected, err := balancer.nextConn(ctx)
+		require.NoError(t, err)
+		require.Equal(t, discovered.AddrField, selected.Endpoint().Address())
+		require.Equal(t, discovered.NodeIDField, selected.Endpoint().NodeID())
+		require.Equal(t, discovered.OverrideHostField, selected.Endpoint().OverrideHost())
+	}
+
+	check()
+	discovered.NodeIDField = 2
+	check()
+	discovered.OverrideHostField = "dyn-node-2.svc.cluster.local"
+	check()
+}
+
+func bridgeEndpoints(first, second endpoint.PileState) []endpoint.Endpoint {
+	return []endpoint.Endpoint{
+		endpoint.New("node-1", endpoint.WithID(1), endpoint.WithMetadata(endpoint.Metadata{
+			BridgePileState: first,
+		})),
+		endpoint.New("node-2", endpoint.WithID(2), endpoint.WithMetadata(endpoint.Metadata{
+			BridgePileState: second,
+		})),
+	}
+}
+
+type errorCredentials struct {
+	err error
+}
+
+func (c errorCredentials) Token(context.Context) (string, error) {
+	return "", c.err
+}
+
+func TestNextEstimatedConnContinuesWithLatestSnapshot(t *testing.T) {
+	replacement := &mock.Conn{
+		AddrField:   "replacement:2135",
+		NodeIDField: 2,
+		StateField:  state.Online,
+	}
+	next := newConnectionsStateWithBalancer(
+		[]conn.Conn{replacement}, strategy.RandomChoice(), strategy.Info{}, nil,
+	)
+	balancer := &Balancer{}
+	staleBase := &mock.Conn{
+		AddrField:   "stale:2135",
+		NodeIDField: 1,
+		StateField:  state.Online,
+	}
+	stale := &snapshotSwappingConn{
+		Conn:      staleBase,
+		balancer:  balancer,
+		nextState: next,
+	}
+	previous := newConnectionsStateWithBalancer(
+		[]conn.Conn{stale}, strategy.RandomChoice(), strategy.Info{}, nil,
+	)
+	balancer.connectionsState.Store(previous)
+	stale.armed = true
+
+	selected, failedCount := balancer.nextEstimatedConn(t.Context(), previous)
+
+	require.Same(t, replacement, selected)
+	require.Equal(t, 1, failedCount)
+	require.Same(t, next, balancer.connections())
+}
+
+func TestNextEstimatedConnStopsWhenBalancerClosesDuringSelection(t *testing.T) {
+	balancer := &Balancer{}
+	staleBase := &mock.Conn{
+		AddrField:   "stale:2135",
+		NodeIDField: 1,
+		StateField:  state.Online,
+	}
+	stale := &snapshotSwappingConn{
+		Conn:     staleBase,
+		balancer: balancer,
+	}
+	previous := newConnectionsStateWithBalancer(
+		[]conn.Conn{stale}, strategy.RandomChoice(), strategy.Info{}, nil,
+	)
+	balancer.connectionsState.Store(previous)
+	stale.armed = true
+
+	selected, failedCount := balancer.nextEstimatedConn(t.Context(), previous)
+
+	require.Nil(t, selected)
+	require.Equal(t, 1, failedCount)
+	require.Nil(t, balancer.connections())
+}
+
+func TestNextEstimatedConnStopsWhenElectionSnapshotIsEmpty(t *testing.T) {
+	connections := newConnectionsStateWithEstimates(nil, nil, nil, nil)
+	balancer := &Balancer{}
+	balancer.connectionsState.Store(connections)
+
+	selected, failedCount := balancer.nextEstimatedConn(t.Context(), connections)
+
+	require.Nil(t, selected)
+	require.Zero(t, failedCount)
+}
+
+func TestNextEstimatedConnStopsWhenContextIsCanceled(t *testing.T) {
+	connection := &mock.Conn{AddrField: "available:2135", StateField: state.Online}
+	connections := newConnectionsStateWithBalancer(
+		[]conn.Conn{connection}, strategy.RandomChoice(), strategy.Info{}, nil,
+	)
+	balancer := &Balancer{}
+	balancer.connectionsState.Store(connections)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	selected, failedCount := balancer.nextEstimatedConn(ctx, connections)
+
+	require.Nil(t, selected)
+	require.Zero(t, failedCount)
+}
+
+func TestNextConnReturnsCanceledContext(t *testing.T) {
+	connection := &mock.Conn{AddrField: "available:2135", StateField: state.Online}
+	balancer := &Balancer{driverConfig: config.New()}
+	balancer.connectionsState.Store(newConnectionsStateWithBalancer(
+		[]conn.Conn{connection}, strategy.RandomChoice(), strategy.Info{}, nil,
+	))
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	selected, err := balancer.nextConn(ctx)
+
+	require.Nil(t, selected)
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+type snapshotSwappingConn struct {
+	conn.Conn
+
+	balancer  *Balancer
+	nextState *connectionsState
+	armed     bool
+	swapped   bool
+}
+
+func (c *snapshotSwappingConn) State() state.State {
+	if c.armed && !c.swapped {
+		c.swapped = true
+		c.balancer.connectionsState.Store(c.nextState)
+
+		return state.Destroyed
+	}
+
+	return c.Conn.State()
+}
+
+func TestWithNodeIDBypassesSelectionPolicies(t *testing.T) {
+	connections := []conn.Conn{
+		userBalancerConn(1, "preferred", state.Online),
+		userBalancerConn(2, "excluded", state.Online),
+	}
+	balancer := userConfiguredBalancer(
+		config.WithBalancer(userBalancers.PreferLocations(
+			userBalancers.RandomChoice(), "preferred",
+		)),
+		connections,
+		"",
+	)
+
+	selected, err := balancer.nextConn(userBalancers.WithNodeID(t.Context(), 2))
+	require.NoError(t, err)
+	require.Same(t, connections[1], selected)
+}
+
+func TestPinnedNodeIDDoesNotFallbackToAnotherConnection(t *testing.T) {
+	balancer := userConfiguredBalancer(
+		config.WithBalancer(userBalancers.RandomChoice()),
+		[]conn.Conn{userBalancerConn(1, "available", state.Online)},
+		"",
+	)
+
+	ctx := endpoint.WithNodeID(t.Context(), 2, endpoint.WithFallback(false))
+	selected, err := balancer.nextConn(ctx)
+	require.ErrorIs(t, err, ErrNoEndpoints)
+	require.Nil(t, selected)
+}
+
+func TestBalancerHandlesBanAndUnban(t *testing.T) {
+	preferred := userBalancerConn(1, "preferred", state.Online)
+	fallback := userBalancerConn(2, "fallback", state.Online)
+	option := config.WithBalancer(userBalancers.PreferLocationsWithFallback(
+		userBalancers.RandomChoice(), "preferred",
+	))
+	balancer := userConfiguredBalancer(option, []conn.Conn{preferred, fallback}, "")
+
+	selected, err := balancer.nextConn(t.Context())
+	require.NoError(t, err)
+	require.Same(t, preferred, selected)
+
+	preferred.Ban(t.Context())
+	selected, err = balancer.nextConn(t.Context())
+	require.NoError(t, err)
+	require.Same(t, fallback, selected)
+
+	preferred.Unban(t.Context())
+	balancer.connectionsState.Store(newConnectionsStateWithBalancer(
+		[]conn.Conn{preferred, fallback}, config.New(option).Balancer(), strategy.Info{}, nil,
+	))
+	selected, err = balancer.nextConn(t.Context())
+	require.NoError(t, err)
+	require.Same(t, preferred, selected)
+}
+
+func TestUserBalancerConfigurations(t *testing.T) {
+	tests := []struct {
+		name         string
+		option       config.Option
+		selfLocation string
+		connections  []conn.Conn
+		allowed      map[uint32]struct{}
+	}{
+		{
+			name:   "random choice",
+			option: config.WithBalancer(userBalancers.RandomChoice()),
+			connections: []conn.Conn{
+				userBalancerConn(1, "a", state.Online),
+				userBalancerConn(2, "b", state.Online),
+			},
+			allowed: nodeIDSet(1, 2),
+		},
+		{
+			name:   "single connection",
+			option: config.WithBalancer(userBalancers.SingleConn()),
+			connections: []conn.Conn{
+				userBalancerConn(1, "configured", state.Online),
+			},
+			allowed: nodeIDSet(1),
+		},
+		{
+			name: "prefer nearest dc",
+			option: config.WithBalancer(userBalancers.PreferNearestDC(
+				userBalancers.RandomChoice(),
+			)),
+			selfLocation: "a",
+			connections: []conn.Conn{
+				userBalancerConn(1, "a", state.Online),
+				userBalancerConn(2, "b", state.Online),
+			},
+			allowed: nodeIDSet(1),
+		},
+		{
+			name: "prefer nearest dc with fallback",
+			option: config.WithBalancer(userBalancers.PreferNearestDCWithFallBack(
+				userBalancers.RandomChoice(),
+			)),
+			selfLocation: "a",
+			connections: []conn.Conn{
+				userBalancerConn(1, "a", state.Banned),
+				userBalancerConn(2, "b", state.Online),
+			},
+			allowed: nodeIDSet(2),
+		},
+		{
+			name: "prefer locations",
+			option: config.WithBalancer(userBalancers.PreferLocations(
+				userBalancers.RandomChoice(), "a", "c",
+			)),
+			connections: []conn.Conn{
+				userBalancerConn(1, "a", state.Online),
+				userBalancerConn(2, "b", state.Online),
+				userBalancerConn(3, "c", state.Online),
+			},
+			allowed: nodeIDSet(1, 3),
+		},
+		{
+			name: "prefer locations with fallback",
+			option: config.WithBalancer(userBalancers.PreferLocationsWithFallback(
+				userBalancers.RandomChoice(), "a",
+			)),
+			connections: []conn.Conn{
+				userBalancerConn(1, "a", state.Banned),
+				userBalancerConn(2, "b", state.Online),
+			},
+			allowed: nodeIDSet(2),
+		},
+		{
+			name: "custom preference",
+			option: config.WithBalancer(userBalancers.Prefer(
+				userBalancers.RandomChoice(),
+				func(endpoint userBalancers.Endpoint) bool {
+					return endpoint.NodeID()%2 == 0
+				},
+			)),
+			connections: []conn.Conn{
+				userBalancerConn(1, "a", state.Online),
+				userBalancerConn(2, "b", state.Online),
+				userBalancerConn(3, "c", state.Online),
+			},
+			allowed: nodeIDSet(2),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			balancer := userConfiguredBalancer(test.option, test.connections, test.selfLocation)
+			selectedNodeIDs := make(map[uint32]struct{}, len(test.allowed))
+
+			for index := range len(test.allowed) {
+				rand := userAPITestRand{index: index}
+				balancer.connectionsState.Load().elector.rand = rand
+				selected, err := balancer.nextConn(t.Context())
+				require.NoError(t, err)
+				selectedNodeIDs[selected.Endpoint().NodeID()] = struct{}{}
+			}
+
+			require.Equal(t, test.allowed, selectedNodeIDs)
+		})
+	}
+}
+
+func userConfiguredBalancer(option config.Option, connections []conn.Conn, selfLocation string) *Balancer {
+	cfg := config.New(option)
+	balancer := &Balancer{
+		driverConfig: cfg,
+		estimator:    cfg.Balancer(),
+	}
+	balancer.connectionsState.Store(newConnectionsStateWithBalancer(
+		connections,
+		balancer.estimator,
+		strategy.Info{SelfLocation: selfLocation},
+		nil,
+	))
+
+	return balancer
+}
+
+func userBalancerConn(nodeID uint32, location string, connectionState state.State) conn.Conn {
+	return &mock.Conn{
+		AddrField:     location,
+		LocationField: location,
+		NodeIDField:   nodeID,
+		StateField:    connectionState,
+	}
+}
+
+func nodeIDSet(nodeIDs ...uint32) map[uint32]struct{} {
+	result := make(map[uint32]struct{}, len(nodeIDs))
+	for _, nodeID := range nodeIDs {
+		result[nodeID] = struct{}{}
+	}
+
+	return result
+}
+
+type userAPITestRand struct {
+	index int
+}
+
+func (userAPITestRand) Int64(int64) int64 {
+	return 0
+}
+
+func (r userAPITestRand) Int(maximum int) int {
+	return r.index % maximum
+}
+
+func (userAPITestRand) Shuffle(int, func(int, int)) {}
+
+func BenchmarkNextConn(b *testing.B) {
+	tests := []struct {
+		name      string
+		nodeCount int
+		balancer  func() config.Option
+	}{
+		{
+			name:      "RandomChoice",
+			nodeCount: 1,
+			balancer: func() config.Option {
+				return config.WithBalancer(userBalancers.RandomChoice())
+			},
+		},
+		{
+			name:      "RandomChoice",
+			nodeCount: 10,
+			balancer: func() config.Option {
+				return config.WithBalancer(userBalancers.RandomChoice())
+			},
+		},
+		{
+			name:      "RandomChoice",
+			nodeCount: 1000,
+			balancer: func() config.Option {
+				return config.WithBalancer(userBalancers.RandomChoice())
+			},
+		},
+		{
+			name:      "PreferWithFallback",
+			nodeCount: 1000,
+			balancer: func() config.Option {
+				return config.WithBalancer(userBalancers.PreferWithFallback(
+					userBalancers.RandomChoice(),
+					func(candidate userBalancers.Endpoint) bool {
+						return candidate.NodeID()%2 == 0
+					},
+				))
+			},
+		},
+	}
+
+	for _, test := range tests {
+		b.Run(test.name+"/"+strconv.Itoa(test.nodeCount), func(b *testing.B) {
+			benchmarkNextConn(b, test.nodeCount, test.balancer())
+		})
+	}
+}
+
+func benchmarkNextConn(b *testing.B, nodeCount int, balancerOption config.Option) {
+	nodeIDs := make([]uint32, nodeCount)
+	for i := range nodeIDs {
+		nodeIDs[i] = uint32(i + 1)
+	}
+	discovery := startDynamicDiscoveryServer(b, nodeIDs)
+	ctx := context.Background()
+	cfg := config.New(
+		config.WithEndpoint(discovery.endpoint()),
+		config.WithDatabase("/benchmark"),
+		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		balancerOption,
+	)
+	pool := conn.NewPool(ctx, cfg)
+	balancer, err := New(ctx, cfg, pool)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(func() {
+		if err := balancer.Close(ctx); err != nil {
+			b.Error(err)
+		}
+		if err := pool.RemoveRef(ctx); err != nil {
+			b.Error(err)
+		}
+	})
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		nextConnBenchmarkSink, err = balancer.nextConn(ctx)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+var nextConnBenchmarkSink conn.Conn
+
+type dynamicDiscoveryServer struct {
+	listener   net.Listener
+	grpcServer *grpc.Server
+
+	mu      sync.RWMutex
+	nodeIDs []uint32
+	host    string
+	port    uint32
+
+	activeConns atomic.Int64
+}
+
+type dynamicDiscoveryService struct {
+	Ydb_Discovery_V1.UnimplementedDiscoveryServiceServer
+
+	srv *dynamicDiscoveryServer
+}
+
+func (s *dynamicDiscoveryService) ListEndpoints(
+	_ context.Context,
+	_ *Ydb_Discovery.ListEndpointsRequest,
+) (*Ydb_Discovery.ListEndpointsResponse, error) {
+	endpoints := s.srv.currentEndpoints()
+
+	return &Ydb_Discovery.ListEndpointsResponse{
+		Operation: discoveryOperationOK(&Ydb_Discovery.ListEndpointsResult{
+			Endpoints: endpoints,
+		}),
+	}, nil
+}
+
+func (s *dynamicDiscoveryService) WhoAmI(
+	_ context.Context,
+	_ *Ydb_Discovery.WhoAmIRequest,
+) (*Ydb_Discovery.WhoAmIResponse, error) {
+	return &Ydb_Discovery.WhoAmIResponse{
+		Operation: discoveryOperationOK(&emptypb.Empty{}),
+	}, nil
+}
+
+func (s *dynamicDiscoveryServer) currentEndpoints() []*Ydb_Discovery.EndpointInfo {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	nodeIDs := append([]uint32(nil), s.nodeIDs...)
+
+	return mockDiscoveryEndpoints(s.host, s.port, nodeIDs)
+}
+
+func (s *dynamicDiscoveryServer) setNodeIDs(nodeIDs []uint32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.nodeIDs = append([]uint32(nil), nodeIDs...)
+}
+
+func (s *dynamicDiscoveryServer) endpoint() string {
+	return net.JoinHostPort(s.host, strconv.FormatUint(uint64(s.port), 10))
+}
+
+func (s *dynamicDiscoveryServer) Close() {
+	s.grpcServer.Stop()
+	_ = s.listener.Close()
+}
+
+func (s *dynamicDiscoveryServer) activeGRPCConns() int64 {
+	return s.activeConns.Load()
+}
+
+type serverConnStats struct {
+	active *atomic.Int64
+}
+
+func (h *serverConnStats) TagRPC(ctx context.Context, _ *stats.RPCTagInfo) context.Context {
+	return ctx
+}
+
+func (h *serverConnStats) HandleRPC(context.Context, stats.RPCStats) {}
+
+func (h *serverConnStats) TagConn(ctx context.Context, _ *stats.ConnTagInfo) context.Context {
+	return ctx
+}
+
+func (h *serverConnStats) HandleConn(_ context.Context, connectionStats stats.ConnStats) {
+	switch connectionStats.(type) {
+	case *stats.ConnBegin:
+		h.active.Add(1)
+	case *stats.ConnEnd:
+		h.active.Add(-1)
+	}
+}
+
+func startDynamicDiscoveryServer(tb testing.TB, nodeIDs []uint32) *dynamicDiscoveryServer {
+	tb.Helper()
+
+	var listenConfig net.ListenConfig
+	listener, err := listenConfig.Listen(tb.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(tb, err)
+
+	host, portString, err := net.SplitHostPort(listener.Addr().String())
+	require.NoError(tb, err)
+
+	parsedPort, err := strconv.ParseUint(portString, 10, 32)
+	require.NoError(tb, err)
+
+	server := &dynamicDiscoveryServer{
+		listener: listener,
+		host:     host,
+		port:     uint32(parsedPort),
+		nodeIDs:  append([]uint32(nil), nodeIDs...),
+	}
+
+	statsHandler := &serverConnStats{active: &server.activeConns}
+	server.grpcServer = grpc.NewServer(grpc.StatsHandler(statsHandler))
+
+	Ydb_Discovery_V1.RegisterDiscoveryServiceServer(
+		server.grpcServer,
+		&dynamicDiscoveryService{srv: server},
+	)
+
+	go func() {
+		_ = server.grpcServer.Serve(listener)
+	}()
+
+	tb.Cleanup(server.Close)
+
+	require.Eventually(tb, func() bool {
+		var dialer net.Dialer
+		connection, dialErr := dialer.DialContext(tb.Context(), "tcp", listener.Addr().String())
+		if dialErr != nil {
+			return false
+		}
+		_ = connection.Close()
+
+		return true
+	}, time.Second, 10*time.Millisecond)
+
+	return server
+}
+
+func mockDiscoveryEndpoints(host string, port uint32, nodeIDs []uint32) []*Ydb_Discovery.EndpointInfo {
+	endpoints := make([]*Ydb_Discovery.EndpointInfo, len(nodeIDs))
+	for i, nodeID := range nodeIDs {
+		endpoints[i] = &Ydb_Discovery.EndpointInfo{
+			Address:    host,
+			Port:       port,
+			LoadFactor: 0,
+			Ssl:        false,
+			NodeId:     nodeID,
+			IpV4:       []string{host},
+		}
+	}
+
+	return endpoints
+}
+
+func discoveryOperationOK(message proto.Message) *Ydb_Operations.Operation {
+	result := &anypb.Any{}
+	if err := result.MarshalFrom(message); err != nil {
+		panic(err)
+	}
+
+	return &Ydb_Operations.Operation{
+		Ready:  true,
+		Status: Ydb.StatusIds_SUCCESS,
+		Result: result,
+	}
+}
+
+type connLifeEvents struct {
+	mu     sync.Mutex
+	dialed map[uint32]int
+	parked map[uint32]int
+	closed map[uint32]int
+}
+
+func newConnLifeEvents() *connLifeEvents {
+	return &connLifeEvents{
+		dialed: make(map[uint32]int),
+		parked: make(map[uint32]int),
+		closed: make(map[uint32]int),
+	}
+}
+
+func (e *connLifeEvents) driverTrace() *trace.Driver {
+	return &trace.Driver{
+		OnConnDial: func(info trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
+			nodeID := info.Endpoint.NodeID()
+
+			return func(done trace.DriverConnDialDoneInfo) {
+				if done.Error != nil {
+					return
+				}
+				e.mu.Lock()
+				e.dialed[nodeID]++
+				e.mu.Unlock()
+			}
+		},
+		OnConnClose: func(info trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
+			nodeID := info.Endpoint.NodeID()
+
+			return func(trace.DriverConnCloseDoneInfo) {
+				e.mu.Lock()
+				e.closed[nodeID]++
+				e.mu.Unlock()
+			}
+		},
+		OnConnPark: func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
+			nodeID := info.Endpoint.NodeID()
+
+			return func(done trace.DriverConnParkDoneInfo) {
+				if done.Error != nil {
+					return
+				}
+				e.mu.Lock()
+				e.parked[nodeID]++
+				e.mu.Unlock()
+			}
+		},
+	}
+}
+
+func (e *connLifeEvents) dialedCount(nodeID uint32) int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	return e.dialed[nodeID]
+}
+
+func (e *connLifeEvents) closedCount(nodeID uint32) int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	return e.closed[nodeID]
+}
+
+func (e *connLifeEvents) parkedCount(nodeID uint32) int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	return e.parked[nodeID]
+}
+
+func dialWhoAmI(tb testing.TB, balancer *Balancer, nodeID uint32) {
+	tb.Helper()
+
+	ctx := endpoint.WithNodeID(tb.Context(), nodeID)
+	reply := &Ydb_Discovery.WhoAmIResponse{}
+
+	err := balancer.Invoke(
+		ctx,
+		Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
+		&Ydb_Discovery.WhoAmIRequest{},
+		reply,
+	)
+	require.NoError(tb, err)
+}
+
+func connByNodeID(balancer *Balancer, nodeID uint32) conn.Conn {
+	for _, connection := range balancer.connections().All() {
+		if connection.Endpoint().NodeID() == nodeID {
+			return connection
+		}
+	}
+
+	return nil
+}
+
+func activeNodeIDs(balancer *Balancer) []uint32 {
+	connections := balancer.connections().All()
+	ids := make([]uint32, len(connections))
+	for i, connection := range connections {
+		ids[i] = connection.Endpoint().NodeID()
+	}
+
+	return ids
+}
+
+func connInQuarantine(balancer *Balancer, nodeID uint32) conn.Conn {
+	if balancerState := balancer.connectionsState.Load(); balancerState != nil {
+		for _, connection := range balancerState.quarantine {
+			if connection.Endpoint().NodeID() == nodeID {
+				return connection
+			}
+		}
+	}
+
+	return nil
+}
+
+// TestBalancerDiscoveryDropClosesGRPC verifies end-to-end that a node removed from
+// ListEndpoints eventually closes its pooled gRPC connection after the quarantine
+// cycle (two discovery rounds after the drop), and Balancer.Close closes the rest.
+func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
+	const (
+		node1 uint32 = 1
+		node2 uint32 = 2
+	)
+
+	ctx := t.Context()
+	server := startDynamicDiscoveryServer(t, []uint32{node1, node2})
+	events := newConnLifeEvents()
+
+	cfg := config.New(
+		config.WithEndpoint(server.endpoint()),
+		config.WithDatabase("/local"),
+		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		config.WithTrace(*events.driverTrace()),
+		config.WithBalancer(userBalancers.RandomChoice()),
+	)
+
+	pool := conn.NewPool(ctx, cfg)
+	defer func() {
+		require.NoError(t, pool.RemoveRef(ctx))
+	}()
+
+	balancer, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
+	require.NoError(t, err)
+
+	require.ElementsMatch(t, []uint32{node1, node2}, activeNodeIDs(balancer))
+
+	dialWhoAmI(t, balancer, node1)
+	dialWhoAmI(t, balancer, node2)
+
+	require.Equal(t, 1, events.dialedCount(node1))
+	require.Equal(t, 1, events.dialedCount(node2))
+	require.GreaterOrEqual(t, server.activeGRPCConns(), int64(2))
+
+	node2Conn := connByNodeID(balancer, node2)
+	require.NotNil(t, node2Conn)
+	require.Equal(t, state.Online, node2Conn.State())
+
+	// Discovery #2: same cluster — quarantine cycle, refs increment.
+	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
+	require.ElementsMatch(t, []uint32{node1, node2}, activeNodeIDs(balancer))
+	require.Equal(t, 0, events.closedCount(node2))
+
+	// Discovery #3: node 2 disappears — moved to quarantine, gRPC still alive.
+	server.setNodeIDs([]uint32{node1})
+	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
+	require.Equal(t, []uint32{node1}, activeNodeIDs(balancer))
+	require.Equal(t, 0, events.closedCount(node2), "gRPC must not close on first discovery after drop")
+
+	quarantined := connInQuarantine(balancer, node2)
+	require.NotNil(t, quarantined, "dropped node must remain in quarantine")
+	require.Same(t, node2Conn, quarantined)
+
+	// Discovery #4: same cluster — quarantine released, dropped node gRPC must close.
+	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
+	require.Equal(t, []uint32{node1}, activeNodeIDs(balancer))
+
+	require.Eventually(t, func() bool {
+		return events.closedCount(node2) == 1 && node2Conn.State() == state.Destroyed
+	}, time.Second, 10*time.Millisecond, "node removed from discovery must close gRPC connection")
+
+	require.Equal(t, 0, events.closedCount(node1))
+
+	// Balancer.Close: release active + quarantine, remaining pooled conns must close.
+	node1Conn := connByNodeID(balancer, node1)
+	require.NotNil(t, node1Conn)
+	require.Equal(t, 0, events.closedCount(node1))
+
+	require.NoError(t, balancer.Close(ctx))
+
+	require.Eventually(t, func() bool {
+		return events.closedCount(node1) == 1 && node1Conn.State() == state.Destroyed
+	}, time.Second, 10*time.Millisecond, "balancer close must close remaining active connections")
+
+	require.Equal(t, 1, events.closedCount(node2))
+}
+
+func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
+	const (
+		node1 uint32 = 1
+		node2 uint32 = 2
+		ttl          = 50 * time.Millisecond
+	)
+
+	ctx := t.Context()
+	server := startDynamicDiscoveryServer(t, []uint32{node1, node2})
+	events := newConnLifeEvents()
+
+	cfg := config.New(
+		config.WithEndpoint(server.endpoint()),
+		config.WithDatabase("/local"),
+		config.WithConnectionTTL(ttl),
+		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		config.WithTrace(*events.driverTrace()),
+		config.WithBalancer(userBalancers.RandomChoice()),
+	)
+
+	pool := conn.NewPool(ctx, cfg)
+	defer func() {
+		require.NoError(t, pool.RemoveRef(ctx))
+	}()
+
+	balancer, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
+	require.NoError(t, err)
+
+	dialWhoAmI(t, balancer, node2)
+	node2Conn := connByNodeID(balancer, node2)
+	require.NotNil(t, node2Conn)
+
+	require.Eventually(t, func() bool {
+		return node2Conn.State() == state.Offline && events.parkedCount(node2) == 1
+	}, time.Second, 10*time.Millisecond, "connection TTL must park the node transport")
+	require.Equal(t, 0, events.closedCount(node2), "parking must preserve the pooled wrapper")
+
+	// Discovery #2: keep both nodes and establish the quarantine generation.
+	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
+	require.Same(t, node2Conn, connByNodeID(balancer, node2))
+	require.Equal(t, state.Offline, node2Conn.State())
+
+	// Discovery #3: node 2 disappears but remains referenced by quarantine.
+	server.setNodeIDs([]uint32{node1})
+	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
+	require.Same(t, node2Conn, connInQuarantine(balancer, node2))
+	require.Equal(t, state.Offline, node2Conn.State())
+	require.Equal(t, 0, events.closedCount(node2))
+
+	// Discovery #4: release quarantine and destroy the already parked wrapper.
+	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
+	require.Eventually(t, func() bool {
+		return node2Conn.State() == state.Destroyed && events.closedCount(node2) == 1
+	}, time.Second, 10*time.Millisecond, "Discovery removal must destroy a parked connection")
+	require.Equal(t, 1, events.parkedCount(node2))
+	require.Equal(t, 1, events.dialedCount(node2))
+
+	require.NoError(t, balancer.Close(ctx))
+}
+
+func TestBalancerConnectionTTLParksTransportsAfterNetworkLoss(t *testing.T) {
+	const (
+		nodeCount = 16
+		ttl       = 50 * time.Millisecond
+	)
+
+	nodeIDs := make([]uint32, nodeCount)
+	for i := range nodeIDs {
+		nodeIDs[i] = uint32(i + 1)
+	}
+
+	ctx := t.Context()
+	server := startDynamicDiscoveryServer(t, nodeIDs)
+	events := newConnLifeEvents()
+
+	cfg := config.New(
+		config.WithEndpoint(server.endpoint()),
+		config.WithDatabase("/local"),
+		config.WithConnectionTTL(ttl),
+		config.WithDialTimeout(ttl),
+		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		config.WithTrace(*events.driverTrace()),
+		config.WithBalancer(userBalancers.RandomChoice()),
+	)
+
+	pool := conn.NewPool(ctx, cfg)
+	defer func() {
+		require.NoError(t, pool.RemoveRef(ctx))
+	}()
+
+	balancer, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
+	require.NoError(t, err)
+
+	dialWhoAmI(t, balancer, nodeIDs[0])
+	server.Close()
+
+	for _, nodeID := range nodeIDs[1:] {
+		callCtx, cancel := context.WithTimeout(endpoint.WithNodeID(ctx, nodeID), ttl)
+		reply := &Ydb_Discovery.WhoAmIResponse{}
+		err = balancer.Invoke(
+			callCtx,
+			Ydb_Discovery_V1.DiscoveryService_WhoAmI_FullMethodName,
+			&Ydb_Discovery.WhoAmIRequest{},
+			reply,
+		)
+		cancel()
+		require.Error(t, err)
+	}
+
+	for _, nodeID := range nodeIDs {
+		require.Equal(t, 1, events.dialedCount(nodeID))
+	}
+
+	require.Eventually(t, func() bool {
+		for _, nodeID := range nodeIDs {
+			connection := connByNodeID(balancer, nodeID)
+			if connection == nil || connection.State() != state.Offline || events.parkedCount(nodeID) != 1 {
+				return false
+			}
+		}
+
+		return true
+	}, 5*time.Second, 10*time.Millisecond)
+
+	require.ElementsMatch(t, nodeIDs, activeNodeIDs(balancer),
+		"parking must keep Discovery wrappers in the balancer",
+	)
+	require.NoError(t, balancer.Close(ctx))
+
+	for _, nodeID := range nodeIDs {
+		require.Equal(t, 1, events.closedCount(nodeID))
+	}
 }

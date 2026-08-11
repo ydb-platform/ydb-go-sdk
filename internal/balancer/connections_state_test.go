@@ -1,13 +1,10 @@
 package balancer
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
@@ -94,50 +91,6 @@ func TestConnsToNodeIDMap(t *testing.T) {
 		&mock.Conn{NodeIDField: 10},
 	}
 	require.Equal(t, map[uint32]conn.Conn{0: connections[0], 10: connections[1]}, connsToNodeIDMap(connections))
-}
-
-func TestIsConnectionUsable(t *testing.T) {
-	require.False(t, isConnectionUsable(nil, true))
-	for _, goodState := range []state.State{state.Created, state.Online, state.Offline} {
-		require.True(t, isConnectionUsable(&mock.Conn{StateField: goodState}, false))
-	}
-	require.False(t, isConnectionUsable(&mock.Conn{StateField: state.Banned}, false))
-	require.True(t, isConnectionUsable(&mock.Conn{StateField: state.Banned}, true))
-	require.False(t, isConnectionUsable(&mock.Conn{StateField: state.Destroyed}, true))
-}
-
-func TestDiscoveryReuseIPAndHostName(t *testing.T) {
-	ctx := t.Context()
-	cfg := config.New()
-	discovered := mock.Endpoint{
-		AddrField: "::1:123", NodeIDField: 1, OverrideHostField: "dyn-node-1.svc.cluster.local",
-	}
-	balancer := &Balancer{
-		driverConfig: cfg,
-		estimator:    cfg.Balancer(),
-		pool:         conn.NewPool(ctx, cfg),
-		discover: func(context.Context, *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
-			copy := discovered
-
-			return []endpoint.Endpoint{&copy}, "", nil
-		},
-	}
-	t.Cleanup(func() { require.NoError(t, balancer.pool.RemoveRef(ctx)) })
-
-	check := func() {
-		require.NoError(t, balancer.clusterDiscoveryAttempt(ctx, nil))
-		selected, err := balancer.nextConn(ctx)
-		require.NoError(t, err)
-		require.Equal(t, discovered.AddrField, selected.Endpoint().Address())
-		require.Equal(t, discovered.NodeIDField, selected.Endpoint().NodeID())
-		require.Equal(t, discovered.OverrideHostField, selected.Endpoint().OverrideHost())
-	}
-
-	check()
-	discovered.NodeIDField = 2
-	check()
-	discovered.OverrideHostField = "dyn-node-2.svc.cluster.local"
-	check()
 }
 
 type filterFunc func(info strategy.Info, candidate endpoint.Info) bool

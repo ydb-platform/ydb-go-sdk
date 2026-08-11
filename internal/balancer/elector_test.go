@@ -176,6 +176,16 @@ func TestEndpointElectorKeepsHealthyMaxPenaltyAboveBannedEndpoint(t *testing.T) 
 	require.Same(t, healthy, selected)
 }
 
+func TestIsConnectionUsable(t *testing.T) {
+	require.False(t, isConnectionUsable(nil, true))
+	for _, goodState := range []state.State{state.Created, state.Online, state.Offline} {
+		require.True(t, isConnectionUsable(&mock.Conn{StateField: goodState}, false))
+	}
+	require.False(t, isConnectionUsable(&mock.Conn{StateField: state.Banned}, false))
+	require.True(t, isConnectionUsable(&mock.Conn{StateField: state.Banned}, true))
+	require.False(t, isConnectionUsable(&mock.Conn{StateField: state.Destroyed}, true))
+}
+
 func electorConnection(address string, nodeID uint32, connectionState state.State) conn.Conn {
 	return &mock.Conn{AddrField: address, NodeIDField: nodeID, StateField: connectionState}
 }
