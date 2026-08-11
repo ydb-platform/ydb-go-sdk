@@ -65,11 +65,12 @@ func (s *streamWrapper) RecvMsg(m any) error {
 }
 
 type Balancer struct {
-	driverConfig        *config.Config
-	plan                strategy.Plan
-	discoveryConfig     *discoveryConfig.Config
-	pool                *conn.Pool
-	discoveryController strategy.Controller
+	driverConfig      *config.Config
+	estimator         strategy.Estimator
+	detectNearestDC   bool
+	discoveryConfig   *discoveryConfig.Config
+	pool              *conn.Pool
+	discoveryRepeater repeater.Repeater
 
 	address string
 	cc      atomic.Pointer[grpc.ClientConn]
@@ -211,11 +212,13 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 		return xerrors.WithStackTrace(err)
 	}
 
-	resolvedLocation, err := b.plan.ResolveLocation(ctx, endpoints, location, b.localDCDetector)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
+	if b.detectNearestDC {
+		location, err = b.localDCDetector(ctx, endpoints)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
 	}
-	b.applyDiscoveredEndpoints(ctx, endpoints, resolvedLocation)
+	b.applyDiscoveredEndpoints(ctx, endpoints, location)
 
 	return nil
 }
@@ -266,14 +269,14 @@ func (b *Balancer) releaseStateConns(ctx context.Context, state *connectionsStat
 func (b *Balancer) applyDiscoveredEndpoints(
 	ctx context.Context,
 	endpoints []endpoint.Endpoint,
-	resolvedLocation strategy.ResolvedLocation,
+	selfLocation string,
 ) {
 	var (
 		onDone = gtrace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
 			stack.FunctionID(
 				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
-			resolvedLocation.NeedLocalDC,
+			b.detectNearestDC,
 			b.driverConfig.Database(),
 		)
 		state      = b.connectionsState.Load()
@@ -295,7 +298,7 @@ func (b *Balancer) applyDiscoveredEndpoints(
 			xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
 			xslices.Transform(added, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
 			xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
-			resolvedLocation.SelfLocation,
+			selfLocation,
 		)
 	}()
 
@@ -308,8 +311,12 @@ func (b *Balancer) applyDiscoveredEndpoints(
 		return
 	}
 
-	info := strategy.Info{SelfLocation: resolvedLocation.SelfLocation}
-	estimates := b.plan.Estimator().Estimate(info, endpoints)
+	info := strategy.Info{SelfLocation: selfLocation}
+	estimator := b.estimator
+	if estimator == nil {
+		estimator = strategy.RandomChoice()
+	}
+	estimates := estimator.Estimate(info, endpoints)
 	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
 
 	b.connectionsState.Store(newConnectionsStateWithEstimates(
@@ -329,8 +336,8 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 
 	oldState := b.connectionsState.Swap(nil)
 
-	controller := b.discoveryController
-	b.discoveryController = nil
+	discoveryRepeater := b.discoveryRepeater
+	b.discoveryRepeater = nil
 
 	discoveryCC := b.cc.Swap(nil)
 
@@ -344,8 +351,8 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	if controller != nil {
-		controller.Stop()
+	if discoveryRepeater != nil {
+		discoveryRepeater.Stop()
 	}
 
 	b.releaseStateConns(ctx, oldState)
@@ -410,12 +417,14 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		onDone(finalErr)
 	}()
 
-	plan := strategy.Compile(configuredEstimator)
+	usesConfiguredEndpoint := strategy.UsesConfiguredEndpoint(configuredEstimator)
 	b = &Balancer{
 		driverConfig: driverConfig,
-		plan:         plan,
-		pool:         pool,
-		address:      "ydb:///" + driverConfig.Endpoint(),
+		estimator:    configuredEstimator,
+		detectNearestDC: strategy.DetectsNearestDC(configuredEstimator) &&
+			!usesConfiguredEndpoint,
+		pool:    pool,
+		address: "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),
 			discoveryConfig.WithEndpoint(driverConfig.Endpoint()),
@@ -429,39 +438,31 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
 
-	controller, err := plan.Start(ctx, b)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+	if usesConfiguredEndpoint {
+		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
+			endpoint.New(b.driverConfig.Endpoint()),
+		}, "")
+	} else if err := b.startClusterDiscovery(ctx); err != nil {
+		return nil, err
 	}
-	b.discoveryController = controller
 
 	return b, nil
 }
 
-// StartClusterDiscovery initializes dynamic discovery and starts its background refresh.
-func (b *Balancer) StartClusterDiscovery(ctx context.Context) (strategy.Controller, error) {
+func (b *Balancer) startClusterDiscovery(ctx context.Context) error {
 	if err := b.clusterDiscovery(ctx); err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
 	if interval := b.discoveryConfig.Interval(); interval > 0 {
-		return repeater.New(xcontext.ValueOnly(ctx),
+		b.discoveryRepeater = repeater.New(xcontext.ValueOnly(ctx),
 			interval, b.clusterDiscoveryAttemptWithDial,
 			repeater.WithName("discovery"),
 			repeater.WithTrace(b.driverConfig.Trace()),
-		), nil
+		)
 	}
 
-	return nil, nil //nolint:nilnil // Disabled background discovery does not need a controller.
-}
-
-// UseConfiguredEndpoint initializes a static balancer from the configured endpoint.
-func (b *Balancer) UseConfiguredEndpoint(ctx context.Context) (strategy.Controller, error) {
-	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
-		endpoint.New(b.driverConfig.Endpoint()),
-	}, strategy.ResolvedLocation{})
-
-	return nil, nil //nolint:nilnil // A static endpoint source does not need a controller.
+	return nil
 }
 
 func (b *Balancer) Invoke(
@@ -545,11 +546,11 @@ func (b *Balancer) connections() *connectionsState {
 
 func (b *Balancer) forceDiscovery() {
 	b.closeMu.Lock()
-	controller := b.discoveryController
+	discoveryRepeater := b.discoveryRepeater
 	b.closeMu.Unlock()
 
-	if controller != nil {
-		controller.Force()
+	if discoveryRepeater != nil {
+		discoveryRepeater.Force()
 	}
 }
 

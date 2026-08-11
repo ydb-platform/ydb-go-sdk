@@ -64,6 +64,32 @@ func normalize(estimator Estimator) Estimator {
 	return estimator
 }
 
+// UsesConfiguredEndpoint reports whether the estimator ultimately selects only the configured entrypoint.
+func UsesConfiguredEndpoint(estimator Estimator) bool {
+	switch current := normalize(estimator).(type) {
+	case singleConn:
+		return true
+	case prefer:
+		return UsesConfiguredEndpoint(current.child)
+	case nearestDC:
+		return UsesConfiguredEndpoint(current.child)
+	default:
+		return false
+	}
+}
+
+// DetectsNearestDC reports whether the estimator needs client-side nearest DC detection.
+func DetectsNearestDC(estimator Estimator) bool {
+	switch current := normalize(estimator).(type) {
+	case prefer:
+		return DetectsNearestDC(current.child)
+	case nearestDC:
+		return true
+	default:
+		return false
+	}
+}
+
 type randomChoice struct{}
 
 func (randomChoice) Estimate(_ Info, endpoints []endpoint.Endpoint) []Estimation {

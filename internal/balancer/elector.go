@@ -28,12 +28,6 @@ type electionSnapshot struct {
 	unavailablePreferred int
 }
 
-type electionCandidate struct {
-	key     endpoint.Key
-	penalty uint64
-	weight  uint64
-}
-
 // endpointElector keeps mutable health state outside the immutable estimator tree.
 // Discovery and pessimization rebuild a snapshot; the request hot path only loads it atomically.
 type endpointElector struct {
@@ -131,7 +125,7 @@ func (e *endpointElector) rebuildLocked() {
 		}
 		snapshot.totalWeight += weight
 		snapshot.entries[i] = electionEntry{
-			key:        candidate.key,
+			key:        candidate.Key,
 			cumulative: snapshot.totalWeight,
 		}
 	}
@@ -139,7 +133,7 @@ func (e *endpointElector) rebuildLocked() {
 }
 
 func (e *endpointElector) bestCandidates() (
-	best []electionCandidate,
+	best []strategy.Estimation,
 	allowBanned bool,
 	preferredCount int,
 	unavailablePreferred int,
@@ -151,11 +145,11 @@ func (e *endpointElector) bestCandidates() (
 
 	minimumHealthyPenalty := uint64(math.MaxUint64)
 	for _, candidate := range healthy {
-		minimumHealthyPenalty = min(minimumHealthyPenalty, candidate.penalty)
+		minimumHealthyPenalty = min(minimumHealthyPenalty, candidate.Penalty)
 	}
-	best = make([]electionCandidate, 0, len(healthy))
+	best = make([]strategy.Estimation, 0, len(healthy))
 	for _, candidate := range healthy {
-		if candidate.penalty == minimumHealthyPenalty {
+		if candidate.Penalty == minimumHealthyPenalty {
 			best = append(best, candidate)
 		}
 	}
@@ -164,14 +158,14 @@ func (e *endpointElector) bestCandidates() (
 }
 
 func (e *endpointElector) candidatesByHealth() (
-	healthy []electionCandidate,
-	banned []electionCandidate,
+	healthy []strategy.Estimation,
+	banned []strategy.Estimation,
 	preferredCount int,
 	unavailablePreferred int,
 ) {
 	minimumPolicy := e.minimumPolicyPenalty()
-	healthy = make([]electionCandidate, 0, len(e.estimates))
-	banned = make([]electionCandidate, 0, len(e.estimates))
+	healthy = make([]strategy.Estimation, 0, len(e.estimates))
+	banned = make([]strategy.Estimation, 0, len(e.estimates))
 	for _, estimation := range e.estimates {
 		if estimation.Weight == 0 {
 			continue
@@ -192,16 +186,11 @@ func (e *endpointElector) candidatesByHealth() (
 			}
 		}
 
-		candidate := electionCandidate{
-			key:     estimation.Key,
-			penalty: estimation.Penalty,
-			weight:  estimation.Weight,
-		}
 		switch {
 		case healthyCandidate:
-			healthy = append(healthy, candidate)
+			healthy = append(healthy, estimation)
 		case bannedCandidate:
-			banned = append(banned, candidate)
+			banned = append(banned, estimation)
 		}
 	}
 
@@ -219,7 +208,7 @@ func (e *endpointElector) minimumPolicyPenalty() uint64 {
 	return minimumPolicy
 }
 
-func normalizeElectionWeights(candidates []electionCandidate) []uint64 {
+func normalizeElectionWeights(candidates []strategy.Estimation) []uint64 {
 	weights := make([]uint64, len(candidates))
 	if len(candidates) == 0 {
 		return weights
@@ -228,14 +217,14 @@ func normalizeElectionWeights(candidates []electionCandidate) []uint64 {
 	maximumPerCandidate := uint64(math.MaxInt64 / len(candidates))
 	var maximum uint64
 	for _, candidate := range candidates {
-		maximum = max(maximum, candidate.weight)
+		maximum = max(maximum, candidate.Weight)
 	}
 	scale := maximum / maximumPerCandidate
 	if maximum%maximumPerCandidate != 0 {
 		scale++
 	}
 	for i, candidate := range candidates {
-		weights[i] = max(uint64(1), candidate.weight/scale)
+		weights[i] = max(uint64(1), candidate.Weight/scale)
 	}
 
 	return weights

@@ -130,7 +130,7 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	e2 := endpoint.New("e2.example:2135", endpoint.WithIPV6([]string{"2001:db8::2"}), endpoint.WithID(2))
 
 	// call with two endpoints
-	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, strategy.ResolvedLocation{})
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, "")
 
 	// connectionsState should be updated and reflect the endpoints
 	after := b.connections()
@@ -144,7 +144,7 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 
 	// partially replace endpoints
 	e3 := endpoint.New("e3.example:2135", endpoint.WithIPV6([]string{"2001:db8::3"}), endpoint.WithID(1))
-	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e2, e3}, strategy.ResolvedLocation{})
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e2, e3}, "")
 	// connectionsState should be updated and reflect the endpoints
 	after = b.connections()
 	require.NotNil(t, after)
@@ -171,27 +171,27 @@ func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem
 	e1 := endpoint.New("e1.example:2135", endpoint.WithID(1))
 	e2 := endpoint.New("e2.example:2135", endpoint.WithID(2))
 
-	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, strategy.ResolvedLocation{})
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, "")
 	require.Len(t, b.connections().All(), 2)
 	require.Equal(t, 2, b.connections().PreferredCount())
 
-	b.plan = strategy.Compile(strategy.Prefer(
+	b.estimator = strategy.Prefer(
 		strategy.RandomChoice(), "NodeID(1)",
 		func(_ strategy.Info, candidate endpoint.Info) bool {
 			return candidate.NodeID() == 1
 		}, false,
-	))
-	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, strategy.ResolvedLocation{})
+	)
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, "")
 	require.Len(t, b.connections().All(), 2, "selection policy must not change connection ownership")
 	require.Equal(t, 1, b.connections().PreferredCount())
 	selected, err := b.nextConn(endpoint.WithNodeID(ctx, 2))
 	require.NoError(t, err)
 	require.Equal(t, e2.Key(), selected.Endpoint().Key())
 
-	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1}, strategy.ResolvedLocation{})
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1}, "")
 	require.NotNil(t, connInQuarantine(b, 2), "filtered-out conn must stay in quarantine until released")
 
-	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1}, strategy.ResolvedLocation{})
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1}, "")
 	require.Nil(t, connInQuarantine(b, 2), "filtered-out conn must be released after quarantine cycle")
 }
 
@@ -208,7 +208,7 @@ func TestApplyDiscoveredEndpointsClosedPool(t *testing.T) {
 	require.NotPanics(t, func() {
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
 			endpoint.New("node:2135", endpoint.WithID(1)),
-		}, strategy.ResolvedLocation{})
+		}, "")
 	})
 }
 
@@ -311,7 +311,7 @@ func TestBalancer_Close(t *testing.T) {
 		require.NotPanics(t, func() {
 			b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
 				endpoint.New("late-discovery:2135", endpoint.WithID(1)),
-			}, strategy.ResolvedLocation{})
+			}, "")
 		})
 	})
 
@@ -331,7 +331,7 @@ func TestBalancer_Close(t *testing.T) {
 
 		stopCalled := make(chan struct{})
 		closeMuFreeDuringStop := false
-		b.discoveryController = &stubRepeater{
+		b.discoveryRepeater = &stubRepeater{
 			stopFn: func() {
 				if b.closeMu.TryLock() {
 					closeMuFreeDuringStop = true
@@ -425,7 +425,7 @@ func TestBalancer_Close(t *testing.T) {
 			nil,
 		))
 
-		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e}, strategy.ResolvedLocation{})
+		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e}, "")
 		require.Nil(t, b.connectionsState.Load())
 
 		c2 := pool.Get(e)
@@ -454,9 +454,9 @@ func TestBalancer_CloseRacesWithNextConnRepeater(t *testing.T) {
 	}
 
 	b := &Balancer{
-		driverConfig:        cfg,
-		pool:                pool,
-		discoveryController: &stubRepeater{},
+		driverConfig:      cfg,
+		pool:              pool,
+		discoveryRepeater: &stubRepeater{},
 	}
 	connections := newConnectionsState(
 		[]conn.Conn{baseConn},
@@ -638,7 +638,7 @@ func TestNew(t *testing.T) {
 
 		b, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(-time.Nanosecond))
 		require.NoError(t, err)
-		require.Equal(t, "RandomChoice", b.plan.Estimator().String())
+		require.Equal(t, "RandomChoice", b.estimator.String())
 		require.NoError(t, b.Close(ctx))
 	})
 	t.Run("single connection policy skips discovery", func(t *testing.T) {
@@ -661,7 +661,7 @@ func TestNew(t *testing.T) {
 func TestBalancerForceDiscovery(t *testing.T) {
 	forceCalled := false
 	b := &Balancer{
-		discoveryController: &stubRepeater{
+		discoveryRepeater: &stubRepeater{
 			forceFn: func() {
 				forceCalled = true
 			},
@@ -689,7 +689,7 @@ func TestBalancerForcesDiscoveryWhenPreferredTierIsUnavailable(t *testing.T) {
 	forceCalled := false
 	balancer := &Balancer{
 		driverConfig: config.New(),
-		discoveryController: &stubRepeater{forceFn: func() {
+		discoveryRepeater: &stubRepeater{forceFn: func() {
 			forceCalled = true
 		}},
 	}
@@ -712,9 +712,9 @@ func TestStartClusterDiscoveryCanceledContext(t *testing.T) {
 		discoveryConfig: discoveryConfig.New(),
 	}
 
-	controller, err := b.StartClusterDiscovery(ctx)
+	err := b.startClusterDiscovery(ctx)
 	require.ErrorIs(t, err, context.Canceled)
-	require.Nil(t, controller)
+	require.Nil(t, b.discoveryRepeater)
 }
 
 // TestPessimizationOnOverloaded verifies that calling Invoke with a context tagged via

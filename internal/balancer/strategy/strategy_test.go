@@ -33,6 +33,46 @@ func TestIdentityEstimators(t *testing.T) {
 	}
 }
 
+func TestEstimatorDiscoveryRequirements(t *testing.T) {
+	tests := []struct {
+		name                       string
+		estimator                  Estimator
+		expectedConfiguredEndpoint bool
+		expectedNearestDC          bool
+	}{
+		{name: "nil defaults", estimator: nil},
+		{name: "unknown estimator", estimator: fixedEstimator{}},
+		{
+			name:                       "preference preserves single connection source",
+			estimator:                  Prefer(SingleConn(), "local", locationMatch("local"), false),
+			expectedConfiguredEndpoint: true,
+		},
+		{
+			name: "nearest DC over dynamic discovery",
+			estimator: PreferNearestDC(
+				RandomChoice(), "local", locationMatch("local"), true,
+			),
+			expectedNearestDC: true,
+		},
+		{
+			name: "outer preference preserves nested requirements",
+			estimator: Prefer(
+				PreferNearestDC(SingleConn(), "local", locationMatch("local"), true),
+				"remote", locationMatch("remote"), false,
+			),
+			expectedConfiguredEndpoint: true,
+			expectedNearestDC:          true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.expectedConfiguredEndpoint, UsesConfiguredEndpoint(test.estimator))
+			require.Equal(t, test.expectedNearestDC, DetectsNearestDC(test.estimator))
+		})
+	}
+}
+
 func TestPreferEstimator(t *testing.T) {
 	endpoints := strategyEndpoints("local", "remote")
 	withoutFallback := PreferNearestDC(RandomChoice(), "Location(local)", locationMatch("local"), false)

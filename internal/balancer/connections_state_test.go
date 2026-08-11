@@ -124,7 +124,7 @@ func TestDiscoveryReuseIPAndHostName(t *testing.T) {
 	}
 	balancer := &Balancer{
 		driverConfig: cfg,
-		plan:         strategy.Compile(cfg.Balancer()),
+		estimator:    cfg.Balancer(),
 		pool:         conn.NewPool(ctx, cfg),
 		discover: func(context.Context, *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
 			copy := discovered

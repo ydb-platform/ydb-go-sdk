@@ -24,7 +24,7 @@ func TestEstimatorUsesFreshDiscoveryMetadataBeforePoolGet(t *testing.T) {
 	)
 	balancer := &Balancer{
 		driverConfig: cfg,
-		plan:         strategy.Compile(policy),
+		estimator:    policy,
 		pool:         pool,
 	}
 	t.Cleanup(func() {
@@ -33,12 +33,12 @@ func TestEstimatorUsesFreshDiscoveryMetadataBeforePoolGet(t *testing.T) {
 	})
 
 	first := bridgeEndpoints(endpoint.PileStatePrimary, endpoint.PileStateSynchronized)
-	balancer.applyDiscoveredEndpoints(ctx, first, strategy.ResolvedLocation{})
+	balancer.applyDiscoveredEndpoints(ctx, first, "")
 	reused := balancer.connections().connByKey[first[1].Key()]
 	require.NotNil(t, reused)
 
 	second := bridgeEndpoints(endpoint.PileStateSynchronized, endpoint.PileStatePrimary)
-	balancer.applyDiscoveredEndpoints(ctx, second, strategy.ResolvedLocation{})
+	balancer.applyDiscoveredEndpoints(ctx, second, "")
 
 	selected, err := balancer.nextConn(ctx)
 	require.NoError(t, err)

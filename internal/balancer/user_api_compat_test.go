@@ -1,7 +1,6 @@
 package balancer
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -124,16 +123,16 @@ func TestUserBalancerConfigurations(t *testing.T) {
 
 func TestUserBalancerConfigDeserializationCompatibility(t *testing.T) {
 	tests := []struct {
-		name             string
-		serialized       string
-		preferred        []uint32
-		fallback         []uint32
-		nearestDC        bool
-		configuredSource bool
+		name                   string
+		serialized             string
+		preferred              []uint32
+		fallback               []uint32
+		nearestDC              bool
+		usesConfiguredEndpoint bool
 	}{
-		{name: "disable", serialized: `disable`, preferred: []uint32{1, 2, 3}, configuredSource: true},
-		{name: "single", serialized: `single`, preferred: []uint32{1, 2, 3}, configuredSource: true},
-		{name: "single JSON", serialized: `{"type":"single"}`, preferred: []uint32{1, 2, 3}, configuredSource: true},
+		{name: "disable", serialized: `disable`, preferred: []uint32{1, 2, 3}, usesConfiguredEndpoint: true},
+		{name: "single", serialized: `single`, preferred: []uint32{1, 2, 3}, usesConfiguredEndpoint: true},
+		{name: "single JSON", serialized: `{"type":"single"}`, preferred: []uint32{1, 2, 3}, usesConfiguredEndpoint: true},
 		{name: "round robin", serialized: `round_robin`, preferred: []uint32{1, 2, 3}},
 		{name: "round robin JSON", serialized: `{"type":"round_robin"}`, preferred: []uint32{1, 2, 3}},
 		{name: "random choice", serialized: `random_choice`, preferred: []uint32{1, 2, 3}},
@@ -197,35 +196,8 @@ func TestUserBalancerConfigDeserializationCompatibility(t *testing.T) {
 			require.Equal(t, test.preferred, preferred)
 			require.Equal(t, test.fallback, fallback)
 
-			plan := strategy.Compile(policy)
-			runtime := &userAPIPlanRuntime{}
-			_, err := plan.Start(t.Context(), runtime)
-			require.NoError(t, err)
-			if test.configuredSource {
-				require.Equal(t, "configured", runtime.source)
-			} else {
-				require.Equal(t, "cluster", runtime.source)
-			}
-
-			detectorCalls := 0
-			resolvedLocation, err := plan.ResolveLocation(
-				t.Context(), nil, "discovered",
-				func(context.Context, []endpoint.Endpoint) (string, error) {
-					detectorCalls++
-
-					return "detected", nil
-				},
-			)
-			require.NoError(t, err)
-			if test.nearestDC {
-				require.Equal(t, "detected", resolvedLocation.SelfLocation)
-				require.True(t, resolvedLocation.NeedLocalDC)
-				require.Equal(t, 1, detectorCalls)
-			} else {
-				require.Equal(t, "discovered", resolvedLocation.SelfLocation)
-				require.False(t, resolvedLocation.NeedLocalDC)
-				require.Zero(t, detectorCalls)
-			}
+			require.Equal(t, test.usesConfiguredEndpoint, strategy.UsesConfiguredEndpoint(policy))
+			require.Equal(t, test.nearestDC, strategy.DetectsNearestDC(policy))
 		})
 	}
 }
@@ -234,11 +206,11 @@ func userConfiguredBalancer(option config.Option, connections []conn.Conn, selfL
 	cfg := config.New(option)
 	b := &Balancer{
 		driverConfig: cfg,
-		plan:         strategy.Compile(cfg.Balancer()),
+		estimator:    cfg.Balancer(),
 	}
 	b.connectionsState.Store(newConnectionsStateWithBalancer(
 		connections,
-		b.plan.Estimator(),
+		b.estimator,
 		strategy.Info{SelfLocation: selfLocation},
 		nil,
 	))
@@ -307,24 +279,3 @@ func (r userAPITestRand) Int(max int) int {
 }
 
 func (userAPITestRand) Shuffle(int, func(int, int)) {}
-
-type userAPIPlanRuntime struct {
-	source string
-}
-
-func (r *userAPIPlanRuntime) StartClusterDiscovery(context.Context) (strategy.Controller, error) {
-	r.source = "cluster"
-
-	return userAPIPlanController{}, nil
-}
-
-func (r *userAPIPlanRuntime) UseConfiguredEndpoint(context.Context) (strategy.Controller, error) {
-	r.source = "configured"
-
-	return userAPIPlanController{}, nil
-}
-
-type userAPIPlanController struct{}
-
-func (userAPIPlanController) Force() {}
-func (userAPIPlanController) Stop()  {}

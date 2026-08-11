@@ -38,14 +38,15 @@ func TestNewReturnsDiscoveryStartError(t *testing.T) {
 	require.Nil(t, balancer)
 }
 
-func TestClusterDiscoveryAttemptReturnsLocationResolverError(t *testing.T) {
+func TestClusterDiscoveryAttemptReturnsLocalDCDetectorError(t *testing.T) {
 	expectedErr := errors.New("local DC detection failed")
 	policy := strategy.PreferNearestDC(
 		strategy.RandomChoice(), "LocalDC", func(strategy.Info, endpoint.Info) bool { return true }, false,
 	)
 	balancer := &Balancer{
-		driverConfig: config.New(),
-		plan:         strategy.Compile(policy),
+		driverConfig:    config.New(),
+		estimator:       policy,
+		detectNearestDC: true,
 		discover: func(context.Context, *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
 			return []endpoint.Endpoint{endpoint.New("node:2135")}, "", nil
 		},
