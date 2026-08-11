@@ -76,13 +76,15 @@ func locationsString(locations []string) string {
 // PreferLocations creates balancer which use endpoints only in selected locations (such as "ABC", "DEF", etc.)
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 func PreferLocations(estimator strategy.Estimator, locations ...string) strategy.Estimator {
+	return preferLocations(estimator, false, locations)
+}
+
+func preferLocations(estimator strategy.Estimator, allowFallback bool, locations []string) strategy.Estimator {
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
 
-	// Prevent modify source locations
 	locations = slices.Clone(locations)
-
 	for i := range locations {
 		locations[i] = strings.ToUpper(locations[i])
 	}
@@ -90,26 +92,14 @@ func PreferLocations(estimator strategy.Estimator, locations ...string) strategy
 
 	return strategy.Prefer(estimator, locationsString(locations), func(_ strategy.Info, candidate endpoint.Info) bool {
 		return slices.Contains(locations, strings.ToUpper(candidate.Location()))
-	}, false)
+	}, allowFallback)
 }
 
 // PreferLocationsWithFallback creates balancer which use endpoints only in selected locations
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
 func PreferLocationsWithFallback(estimator strategy.Estimator, locations ...string) strategy.Estimator {
-	if len(locations) == 0 {
-		panic("empty list of locations")
-	}
-
-	locations = slices.Clone(locations)
-	for i := range locations {
-		locations[i] = strings.ToUpper(locations[i])
-	}
-	sort.Strings(locations)
-
-	return strategy.Prefer(estimator, locationsString(locations), func(_ strategy.Info, candidate endpoint.Info) bool {
-		return slices.Contains(locations, strings.ToUpper(candidate.Location()))
-	}, true)
+	return preferLocations(estimator, true, locations)
 }
 
 type Endpoint interface {

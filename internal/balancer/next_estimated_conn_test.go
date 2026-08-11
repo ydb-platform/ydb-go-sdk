@@ -1,10 +1,12 @@
 package balancer
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
@@ -77,6 +79,37 @@ func TestNextEstimatedConnStopsWhenElectionSnapshotIsEmpty(t *testing.T) {
 
 	require.Nil(t, selected)
 	require.Zero(t, failedCount)
+}
+
+func TestNextEstimatedConnStopsWhenContextIsCanceled(t *testing.T) {
+	connection := &mock.Conn{AddrField: "available:2135", StateField: state.Online}
+	connections := newConnectionsStateWithBalancer(
+		[]conn.Conn{connection}, strategy.RandomChoice(), strategy.Info{}, nil,
+	)
+	balancer := &Balancer{}
+	balancer.connectionsState.Store(connections)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	selected, failedCount := balancer.nextEstimatedConn(ctx, connections)
+
+	require.Nil(t, selected)
+	require.Zero(t, failedCount)
+}
+
+func TestNextConnReturnsCanceledContext(t *testing.T) {
+	connection := &mock.Conn{AddrField: "available:2135", StateField: state.Online}
+	balancer := &Balancer{driverConfig: config.New()}
+	balancer.connectionsState.Store(newConnectionsStateWithBalancer(
+		[]conn.Conn{connection}, strategy.RandomChoice(), strategy.Info{}, nil,
+	))
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	selected, err := balancer.nextConn(ctx)
+
+	require.Nil(t, selected)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 type snapshotSwappingConn struct {

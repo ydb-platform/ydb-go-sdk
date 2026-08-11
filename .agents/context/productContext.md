@@ -37,6 +37,9 @@ YDB targets OLTP primarily; the SDK also supports OLAP-oriented scenarios (analy
 - Published as `github.com/ydb-platform/ydb-go-sdk/v3` on pkg.go.dev.
 - `// Experimental`, `// Deprecated`, `// Internals` markers per `VERSIONING.md`.
 - Breaking changes tracked by `breaking.yml` (`gorelease`); label `broken changes` to skip gate.
+- Balancer refactors may change constructor result types, but existing expressions such as
+  `ydb.WithBalancer(balancers.PreferNearestDC(balancers.RandomChoice()))` must remain source-usable with the same logical
+  selection behavior. Persisted `balancers.FromConfig(string)` settings are also a compatibility boundary.
 
 ## Related resources
 

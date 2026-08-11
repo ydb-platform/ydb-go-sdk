@@ -173,7 +173,8 @@ func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem
 
 	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, "")
 	require.Len(t, b.connections().All(), 2)
-	require.Equal(t, 2, b.connections().PreferredCount())
+	preferred, _ := b.connections().elector.PreferenceHealth()
+	require.Equal(t, 2, preferred)
 
 	b.estimator = strategy.Prefer(
 		strategy.RandomChoice(), "NodeID(1)",
@@ -183,7 +184,8 @@ func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem
 	)
 	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, "")
 	require.Len(t, b.connections().All(), 2, "selection policy must not change connection ownership")
-	require.Equal(t, 1, b.connections().PreferredCount())
+	preferred, _ = b.connections().elector.PreferenceHealth()
+	require.Equal(t, 1, preferred)
 	selected, err := b.nextConn(endpoint.WithNodeID(ctx, 2))
 	require.NoError(t, err)
 	require.Equal(t, e2.Key(), selected.Endpoint().Key())
@@ -466,7 +468,8 @@ func TestBalancer_CloseRacesWithNextConnRepeater(t *testing.T) {
 		nil,
 	)
 	connections.all[0] = blockingConn
-	connections.connByKey[baseConn.Endpoint().Key()] = blockingConn
+	connections.elector.connections[baseConn.Endpoint().Key()] = blockingConn
+	connections.elector.snapshot.Load().entries[0].connection = blockingConn
 	connections.connByNodeID[baseConn.Endpoint().NodeID()] = blockingConn
 	b.connectionsState.Store(connections)
 

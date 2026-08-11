@@ -590,12 +590,11 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 			)
 		}
 	}
-	if len(state.estimates) == 0 {
+	if state.elector.CandidateCount() == 0 {
 		return nil, xerrors.WithStackTrace(ErrNoEndpoints)
 	}
 
-	preferredCount := state.PreferredCount()
-	unavailablePreferred := state.UnavailablePreferredCount()
+	preferredCount, unavailablePreferred := state.elector.PreferenceHealth()
 	defer func() {
 		if max(failedCount, unavailablePreferred)*2 <= preferredCount {
 			return
@@ -616,21 +615,24 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 
 func (b *Balancer) nextEstimatedConn(ctx context.Context, state *connectionsState) (conn.Conn, int) {
 	failedCount := 0
-	for range len(state.estimates) + 1 {
-		key, selected, allowBanned, ok := state.NextEndpoint(ctx)
+	for range state.elector.CandidateCount() + 1 {
+		if ctx.Err() != nil {
+			break
+		}
+		key, selected, allowBanned, ok := state.elector.Next()
 		if !ok {
 			break
 		}
-		if selected != nil && isOkConnection(selected, allowBanned) {
+		if isConnectionUsable(selected, allowBanned) {
 			return selected, failedCount
 		}
 		failedCount++
-		state.Pessimize(key)
+		state.elector.Pessimize(key)
 		if current := b.connections(); current != state {
 			if current == nil {
 				break
 			}
-			current.Pessimize(key)
+			current.elector.Pessimize(key)
 			state = current
 		}
 	}
@@ -641,6 +643,6 @@ func (b *Balancer) nextEstimatedConn(ctx context.Context, state *connectionsStat
 func (b *Balancer) ban(ctx context.Context, connection conn.Conn, cause error) {
 	b.pool.Ban(ctx, connection, cause)
 	if current := b.connections(); current != nil {
-		current.Pessimize(connection.Endpoint().Key())
+		current.elector.Pessimize(connection.Endpoint().Key())
 	}
 }

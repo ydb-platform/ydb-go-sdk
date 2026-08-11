@@ -15,6 +15,7 @@ import (
 
 type electionEntry struct {
 	key        endpoint.Key
+	connection conn.Conn
 	cumulative int64
 }
 
@@ -60,10 +61,10 @@ func newEndpointElector(
 	return elector
 }
 
-func (e *endpointElector) Next() (key endpoint.Key, allowBanned bool, ok bool) {
+func (e *endpointElector) Next() (key endpoint.Key, connection conn.Conn, allowBanned bool, ok bool) {
 	snapshot := e.snapshot.Load()
 	if snapshot == nil || len(snapshot.entries) == 0 {
-		return endpoint.Key{}, false, false
+		return endpoint.Key{}, nil, false, false
 	}
 
 	var index int
@@ -76,7 +77,17 @@ func (e *endpointElector) Next() (key endpoint.Key, allowBanned bool, ok bool) {
 		})
 	}
 
-	return snapshot.entries[index].key, snapshot.allowBanned, true
+	entry := snapshot.entries[index]
+
+	return entry.key, entry.connection, snapshot.allowBanned, true
+}
+
+func (e *endpointElector) CandidateCount() int {
+	if e == nil {
+		return 0
+	}
+
+	return len(e.estimates)
 }
 
 func (e *endpointElector) Pessimize(key endpoint.Key) {
@@ -126,6 +137,7 @@ func (e *endpointElector) rebuildLocked() {
 		snapshot.totalWeight += weight
 		snapshot.entries[i] = electionEntry{
 			key:        candidate.Key,
+			connection: e.connections[candidate.Key],
 			cumulative: snapshot.totalWeight,
 		}
 	}
@@ -177,7 +189,7 @@ func (e *endpointElector) candidatesByHealth() (
 
 		_, pessimized := e.pessimized[estimation.Key]
 		connectionState := connection.State()
-		healthyCandidate := !pessimized && isHealthyConnectionState(connectionState)
+		healthyCandidate := !pessimized && isConnectionUsable(connection, false)
 		bannedCandidate := pessimized || connectionState == state.Banned
 		if estimation.Penalty == minimumPolicy {
 			preferredCount++
@@ -230,10 +242,16 @@ func normalizeElectionWeights(candidates []strategy.Estimation) []uint64 {
 	return weights
 }
 
-func isHealthyConnectionState(connectionState state.State) bool {
-	switch connectionState {
+func isConnectionUsable(connection conn.Conn, allowBanned bool) bool {
+	if connection == nil {
+		return false
+	}
+
+	switch connection.State() {
 	case state.Created, state.Online, state.Offline:
 		return true
+	case state.Banned:
+		return allowBanned
 	default:
 		return false
 	}

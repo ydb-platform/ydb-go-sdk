@@ -26,14 +26,9 @@ func TestConnectionsStateDefensiveViews(t *testing.T) {
 	all := s.All()
 	all[0] = &mock.Conn{AddrField: "mutated"}
 	require.Equal(t, "1", s.All()[0].Endpoint().Address())
-	require.Equal(t, 2, s.PreferredCount())
-	require.Zero(t, s.UnavailablePreferredCount())
 
 	var nilState *connectionsState
 	require.Nil(t, nilState.All())
-	require.Zero(t, nilState.PreferredCount())
-	require.Zero(t, nilState.UnavailablePreferredCount())
-	nilState.Pessimize(endpoint.Key{})
 }
 
 func TestConnectionsStatePolicyGroups(t *testing.T) {
@@ -49,11 +44,13 @@ func TestConnectionsStatePolicyGroups(t *testing.T) {
 	)
 	s := newConnectionsStateWithBalancer(connections, estimator, strategy.Info{SelfLocation: "local"}, nil)
 
-	require.Equal(t, 1, s.PreferredCount())
+	preferred, unavailable := s.elector.PreferenceHealth()
+	require.Equal(t, 1, preferred)
+	require.Zero(t, unavailable)
 	require.Equal(t, []strategy.Estimation{
 		{Key: connections[0].Endpoint().Key(), Weight: 1},
 		{Key: connections[1].Endpoint().Key(), Penalty: 1, Weight: 1},
-	}, s.estimates)
+	}, s.elector.estimates)
 }
 
 func TestConnectionsStatePinnedNodeContract(t *testing.T) {
@@ -77,25 +74,17 @@ func TestConnectionsStateLastResort(t *testing.T) {
 		connections, strategy.RandomChoice(), strategy.Info{}, nil, deterministicRand{},
 	)
 
-	_, selected, allowBanned, ok := s.NextEndpoint(t.Context())
+	_, selected, allowBanned, ok := s.elector.Next()
 	require.True(t, ok)
 	require.True(t, allowBanned)
 	require.Same(t, connections[0], selected)
 }
 
-func TestConnectionsStateEmptyAndCanceled(t *testing.T) {
+func TestConnectionsStateEmpty(t *testing.T) {
 	s := newConnectionsState(nil, nil, strategy.Info{}, false, nil)
-	_, connection, _, ok := s.NextEndpoint(t.Context())
+	_, connection, _, ok := s.elector.Next()
 	require.False(t, ok)
 	require.Nil(t, connection)
-
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	key, connection, allowBanned, ok := s.NextEndpoint(ctx)
-	require.False(t, ok)
-	require.Equal(t, endpoint.Key{}, key)
-	require.Nil(t, connection)
-	require.False(t, allowBanned)
 }
 
 func TestConnsToNodeIDMap(t *testing.T) {
@@ -107,13 +96,14 @@ func TestConnsToNodeIDMap(t *testing.T) {
 	require.Equal(t, map[uint32]conn.Conn{0: connections[0], 10: connections[1]}, connsToNodeIDMap(connections))
 }
 
-func TestIsOKConnection(t *testing.T) {
+func TestIsConnectionUsable(t *testing.T) {
+	require.False(t, isConnectionUsable(nil, true))
 	for _, goodState := range []state.State{state.Created, state.Online, state.Offline} {
-		require.True(t, isOkConnection(&mock.Conn{StateField: goodState}, false))
+		require.True(t, isConnectionUsable(&mock.Conn{StateField: goodState}, false))
 	}
-	require.False(t, isOkConnection(&mock.Conn{StateField: state.Banned}, false))
-	require.True(t, isOkConnection(&mock.Conn{StateField: state.Banned}, true))
-	require.False(t, isOkConnection(&mock.Conn{StateField: state.Destroyed}, true))
+	require.False(t, isConnectionUsable(&mock.Conn{StateField: state.Banned}, false))
+	require.True(t, isConnectionUsable(&mock.Conn{StateField: state.Banned}, true))
+	require.False(t, isConnectionUsable(&mock.Conn{StateField: state.Destroyed}, true))
 }
 
 func TestDiscoveryReuseIPAndHostName(t *testing.T) {

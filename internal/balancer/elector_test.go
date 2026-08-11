@@ -23,10 +23,11 @@ func TestEndpointElectorUniformAndWeightedSelection(t *testing.T) {
 		{Key: second.Endpoint().Key(), Weight: 1},
 	}, connections, rand)
 
-	key, allowBanned, ok := elector.Next()
+	key, selected, allowBanned, ok := elector.Next()
 	require.True(t, ok)
 	require.False(t, allowBanned)
 	require.Equal(t, second.Endpoint().Key(), key)
+	require.Same(t, second, selected)
 	require.True(t, elector.snapshot.Load().uniform)
 
 	rand.int64Value = 0
@@ -34,16 +35,18 @@ func TestEndpointElectorUniformAndWeightedSelection(t *testing.T) {
 		{Key: first.Endpoint().Key(), Weight: 1},
 		{Key: second.Endpoint().Key(), Weight: 3},
 	}, connections, rand)
-	key, allowBanned, ok = elector.Next()
+	key, selected, allowBanned, ok = elector.Next()
 	require.True(t, ok)
 	require.False(t, allowBanned)
 	require.Equal(t, first.Endpoint().Key(), key)
+	require.Same(t, first, selected)
 	require.False(t, elector.snapshot.Load().uniform)
 
 	rand.int64Value = 1
-	key, _, ok = elector.Next()
+	key, selected, _, ok = elector.Next()
 	require.True(t, ok)
 	require.Equal(t, second.Endpoint().Key(), key)
+	require.Same(t, second, selected)
 }
 
 func TestEndpointElectorUsesBestHealthyPenaltyBucket(t *testing.T) {
@@ -54,10 +57,11 @@ func TestEndpointElectorUsesBestHealthyPenaltyBucket(t *testing.T) {
 		{Key: second.Endpoint().Key(), Penalty: 1, Weight: 1},
 	}, connectionMap(first, second), &electorRand{})
 
-	key, allowBanned, ok := elector.Next()
+	key, selected, allowBanned, ok := elector.Next()
 	require.True(t, ok)
 	require.False(t, allowBanned)
 	require.Equal(t, second.Endpoint().Key(), key)
+	require.Same(t, second, selected)
 }
 
 func TestEndpointElectorPessimizeAndLastResort(t *testing.T) {
@@ -73,16 +77,18 @@ func TestEndpointElectorPessimizeAndLastResort(t *testing.T) {
 	preferred, unavailable := elector.PreferenceHealth()
 	require.Equal(t, 2, preferred)
 	require.Equal(t, 1, unavailable)
-	key, allowBanned, ok := elector.Next()
+	key, selected, allowBanned, ok := elector.Next()
 	require.True(t, ok)
 	require.False(t, allowBanned)
 	require.Equal(t, second.Endpoint().Key(), key)
+	require.Same(t, second, selected)
 
 	elector.Pessimize(second.Endpoint().Key())
-	key, allowBanned, ok = elector.Next()
+	key, selected, allowBanned, ok = elector.Next()
 	require.True(t, ok)
 	require.True(t, allowBanned)
 	require.Equal(t, first.Endpoint().Key(), key)
+	require.Same(t, first, selected)
 }
 
 func TestEndpointElectorCombinesConnectionStateAndPolicy(t *testing.T) {
@@ -106,29 +112,34 @@ func TestEndpointElectorCombinesConnectionStateAndPolicy(t *testing.T) {
 	}
 	elector := newEndpointElector(estimates, connections, &electorRand{})
 
-	key, allowBanned, ok := elector.Next()
+	key, selected, allowBanned, ok := elector.Next()
 	require.True(t, ok)
 	require.False(t, allowBanned)
 	require.Equal(t, created.Endpoint().Key(), key)
-	for _, connectionState := range []state.State{state.Created, state.Online, state.Offline} {
-		require.True(t, isHealthyConnectionState(connectionState))
-	}
-	require.False(t, isHealthyConnectionState(state.Banned))
-	require.False(t, isHealthyConnectionState(state.Unknown))
-	require.False(t, isHealthyConnectionState(state.Destroyed))
+	require.Same(t, created, selected)
 }
 
 func TestEndpointElectorEmptyAndLargeWeights(t *testing.T) {
 	var zero endpointElector
-	_, _, ok := zero.Next()
+	key, selected, allowBanned, ok := zero.Next()
 	require.False(t, ok)
+	require.Equal(t, endpoint.Key{}, key)
+	require.Nil(t, selected)
+	require.False(t, allowBanned)
+	require.Zero(t, zero.CandidateCount())
+	var nilElector *endpointElector
+	require.Zero(t, nilElector.CandidateCount())
 	preferred, unavailable := zero.PreferenceHealth()
 	require.Zero(t, preferred)
 	require.Zero(t, unavailable)
 
 	empty := newEndpointElector([]strategy.Estimation{{Weight: 0}}, nil, nil)
-	_, _, ok = empty.Next()
+	key, selected, allowBanned, ok = empty.Next()
 	require.False(t, ok)
+	require.Equal(t, endpoint.Key{}, key)
+	require.Nil(t, selected)
+	require.False(t, allowBanned)
+	require.Equal(t, 1, empty.CandidateCount())
 	require.NotNil(t, empty.snapshot.Load())
 
 	first := electorConnection("first", 1, state.Online)
@@ -137,9 +148,11 @@ func TestEndpointElectorEmptyAndLargeWeights(t *testing.T) {
 		{Key: first.Endpoint().Key(), Weight: math.MaxUint64},
 		{Key: second.Endpoint().Key(), Weight: math.MaxUint64 / 2},
 	}, connectionMap(first, second), &electorRand{})
-	key, _, ok := large.Next()
+	key, selected, allowBanned, ok = large.Next()
 	require.True(t, ok)
+	require.False(t, allowBanned)
 	require.Equal(t, first.Endpoint().Key(), key)
+	require.Same(t, first, selected)
 	require.False(t, large.snapshot.Load().uniform)
 	require.Greater(t, large.snapshot.Load().entries[0].cumulative,
 		large.snapshot.Load().totalWeight-large.snapshot.Load().entries[0].cumulative,
@@ -156,10 +169,11 @@ func TestEndpointElectorKeepsHealthyMaxPenaltyAboveBannedEndpoint(t *testing.T) 
 		{Key: banned.Endpoint().Key(), Weight: 1},
 	}, connectionMap(healthy, banned), &electorRand{})
 
-	key, allowBanned, ok := elector.Next()
+	key, selected, allowBanned, ok := elector.Next()
 	require.True(t, ok)
 	require.False(t, allowBanned)
 	require.Equal(t, healthy.Endpoint().Key(), key)
+	require.Same(t, healthy, selected)
 }
 
 func electorConnection(address string, nodeID uint32, connectionState state.State) conn.Conn {

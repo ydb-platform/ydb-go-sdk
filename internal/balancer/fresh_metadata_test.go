@@ -34,7 +34,7 @@ func TestEstimatorUsesFreshDiscoveryMetadataBeforePoolGet(t *testing.T) {
 
 	first := bridgeEndpoints(endpoint.PileStatePrimary, endpoint.PileStateSynchronized)
 	balancer.applyDiscoveredEndpoints(ctx, first, "")
-	reused := balancer.connections().connByKey[first[1].Key()]
+	reused := balancer.connections().elector.connections[first[1].Key()]
 	require.NotNil(t, reused)
 
 	second := bridgeEndpoints(endpoint.PileStateSynchronized, endpoint.PileStatePrimary)

@@ -52,7 +52,7 @@ Service clients are **lazy**: `d.Table()` calls `d.table.Must()` which runs the 
 All service clients receive the same `*balancerWithMeta` (implements `grpc.ClientConnInterface`):
 
 - `Invoke()` / `NewStream()` inject `meta.Meta` into context, then delegate to `internal/balancer.Balancer`.
-- `Balancer` picks an endpoint, gets `conn.Pool.Get(endpoint)`, executes RPC.
+- Discovery maps fresh endpoints to pooled connection wrappers. `Balancer.nextConn` chooses one wrapper and executes the RPC.
 - On stream/call errors that indicate a bad connection, the endpoint may be **banned** (pessimization) and rediscovered.
 
 This is the single production path for gRPC — do not dial around the balancer.
@@ -115,16 +115,49 @@ Query additionally has **implicit** session pool for server-side session managem
 
 ```
 Balancer
-  ├── clusterDiscovery()     # periodic / on-init endpoint list refresh
-  ├── discover endpoints     # via Discovery gRPC (or static single endpoint)
-  ├── localDCDetector        # for PreferNearestDC balancers
-  ├── filter by balancerConfig (RandomChoice, PreferNearestDC, location filters)
-  └── wrapCall / wrapStream  # ban endpoint on retriable connection failures
+  ├── clusterDiscovery()       # periodic / on-init endpoint refresh
+  ├── enrich fresh endpoints   # LocalDC and discovery metadata before pool lookup
+  ├── Estimator.Estimate()     # immutable policy tree → key/penalty/weight
+  ├── endpointElector          # health + weighted random hot-path snapshot
+  └── wrapCall / wrapStream    # pessimization on retriable connection failures
 ```
 
 User-facing presets: `balancers/RandomChoice`, `SingleConn`, `PreferNearestDC`, `PreferNearestDCWithFallBack`.
 
 Configured via `config.WithBalancer(...)` or `ydb.WithBalancer(...)`.
+
+### Selection policy and runtime health
+
+Balancer configuration is an immutable tree of `strategy.Estimator` values. Leaf estimators assign an initial
+`Estimation{Key, Penalty, Weight}` to every candidate. Preference constructors wrap a child estimator and transform
+its output: preferred endpoints keep the best penalty bucket, while an enabled fallback receives a worse bucket.
+This makes existing constructor expressions composable without putting discovery or connection state into the tree.
+
+```text
+PreferNearestDCWithFallBack(RandomChoice())
+  → Prefer(LocalDC, fallback=true)
+      → RandomChoice
+```
+
+The estimator runs once for each fresh discovery snapshot, before endpoints are mapped to pooled wrappers. This order
+is important: reused `conn.Conn` values may retain endpoint metadata from an older discovery response.
+
+Mutable state has one owner: `endpointElector`. It stores the estimates, the `endpoint.Key → conn.Conn` mapping, and
+pessimized keys. Discovery and pessimization rebuild an immutable election snapshot behind `atomic.Pointer`; the RPC
+hot path only loads that snapshot, chooses among the lowest-penalty usable endpoints, and performs weighted random
+selection. If no healthy endpoint remains, banned/pessimized endpoints are a last resort.
+
+`nextConn` handles the contracts outside policy estimation:
+
+- `balancers.WithNodeID` bypasses estimator policy and addresses the requested node directly (unless fallback was requested);
+- `Created`, `Online`, and `Offline` wrappers are usable; `Banned` is eligible only as the last resort;
+- a selected wrapper that becomes unusable is pessimized in the elector, and sufficient preferred-endpoint loss forces discovery.
+
+Keep these responsibilities separate: estimators express endpoint policy; the elector owns runtime health and random
+choice; the connection pool owns wrapper lifecycle.
+
+Compatibility tests must keep existing constructor expressions source-usable and preserve the logical meaning of
+persisted `balancers.FromConfig(string)` values across balancer refactors.
 
 `Driver.Discovery()` exposes a separate discovery client (uses bootstrap connection from pool, not the main balancer loop).
 

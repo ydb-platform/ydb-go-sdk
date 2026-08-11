@@ -8,6 +8,18 @@ Read when touching public API, package layout, dependencies, or error handling.
 - Match naming and formatting in the touched package; do not reformat unrelated code.
 - Run `golangci-lint run ./...` before handoff (CI also checks gofumpt + gci).
 
+## Simplicity and maintainability
+
+Simple, readable code is a design requirement, not a cleanup task for a later PR.
+
+- Start with the smallest function or concrete type that satisfies the current behavior. Add an interface, lifecycle phase, state holder, or wrapper only when it owns a distinct invariant or removes more complexity than it introduces.
+- A hypothetical future feature alone does not justify a new abstraction. Name the concrete requirement, show how the abstraction serves it, and cover that extension point with a test or benchmark.
+- Keep the main execution path easy to follow from entrypoint to side effect. One decision and one piece of mutable state should have one owner; avoid duplicate state, forwarding-only layers, and parallel representations of the same policy.
+- Prefer composition of small domain operations over generic framework vocabulary. Do not introduce multi-stage `Plan` / `Compile` / `Runtime`-style pipelines when a direct function or immutable value expresses the same behavior.
+- In a refactor, justify every new exported or package-level entity and delete superseded scaffolding. A refactor that merely moves complexity or increases the number of concepts is not complete.
+- Measure hot-path changes with a benchmark that can be compared with the previous implementation. Do not trade debuggability or obvious control flow for speculative performance.
+- During review, explicitly ask: can a reader diagnose behavior and add the next known feature by changing fewer concepts than before? If not, simplify before merge.
+
 ## Dependencies
 
 - Do **not** change `go.mod` / `go.sum` unless the task explicitly requires it.
@@ -68,4 +80,3 @@ func (p *Pool) tryPut(c *conn) bool {
 Same pattern for `release()` in `Pool.RemoveRef`.
 
 **Avoid** holding a pool-wide mutex across blocking `Close()` unless there is a documented lock-order reason (e.g. `onClose` must re-enter the same mutex). Prefer delete-from-map under lock, then close outside.
-
