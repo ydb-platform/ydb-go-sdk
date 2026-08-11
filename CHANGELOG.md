@@ -1,3 +1,4 @@
+## v3.147.2
 * Updated ydb-go-genproto and added bridge pile state to discovered endpoint metadata
 
 ## v3.147.1
