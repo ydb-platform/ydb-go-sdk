@@ -20,10 +20,11 @@ type electionEntry struct {
 }
 
 type electionSnapshot struct {
-	entries     []electionEntry
-	totalWeight int64
-	uniform     bool
-	allowBanned bool
+	entries        []electionEntry
+	totalWeight    int64
+	uniform        bool
+	allowBanned    bool
+	candidateCount int
 
 	preferredCount       int
 	unavailablePreferred int
@@ -87,7 +88,12 @@ func (e *endpointElector) CandidateCount() int {
 		return 0
 	}
 
-	return len(e.estimates)
+	snapshot := e.snapshot.Load()
+	if snapshot == nil {
+		return 0
+	}
+
+	return snapshot.candidateCount
 }
 
 func (e *endpointElector) Pessimize(key endpoint.Key) {
@@ -111,9 +117,10 @@ func (e *endpointElector) PreferenceHealth() (preferred, unavailable int) {
 }
 
 func (e *endpointElector) rebuildLocked() {
-	best, allowBanned, preferredCount, unavailablePreferred := e.bestCandidates()
+	best, allowBanned, candidates, preferredCount, unavailablePreferred := e.bestCandidates()
 	snapshot := &electionSnapshot{
 		allowBanned:          allowBanned,
+		candidateCount:       candidates,
 		preferredCount:       preferredCount,
 		unavailablePreferred: unavailablePreferred,
 	}
@@ -147,12 +154,14 @@ func (e *endpointElector) rebuildLocked() {
 func (e *endpointElector) bestCandidates() (
 	best []strategy.Estimation,
 	allowBanned bool,
+	candidates int,
 	preferredCount int,
 	unavailablePreferred int,
 ) {
 	healthy, banned, preferredCount, unavailablePreferred := e.candidatesByHealth()
+	candidates = len(healthy) + len(banned)
 	if len(healthy) == 0 {
-		return banned, len(banned) > 0, preferredCount, unavailablePreferred
+		return banned, len(banned) > 0, candidates, preferredCount, unavailablePreferred
 	}
 
 	minimumHealthyPenalty := uint64(math.MaxUint64)
@@ -166,7 +175,7 @@ func (e *endpointElector) bestCandidates() (
 		}
 	}
 
-	return best, false, preferredCount, unavailablePreferred
+	return best, false, candidates, preferredCount, unavailablePreferred
 }
 
 func (e *endpointElector) candidatesByHealth() (
@@ -190,7 +199,8 @@ func (e *endpointElector) candidatesByHealth() (
 		_, pessimized := e.pessimized[estimation.Key]
 		connectionState := connection.State()
 		healthyCandidate := !pessimized && isConnectionStateUsable(connectionState, false)
-		bannedCandidate := pessimized || connectionState == state.Banned
+		bannedCandidate := isConnectionStateUsable(connectionState, true) &&
+			(pessimized || connectionState == state.Banned)
 		if estimation.Penalty == minimumPolicy {
 			preferredCount++
 			if !healthyCandidate {

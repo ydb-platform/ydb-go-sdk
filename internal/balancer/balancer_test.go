@@ -1611,6 +1611,39 @@ func TestNextEstimatedConnStopsWhenElectionSnapshotIsEmpty(t *testing.T) {
 	require.Zero(t, failedCount)
 }
 
+func TestNextEstimatedConnStopsWhenElectionSnapshotBecomesEmpty(t *testing.T) {
+	connection := &mock.Conn{AddrField: "available:2135", StateField: state.Online}
+	connections := newConnectionsStateWithBalancer(
+		[]conn.Conn{connection}, strategy.RandomChoice(), strategy.Info{}, nil,
+	)
+	balancer := &Balancer{}
+	balancer.connectionsState.Store(connections)
+	ctx := &clearElectionContext{elector: connections.elector}
+
+	selected, failedCount := balancer.nextEstimatedConn(ctx, connections)
+
+	require.Nil(t, selected)
+	require.Zero(t, failedCount)
+}
+
+func TestNextConnReturnsNoEndpointsWhenElectionSnapshotIsEmpty(t *testing.T) {
+	connection := &mock.Conn{AddrField: "destroyed:2135", StateField: state.Destroyed}
+	connections := newConnectionsStateWithEstimates(
+		[]conn.Conn{connection},
+		[]strategy.Estimation{{Key: connection.Endpoint().Key(), Weight: 1}},
+		nil,
+		nil,
+	)
+	balancer := &Balancer{driverConfig: config.New()}
+	balancer.connectionsState.Store(connections)
+
+	selected, err := balancer.nextConn(t.Context())
+
+	require.Nil(t, selected)
+	require.ErrorIs(t, err, ErrNoEndpoints)
+	require.NotContains(t, err.Error(), "after 0 attempts")
+}
+
 func TestNextEstimatedConnStopsWhenContextIsCanceled(t *testing.T) {
 	connection := &mock.Conn{AddrField: "available:2135", StateField: state.Online}
 	connections := newConnectionsStateWithBalancer(
@@ -2481,4 +2514,26 @@ func TestBalancerConnectionTTLParksTransportsAfterNetworkLoss(t *testing.T) {
 	for _, nodeID := range nodeIDs {
 		require.Equal(t, 1, events.closedCount(nodeID))
 	}
+}
+
+type clearElectionContext struct {
+	elector *endpointElector
+}
+
+func (*clearElectionContext) Deadline() (time.Time, bool) {
+	return time.Time{}, false
+}
+
+func (*clearElectionContext) Done() <-chan struct{} {
+	return nil
+}
+
+func (c *clearElectionContext) Err() error {
+	c.elector.snapshot.Store(&electionSnapshot{})
+
+	return nil
+}
+
+func (*clearElectionContext) Value(any) any {
+	return nil
 }

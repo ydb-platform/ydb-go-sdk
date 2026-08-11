@@ -111,6 +111,9 @@ func TestEndpointElectorCombinesConnectionStateAndPolicy(t *testing.T) {
 		{Key: endpoint.New("zero-weight").Key(), Weight: 0},
 	}
 	elector := newEndpointElector(estimates, connections, &electorRand{})
+	require.Equal(t, 4, elector.CandidateCount())
+	elector.Pessimize(destroyed.Endpoint().Key())
+	require.Equal(t, 4, elector.CandidateCount())
 
 	key, selected, allowBanned, ok := elector.Next()
 	require.True(t, ok)
@@ -139,7 +142,7 @@ func TestEndpointElectorEmptyAndLargeWeights(t *testing.T) {
 	require.Equal(t, endpoint.Key{}, key)
 	require.Nil(t, selected)
 	require.False(t, allowBanned)
-	require.Equal(t, 1, empty.CandidateCount())
+	require.Zero(t, empty.CandidateCount())
 	require.NotNil(t, empty.snapshot.Load())
 
 	first := electorConnection("first", 1, state.Online)
