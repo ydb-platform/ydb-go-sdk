@@ -203,6 +203,8 @@ func (e *endpointElector) candidatesByHealth() (
 			healthy = append(healthy, estimation)
 		case bannedCandidate:
 			banned = append(banned, estimation)
+		default:
+			// Unknown and destroyed connections are intentionally excluded from election.
 		}
 	}
 

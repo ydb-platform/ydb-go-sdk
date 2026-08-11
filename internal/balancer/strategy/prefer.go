@@ -25,7 +25,7 @@ func (p prefer) Estimate(info Info, endpoints []endpoint.Endpoint) []Estimation 
 		return preferred
 	}
 
-	return append(preferred, shiftFallbackPenalties(preferred, fallback)...)
+	return shiftFallbackPenalties(preferred, fallback)
 }
 
 func (p prefer) String() string {
@@ -73,8 +73,11 @@ func partitionEstimates(
 }
 
 func shiftFallbackPenalties(preferred, fallback []Estimation) []Estimation {
+	result := make([]Estimation, 0, len(preferred)+len(fallback))
+	result = append(result, preferred...)
+	result = append(result, fallback...)
 	if len(preferred) == 0 || len(fallback) == 0 {
-		return fallback
+		return result
 	}
 
 	penalties := make([]uint64, 0, len(preferred)+len(fallback))
@@ -92,15 +95,15 @@ func shiftFallbackPenalties(preferred, fallback []Estimation) []Estimation {
 
 	var maximumPreferred uint64
 	for i := range preferred {
-		preferred[i].Penalty = ranks[preferred[i].Penalty]
-		maximumPreferred = max(maximumPreferred, preferred[i].Penalty)
+		result[i].Penalty = ranks[result[i].Penalty]
+		maximumPreferred = max(maximumPreferred, result[i].Penalty)
 	}
 	shift := maximumPreferred + 1
-	for i := range fallback {
-		fallback[i].Penalty = ranks[fallback[i].Penalty] + shift
+	for i := len(preferred); i < len(result); i++ {
+		result[i].Penalty = ranks[result[i].Penalty] + shift
 	}
 
-	return fallback
+	return result
 }
 
 func compactPenalties(penalties []uint64) []uint64 {

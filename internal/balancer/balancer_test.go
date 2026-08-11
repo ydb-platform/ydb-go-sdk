@@ -691,7 +691,7 @@ func TestBalancerForceDiscovery(t *testing.T) {
 	require.True(t, closeMuFreeDuringForce, "closeMu must be released before repeater Force")
 }
 
-func TestBalancerForcesDiscoveryWhenPreferredTierIsUnavailable(t *testing.T) {
+func TestBalancerDoesNotForceDiscoveryWhenFallbackSelectionSucceeds(t *testing.T) {
 	preferred := &mock.Conn{
 		AddrField: "preferred", NodeIDField: 1, LocationField: "preferred", StateField: state.Banned,
 	}
@@ -719,7 +719,7 @@ func TestBalancerForcesDiscoveryWhenPreferredTierIsUnavailable(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Same(t, fallback, selected)
-	require.True(t, forceCalled)
+	require.False(t, forceCalled)
 }
 
 func TestStartClusterDiscoveryCanceledContext(t *testing.T) {

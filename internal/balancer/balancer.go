@@ -26,7 +26,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -77,7 +76,6 @@ type Balancer struct {
 
 	discover        func(context.Context, *grpc.ClientConn) (endpoints []endpoint.Endpoint, location string, err error)
 	localDCDetector func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
-	rnd             xrand.Rand
 
 	connectionsState atomic.Pointer[connectionsState]
 
@@ -283,6 +281,8 @@ func (b *Balancer) applyDiscoveredEndpoints(
 		active     []conn.Conn
 		quarantine []conn.Conn
 	)
+	// Discovery attempts are serialized. If Close wins before closeMu is acquired below,
+	// the closed branch discards this snapshot; only the update trace may describe the pre-close state.
 
 	if state != nil {
 		active = state.All()
@@ -320,7 +320,7 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
 
 	b.connectionsState.Store(newConnectionsStateWithEstimates(
-		connections, estimates, quarantine, b.rnd,
+		connections, estimates, quarantine, nil,
 	))
 }
 
@@ -433,7 +433,6 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 			discoveryConfig.WithMeta(driverConfig.Meta()),
 		)...),
 		localDCDetector: detectLocalDC,
-		rnd:             xrand.New(xrand.WithLock()),
 	}
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
@@ -598,9 +597,9 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		return nil, xerrors.WithStackTrace(ErrNoEndpoints)
 	}
 
-	preferredCount, unavailablePreferred := state.elector.PreferenceHealth()
+	preferredCount, _ := state.elector.PreferenceHealth()
 	defer func() {
-		if max(failedCount, unavailablePreferred)*2 <= preferredCount {
+		if failedCount*2 <= preferredCount {
 			return
 		}
 
@@ -619,7 +618,7 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 
 func (b *Balancer) nextEstimatedConn(ctx context.Context, state *connectionsState) (conn.Conn, int) {
 	var failedCount int
-	attemptsLeft := state.elector.CandidateCount() + 1
+	attemptsLeft := state.elector.CandidateCount()
 	for attemptsLeft > 0 {
 		attemptsLeft--
 		if ctx.Err() != nil {

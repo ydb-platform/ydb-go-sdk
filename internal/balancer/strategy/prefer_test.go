@@ -59,6 +59,20 @@ func TestPreferPenaltyComposition(t *testing.T) {
 	}, overflowSafe.Estimate(Info{}, endpoints))
 }
 
+func TestShiftFallbackPenaltiesDoesNotMutateInputs(t *testing.T) {
+	preferred := []Estimation{{Penalty: 2, Weight: 1}}
+	fallback := []Estimation{{Penalty: 5, Weight: 1}}
+
+	result := shiftFallbackPenalties(preferred, fallback)
+
+	require.Equal(t, []Estimation{{Penalty: 2, Weight: 1}}, preferred)
+	require.Equal(t, []Estimation{{Penalty: 5, Weight: 1}}, fallback)
+	require.Equal(t, []Estimation{
+		{Weight: 1},
+		{Penalty: 2, Weight: 1},
+	}, result)
+}
+
 func TestPreferCallsChildOnceWithFullSnapshot(t *testing.T) {
 	endpoints := strategyEndpoints("local", "remote")
 	child := &recordingEstimator{}
