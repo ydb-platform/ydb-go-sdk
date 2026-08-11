@@ -268,16 +268,14 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	endpoints []endpoint.Endpoint,
 	resolvedLocation strategy.ResolvedLocation,
 ) {
-	b.closeMu.Lock()
-	defer b.closeMu.Unlock()
-
-	if b.closed {
-		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
-
-		return
-	}
-
 	var (
+		onDone = gtrace.DriverOnBalancerUpdate(
+			b.driverConfig.Trace(), &ctx,
+			stack.FunctionID(
+				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
+			resolvedLocation.NeedLocalDC,
+			b.driverConfig.Database(),
+		)
 		state      = b.connectionsState.Load()
 		active     []conn.Conn
 		quarantine []conn.Conn
@@ -287,32 +285,8 @@ func (b *Balancer) applyDiscoveredEndpoints(
 		active = state.All()
 		quarantine = state.quarantine
 	}
-	defer b.traceBalancerUpdate(&ctx, active, endpoints, resolvedLocation)()
 
-	info := strategy.Info{SelfLocation: resolvedLocation.SelfLocation}
-	estimates := b.plan.Estimator().Estimate(info, endpoints)
-	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
-
-	b.connectionsState.Store(newConnectionsStateWithEstimates(
-		connections, estimates, quarantine, b.rnd,
-	))
-}
-
-func (b *Balancer) traceBalancerUpdate(
-	ctx *context.Context,
-	active []conn.Conn,
-	endpoints []endpoint.Endpoint,
-	resolvedLocation strategy.ResolvedLocation,
-) func() {
-	onDone := gtrace.DriverOnBalancerUpdate(
-		b.driverConfig.Trace(), ctx,
-		stack.FunctionID(
-			"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
-		resolvedLocation.NeedLocalDC,
-		b.driverConfig.Database(),
-	)
-
-	return func() {
+	defer func() {
 		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
 			return cc.Endpoint()
 		}), endpoints, endpoint.Compare)
@@ -323,7 +297,24 @@ func (b *Balancer) traceBalancerUpdate(
 			xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
 			resolvedLocation.SelfLocation,
 		)
+	}()
+
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+
+	if b.closed {
+		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
+
+		return
 	}
+
+	info := strategy.Info{SelfLocation: resolvedLocation.SelfLocation}
+	estimates := b.plan.Estimator().Estimate(info, endpoints)
+	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
+
+	b.connectionsState.Store(newConnectionsStateWithEstimates(
+		connections, estimates, quarantine, b.rnd,
+	))
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
