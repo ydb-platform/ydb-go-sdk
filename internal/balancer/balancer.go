@@ -545,13 +545,17 @@ func (b *Balancer) connections() *connectionsState {
 }
 
 func (b *Balancer) forceDiscovery() {
-	b.closeMu.Lock()
-	discoveryRepeater := b.discoveryRepeater
-	b.closeMu.Unlock()
-
+	discoveryRepeater := b.currentDiscoveryRepeater()
 	if discoveryRepeater != nil {
 		discoveryRepeater.Force()
 	}
+}
+
+func (b *Balancer) currentDiscoveryRepeater() repeater.Repeater {
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+
+	return b.discoveryRepeater
 }
 
 func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {

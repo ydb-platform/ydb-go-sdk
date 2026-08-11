@@ -663,17 +663,22 @@ func TestNew(t *testing.T) {
 
 func TestBalancerForceDiscovery(t *testing.T) {
 	forceCalled := false
-	b := &Balancer{
-		discoveryRepeater: &stubRepeater{
-			forceFn: func() {
-				forceCalled = true
-			},
+	closeMuFreeDuringForce := false
+	b := &Balancer{}
+	b.discoveryRepeater = &stubRepeater{
+		forceFn: func() {
+			forceCalled = true
+			if b.closeMu.TryLock() {
+				closeMuFreeDuringForce = true
+				b.closeMu.Unlock()
+			}
 		},
 	}
 
 	b.forceDiscovery()
 
 	require.True(t, forceCalled)
+	require.True(t, closeMuFreeDuringForce, "closeMu must be released before repeater Force")
 }
 
 func TestBalancerForcesDiscoveryWhenPreferredTierIsUnavailable(t *testing.T) {
