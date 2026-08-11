@@ -189,7 +189,7 @@ func (e *endpointElector) candidatesByHealth() (
 
 		_, pessimized := e.pessimized[estimation.Key]
 		connectionState := connection.State()
-		healthyCandidate := !pessimized && isConnectionUsable(connection, false)
+		healthyCandidate := !pessimized && isConnectionStateUsable(connectionState, false)
 		bannedCandidate := pessimized || connectionState == state.Banned
 		if estimation.Penalty == minimumPolicy {
 			preferredCount++
@@ -242,12 +242,8 @@ func normalizeElectionWeights(candidates []strategy.Estimation) []uint64 {
 	return weights
 }
 
-func isConnectionUsable(connection conn.Conn, allowBanned bool) bool {
-	if connection == nil {
-		return false
-	}
-
-	switch connection.State() {
+func isConnectionStateUsable(connectionState state.State, allowBanned bool) bool {
+	switch connectionState {
 	case state.Created, state.Online, state.Offline:
 		return true
 	case state.Banned:

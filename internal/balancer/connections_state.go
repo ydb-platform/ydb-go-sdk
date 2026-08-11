@@ -49,7 +49,7 @@ func (s *connectionsState) All() []conn.Conn {
 func (s *connectionsState) preferConnection(ctx context.Context) conn.Conn {
 	if nodeID, hasPreferredEndpoint := endpoint.ContextNodeID(ctx); hasPreferredEndpoint {
 		connection := s.connByNodeID[nodeID]
-		if isConnectionUsable(connection, false) {
+		if connection != nil && isConnectionStateUsable(connection.State(), false) {
 			return connection
 		}
 	}

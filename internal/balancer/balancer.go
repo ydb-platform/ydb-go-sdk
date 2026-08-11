@@ -627,7 +627,7 @@ func (b *Balancer) nextEstimatedConn(ctx context.Context, state *connectionsStat
 		if !ok {
 			break
 		}
-		if isConnectionUsable(selected, allowBanned) {
+		if selected != nil && isConnectionStateUsable(selected.State(), allowBanned) {
 			return selected, failedCount
 		}
 		failedCount++
