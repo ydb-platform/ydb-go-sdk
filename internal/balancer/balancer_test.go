@@ -28,6 +28,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var errNodeShutdownHint = errors.New("received node shutdown hint")
@@ -216,6 +217,37 @@ func TestApplyDiscoveredEndpointsClosedPool(t *testing.T) {
 			endpoint.New("node:2135", endpoint.WithID(1)),
 		}, "")
 	})
+}
+
+func TestApplyDiscoveredEndpointsReleasesConnectionsOutsideCloseMu(t *testing.T) {
+	ctx := t.Context()
+	closeMuFreeDuringConnClose := false
+	var b *Balancer
+	cfg := config.New(config.WithTrace(trace.Driver{
+		OnConnClose: func(trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
+			if b.closeMu.TryLock() {
+				closeMuFreeDuringConnClose = true
+				b.closeMu.Unlock()
+			}
+
+			return func(trace.DriverConnCloseDoneInfo) {}
+		},
+	}))
+	pool := conn.NewPool(ctx, cfg)
+	t.Cleanup(func() { require.NoError(t, pool.RemoveRef(ctx)) })
+	b = &Balancer{
+		driverConfig:   cfg,
+		pool:           pool,
+		balancerConfig: balancerConfig.Config{},
+	}
+
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
+		endpoint.New("retired:2135", endpoint.WithID(1)),
+	}, "")
+	b.applyDiscoveredEndpoints(ctx, nil, "")
+	b.applyDiscoveredEndpoints(ctx, nil, "")
+
+	require.True(t, closeMuFreeDuringConnClose, "closeMu must be released before closing a retired connection")
 }
 
 func TestBalancer_Close(t *testing.T) {
@@ -1192,9 +1224,16 @@ func TestNextState(t *testing.T) {
 		b = endpoint.New("node-b:2135", endpoint.WithID(2))
 		c = endpoint.New("node-c:2135", endpoint.WithID(3))
 	)
+	next := func(endpoints []endpoint.Endpoint) {
+		retired := quarantine
+		quarantine, active = nextState(ctx, pool, active, endpoints)
+		for _, connection := range retired {
+			pool.Put(ctx, connection)
+		}
+	}
 
 	// Discovery #1: [a, b, c] — first acquire, nothing to release from quarantine.
-	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b, c})
+	next([]endpoint.Endpoint{a, b, c})
 	require.Empty(t, quarantine)
 	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, active)
 	require.Equal(t, 1, pool.count(a.Key()))
@@ -1204,7 +1243,7 @@ func TestNextState(t *testing.T) {
 	connA, connB, connC := active[0], active[1], active[2]
 
 	// Discovery #2: same set — previous active moves to quarantine, Get bumps refs again.
-	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b, c})
+	next([]endpoint.Endpoint{a, b, c})
 	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, quarantine)
 	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, active)
 	require.Same(t, connA, quarantine[0])
@@ -1215,7 +1254,7 @@ func TestNextState(t *testing.T) {
 	require.Equal(t, 2, pool.count(c.Key()))
 
 	// Discovery #3: drop c — release quarantine, c stays referenced only from new quarantine.
-	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b})
+	next([]endpoint.Endpoint{a, b})
 	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, quarantine)
 	requireConnKeys(t, []endpoint.Endpoint{a, b}, active)
 	require.Equal(t, 2, pool.count(a.Key()))
@@ -1223,7 +1262,7 @@ func TestNextState(t *testing.T) {
 	require.Equal(t, 1, pool.count(c.Key()))
 
 	// Discovery #4: same [a, b] — release full quarantine; c ref drops to zero.
-	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b})
+	next([]endpoint.Endpoint{a, b})
 	requireConnKeys(t, []endpoint.Endpoint{a, b}, quarantine)
 	requireConnKeys(t, []endpoint.Endpoint{a, b}, active)
 	require.Equal(t, 2, pool.count(a.Key()))
@@ -1231,7 +1270,7 @@ func TestNextState(t *testing.T) {
 	require.Equal(t, 0, pool.count(c.Key()))
 
 	// Discovery #5: c returns — new Get for c, a/b keep elevated refs.
-	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b, c})
+	next([]endpoint.Endpoint{a, b, c})
 	requireConnKeys(t, []endpoint.Endpoint{a, b}, quarantine)
 	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, active)
 	require.Equal(t, 2, pool.count(a.Key()))
@@ -1240,7 +1279,7 @@ func TestNextState(t *testing.T) {
 	require.Same(t, connC, active[2])
 
 	// Discovery #6: cluster empty — active set moves to quarantine, one ref each.
-	quarantine, active = nextState(ctx, pool, quarantine, active, nil)
+	next(nil)
 	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, quarantine)
 	require.Empty(t, active)
 	require.Equal(t, 1, pool.count(a.Key()))
@@ -1248,7 +1287,7 @@ func TestNextState(t *testing.T) {
 	require.Equal(t, 1, pool.count(c.Key()))
 
 	// Discovery #7: still empty — release quarantine, all refs reach zero.
-	quarantine, active = nextState(ctx, pool, quarantine, active, nil)
+	next(nil)
 	require.Empty(t, quarantine)
 	require.Empty(t, active)
 	require.Equal(t, 0, pool.count(a.Key()))
@@ -1261,7 +1300,7 @@ func TestNextStateClosedPool(t *testing.T) {
 	pool := conn.NewPool(ctx, config.New())
 	require.NoError(t, pool.RemoveRef(ctx))
 
-	newQuarantine, newActive := nextState(ctx, pool, nil, nil, []endpoint.Endpoint{
+	newQuarantine, newActive := nextState(ctx, pool, nil, []endpoint.Endpoint{
 		endpoint.New("node:2135", endpoint.WithID(1)),
 	})
 

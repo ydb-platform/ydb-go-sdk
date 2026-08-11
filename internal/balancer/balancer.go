@@ -225,8 +225,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 
 func nextState(ctx context.Context, pool interface {
 	Get(e endpoint.Endpoint) conn.Conn
-	Put(ctx context.Context, cc conn.Conn)
-}, quarantine []conn.Conn, active []conn.Conn, endpoints []endpoint.Endpoint) (
+}, active []conn.Conn, endpoints []endpoint.Endpoint) (
 	newQuarantine []conn.Conn,
 	newActive []conn.Conn,
 ) {
@@ -236,10 +235,6 @@ func nextState(ctx context.Context, pool interface {
 		}),
 		func(cc conn.Conn) bool { return cc != nil },
 	)
-
-	for _, cc := range quarantine {
-		pool.Put(ctx, cc)
-	}
 
 	for _, cc := range newActive {
 		cc.Unban(ctx)
@@ -267,15 +262,6 @@ func (b *Balancer) releaseStateConns(ctx context.Context, state *connectionsStat
 }
 
 func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
-	b.closeMu.Lock()
-	defer b.closeMu.Unlock()
-
-	if b.closed {
-		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
-
-		return
-	}
-
 	var (
 		onDone = gtrace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
@@ -284,15 +270,8 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 			b.balancerConfig.DetectNearestDC,
 			b.driverConfig.Database(),
 		)
-		state      = b.connectionsState.Load()
-		active     []conn.Conn
-		quarantine []conn.Conn
+		active []conn.Conn
 	)
-
-	if state != nil {
-		active = state.All()
-		quarantine = state.quarantine
-	}
 
 	defer func() {
 		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
@@ -307,7 +286,40 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 		)
 	}()
 
-	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
+	var retired []conn.Conn
+	active, retired = b.updateConnectionsState(ctx, endpoints, localDC)
+	for _, connection := range retired {
+		b.pool.Put(ctx, connection)
+	}
+}
+
+func (b *Balancer) updateConnectionsState(
+	ctx context.Context,
+	endpoints []endpoint.Endpoint,
+	localDC string,
+) (active, retired []conn.Conn) {
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+
+	state := b.connectionsState.Load()
+	var quarantine []conn.Conn
+	if state != nil {
+		active = state.All()
+		quarantine = state.quarantine
+	}
+
+	if b.closed {
+		state = b.connectionsState.Swap(nil)
+		if state != nil {
+			retired = append(retired, state.quarantine...)
+			retired = append(retired, state.all...)
+		}
+
+		return active, retired
+	}
+
+	retired = quarantine
+	quarantine, connections := nextState(ctx, b.pool, active, endpoints)
 
 	b.connectionsState.Store(
 		newConnectionsState(connections,
@@ -317,6 +329,8 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 			quarantine,
 		),
 	)
+
+	return active, retired
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
