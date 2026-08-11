@@ -390,7 +390,7 @@ func newTestCommitter(ctx context.Context, t testing.TB) *Committer {
 	})
 	res.Start()
 	t.Cleanup(func() {
-		if err := res.Close(ctx, errors.New("test committer closed")); err != nil {
+		if err := res.Close(context.Background(), errors.New("test committer closed")); err != nil {
 			require.ErrorIs(t, err, background.ErrAlreadyClosed)
 		}
 	})
