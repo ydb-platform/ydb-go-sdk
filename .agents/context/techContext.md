@@ -16,12 +16,7 @@
 ```bash
 go test -race ./...          # unit only (integration tag excluded)
 golangci-lint run ./...
-go test ./internal/balancer -run '^$' -bench '^BenchmarkNextConn' -benchmem
 ```
-
-Keep the `nextConn` benchmark source compatible with both the target branch and balancer-refactor branches so the same
-workload can be run at both revisions. Construct the balancer through stable configuration/discovery paths; do not
-benchmark a branch-specific elector or state helper directly.
 
 ### Devcontainer
 
