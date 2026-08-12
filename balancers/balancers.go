@@ -32,8 +32,7 @@ func PreferLocalDC(p policy.Policy) policy.Policy {
 	return PreferNearestDC(p)
 }
 
-// PreferNearestDC prioritizes endpoints in the location nearest to the client.
-// Endpoints in other locations are used when all nearer endpoints are unavailable.
+// PreferNearestDC uses only endpoints in the location nearest to the client.
 func PreferNearestDC(p policy.Policy) policy.Policy {
 	return policy.PreferNearestDC(p, "LocalDC", func(info policy.Info, candidate endpoint.Info) bool {
 		return candidate.Location() == info.SelfLocation
@@ -44,12 +43,15 @@ func PreferNearestDC(p policy.Policy) policy.Policy {
 // Will be removed after March 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func PreferLocalDCWithFallBack(p policy.Policy) policy.Policy {
-	return PreferNearestDC(p)
+	return PreferNearestDCWithFallBack(p)
 }
 
-// PreferNearestDCWithFallBack is an alias for PreferNearestDC.
+// PreferNearestDCWithFallBack prioritizes endpoints in the location nearest to the client.
+// Endpoints in other locations are used when all nearer endpoints are unavailable.
 func PreferNearestDCWithFallBack(p policy.Policy) policy.Policy {
-	return PreferNearestDC(p)
+	return policy.PreferNearestDCWithFallback(p, "LocalDC", func(info policy.Info, candidate endpoint.Info) bool {
+		return candidate.Location() == info.SelfLocation
+	})
 }
 
 func locationsString(locations []string) string {
@@ -68,13 +70,12 @@ func locationsString(locations []string) string {
 	return buffer.String()
 }
 
-// PreferLocations prioritizes endpoints in the selected locations (such as "ABC", "DEF", etc.).
-// Endpoints in other locations are used when all preferred endpoints are unavailable.
+// PreferLocations uses only endpoints in the selected locations (such as "ABC", "DEF", etc.).
 func PreferLocations(p policy.Policy, locations ...string) policy.Policy {
-	return preferLocations(p, locations)
+	return preferLocations(p, false, locations)
 }
 
-func preferLocations(p policy.Policy, locations []string) policy.Policy {
+func preferLocations(p policy.Policy, allowFallback bool, locations []string) policy.Policy {
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
@@ -85,14 +86,20 @@ func preferLocations(p policy.Policy, locations []string) policy.Policy {
 	}
 	sort.Strings(locations)
 
-	return policy.Prefer(p, locationsString(locations), func(_ policy.Info, candidate endpoint.Info) bool {
+	match := func(_ policy.Info, candidate endpoint.Info) bool {
 		return slices.Contains(locations, strings.ToUpper(candidate.Location()))
-	})
+	}
+	if allowFallback {
+		return policy.PreferWithFallback(p, locationsString(locations), match)
+	}
+
+	return policy.Prefer(p, locationsString(locations), match)
 }
 
-// PreferLocationsWithFallback is an alias for PreferLocations.
+// PreferLocationsWithFallback prioritizes endpoints in the selected locations.
+// Endpoints in other locations are used when all preferred endpoints are unavailable.
 func PreferLocationsWithFallback(p policy.Policy, locations ...string) policy.Policy {
-	return PreferLocations(p, locations...)
+	return preferLocations(p, true, locations)
 }
 
 type Endpoint interface {
@@ -107,17 +114,19 @@ type Endpoint interface {
 	LocalDC() bool
 }
 
-// Prefer prioritizes endpoints accepted by filter.
-// Other endpoints are used when all preferred endpoints are unavailable.
+// Prefer uses only endpoints accepted by filter.
 func Prefer(p policy.Policy, filter func(endpoint Endpoint) bool) policy.Policy {
 	return policy.Prefer(p, "Custom", func(_ policy.Info, candidate endpoint.Info) bool {
 		return filter(candidate)
 	})
 }
 
-// PreferWithFallback is an alias for Prefer.
+// PreferWithFallback prioritizes endpoints accepted by filter.
+// Other endpoints are used when all preferred endpoints are unavailable.
 func PreferWithFallback(p policy.Policy, filter func(endpoint Endpoint) bool) policy.Policy {
-	return Prefer(p, filter)
+	return policy.PreferWithFallback(p, "Custom", func(_ policy.Info, candidate endpoint.Info) bool {
+		return filter(candidate)
+	})
 }
 
 // Default balancer used by default

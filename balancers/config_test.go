@@ -103,6 +103,7 @@ func TestFromConfigLogicalCompatibility(t *testing.T) {
 		serialized             string
 		preferred              []uint32
 		lowerPriority          []uint32
+		excluded               []uint32
 		nearestDC              bool
 		usesConfiguredEndpoint bool
 	}{
@@ -114,18 +115,18 @@ func TestFromConfigLogicalCompatibility(t *testing.T) {
 		{name: "random choice", serialized: `random_choice`, preferred: []uint32{1, 2, 3}},
 		{name: "random choice JSON", serialized: `{"type":"random_choice"}`, preferred: []uint32{1, 2, 3}},
 		{
-			name:          "legacy local DC",
-			serialized:    `{"type":"random_choice","prefer":"local_dc"}`,
-			preferred:     []uint32{1},
-			lowerPriority: []uint32{2, 3},
-			nearestDC:     true,
+			name:       "legacy local DC",
+			serialized: `{"type":"random_choice","prefer":"local_dc"}`,
+			preferred:  []uint32{1},
+			excluded:   []uint32{2, 3},
+			nearestDC:  true,
 		},
 		{
-			name:          "nearest DC",
-			serialized:    `{"type":"random_choice","prefer":"nearest_dc"}`,
-			preferred:     []uint32{1},
-			lowerPriority: []uint32{2, 3},
-			nearestDC:     true,
+			name:       "nearest DC",
+			serialized: `{"type":"random_choice","prefer":"nearest_dc"}`,
+			preferred:  []uint32{1},
+			excluded:   []uint32{2, 3},
+			nearestDC:  true,
 		},
 		{
 			name:          "legacy local DC with fallback",
@@ -142,10 +143,10 @@ func TestFromConfigLogicalCompatibility(t *testing.T) {
 			nearestDC:     true,
 		},
 		{
-			name:          "locations",
-			serialized:    `{"type":"random_choice","prefer":"locations","locations":["a","c"]}`,
-			preferred:     []uint32{1, 3},
-			lowerPriority: []uint32{2},
+			name:       "locations",
+			serialized: `{"type":"random_choice","prefer":"locations","locations":["a","c"]}`,
+			preferred:  []uint32{1, 3},
+			excluded:   []uint32{2},
 		},
 		{
 			name:          "locations with fallback",
@@ -168,10 +169,11 @@ func TestFromConfigLogicalCompatibility(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			p := FromConfig(test.serialized)
-			preferred, lowerPriority := logicalGroups(p, endpoints, policy.Info{SelfLocation: "a"})
+			preferred, lowerPriority, excluded := logicalGroups(p, endpoints, policy.Info{SelfLocation: "a"})
 
 			require.Equal(t, test.preferred, preferred)
 			require.Equal(t, test.lowerPriority, lowerPriority)
+			require.Equal(t, test.excluded, excluded)
 			require.Equal(t, test.usesConfiguredEndpoint, p.SingleConnection())
 			require.Equal(t, test.nearestDC, p.DetectsNearestDC())
 		})
@@ -182,26 +184,28 @@ func logicalGroups(
 	policy policy.Policy,
 	endpoints []endpoint.Endpoint,
 	info policy.Info,
-) (preferred, lowerPriority []uint32) {
+) (preferred, lowerPriority, excluded []uint32) {
 	nodeIDByKey := make(map[endpoint.Key]uint32, len(endpoints))
 	for _, candidate := range endpoints {
 		nodeIDByKey[candidate.Key()] = candidate.NodeID()
 	}
 	priorities := policy.Prioritize(info, endpoints)
-	if len(priorities) == 0 {
-		return nil, nil
-	}
-	minimum := priorities[0].Priority
-	for _, candidate := range priorities[1:] {
-		minimum = min(minimum, candidate.Priority)
+	minimum := ^uint64(0)
+	for _, candidate := range priorities {
+		if !candidate.Excluded {
+			minimum = min(minimum, candidate.Priority)
+		}
 	}
 	for _, candidate := range priorities {
-		if candidate.Priority == minimum {
+		switch {
+		case candidate.Excluded:
+			excluded = append(excluded, nodeIDByKey[candidate.Key])
+		case candidate.Priority == minimum:
 			preferred = append(preferred, nodeIDByKey[candidate.Key])
-		} else {
+		default:
 			lowerPriority = append(lowerPriority, nodeIDByKey[candidate.Key])
 		}
 	}
 
-	return preferred, lowerPriority
+	return preferred, lowerPriority, excluded
 }

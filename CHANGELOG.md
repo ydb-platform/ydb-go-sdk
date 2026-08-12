@@ -1,4 +1,4 @@
-* Refactored balancer configuration into a priority pipeline without changing existing configuration call sites; `Prefer*` policies now cascade to lower-priority endpoints
+* Refactored balancer configuration into an immutable priority pipeline without changing existing configuration call sites or strict `Prefer*` and `*WithFallback` behavior
 * Prevented temporary errors from banning the only `SingleConn` endpoint; disabling periodic discovery is now rejected for other balancer policies
 
 ## v3.147.2

@@ -40,6 +40,18 @@ func TestPolicy(t *testing.T) {
 		require.True(t, policy.DetectsNearestDC())
 	})
 
+	t.Run("nearest DC with fallback", func(t *testing.T) {
+		policy := PreferNearestDCWithFallback(Policy{}, "LocalDC", locationMatch("local"))
+
+		require.Equal(t, "Priority{Preferences=[LocalDC]}", policy.String())
+		require.False(t, policy.SingleConnection())
+		require.True(t, policy.DetectsNearestDC())
+		require.Equal(t, []EndpointPriority{
+			{Key: endpoints[0].Key()},
+			{Key: endpoints[1].Key(), Priority: 1},
+		}, policy.Prioritize(Info{}, endpoints))
+	})
+
 	t.Run("preference preserves mode", func(t *testing.T) {
 		policy := PreferNearestDC(SingleConn(), "LocalDC", locationMatch("local"))
 
@@ -64,12 +76,28 @@ func TestApplyPreference(t *testing.T) {
 	applyPreference(Info{}, endpoints, priorities, preference{
 		name:  "LocalDC",
 		match: locationMatch("local"),
-	})
+	}, 0)
 
 	require.Equal(t, []EndpointPriority{
 		{Key: endpoints[0].Key()},
-		{Key: endpoints[1].Key(), Priority: 1},
-		{Key: endpoints[2].Key(), Priority: 1},
+		{Key: endpoints[1].Key(), Excluded: true},
+		{Key: endpoints[2].Key(), Excluded: true},
+	}, priorities)
+}
+
+func TestApplyPreferenceWithFallback(t *testing.T) {
+	endpoints := policyEndpoints("local", "remote")
+	priorities := Policy{}.Prioritize(Info{}, endpoints)
+
+	applyPreference(Info{}, endpoints, priorities, preference{
+		name:          "LocalDC",
+		match:         locationMatch("local"),
+		allowFallback: true,
+	}, 1)
+
+	require.Equal(t, []EndpointPriority{
+		{Key: endpoints[0].Key()},
+		{Key: endpoints[1].Key(), Priority: 2},
 	}, priorities)
 }
 
@@ -80,7 +108,7 @@ func TestApplyPreferenceKeepsSingleBucketWhenAllEndpointsMatchEqually(t *testing
 	applyPreference(Info{}, endpoints, priorities, preference{
 		name:  "LocalDC",
 		match: locationMatch("local"),
-	})
+	}, 0)
 
 	require.Equal(t, []EndpointPriority{
 		{Key: endpoints[0].Key()},
@@ -98,8 +126,8 @@ func TestPolicyPrioritizeComposesPreferencesOutermostFirst(t *testing.T) {
 	evenNodeID := func(_ Info, candidate endpoint.Info) bool {
 		return candidate.NodeID()%2 == 0
 	}
-	policy := Prefer(
-		Prefer(Policy{}, "EvenNodeID", evenNodeID),
+	policy := PreferWithFallback(
+		PreferWithFallback(Policy{}, "EvenNodeID", evenNodeID),
 		"LocalDC", locationMatch("local"),
 	)
 
@@ -109,6 +137,29 @@ func TestPolicyPrioritizeComposesPreferencesOutermostFirst(t *testing.T) {
 		{Key: endpoints[1].Key(), Priority: 1},
 		{Key: endpoints[2].Key(), Priority: 2},
 		{Key: endpoints[3].Key(), Priority: 3},
+	}, policy.Prioritize(Info{}, endpoints))
+}
+
+func TestPolicyPrioritizeExclusionStopsPipelineForEndpoint(t *testing.T) {
+	endpoints := []endpoint.Endpoint{
+		endpoint.New("local-even", endpoint.WithID(2), endpoint.WithLocation("local")),
+		endpoint.New("local-odd", endpoint.WithID(1), endpoint.WithLocation("local")),
+		endpoint.New("remote-even", endpoint.WithID(4), endpoint.WithLocation("remote")),
+		endpoint.New("remote-odd", endpoint.WithID(3), endpoint.WithLocation("remote")),
+	}
+	evenNodeID := func(_ Info, candidate endpoint.Info) bool {
+		return candidate.NodeID()%2 == 0
+	}
+	policy := PreferWithFallback(
+		Prefer(Policy{}, "EvenNodeID", evenNodeID),
+		"LocalDC", locationMatch("local"),
+	)
+
+	require.Equal(t, []EndpointPriority{
+		{Key: endpoints[0].Key()},
+		{Key: endpoints[1].Key(), Excluded: true},
+		{Key: endpoints[2].Key(), Priority: 2},
+		{Key: endpoints[3].Key(), Excluded: true},
 	}, policy.Prioritize(Info{}, endpoints))
 }
 
@@ -122,9 +173,9 @@ func TestPolicyPrioritySaturatesInsteadOfOverflowing(t *testing.T) {
 	endpoints := []endpoint.Endpoint{endpoint.New("candidate")}
 	p := Policy{}
 	for range 64 {
-		p = Prefer(p, "match", func(Info, endpoint.Info) bool { return true })
+		p = PreferWithFallback(p, "match", func(Info, endpoint.Info) bool { return true })
 	}
-	p = Prefer(p, "outer-miss", func(Info, endpoint.Info) bool { return false })
+	p = PreferWithFallback(p, "outer-miss", func(Info, endpoint.Info) bool { return false })
 
 	priorities := p.Prioritize(Info{}, endpoints)
 

@@ -30,11 +30,10 @@ const (
 )
 
 type balancersConfig struct {
-	Type   balancerType `json:"type"`
-	Prefer preferType   `json:"prefer,omitempty"`
-	// Fallback is retained for compatibility; every preference now has cascade semantics.
-	Fallback  bool     `json:"fallback,omitempty"`
-	Locations []string `json:"locations,omitempty"`
+	Type      balancerType `json:"type"`
+	Prefer    preferType   `json:"prefer,omitempty"`
+	Fallback  bool         `json:"fallback,omitempty"`
+	Locations []string     `json:"locations,omitempty"`
 }
 
 type fromConfigOptionsHolder struct {
@@ -95,14 +94,25 @@ func CreateFromConfig(s string) (policy.Policy, error) {
 
 	switch c.Prefer {
 	case preferTypeLocalDC:
+		if c.Fallback {
+			return PreferNearestDCWithFallBack(b), nil
+		}
+
 		return PreferNearestDC(b), nil
 	case preferTypeNearestDC:
+		if c.Fallback {
+			return PreferNearestDCWithFallBack(b), nil
+		}
+
 		return PreferNearestDC(b), nil
 	case preferTypeLocations:
 		if len(c.Locations) == 0 {
 			return policy.Policy{}, xerrors.WithStackTrace(
 				fmt.Errorf("empty locations list in balancer '%s' config", c.Type),
 			)
+		}
+		if c.Fallback {
+			return PreferLocationsWithFallback(b, c.Locations...), nil
 		}
 
 		return PreferLocations(b, c.Locations...), nil

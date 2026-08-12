@@ -43,7 +43,7 @@ func TestConnectionsStatePolicyGroups(t *testing.T) {
 
 	require.Equal(t, []policy.EndpointPriority{
 		{Key: connections[0].Endpoint().Key()},
-		{Key: connections[1].Endpoint().Key(), Priority: 1},
+		{Key: connections[1].Endpoint().Key(), Excluded: true},
 	}, s.elector.priorities)
 }
 

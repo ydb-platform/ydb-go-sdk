@@ -198,7 +198,7 @@ func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem
 	require.Len(t, b.connections().All(), 2, "selection policy must not change connection ownership")
 	require.Equal(t, []policy.EndpointPriority{
 		{Key: e1.Key()},
-		{Key: e2.Key(), Priority: 1},
+		{Key: e2.Key(), Excluded: true},
 	}, b.connections().elector.priorities)
 	selected, err := b.nextConn(endpoint.WithNodeID(ctx, 2))
 	require.NoError(t, err)
@@ -712,7 +712,7 @@ func TestBalancerForcesDiscoveryWhenMostConnectionsAreBanned(t *testing.T) {
 	secondFallback := &mock.Conn{
 		AddrField: "second-fallback", NodeIDField: 3, LocationField: "fallback", StateField: state.Online,
 	}
-	p := policy.Prefer(
+	p := policy.PreferWithFallback(
 		policy.Policy{}, "preferred",
 		func(_ policy.Info, candidate endpoint.Info) bool {
 			return candidate.Location() == "preferred"
@@ -1794,6 +1794,20 @@ func TestWithNodeIDBypassesSelectionPolicies(t *testing.T) {
 	require.Same(t, connections[1], selected)
 }
 
+func TestStrictPreferenceWithoutMatchesReturnsNoEndpoints(t *testing.T) {
+	balancer := userConfiguredBalancer(
+		config.WithBalancer(userBalancers.PreferLocations(
+			userBalancers.RandomChoice(), "missing",
+		)),
+		[]conn.Conn{userBalancerConn(1, "available", state.Online)},
+		"",
+	)
+
+	selected, err := balancer.nextConn(t.Context())
+	require.ErrorIs(t, err, ErrNoEndpoints)
+	require.Nil(t, selected)
+}
+
 func TestPinnedNodeIDDoesNotFallbackToAnotherConnection(t *testing.T) {
 	balancer := userConfiguredBalancer(
 		config.WithBalancer(userBalancers.RandomChoice()),
@@ -1810,7 +1824,7 @@ func TestPinnedNodeIDDoesNotFallbackToAnotherConnection(t *testing.T) {
 func TestBalancerHandlesBanAndUnban(t *testing.T) {
 	preferred := userBalancerConn(1, "preferred", state.Online)
 	fallback := userBalancerConn(2, "fallback", state.Online)
-	option := config.WithBalancer(userBalancers.PreferLocations(
+	option := config.WithBalancer(userBalancers.PreferLocationsWithFallback(
 		userBalancers.RandomChoice(), "preferred",
 	))
 	balancer := userConfiguredBalancer(option, []conn.Conn{preferred, fallback}, "")
@@ -1870,8 +1884,20 @@ func TestUserBalancerConfigurations(t *testing.T) {
 			allowed: nodeIDSet(1),
 		},
 		{
-			name: "prefer nearest dc cascades",
+			name: "prefer nearest dc remains strict when preferred endpoint is banned",
 			option: config.WithBalancer(userBalancers.PreferNearestDC(
+				userBalancers.RandomChoice(),
+			)),
+			selfLocation: "a",
+			connections: []conn.Conn{
+				userBalancerConn(1, "a", state.Banned),
+				userBalancerConn(2, "b", state.Online),
+			},
+			allowed: nodeIDSet(1),
+		},
+		{
+			name: "prefer nearest dc with fallback",
+			option: config.WithBalancer(userBalancers.PreferNearestDCWithFallBack(
 				userBalancers.RandomChoice(),
 			)),
 			selfLocation: "a",
@@ -1894,8 +1920,19 @@ func TestUserBalancerConfigurations(t *testing.T) {
 			allowed: nodeIDSet(1, 3),
 		},
 		{
-			name: "prefer locations cascades",
+			name: "prefer locations remains strict when preferred endpoint is banned",
 			option: config.WithBalancer(userBalancers.PreferLocations(
+				userBalancers.RandomChoice(), "a",
+			)),
+			connections: []conn.Conn{
+				userBalancerConn(1, "a", state.Banned),
+				userBalancerConn(2, "b", state.Online),
+			},
+			allowed: nodeIDSet(1),
+		},
+		{
+			name: "prefer locations with fallback",
+			option: config.WithBalancer(userBalancers.PreferLocationsWithFallback(
 				userBalancers.RandomChoice(), "a",
 			)),
 			connections: []conn.Conn{

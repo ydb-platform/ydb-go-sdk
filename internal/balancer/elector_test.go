@@ -60,6 +60,34 @@ func TestEndpointElectorPessimizationPromotesNextPriority(t *testing.T) {
 	require.Same(t, remote, selected)
 }
 
+func TestEndpointElectorNeverSelectsExcludedEndpoint(t *testing.T) {
+	preferred := electorConnection("preferred", 1, state.Banned)
+	excluded := electorConnection("excluded", 2, state.Online)
+	elector := newEndpointElector([]policy.EndpointPriority{
+		{Key: preferred.Endpoint().Key()},
+		{Key: excluded.Endpoint().Key(), Excluded: true},
+	}, connectionMap(preferred, excluded), &electorRand{})
+
+	selected, allowBanned, ok := elector.Next()
+	require.True(t, ok)
+	require.True(t, allowBanned)
+	require.Same(t, preferred, selected)
+	require.Equal(t, 1, elector.CandidateCount())
+}
+
+func TestEndpointElectorReturnsEmptyWhenEveryEndpointIsExcluded(t *testing.T) {
+	excluded := electorConnection("excluded", 1, state.Online)
+	elector := newEndpointElector([]policy.EndpointPriority{
+		{Key: excluded.Endpoint().Key(), Excluded: true},
+	}, connectionMap(excluded), &electorRand{})
+
+	selected, allowBanned, ok := elector.Next()
+	require.False(t, ok)
+	require.False(t, allowBanned)
+	require.Nil(t, selected)
+	require.Zero(t, elector.CandidateCount())
+}
+
 func TestEndpointElectorPessimizeAndLastResort(t *testing.T) {
 	first := electorConnection("first", 1, state.Online)
 	second := electorConnection("second", 2, state.Online)
@@ -204,6 +232,22 @@ func TestEndpointElectorForcesDiscoveryOnceAfterMostRecordsAreBanned(t *testing.
 	require.False(t, elector.Refresh())
 	second.Ban(t.Context())
 	require.True(t, elector.Refresh(), "crossing the threshold again must force a new discovery")
+}
+
+func TestEndpointElectorPessimizationThresholdIgnoresExcludedEndpoints(t *testing.T) {
+	first := electorConnection("first", 1, state.Online)
+	second := electorConnection("second", 2, state.Online)
+	excluded := electorConnection("excluded", 3, state.Banned)
+	elector := newEndpointElector([]policy.EndpointPriority{
+		{Key: first.Endpoint().Key()},
+		{Key: second.Endpoint().Key()},
+		{Key: excluded.Endpoint().Key(), Excluded: true},
+	}, connectionMap(first, second, excluded), &electorRand{})
+
+	first.Ban(t.Context())
+	require.False(t, elector.Refresh(), "exactly half of eligible endpoints are banned")
+	second.Ban(t.Context())
+	require.True(t, elector.Refresh(), "all eligible endpoints are banned")
 }
 
 func TestIsConnectionStateUsable(t *testing.T) {

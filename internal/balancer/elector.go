@@ -82,15 +82,18 @@ func (e *endpointElector) Refresh() (forceDiscovery bool) {
 	previous := e.snapshot.Load()
 	snapshot := &electionSnapshot{
 		connections: make([]conn.Conn, 0, len(e.priorities)),
-		recordCount: len(e.connections),
 	}
 	banned := make([]conn.Conn, 0, len(e.priorities))
 	minimumHealthyPriority := uint64(math.MaxUint64)
 	for _, candidate := range e.priorities {
+		if candidate.Excluded {
+			continue
+		}
 		connection := e.connections[candidate.Key]
 		if connection == nil {
 			continue
 		}
+		snapshot.recordCount++
 		connectionState := connection.State()
 		switch {
 		case isConnectionStateUsable(connectionState, false):

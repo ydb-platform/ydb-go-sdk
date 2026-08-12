@@ -129,18 +129,20 @@ Configured via `config.WithBalancer(...)` or `ydb.WithBalancer(...)`.
 ### Selection policy and runtime health
 
 Balancer configuration is one concrete immutable `policy.Policy`. Preference constructors append a predicate to
-the policy. `Policy.Prioritize` evaluates the predicates from the outermost public constructor to the innermost and
-assigns every endpoint a lexicographic priority. A preferred endpoint receives bit `0`, a less preferred endpoint bit
-`1`; earlier predicates therefore dominate later predicates.
+the policy. Each predicate classifies an endpoint as preferred, fallback, or excluded. `Policy.Prioritize` assigns one
+bit per fallback-capable stage in pipeline construction order: an inner constructor gets the least significant bit and
+each outer constructor gets the next bit, so outer preferences dominate inner ones. Preferred contributes `0`,
+fallback contributes `1 << stage`, and excluded endpoints do not participate in policy-based selection.
 
 ```text
-PreferNearestDC(PreferLocations(RandomChoice(), "A", "B"))
-  → policy stages: NearestDC, Locations{A,B}
-  → priorities: nearest+A/B, nearest+other, remote+A/B, remote+other
+PreferNearestDCWithFallBack(PreferLocationsWithFallback(RandomChoice(), "A", "B"))
+  → stages: Locations{A,B} at bit 0, NearestDC at bit 1
+  → priorities: nearest+A/B=0, nearest+other=1, remote+A/B=2, remote+other=3
 ```
 
-Every `Prefer*` keeps all endpoints at successively lower priorities. The `*WithFallback` constructors are aliases
-because this cascade is now the normal meaning of "prefer".
+Strict `Prefer*` constructors exclude non-matching endpoints, preserving their existing fail-fast behavior.
+`*WithFallback` constructors retain non-matching endpoints in a lower-priority bucket. Any strict exclusion in a
+composed pipeline wins immediately. `balancers.WithNodeID` still bypasses these policy decisions.
 
 The policy runs once for each fresh discovery snapshot, before endpoints are mapped to pooled wrappers. This ensures
 selection uses current endpoint attributes even when `conn.Pool` reuses a wrapper from an older discovery response.
@@ -150,9 +152,10 @@ selection uses current endpoint attributes even when `conn.Pool` reuses a wrappe
 change. The RPC hot path only loads that snapshot and randomly chooses among healthy connections with the lowest
 policy priority. If every connection is banned, banned connections remain a randomized last resort.
 
-Pessimization forces discovery only when the share of banned records among all current connections crosses strictly
-above 50%. The threshold is edge-triggered, so repeated reports for an already banned connection do not schedule
-additional discovery attempts. `SingleConn` does not ban its only connection and does not run periodic discovery.
+Pessimization forces discovery only when the share of banned records among policy-eligible connections crosses
+strictly above 50%. The threshold is edge-triggered, so repeated reports for an already banned connection do not
+schedule additional discovery attempts. `SingleConn` does not ban its only connection and does not run periodic
+discovery.
 
 `nextConn` handles contracts outside policy calculation:
 
@@ -165,8 +168,8 @@ Keep these responsibilities separate: `Policy` expresses static endpoint prefere
 health and hot-path choice, and `conn.Pool` owns wrapper lifecycle.
 
 Compatibility tests must keep existing public constructor expressions source-usable and verify persisted
-`balancers.FromConfig(string)` values. Serialized `fallback` is still accepted, but both values now produce the same
-priority cascade.
+`balancers.FromConfig(string)` values. Serialized `fallback=false` retains strict exclusion, while `fallback=true`
+retains lower-priority fallback selection.
 
 `Driver.Discovery()` exposes a separate discovery client (uses bootstrap connection from pool, not the main balancer loop).
 
