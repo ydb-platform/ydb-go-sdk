@@ -13,7 +13,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
@@ -65,7 +65,7 @@ func (s *streamWrapper) RecvMsg(m any) error {
 
 type Balancer struct {
 	driverConfig      *config.Config
-	policy            strategy.Policy
+	policy            policy.Policy
 	detectNearestDC   bool
 	discoveryConfig   *discoveryConfig.Config
 	pool              *conn.Pool
@@ -311,7 +311,7 @@ func (b *Balancer) applyDiscoveredEndpoints(
 		return
 	}
 
-	info := strategy.Info{SelfLocation: selfLocation}
+	info := policy.Info{SelfLocation: selfLocation}
 	priorities := b.policy.Prioritize(info, endpoints)
 	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"slices"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
@@ -20,7 +20,7 @@ type connectionsState struct {
 
 func newConnectionsStateWithPriorities(
 	connections []conn.Conn,
-	priorities []strategy.EndpointPriority,
+	priorities []policy.EndpointPriority,
 	quarantine []conn.Conn,
 	rand xrand.Rand,
 ) *connectionsState {

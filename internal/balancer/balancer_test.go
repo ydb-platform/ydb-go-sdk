@@ -30,7 +30,7 @@ import (
 
 	userBalancers "github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
@@ -133,7 +133,7 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 		pool:         pool,
 	}
 
-	initial := newConnectionsState(nil, nil, strategy.Info{}, nil)
+	initial := newConnectionsState(nil, nil, policy.Info{}, nil)
 	b.connectionsState.Store(initial)
 
 	e1 := endpoint.New("e1.example:2135", endpoint.WithIPV6([]string{"2001:db8::1"}), endpoint.WithID(1))
@@ -185,9 +185,9 @@ func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem
 	require.Len(t, b.connections().All(), 2)
 	require.Equal(t, 2, b.connections().elector.preferredCount)
 
-	b.policy = strategy.Prefer(
-		strategy.Policy{}, "NodeID(1)",
-		func(_ strategy.Info, candidate endpoint.Info) bool {
+	b.policy = policy.Prefer(
+		policy.Policy{}, "NodeID(1)",
+		func(_ policy.Info, candidate endpoint.Info) bool {
 			return candidate.NodeID() == 1
 		},
 	)
@@ -242,7 +242,7 @@ func TestBalancer_Close(t *testing.T) {
 		b.connectionsState.Store(newConnectionsState(
 			[]conn.Conn{cc},
 			nil,
-			strategy.Info{},
+			policy.Info{},
 			nil,
 		))
 
@@ -264,7 +264,7 @@ func TestBalancer_Close(t *testing.T) {
 			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
-			nil, strategy.Info{}, nil,
+			nil, policy.Info{}, nil,
 		))
 
 		var wg sync.WaitGroup
@@ -305,7 +305,7 @@ func TestBalancer_Close(t *testing.T) {
 			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
-			nil, strategy.Info{}, nil,
+			nil, policy.Info{}, nil,
 		))
 
 		closeStarted := make(chan struct{})
@@ -335,7 +335,7 @@ func TestBalancer_Close(t *testing.T) {
 			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
-			nil, strategy.Info{}, nil,
+			nil, policy.Info{}, nil,
 		))
 
 		stopCalled := make(chan struct{})
@@ -382,7 +382,7 @@ func TestBalancer_Close(t *testing.T) {
 			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
-			nil, strategy.Info{}, nil,
+			nil, policy.Info{}, nil,
 		))
 		b.cc.Store(cc)
 
@@ -403,7 +403,7 @@ func TestBalancer_Close(t *testing.T) {
 		b.connectionsState.Store(newConnectionsState(
 			nil,
 			nil,
-			strategy.Info{},
+			policy.Info{},
 			nil,
 		))
 
@@ -428,7 +428,7 @@ func TestBalancer_Close(t *testing.T) {
 		b.connectionsState.Store(newConnectionsState(
 			[]conn.Conn{c},
 			nil,
-			strategy.Info{},
+			policy.Info{},
 			nil,
 		))
 
@@ -468,7 +468,7 @@ func TestBalancer_CloseRacesWithNextConnRepeater(t *testing.T) {
 	connections := newConnectionsState(
 		[]conn.Conn{baseConn},
 		nil,
-		strategy.Info{},
+		policy.Info{},
 		nil,
 	)
 	connections.all[0] = blockingConn
@@ -535,7 +535,7 @@ func TestBalancer_CloseWhileDiscoveryDialInFlight(t *testing.T) {
 	b.connectionsState.Store(newConnectionsState(
 		nil,
 		nil,
-		strategy.Info{},
+		policy.Info{},
 		nil,
 	))
 
@@ -650,7 +650,7 @@ func TestNew(t *testing.T) {
 		ctx := t.Context()
 		cfg := config.New(
 			config.WithEndpoint("bootstrap:2135"),
-			config.WithBalancer(strategy.SingleConn()),
+			config.WithBalancer(policy.SingleConn()),
 		)
 		pool := conn.NewPool(ctx, cfg)
 		defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
@@ -690,9 +690,9 @@ func TestBalancerDoesNotForceDiscoveryWhenLowerPrioritySelectionSucceeds(t *test
 	fallback := &mock.Conn{
 		AddrField: "fallback", NodeIDField: 2, LocationField: "fallback", StateField: state.Online,
 	}
-	policy := strategy.Prefer(
-		strategy.Policy{}, "preferred",
-		func(_ strategy.Info, candidate endpoint.Info) bool {
+	p := policy.Prefer(
+		policy.Policy{}, "preferred",
+		func(_ policy.Info, candidate endpoint.Info) bool {
 			return candidate.Location() == "preferred"
 		},
 	)
@@ -704,7 +704,7 @@ func TestBalancerDoesNotForceDiscoveryWhenLowerPrioritySelectionSucceeds(t *test
 		}},
 	}
 	balancer.connectionsState.Store(newConnectionsStateWithPolicy(
-		[]conn.Conn{preferred, fallback}, policy, strategy.Info{}, nil,
+		[]conn.Conn{preferred, fallback}, p, policy.Info{}, nil,
 	))
 
 	selected, err := balancer.nextConn(t.Context())
@@ -778,7 +778,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 				driverConfig: cfg,
 				pool:         pool,
 			}
-			s := newConnectionsState([]conn.Conn{cc1}, nil, strategy.Info{}, nil)
+			s := newConnectionsState([]conn.Conn{cc1}, nil, policy.Info{}, nil)
 			b.connectionsState.Store(s)
 
 			nodeCtx := endpoint.WithNodeID(ctx, e1.NodeID())
@@ -827,7 +827,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, strategy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{}, nil)
 		b.connectionsState.Store(s)
 
 		err := b.Invoke(endpoint.WithNodeID(ctx, cc1.NodeIDField), "/test.Service/Method", nil, nil)
@@ -866,7 +866,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1}, nil, strategy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1}, nil, policy.Info{}, nil)
 		b.connectionsState.Store(s)
 
 		err := b.Invoke(ctx, "/test.Service/Method", nil, nil)
@@ -907,7 +907,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, strategy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{}, nil)
 		b.connectionsState.Store(s)
 
 		// Call Invoke targeting cc1 with OVERLOADED tagged in context — wrapCall must ban cc1.
@@ -957,7 +957,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1}, nil, strategy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1}, nil, policy.Info{}, nil)
 		b.connectionsState.Store(s)
 
 		// Context only bans on OVERLOADED — a NOT_FOUND error must not ban.
@@ -1003,7 +1003,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, strategy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{}, nil)
 		b.connectionsState.Store(s)
 
 		invokeCtx := BanOnSessionCreate(endpoint.WithNodeID(ctx, cc1.NodeIDField))
@@ -1051,7 +1051,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, strategy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{}, nil)
 		b.connectionsState.Store(s)
 
 		invokeCtx := BanOnSessionCreate(endpoint.WithNodeID(ctx, cc1.NodeIDField))
@@ -1095,7 +1095,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, strategy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{}, nil)
 		b.connectionsState.Store(s)
 
 		// Sequentially pessimize cc1 then cc2 via the normal Invoke+BanOnOperationError flow.
@@ -1147,7 +1147,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, strategy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{}, nil)
 		b.connectionsState.Store(s)
 
 		streamCtx := BanOnOperationError(
@@ -1200,7 +1200,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, strategy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{}, nil)
 		b.connectionsState.Store(s)
 
 		streamCtx := BanOnOperationError(
@@ -1379,12 +1379,12 @@ func TestNewReturnsDiscoveryStartError(t *testing.T) {
 
 func TestClusterDiscoveryAttemptReturnsLocalDCDetectorError(t *testing.T) {
 	expectedErr := errors.New("local DC detection failed")
-	policy := strategy.PreferNearestDC(
-		strategy.Policy{}, "LocalDC", func(strategy.Info, endpoint.Info) bool { return true },
+	p := policy.PreferNearestDC(
+		policy.Policy{}, "LocalDC", func(policy.Info, endpoint.Info) bool { return true },
 	)
 	balancer := &Balancer{
 		driverConfig:    config.New(),
-		policy:          policy,
+		policy:          p,
 		detectNearestDC: true,
 		discover: func(context.Context, *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
 			return []endpoint.Endpoint{endpoint.New("node:2135")}, "", nil
@@ -1403,15 +1403,15 @@ func TestPolicyUsesFreshDiscoveryMetadataBeforePoolGet(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.New()
 	pool := conn.NewPool(ctx, cfg)
-	policy := strategy.Prefer(
-		strategy.Policy{}, "PrimaryPile",
-		func(_ strategy.Info, candidate endpoint.Info) bool {
+	p := policy.Prefer(
+		policy.Policy{}, "PrimaryPile",
+		func(_ policy.Info, candidate endpoint.Info) bool {
 			return candidate.Metadata().BridgePileState == endpoint.PileStatePrimary
 		},
 	)
 	balancer := &Balancer{
 		driverConfig: cfg,
-		policy:       policy,
+		policy:       p,
 		pool:         pool,
 	}
 	t.Cleanup(func() {
@@ -1496,7 +1496,7 @@ func TestNextAvailableConnContinuesWithLatestSnapshot(t *testing.T) {
 		StateField:  state.Online,
 	}
 	next := newConnectionsStateWithPolicy(
-		[]conn.Conn{replacement}, strategy.Policy{}, strategy.Info{}, nil,
+		[]conn.Conn{replacement}, policy.Policy{}, policy.Info{}, nil,
 	)
 	balancer := &Balancer{}
 	staleBase := &mock.Conn{
@@ -1510,7 +1510,7 @@ func TestNextAvailableConnContinuesWithLatestSnapshot(t *testing.T) {
 		nextState: next,
 	}
 	previous := newConnectionsStateWithPolicy(
-		[]conn.Conn{stale}, strategy.Policy{}, strategy.Info{}, nil,
+		[]conn.Conn{stale}, policy.Policy{}, policy.Info{}, nil,
 	)
 	balancer.connectionsState.Store(previous)
 	stale.armed = true
@@ -1545,7 +1545,7 @@ func TestNextAvailableConnExtendsAttemptsForLargerSnapshot(t *testing.T) {
 	}
 	next := newConnectionsStateWithPolicyAndRand(
 		[]conn.Conn{firstUnavailable, secondUnavailable, available},
-		strategy.Policy{}, strategy.Info{}, nil, userAPITestRand{},
+		policy.Policy{}, policy.Info{}, nil, userAPITestRand{},
 	)
 	balancer := &Balancer{}
 	stale := &snapshotSwappingConn{
@@ -1554,7 +1554,7 @@ func TestNextAvailableConnExtendsAttemptsForLargerSnapshot(t *testing.T) {
 		nextState: next,
 	}
 	previous := newConnectionsStateWithPolicy(
-		[]conn.Conn{stale}, strategy.Policy{}, strategy.Info{}, nil,
+		[]conn.Conn{stale}, policy.Policy{}, policy.Info{}, nil,
 	)
 	balancer.connectionsState.Store(previous)
 	stale.armed = true
@@ -1578,7 +1578,7 @@ func TestNextAvailableConnStopsWhenBalancerClosesDuringSelection(t *testing.T) {
 		balancer: balancer,
 	}
 	previous := newConnectionsStateWithPolicy(
-		[]conn.Conn{stale}, strategy.Policy{}, strategy.Info{}, nil,
+		[]conn.Conn{stale}, policy.Policy{}, policy.Info{}, nil,
 	)
 	balancer.connectionsState.Store(previous)
 	stale.armed = true
@@ -1604,7 +1604,7 @@ func TestNextAvailableConnStopsWhenElectionSnapshotIsEmpty(t *testing.T) {
 func TestNextAvailableConnStopsWhenElectionSnapshotBecomesEmpty(t *testing.T) {
 	connection := &mock.Conn{AddrField: "available:2135", StateField: state.Online}
 	connections := newConnectionsStateWithPolicy(
-		[]conn.Conn{connection}, strategy.Policy{}, strategy.Info{}, nil,
+		[]conn.Conn{connection}, policy.Policy{}, policy.Info{}, nil,
 	)
 	balancer := &Balancer{}
 	balancer.connectionsState.Store(connections)
@@ -1620,7 +1620,7 @@ func TestNextConnReturnsNoEndpointsWhenElectionSnapshotIsEmpty(t *testing.T) {
 	connection := &mock.Conn{AddrField: "destroyed:2135", StateField: state.Destroyed}
 	connections := newConnectionsStateWithPriorities(
 		[]conn.Conn{connection},
-		[]strategy.EndpointPriority{{Key: connection.Endpoint().Key()}},
+		[]policy.EndpointPriority{{Key: connection.Endpoint().Key()}},
 		nil,
 		nil,
 	)
@@ -1637,7 +1637,7 @@ func TestNextConnReturnsNoEndpointsWhenElectionSnapshotIsEmpty(t *testing.T) {
 func TestNextAvailableConnStopsWhenContextIsCanceled(t *testing.T) {
 	connection := &mock.Conn{AddrField: "available:2135", StateField: state.Online}
 	connections := newConnectionsStateWithPolicy(
-		[]conn.Conn{connection}, strategy.Policy{}, strategy.Info{}, nil,
+		[]conn.Conn{connection}, policy.Policy{}, policy.Info{}, nil,
 	)
 	balancer := &Balancer{}
 	balancer.connectionsState.Store(connections)
@@ -1654,7 +1654,7 @@ func TestNextConnReturnsCanceledContext(t *testing.T) {
 	connection := &mock.Conn{AddrField: "available:2135", StateField: state.Online}
 	balancer := &Balancer{driverConfig: config.New()}
 	balancer.connectionsState.Store(newConnectionsStateWithPolicy(
-		[]conn.Conn{connection}, strategy.Policy{}, strategy.Info{}, nil,
+		[]conn.Conn{connection}, policy.Policy{}, policy.Info{}, nil,
 	))
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -1873,7 +1873,7 @@ func userConfiguredBalancer(option config.Option, connections []conn.Conn, selfL
 	balancer.connectionsState.Store(newConnectionsStateWithPolicy(
 		connections,
 		balancer.policy,
-		strategy.Info{SelfLocation: selfLocation},
+		policy.Info{SelfLocation: selfLocation},
 		nil,
 	))
 

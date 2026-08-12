@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -38,13 +38,13 @@ type balancersConfig struct {
 }
 
 type fromConfigOptionsHolder struct {
-	fallbackBalancer strategy.Policy
+	fallbackBalancer policy.Policy
 	errorHandler     func(error)
 }
 
 type fromConfigOption func(h *fromConfigOptionsHolder)
 
-func WithParseErrorFallbackBalancer(b strategy.Policy) fromConfigOption {
+func WithParseErrorFallbackBalancer(b policy.Policy) fromConfigOption {
 	return func(h *fromConfigOptionsHolder) {
 		h.fallbackBalancer = b
 	}
@@ -56,7 +56,7 @@ func WithParseErrorHandler(errorHandler func(error)) fromConfigOption {
 	}
 }
 
-func createByType(t balancerType) (strategy.Policy, error) {
+func createByType(t balancerType) (policy.Policy, error) {
 	switch t {
 	case typeDisable:
 		return SingleConn(), nil
@@ -67,30 +67,30 @@ func createByType(t balancerType) (strategy.Policy, error) {
 	case typeRoundRobin:
 		return RoundRobin(), nil
 	default:
-		return strategy.Policy{}, xerrors.WithStackTrace(fmt.Errorf("unknown type of balancer: %s", t))
+		return policy.Policy{}, xerrors.WithStackTrace(fmt.Errorf("unknown type of balancer: %s", t))
 	}
 }
 
-func CreateFromConfig(s string) (strategy.Policy, error) {
+func CreateFromConfig(s string) (policy.Policy, error) {
 	// try to parse s as identifier of balancer
 	if c, err := createByType(balancerType(s)); err == nil {
 		return c, nil
 	}
 
 	var (
-		b   strategy.Policy
+		b   policy.Policy
 		err error
 		c   balancersConfig
 	)
 
 	// try to parse s as json
 	if err = json.Unmarshal([]byte(s), &c); err != nil {
-		return strategy.Policy{}, xerrors.WithStackTrace(err)
+		return policy.Policy{}, xerrors.WithStackTrace(err)
 	}
 
 	b, err = createByType(c.Type)
 	if err != nil {
-		return strategy.Policy{}, xerrors.WithStackTrace(err)
+		return policy.Policy{}, xerrors.WithStackTrace(err)
 	}
 
 	switch c.Prefer {
@@ -100,7 +100,7 @@ func CreateFromConfig(s string) (strategy.Policy, error) {
 		return PreferNearestDC(b), nil
 	case preferTypeLocations:
 		if len(c.Locations) == 0 {
-			return strategy.Policy{}, xerrors.WithStackTrace(
+			return policy.Policy{}, xerrors.WithStackTrace(
 				fmt.Errorf("empty locations list in balancer '%s' config", c.Type),
 			)
 		}
@@ -111,12 +111,12 @@ func CreateFromConfig(s string) (strategy.Policy, error) {
 	}
 }
 
-func FromConfig(config string, opts ...fromConfigOption) strategy.Policy {
+func FromConfig(config string, opts ...fromConfigOption) policy.Policy {
 	var (
 		h = fromConfigOptionsHolder{
 			fallbackBalancer: Default(),
 		}
-		b   strategy.Policy
+		b   policy.Policy
 		err error
 	)
 	for _, opt := range opts {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -18,7 +18,7 @@ func TestConnectionsStateDefensiveViews(t *testing.T) {
 		&mock.Conn{AddrField: "1", NodeIDField: 1, StateField: state.Online},
 		&mock.Conn{AddrField: "2", NodeIDField: 2, StateField: state.Online},
 	}
-	s := newConnectionsState(connections, nil, strategy.Info{}, nil)
+	s := newConnectionsState(connections, nil, policy.Info{}, nil)
 
 	all := s.All()
 	all[0] = &mock.Conn{AddrField: "mutated"}
@@ -33,16 +33,16 @@ func TestConnectionsStatePolicyGroups(t *testing.T) {
 		&mock.Conn{AddrField: "local", NodeIDField: 1, LocationField: "local", StateField: state.Online},
 		&mock.Conn{AddrField: "remote", NodeIDField: 2, LocationField: "remote", StateField: state.Online},
 	}
-	policy := strategy.Prefer(
-		strategy.Policy{}, "LocalDC",
-		func(info strategy.Info, candidate endpoint.Info) bool {
+	p := policy.Prefer(
+		policy.Policy{}, "LocalDC",
+		func(info policy.Info, candidate endpoint.Info) bool {
 			return candidate.Location() == info.SelfLocation
 		},
 	)
-	s := newConnectionsStateWithPolicy(connections, policy, strategy.Info{SelfLocation: "local"}, nil)
+	s := newConnectionsStateWithPolicy(connections, p, policy.Info{SelfLocation: "local"}, nil)
 
 	require.Equal(t, 1, s.elector.preferredCount)
-	require.Equal(t, []strategy.EndpointPriority{
+	require.Equal(t, []policy.EndpointPriority{
 		{Key: connections[0].Endpoint().Key()},
 		{Key: connections[1].Endpoint().Key(), Priority: 1},
 	}, s.elector.priorities)
@@ -53,7 +53,7 @@ func TestConnectionsStatePinnedNodeContract(t *testing.T) {
 		&mock.Conn{AddrField: "1", NodeIDField: 1, StateField: state.Online},
 		&mock.Conn{AddrField: "2", NodeIDField: 2, StateField: state.Online},
 	}
-	s := newConnectionsState(connections, nil, strategy.Info{}, nil)
+	s := newConnectionsState(connections, nil, policy.Info{}, nil)
 
 	require.Same(t, connections[1], s.preferConnection(endpoint.WithNodeID(t.Context(), 2)))
 	connections[1].Ban(t.Context())
@@ -66,7 +66,7 @@ func TestConnectionsStateLastResort(t *testing.T) {
 		&mock.Conn{AddrField: "2", NodeIDField: 2, StateField: state.Banned},
 	}
 	s := newConnectionsStateWithPolicyAndRand(
-		connections, strategy.Policy{}, strategy.Info{}, nil, deterministicRand{},
+		connections, policy.Policy{}, policy.Info{}, nil, deterministicRand{},
 	)
 
 	selected, allowBanned, ok := s.elector.Next()
@@ -76,7 +76,7 @@ func TestConnectionsStateLastResort(t *testing.T) {
 }
 
 func TestConnectionsStateEmpty(t *testing.T) {
-	s := newConnectionsState(nil, nil, strategy.Info{}, nil)
+	s := newConnectionsState(nil, nil, policy.Info{}, nil)
 	connection, _, ok := s.elector.Next()
 	require.False(t, ok)
 	require.Nil(t, connection)
@@ -91,26 +91,26 @@ func TestConnsToNodeIDMap(t *testing.T) {
 	require.Equal(t, map[uint32]conn.Conn{0: connections[0], 10: connections[1]}, connsToNodeIDMap(connections))
 }
 
-type filterFunc func(info strategy.Info, candidate endpoint.Info) bool
+type filterFunc func(info policy.Info, candidate endpoint.Info) bool
 
 func newConnectionsState(
 	connections []conn.Conn,
 	filter filterFunc,
-	info strategy.Info,
+	info policy.Info,
 	quarantine []conn.Conn,
 ) *connectionsState {
-	policy := strategy.Policy{}
+	p := policy.Policy{}
 	if filter != nil {
-		policy = strategy.Prefer(policy, "Custom", filter)
+		p = policy.Prefer(p, "Custom", filter)
 	}
 
-	return newConnectionsStateWithPolicy(connections, policy, info, quarantine)
+	return newConnectionsStateWithPolicy(connections, p, info, quarantine)
 }
 
 func newConnectionsStateWithPolicy(
 	connections []conn.Conn,
-	policy strategy.Policy,
-	info strategy.Info,
+	policy policy.Policy,
+	info policy.Info,
 	quarantine []conn.Conn,
 ) *connectionsState {
 	return newConnectionsStateWithPolicyAndRand(connections, policy, info, quarantine, nil)
@@ -118,8 +118,8 @@ func newConnectionsStateWithPolicy(
 
 func newConnectionsStateWithPolicyAndRand(
 	connections []conn.Conn,
-	policy strategy.Policy,
-	info strategy.Info,
+	policy policy.Policy,
+	info policy.Info,
 	quarantine []conn.Conn,
 	rand xrand.Rand,
 ) *connectionsState {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -18,13 +18,13 @@ func TestPreferNearestDC(t *testing.T) {
 		&mock.Conn{AddrField: "2", LocationField: "2", StateField: state.Online},
 		&mock.Conn{AddrField: "3", LocationField: "2", StateField: state.Online},
 	}
-	policy := PreferNearestDC(RandomChoice())
-	priorities := policy.Prioritize(strategy.Info{SelfLocation: "2"}, connEndpoints(connections))
+	p := PreferNearestDC(RandomChoice())
+	priorities := p.Prioritize(policy.Info{SelfLocation: "2"}, connEndpoints(connections))
 
 	require.Len(t, priorities, len(connections))
 	require.Equal(t, 2, priorityGroupCount(priorities))
 	require.Equal(t, []conn.Conn{connections[1], connections[2]}, bestConnections(priorities, connections))
-	require.True(t, policy.DetectsNearestDC())
+	require.True(t, p.DetectsNearestDC())
 }
 
 func TestPreferLocations(t *testing.T) {
@@ -33,13 +33,13 @@ func TestPreferLocations(t *testing.T) {
 		&mock.Conn{AddrField: "2", LocationField: "one", StateField: state.Online},
 		&mock.Conn{AddrField: "3", LocationField: "two", StateField: state.Online},
 	}
-	policy := PreferLocations(RandomChoice(), "two", "zero")
-	priorities := policy.Prioritize(strategy.Info{}, connEndpoints(connections))
+	p := PreferLocations(RandomChoice(), "two", "zero")
+	priorities := p.Prioritize(policy.Info{}, connEndpoints(connections))
 
 	require.Len(t, priorities, len(connections))
 	require.Equal(t, 2, priorityGroupCount(priorities))
 	require.Equal(t, []conn.Conn{connections[0], connections[2]}, bestConnections(priorities, connections))
-	require.Equal(t, "Priority{Preferences=[Locations{TWO,ZERO}]}", policy.String())
+	require.Equal(t, "Priority{Preferences=[Locations{TWO,ZERO}]}", p.String())
 }
 
 func TestPreferenceAliases(t *testing.T) {
@@ -50,7 +50,7 @@ func TestPreferenceAliases(t *testing.T) {
 		endpoint.New("local", endpoint.WithID(1), endpoint.WithLocation("a")),
 		endpoint.New("remote", endpoint.WithID(2), endpoint.WithLocation("b")),
 	}
-	info := strategy.Info{SelfLocation: "a"}
+	info := policy.Info{SelfLocation: "a"}
 
 	requireSamePolicySemantics(t, info, endpoints, PreferNearestDC(RandomChoice()), PreferLocalDC(RandomChoice()))
 	requireSamePolicySemantics(t,
@@ -82,14 +82,14 @@ func TestCustomPrefer(t *testing.T) {
 		&mock.Conn{AddrField: "1", NodeIDField: 1, StateField: state.Online},
 		&mock.Conn{AddrField: "2", NodeIDField: 2, StateField: state.Online},
 	}
-	policy := Prefer(RandomChoice(), func(candidate Endpoint) bool {
+	p := Prefer(RandomChoice(), func(candidate Endpoint) bool {
 		return candidate.NodeID()%2 == 0
 	})
-	priorities := policy.Prioritize(strategy.Info{}, connEndpoints(connections))
+	priorities := p.Prioritize(policy.Info{}, connEndpoints(connections))
 
 	require.Len(t, priorities, len(connections))
 	require.Equal(t, []conn.Conn{connections[1]}, bestConnections(priorities, connections))
-	require.Contains(t, policy.String(), "Custom")
+	require.Contains(t, p.String(), "Custom")
 }
 
 func TestBasicPolicies(t *testing.T) {
@@ -100,10 +100,10 @@ func TestBasicPolicies(t *testing.T) {
 
 func requireSamePolicySemantics(
 	t *testing.T,
-	info strategy.Info,
+	info policy.Info,
 	endpoints []endpoint.Endpoint,
-	expected strategy.Policy,
-	actual strategy.Policy,
+	expected policy.Policy,
+	actual policy.Policy,
 ) {
 	t.Helper()
 	require.Equal(t, expected.String(), actual.String())
@@ -112,7 +112,7 @@ func requireSamePolicySemantics(
 	require.Equal(t, expected.Prioritize(info, endpoints), actual.Prioritize(info, endpoints))
 }
 
-func bestConnections(priorities []strategy.EndpointPriority, connections []conn.Conn) []conn.Conn {
+func bestConnections(priorities []policy.EndpointPriority, connections []conn.Conn) []conn.Conn {
 	if len(priorities) == 0 {
 		return nil
 	}
@@ -138,7 +138,7 @@ func bestConnections(priorities []strategy.EndpointPriority, connections []conn.
 	return result
 }
 
-func priorityGroupCount(priorities []strategy.EndpointPriority) int {
+func priorityGroupCount(priorities []policy.EndpointPriority) int {
 	groups := make(map[uint64]struct{})
 	for _, candidate := range priorities {
 		groups[candidate.Priority] = struct{}{}

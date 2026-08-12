@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
@@ -167,21 +167,21 @@ func TestFromConfigLogicalCompatibility(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			policy := FromConfig(test.serialized)
-			preferred, lowerPriority := logicalGroups(policy, endpoints, strategy.Info{SelfLocation: "a"})
+			p := FromConfig(test.serialized)
+			preferred, lowerPriority := logicalGroups(p, endpoints, policy.Info{SelfLocation: "a"})
 
 			require.Equal(t, test.preferred, preferred)
 			require.Equal(t, test.lowerPriority, lowerPriority)
-			require.Equal(t, test.usesConfiguredEndpoint, policy.SingleConnection())
-			require.Equal(t, test.nearestDC, policy.DetectsNearestDC())
+			require.Equal(t, test.usesConfiguredEndpoint, p.SingleConnection())
+			require.Equal(t, test.nearestDC, p.DetectsNearestDC())
 		})
 	}
 }
 
 func logicalGroups(
-	policy strategy.Policy,
+	policy policy.Policy,
 	endpoints []endpoint.Endpoint,
-	info strategy.Info,
+	info policy.Info,
 ) (preferred, lowerPriority []uint32) {
 	nodeIDByKey := make(map[endpoint.Key]uint32, len(endpoints))
 	for _, candidate := range endpoints {

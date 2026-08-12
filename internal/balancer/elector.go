@@ -5,7 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -24,7 +24,7 @@ type electionSnapshot struct {
 type endpointElector struct {
 	mu sync.Mutex
 
-	priorities     []strategy.EndpointPriority
+	priorities     []policy.EndpointPriority
 	connections    map[endpoint.Key]conn.Conn
 	pessimized     map[endpoint.Key]struct{}
 	rand           xrand.Rand
@@ -34,7 +34,7 @@ type endpointElector struct {
 }
 
 func newEndpointElector(
-	priorities []strategy.EndpointPriority,
+	priorities []policy.EndpointPriority,
 	connections map[endpoint.Key]conn.Conn,
 	rand xrand.Rand,
 ) *endpointElector {
@@ -42,7 +42,7 @@ func newEndpointElector(
 		rand = xrand.New(xrand.WithLock())
 	}
 	elector := &endpointElector{
-		priorities:  append([]strategy.EndpointPriority(nil), priorities...),
+		priorities:  append([]policy.EndpointPriority(nil), priorities...),
 		connections: connections,
 		pessimized:  make(map[endpoint.Key]struct{}),
 		rand:        rand,

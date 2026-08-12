@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/strategy"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
@@ -13,29 +13,29 @@ import (
 // Deprecated: RoundRobin is an alias to RandomChoice now
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func RoundRobin() strategy.Policy {
+func RoundRobin() policy.Policy {
 	return RandomChoice()
 }
 
-func RandomChoice() strategy.Policy {
-	return strategy.Policy{}
+func RandomChoice() policy.Policy {
+	return policy.Policy{}
 }
 
-func SingleConn() strategy.Policy {
-	return strategy.SingleConn()
+func SingleConn() policy.Policy {
+	return policy.SingleConn()
 }
 
 // Deprecated: use PreferNearestDC instead
 // Will be removed after March 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func PreferLocalDC(policy strategy.Policy) strategy.Policy {
-	return PreferNearestDC(policy)
+func PreferLocalDC(p policy.Policy) policy.Policy {
+	return PreferNearestDC(p)
 }
 
 // PreferNearestDC prioritizes endpoints in the location nearest to the client.
 // Endpoints in other locations are used when all nearer endpoints are unavailable.
-func PreferNearestDC(policy strategy.Policy) strategy.Policy {
-	return strategy.PreferNearestDC(policy, "LocalDC", func(info strategy.Info, candidate endpoint.Info) bool {
+func PreferNearestDC(p policy.Policy) policy.Policy {
+	return policy.PreferNearestDC(p, "LocalDC", func(info policy.Info, candidate endpoint.Info) bool {
 		return candidate.Location() == info.SelfLocation
 	})
 }
@@ -43,13 +43,13 @@ func PreferNearestDC(policy strategy.Policy) strategy.Policy {
 // Deprecated: use PreferNearestDCWithFallBack instead
 // Will be removed after March 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func PreferLocalDCWithFallBack(policy strategy.Policy) strategy.Policy {
-	return PreferNearestDC(policy)
+func PreferLocalDCWithFallBack(p policy.Policy) policy.Policy {
+	return PreferNearestDC(p)
 }
 
 // PreferNearestDCWithFallBack is an alias for PreferNearestDC.
-func PreferNearestDCWithFallBack(policy strategy.Policy) strategy.Policy {
-	return PreferNearestDC(policy)
+func PreferNearestDCWithFallBack(p policy.Policy) policy.Policy {
+	return PreferNearestDC(p)
 }
 
 func locationsString(locations []string) string {
@@ -70,11 +70,11 @@ func locationsString(locations []string) string {
 
 // PreferLocations prioritizes endpoints in the selected locations (such as "ABC", "DEF", etc.).
 // Endpoints in other locations are used when all preferred endpoints are unavailable.
-func PreferLocations(policy strategy.Policy, locations ...string) strategy.Policy {
-	return preferLocations(policy, locations)
+func PreferLocations(p policy.Policy, locations ...string) policy.Policy {
+	return preferLocations(p, locations)
 }
 
-func preferLocations(policy strategy.Policy, locations []string) strategy.Policy {
+func preferLocations(p policy.Policy, locations []string) policy.Policy {
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
@@ -85,14 +85,14 @@ func preferLocations(policy strategy.Policy, locations []string) strategy.Policy
 	}
 	sort.Strings(locations)
 
-	return strategy.Prefer(policy, locationsString(locations), func(_ strategy.Info, candidate endpoint.Info) bool {
+	return policy.Prefer(p, locationsString(locations), func(_ policy.Info, candidate endpoint.Info) bool {
 		return slices.Contains(locations, strings.ToUpper(candidate.Location()))
 	})
 }
 
 // PreferLocationsWithFallback is an alias for PreferLocations.
-func PreferLocationsWithFallback(policy strategy.Policy, locations ...string) strategy.Policy {
-	return PreferLocations(policy, locations...)
+func PreferLocationsWithFallback(p policy.Policy, locations ...string) policy.Policy {
+	return PreferLocations(p, locations...)
 }
 
 type Endpoint interface {
@@ -109,18 +109,18 @@ type Endpoint interface {
 
 // Prefer prioritizes endpoints accepted by filter.
 // Other endpoints are used when all preferred endpoints are unavailable.
-func Prefer(policy strategy.Policy, filter func(endpoint Endpoint) bool) strategy.Policy {
-	return strategy.Prefer(policy, "Custom", func(_ strategy.Info, candidate endpoint.Info) bool {
+func Prefer(p policy.Policy, filter func(endpoint Endpoint) bool) policy.Policy {
+	return policy.Prefer(p, "Custom", func(_ policy.Info, candidate endpoint.Info) bool {
 		return filter(candidate)
 	})
 }
 
 // PreferWithFallback is an alias for Prefer.
-func PreferWithFallback(policy strategy.Policy, filter func(endpoint Endpoint) bool) strategy.Policy {
-	return Prefer(policy, filter)
+func PreferWithFallback(p policy.Policy, filter func(endpoint Endpoint) bool) policy.Policy {
+	return Prefer(p, filter)
 }
 
 // Default balancer used by default
-func Default() strategy.Policy {
+func Default() policy.Policy {
 	return RandomChoice()
 }
