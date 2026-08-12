@@ -139,9 +139,8 @@ PreferNearestDC(PreferLocations(RandomChoice(), "A", "B"))
   → priorities: nearest+A/B, nearest+other, remote+A/B, remote+other
 ```
 
-There is no policy tree, compile phase, runtime policy interface, or separate fallback branch. Every `Prefer*` keeps
-all endpoints at successively lower priorities. The deprecated `*WithFallback` constructors are aliases because this
-cascade is now the normal meaning of "prefer".
+Every `Prefer*` keeps all endpoints at successively lower priorities. The `*WithFallback` constructors are aliases
+because this cascade is now the normal meaning of "prefer".
 
 The policy runs once for each fresh discovery snapshot, before endpoints are mapped to pooled wrappers. This order is
 important: reused `conn.Conn` values may retain endpoint metadata from an older discovery response.

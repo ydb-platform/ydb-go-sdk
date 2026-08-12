@@ -42,7 +42,7 @@ func TestPreferLocations(t *testing.T) {
 	require.Equal(t, "Priority{Preferences=[Locations{TWO,ZERO}]}", policy.String())
 }
 
-func TestDeprecatedPreferenceAliases(t *testing.T) {
+func TestPreferenceAliases(t *testing.T) {
 	filter := func(candidate Endpoint) bool {
 		return candidate.NodeID()%2 == 0
 	}

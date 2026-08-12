@@ -40,18 +40,14 @@ func PreferNearestDC(policy strategy.Policy) strategy.Policy {
 	})
 }
 
-// Deprecated: use PreferNearestDC instead.
-// All preference policies automatically cascade to lower-priority endpoints.
-// Will be removed after March 2027.
+// Deprecated: use PreferNearestDCWithFallBack instead
+// Will be removed after March 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func PreferLocalDCWithFallBack(policy strategy.Policy) strategy.Policy {
 	return PreferNearestDC(policy)
 }
 
-// Deprecated: use PreferNearestDC instead.
-// All preference policies automatically cascade to lower-priority endpoints.
-// Will be removed after March 2027.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// PreferNearestDCWithFallBack is an alias for PreferNearestDC.
 func PreferNearestDCWithFallBack(policy strategy.Policy) strategy.Policy {
 	return PreferNearestDC(policy)
 }
@@ -94,10 +90,7 @@ func preferLocations(policy strategy.Policy, locations []string) strategy.Policy
 	})
 }
 
-// Deprecated: use PreferLocations instead.
-// All preference policies automatically cascade to lower-priority endpoints.
-// Will be removed after March 2027.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// PreferLocationsWithFallback is an alias for PreferLocations.
 func PreferLocationsWithFallback(policy strategy.Policy, locations ...string) strategy.Policy {
 	return PreferLocations(policy, locations...)
 }
@@ -122,10 +115,7 @@ func Prefer(policy strategy.Policy, filter func(endpoint Endpoint) bool) strateg
 	})
 }
 
-// Deprecated: use Prefer instead.
-// All preference policies automatically cascade to lower-priority endpoints.
-// Will be removed after March 2027.
-// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// PreferWithFallback is an alias for Prefer.
 func PreferWithFallback(policy strategy.Policy, filter func(endpoint Endpoint) bool) strategy.Policy {
 	return Prefer(policy, filter)
 }
