@@ -16,60 +16,60 @@ func TestPreferEstimator(t *testing.T) {
 	require.Equal(t, "Prefer{Filter=Location(local),AllowFallback=false,Child=RandomChoice}",
 		withoutFallback.String(),
 	)
-	require.Equal(t, []Estimation{{Key: endpoints[0].Key(), Weight: 1}},
+	require.Equal(t, []Estimation{{Key: endpoints[0].Key()}},
 		withoutFallback.Estimate(Info{}, endpoints),
 	)
 
 	withFallback := Prefer(SingleConn(), "Location(local)", locationMatch("local"), true)
 	require.Equal(t, []Estimation{
-		{Key: endpoints[0].Key(), Weight: 1},
-		{Key: endpoints[1].Key(), Penalty: 1, Weight: 1},
+		{Key: endpoints[0].Key()},
+		{Key: endpoints[1].Key(), Priority: 1},
 	}, withFallback.Estimate(Info{}, endpoints))
 
 	noPreferred := Prefer(RandomChoice(), "missing", locationMatch("missing"), true)
 	require.Equal(t, []Estimation{
-		{Key: endpoints[0].Key(), Weight: 1},
-		{Key: endpoints[1].Key(), Weight: 1},
+		{Key: endpoints[0].Key()},
+		{Key: endpoints[1].Key()},
 	}, noPreferred.Estimate(Info{}, endpoints))
 
 	normalized := Prefer(nil, "Location(local)", locationMatch("local"), false)
 	require.Equal(t, "Prefer{Filter=Location(local),AllowFallback=false,Child=RandomChoice}", normalized.String())
 }
 
-func TestPreferPenaltyComposition(t *testing.T) {
+func TestPreferPriorityComposition(t *testing.T) {
 	endpoints := strategyEndpoints("local", "remote", "other")
 	child := fixedEstimator{estimates: []Estimation{
-		{Key: endpoints[0].Key(), Penalty: 2, Weight: 3},
-		{Key: endpoints[1].Key(), Penalty: 5, Weight: 4},
+		{Key: endpoints[0].Key(), Priority: 2},
+		{Key: endpoints[1].Key(), Priority: 5},
 	}}
 	estimator := Prefer(child, "local", locationMatch("local"), true)
 
 	require.Equal(t, []Estimation{
-		{Key: endpoints[0].Key(), Weight: 3},
-		{Key: endpoints[1].Key(), Penalty: 2, Weight: 4},
+		{Key: endpoints[0].Key()},
+		{Key: endpoints[1].Key(), Priority: 2},
 	}, estimator.Estimate(Info{}, endpoints))
 
 	overflowSafe := Prefer(fixedEstimator{estimates: []Estimation{
-		{Key: endpoints[0].Key(), Penalty: math.MaxUint64, Weight: 1},
-		{Key: endpoints[1].Key(), Weight: 1},
+		{Key: endpoints[0].Key(), Priority: math.MaxUint64},
+		{Key: endpoints[1].Key()},
 	}}, "local", locationMatch("local"), true)
 	require.Equal(t, []Estimation{
-		{Key: endpoints[0].Key(), Penalty: 1, Weight: 1},
-		{Key: endpoints[1].Key(), Penalty: 2, Weight: 1},
+		{Key: endpoints[0].Key(), Priority: 1},
+		{Key: endpoints[1].Key(), Priority: 2},
 	}, overflowSafe.Estimate(Info{}, endpoints))
 }
 
-func TestShiftFallbackPenaltiesDoesNotMutateInputs(t *testing.T) {
-	preferred := []Estimation{{Penalty: 2, Weight: 1}}
-	fallback := []Estimation{{Penalty: 5, Weight: 1}}
+func TestShiftFallbackPrioritiesDoesNotMutateInputs(t *testing.T) {
+	preferred := []Estimation{{Priority: 2}}
+	fallback := []Estimation{{Priority: 5}}
 
-	result := shiftFallbackPenalties(preferred, fallback)
+	result := shiftFallbackPriorities(preferred, fallback)
 
-	require.Equal(t, []Estimation{{Penalty: 2, Weight: 1}}, preferred)
-	require.Equal(t, []Estimation{{Penalty: 5, Weight: 1}}, fallback)
+	require.Equal(t, []Estimation{{Priority: 2}}, preferred)
+	require.Equal(t, []Estimation{{Priority: 5}}, fallback)
 	require.Equal(t, []Estimation{
-		{Weight: 1},
-		{Penalty: 2, Weight: 1},
+		{},
+		{Priority: 2},
 	}, result)
 }
 
@@ -95,7 +95,7 @@ func TestPartitionEstimates(t *testing.T) {
 	preferred, fallback = partitionEstimates(endpoints, estimates, locationMatch("local"), Info{})
 	require.Equal(t, estimates[:1], preferred)
 	require.Equal(t, estimates[1:], fallback)
-	require.Nil(t, compactPenalties(nil))
+	require.Nil(t, compactPriorities(nil))
 }
 
 func TestEstimatorCanUseEndpointMetadata(t *testing.T) {
@@ -111,7 +111,7 @@ func TestEstimatorCanUseEndpointMetadata(t *testing.T) {
 		return candidate.Metadata().BridgePileState == endpoint.PileStatePrimary
 	}, false)
 
-	require.Equal(t, []Estimation{{Key: endpoints[0].Key(), Weight: 1}}, estimator.Estimate(Info{}, endpoints))
+	require.Equal(t, []Estimation{{Key: endpoints[0].Key()}}, estimator.Estimate(Info{}, endpoints))
 }
 
 type recordingEstimator struct {

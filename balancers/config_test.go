@@ -188,12 +188,12 @@ func logicalGroups(
 	if len(estimates) == 0 {
 		return nil, nil
 	}
-	minimum := estimates[0].Penalty
+	minimum := estimates[0].Priority
 	for _, estimation := range estimates[1:] {
-		minimum = min(minimum, estimation.Penalty)
+		minimum = min(minimum, estimation.Priority)
 	}
 	for _, estimation := range estimates {
-		if estimation.Penalty == minimum {
+		if estimation.Priority == minimum {
 			preferred = append(preferred, nodeIDByKey[estimation.Key])
 		} else {
 			fallback = append(fallback, nodeIDByKey[estimation.Key])

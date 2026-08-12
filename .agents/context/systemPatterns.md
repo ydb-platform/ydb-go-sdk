@@ -117,8 +117,8 @@ Query additionally has **implicit** session pool for server-side session managem
 Balancer
   ├── clusterDiscovery()       # periodic / on-init endpoint refresh
   ├── enrich fresh endpoints   # LocalDC and discovery metadata before pool lookup
-  ├── Estimator.Estimate()     # immutable policy tree → key/penalty/weight
-  ├── endpointElector          # health + weighted random hot-path snapshot
+  ├── Estimator.Estimate()     # immutable policy tree → key/priority
+  ├── endpointElector          # health + random hot-path snapshot
   └── wrapCall / wrapStream    # pessimization on retriable connection failures
 ```
 
@@ -129,8 +129,8 @@ Configured via `config.WithBalancer(...)` or `ydb.WithBalancer(...)`.
 ### Selection policy and runtime health
 
 Balancer configuration is an immutable tree of `strategy.Estimator` values. Leaf estimators assign an initial
-`Estimation{Key, Penalty, Weight}` to every candidate. Preference constructors wrap a child estimator and transform
-its output: preferred endpoints keep the best penalty bucket, while an enabled fallback receives a worse bucket.
+`Estimation{Key, Priority}` to every candidate. Preference constructors wrap a child estimator and transform its
+output: preferred endpoints keep the best priority bucket, while an enabled fallback receives a worse bucket.
 This makes existing constructor expressions composable without putting discovery or connection state into the tree.
 
 ```text
@@ -144,8 +144,9 @@ is important: reused `conn.Conn` values may retain endpoint metadata from an old
 
 Mutable state has one owner: `endpointElector`. It stores the estimates, the `endpoint.Key → conn.Conn` mapping, and
 pessimized keys. Discovery and pessimization rebuild an immutable election snapshot behind `atomic.Pointer`; the RPC
-hot path only loads that snapshot, chooses among the lowest-penalty usable endpoints, and performs weighted random
-selection. If no healthy endpoint remains, banned/pessimized endpoints are a last resort.
+hot path only loads that snapshot and randomly chooses among the usable endpoints with the lowest effective priority.
+Pessimization assigns `math.MaxUint64` effective priority; if no healthy endpoint remains, those endpoints are a
+randomized last resort.
 
 `nextConn` handles the contracts outside policy estimation:
 

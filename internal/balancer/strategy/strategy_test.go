@@ -11,8 +11,8 @@ import (
 func TestIdentityEstimators(t *testing.T) {
 	endpoints := strategyEndpoints("local", "remote")
 	expected := []Estimation{
-		{Key: endpoints[0].Key(), Weight: 1},
-		{Key: endpoints[1].Key(), Weight: 1},
+		{Key: endpoints[0].Key()},
+		{Key: endpoints[1].Key()},
 	}
 
 	tests := []struct {

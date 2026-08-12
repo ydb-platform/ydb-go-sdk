@@ -45,8 +45,8 @@ func TestConnectionsStatePolicyGroups(t *testing.T) {
 	require.Equal(t, 1, preferred)
 	require.Zero(t, unavailable)
 	require.Equal(t, []strategy.Estimation{
-		{Key: connections[0].Endpoint().Key(), Weight: 1},
-		{Key: connections[1].Endpoint().Key(), Penalty: 1, Weight: 1},
+		{Key: connections[0].Endpoint().Key()},
+		{Key: connections[1].Endpoint().Key(), Priority: 1},
 	}, s.elector.estimates)
 }
 

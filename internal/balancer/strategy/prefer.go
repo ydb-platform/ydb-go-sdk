@@ -25,7 +25,7 @@ func (p prefer) Estimate(info Info, endpoints []endpoint.Endpoint) []Estimation 
 		return preferred
 	}
 
-	return shiftFallbackPenalties(preferred, fallback)
+	return shiftFallbackPriorities(preferred, fallback)
 }
 
 func (p prefer) String() string {
@@ -72,7 +72,7 @@ func partitionEstimates(
 	return preferred, fallback
 }
 
-func shiftFallbackPenalties(preferred, fallback []Estimation) []Estimation {
+func shiftFallbackPriorities(preferred, fallback []Estimation) []Estimation {
 	result := make([]Estimation, 0, len(preferred)+len(fallback))
 	result = append(result, preferred...)
 	result = append(result, fallback...)
@@ -80,41 +80,41 @@ func shiftFallbackPenalties(preferred, fallback []Estimation) []Estimation {
 		return result
 	}
 
-	penalties := make([]uint64, 0, len(preferred)+len(fallback))
+	priorities := make([]uint64, 0, len(preferred)+len(fallback))
 	for _, estimations := range [][]Estimation{preferred, fallback} {
 		for _, estimation := range estimations {
-			penalties = append(penalties, estimation.Penalty)
+			priorities = append(priorities, estimation.Priority)
 		}
 	}
-	slices.Sort(penalties)
-	penalties = compactPenalties(penalties)
-	ranks := make(map[uint64]uint64, len(penalties))
-	for rank, penalty := range penalties {
-		ranks[penalty] = uint64(rank)
+	slices.Sort(priorities)
+	priorities = compactPriorities(priorities)
+	ranks := make(map[uint64]uint64, len(priorities))
+	for rank, priority := range priorities {
+		ranks[priority] = uint64(rank)
 	}
 
 	var maximumPreferred uint64
 	for i := range preferred {
-		result[i].Penalty = ranks[result[i].Penalty]
-		maximumPreferred = max(maximumPreferred, result[i].Penalty)
+		result[i].Priority = ranks[result[i].Priority]
+		maximumPreferred = max(maximumPreferred, result[i].Priority)
 	}
 	shift := maximumPreferred + 1
 	for i := len(preferred); i < len(result); i++ {
-		result[i].Penalty = ranks[result[i].Penalty] + shift
+		result[i].Priority = ranks[result[i].Priority] + shift
 	}
 
 	return result
 }
 
-func compactPenalties(penalties []uint64) []uint64 {
-	if len(penalties) == 0 {
+func compactPriorities(priorities []uint64) []uint64 {
+	if len(priorities) == 0 {
 		return nil
 	}
 
-	result := penalties[:1]
-	for _, penalty := range penalties[1:] {
-		if penalty != result[len(result)-1] {
-			result = append(result, penalty)
+	result := priorities[:1]
+	for _, priority := range priorities[1:] {
+		if priority != result[len(result)-1] {
+			result = append(result, priority)
 		}
 	}
 

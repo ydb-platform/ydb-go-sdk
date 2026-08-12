@@ -1630,7 +1630,7 @@ func TestNextConnReturnsNoEndpointsWhenElectionSnapshotIsEmpty(t *testing.T) {
 	connection := &mock.Conn{AddrField: "destroyed:2135", StateField: state.Destroyed}
 	connections := newConnectionsStateWithEstimates(
 		[]conn.Conn{connection},
-		[]strategy.Estimation{{Key: connection.Endpoint().Key(), Weight: 1}},
+		[]strategy.Estimation{{Key: connection.Endpoint().Key()}},
 		nil,
 		nil,
 	)

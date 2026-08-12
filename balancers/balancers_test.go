@@ -104,13 +104,13 @@ func applyPreferEstimator(info strategy.Info, estimator strategy.Estimator, conn
 		return nil
 	}
 
-	minimum := estimates[0].Penalty
+	minimum := estimates[0].Priority
 	for _, estimation := range estimates {
-		minimum = min(minimum, estimation.Penalty)
+		minimum = min(minimum, estimation.Priority)
 	}
 	allowed := make(map[endpoint.Key]struct{}, len(estimates))
 	for _, estimation := range estimates {
-		if estimation.Penalty == minimum {
+		if estimation.Priority == minimum {
 			allowed[estimation.Key] = struct{}{}
 		}
 	}
@@ -126,12 +126,12 @@ func applyPreferEstimator(info strategy.Info, estimator strategy.Estimator, conn
 }
 
 func estimationGroupCount(estimates []strategy.Estimation) int {
-	penalties := make(map[uint64]struct{})
+	priorities := make(map[uint64]struct{})
 	for _, estimation := range estimates {
-		penalties[estimation.Penalty] = struct{}{}
+		priorities[estimation.Priority] = struct{}{}
 	}
 
-	return len(penalties)
+	return len(priorities)
 }
 
 func connEndpoints(conns []conn.Conn) []endpoint.Endpoint {

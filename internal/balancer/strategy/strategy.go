@@ -4,17 +4,15 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
-const defaultWeight uint64 = 1
-
 // Estimation describes endpoint selection policy independent of connection state.
 type Estimation struct {
-	Key     endpoint.Key
-	Penalty uint64
-	Weight  uint64
+	Key endpoint.Key
+	// Priority is ordered from the most preferred endpoint at zero to the least preferred endpoint.
+	Priority uint64
 }
 
 // Estimator is an immutable, composable endpoint estimation policy.
-// Connection ownership, health penalties, and discovery lifecycle remain outside the estimator tree.
+// Connection ownership, health pessimization, and discovery lifecycle remain outside the estimator tree.
 type Estimator interface {
 	Estimate(info Info, endpoints []endpoint.Endpoint) []Estimation
 	String() string
@@ -95,7 +93,7 @@ type randomChoice struct{}
 func (randomChoice) Estimate(_ Info, endpoints []endpoint.Endpoint) []Estimation {
 	result := make([]Estimation, len(endpoints))
 	for i, candidate := range endpoints {
-		result[i] = Estimation{Key: candidate.Key(), Weight: defaultWeight}
+		result[i] = Estimation{Key: candidate.Key()}
 	}
 
 	return result
