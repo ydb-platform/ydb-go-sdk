@@ -52,7 +52,7 @@ func TestEndpointElectorPessimizationPromotesNextPriority(t *testing.T) {
 	}, connectionMap(local, remote), &electorRand{})
 
 	local.Ban(t.Context())
-	elector.Pessimize(local.Endpoint().Key())
+	elector.Refresh()
 	selected, allowBanned, ok := elector.Next()
 
 	require.True(t, ok)
@@ -69,34 +69,41 @@ func TestEndpointElectorPessimizeAndLastResort(t *testing.T) {
 	}, connectionMap(first, second), &electorRand{})
 
 	first.Ban(t.Context())
-	elector.Pessimize(first.Endpoint().Key())
-	elector.Pessimize(first.Endpoint().Key())
-	require.Equal(t, 2, elector.preferredCount)
+	require.False(t, elector.Refresh(), "exactly 50% banned must not force discovery")
 	selected, allowBanned, ok := elector.Next()
 	require.True(t, ok)
 	require.False(t, allowBanned)
 	require.Same(t, second, selected)
 
 	second.Ban(t.Context())
-	elector.Pessimize(second.Endpoint().Key())
+	require.True(t, elector.Refresh())
 	selected, allowBanned, ok = elector.Next()
 	require.True(t, ok)
 	require.True(t, allowBanned)
 	require.Same(t, first, selected)
 }
 
-func TestEndpointElectorIgnoresUnknownPessimization(t *testing.T) {
-	connection := electorConnection("known", 1, state.Online)
+func TestEndpointElectorRefreshRestoresUnbannedConnection(t *testing.T) {
+	preferred := electorConnection("preferred", 1, state.Banned)
+	fallback := electorConnection("fallback", 2, state.Online)
 	elector := newEndpointElector(
-		[]policy.EndpointPriority{{Key: connection.Endpoint().Key()}},
-		connectionMap(connection),
+		[]policy.EndpointPriority{
+			{Key: preferred.Endpoint().Key()},
+			{Key: fallback.Endpoint().Key(), Priority: 1},
+		},
+		connectionMap(preferred, fallback),
 		&electorRand{},
 	)
 
-	elector.Pessimize(endpoint.New("unknown").Key())
+	selected, _, ok := elector.Next()
+	require.True(t, ok)
+	require.Same(t, fallback, selected)
 
-	require.Empty(t, elector.pessimized)
-	require.False(t, elector.snapshot.Load().hasPessimized)
+	preferred.Unban(t.Context())
+	elector.Refresh()
+	selected, _, ok = elector.Next()
+	require.True(t, ok)
+	require.Same(t, preferred, selected)
 }
 
 func TestEndpointElectorCombinesConnectionStateAndPolicy(t *testing.T) {
@@ -119,7 +126,7 @@ func TestEndpointElectorCombinesConnectionStateAndPolicy(t *testing.T) {
 	}
 	elector := newEndpointElector(priorities, connections, &electorRand{})
 	require.Equal(t, 4, elector.CandidateCount())
-	elector.Pessimize(destroyed.Endpoint().Key())
+	elector.Refresh()
 	require.Equal(t, 4, elector.CandidateCount())
 
 	selected, allowBanned, ok := elector.Next()
@@ -137,7 +144,7 @@ func TestEndpointElectorEmpty(t *testing.T) {
 	require.Zero(t, zero.CandidateCount())
 	var nilElector *endpointElector
 	require.Zero(t, nilElector.CandidateCount())
-	require.Zero(t, zero.preferredCount)
+	require.False(t, nilElector.Refresh())
 
 	empty := newEndpointElector([]policy.EndpointPriority{{}}, nil, nil)
 	selected, allowBanned, ok = empty.Next()
@@ -148,11 +155,11 @@ func TestEndpointElectorEmpty(t *testing.T) {
 	require.NotNil(t, empty.snapshot.Load())
 }
 
-func TestEndpointElectorPessimizationUsesMaxPriority(t *testing.T) {
+func TestEndpointElectorBannedPriorityDoesNotCollideWithHealthyMaxPriority(t *testing.T) {
 	healthy := electorConnection("healthy", 1, state.Online)
 	banned := electorConnection("banned", 2, state.Banned)
 	elector := newEndpointElector([]policy.EndpointPriority{
-		{Key: healthy.Endpoint().Key(), Priority: math.MaxUint64 - 1},
+		{Key: healthy.Endpoint().Key(), Priority: math.MaxUint64},
 		{Key: banned.Endpoint().Key()},
 	}, connectionMap(healthy, banned), &electorRand{})
 
@@ -162,12 +169,41 @@ func TestEndpointElectorPessimizationUsesMaxPriority(t *testing.T) {
 	require.Same(t, healthy, selected)
 
 	healthy.Ban(t.Context())
-	elector.Pessimize(healthy.Endpoint().Key())
+	elector.Refresh()
 	selected, allowBanned, ok = elector.Next()
 	require.True(t, ok)
 	require.True(t, allowBanned)
 	require.Contains(t, []conn.Conn{healthy, banned}, selected)
 	require.NotNil(t, selected)
+}
+
+func TestEndpointElectorForcesDiscoveryOnceAfterMostRecordsAreBanned(t *testing.T) {
+	first := electorConnection("first", 1, state.Online)
+	second := electorConnection("second", 2, state.Online)
+	third := electorConnection("third", 3, state.Online)
+	fallback := electorConnection("fallback", 4, state.Online)
+	elector := newEndpointElector([]policy.EndpointPriority{
+		{Key: first.Endpoint().Key()},
+		{Key: second.Endpoint().Key(), Priority: 1},
+		{Key: third.Endpoint().Key(), Priority: 1},
+		{Key: fallback.Endpoint().Key(), Priority: 1},
+	}, connectionMap(first, second, third, fallback), &electorRand{})
+
+	first.Ban(t.Context())
+	require.False(t, elector.Refresh(), "one unavailable best-bucket endpoint is only 25% of all records")
+	second.Ban(t.Context())
+	require.False(t, elector.Refresh(), "exactly 50% banned must not force discovery")
+	third.Ban(t.Context())
+	require.True(t, elector.Refresh(), "more than 50% banned must force discovery")
+	require.False(t, elector.Refresh(), "remaining above the threshold must not force discovery repeatedly")
+
+	first.Unban(t.Context())
+	second.Unban(t.Context())
+	elector.Refresh()
+	first.Ban(t.Context())
+	require.False(t, elector.Refresh())
+	second.Ban(t.Context())
+	require.True(t, elector.Refresh(), "crossing the threshold again must force a new discovery")
 }
 
 func TestIsConnectionStateUsable(t *testing.T) {

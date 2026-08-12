@@ -2,6 +2,7 @@ package policy
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 
@@ -80,6 +81,11 @@ func applyPreference(
 	preference preference,
 ) {
 	for i, candidate := range endpoints {
+		if priorities[i].Priority > math.MaxUint64>>1 {
+			priorities[i].Priority = math.MaxUint64
+
+			continue
+		}
 		priorities[i].Priority <<= 1
 		if !preference.match(info, candidate) {
 			priorities[i].Priority++

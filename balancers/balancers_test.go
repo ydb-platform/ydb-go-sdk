@@ -42,6 +42,26 @@ func TestPreferLocations(t *testing.T) {
 	require.Equal(t, "Priority{Preferences=[Locations{TWO,ZERO}]}", p.String())
 }
 
+func TestNestedPreferencesPreservePublicConstructorOrder(t *testing.T) {
+	endpoints := []endpoint.Endpoint{
+		endpoint.New("local-even", endpoint.WithID(2), endpoint.WithLocation("local")),
+		endpoint.New("local-odd", endpoint.WithID(1), endpoint.WithLocation("local")),
+		endpoint.New("remote-even", endpoint.WithID(4), endpoint.WithLocation("remote")),
+		endpoint.New("remote-odd", endpoint.WithID(3), endpoint.WithLocation("remote")),
+	}
+	p := PreferNearestDC(Prefer(RandomChoice(), func(candidate Endpoint) bool {
+		return candidate.NodeID()%2 == 0
+	}))
+	priorities := p.Prioritize(policy.Info{SelfLocation: "local"}, endpoints)
+
+	require.Equal(t, []policy.EndpointPriority{
+		{Key: endpoints[0].Key()},
+		{Key: endpoints[1].Key(), Priority: 1},
+		{Key: endpoints[2].Key(), Priority: 2},
+		{Key: endpoints[3].Key(), Priority: 3},
+	}, priorities)
+}
+
 func TestPreferenceAliases(t *testing.T) {
 	filter := func(candidate Endpoint) bool {
 		return candidate.NodeID()%2 == 0

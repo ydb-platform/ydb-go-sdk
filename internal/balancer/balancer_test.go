@@ -183,7 +183,10 @@ func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem
 
 	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, "")
 	require.Len(t, b.connections().All(), 2)
-	require.Equal(t, 2, b.connections().elector.preferredCount)
+	require.Equal(t, []policy.EndpointPriority{
+		{Key: e1.Key()},
+		{Key: e2.Key()},
+	}, b.connections().elector.priorities)
 
 	b.policy = policy.Prefer(
 		policy.Policy{}, "NodeID(1)",
@@ -193,7 +196,10 @@ func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem
 	)
 	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1, e2}, "")
 	require.Len(t, b.connections().All(), 2, "selection policy must not change connection ownership")
-	require.Equal(t, 1, b.connections().elector.preferredCount)
+	require.Equal(t, []policy.EndpointPriority{
+		{Key: e1.Key()},
+		{Key: e2.Key(), Priority: 1},
+	}, b.connections().elector.priorities)
 	selected, err := b.nextConn(endpoint.WithNodeID(ctx, 2))
 	require.NoError(t, err)
 	require.Equal(t, e2.Key(), selected.Endpoint().Key())
@@ -641,7 +647,7 @@ func TestNew(t *testing.T) {
 		pool := conn.NewPool(ctx, cfg)
 		defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
 
-		b, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(-time.Nanosecond))
+		b, err := New(ctx, cfg, pool)
 		require.NoError(t, err)
 		require.Equal(t, "Priority", b.policy.String())
 		require.NoError(t, b.Close(ctx))
@@ -659,7 +665,19 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, b.connections().All(), 1)
 		require.Equal(t, "bootstrap:2135", b.connections().All()[0].Endpoint().Address())
+		require.Nil(t, b.discoveryRepeater)
 		require.NoError(t, b.Close(ctx))
+	})
+	t.Run("non-single policy requires periodic discovery", func(t *testing.T) {
+		ctx := t.Context()
+		cfg := config.New()
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
+
+		b, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(-time.Nanosecond))
+
+		require.ErrorIs(t, err, errPeriodicDiscoveryDisabled)
+		require.Nil(t, b)
 	})
 }
 
@@ -683,12 +701,16 @@ func TestBalancerForceDiscovery(t *testing.T) {
 	require.True(t, closeMuFreeDuringForce, "closeMu must be released before repeater Force")
 }
 
-func TestBalancerDoesNotForceDiscoveryWhenLowerPrioritySelectionSucceeds(t *testing.T) {
+func TestBalancerForcesDiscoveryWhenMostConnectionsAreBanned(t *testing.T) {
+	ctx := t.Context()
 	preferred := &mock.Conn{
-		AddrField: "preferred", NodeIDField: 1, LocationField: "preferred", StateField: state.Banned,
+		AddrField: "preferred", NodeIDField: 1, LocationField: "preferred", StateField: state.Online,
 	}
-	fallback := &mock.Conn{
-		AddrField: "fallback", NodeIDField: 2, LocationField: "fallback", StateField: state.Online,
+	firstFallback := &mock.Conn{
+		AddrField: "first-fallback", NodeIDField: 2, LocationField: "fallback", StateField: state.Online,
+	}
+	secondFallback := &mock.Conn{
+		AddrField: "second-fallback", NodeIDField: 3, LocationField: "fallback", StateField: state.Online,
 	}
 	p := policy.Prefer(
 		policy.Policy{}, "preferred",
@@ -696,22 +718,52 @@ func TestBalancerDoesNotForceDiscoveryWhenLowerPrioritySelectionSucceeds(t *test
 			return candidate.Location() == "preferred"
 		},
 	)
-	forceCalled := false
+	forceCalls := 0
+	pool := conn.NewPool(ctx, config.New())
+	defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
 	balancer := &Balancer{
-		driverConfig: config.New(),
+		driverConfig: config.New(), pool: pool,
 		discoveryRepeater: &stubRepeater{forceFn: func() {
-			forceCalled = true
+			forceCalls++
 		}},
 	}
 	balancer.connectionsState.Store(newConnectionsStateWithPolicy(
-		[]conn.Conn{preferred, fallback}, p, policy.Info{}, nil,
+		[]conn.Conn{preferred, firstFallback, secondFallback}, p, policy.Info{}, nil,
 	))
 
+	balancer.ban(ctx, preferred, errors.New("preferred unavailable"))
+	require.Zero(t, forceCalls, "one banned preferred endpoint is less than half of all connections")
+
+	selected, err := balancer.nextConn(ctx)
+	require.NoError(t, err)
+	require.Contains(t, []conn.Conn{firstFallback, secondFallback}, selected)
+
+	balancer.ban(ctx, firstFallback, errors.New("first fallback unavailable"))
+	require.Equal(t, 1, forceCalls, "two of three banned connections must force discovery")
+	balancer.ban(ctx, firstFallback, errors.New("duplicate ban"))
+	require.Equal(t, 1, forceCalls, "remaining above the threshold must not force discovery repeatedly")
+
+	selected, err = balancer.nextConn(ctx)
+	require.NoError(t, err)
+	require.Same(t, secondFallback, selected)
+}
+
+func TestSingleConnectionPolicyDoesNotBanItsOnlyConnection(t *testing.T) {
+	connection := &mock.Conn{AddrField: "entrypoint", StateField: state.Online}
+	balancer := &Balancer{
+		driverConfig: config.New(),
+		policy:       policy.SingleConn(),
+	}
+	balancer.connectionsState.Store(newConnectionsStateWithPolicy(
+		[]conn.Conn{connection}, balancer.policy, policy.Info{}, nil,
+	))
+
+	balancer.ban(t.Context(), connection, errors.New("temporary failure"))
 	selected, err := balancer.nextConn(t.Context())
 
 	require.NoError(t, err)
-	require.Same(t, fallback, selected)
-	require.False(t, forceCalled)
+	require.Same(t, connection, selected)
+	require.Equal(t, state.Online, connection.State())
 }
 
 func TestStartClusterDiscoveryCanceledContext(t *testing.T) {
@@ -1371,7 +1423,7 @@ func TestNewReturnsDiscoveryStartError(t *testing.T) {
 		require.NoError(t, pool.RemoveRef(ctx))
 	})
 
-	balancer, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(-time.Nanosecond))
+	balancer, err := New(ctx, cfg, pool)
 
 	require.ErrorIs(t, err, expectedErr)
 	require.Nil(t, balancer)
@@ -1562,7 +1614,7 @@ func TestNextAvailableConnExtendsAttemptsForLargerSnapshot(t *testing.T) {
 	selected, failedCount := balancer.nextAvailableConn(t.Context(), previous)
 
 	require.Same(t, available, selected)
-	require.Equal(t, 3, failedCount)
+	require.Equal(t, 2, failedCount)
 	require.Same(t, next, balancer.connections())
 }
 
@@ -1752,6 +1804,8 @@ func TestBalancerHandlesBanAndUnban(t *testing.T) {
 	require.Same(t, fallback, selected)
 
 	preferred.Unban(t.Context())
+	// Discovery unbans pooled connections before it publishes a fresh election snapshot.
+	balancer.connections().elector.Refresh()
 	selected, err = balancer.nextConn(t.Context())
 	require.NoError(t, err)
 	require.Same(t, preferred, selected)
@@ -1914,9 +1968,10 @@ func (userAPITestRand) Shuffle(int, func(int, int)) {}
 
 func BenchmarkNextConn(b *testing.B) {
 	tests := []struct {
-		name      string
-		nodeCount int
-		balancer  func() config.Option
+		name        string
+		nodeCount   int
+		bannedCount int
+		balancer    func() config.Option
 	}{
 		{
 			name:      "RandomChoice",
@@ -1951,16 +2006,24 @@ func BenchmarkNextConn(b *testing.B) {
 				))
 			},
 		},
+		{
+			name:        "RandomChoiceHalfBanned",
+			nodeCount:   1000,
+			bannedCount: 500,
+			balancer: func() config.Option {
+				return config.WithBalancer(userBalancers.RandomChoice())
+			},
+		},
 	}
 
 	for _, test := range tests {
 		b.Run(test.name+"/"+strconv.Itoa(test.nodeCount), func(b *testing.B) {
-			benchmarkNextConn(b, test.nodeCount, test.balancer())
+			benchmarkNextConn(b, test.nodeCount, test.bannedCount, test.balancer())
 		})
 	}
 }
 
-func benchmarkNextConn(b *testing.B, nodeCount int, balancerOption config.Option) {
+func benchmarkNextConn(b *testing.B, nodeCount, bannedCount int, balancerOption config.Option) {
 	nodeIDs := make([]uint32, nodeCount)
 	for i := range nodeIDs {
 		nodeIDs[i] = uint32(i + 1)
@@ -1986,6 +2049,15 @@ func benchmarkNextConn(b *testing.B, nodeCount int, balancerOption config.Option
 			b.Error(err)
 		}
 	})
+	connections := balancer.connections().All()
+	for i := range min(bannedCount, len(connections)) {
+		connections[i].Ban(ctx)
+	}
+	for range nodeCount {
+		if _, err = balancer.nextConn(ctx); err != nil {
+			b.Fatal(err)
+		}
+	}
 
 	b.ReportAllocs()
 	b.ResetTimer()

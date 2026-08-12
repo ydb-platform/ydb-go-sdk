@@ -128,7 +128,7 @@ Configured via `config.WithBalancer(...)` or `ydb.WithBalancer(...)`.
 
 ### Selection policy and runtime health
 
-Balancer configuration is one concrete immutable `strategy.Policy`. Preference constructors append a predicate to
+Balancer configuration is one concrete immutable `policy.Policy`. Preference constructors append a predicate to
 the policy. `Policy.Prioritize` evaluates the predicates from the outermost public constructor to the innermost and
 assigns every endpoint a lexicographic priority. A preferred endpoint receives bit `0`, a less preferred endpoint bit
 `1`; earlier predicates therefore dominate later predicates.
@@ -145,17 +145,21 @@ because this cascade is now the normal meaning of "prefer".
 The policy runs once for each fresh discovery snapshot, before endpoints are mapped to pooled wrappers. This order is
 important: reused `conn.Conn` values may retain endpoint metadata from an older discovery response.
 
-Mutable health has one owner: `endpointElector`. It stores policy priorities, the `endpoint.Key → conn.Conn` mapping,
-and pessimized keys. Discovery and pessimization rebuild an immutable election snapshot behind `atomic.Pointer`; the
-RPC hot path only loads that snapshot and randomly chooses among connections with the lowest effective priority.
-Pessimization assigns `math.MaxUint64` effective priority. If every connection is pessimized, those connections remain
-a randomized last resort.
+`conn.State()` is the only source of mutable endpoint health. `endpointElector` stores policy priorities and the
+`endpoint.Key → conn.Conn` mapping, and atomically publishes immutable election snapshots after discovery or a state
+change. The RPC hot path only loads that snapshot and randomly chooses among healthy connections with the lowest
+policy priority. If every connection is banned, banned connections remain a randomized last resort.
+
+Pessimization forces discovery only when the share of banned records among all current connections crosses strictly
+above 50%. The threshold is edge-triggered, so repeated reports for an already banned connection do not schedule
+additional discovery attempts. `SingleConn` does not ban its only connection and does not run periodic discovery.
 
 `nextConn` handles contracts outside policy calculation:
 
 - `balancers.WithNodeID` addresses the requested node before policy selection; its context option independently controls node-ID fallback;
 - `Created`, `Online`, and `Offline` wrappers are usable; `Banned` is eligible only as the last resort;
-- a selected wrapper that becomes unusable is pessimized, and sufficient preferred-endpoint loss forces discovery.
+- a selected wrapper that becomes unusable refreshes the election snapshot, and a newly lost majority of all
+  connections forces discovery.
 
 Keep these responsibilities separate: `Policy` expresses static endpoint preference, `endpointElector` owns runtime
 health and hot-path choice, and `conn.Pool` owns wrapper lifecycle.

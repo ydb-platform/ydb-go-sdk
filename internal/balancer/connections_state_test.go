@@ -41,7 +41,6 @@ func TestConnectionsStatePolicyGroups(t *testing.T) {
 	)
 	s := newConnectionsStateWithPolicy(connections, p, policy.Info{SelfLocation: "local"}, nil)
 
-	require.Equal(t, 1, s.elector.preferredCount)
 	require.Equal(t, []policy.EndpointPriority{
 		{Key: connections[0].Endpoint().Key()},
 		{Key: connections[1].Endpoint().Key(), Priority: 1},

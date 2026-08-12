@@ -33,8 +33,14 @@ import (
 )
 
 var (
-	ErrNoEndpoints    = xerrors.Wrap(xerrors.Retryable(fmt.Errorf("no endpoints"), xerrors.WithBackoff(backoff.TypeSlow)))
-	errBalancerClosed = xerrors.Wrap(fmt.Errorf("internal ydb sdk balancer closed"))
+	ErrNoEndpoints = xerrors.Wrap(xerrors.Retryable(
+		fmt.Errorf("no endpoints"),
+		xerrors.WithBackoff(backoff.TypeSlow),
+	))
+	errBalancerClosed            = xerrors.Wrap(fmt.Errorf("internal ydb sdk balancer closed"))
+	errPeriodicDiscoveryDisabled = xerrors.Wrap(fmt.Errorf(
+		"periodic discovery must be enabled for non-single-connection balancer",
+	))
 )
 
 // streamWrapper wraps grpc.ClientStream and triggers pool.Ban on RecvMsg/SendMsg/CloseSend
@@ -428,6 +434,9 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	}
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
+	if !policy.SingleConnection() && b.discoveryConfig.Interval() <= 0 {
+		return nil, xerrors.WithStackTrace(errPeriodicDiscoveryDisabled)
+	}
 
 	if policy.SingleConnection() {
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
@@ -567,10 +576,7 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	var (
-		state       = b.connections()
-		failedCount int
-	)
+	state := b.connections()
 
 	if state == nil {
 		return nil, xerrors.WithStackTrace(errBalancerClosed)
@@ -590,16 +596,7 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		return nil, xerrors.WithStackTrace(ErrNoEndpoints)
 	}
 
-	preferredCount := state.elector.preferredCount
-	defer func() {
-		if failedCount*2 <= preferredCount {
-			return
-		}
-
-		b.forceDiscovery()
-	}()
-
-	c, failedCount = b.nextAvailableConn(ctx, state)
+	c, failedCount := b.nextAvailableConn(ctx, state)
 	if c != nil {
 		return c, nil
 	}
@@ -625,13 +622,12 @@ func (b *Balancer) nextAvailableConn(ctx context.Context, state *connectionsStat
 			return selected, failedCount
 		}
 		failedCount++
-		key := selected.Endpoint().Key()
-		state.elector.Pessimize(key)
+		b.refreshElection(state.elector)
 		if current := b.connections(); current != state {
 			if current == nil {
 				break
 			}
-			current.elector.Pessimize(key)
+			b.refreshElection(current.elector)
 			state = current
 			attemptsLeft = max(attemptsLeft, state.elector.CandidateCount())
 		}
@@ -641,8 +637,18 @@ func (b *Balancer) nextAvailableConn(ctx context.Context, state *connectionsStat
 }
 
 func (b *Balancer) ban(ctx context.Context, connection conn.Conn, cause error) {
+	if b.policy.SingleConnection() {
+		return
+	}
+
 	b.pool.Ban(ctx, connection, cause)
 	if current := b.connections(); current != nil {
-		current.elector.Pessimize(connection.Endpoint().Key())
+		b.refreshElection(current.elector)
+	}
+}
+
+func (b *Balancer) refreshElection(elector *endpointElector) {
+	if elector.Refresh() {
+		b.forceDiscovery()
 	}
 }
