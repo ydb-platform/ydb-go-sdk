@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"errors"
+	"io"
 	"runtime"
 	"runtime/debug"
 	"sync"
@@ -15,9 +16,12 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
+	grpcCodes "google.golang.org/grpc/codes"
+	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestSessionCoreCancelAttachOnDone(t *testing.T) {
@@ -92,10 +96,153 @@ func TestSessionCoreAttachError(t *testing.T) {
 		client.EXPECT().AttachSession(gomock.Any(), &Ydb_Query.AttachSessionRequest{
 			SessionId: "123",
 		}).Return(attachStream, nil)
-		core, err := Open(ctx, client)
+		var closedEvents atomic.Uint32
+		core, err := Open(ctx, client,
+			WithPoolName("/local"),
+			WithTrace(&trace.Query{
+				OnSessionClosed: func(trace.QuerySessionClosedInfo) {
+					closedEvents.Add(1)
+				},
+			}),
+		)
 		require.ErrorIs(t, err, errSessionClosed)
 		require.Nil(t, core)
+		require.Zero(t, closedEvents.Load(), "initial attach failure must not close a working session")
 	}, xtest.StopAfter(time.Second))
+}
+
+func TestSessionCoreClosedReasons(t *testing.T) {
+	tests := []struct {
+		name   string
+		reason string
+		msg    *Ydb_Query.SessionState
+		err    error
+	}{
+		{
+			name:   "AttachStreamClosed",
+			reason: "attach_closed",
+			err:    io.EOF,
+		},
+		{
+			name:   "AttachStreamError",
+			reason: "transport_error",
+			err:    grpcStatus.Error(grpcCodes.Unavailable, "attach stream failed"),
+		},
+		{
+			name:   "NodeShutdown",
+			reason: "node_shutdown",
+			msg: &Ydb_Query.SessionState{
+				SessionHint: &Ydb_Query.SessionState_NodeShutdown{
+					NodeShutdown: &Ydb_Query.NodeShutdownHint{},
+				},
+			},
+		},
+		{
+			name:   "SessionShutdown",
+			reason: "session_shutdown",
+			msg: &Ydb_Query.SessionState{
+				SessionHint: &Ydb_Query.SessionState_SessionShutdown{
+					SessionShutdown: &Ydb_Query.SessionShutdownHint{},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().DeleteSession(gomock.Any(), &Ydb_Query.DeleteSessionRequest{
+				SessionId: "123",
+			}).Return(&Ydb_Query.DeleteSessionResponse{}, nil)
+
+			var events []trace.QuerySessionClosedInfo
+			core := &sessionCore{
+				Client: client,
+				Trace: &trace.Query{
+					OnSessionClosed: func(info trace.QuerySessionClosedInfo) {
+						events = append(events, info)
+					},
+				},
+				id:             "123",
+				poolName:       "/local",
+				onNodeShutdown: func(error) {},
+			}
+			core.status.Store(uint32(StatusIdle))
+
+			attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+			attachStream.EXPECT().Recv().Return(test.msg, test.err)
+			core.listenAttachStream(attachStream)
+			require.NoError(t, core.Close(t.Context()))
+
+			require.Equal(t, []trace.QuerySessionClosedInfo{{
+				PoolName: "/local",
+				Reason:   test.reason,
+			}}, events)
+		})
+	}
+}
+
+func TestSessionCoreLocalCloseDoesNotReportTransportError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+	recvStarted := make(chan struct{})
+	unblockRecv := make(chan struct{})
+	attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
+		close(recvStarted)
+		<-unblockRecv
+
+		return nil, context.Canceled
+	})
+
+	var events atomic.Uint32
+	core := &sessionCore{
+		Trace: &trace.Query{
+			OnSessionClosed: func(trace.QuerySessionClosedInfo) {
+				events.Add(1)
+			},
+		},
+		poolName: "/local",
+	}
+	core.status.Store(uint32(StatusIdle))
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		core.listenAttachStream(attachStream)
+	}()
+	<-recvStarted
+	core.closed.Store(true)
+	close(unblockRecv)
+	<-done
+
+	require.Zero(t, events.Load())
+}
+
+func TestSessionCoreClosedMetricDisabledWithoutClientPool(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	client := NewMockQueryServiceClient(ctrl)
+	client.EXPECT().DeleteSession(gomock.Any(), &Ydb_Query.DeleteSessionRequest{
+		SessionId: "123",
+	}).Return(&Ydb_Query.DeleteSessionResponse{}, nil)
+
+	var events atomic.Uint32
+	core := &sessionCore{
+		Client: client,
+		Trace: &trace.Query{
+			OnSessionClosed: func(trace.QuerySessionClosedInfo) {
+				events.Add(1)
+			},
+		},
+		id: "123",
+	}
+	core.status.Store(uint32(StatusIdle))
+
+	attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+	attachStream.EXPECT().Recv().Return(nil, io.EOF)
+	core.listenAttachStream(attachStream)
+	require.NoError(t, core.Close(t.Context()))
+	require.Zero(t, events.Load())
 }
 
 func TestSessionCoreClose(t *testing.T) {

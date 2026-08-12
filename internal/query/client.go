@@ -830,7 +830,7 @@ func newWithQueryServiceClient(ctx context.Context,
 		pool.WithWarmUpItems[*Session](cfg.PoolWarmUpSize()),
 		pool.WithItemUsageLimit[*Session](cfg.PoolSessionUsageLimit()),
 		pool.WithItemUsageTTL[*Session](cfg.PoolSessionUsageTTL()),
-		pool.WithTrace[*Session](poolTrace(cfg.Trace())),
+		pool.WithTrace[*Session](poolTrace(cfg.Trace(), cfg.PoolName())),
 		pool.WithCreateItemTimeout[*Session](cfg.SessionCreateTimeout()),
 		pool.WithCloseItemTimeout[*Session](cfg.SessionDeleteTimeout()),
 		pool.WithIdleTimeToLive[*Session](cfg.SessionIdleTimeToLive()),
@@ -842,6 +842,7 @@ func newWithQueryServiceClient(ctx context.Context,
 			s, err := createSession(ctx, client,
 				WithConn(cc),
 				WithDeleteTimeout(cfg.SessionDeleteTimeout()),
+				WithPoolName(cfg.PoolName()),
 				WithRegisterCloseCancel(c.registerCloseCancel),
 				WithTrace(cfg.Trace()),
 			)
@@ -872,7 +873,7 @@ func newWithQueryServiceClient(ctx context.Context,
 	return c, nil
 }
 
-func poolTrace(t *trace.Query) *pool.Trace[*Session, Session] {
+func poolTrace(t *trace.Query, poolName string) *pool.Trace[*Session, Session] {
 	return &pool.Trace[*Session, Session]{
 		OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
 			onDone := gtrace.QueryOnPoolNew(t, ctx, call)
@@ -909,6 +910,14 @@ func poolTrace(t *trace.Query) *pool.Trace[*Session, Session] {
 				onDone(err)
 			}
 		},
+		OnCloseItem: func(item *Session, reason string) {
+			core, ok := item.Core.(*sessionCore)
+			if poolName == "" || !ok || !core.closedReported.CompareAndSwap(false, true) {
+				return
+			}
+
+			gtrace.QueryOnSessionClosed(t, poolName, reason)
+		},
 		OnGet: func(ctx *context.Context, call stack.Caller) func(
 			session *Session,
 			hint *trace.NodeHintInfo,
@@ -934,7 +943,7 @@ func createImplicitSessionPool(ctx context.Context,
 ) (sessionPool, error) {
 	return pool.New(ctx,
 		pool.WithLimit[*Session](cfg.PoolLimit()),
-		pool.WithTrace[*Session](poolTrace(cfg.Trace())),
+		pool.WithTrace[*Session](poolTrace(cfg.Trace(), "")),
 		pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
 			core := &implicitSessionCore{
 				sessionCore{

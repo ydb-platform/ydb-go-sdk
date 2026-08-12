@@ -137,6 +137,17 @@ func onNextPartErr(callback func(err error)) resultOption {
 	}
 }
 
+func (r *streamResult) notifyNextPartErr(ctx context.Context, err error) error {
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		err = ctxErr
+	}
+	for _, callback := range r.onNextPartErr {
+		callback(err)
+	}
+
+	return err
+}
+
 func onTxMeta(callback func(txMeta *Ydb_Query.TransactionMeta)) resultOption {
 	return func(s *streamResult) {
 		s.onTxMeta = append(s.onTxMeta, callback)
@@ -230,6 +241,8 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	}
 
 	if ctxErr := ctx.Err(); ctxErr != nil {
+		_ = r.notifyNextPartErr(ctx, ctxErr)
+
 		return nil, ctxErr
 	}
 
@@ -258,9 +271,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		}
 	}
 	if err != nil {
-		for _, callback := range r.onNextPartErr {
-			callback(err)
-		}
+		err = r.notifyNextPartErr(ctx, err)
 
 		if xerrors.Is(err, io.EOF) {
 			return nil, io.EOF
