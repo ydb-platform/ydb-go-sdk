@@ -116,7 +116,7 @@ Query additionally has **implicit** session pool for server-side session managem
 ```
 Balancer
   ├── clusterDiscovery()       # periodic / on-init endpoint refresh
-  ├── enrich fresh endpoints   # LocalDC and discovery metadata before pool lookup
+  ├── evaluate fresh endpoints # current discovery attributes before pool lookup
   ├── Policy.Prioritize()      # immutable preference pipeline → key/priority
   ├── endpointElector          # health + random hot-path snapshot
   └── wrapCall / wrapStream    # pessimization on retriable connection failures
@@ -142,8 +142,8 @@ PreferNearestDC(PreferLocations(RandomChoice(), "A", "B"))
 Every `Prefer*` keeps all endpoints at successively lower priorities. The `*WithFallback` constructors are aliases
 because this cascade is now the normal meaning of "prefer".
 
-The policy runs once for each fresh discovery snapshot, before endpoints are mapped to pooled wrappers. This order is
-important: reused `conn.Conn` values may retain endpoint metadata from an older discovery response.
+The policy runs once for each fresh discovery snapshot, before endpoints are mapped to pooled wrappers. This ensures
+selection uses current endpoint attributes even when `conn.Pool` reuses a wrapper from an older discovery response.
 
 `conn.State()` is the only source of mutable endpoint health. `endpointElector` stores policy priorities and the
 `endpoint.Key → conn.Conn` mapping, and atomically publishes immutable election snapshots after discovery or a state

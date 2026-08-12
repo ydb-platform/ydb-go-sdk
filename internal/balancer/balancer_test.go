@@ -1437,14 +1437,14 @@ func TestClusterDiscoveryAttemptReturnsLocalDCDetectorError(t *testing.T) {
 	require.ErrorIs(t, err, expectedErr)
 }
 
-func TestPolicyUsesFreshDiscoveryMetadataBeforePoolGet(t *testing.T) {
+func TestPolicyUsesFreshDiscoveryEndpointBeforePoolGet(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.New()
 	pool := conn.NewPool(ctx, cfg)
 	p := policy.Prefer(
-		policy.Policy{}, "PrimaryPile",
+		policy.Policy{}, "PreferredLocation",
 		func(_ policy.Info, candidate endpoint.Info) bool {
-			return candidate.Metadata().BridgePileState == endpoint.PileStatePrimary
+			return candidate.Location() == "preferred"
 		},
 	)
 	balancer := &Balancer{
@@ -1457,20 +1457,20 @@ func TestPolicyUsesFreshDiscoveryMetadataBeforePoolGet(t *testing.T) {
 		require.NoError(t, pool.RemoveRef(ctx))
 	})
 
-	first := bridgeEndpoints(endpoint.PileStatePrimary, endpoint.PileStateSynchronized)
+	first := locationEndpoints("preferred", "fallback")
 	balancer.applyDiscoveredEndpoints(ctx, first, "")
 	reused := balancer.connections().elector.connections[first[1].Key()]
 	require.NotNil(t, reused)
 
-	second := bridgeEndpoints(endpoint.PileStateSynchronized, endpoint.PileStatePrimary)
+	second := locationEndpoints("fallback", "preferred")
 	balancer.applyDiscoveredEndpoints(ctx, second, "")
 
 	selected, err := balancer.nextConn(ctx)
 	require.NoError(t, err)
 	require.Equal(t, uint32(2), selected.Endpoint().NodeID())
 	require.Same(t, reused, selected, "the pool must reuse the existing connection wrapper")
-	require.Equal(t, endpoint.PileStateSynchronized, selected.Endpoint().Metadata().BridgePileState,
-		"selection must use fresh discovery metadata rather than metadata retained by the pooled connection",
+	require.Equal(t, "fallback", selected.Endpoint().Location(),
+		"selection must use the fresh discovery endpoint rather than attributes retained by the pooled connection",
 	)
 }
 
@@ -1508,14 +1508,10 @@ func TestDiscoveryReuseIPAndHostName(t *testing.T) {
 	check()
 }
 
-func bridgeEndpoints(first, second endpoint.PileState) []endpoint.Endpoint {
+func locationEndpoints(first, second string) []endpoint.Endpoint {
 	return []endpoint.Endpoint{
-		endpoint.New("node-1", endpoint.WithID(1), endpoint.WithMetadata(endpoint.Metadata{
-			BridgePileState: first,
-		})),
-		endpoint.New("node-2", endpoint.WithID(2), endpoint.WithMetadata(endpoint.Metadata{
-			BridgePileState: second,
-		})),
+		endpoint.New("node-1", endpoint.WithID(1), endpoint.WithLocation(first)),
+		endpoint.New("node-2", endpoint.WithID(2), endpoint.WithLocation(second)),
 	}
 }
 

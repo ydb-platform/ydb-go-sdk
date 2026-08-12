@@ -90,20 +90,20 @@ func TestApplyPreferenceKeepsSingleBucketWhenAllEndpointsMatchEqually(t *testing
 
 func TestPolicyPrioritizeComposesPreferencesOutermostFirst(t *testing.T) {
 	endpoints := []endpoint.Endpoint{
-		policyEndpoint("local-primary", "local", endpoint.PileStatePrimary),
-		policyEndpoint("local-secondary", "local", endpoint.PileStateSynchronized),
-		policyEndpoint("remote-primary", "remote", endpoint.PileStatePrimary),
-		policyEndpoint("remote-secondary", "remote", endpoint.PileStateSynchronized),
+		endpoint.New("local-even", endpoint.WithID(2), endpoint.WithLocation("local")),
+		endpoint.New("local-odd", endpoint.WithID(1), endpoint.WithLocation("local")),
+		endpoint.New("remote-even", endpoint.WithID(4), endpoint.WithLocation("remote")),
+		endpoint.New("remote-odd", endpoint.WithID(3), endpoint.WithLocation("remote")),
 	}
-	primary := func(_ Info, candidate endpoint.Info) bool {
-		return candidate.Metadata().BridgePileState == endpoint.PileStatePrimary
+	evenNodeID := func(_ Info, candidate endpoint.Info) bool {
+		return candidate.NodeID()%2 == 0
 	}
 	policy := Prefer(
-		Prefer(Policy{}, "PrimaryPile", primary),
+		Prefer(Policy{}, "EvenNodeID", evenNodeID),
 		"LocalDC", locationMatch("local"),
 	)
 
-	require.Equal(t, "Priority{Preferences=[LocalDC,PrimaryPile]}", policy.String())
+	require.Equal(t, "Priority{Preferences=[LocalDC,EvenNodeID]}", policy.String())
 	require.Equal(t, []EndpointPriority{
 		{Key: endpoints[0].Key()},
 		{Key: endpoints[1].Key(), Priority: 1},
@@ -144,11 +144,4 @@ func locationMatch(location string) func(Info, endpoint.Info) bool {
 	return func(_ Info, candidate endpoint.Info) bool {
 		return candidate.Location() == location
 	}
-}
-
-func policyEndpoint(address, location string, pileState endpoint.PileState) endpoint.Endpoint {
-	return endpoint.New(address,
-		endpoint.WithLocation(location),
-		endpoint.WithMetadata(endpoint.Metadata{BridgePileState: pileState}),
-	)
 }
