@@ -68,3 +68,4 @@ func (p *Pool) tryPut(c *conn) bool {
 Same pattern for `release()` in `Pool.RemoveRef`.
 
 **Avoid** holding a pool-wide mutex across blocking `Close()` unless there is a documented lock-order reason (e.g. `onClose` must re-enter the same mutex). Prefer delete-from-map under lock, then close outside.
+

@@ -1435,9 +1435,8 @@ func TestClusterDiscoveryAttemptReturnsLocalDCDetectorError(t *testing.T) {
 		policy.Policy{}, "LocalDC", func(policy.Info, endpoint.Info) bool { return true },
 	)
 	balancer := &Balancer{
-		driverConfig:    config.New(),
-		policy:          p,
-		detectNearestDC: true,
+		driverConfig: config.New(),
+		policy:       p,
 		discover: func(context.Context, *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
 			return []endpoint.Endpoint{endpoint.New("node:2135")}, "", nil
 		},
@@ -1715,6 +1714,45 @@ func TestNextConnReturnsCanceledContext(t *testing.T) {
 
 	require.Nil(t, selected)
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestNextConnReturnsContextCanceledDuringSelection(t *testing.T) {
+	connection := &mock.Conn{AddrField: "available:2135", StateField: state.Online}
+	balancer := &Balancer{driverConfig: config.New()}
+	balancer.connectionsState.Store(newConnectionsStateWithPolicy(
+		[]conn.Conn{connection}, policy.Policy{}, policy.Info{}, nil,
+	))
+	ctx := &cancelAfterFirstCheckContext{}
+
+	selected, err := balancer.nextConn(ctx)
+
+	require.Nil(t, selected)
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+type cancelAfterFirstCheckContext struct {
+	checks int
+}
+
+func (*cancelAfterFirstCheckContext) Deadline() (time.Time, bool) {
+	return time.Time{}, false
+}
+
+func (*cancelAfterFirstCheckContext) Done() <-chan struct{} {
+	return nil
+}
+
+func (c *cancelAfterFirstCheckContext) Err() error {
+	c.checks++
+	if c.checks > 1 {
+		return context.Canceled
+	}
+
+	return nil
+}
+
+func (*cancelAfterFirstCheckContext) Value(any) any {
+	return nil
 }
 
 type snapshotSwappingConn struct {

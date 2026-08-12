@@ -72,7 +72,6 @@ func (s *streamWrapper) RecvMsg(m any) error {
 type Balancer struct {
 	driverConfig      *config.Config
 	policy            policy.Policy
-	detectNearestDC   bool
 	discoveryConfig   *discoveryConfig.Config
 	pool              *conn.Pool
 	discoveryRepeater repeater.Repeater
@@ -216,7 +215,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 		return xerrors.WithStackTrace(err)
 	}
 
-	if b.detectNearestDC {
+	if b.policy.DetectsNearestDC() {
 		location, err = b.localDCDetector(ctx, endpoints)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -280,7 +279,7 @@ func (b *Balancer) applyDiscoveredEndpoints(
 			b.driverConfig.Trace(), &ctx,
 			stack.FunctionID(
 				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
-			b.detectNearestDC,
+			b.policy.DetectsNearestDC(),
 			b.driverConfig.Database(),
 		)
 		state      = b.connectionsState.Load()
@@ -419,10 +418,8 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	b = &Balancer{
 		driverConfig: driverConfig,
 		policy:       policy,
-		detectNearestDC: policy.DetectsNearestDC() &&
-			!policy.SingleConnection(),
-		pool:    pool,
-		address: "ydb:///" + driverConfig.Endpoint(),
+		pool:         pool,
+		address:      "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),
 			discoveryConfig.WithEndpoint(driverConfig.Endpoint()),
@@ -599,6 +596,9 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 	c, failedCount := b.nextAvailableConn(ctx, state)
 	if c != nil {
 		return c, nil
+	}
+	if err = ctx.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return nil, xerrors.WithStackTrace(
