@@ -766,19 +766,6 @@ func TestSingleConnectionPolicyDoesNotBanItsOnlyConnection(t *testing.T) {
 	require.Equal(t, state.Online, connection.State())
 }
 
-func TestStartClusterDiscoveryCanceledContext(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	b := &Balancer{
-		driverConfig:    config.New(),
-		discoveryConfig: discoveryConfig.New(),
-	}
-
-	err := b.startClusterDiscovery(ctx)
-	require.ErrorIs(t, err, context.Canceled)
-	require.Nil(t, b.discoveryRepeater)
-}
-
 // TestPessimizationOnOverloaded verifies that calling Invoke with a context tagged via
 // conn.BanOnOperationError causes the balancer to ban the connection that returns OVERLOADED,
 // and that when all connections are pessimized the balancer still returns a connection

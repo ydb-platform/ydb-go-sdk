@@ -32,11 +32,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var ErrNoEndpoints = xerrors.Wrap(xerrors.Retryable(fmt.Errorf("no endpoints"), xerrors.WithBackoff(backoff.TypeSlow)))
+
 var (
-	ErrNoEndpoints = xerrors.Wrap(xerrors.Retryable(
-		fmt.Errorf("no endpoints"),
-		xerrors.WithBackoff(backoff.TypeSlow),
-	))
 	errBalancerClosed            = xerrors.Wrap(fmt.Errorf("internal ydb sdk balancer closed"))
 	errPeriodicDiscoveryDisabled = xerrors.Wrap(fmt.Errorf(
 		"periodic discovery must be enabled for non-single-connection balancer",
@@ -274,6 +272,15 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	endpoints []endpoint.Endpoint,
 	selfLocation string,
 ) {
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+
+	if b.closed {
+		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
+
+		return
+	}
+
 	var (
 		onDone = gtrace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
@@ -286,9 +293,6 @@ func (b *Balancer) applyDiscoveredEndpoints(
 		active     []conn.Conn
 		quarantine []conn.Conn
 	)
-	// Discovery attempts are serialized. If Close wins before closeMu is acquired below,
-	// the closed branch discards this snapshot; only the update trace may describe the pre-close state.
-
 	if state != nil {
 		active = state.All()
 		quarantine = state.quarantine
@@ -306,15 +310,6 @@ func (b *Balancer) applyDiscoveredEndpoints(
 			selfLocation,
 		)
 	}()
-
-	b.closeMu.Lock()
-	defer b.closeMu.Unlock()
-
-	if b.closed {
-		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
-
-		return
-	}
 
 	info := policy.Info{SelfLocation: selfLocation}
 	priorities := b.policy.Prioritize(info, endpoints)
@@ -439,27 +434,18 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
 			endpoint.New(b.driverConfig.Endpoint()),
 		}, "")
-	} else if err := b.startClusterDiscovery(ctx); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-func (b *Balancer) startClusterDiscovery(ctx context.Context) error {
-	if err := b.clusterDiscovery(ctx); err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	if interval := b.discoveryConfig.Interval(); interval > 0 {
+	} else {
+		if err := b.clusterDiscovery(ctx); err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
 		b.discoveryRepeater = repeater.New(xcontext.ValueOnly(ctx),
-			interval, b.clusterDiscoveryAttemptWithDial,
+			b.discoveryConfig.Interval(), b.clusterDiscoveryAttemptWithDial,
 			repeater.WithName("discovery"),
 			repeater.WithTrace(b.driverConfig.Trace()),
 		)
 	}
 
-	return nil
+	return b, nil
 }
 
 func (b *Balancer) Invoke(
