@@ -12,35 +12,29 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
-type electionEntry struct {
-	key        endpoint.Key
-	connection conn.Conn
-}
-
 type electionSnapshot struct {
-	entries        []electionEntry
+	connections    []conn.Conn
 	allowBanned    bool
 	candidateCount int
-
-	preferredCount       int
-	unavailablePreferred int
+	hasPessimized  bool
 }
 
-// endpointElector keeps mutable health state outside the immutable estimator tree.
+// endpointElector combines immutable policy priorities with mutable connection health.
 // Discovery and pessimization rebuild a snapshot; the request hot path only loads it atomically.
 type endpointElector struct {
 	mu sync.Mutex
 
-	estimates   []strategy.Estimation
-	connections map[endpoint.Key]conn.Conn
-	pessimized  map[endpoint.Key]struct{}
-	rand        xrand.Rand
+	priorities     []strategy.EndpointPriority
+	connections    map[endpoint.Key]conn.Conn
+	pessimized     map[endpoint.Key]struct{}
+	rand           xrand.Rand
+	preferredCount int
 
 	snapshot atomic.Pointer[electionSnapshot]
 }
 
 func newEndpointElector(
-	estimates []strategy.Estimation,
+	priorities []strategy.EndpointPriority,
 	connections map[endpoint.Key]conn.Conn,
 	rand xrand.Rand,
 ) *endpointElector {
@@ -48,26 +42,59 @@ func newEndpointElector(
 		rand = xrand.New(xrand.WithLock())
 	}
 	elector := &endpointElector{
-		estimates:   append([]strategy.Estimation(nil), estimates...),
+		priorities:  append([]strategy.EndpointPriority(nil), priorities...),
 		connections: connections,
 		pessimized:  make(map[endpoint.Key]struct{}),
 		rand:        rand,
+	}
+	minimumPriority := uint64(math.MaxUint64)
+	for _, candidate := range priorities {
+		if connections[candidate.Key] == nil {
+			continue
+		}
+		switch {
+		case candidate.Priority < minimumPriority:
+			minimumPriority = candidate.Priority
+			elector.preferredCount = 1
+		case candidate.Priority == minimumPriority:
+			elector.preferredCount++
+		}
 	}
 	elector.rebuildLocked()
 
 	return elector
 }
 
-func (e *endpointElector) Next() (key endpoint.Key, connection conn.Conn, allowBanned bool, ok bool) {
+func (e *endpointElector) Next() (connection conn.Conn, allowBanned bool, ok bool) {
 	snapshot := e.snapshot.Load()
-	if snapshot == nil || len(snapshot.entries) == 0 {
-		return endpoint.Key{}, nil, false, false
+	if snapshot != nil && snapshot.hasPessimized {
+		e.restoreUnbanned()
+		snapshot = e.snapshot.Load()
+	}
+	if snapshot == nil || len(snapshot.connections) == 0 {
+		return nil, false, false
 	}
 
-	index := e.rand.Int(len(snapshot.entries))
-	entry := snapshot.entries[index]
+	connection = snapshot.connections[e.rand.Int(len(snapshot.connections))]
 
-	return entry.key, entry.connection, snapshot.allowBanned, true
+	return connection, snapshot.allowBanned, true
+}
+
+func (e *endpointElector) restoreUnbanned() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	changed := false
+	for key := range e.pessimized {
+		connection := e.connections[key]
+		if connection != nil && isConnectionStateUsable(connection.State(), false) {
+			delete(e.pessimized, key)
+			changed = true
+		}
+	}
+	if changed {
+		e.rebuildLocked()
+	}
 }
 
 func (e *endpointElector) CandidateCount() int {
@@ -87,6 +114,9 @@ func (e *endpointElector) Pessimize(key endpoint.Key) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	if e.connections[key] == nil {
+		return
+	}
 	if _, ok := e.pessimized[key]; ok {
 		return
 	}
@@ -94,40 +124,24 @@ func (e *endpointElector) Pessimize(key endpoint.Key) {
 	e.rebuildLocked()
 }
 
-func (e *endpointElector) PreferenceHealth() (preferred, unavailable int) {
-	snapshot := e.snapshot.Load()
-	if snapshot == nil {
-		return 0, 0
-	}
-
-	return snapshot.preferredCount, snapshot.unavailablePreferred
-}
-
 func (e *endpointElector) rebuildLocked() {
 	snapshot := &electionSnapshot{
-		entries: make([]electionEntry, 0, len(e.estimates)),
+		connections:   make([]conn.Conn, 0, len(e.priorities)),
+		hasPessimized: len(e.pessimized) > 0,
 	}
-	minimumPolicy := e.minimumPolicyPriority()
 	minimumEffective := uint64(math.MaxUint64)
-	for _, estimation := range e.estimates {
-		connection := e.connections[estimation.Key]
+	for _, candidate := range e.priorities {
+		connection := e.connections[candidate.Key]
 		if connection == nil {
 			continue
 		}
 
-		_, pessimized := e.pessimized[estimation.Key]
+		_, pessimized := e.pessimized[candidate.Key]
 		connectionState := connection.State()
 		healthyCandidate := !pessimized && isConnectionStateUsable(connectionState, false)
 		bannedCandidate := isConnectionStateUsable(connectionState, true) &&
 			(pessimized || connectionState == state.Banned)
-		if estimation.Priority == minimumPolicy {
-			snapshot.preferredCount++
-			if !healthyCandidate {
-				snapshot.unavailablePreferred++
-			}
-		}
-
-		effectivePriority := estimation.Priority
+		effectivePriority := candidate.Priority
 		allowBanned := false
 		switch {
 		case healthyCandidate:
@@ -140,30 +154,18 @@ func (e *endpointElector) rebuildLocked() {
 		}
 
 		snapshot.candidateCount++
-		entry := electionEntry{key: estimation.Key, connection: connection}
 		switch {
 		case effectivePriority < minimumEffective:
 			minimumEffective = effectivePriority
-			snapshot.entries = append(snapshot.entries[:0], entry)
+			snapshot.connections = append(snapshot.connections[:0], connection)
 			snapshot.allowBanned = allowBanned
 		case effectivePriority == minimumEffective:
-			snapshot.entries = append(snapshot.entries, entry)
+			snapshot.connections = append(snapshot.connections, connection)
 			snapshot.allowBanned = snapshot.allowBanned || allowBanned
 		}
 	}
 
 	e.snapshot.Store(snapshot)
-}
-
-func (e *endpointElector) minimumPolicyPriority() uint64 {
-	minimumPolicy := uint64(math.MaxUint64)
-	for _, estimation := range e.estimates {
-		if e.connections[estimation.Key] != nil {
-			minimumPolicy = min(minimumPolicy, estimation.Priority)
-		}
-	}
-
-	return minimumPolicy
 }
 
 func isConnectionStateUsable(connectionState state.State, allowBanned bool) bool {

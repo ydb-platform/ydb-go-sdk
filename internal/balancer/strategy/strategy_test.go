@@ -8,68 +8,113 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
-func TestIdentityEstimators(t *testing.T) {
+func TestPolicy(t *testing.T) {
 	endpoints := strategyEndpoints("local", "remote")
-	expected := []Estimation{
-		{Key: endpoints[0].Key()},
-		{Key: endpoints[1].Key()},
-	}
 
-	tests := []struct {
-		name      string
-		estimator Estimator
-		expected  string
-	}{
-		{name: "random choice", estimator: RandomChoice(), expected: "RandomChoice"},
-		{name: "single connection", estimator: SingleConn(), expected: "SingleConn"},
-	}
+	t.Run("default", func(t *testing.T) {
+		policy := Policy{}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.expected, test.estimator.String())
-			require.Equal(t, expected, test.estimator.Estimate(Info{}, endpoints))
-		})
-	}
+		require.Equal(t, "Priority", policy.String())
+		require.False(t, policy.SingleConnection())
+		require.False(t, policy.DetectsNearestDC())
+		require.Equal(t, []EndpointPriority{
+			{Key: endpoints[0].Key()},
+			{Key: endpoints[1].Key()},
+		}, policy.Prioritize(Info{}, endpoints))
+	})
+
+	t.Run("single connection", func(t *testing.T) {
+		policy := SingleConn()
+
+		require.Equal(t, "SingleConn", policy.String())
+		require.True(t, policy.SingleConnection())
+		require.False(t, policy.DetectsNearestDC())
+	})
+
+	t.Run("nearest DC", func(t *testing.T) {
+		policy := PreferNearestDC(Policy{}, "LocalDC", locationMatch("local"))
+
+		require.Equal(t, "Priority{Preferences=[LocalDC]}", policy.String())
+		require.False(t, policy.SingleConnection())
+		require.True(t, policy.DetectsNearestDC())
+	})
+
+	t.Run("preference preserves mode", func(t *testing.T) {
+		policy := PreferNearestDC(SingleConn(), "LocalDC", locationMatch("local"))
+
+		require.Equal(t, "SingleConn{Preferences=[LocalDC]}", policy.String())
+		require.True(t, policy.SingleConnection())
+		require.True(t, policy.DetectsNearestDC())
+	})
 }
 
-func TestEstimatorDiscoveryRequirements(t *testing.T) {
-	tests := []struct {
-		name                       string
-		estimator                  Estimator
-		expectedConfiguredEndpoint bool
-		expectedNearestDC          bool
-	}{
-		{name: "nil defaults", estimator: nil},
-		{name: "unknown estimator", estimator: fixedEstimator{}},
-		{
-			name:                       "preference preserves single connection source",
-			estimator:                  Prefer(SingleConn(), "local", locationMatch("local"), false),
-			expectedConfiguredEndpoint: true,
-		},
-		{
-			name: "nearest DC over dynamic discovery",
-			estimator: PreferNearestDC(
-				RandomChoice(), "local", locationMatch("local"), true,
-			),
-			expectedNearestDC: true,
-		},
-		{
-			name: "outer preference preserves nested requirements",
-			estimator: Prefer(
-				PreferNearestDC(SingleConn(), "local", locationMatch("local"), true),
-				"remote", locationMatch("remote"), false,
-			),
-			expectedConfiguredEndpoint: true,
-			expectedNearestDC:          true,
-		},
-	}
+func TestPolicyIsImmutable(t *testing.T) {
+	base := Prefer(Policy{}, "LocalDC", locationMatch("local"))
+	composed := Prefer(base, "RemoteDC", locationMatch("remote"))
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.expectedConfiguredEndpoint, UsesConfiguredEndpoint(test.estimator))
-			require.Equal(t, test.expectedNearestDC, DetectsNearestDC(test.estimator))
-		})
+	require.Equal(t, "Priority{Preferences=[LocalDC]}", base.String())
+	require.Equal(t, "Priority{Preferences=[RemoteDC,LocalDC]}", composed.String())
+}
+
+func TestApplyPreference(t *testing.T) {
+	endpoints := strategyEndpoints("local", "remote", "remote")
+	priorities := Policy{}.Prioritize(Info{}, endpoints)
+
+	applyPreference(Info{}, endpoints, priorities, preference{
+		name:  "LocalDC",
+		match: locationMatch("local"),
+	})
+
+	require.Equal(t, []EndpointPriority{
+		{Key: endpoints[0].Key()},
+		{Key: endpoints[1].Key(), Priority: 1},
+		{Key: endpoints[2].Key(), Priority: 1},
+	}, priorities)
+}
+
+func TestApplyPreferenceKeepsSingleBucketWhenAllEndpointsMatchEqually(t *testing.T) {
+	endpoints := strategyEndpoints("local", "local")
+	priorities := Policy{}.Prioritize(Info{}, endpoints)
+
+	applyPreference(Info{}, endpoints, priorities, preference{
+		name:  "LocalDC",
+		match: locationMatch("local"),
+	})
+
+	require.Equal(t, []EndpointPriority{
+		{Key: endpoints[0].Key()},
+		{Key: endpoints[1].Key()},
+	}, priorities)
+}
+
+func TestPolicyPrioritizeComposesPreferencesOutermostFirst(t *testing.T) {
+	endpoints := []endpoint.Endpoint{
+		strategyEndpoint("local-primary", "local", endpoint.PileStatePrimary),
+		strategyEndpoint("local-secondary", "local", endpoint.PileStateSynchronized),
+		strategyEndpoint("remote-primary", "remote", endpoint.PileStatePrimary),
+		strategyEndpoint("remote-secondary", "remote", endpoint.PileStateSynchronized),
 	}
+	primary := func(_ Info, candidate endpoint.Info) bool {
+		return candidate.Metadata().BridgePileState == endpoint.PileStatePrimary
+	}
+	policy := Prefer(
+		Prefer(Policy{}, "PrimaryPile", primary),
+		"LocalDC", locationMatch("local"),
+	)
+
+	require.Equal(t, "Priority{Preferences=[LocalDC,PrimaryPile]}", policy.String())
+	require.Equal(t, []EndpointPriority{
+		{Key: endpoints[0].Key()},
+		{Key: endpoints[1].Key(), Priority: 1},
+		{Key: endpoints[2].Key(), Priority: 2},
+		{Key: endpoints[3].Key(), Priority: 3},
+	}, policy.Prioritize(Info{}, endpoints))
+}
+
+func TestPolicyPrioritizeEmptyEndpoints(t *testing.T) {
+	policy := Prefer(Policy{}, "LocalDC", locationMatch("local"))
+
+	require.Empty(t, policy.Prioritize(Info{}, nil))
 }
 
 func strategyEndpoints(locations ...string) []endpoint.Endpoint {
@@ -87,25 +132,9 @@ func locationMatch(location string) func(Info, endpoint.Info) bool {
 	}
 }
 
-type fixedEstimator struct {
-	estimates []Estimation
-}
-
-func (f fixedEstimator) Estimate(_ Info, endpoints []endpoint.Endpoint) []Estimation {
-	keys := make(map[endpoint.Key]struct{}, len(endpoints))
-	for _, candidate := range endpoints {
-		keys[candidate.Key()] = struct{}{}
-	}
-	result := make([]Estimation, 0, len(f.estimates))
-	for _, estimation := range f.estimates {
-		if _, ok := keys[estimation.Key]; ok {
-			result = append(result, estimation)
-		}
-	}
-
-	return result
-}
-
-func (fixedEstimator) String() string {
-	return "Fixed"
+func strategyEndpoint(address, location string, pileState endpoint.PileState) endpoint.Endpoint {
+	return endpoint.New(address,
+		endpoint.WithLocation(location),
+		endpoint.WithMetadata(endpoint.Metadata{BridgePileState: pileState}),
+	)
 }

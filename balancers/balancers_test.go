@@ -12,64 +12,60 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 )
 
-func TestPreferLocalDC(t *testing.T) {
-	conns := []conn.Conn{
-		&mock.Conn{AddrField: "1", LocationField: "1"},
-		&mock.Conn{AddrField: "2", StateField: state.Online, LocationField: "2"},
-		&mock.Conn{AddrField: "3", StateField: state.Online, LocationField: "2"},
+func TestPreferNearestDC(t *testing.T) {
+	connections := []conn.Conn{
+		&mock.Conn{AddrField: "1", LocationField: "1", StateField: state.Online},
+		&mock.Conn{AddrField: "2", LocationField: "2", StateField: state.Online},
+		&mock.Conn{AddrField: "3", LocationField: "2", StateField: state.Online},
 	}
-	rr := PreferNearestDC(RandomChoice())
-	require.Len(t, rr.Estimate(strategy.Info{SelfLocation: "2"}, connEndpoints(conns)), 2)
-	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferEstimator(strategy.Info{SelfLocation: "2"}, rr, conns))
-}
+	policy := PreferNearestDC(RandomChoice())
+	priorities := policy.Prioritize(strategy.Info{SelfLocation: "2"}, connEndpoints(connections))
 
-func TestPreferLocalDCWithFallBack(t *testing.T) {
-	conns := []conn.Conn{
-		&mock.Conn{AddrField: "1", LocationField: "1"},
-		&mock.Conn{AddrField: "2", StateField: state.Online, LocationField: "2"},
-		&mock.Conn{AddrField: "3", StateField: state.Online, LocationField: "2"},
-	}
-	rr := PreferNearestDCWithFallBack(RandomChoice())
-	require.Equal(t, 2, estimationGroupCount(rr.Estimate(strategy.Info{SelfLocation: "2"}, connEndpoints(conns))))
-	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferEstimator(strategy.Info{SelfLocation: "2"}, rr, conns))
+	require.Len(t, priorities, len(connections))
+	require.Equal(t, 2, priorityGroupCount(priorities))
+	require.Equal(t, []conn.Conn{connections[1], connections[2]}, bestConnections(priorities, connections))
+	require.True(t, policy.DetectsNearestDC())
 }
 
 func TestPreferLocations(t *testing.T) {
-	conns := []conn.Conn{
+	connections := []conn.Conn{
 		&mock.Conn{AddrField: "1", LocationField: "zero", StateField: state.Online},
-		&mock.Conn{AddrField: "2", StateField: state.Online, LocationField: "one"},
-		&mock.Conn{AddrField: "3", StateField: state.Online, LocationField: "two"},
+		&mock.Conn{AddrField: "2", LocationField: "one", StateField: state.Online},
+		&mock.Conn{AddrField: "3", LocationField: "two", StateField: state.Online},
 	}
+	policy := PreferLocations(RandomChoice(), "two", "zero")
+	priorities := policy.Prioritize(strategy.Info{}, connEndpoints(connections))
 
-	rr := PreferLocations(RandomChoice(), "zero", "two")
-	require.Len(t, rr.Estimate(strategy.Info{}, connEndpoints(conns)), 2)
-	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferEstimator(strategy.Info{}, rr, conns))
+	require.Len(t, priorities, len(connections))
+	require.Equal(t, 2, priorityGroupCount(priorities))
+	require.Equal(t, []conn.Conn{connections[0], connections[2]}, bestConnections(priorities, connections))
+	require.Equal(t, "Priority{Preferences=[Locations{TWO,ZERO}]}", policy.String())
 }
 
-func TestPreferLocationsWithFallback(t *testing.T) {
-	conns := []conn.Conn{
-		&mock.Conn{AddrField: "1", LocationField: "zero", StateField: state.Online},
-		&mock.Conn{AddrField: "2", StateField: state.Online, LocationField: "one"},
-		&mock.Conn{AddrField: "3", StateField: state.Online, LocationField: "two"},
+func TestDeprecatedPreferenceAliases(t *testing.T) {
+	filter := func(candidate Endpoint) bool {
+		return candidate.NodeID()%2 == 0
 	}
-
-	rr := PreferLocationsWithFallback(RandomChoice(), "zero", "two")
-	require.Equal(t, 2, estimationGroupCount(rr.Estimate(strategy.Info{}, connEndpoints(conns))))
-	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferEstimator(strategy.Info{}, rr, conns))
-}
-
-func TestDeprecatedLocalDCAliases(t *testing.T) {
-	conns := []conn.Conn{
-		&mock.Conn{AddrField: "1", LocationField: "local", StateField: state.Online},
-		&mock.Conn{AddrField: "2", LocationField: "remote", StateField: state.Online},
+	endpoints := []endpoint.Endpoint{
+		endpoint.New("local", endpoint.WithID(1), endpoint.WithLocation("a")),
+		endpoint.New("remote", endpoint.WithID(2), endpoint.WithLocation("b")),
 	}
-	info := strategy.Info{SelfLocation: "local"}
+	info := strategy.Info{SelfLocation: "a"}
 
-	withoutFallback := PreferLocalDC(RandomChoice())
-	require.Equal(t, []conn.Conn{conns[0]}, applyPreferEstimator(info, withoutFallback, conns))
-
-	withFallback := PreferLocalDCWithFallBack(RandomChoice())
-	require.Equal(t, 2, estimationGroupCount(withFallback.Estimate(info, connEndpoints(conns))))
+	requireSamePolicySemantics(t, info, endpoints, PreferNearestDC(RandomChoice()), PreferLocalDC(RandomChoice()))
+	requireSamePolicySemantics(t,
+		info, endpoints, PreferNearestDC(RandomChoice()), PreferLocalDCWithFallBack(RandomChoice()),
+	)
+	requireSamePolicySemantics(t,
+		info, endpoints, PreferNearestDC(RandomChoice()), PreferNearestDCWithFallBack(RandomChoice()),
+	)
+	requireSamePolicySemantics(t, info, endpoints,
+		PreferLocations(RandomChoice(), "a"),
+		PreferLocationsWithFallback(RandomChoice(), "a"),
+	)
+	requireSamePolicySemantics(t,
+		info, endpoints, Prefer(RandomChoice(), filter), PreferWithFallback(RandomChoice(), filter),
+	)
 }
 
 func TestPreferLocationsRejectsEmptyList(t *testing.T) {
@@ -82,61 +78,78 @@ func TestPreferLocationsRejectsEmptyList(t *testing.T) {
 }
 
 func TestCustomPrefer(t *testing.T) {
-	conns := []conn.Conn{
+	connections := []conn.Conn{
 		&mock.Conn{AddrField: "1", NodeIDField: 1, StateField: state.Online},
 		&mock.Conn{AddrField: "2", NodeIDField: 2, StateField: state.Online},
 	}
-	filter := func(candidate Endpoint) bool {
+	policy := Prefer(RandomChoice(), func(candidate Endpoint) bool {
 		return candidate.NodeID()%2 == 0
-	}
+	})
+	priorities := policy.Prioritize(strategy.Info{}, connEndpoints(connections))
 
-	withoutFallback := Prefer(RandomChoice(), filter)
-	require.Equal(t, []conn.Conn{conns[1]}, applyPreferEstimator(strategy.Info{}, withoutFallback, conns))
-	require.Contains(t, withoutFallback.String(), "Filter=Custom")
-
-	withFallback := PreferWithFallback(RandomChoice(), filter)
-	require.Equal(t, 2, estimationGroupCount(withFallback.Estimate(strategy.Info{}, connEndpoints(conns))))
+	require.Len(t, priorities, len(connections))
+	require.Equal(t, []conn.Conn{connections[1]}, bestConnections(priorities, connections))
+	require.Contains(t, policy.String(), "Custom")
 }
 
-func applyPreferEstimator(info strategy.Info, estimator strategy.Estimator, conns []conn.Conn) []conn.Conn {
-	estimates := estimator.Estimate(info, connEndpoints(conns))
-	if len(estimates) == 0 {
+func TestBasicPolicies(t *testing.T) {
+	require.Equal(t, RandomChoice(), RoundRobin())
+	require.Equal(t, RandomChoice(), Default())
+	require.True(t, SingleConn().SingleConnection())
+}
+
+func requireSamePolicySemantics(
+	t *testing.T,
+	info strategy.Info,
+	endpoints []endpoint.Endpoint,
+	expected strategy.Policy,
+	actual strategy.Policy,
+) {
+	t.Helper()
+	require.Equal(t, expected.String(), actual.String())
+	require.Equal(t, expected.SingleConnection(), actual.SingleConnection())
+	require.Equal(t, expected.DetectsNearestDC(), actual.DetectsNearestDC())
+	require.Equal(t, expected.Prioritize(info, endpoints), actual.Prioritize(info, endpoints))
+}
+
+func bestConnections(priorities []strategy.EndpointPriority, connections []conn.Conn) []conn.Conn {
+	if len(priorities) == 0 {
 		return nil
 	}
 
-	minimum := estimates[0].Priority
-	for _, estimation := range estimates {
-		minimum = min(minimum, estimation.Priority)
+	minimum := priorities[0].Priority
+	for _, candidate := range priorities[1:] {
+		minimum = min(minimum, candidate.Priority)
 	}
-	allowed := make(map[endpoint.Key]struct{}, len(estimates))
-	for _, estimation := range estimates {
-		if estimation.Priority == minimum {
-			allowed[estimation.Key] = struct{}{}
+	best := make(map[endpoint.Key]struct{}, len(priorities))
+	for _, candidate := range priorities {
+		if candidate.Priority == minimum {
+			best[candidate.Key] = struct{}{}
 		}
 	}
 
-	res := make([]conn.Conn, 0, len(allowed))
-	for _, c := range conns {
-		if _, ok := allowed[c.Endpoint().Key()]; ok {
-			res = append(res, c)
+	result := make([]conn.Conn, 0, len(best))
+	for _, connection := range connections {
+		if _, ok := best[connection.Endpoint().Key()]; ok {
+			result = append(result, connection)
 		}
 	}
 
-	return res
+	return result
 }
 
-func estimationGroupCount(estimates []strategy.Estimation) int {
-	priorities := make(map[uint64]struct{})
-	for _, estimation := range estimates {
-		priorities[estimation.Priority] = struct{}{}
+func priorityGroupCount(priorities []strategy.EndpointPriority) int {
+	groups := make(map[uint64]struct{})
+	for _, candidate := range priorities {
+		groups[candidate.Priority] = struct{}{}
 	}
 
-	return len(priorities)
+	return len(groups)
 }
 
-func connEndpoints(conns []conn.Conn) []endpoint.Endpoint {
-	result := make([]endpoint.Endpoint, 0, len(conns))
-	for _, connection := range conns {
+func connEndpoints(connections []conn.Conn) []endpoint.Endpoint {
+	result := make([]endpoint.Endpoint, 0, len(connections))
+	for _, connection := range connections {
 		result = append(result, connection.Endpoint())
 	}
 

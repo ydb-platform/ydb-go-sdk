@@ -1,114 +1,115 @@
 package strategy
 
 import (
+	"fmt"
+	"slices"
+	"strings"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
-// Estimation describes endpoint selection policy independent of connection state.
-type Estimation struct {
+// EndpointPriority describes endpoint selection priority independent of connection state.
+type EndpointPriority struct {
 	Key endpoint.Key
 	// Priority is ordered from the most preferred endpoint at zero to the least preferred endpoint.
 	Priority uint64
 }
 
-// Estimator is an immutable, composable endpoint estimation policy.
-// Connection ownership, health pessimization, and discovery lifecycle remain outside the estimator tree.
-type Estimator interface {
-	Estimate(info Info, endpoints []endpoint.Endpoint) []Estimation
-	String() string
-}
-
-// Info contains immutable data shared by estimators during one discovery refresh.
+// Info contains immutable data shared by a policy during one discovery refresh.
 type Info struct {
 	SelfLocation string
 }
 
-func RandomChoice() Estimator {
-	return randomChoice{}
+type preference struct {
+	name  string
+	match func(info Info, candidate endpoint.Info) bool
 }
 
-func SingleConn() Estimator {
-	return singleConn{}
+// Policy is an immutable endpoint priority pipeline.
+type Policy struct {
+	preferences      []preference
+	singleConnection bool
+	detectNearestDC  bool
+}
+
+func SingleConn() Policy {
+	return Policy{singleConnection: true}
 }
 
 func Prefer(
-	child Estimator,
+	policy Policy,
 	name string,
 	match func(info Info, candidate endpoint.Info) bool,
-	allowFallback bool,
-) Estimator {
-	return prefer{
-		child:         normalize(child),
-		name:          name,
-		match:         match,
-		allowFallback: allowFallback,
-	}
+) Policy {
+	policy.preferences = append(slices.Clone(policy.preferences), preference{
+		name:  name,
+		match: match,
+	})
+
+	return policy
 }
 
 func PreferNearestDC(
-	child Estimator,
+	policy Policy,
 	name string,
 	match func(info Info, candidate endpoint.Info) bool,
-	allowFallback bool,
-) Estimator {
-	return nearestDC{child: Prefer(child, name, match, allowFallback)}
+) Policy {
+	policy = Prefer(policy, name, match)
+	policy.detectNearestDC = true
+
+	return policy
 }
 
-func normalize(estimator Estimator) Estimator {
-	if estimator == nil {
-		return RandomChoice()
-	}
-
-	return estimator
-}
-
-// UsesConfiguredEndpoint reports whether the estimator ultimately selects only the configured entrypoint.
-func UsesConfiguredEndpoint(estimator Estimator) bool {
-	switch current := normalize(estimator).(type) {
-	case singleConn:
-		return true
-	case prefer:
-		return UsesConfiguredEndpoint(current.child)
-	case nearestDC:
-		return UsesConfiguredEndpoint(current.child)
-	default:
-		return false
-	}
-}
-
-// DetectsNearestDC reports whether the estimator needs client-side nearest DC detection.
-func DetectsNearestDC(estimator Estimator) bool {
-	switch current := normalize(estimator).(type) {
-	case prefer:
-		return DetectsNearestDC(current.child)
-	case nearestDC:
-		return true
-	default:
-		return false
-	}
-}
-
-type randomChoice struct{}
-
-func (randomChoice) Estimate(_ Info, endpoints []endpoint.Endpoint) []Estimation {
-	result := make([]Estimation, len(endpoints))
+// Prioritize applies preferences from the outermost constructor to the innermost constructor.
+func (p Policy) Prioritize(info Info, endpoints []endpoint.Endpoint) []EndpointPriority {
+	priorities := make([]EndpointPriority, len(endpoints))
 	for i, candidate := range endpoints {
-		result[i] = Estimation{Key: candidate.Key()}
+		priorities[i] = EndpointPriority{Key: candidate.Key()}
+	}
+	for i := len(p.preferences) - 1; i >= 0; i-- {
+		applyPreference(info, endpoints, priorities, p.preferences[i])
 	}
 
-	return result
+	return priorities
 }
 
-func (randomChoice) String() string {
-	return "RandomChoice"
+func applyPreference(
+	info Info,
+	endpoints []endpoint.Endpoint,
+	priorities []EndpointPriority,
+	preference preference,
+) {
+	for i, candidate := range endpoints {
+		priorities[i].Priority <<= 1
+		if !preference.match(info, candidate) {
+			priorities[i].Priority++
+		}
+	}
 }
 
-type singleConn struct{}
-
-func (singleConn) Estimate(_ Info, endpoints []endpoint.Endpoint) []Estimation {
-	return randomChoice{}.Estimate(Info{}, endpoints)
+// SingleConnection reports whether the balancer must use only the configured entrypoint.
+func (p Policy) SingleConnection() bool {
+	return p.singleConnection
 }
 
-func (singleConn) String() string {
-	return "SingleConn"
+// DetectsNearestDC reports whether the balancer needs client-side nearest DC detection.
+func (p Policy) DetectsNearestDC() bool {
+	return p.detectNearestDC
+}
+
+func (p Policy) String() string {
+	mode := "Priority"
+	if p.singleConnection {
+		mode = "SingleConn"
+	}
+	if len(p.preferences) == 0 {
+		return mode
+	}
+
+	names := make([]string, len(p.preferences))
+	for i := range p.preferences {
+		names[len(p.preferences)-1-i] = p.preferences[i].name
+	}
+
+	return fmt.Sprintf("%s{Preferences=[%s]}", mode, strings.Join(names, ","))
 }

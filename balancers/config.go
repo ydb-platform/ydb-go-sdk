@@ -30,20 +30,21 @@ const (
 )
 
 type balancersConfig struct {
-	Type      balancerType `json:"type"`
-	Prefer    preferType   `json:"prefer,omitempty"`
-	Fallback  bool         `json:"fallback,omitempty"`
-	Locations []string     `json:"locations,omitempty"`
+	Type   balancerType `json:"type"`
+	Prefer preferType   `json:"prefer,omitempty"`
+	// Fallback is retained for compatibility; every preference now has cascade semantics.
+	Fallback  bool     `json:"fallback,omitempty"`
+	Locations []string `json:"locations,omitempty"`
 }
 
 type fromConfigOptionsHolder struct {
-	fallbackBalancer strategy.Estimator
+	fallbackBalancer strategy.Policy
 	errorHandler     func(error)
 }
 
 type fromConfigOption func(h *fromConfigOptionsHolder)
 
-func WithParseErrorFallbackBalancer(b strategy.Estimator) fromConfigOption {
+func WithParseErrorFallbackBalancer(b strategy.Policy) fromConfigOption {
 	return func(h *fromConfigOptionsHolder) {
 		h.fallbackBalancer = b
 	}
@@ -55,7 +56,7 @@ func WithParseErrorHandler(errorHandler func(error)) fromConfigOption {
 	}
 }
 
-func createByType(t balancerType) (strategy.Estimator, error) {
+func createByType(t balancerType) (strategy.Policy, error) {
 	switch t {
 	case typeDisable:
 		return SingleConn(), nil
@@ -66,51 +67,42 @@ func createByType(t balancerType) (strategy.Estimator, error) {
 	case typeRoundRobin:
 		return RoundRobin(), nil
 	default:
-		return nil, xerrors.WithStackTrace(fmt.Errorf("unknown type of balancer: %s", t))
+		return strategy.Policy{}, xerrors.WithStackTrace(fmt.Errorf("unknown type of balancer: %s", t))
 	}
 }
 
-func CreateFromConfig(s string) (strategy.Estimator, error) {
+func CreateFromConfig(s string) (strategy.Policy, error) {
 	// try to parse s as identifier of balancer
 	if c, err := createByType(balancerType(s)); err == nil {
 		return c, nil
 	}
 
 	var (
-		b   strategy.Estimator
+		b   strategy.Policy
 		err error
 		c   balancersConfig
 	)
 
 	// try to parse s as json
 	if err = json.Unmarshal([]byte(s), &c); err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return strategy.Policy{}, xerrors.WithStackTrace(err)
 	}
 
 	b, err = createByType(c.Type)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return strategy.Policy{}, xerrors.WithStackTrace(err)
 	}
 
 	switch c.Prefer {
 	case preferTypeLocalDC:
-		if c.Fallback {
-			return PreferNearestDCWithFallBack(b), nil
-		}
-
 		return PreferNearestDC(b), nil
 	case preferTypeNearestDC:
-		if c.Fallback {
-			return PreferNearestDCWithFallBack(b), nil
-		}
-
 		return PreferNearestDC(b), nil
 	case preferTypeLocations:
 		if len(c.Locations) == 0 {
-			return nil, xerrors.WithStackTrace(fmt.Errorf("empty locations list in balancer '%s' config", c.Type))
-		}
-		if c.Fallback {
-			return PreferLocationsWithFallback(b, c.Locations...), nil
+			return strategy.Policy{}, xerrors.WithStackTrace(
+				fmt.Errorf("empty locations list in balancer '%s' config", c.Type),
+			)
 		}
 
 		return PreferLocations(b, c.Locations...), nil
@@ -119,12 +111,12 @@ func CreateFromConfig(s string) (strategy.Estimator, error) {
 	}
 }
 
-func FromConfig(config string, opts ...fromConfigOption) strategy.Estimator {
+func FromConfig(config string, opts ...fromConfigOption) strategy.Policy {
 	var (
 		h = fromConfigOptionsHolder{
 			fallbackBalancer: Default(),
 		}
-		b   strategy.Estimator
+		b   strategy.Policy
 		err error
 	)
 	for _, opt := range opts {

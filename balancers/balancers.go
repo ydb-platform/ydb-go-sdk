@@ -13,48 +13,47 @@ import (
 // Deprecated: RoundRobin is an alias to RandomChoice now
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func RoundRobin() strategy.Estimator {
+func RoundRobin() strategy.Policy {
 	return RandomChoice()
 }
 
-func RandomChoice() strategy.Estimator {
-	return strategy.RandomChoice()
+func RandomChoice() strategy.Policy {
+	return strategy.Policy{}
 }
 
-func SingleConn() strategy.Estimator {
+func SingleConn() strategy.Policy {
 	return strategy.SingleConn()
 }
 
 // Deprecated: use PreferNearestDC instead
 // Will be removed after March 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func PreferLocalDC(estimator strategy.Estimator) strategy.Estimator {
-	return PreferNearestDC(estimator)
+func PreferLocalDC(policy strategy.Policy) strategy.Policy {
+	return PreferNearestDC(policy)
 }
 
-// PreferNearestDC creates balancer which use endpoints only in location such as initial endpoint location
-// Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-// PreferNearestDC balancer try to autodetect local DC from client side.
-func PreferNearestDC(estimator strategy.Estimator) strategy.Estimator {
-	return strategy.PreferNearestDC(estimator, "LocalDC", func(info strategy.Info, candidate endpoint.Info) bool {
+// PreferNearestDC prioritizes endpoints in the location nearest to the client.
+// Endpoints in other locations are used when all nearer endpoints are unavailable.
+func PreferNearestDC(policy strategy.Policy) strategy.Policy {
+	return strategy.PreferNearestDC(policy, "LocalDC", func(info strategy.Info, candidate endpoint.Info) bool {
 		return candidate.Location() == info.SelfLocation
-	}, false)
+	})
 }
 
-// Deprecated: use PreferNearestDCWithFallBack instead
-// Will be removed after March 2025.
+// Deprecated: use PreferNearestDC instead.
+// All preference policies automatically cascade to lower-priority endpoints.
+// Will be removed after March 2027.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func PreferLocalDCWithFallBack(estimator strategy.Estimator) strategy.Estimator {
-	return PreferNearestDCWithFallBack(estimator)
+func PreferLocalDCWithFallBack(policy strategy.Policy) strategy.Policy {
+	return PreferNearestDC(policy)
 }
 
-// PreferNearestDCWithFallBack creates balancer which use endpoints only in location such as initial endpoint location
-// Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-// If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferNearestDCWithFallBack(estimator strategy.Estimator) strategy.Estimator {
-	return strategy.PreferNearestDC(estimator, "LocalDC", func(info strategy.Info, candidate endpoint.Info) bool {
-		return candidate.Location() == info.SelfLocation
-	}, true)
+// Deprecated: use PreferNearestDC instead.
+// All preference policies automatically cascade to lower-priority endpoints.
+// Will be removed after March 2027.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+func PreferNearestDCWithFallBack(policy strategy.Policy) strategy.Policy {
+	return PreferNearestDC(policy)
 }
 
 func locationsString(locations []string) string {
@@ -73,13 +72,13 @@ func locationsString(locations []string) string {
 	return buffer.String()
 }
 
-// PreferLocations creates balancer which use endpoints only in selected locations (such as "ABC", "DEF", etc.)
-// Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-func PreferLocations(estimator strategy.Estimator, locations ...string) strategy.Estimator {
-	return preferLocations(estimator, false, locations)
+// PreferLocations prioritizes endpoints in the selected locations (such as "ABC", "DEF", etc.).
+// Endpoints in other locations are used when all preferred endpoints are unavailable.
+func PreferLocations(policy strategy.Policy, locations ...string) strategy.Policy {
+	return preferLocations(policy, locations)
 }
 
-func preferLocations(estimator strategy.Estimator, allowFallback bool, locations []string) strategy.Estimator {
+func preferLocations(policy strategy.Policy, locations []string) strategy.Policy {
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
@@ -90,16 +89,17 @@ func preferLocations(estimator strategy.Estimator, allowFallback bool, locations
 	}
 	sort.Strings(locations)
 
-	return strategy.Prefer(estimator, locationsString(locations), func(_ strategy.Info, candidate endpoint.Info) bool {
+	return strategy.Prefer(policy, locationsString(locations), func(_ strategy.Info, candidate endpoint.Info) bool {
 		return slices.Contains(locations, strings.ToUpper(candidate.Location()))
-	}, allowFallback)
+	})
 }
 
-// PreferLocationsWithFallback creates balancer which use endpoints only in selected locations
-// Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-// If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferLocationsWithFallback(estimator strategy.Estimator, locations ...string) strategy.Estimator {
-	return preferLocations(estimator, true, locations)
+// Deprecated: use PreferLocations instead.
+// All preference policies automatically cascade to lower-priority endpoints.
+// Will be removed after March 2027.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+func PreferLocationsWithFallback(policy strategy.Policy, locations ...string) strategy.Policy {
+	return PreferLocations(policy, locations...)
 }
 
 type Endpoint interface {
@@ -114,24 +114,23 @@ type Endpoint interface {
 	LocalDC() bool
 }
 
-// Prefer creates balancer which use endpoints by filter
-// Balancer "balancer" defines balancing algorithm between endpoints selected with filter
-func Prefer(child strategy.Estimator, filter func(endpoint Endpoint) bool) strategy.Estimator {
-	return strategy.Prefer(child, "Custom", func(_ strategy.Info, candidate endpoint.Info) bool {
+// Prefer prioritizes endpoints accepted by filter.
+// Other endpoints are used when all preferred endpoints are unavailable.
+func Prefer(policy strategy.Policy, filter func(endpoint Endpoint) bool) strategy.Policy {
+	return strategy.Prefer(policy, "Custom", func(_ strategy.Info, candidate endpoint.Info) bool {
 		return filter(candidate)
-	}, false)
+	})
 }
 
-// PreferWithFallback creates balancer which use endpoints by filter
-// Balancer "balancer" defines balancing algorithm between endpoints selected with filter
-// If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferWithFallback(child strategy.Estimator, filter func(endpoint Endpoint) bool) strategy.Estimator {
-	return strategy.Prefer(child, "Custom", func(_ strategy.Info, candidate endpoint.Info) bool {
-		return filter(candidate)
-	}, true)
+// Deprecated: use Prefer instead.
+// All preference policies automatically cascade to lower-priority endpoints.
+// Will be removed after March 2027.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+func PreferWithFallback(policy strategy.Policy, filter func(endpoint Endpoint) bool) strategy.Policy {
+	return Prefer(policy, filter)
 }
 
 // Default balancer used by default
-func Default() strategy.Estimator {
+func Default() strategy.Policy {
 	return RandomChoice()
 }

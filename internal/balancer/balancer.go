@@ -65,7 +65,7 @@ func (s *streamWrapper) RecvMsg(m any) error {
 
 type Balancer struct {
 	driverConfig      *config.Config
-	estimator         strategy.Estimator
+	policy            strategy.Policy
 	detectNearestDC   bool
 	discoveryConfig   *discoveryConfig.Config
 	pool              *conn.Pool
@@ -312,15 +312,11 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	}
 
 	info := strategy.Info{SelfLocation: selfLocation}
-	estimator := b.estimator
-	if estimator == nil {
-		estimator = strategy.RandomChoice()
-	}
-	estimates := estimator.Estimate(info, endpoints)
+	priorities := b.policy.Prioritize(info, endpoints)
 	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
 
-	b.connectionsState.Store(newConnectionsStateWithEstimates(
-		connections, estimates, quarantine, nil,
+	b.connectionsState.Store(newConnectionsStateWithPriorities(
+		connections, priorities, quarantine, nil,
 	))
 }
 
@@ -404,25 +400,21 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	}
 
-	configuredEstimator := driverConfig.Balancer()
-	if configuredEstimator == nil {
-		configuredEstimator = strategy.RandomChoice()
-	}
+	policy := driverConfig.Balancer()
 
 	onDone := gtrace.DriverOnBalancerInit(driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.New"),
-		configuredEstimator.String(),
+		policy.String(),
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	usesConfiguredEndpoint := strategy.UsesConfiguredEndpoint(configuredEstimator)
 	b = &Balancer{
 		driverConfig: driverConfig,
-		estimator:    configuredEstimator,
-		detectNearestDC: strategy.DetectsNearestDC(configuredEstimator) &&
-			!usesConfiguredEndpoint,
+		policy:       policy,
+		detectNearestDC: policy.DetectsNearestDC() &&
+			!policy.SingleConnection(),
 		pool:    pool,
 		address: "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
@@ -437,7 +429,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
 
-	if usesConfiguredEndpoint {
+	if policy.SingleConnection() {
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
 			endpoint.New(b.driverConfig.Endpoint()),
 		}, "")
@@ -545,6 +537,7 @@ func (b *Balancer) connections() *connectionsState {
 
 func (b *Balancer) forceDiscovery() {
 	discoveryRepeater := b.currentDiscoveryRepeater()
+
 	if discoveryRepeater != nil {
 		discoveryRepeater.Force()
 	}
@@ -597,7 +590,7 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		return nil, xerrors.WithStackTrace(ErrNoEndpoints)
 	}
 
-	preferredCount, _ := state.elector.PreferenceHealth()
+	preferredCount := state.elector.preferredCount
 	defer func() {
 		if failedCount*2 <= preferredCount {
 			return
@@ -606,7 +599,7 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		b.forceDiscovery()
 	}()
 
-	c, failedCount = b.nextEstimatedConn(ctx, state)
+	c, failedCount = b.nextAvailableConn(ctx, state)
 	if c != nil {
 		return c, nil
 	}
@@ -616,7 +609,7 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 	)
 }
 
-func (b *Balancer) nextEstimatedConn(ctx context.Context, state *connectionsState) (conn.Conn, int) {
+func (b *Balancer) nextAvailableConn(ctx context.Context, state *connectionsState) (conn.Conn, int) {
 	var failedCount int
 	attemptsLeft := state.elector.CandidateCount()
 	for attemptsLeft > 0 {
@@ -624,14 +617,15 @@ func (b *Balancer) nextEstimatedConn(ctx context.Context, state *connectionsStat
 		if ctx.Err() != nil {
 			break
 		}
-		key, selected, allowBanned, ok := state.elector.Next()
+		selected, allowBanned, ok := state.elector.Next()
 		if !ok {
 			break
 		}
-		if selected != nil && isConnectionStateUsable(selected.State(), allowBanned) {
+		if isConnectionStateUsable(selected.State(), allowBanned) {
 			return selected, failedCount
 		}
 		failedCount++
+		key := selected.Endpoint().Key()
 		state.elector.Pessimize(key)
 		if current := b.connections(); current != state {
 			if current == nil {

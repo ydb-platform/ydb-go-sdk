@@ -21,19 +21,19 @@ func TestFromConfig(t *testing.T) {
 		{name: "disable", config: `disable`, expected: "SingleConn"},
 		{name: "single", config: `single`, expected: "SingleConn"},
 		{name: "single/JSON", config: `{"type":"single"}`, expected: "SingleConn"},
-		{name: "round_robin", config: `round_robin`, expected: "RandomChoice"},
-		{name: "round_robin/JSON", config: `{"type":"round_robin"}`, expected: "RandomChoice"},
-		{name: "random_choice", config: `random_choice`, expected: "RandomChoice"},
-		{name: "random_choice/JSON", config: `{"type":"random_choice"}`, expected: "RandomChoice"},
+		{name: "round_robin", config: `round_robin`, expected: "Priority"},
+		{name: "round_robin/JSON", config: `{"type":"round_robin"}`, expected: "Priority"},
+		{name: "random_choice", config: `random_choice`, expected: "Priority"},
+		{name: "random_choice/JSON", config: `{"type":"random_choice"}`, expected: "Priority"},
 		{
 			name:     "prefer_local_dc",
 			config:   `{"type":"random_choice","prefer":"local_dc"}`,
-			expected: "Prefer{Filter=LocalDC,AllowFallback=false,Child=RandomChoice}",
+			expected: "Priority{Preferences=[LocalDC]}",
 		},
 		{
 			name:     "prefer_nearest_dc",
 			config:   `{"type":"random_choice","prefer":"nearest_dc"}`,
-			expected: "Prefer{Filter=LocalDC,AllowFallback=false,Child=RandomChoice}",
+			expected: "Priority{Preferences=[LocalDC]}",
 		},
 		{
 			name:   "prefer_unknown_type",
@@ -43,27 +43,27 @@ func TestFromConfig(t *testing.T) {
 		{
 			name:     "unknown preference",
 			config:   `{"type":"random_choice","prefer":"unknown"}`,
-			expected: "RandomChoice",
+			expected: "Priority",
 		},
 		{
 			name:     "prefer_local_dc_with_fallback",
 			config:   `{"type":"random_choice","prefer":"local_dc","fallback":true}`,
-			expected: "Prefer{Filter=LocalDC,AllowFallback=true,Child=RandomChoice}",
+			expected: "Priority{Preferences=[LocalDC]}",
 		},
 		{
 			name:     "prefer_nearest_dc_with_fallback",
 			config:   `{"type":"random_choice","prefer":"nearest_dc","fallback":true}`,
-			expected: "Prefer{Filter=LocalDC,AllowFallback=true,Child=RandomChoice}",
+			expected: "Priority{Preferences=[LocalDC]}",
 		},
 		{
 			name:     "prefer_locations",
 			config:   `{"type":"random_choice","prefer":"locations","locations":["AAA","BBB","CCC"]}`,
-			expected: "Prefer{Filter=Locations{AAA,BBB,CCC},AllowFallback=false,Child=RandomChoice}",
+			expected: "Priority{Preferences=[Locations{AAA,BBB,CCC}]}",
 		},
 		{
 			name:     "prefer_locations_with_fallback",
 			config:   `{"type":"random_choice","prefer":"locations","locations":["AAA","BBB","CCC"],"fallback":true}`,
-			expected: "Prefer{Filter=Locations{AAA,BBB,CCC},AllowFallback=true,Child=RandomChoice}",
+			expected: "Priority{Preferences=[Locations{AAA,BBB,CCC}]}",
 		},
 		{
 			name:   "prefer_locations_without_locations",
@@ -102,7 +102,7 @@ func TestFromConfigLogicalCompatibility(t *testing.T) {
 		name                   string
 		serialized             string
 		preferred              []uint32
-		fallback               []uint32
+		lowerPriority          []uint32
 		nearestDC              bool
 		usesConfiguredEndpoint bool
 	}{
@@ -114,41 +114,44 @@ func TestFromConfigLogicalCompatibility(t *testing.T) {
 		{name: "random choice", serialized: `random_choice`, preferred: []uint32{1, 2, 3}},
 		{name: "random choice JSON", serialized: `{"type":"random_choice"}`, preferred: []uint32{1, 2, 3}},
 		{
-			name:       "legacy local DC",
-			serialized: `{"type":"random_choice","prefer":"local_dc"}`,
-			preferred:  []uint32{1},
-			nearestDC:  true,
+			name:          "legacy local DC",
+			serialized:    `{"type":"random_choice","prefer":"local_dc"}`,
+			preferred:     []uint32{1},
+			lowerPriority: []uint32{2, 3},
+			nearestDC:     true,
 		},
 		{
-			name:       "nearest DC",
-			serialized: `{"type":"random_choice","prefer":"nearest_dc"}`,
-			preferred:  []uint32{1},
-			nearestDC:  true,
+			name:          "nearest DC",
+			serialized:    `{"type":"random_choice","prefer":"nearest_dc"}`,
+			preferred:     []uint32{1},
+			lowerPriority: []uint32{2, 3},
+			nearestDC:     true,
 		},
 		{
-			name:       "legacy local DC with fallback",
-			serialized: `{"type":"random_choice","prefer":"local_dc","fallback":true}`,
-			preferred:  []uint32{1},
-			fallback:   []uint32{2, 3},
-			nearestDC:  true,
+			name:          "legacy local DC with fallback",
+			serialized:    `{"type":"random_choice","prefer":"local_dc","fallback":true}`,
+			preferred:     []uint32{1},
+			lowerPriority: []uint32{2, 3},
+			nearestDC:     true,
 		},
 		{
-			name:       "nearest DC with fallback",
-			serialized: `{"type":"random_choice","prefer":"nearest_dc","fallback":true}`,
-			preferred:  []uint32{1},
-			fallback:   []uint32{2, 3},
-			nearestDC:  true,
+			name:          "nearest DC with fallback",
+			serialized:    `{"type":"random_choice","prefer":"nearest_dc","fallback":true}`,
+			preferred:     []uint32{1},
+			lowerPriority: []uint32{2, 3},
+			nearestDC:     true,
 		},
 		{
-			name:       "locations",
-			serialized: `{"type":"random_choice","prefer":"locations","locations":["a","c"]}`,
-			preferred:  []uint32{1, 3},
+			name:          "locations",
+			serialized:    `{"type":"random_choice","prefer":"locations","locations":["a","c"]}`,
+			preferred:     []uint32{1, 3},
+			lowerPriority: []uint32{2},
 		},
 		{
-			name:       "locations with fallback",
-			serialized: `{"type":"random_choice","prefer":"locations","locations":["a","c"],"fallback":true}`,
-			preferred:  []uint32{1, 3},
-			fallback:   []uint32{2},
+			name:          "locations with fallback",
+			serialized:    `{"type":"random_choice","prefer":"locations","locations":["a","c"],"fallback":true}`,
+			preferred:     []uint32{1, 3},
+			lowerPriority: []uint32{2},
 		},
 		{
 			name:       "unknown preference remains random choice",
@@ -165,40 +168,40 @@ func TestFromConfigLogicalCompatibility(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			policy := FromConfig(test.serialized)
-			preferred, fallback := logicalGroups(policy, endpoints, strategy.Info{SelfLocation: "a"})
+			preferred, lowerPriority := logicalGroups(policy, endpoints, strategy.Info{SelfLocation: "a"})
 
 			require.Equal(t, test.preferred, preferred)
-			require.Equal(t, test.fallback, fallback)
-			require.Equal(t, test.usesConfiguredEndpoint, strategy.UsesConfiguredEndpoint(policy))
-			require.Equal(t, test.nearestDC, strategy.DetectsNearestDC(policy))
+			require.Equal(t, test.lowerPriority, lowerPriority)
+			require.Equal(t, test.usesConfiguredEndpoint, policy.SingleConnection())
+			require.Equal(t, test.nearestDC, policy.DetectsNearestDC())
 		})
 	}
 }
 
 func logicalGroups(
-	estimator strategy.Estimator,
+	policy strategy.Policy,
 	endpoints []endpoint.Endpoint,
 	info strategy.Info,
-) (preferred, fallback []uint32) {
+) (preferred, lowerPriority []uint32) {
 	nodeIDByKey := make(map[endpoint.Key]uint32, len(endpoints))
 	for _, candidate := range endpoints {
 		nodeIDByKey[candidate.Key()] = candidate.NodeID()
 	}
-	estimates := estimator.Estimate(info, endpoints)
-	if len(estimates) == 0 {
+	priorities := policy.Prioritize(info, endpoints)
+	if len(priorities) == 0 {
 		return nil, nil
 	}
-	minimum := estimates[0].Priority
-	for _, estimation := range estimates[1:] {
-		minimum = min(minimum, estimation.Priority)
+	minimum := priorities[0].Priority
+	for _, candidate := range priorities[1:] {
+		minimum = min(minimum, candidate.Priority)
 	}
-	for _, estimation := range estimates {
-		if estimation.Priority == minimum {
-			preferred = append(preferred, nodeIDByKey[estimation.Key])
+	for _, candidate := range priorities {
+		if candidate.Priority == minimum {
+			preferred = append(preferred, nodeIDByKey[candidate.Key])
 		} else {
-			fallback = append(fallback, nodeIDByKey[estimation.Key])
+			lowerPriority = append(lowerPriority, nodeIDByKey[candidate.Key])
 		}
 	}
 
-	return preferred, fallback
+	return preferred, lowerPriority
 }

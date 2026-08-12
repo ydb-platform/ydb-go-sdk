@@ -601,7 +601,7 @@ func ExampleOpen_advanced() {
 		"grpc://localhost:2135/local",
 		ydb.WithAnonymousCredentials(),
 		ydb.WithBalancer(
-			balancers.PreferLocationsWithFallback(
+			balancers.PreferLocations(
 				balancers.RandomChoice(), "a", "b",
 			),
 		),
@@ -621,7 +621,7 @@ func ExampleParamsFromMap() {
 		"grpc://localhost:2135/local",
 		ydb.WithAnonymousCredentials(),
 		ydb.WithBalancer(
-			balancers.PreferLocationsWithFallback(
+			balancers.PreferLocations(
 				balancers.RandomChoice(), "a", "b",
 			),
 		),

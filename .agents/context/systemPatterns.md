@@ -117,7 +117,7 @@ Query additionally has **implicit** session pool for server-side session managem
 Balancer
   ├── clusterDiscovery()       # periodic / on-init endpoint refresh
   ├── enrich fresh endpoints   # LocalDC and discovery metadata before pool lookup
-  ├── Estimator.Estimate()     # immutable policy tree → key/priority
+  ├── Policy.Prioritize()      # immutable preference pipeline → key/priority
   ├── endpointElector          # health + random hot-path snapshot
   └── wrapCall / wrapStream    # pessimization on retriable connection failures
 ```
@@ -128,37 +128,42 @@ Configured via `config.WithBalancer(...)` or `ydb.WithBalancer(...)`.
 
 ### Selection policy and runtime health
 
-Balancer configuration is an immutable tree of `strategy.Estimator` values. Leaf estimators assign an initial
-`Estimation{Key, Priority}` to every candidate. Preference constructors wrap a child estimator and transform its
-output: preferred endpoints keep the best priority bucket, while an enabled fallback receives a worse bucket.
-This makes existing constructor expressions composable without putting discovery or connection state into the tree.
+Balancer configuration is one concrete immutable `strategy.Policy`. Preference constructors append a predicate to
+the policy. `Policy.Prioritize` evaluates the predicates from the outermost public constructor to the innermost and
+assigns every endpoint a lexicographic priority. A preferred endpoint receives bit `0`, a less preferred endpoint bit
+`1`; earlier predicates therefore dominate later predicates.
 
 ```text
-PreferNearestDCWithFallBack(RandomChoice())
-  → Prefer(LocalDC, fallback=true)
-      → RandomChoice
+PreferNearestDC(PreferLocations(RandomChoice(), "A", "B"))
+  → policy stages: NearestDC, Locations{A,B}
+  → priorities: nearest+A/B, nearest+other, remote+A/B, remote+other
 ```
 
-The estimator runs once for each fresh discovery snapshot, before endpoints are mapped to pooled wrappers. This order
-is important: reused `conn.Conn` values may retain endpoint metadata from an older discovery response.
+There is no policy tree, compile phase, runtime policy interface, or separate fallback branch. Every `Prefer*` keeps
+all endpoints at successively lower priorities. The deprecated `*WithFallback` constructors are aliases because this
+cascade is now the normal meaning of "prefer".
 
-Mutable state has one owner: `endpointElector`. It stores the estimates, the `endpoint.Key → conn.Conn` mapping, and
-pessimized keys. Discovery and pessimization rebuild an immutable election snapshot behind `atomic.Pointer`; the RPC
-hot path only loads that snapshot and randomly chooses among the usable endpoints with the lowest effective priority.
-Pessimization assigns `math.MaxUint64` effective priority; if no healthy endpoint remains, those endpoints are a
-randomized last resort.
+The policy runs once for each fresh discovery snapshot, before endpoints are mapped to pooled wrappers. This order is
+important: reused `conn.Conn` values may retain endpoint metadata from an older discovery response.
 
-`nextConn` handles the contracts outside policy estimation:
+Mutable health has one owner: `endpointElector`. It stores policy priorities, the `endpoint.Key → conn.Conn` mapping,
+and pessimized keys. Discovery and pessimization rebuild an immutable election snapshot behind `atomic.Pointer`; the
+RPC hot path only loads that snapshot and randomly chooses among connections with the lowest effective priority.
+Pessimization assigns `math.MaxUint64` effective priority. If every connection is pessimized, those connections remain
+a randomized last resort.
 
-- `balancers.WithNodeID` bypasses estimator policy and addresses the requested node directly (unless fallback was requested);
+`nextConn` handles contracts outside policy calculation:
+
+- `balancers.WithNodeID` addresses the requested node before policy selection; its context option independently controls node-ID fallback;
 - `Created`, `Online`, and `Offline` wrappers are usable; `Banned` is eligible only as the last resort;
-- a selected wrapper that becomes unusable is pessimized in the elector, and sufficient preferred-endpoint loss forces discovery.
+- a selected wrapper that becomes unusable is pessimized, and sufficient preferred-endpoint loss forces discovery.
 
-Keep these responsibilities separate: estimators express endpoint policy; the elector owns runtime health and random
-choice; the connection pool owns wrapper lifecycle.
+Keep these responsibilities separate: `Policy` expresses static endpoint preference, `endpointElector` owns runtime
+health and hot-path choice, and `conn.Pool` owns wrapper lifecycle.
 
-Compatibility tests must keep existing constructor expressions source-usable and preserve the logical meaning of
-persisted `balancers.FromConfig(string)` values across balancer refactors.
+Compatibility tests must keep existing public constructor expressions source-usable and verify persisted
+`balancers.FromConfig(string)` values. Serialized `fallback` is still accepted, but both values now produce the same
+priority cascade.
 
 `Driver.Discovery()` exposes a separate discovery client (uses bootstrap connection from pool, not the main balancer loop).
 

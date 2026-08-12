@@ -1,4 +1,4 @@
-* Refactored balancer configuration into composable strategies without changing existing configuration call sites
+* Refactored balancer configuration into a priority pipeline without changing existing configuration call sites; `Prefer*` policies now cascade to lower-priority endpoints, and redundant `*WithFallback` variants are deprecated
 
 ## v3.147.2
 * Updated ydb-go-genproto and added bridge pile state to discovered endpoint metadata

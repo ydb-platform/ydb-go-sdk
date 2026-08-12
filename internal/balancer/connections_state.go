@@ -18,9 +18,9 @@ type connectionsState struct {
 	quarantine []conn.Conn
 }
 
-func newConnectionsStateWithEstimates(
+func newConnectionsStateWithPriorities(
 	connections []conn.Conn,
-	estimates []strategy.Estimation,
+	priorities []strategy.EndpointPriority,
 	quarantine []conn.Conn,
 	rand xrand.Rand,
 ) *connectionsState {
@@ -33,7 +33,7 @@ func newConnectionsStateWithEstimates(
 		all:          append([]conn.Conn(nil), connections...),
 		quarantine:   quarantine,
 	}
-	result.elector = newEndpointElector(estimates, connectionsByKey, rand)
+	result.elector = newEndpointElector(priorities, connectionsByKey, rand)
 
 	return result
 }

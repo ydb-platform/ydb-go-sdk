@@ -136,7 +136,7 @@ func TestLocalDCDiscovery(t *testing.T) {
 	)
 	r := &Balancer{
 		driverConfig:    cfg,
-		estimator:       cfg.Balancer(),
+		policy:          cfg.Balancer(),
 		detectNearestDC: true,
 		pool:            conn.NewPool(context.Background(), cfg),
 		discover: func(ctx context.Context, _ *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {

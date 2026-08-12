@@ -18,7 +18,7 @@ func TestConnectionsStateDefensiveViews(t *testing.T) {
 		&mock.Conn{AddrField: "1", NodeIDField: 1, StateField: state.Online},
 		&mock.Conn{AddrField: "2", NodeIDField: 2, StateField: state.Online},
 	}
-	s := newConnectionsState(connections, nil, strategy.Info{}, false, nil)
+	s := newConnectionsState(connections, nil, strategy.Info{}, nil)
 
 	all := s.All()
 	all[0] = &mock.Conn{AddrField: "mutated"}
@@ -33,21 +33,19 @@ func TestConnectionsStatePolicyGroups(t *testing.T) {
 		&mock.Conn{AddrField: "local", NodeIDField: 1, LocationField: "local", StateField: state.Online},
 		&mock.Conn{AddrField: "remote", NodeIDField: 2, LocationField: "remote", StateField: state.Online},
 	}
-	estimator := strategy.Prefer(
-		strategy.RandomChoice(), "LocalDC",
+	policy := strategy.Prefer(
+		strategy.Policy{}, "LocalDC",
 		func(info strategy.Info, candidate endpoint.Info) bool {
 			return candidate.Location() == info.SelfLocation
-		}, true,
+		},
 	)
-	s := newConnectionsStateWithBalancer(connections, estimator, strategy.Info{SelfLocation: "local"}, nil)
+	s := newConnectionsStateWithPolicy(connections, policy, strategy.Info{SelfLocation: "local"}, nil)
 
-	preferred, unavailable := s.elector.PreferenceHealth()
-	require.Equal(t, 1, preferred)
-	require.Zero(t, unavailable)
-	require.Equal(t, []strategy.Estimation{
+	require.Equal(t, 1, s.elector.preferredCount)
+	require.Equal(t, []strategy.EndpointPriority{
 		{Key: connections[0].Endpoint().Key()},
 		{Key: connections[1].Endpoint().Key(), Priority: 1},
-	}, s.elector.estimates)
+	}, s.elector.priorities)
 }
 
 func TestConnectionsStatePinnedNodeContract(t *testing.T) {
@@ -55,7 +53,7 @@ func TestConnectionsStatePinnedNodeContract(t *testing.T) {
 		&mock.Conn{AddrField: "1", NodeIDField: 1, StateField: state.Online},
 		&mock.Conn{AddrField: "2", NodeIDField: 2, StateField: state.Online},
 	}
-	s := newConnectionsState(connections, nil, strategy.Info{}, false, nil)
+	s := newConnectionsState(connections, nil, strategy.Info{}, nil)
 
 	require.Same(t, connections[1], s.preferConnection(endpoint.WithNodeID(t.Context(), 2)))
 	connections[1].Ban(t.Context())
@@ -67,19 +65,19 @@ func TestConnectionsStateLastResort(t *testing.T) {
 		&mock.Conn{AddrField: "1", NodeIDField: 1, StateField: state.Banned},
 		&mock.Conn{AddrField: "2", NodeIDField: 2, StateField: state.Banned},
 	}
-	s := newConnectionsStateWithBalancerAndRand(
-		connections, strategy.RandomChoice(), strategy.Info{}, nil, deterministicRand{},
+	s := newConnectionsStateWithPolicyAndRand(
+		connections, strategy.Policy{}, strategy.Info{}, nil, deterministicRand{},
 	)
 
-	_, selected, allowBanned, ok := s.elector.Next()
+	selected, allowBanned, ok := s.elector.Next()
 	require.True(t, ok)
 	require.True(t, allowBanned)
 	require.Same(t, connections[0], selected)
 }
 
 func TestConnectionsStateEmpty(t *testing.T) {
-	s := newConnectionsState(nil, nil, strategy.Info{}, false, nil)
-	_, connection, _, ok := s.elector.Next()
+	s := newConnectionsState(nil, nil, strategy.Info{}, nil)
+	connection, _, ok := s.elector.Next()
 	require.False(t, ok)
 	require.Nil(t, connection)
 }
@@ -99,43 +97,39 @@ func newConnectionsState(
 	connections []conn.Conn,
 	filter filterFunc,
 	info strategy.Info,
-	allowFallback bool,
 	quarantine []conn.Conn,
 ) *connectionsState {
-	estimator := strategy.RandomChoice()
+	policy := strategy.Policy{}
 	if filter != nil {
-		estimator = strategy.Prefer(estimator, "Custom", filter, allowFallback)
+		policy = strategy.Prefer(policy, "Custom", filter)
 	}
 
-	return newConnectionsStateWithBalancer(connections, estimator, info, quarantine)
+	return newConnectionsStateWithPolicy(connections, policy, info, quarantine)
 }
 
-func newConnectionsStateWithBalancer(
+func newConnectionsStateWithPolicy(
 	connections []conn.Conn,
-	estimator strategy.Estimator,
+	policy strategy.Policy,
 	info strategy.Info,
 	quarantine []conn.Conn,
 ) *connectionsState {
-	return newConnectionsStateWithBalancerAndRand(connections, estimator, info, quarantine, nil)
+	return newConnectionsStateWithPolicyAndRand(connections, policy, info, quarantine, nil)
 }
 
-func newConnectionsStateWithBalancerAndRand(
+func newConnectionsStateWithPolicyAndRand(
 	connections []conn.Conn,
-	estimator strategy.Estimator,
+	policy strategy.Policy,
 	info strategy.Info,
 	quarantine []conn.Conn,
 	rand xrand.Rand,
 ) *connectionsState {
-	if estimator == nil {
-		estimator = strategy.RandomChoice()
-	}
 	endpoints := make([]endpoint.Endpoint, 0, len(connections))
 	for _, connection := range connections {
 		endpoints = append(endpoints, connection.Endpoint())
 	}
 
-	return newConnectionsStateWithEstimates(
-		connections, estimator.Estimate(info, endpoints), quarantine, rand,
+	return newConnectionsStateWithPriorities(
+		connections, policy.Prioritize(info, endpoints), quarantine, rand,
 	)
 }
 
