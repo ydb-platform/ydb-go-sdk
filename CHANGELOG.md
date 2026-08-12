@@ -1,4 +1,5 @@
 * Refactored balancer configuration into a priority pipeline without changing existing configuration call sites; `Prefer*` policies now cascade to lower-priority endpoints
+* Prevented temporary errors from banning the only `SingleConn` endpoint; disabling periodic discovery is now rejected for other balancer policies
 
 ## v3.147.2
 * Updated ydb-go-genproto and added bridge pile state to discovered endpoint metadata
