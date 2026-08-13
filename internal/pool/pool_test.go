@@ -63,6 +63,8 @@ func defaultTrace[PT ItemConstraint[T], T any]() *Trace[PT, T] {
 			return func(err error) {
 			}
 		},
+		OnCloseItem: func(info PT, reason string) {
+		},
 		OnGet: func(ctx *context.Context, call stack.Caller) func(
 			info PT,
 			nodeHintInfo *trace.NodeHintInfo,
@@ -1071,6 +1073,31 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				requirePoolStats(t, p, poolStats(2, nil))
 				require.Equal(t, 0, p.Stats().Size)
 			})
+		})
+		t.Run("CloseReasons", func(t *testing.T) {
+			var reasons []string
+			fakeClock := clockwork.NewFakeClock()
+			poolTrace := defaultTrace[*testItem, testItem]()
+			poolTrace.OnCloseItem = func(_ *testItem, reason string) {
+				reasons = append(reasons, reason)
+			}
+
+			p := mustNewPool[*testItem, testItem](t,
+				WithLimit[*testItem, testItem](1),
+				WithClock[*testItem, testItem](fakeClock),
+				WithIdleTimeToLive[*testItem, testItem](time.Second),
+				WithTrace[*testItem, testItem](poolTrace),
+			)
+
+			info := mustGetItem(t, p)
+			mustPutItem(t, p, info)
+			fakeClock.Advance(time.Second)
+
+			info = mustGetItem(t, p)
+			require.Equal(t, []string{"pool_idle_timeout"}, reasons)
+			mustPutItem(t, p, info)
+			require.NoError(t, p.Close(t.Context()))
+			require.Equal(t, []string{"pool_idle_timeout", "pool_graceful_shutdown"}, reasons)
 		})
 	})
 	t.Run("Retry", func(t *testing.T) {

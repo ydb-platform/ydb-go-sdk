@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"math/rand"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -1791,13 +1792,22 @@ func TestClient(t *testing.T) {
 
 	t.Run("Close", func(t *testing.T) {
 		t.Run("AllowImplicitSessions", func(t *testing.T) {
-			client := mockClientForImplicitSessionTest(ctx, t)
+			var closedEvents atomic.Uint32
+			client := mockClientForImplicitSessionTest(ctx, t,
+				config.WithPoolName("/local"),
+				config.WithTrace(&trace.Query{
+					OnSessionClosed: func(trace.QuerySessionClosedInfo) {
+						closedEvents.Add(1)
+					},
+				}),
+			)
 			_, err := client.QueryRow(ctx, "SELECT 1")
 			require.NoError(t, err)
 
 			err = client.Close(t.Context())
 
 			require.NoError(t, err)
+			require.Zero(t, closedEvents.Load())
 		})
 	})
 }
@@ -1805,7 +1815,7 @@ func TestClient(t *testing.T) {
 // mockClientForImplicitSessionTest creates a new Client with a test balancer
 // for simulating implicit session scenarios in query client testing. It configures
 // the mock in such way that calling `CreateSession` or `AttachSession` will result in an error.
-func mockClientForImplicitSessionTest(ctx context.Context, t *testing.T) *Client {
+func mockClientForImplicitSessionTest(ctx context.Context, t *testing.T, opts ...config.Option) *Client {
 	ctrl := gomock.NewController(t)
 
 	stream := newExecuteQueryStreamMock(ctrl)
@@ -1817,7 +1827,7 @@ func mockClientForImplicitSessionTest(ctx context.Context, t *testing.T) *Client
 	queryService := NewMockQueryServiceClient(ctrl)
 	queryService.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-	cfg := config.New(config.AllowImplicitSessions())
+	cfg := config.New(append([]config.Option{config.AllowImplicitSessions()}, opts...)...)
 
 	c, err := newWithQueryServiceClient(ctx, queryService, nil, cfg)
 	require.NoError(t, err)

@@ -18,6 +18,7 @@ type Config struct {
 	config.Common
 
 	poolLimit             int
+	poolName              string
 	poolSessionUsageLimit uint64
 	poolSessionUsageTTL   time.Duration
 
@@ -65,6 +66,10 @@ func (c *Config) Trace() *trace.Query {
 // DefaultPoolMaxSize variable is used as a pool limit.
 func (c *Config) PoolLimit() int {
 	return c.poolLimit
+}
+
+func (c *Config) PoolName() string {
+	return c.poolName
 }
 
 func (c *Config) AllowImplicitSessions() bool {

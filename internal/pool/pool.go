@@ -559,6 +559,9 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 
 		closes.Add(len(data))
 		for _, info := range data {
+			if onCloseItem := p.config.trace.OnCloseItem; onCloseItem != nil {
+				onCloseItem(info.item, "pool_graceful_shutdown")
+			}
 			go func(ctx context.Context, info *itemInfo[PT, T]) {
 				defer closes.Done()
 
@@ -610,23 +613,6 @@ func needCloseItemByIdleTTL[PT ItemConstraint[T], T any](c *Config[PT, T], info 
 	}
 
 	return true
-}
-
-func needCloseItem[PT ItemConstraint[T], T any](c *Config[PT, T], info *itemInfo[PT, T]) bool {
-	if !info.item.IsAlive() {
-		return true
-	}
-	if needCloseItemByMaxUsage(c, info) {
-		return true
-	}
-	if needCloseItemByTTL(c, info) {
-		return true
-	}
-	if needCloseItemByIdleTTL(c, info) {
-		return true
-	}
-
-	return false
 }
 
 func needCloseOldestItem[PT ItemConstraint[T], T any](c *Config[PT, T], info *itemInfo[PT, T]) bool {
@@ -718,7 +704,16 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 		}
 
 		switch {
-		case needCloseItem(p.config, info):
+		case !info.item.IsAlive():
+			p.closeItem(ctx, info.item, batchChanges)
+		case needCloseItemByMaxUsage(p.config, info):
+			p.closeItem(ctx, info.item, batchChanges)
+		case needCloseItemByTTL(p.config, info):
+			p.closeItem(ctx, info.item, batchChanges)
+		case needCloseItemByIdleTTL(p.config, info):
+			if onCloseItem := p.config.trace.OnCloseItem; onCloseItem != nil {
+				onCloseItem(info.item, "pool_idle_timeout")
+			}
 			p.closeItem(ctx, info.item, batchChanges)
 		default:
 			return info, nil
@@ -781,6 +776,9 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T], batchC
 
 	select {
 	case <-p.done:
+		if onCloseItem := p.config.trace.OnCloseItem; onCloseItem != nil {
+			onCloseItem(info.item, "pool_graceful_shutdown")
+		}
 		p.closeItem(ctx, info.item, batchChanges)
 
 		return xerrors.WithStackTrace(errClosedPool)

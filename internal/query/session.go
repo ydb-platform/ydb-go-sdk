@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -170,8 +171,12 @@ func (s *Session) execute(ctx context.Context,
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		if finalErr != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				s.onQueryError(ctxErr)
+			} else {
+				s.onQueryError(finalErr)
+			}
 			cancel()
-			applyStatusByError(s, finalErr)
 		}
 	}()
 
@@ -182,8 +187,44 @@ func (s *Session) execute(ctx context.Context,
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+	r.onNextPartErr = append(r.onNextPartErr, s.onQueryError)
 
 	return r, nil
+}
+
+func (s *Session) onQueryError(err error) {
+	if err == nil || xerrors.Is(err, io.EOF) {
+		return
+	}
+
+	status := StatusFromErr(err)
+	if status == StatusUnknown {
+		if !xerrors.MustDeleteTableOrQuerySession(err) {
+			return
+		}
+		status = StatusError
+	}
+	s.SetStatus(status)
+
+	var reason string
+	switch {
+	case xerrors.Is(err, context.DeadlineExceeded):
+		reason = "client_timeout"
+	case xerrors.Is(err, context.Canceled):
+		reason = "client_cancelled"
+	case xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION, Ydb.StatusIds_SESSION_EXPIRED):
+		reason = "bad_session"
+	case xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_BUSY):
+		reason = "session_busy"
+	case xerrors.IsTransportError(err):
+		reason = "transport_error"
+	}
+
+	core, ok := s.Core.(*sessionCore)
+	if reason == "" || !ok || core.poolName == "" || !core.closedReported.CompareAndSwap(false, true) {
+		return
+	}
+	gtrace.QueryOnSessionClosed(s.trace, core.poolName, reason)
 }
 
 func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (finalErr error) {

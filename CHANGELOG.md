@@ -1,3 +1,8 @@
+* Added the `ydb.query.session.closed` counter with query session pool name and close reason attributes:
+  `pool_idle_timeout`, `pool_graceful_shutdown`, `client_timeout`, `client_cancelled`, `attach_closed`,
+  `transport_error`, `node_shutdown`, `session_shutdown`, `bad_session`, and `session_busy`; bumped the metrics
+  observability-chain version to `ydb-sdk-metrics/0.2.0`
+
 ## v3.147.2
 * Updated ydb-go-genproto and added bridge pile state to discovered endpoint metadata
 
