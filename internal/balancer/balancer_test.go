@@ -166,6 +166,153 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	require.Equal(t, e3.NodeID(), all[1].Endpoint().NodeID())
 }
 
+func TestApplyDiscoveredEndpointsMaxConnections(t *testing.T) {
+	ctx := t.Context()
+	balancerPolicy := userBalancers.WithMaxConnections(userBalancers.RandomChoice(), 2)
+	cfg := config.New(config.WithBalancer(balancerPolicy))
+	pool := conn.NewPool(ctx, cfg)
+	b := &Balancer{
+		driverConfig: cfg,
+		policy:       balancerPolicy,
+		pool:         pool,
+		random:       noShuffleRand{},
+	}
+	t.Cleanup(func() {
+		require.NoError(t, b.Close(ctx))
+		require.NoError(t, pool.RemoveRef(ctx))
+	})
+
+	endpoints := []endpoint.Endpoint{
+		endpoint.New("node-1", endpoint.WithID(1)),
+		endpoint.New("node-2", endpoint.WithID(2)),
+		endpoint.New("node-3", endpoint.WithID(3)),
+	}
+	b.applyDiscoveredEndpoints(ctx, endpoints, "")
+	require.Equal(t, []uint32{1, 2}, activeNodeIDs(b))
+
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{endpoints[2], endpoints[1], endpoints[0]}, "")
+	require.ElementsMatch(t, []uint32{1, 2}, activeNodeIDs(b), "healthy active set must remain sticky")
+
+	forceCalls := 0
+	b.discoveryRepeater = &stubRepeater{forceFn: func() { forceCalls++ }}
+	banned := connByNodeID(b, 1)
+	b.ban(ctx, banned, errors.New("overloaded"))
+	b.ban(ctx, banned, errors.New("duplicate overloaded"))
+	require.Equal(t, 1, forceCalls, "only the first ban transition must force discovery")
+
+	b.applyDiscoveredEndpoints(ctx, endpoints, "")
+	require.Equal(t, []uint32{2, 3}, activeNodeIDs(b), "a banned connection must free its active-set slot")
+}
+
+func TestMaxConnectionsWithNodeIDSoftLimit(t *testing.T) {
+	ctx := t.Context()
+	balancerPolicy := userBalancers.WithMaxConnections(
+		userBalancers.PreferLocations(userBalancers.RandomChoice(), "preferred"), 1,
+	)
+	cfg := config.New(config.WithBalancer(balancerPolicy))
+	pool := conn.NewPool(ctx, cfg)
+	b := &Balancer{
+		driverConfig: cfg,
+		policy:       balancerPolicy,
+		pool:         pool,
+		random:       noShuffleRand{},
+	}
+	t.Cleanup(func() {
+		require.NoError(t, b.Close(ctx))
+		require.NoError(t, pool.RemoveRef(ctx))
+	})
+
+	endpoints := []endpoint.Endpoint{
+		endpoint.New("preferred", endpoint.WithID(1), endpoint.WithLocation("preferred")),
+		endpoint.New("excluded", endpoint.WithID(2), endpoint.WithLocation("excluded")),
+	}
+	b.applyDiscoveredEndpoints(ctx, endpoints, "")
+	require.Equal(t, []uint32{1}, activeNodeIDs(b))
+
+	pinned, err := b.nextConn(userBalancers.WithNodeID(ctx, 2))
+	require.NoError(t, err)
+	require.Equal(t, uint32(2), pinned.Endpoint().NodeID())
+	require.Len(t, b.connections().All(), 2, "WithNodeID may soft-exceed MaxConnections")
+
+	pinnedAgain, err := b.nextConn(userBalancers.WithNodeID(ctx, 2))
+	require.NoError(t, err)
+	require.Same(t, pinned, pinnedAgain)
+	require.Len(t, b.connections().All(), 2, "repeated pinning must not duplicate a connection")
+
+	for range 10 {
+		selected, nextErr := b.nextConn(ctx)
+		require.NoError(t, nextErr)
+		require.Equal(t, uint32(1), selected.Endpoint().NodeID(), "soft-limit overflow must not enter normal election")
+	}
+
+	b.ban(ctx, pinned, errors.New("pinned connection failed"))
+	strictPin := endpoint.WithNodeID(ctx, 2, endpoint.WithFallback(false))
+	selected, err := b.nextConn(strictPin)
+	require.ErrorIs(t, err, ErrNoEndpoints)
+	require.Nil(t, selected)
+	require.Equal(t, state.Banned, pinned.State(), "a pinned request must not revive a banned connection")
+
+	b.applyDiscoveredEndpoints(ctx, endpoints, "")
+	selected, err = b.nextConn(strictPin)
+	require.ErrorIs(t, err, ErrNoEndpoints)
+	require.Nil(t, selected)
+	require.Equal(t, state.Banned, pinned.State(), "a quarantined connection must not be revived either")
+}
+
+func TestTryAddPinnedConnectionDefensivePaths(t *testing.T) {
+	t.Run("closed balancer", func(t *testing.T) {
+		connection, rejected := (&Balancer{closed: true}).tryAddPinnedConnection(1)
+		require.Nil(t, connection)
+		require.Nil(t, rejected)
+	})
+
+	t.Run("missing state", func(t *testing.T) {
+		connection, rejected := (&Balancer{}).tryAddPinnedConnection(1)
+		require.Nil(t, connection)
+		require.Nil(t, rejected)
+	})
+
+	t.Run("concurrent pin already added", func(t *testing.T) {
+		existing := userBalancerConn(1, "node", state.Online)
+		b := &Balancer{}
+		b.connectionsState.Store(newConnectionsStateWithPolicy(
+			[]conn.Conn{existing}, policy.Policy{}, policy.Info{}, nil,
+		))
+
+		connection, rejected := b.tryAddPinnedConnection(1)
+		require.Same(t, existing, connection)
+		require.Nil(t, rejected)
+	})
+
+	t.Run("node absent from discovery", func(t *testing.T) {
+		b := &Balancer{}
+		b.connectionsState.Store(newConnectionsStateWithPolicy(
+			nil, policy.Policy{}, policy.Info{}, nil,
+		))
+
+		connection, rejected := b.tryAddPinnedConnection(1)
+		require.Nil(t, connection)
+		require.Nil(t, rejected)
+	})
+
+	t.Run("closed pool", func(t *testing.T) {
+		ctx := t.Context()
+		pool := conn.NewPool(ctx, config.New())
+		require.NoError(t, pool.RemoveRef(ctx))
+		b := &Balancer{
+			pool:           pool,
+			lastDiscovered: []endpoint.Endpoint{endpoint.New("node", endpoint.WithID(1))},
+		}
+		b.connectionsState.Store(newConnectionsStateWithPolicy(
+			nil, policy.Policy{}, policy.Info{}, nil,
+		))
+
+		connection, rejected := b.tryAddPinnedConnection(1)
+		require.Nil(t, connection)
+		require.Nil(t, rejected)
+	})
+}
+
 func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem(t *testing.T) {
 	ctx := context.Background()
 
@@ -650,6 +797,27 @@ func TestNew(t *testing.T) {
 		b, err := New(ctx, cfg, pool)
 		require.NoError(t, err)
 		require.Equal(t, "Priority", b.policy.String())
+		require.Empty(t, b.lastDiscovered)
+		require.Nil(t, b.random)
+		require.NoError(t, b.Close(ctx))
+	})
+	t.Run("max connections policy", func(t *testing.T) {
+		ctx := t.Context()
+		srv := startDynamicDiscoveryServer(t, []uint32{1, 2, 3})
+		cfg := config.New(
+			config.WithEndpoint(srv.endpoint()),
+			config.WithDatabase("/local"),
+			config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+			config.WithBalancer(userBalancers.WithMaxConnections(userBalancers.RandomChoice(), 2)),
+		)
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
+
+		b, err := New(ctx, cfg, pool)
+		require.NoError(t, err)
+		require.Len(t, b.connections().All(), 2)
+		require.Len(t, b.lastDiscovered, 3)
+		require.NotNil(t, b.random)
 		require.NoError(t, b.Close(ctx))
 	})
 	t.Run("single connection policy skips discovery", func(t *testing.T) {
@@ -2061,6 +2229,15 @@ func BenchmarkNextConn(b *testing.B) {
 					func(candidate userBalancers.Endpoint) bool {
 						return candidate.NodeID()%2 == 0
 					},
+				))
+			},
+		},
+		{
+			name:      "MaxConnections9",
+			nodeCount: 1000,
+			balancer: func() config.Option {
+				return config.WithBalancer(userBalancers.WithMaxConnections(
+					userBalancers.RandomChoice(), 9,
 				))
 			},
 		},

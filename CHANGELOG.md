@@ -1,3 +1,5 @@
+* Added `balancers.WithMaxConnections` to configure a soft limit on the active gRPC connection set; `balancers.WithNodeID` may exceed the limit to preserve node affinity
+
 ## v3.148.0
 * Refactored balancer configuration into an immutable priority pipeline without changing existing configuration call sites or strict `Prefer*` and `*WithFallback` behavior
 * Prevented temporary errors from banning the only `SingleConn` endpoint; disabling periodic discovery is now rejected for other balancer policies

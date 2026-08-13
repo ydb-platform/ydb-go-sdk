@@ -26,6 +26,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -81,6 +82,8 @@ type Balancer struct {
 	localDCDetector func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
 	connectionsState atomic.Pointer[connectionsState]
+	random           xrand.Rand
+	lastDiscovered   []endpoint.Endpoint
 
 	closeMu sync.Mutex
 	closed  bool
@@ -289,9 +292,11 @@ func (b *Balancer) applyDiscoveredEndpoints(
 			b.policy.DetectsNearestDC(),
 			b.driverConfig.Database(),
 		)
-		state      = b.connectionsState.Load()
-		active     []conn.Conn
-		quarantine []conn.Conn
+		state              = b.connectionsState.Load()
+		active             []conn.Conn
+		quarantine         []conn.Conn
+		selectedEndpoints  []endpoint.Endpoint
+		selectedPriorities []policy.EndpointPriority
 	)
 	if state != nil {
 		active = state.All()
@@ -301,7 +306,7 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	defer func() {
 		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
 			return cc.Endpoint()
-		}), endpoints, endpoint.Compare)
+		}), selectedEndpoints, endpoint.Compare)
 
 		onDone(
 			xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
@@ -313,10 +318,16 @@ func (b *Balancer) applyDiscoveredEndpoints(
 
 	info := policy.Info{SelfLocation: selfLocation}
 	priorities := b.policy.Prioritize(info, endpoints)
-	quarantine, connections := nextState(ctx, b.pool, quarantine, active, endpoints)
+	selectedEndpoints, selectedPriorities = selectActiveEndpoints(
+		active, quarantine, endpoints, priorities, b.policy.MaxConnections(), b.random,
+	)
+	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selectedEndpoints)
 
+	if b.policy.MaxConnections() > 0 {
+		b.lastDiscovered = append(b.lastDiscovered[:0], endpoints...)
+	}
 	b.connectionsState.Store(newConnectionsStateWithPriorities(
-		connections, priorities, quarantine, nil,
+		connections, selectedPriorities, quarantine, nil,
 	))
 }
 
@@ -329,6 +340,7 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	}
 
 	b.closed = true
+	b.lastDiscovered = nil
 
 	oldState := b.connectionsState.Swap(nil)
 
@@ -423,6 +435,9 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 			discoveryConfig.WithMeta(driverConfig.Meta()),
 		)...),
 		localDCDetector: detectLocalDC,
+	}
+	if policy.MaxConnections() > 0 {
+		b.random = xrand.New(xrand.WithLock())
 	}
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
@@ -566,13 +581,10 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 	}
 
 	if nodeID, ok := endpoint.ContextNodeID(ctx); ok {
-		if cc := state.preferConnection(ctx); cc != nil {
-			return cc, nil
-		}
-		if !endpoint.ContextFallback(ctx) {
-			return nil, xerrors.WithStackTrace(
-				fmt.Errorf("%w: pinned node %d is not available", ErrNoEndpoints, nodeID),
-			)
+		var handled bool
+		c, handled, err = b.pinnedConnection(ctx, state, nodeID)
+		if handled {
+			return c, err
 		}
 	}
 	if state.elector.CandidateCount() == 0 {
@@ -590,6 +602,32 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 	return nil, xerrors.WithStackTrace(
 		fmt.Errorf("%w: cannot get connection from Balancer after %d attempts", ErrNoEndpoints, failedCount),
 	)
+}
+
+func (b *Balancer) pinnedConnection(
+	ctx context.Context,
+	current *connectionsState,
+	nodeID uint32,
+) (connection conn.Conn, handled bool, err error) {
+	if connection := current.preferConnection(ctx); connection != nil {
+		return connection, true, nil
+	}
+	if b.policy.MaxConnections() > 0 {
+		connection, rejected := b.tryAddPinnedConnection(nodeID)
+		if rejected != nil {
+			b.pool.Put(ctx, rejected)
+		}
+		if connection != nil {
+			return connection, true, nil
+		}
+	}
+	if !endpoint.ContextFallback(ctx) {
+		return nil, true, xerrors.WithStackTrace(
+			fmt.Errorf("%w: pinned node %d is not available", ErrNoEndpoints, nodeID),
+		)
+	}
+
+	return nil, false, nil
 }
 
 func (b *Balancer) nextAvailableConn(ctx context.Context, state *connectionsState) (conn.Conn, int) {
@@ -627,10 +665,68 @@ func (b *Balancer) ban(ctx context.Context, connection conn.Conn, cause error) {
 		return
 	}
 
+	alreadyBanned := connection.State() == state.Banned
 	b.pool.Ban(ctx, connection, cause)
+	forceDiscovery := b.policy.MaxConnections() > 0 && !alreadyBanned
 	if current := b.connections(); current != nil {
-		b.refreshElection(current.elector)
+		forceDiscovery = current.elector.Refresh() || forceDiscovery
 	}
+	if forceDiscovery {
+		b.forceDiscovery()
+	}
+}
+
+func (b *Balancer) tryAddPinnedConnection(nodeID uint32) (connection, rejected conn.Conn) {
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+
+	if b.closed {
+		return nil, nil
+	}
+
+	current := b.connectionsState.Load()
+	if current == nil {
+		return nil, nil
+	}
+	if existing := current.connByNodeID[nodeID]; existing != nil {
+		if isConnectionStateUsable(existing.State(), false) {
+			return existing, nil
+		}
+
+		return nil, nil
+	}
+
+	var discovered endpoint.Endpoint
+	for _, candidate := range b.lastDiscovered {
+		if candidate.NodeID() == nodeID {
+			discovered = candidate
+
+			break
+		}
+	}
+	if discovered == nil {
+		return nil, nil
+	}
+
+	connection = b.pool.Get(discovered)
+	if connection == nil {
+		return nil, nil
+	}
+	if !isConnectionStateUsable(connection.State(), false) {
+		return nil, connection
+	}
+
+	connections := append(current.All(), connection)
+	priorities := append([]policy.EndpointPriority(nil), current.elector.priorities...)
+	priorities = append(priorities, policy.EndpointPriority{
+		Key:      discovered.Key(),
+		Excluded: true,
+	})
+	b.connectionsState.Store(newConnectionsStateWithPriorities(
+		connections, priorities, current.quarantine, current.elector.rand,
+	))
+
+	return connection, nil
 }
 
 func (b *Balancer) refreshElection(elector *endpointElector) {

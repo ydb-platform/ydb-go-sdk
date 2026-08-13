@@ -150,6 +150,26 @@ func TestBasicPolicies(t *testing.T) {
 	require.True(t, SingleConn().SingleConnection())
 }
 
+func TestWithMaxConnections(t *testing.T) {
+	base := PreferNearestDCWithFallBack(RandomChoice())
+	limited := WithMaxConnections(base, 9)
+
+	require.Zero(t, base.MaxConnections())
+	require.Equal(t, 9, limited.MaxConnections())
+	require.Equal(t,
+		"Priority{MaxConnections=9,Preferences=[LocalDC(AllowFallback)]}",
+		limited.String(),
+	)
+	require.Equal(t, base.Prioritize(policy.Info{SelfLocation: "local"}, []endpoint.Endpoint{
+		endpoint.New("local", endpoint.WithLocation("local")),
+		endpoint.New("remote", endpoint.WithLocation("remote")),
+	}), limited.Prioritize(policy.Info{SelfLocation: "local"}, []endpoint.Endpoint{
+		endpoint.New("local", endpoint.WithLocation("local")),
+		endpoint.New("remote", endpoint.WithLocation("remote")),
+	}))
+	require.Zero(t, WithMaxConnections(base, -1).MaxConnections())
+}
+
 func requireSamePolicySemantics(
 	t *testing.T,
 	info policy.Info,
