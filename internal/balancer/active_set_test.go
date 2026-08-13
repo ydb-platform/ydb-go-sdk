@@ -20,13 +20,13 @@ func TestSelectActiveEndpointsUnlimited(t *testing.T) {
 	}
 
 	selected, selectedPriorities := selectActiveEndpoints(
-		nil, nil, endpoints, priorities, 0, nil,
+		nil, nil, nil, endpoints, priorities, 0, nil,
 	)
 	require.Equal(t, endpoints, selected)
 	require.Equal(t, priorities, selectedPriorities)
 
 	selected, selectedPriorities = selectActiveEndpoints(
-		nil, nil, endpoints, priorities, -1, nil,
+		nil, nil, nil, endpoints, priorities, -1, nil,
 	)
 	require.Equal(t, endpoints, selected)
 	require.Equal(t, priorities, selectedPriorities)
@@ -46,7 +46,7 @@ func TestSelectActiveEndpointsUsesPriorityBeforeStickiness(t *testing.T) {
 	}
 
 	selected, selectedPriorities := selectActiveEndpoints(
-		previous, nil, endpoints, priorities, 3, noShuffleRand{},
+		previous, nil, priorities, endpoints, priorities, 3, noShuffleRand{},
 	)
 
 	require.Equal(t, []endpoint.Endpoint{endpoints[1], endpoints[0], endpoints[2]}, selected)
@@ -62,7 +62,7 @@ func TestSelectActiveEndpointsFillsFromFallbackPriority(t *testing.T) {
 	}
 
 	selected, selectedPriorities := selectActiveEndpoints(
-		nil, nil, endpoints, priorities, 2, noShuffleRand{},
+		nil, nil, nil, endpoints, priorities, 2, noShuffleRand{},
 	)
 
 	require.Equal(t, []endpoint.Endpoint{endpoints[0], endpoints[1]}, selected)
@@ -81,7 +81,7 @@ func TestSelectActiveEndpointsReplacesKnownUnusableConnections(t *testing.T) {
 	}
 
 	selected, _ := selectActiveEndpoints(
-		previous, quarantine, endpoints, priorities, 2, noShuffleRand{},
+		previous, quarantine, priorities, endpoints, priorities, 2, noShuffleRand{},
 	)
 
 	require.Equal(t, []endpoint.Endpoint{endpoints[1], endpoints[3]}, selected)
@@ -104,7 +104,7 @@ func TestSelectActiveEndpointsUsesKnownUnusableConnectionsAsLastResort(t *testin
 	}
 
 	selected, _ := selectActiveEndpoints(
-		previous, quarantine, endpoints, priorities, 3, noShuffleRand{},
+		previous, quarantine, priorities, endpoints, priorities, 3, noShuffleRand{},
 	)
 
 	require.Equal(t, []endpoint.Endpoint{endpoints[2], endpoints[0], endpoints[1]}, selected)
@@ -119,7 +119,7 @@ func TestSelectActiveEndpointsExcludesIneligibleEndpoints(t *testing.T) {
 	previous := []conn.Conn{nil, activeSetConn(endpoints[0], state.Online)}
 
 	selected, selectedPriorities := selectActiveEndpoints(
-		previous, nil, endpoints, priorities, 3, noShuffleRand{},
+		previous, nil, priorities, endpoints, priorities, 3, noShuffleRand{},
 	)
 
 	require.Equal(t, []endpoint.Endpoint{endpoints[0]}, selected)
@@ -130,10 +130,35 @@ func TestSelectActiveEndpointsRandomizesNewCandidates(t *testing.T) {
 	endpoints := activeSetEndpoints(1, 2, 3)
 
 	selected, _ := selectActiveEndpoints(
-		nil, nil, endpoints, activeSetPriorities(endpoints), 2, reverseRand{},
+		nil, nil, nil, endpoints, activeSetPriorities(endpoints), 2, reverseRand{},
 	)
 
 	require.Equal(t, []endpoint.Endpoint{endpoints[2], endpoints[1]}, selected)
+}
+
+func TestSelectActiveEndpointsDoesNotTreatPinnedOverflowAsSticky(t *testing.T) {
+	endpoints := activeSetEndpoints(1, 2, 3)
+	previous := []conn.Conn{
+		activeSetConn(endpoints[1], state.Online),
+		activeSetConn(endpoints[0], state.Online),
+	}
+	previousPriorities := []policy.EndpointPriority{
+		{Key: endpoints[1].Key()},
+		{Key: endpoints[0].Key(), Excluded: true},
+	}
+
+	selected, _ := selectActiveEndpoints(
+		previous, nil, previousPriorities, endpoints, activeSetPriorities(endpoints), 1, noShuffleRand{},
+	)
+
+	require.Equal(t, []endpoint.Endpoint{endpoints[1]}, selected)
+}
+
+func TestCompareActiveEndpointCandidatesPlacesUsableFirst(t *testing.T) {
+	require.Positive(t, compareActiveEndpointCandidates(
+		activeEndpointCandidate{usable: false},
+		activeEndpointCandidate{usable: true},
+	))
 }
 
 func activeSetEndpoints(nodeIDs ...uint32) []endpoint.Endpoint {

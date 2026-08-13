@@ -18,6 +18,11 @@ type activeEndpointCandidate struct {
 	usable   bool
 }
 
+type previousEndpointState struct {
+	state  state.State
+	sticky bool
+}
+
 // selectActiveEndpoints applies the connection limit after policy priorities
 // have been calculated and before connection wrappers are acquired from the
 // pool. Existing usable endpoints are preferred within the same priority
@@ -25,6 +30,7 @@ type activeEndpointCandidate struct {
 // can fill the remaining slots.
 func selectActiveEndpoints(
 	previous, quarantine []conn.Conn,
+	previousPriorities []policy.EndpointPriority,
 	endpoints []endpoint.Endpoint,
 	priorities []policy.EndpointPriority,
 	maxConnections int, random xrand.Rand,
@@ -32,24 +38,7 @@ func selectActiveEndpoints(
 	if maxConnections <= 0 {
 		return endpoints, priorities
 	}
-	knownState := make(map[endpoint.Key]state.State, len(previous)+len(quarantine))
-	for _, connection := range quarantine {
-		if connection != nil {
-			knownState[connection.Endpoint().Key()] = connection.State()
-		}
-	}
-	sticky := make(map[endpoint.Key]struct{}, len(previous))
-	for _, connection := range previous {
-		if connection == nil {
-			continue
-		}
-		key := connection.Endpoint().Key()
-		connectionState := connection.State()
-		knownState[key] = connectionState
-		if isConnectionStateUsable(connectionState, false) {
-			sticky[key] = struct{}{}
-		}
-	}
+	previousStates := collectPreviousEndpointStates(previous, quarantine, previousPriorities)
 
 	candidates := make([]activeEndpointCandidate, 0, len(endpoints))
 	for i, candidate := range endpoints {
@@ -59,26 +48,23 @@ func selectActiveEndpoints(
 			continue
 		}
 
-		connectionState, known := knownState[key]
-		_, wasActive := sticky[key]
+		previousState, known := previousStates[key]
 		candidates = append(candidates, activeEndpointCandidate{
 			endpoint: candidate,
 			priority: priority,
-			sticky:   wasActive,
-			usable:   !known || isConnectionStateUsable(connectionState, false),
+			sticky:   previousState.sticky,
+			usable:   !known || isConnectionStateUsable(previousState.state, false),
 		})
 	}
-	slices.SortStableFunc(candidates, func(lhs, rhs activeEndpointCandidate) int {
-		return cmp.Compare(lhs.priority.Priority, rhs.priority.Priority)
+	random.Shuffle(len(candidates), func(i, j int) {
+		candidates[i], candidates[j] = candidates[j], candidates[i]
 	})
+	slices.SortStableFunc(candidates, compareActiveEndpointCandidates)
 
-	selected := make([]activeEndpointCandidate, 0, min(maxConnections, len(candidates)))
-	selected = appendActiveEndpointCandidates(selected, candidates, maxConnections, true, random)
-	selected = appendActiveEndpointCandidates(selected, candidates, maxConnections, false, random)
-
-	selectedEndpoints := make([]endpoint.Endpoint, len(selected))
-	selectedPriorities := make([]policy.EndpointPriority, len(selected))
-	for i, candidate := range selected {
+	selectedCount := min(maxConnections, len(candidates))
+	selectedEndpoints := make([]endpoint.Endpoint, selectedCount)
+	selectedPriorities := make([]policy.EndpointPriority, selectedCount)
+	for i, candidate := range candidates[:selectedCount] {
 		selectedEndpoints[i] = candidate.endpoint
 		selectedPriorities[i] = candidate.priority
 	}
@@ -86,40 +72,51 @@ func selectActiveEndpoints(
 	return selectedEndpoints, selectedPriorities
 }
 
-func appendActiveEndpointCandidates(
-	selected, candidates []activeEndpointCandidate,
-	maxConnections int,
-	usable bool,
-	random xrand.Rand,
-) []activeEndpointCandidate {
-	for begin := 0; begin < len(candidates) && len(selected) < maxConnections; {
-		end := begin + 1
-		for end < len(candidates) && candidates[end].priority.Priority == candidates[begin].priority.Priority {
-			end++
+func collectPreviousEndpointStates(
+	previous, quarantine []conn.Conn,
+	previousPriorities []policy.EndpointPriority,
+) map[endpoint.Key]previousEndpointState {
+	states := make(map[endpoint.Key]previousEndpointState, len(previous)+len(quarantine))
+	for _, connection := range quarantine {
+		if connection != nil {
+			states[connection.Endpoint().Key()] = previousEndpointState{state: connection.State()}
 		}
-
-		sticky := make([]activeEndpointCandidate, 0, end-begin)
-		others := make([]activeEndpointCandidate, 0, end-begin)
-		for _, candidate := range candidates[begin:end] {
-			if candidate.usable != usable {
-				continue
-			}
-			if candidate.sticky {
-				sticky = append(sticky, candidate)
-			} else {
-				others = append(others, candidate)
-			}
+	}
+	for _, connection := range previous {
+		if connection != nil {
+			states[connection.Endpoint().Key()] = previousEndpointState{state: connection.State()}
 		}
-		random.Shuffle(len(others), func(i, j int) {
-			others[i], others[j] = others[j], others[i]
-		})
-
-		remaining := maxConnections - len(selected)
-		selected = append(selected, sticky[:min(remaining, len(sticky))]...)
-		remaining = maxConnections - len(selected)
-		selected = append(selected, others[:min(remaining, len(others))]...)
-		begin = end
+	}
+	for _, priority := range previousPriorities {
+		previousState, ok := states[priority.Key]
+		if !ok || priority.Excluded || !isConnectionStateUsable(previousState.state, false) {
+			continue
+		}
+		previousState.sticky = true
+		states[priority.Key] = previousState
 	}
 
-	return selected
+	return states
+}
+
+func compareActiveEndpointCandidates(lhs, rhs activeEndpointCandidate) int {
+	if lhs.usable != rhs.usable {
+		if lhs.usable {
+			return -1
+		}
+
+		return 1
+	}
+	if priorityComparison := cmp.Compare(lhs.priority.Priority, rhs.priority.Priority); priorityComparison != 0 {
+		return priorityComparison
+	}
+	if lhs.sticky != rhs.sticky {
+		if lhs.sticky {
+			return -1
+		}
+
+		return 1
+	}
+
+	return 0
 }

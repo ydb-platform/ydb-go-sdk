@@ -6,6 +6,7 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"google.golang.org/grpc"
@@ -297,10 +298,12 @@ func (b *Balancer) applyDiscoveredEndpoints(
 		quarantine         []conn.Conn
 		selectedEndpoints  []endpoint.Endpoint
 		selectedPriorities []policy.EndpointPriority
+		previousPriorities []policy.EndpointPriority
 	)
 	if state != nil {
 		active = state.All()
 		quarantine = state.quarantine
+		previousPriorities = state.elector.priorities
 	}
 
 	defer func() {
@@ -319,7 +322,7 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	info := policy.Info{SelfLocation: selfLocation}
 	priorities := b.policy.Prioritize(info, endpoints)
 	selectedEndpoints, selectedPriorities = selectActiveEndpoints(
-		active, quarantine, endpoints, priorities, b.policy.MaxConnections(), b.random,
+		active, quarantine, previousPriorities, endpoints, priorities, b.policy.MaxConnections(), b.random,
 	)
 	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selectedEndpoints)
 
@@ -437,7 +440,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		localDCDetector: detectLocalDC,
 	}
 	if policy.MaxConnections() > 0 {
-		b.random = xrand.New(xrand.WithLock())
+		b.random = xrand.New(xrand.WithSeed(time.Now().UnixNano()))
 	}
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
