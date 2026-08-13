@@ -20,8 +20,9 @@ const (
 type preferType string
 
 const (
-	preferTypeNearestDC = preferType("nearest_dc")
-	preferTypeLocations = preferType("locations")
+	preferTypeNearestDC   = preferType("nearest_dc")
+	preferTypeLocations   = preferType("locations")
+	preferTypePrimaryPile = preferType("primary_pile")
 
 	// Deprecated
 	// Will be removed after March 2025.
@@ -116,6 +117,12 @@ func CreateFromConfig(s string) (policy.Policy, error) {
 		}
 
 		return PreferLocations(b, c.Locations...), nil
+	case preferTypePrimaryPile:
+		if c.Fallback {
+			return PreferPrimaryPileWithFallback(b), nil
+		}
+
+		return PreferPrimaryPile(b), nil
 	default:
 		return b, nil
 	}
