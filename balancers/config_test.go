@@ -48,12 +48,12 @@ func TestFromConfig(t *testing.T) {
 		{
 			name:     "prefer_local_dc_with_fallback",
 			config:   `{"type":"random_choice","prefer":"local_dc","fallback":true}`,
-			expected: "Priority{Preferences=[LocalDC]}",
+			expected: "Priority{Preferences=[LocalDC(AllowFallback)]}",
 		},
 		{
 			name:     "prefer_nearest_dc_with_fallback",
 			config:   `{"type":"random_choice","prefer":"nearest_dc","fallback":true}`,
-			expected: "Priority{Preferences=[LocalDC]}",
+			expected: "Priority{Preferences=[LocalDC(AllowFallback)]}",
 		},
 		{
 			name:     "prefer_locations",
@@ -63,7 +63,7 @@ func TestFromConfig(t *testing.T) {
 		{
 			name:     "prefer_locations_with_fallback",
 			config:   `{"type":"random_choice","prefer":"locations","locations":["AAA","BBB","CCC"],"fallback":true}`,
-			expected: "Priority{Preferences=[Locations{AAA,BBB,CCC}]}",
+			expected: "Priority{Preferences=[Locations{AAA,BBB,CCC}(AllowFallback)]}",
 		},
 		{
 			name:   "prefer_locations_without_locations",
