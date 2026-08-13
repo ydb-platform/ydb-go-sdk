@@ -1,3 +1,4 @@
+## v3.149.0
 * Added `balancers.PreferPrimaryPile` and `balancers.PreferPrimaryPileWithFallback` endpoint selection policies
 
 ## v3.148.0
