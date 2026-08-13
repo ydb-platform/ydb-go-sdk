@@ -44,6 +44,14 @@ type Policy struct {
 	detectNearestDC  bool
 }
 
+func (p preference) String() string {
+	if p.allowFallback {
+		return fmt.Sprintf("%s (allow fallback)", p.name)
+	}
+	
+	return p.name
+}
+
 func SingleConn() Policy {
 	return Policy{singleConnection: true}
 }
@@ -173,7 +181,7 @@ func (p Policy) String() string {
 
 	names := make([]string, len(p.preferences))
 	for i := range p.preferences {
-		names[len(p.preferences)-1-i] = p.preferences[i].name
+		names[len(p.preferences)-1-i] = p.preferences[i].String()
 	}
 
 	return fmt.Sprintf("%s{Preferences=[%s]}", mode, strings.Join(names, ","))
