@@ -54,6 +54,28 @@ func PreferNearestDCWithFallBack(p policy.Policy) policy.Policy {
 	})
 }
 
+// PreferPrimaryPile uses only endpoints marked as belonging to the primary pile.
+func PreferPrimaryPile(p policy.Policy) policy.Policy {
+	return preferPrimaryPile(p, false)
+}
+
+// PreferPrimaryPileWithFallback prioritizes endpoints marked as belonging to the primary pile.
+// Other endpoints, including endpoints without pile metadata, are used when all primary endpoints are unavailable.
+func PreferPrimaryPileWithFallback(p policy.Policy) policy.Policy {
+	return preferPrimaryPile(p, true)
+}
+
+func preferPrimaryPile(p policy.Policy, allowFallback bool) policy.Policy {
+	match := func(_ policy.Info, candidate endpoint.Info) bool {
+		return candidate.Metadata().BridgePileState == endpoint.PileStatePrimary
+	}
+	if allowFallback {
+		return policy.PreferWithFallback(p, "PrimaryPile", match)
+	}
+
+	return policy.Prefer(p, "PrimaryPile", match)
+}
+
 func locationsString(locations []string) string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()

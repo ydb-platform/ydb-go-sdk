@@ -66,6 +66,16 @@ func TestFromConfig(t *testing.T) {
 			expected: "Priority{Preferences=[Locations{AAA,BBB,CCC}(AllowFallback)]}",
 		},
 		{
+			name:     "prefer_primary_pile",
+			config:   `{"type":"random_choice","prefer":"primary_pile"}`,
+			expected: "Priority{Preferences=[PrimaryPile]}",
+		},
+		{
+			name:     "prefer_primary_pile_with_fallback",
+			config:   `{"type":"random_choice","prefer":"primary_pile","fallback":true}`,
+			expected: "Priority{Preferences=[PrimaryPile(AllowFallback)]}",
+		},
+		{
 			name:   "prefer_locations_without_locations",
 			config: `{"type":"random_choice","prefer":"locations"}`,
 			fail:   true,
@@ -155,14 +165,30 @@ func TestFromConfigLogicalCompatibility(t *testing.T) {
 			lowerPriority: []uint32{2},
 		},
 		{
+			name:       "primary pile",
+			serialized: `{"type":"random_choice","prefer":"primary_pile"}`,
+			preferred:  []uint32{1},
+			excluded:   []uint32{2, 3},
+		},
+		{
+			name:          "primary pile with fallback",
+			serialized:    `{"type":"random_choice","prefer":"primary_pile","fallback":true}`,
+			preferred:     []uint32{1},
+			lowerPriority: []uint32{2, 3},
+		},
+		{
 			name:       "unknown preference remains random choice",
 			serialized: `{"type":"random_choice","prefer":"unknown"}`,
 			preferred:  []uint32{1, 2, 3},
 		},
 	}
 	endpoints := []endpoint.Endpoint{
-		endpoint.New("a", endpoint.WithID(1), endpoint.WithLocation("a")),
-		endpoint.New("b", endpoint.WithID(2), endpoint.WithLocation("b")),
+		endpoint.New("a", endpoint.WithID(1), endpoint.WithLocation("a"), endpoint.WithMetadata(endpoint.Metadata{
+			BridgePileState: endpoint.PileStatePrimary,
+		})),
+		endpoint.New("b", endpoint.WithID(2), endpoint.WithLocation("b"), endpoint.WithMetadata(endpoint.Metadata{
+			BridgePileState: endpoint.PileStateSynchronized,
+		})),
 		endpoint.New("c", endpoint.WithID(3), endpoint.WithLocation("c")),
 	}
 
