@@ -43,7 +43,7 @@ func TestPolicy(t *testing.T) {
 	t.Run("nearest DC with fallback", func(t *testing.T) {
 		policy := PreferNearestDCWithFallback(Policy{}, "LocalDC", locationMatch("local"))
 
-		require.Equal(t, "Priority{Preferences=[LocalDC]}", policy.String())
+		require.Equal(t, "Priority{Preferences=[LocalDC(AllowFallback)]}", policy.String())
 		require.False(t, policy.SingleConnection())
 		require.True(t, policy.DetectsNearestDC())
 		require.Equal(t, []EndpointPriority{
@@ -131,7 +131,7 @@ func TestPolicyPrioritizeComposesPreferencesOutermostFirst(t *testing.T) {
 		"LocalDC", locationMatch("local"),
 	)
 
-	require.Equal(t, "Priority{Preferences=[LocalDC,EvenNodeID]}", policy.String())
+	require.Equal(t, "Priority{Preferences=[LocalDC(AllowFallback),EvenNodeID(AllowFallback)]}", policy.String())
 	require.Equal(t, []EndpointPriority{
 		{Key: endpoints[0].Key()},
 		{Key: endpoints[1].Key(), Priority: 1},

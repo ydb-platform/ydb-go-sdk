@@ -46,9 +46,9 @@ type Policy struct {
 
 func (p preference) String() string {
 	if p.allowFallback {
-		return fmt.Sprintf("%s (allow fallback)", p.name)
+		return fmt.Sprintf("%s(AllowFallback)", p.name)
 	}
-	
+
 	return p.name
 }
 
