@@ -135,10 +135,10 @@ func TestLocalDCDiscovery(t *testing.T) {
 		config.WithBalancer(balancers.PreferNearestDC(balancers.Default())),
 	)
 	r := &Balancer{
-		driverConfig:   cfg,
-		balancerConfig: *cfg.Balancer(),
-		pool:           conn.NewPool(context.Background(), cfg),
-		discover: func(ctx context.Context, _ *grpc.ClientConn) (endpoints []endpoint.Endpoint, location string, err error) {
+		driverConfig: cfg,
+		policy:       cfg.Balancer(),
+		pool:         conn.NewPool(context.Background(), cfg),
+		discover: func(ctx context.Context, _ *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
 			return []endpoint.Endpoint{
 				&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
 				&mock.Endpoint{AddrField: "b:234", LocationField: "b"},
@@ -154,9 +154,10 @@ func TestLocalDCDiscovery(t *testing.T) {
 	require.NoError(t, err)
 
 	for range 100 {
-		conn, _ := r.connections().GetConnection(ctx)
-		require.Equal(t, "b:234", conn.Endpoint().Address())
-		require.Equal(t, "b", conn.Endpoint().Location())
+		selected, selectErr := r.nextConn(ctx)
+		require.NoError(t, selectErr)
+		require.Equal(t, "b:234", selected.Endpoint().Address())
+		require.Equal(t, "b", selected.Endpoint().Location())
 	}
 }
 

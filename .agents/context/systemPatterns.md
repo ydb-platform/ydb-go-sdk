@@ -52,7 +52,7 @@ Service clients are **lazy**: `d.Table()` calls `d.table.Must()` which runs the 
 All service clients receive the same `*balancerWithMeta` (implements `grpc.ClientConnInterface`):
 
 - `Invoke()` / `NewStream()` inject `meta.Meta` into context, then delegate to `internal/balancer.Balancer`.
-- `Balancer` picks an endpoint, gets `conn.Pool.Get(endpoint)`, executes RPC.
+- Discovery maps fresh endpoints to pooled connection wrappers. `Balancer.nextConn` chooses one wrapper and executes the RPC.
 - On stream/call errors that indicate a bad connection, the endpoint may be **banned** (pessimization) and rediscovered.
 
 This is the single production path for gRPC — do not dial around the balancer.
@@ -115,16 +115,61 @@ Query additionally has **implicit** session pool for server-side session managem
 
 ```
 Balancer
-  ├── clusterDiscovery()     # periodic / on-init endpoint list refresh
-  ├── discover endpoints     # via Discovery gRPC (or static single endpoint)
-  ├── localDCDetector        # for PreferNearestDC balancers
-  ├── filter by balancerConfig (RandomChoice, PreferNearestDC, location filters)
-  └── wrapCall / wrapStream  # ban endpoint on retriable connection failures
+  ├── clusterDiscovery()       # periodic / on-init endpoint refresh
+  ├── evaluate fresh endpoints # current discovery attributes before pool lookup
+  ├── Policy.Prioritize()      # immutable preference pipeline → key/priority
+  ├── endpointElector          # health + random hot-path snapshot
+  └── wrapCall / wrapStream    # pessimization on retriable connection failures
 ```
 
 User-facing presets: `balancers/RandomChoice`, `SingleConn`, `PreferNearestDC`, `PreferNearestDCWithFallBack`.
 
 Configured via `config.WithBalancer(...)` or `ydb.WithBalancer(...)`.
+
+### Selection policy and runtime health
+
+Balancer configuration is one concrete immutable `policy.Policy`. Preference constructors append a predicate to
+the policy. Each predicate classifies an endpoint as preferred, fallback, or excluded. `Policy.Prioritize` assigns one
+bit per fallback-capable stage in pipeline construction order: an inner constructor gets the least significant bit and
+each outer constructor gets the next bit, so outer preferences dominate inner ones. Preferred contributes `0`,
+fallback contributes `1 << stage`, and excluded endpoints do not participate in policy-based selection.
+
+```text
+PreferNearestDCWithFallBack(PreferLocationsWithFallback(RandomChoice(), "A", "B"))
+  → stages: Locations{A,B} at bit 0, NearestDC at bit 1
+  → priorities: nearest+A/B=0, nearest+other=1, remote+A/B=2, remote+other=3
+```
+
+Strict `Prefer*` constructors exclude non-matching endpoints, preserving their existing fail-fast behavior.
+`*WithFallback` constructors retain non-matching endpoints in a lower-priority bucket. Any strict exclusion in a
+composed pipeline wins immediately. `balancers.WithNodeID` still bypasses these policy decisions.
+
+The policy runs once for each fresh discovery snapshot, before endpoints are mapped to pooled wrappers. This ensures
+selection uses current endpoint attributes even when `conn.Pool` reuses a wrapper from an older discovery response.
+
+`conn.State()` is the only source of mutable endpoint health. `endpointElector` stores policy priorities and the
+`endpoint.Key → conn.Conn` mapping, and atomically publishes immutable election snapshots after discovery or a state
+change. The RPC hot path only loads that snapshot and randomly chooses among healthy connections with the lowest
+policy priority. If every connection is banned, banned connections remain a randomized last resort.
+
+Pessimization forces discovery only when the share of banned records among policy-eligible connections crosses
+strictly above 50%. The threshold is edge-triggered, so repeated reports for an already banned connection do not
+schedule additional discovery attempts. `SingleConn` does not ban its only connection and does not run periodic
+discovery.
+
+`nextConn` handles contracts outside policy calculation:
+
+- `balancers.WithNodeID` addresses the requested node before policy selection; its context option independently controls node-ID fallback;
+- `Created`, `Online`, and `Offline` wrappers are usable; `Banned` is eligible only as the last resort;
+- a selected wrapper that becomes unusable refreshes the election snapshot, and a newly lost majority of all
+  connections forces discovery.
+
+Keep these responsibilities separate: `Policy` expresses static endpoint preference, `endpointElector` owns runtime
+health and hot-path choice, and `conn.Pool` owns wrapper lifecycle.
+
+Compatibility tests must keep existing public constructor expressions source-usable and verify persisted
+`balancers.FromConfig(string)` values. Serialized `fallback=false` retains strict exclusion, while `fallback=true`
+retains lower-priority fallback selection.
 
 `Driver.Discovery()` exposes a separate discovery client (uses bootstrap connection from pool, not the main balancer loop).
 

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
@@ -13,79 +13,48 @@ import (
 // Deprecated: RoundRobin is an alias to RandomChoice now
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func RoundRobin() *balancerConfig.Config {
-	return &balancerConfig.Config{}
+func RoundRobin() policy.Policy {
+	return RandomChoice()
 }
 
-func RandomChoice() *balancerConfig.Config {
-	return &balancerConfig.Config{}
+func RandomChoice() policy.Policy {
+	return policy.Policy{}
 }
 
-func SingleConn() *balancerConfig.Config {
-	return &balancerConfig.Config{
-		SingleConn: true,
-	}
-}
-
-type filterLocalDC struct{}
-
-func (filterLocalDC) Allow(info balancerConfig.Info, e endpoint.Info) bool {
-	return e.Location() == info.SelfLocation
-}
-
-func (filterLocalDC) String() string {
-	return "LocalDC"
+func SingleConn() policy.Policy {
+	return policy.SingleConn()
 }
 
 // Deprecated: use PreferNearestDC instead
 // Will be removed after March 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func PreferLocalDC(balancer *balancerConfig.Config) *balancerConfig.Config {
-	balancer.Filter = filterLocalDC{}
-	balancer.DetectNearestDC = true
-
-	return balancer
+func PreferLocalDC(p policy.Policy) policy.Policy {
+	return PreferNearestDC(p)
 }
 
-// PreferNearestDC creates balancer which use endpoints only in location such as initial endpoint location
-// Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-// PreferNearestDC balancer try to autodetect local DC from client side.
-func PreferNearestDC(balancer *balancerConfig.Config) *balancerConfig.Config {
-	balancer.Filter = filterLocalDC{}
-	balancer.DetectNearestDC = true
-
-	return balancer
+// PreferNearestDC uses only endpoints in the location nearest to the client.
+func PreferNearestDC(p policy.Policy) policy.Policy {
+	return policy.PreferNearestDC(p, "LocalDC", func(info policy.Info, candidate endpoint.Info) bool {
+		return candidate.Location() == info.SelfLocation
+	})
 }
 
 // Deprecated: use PreferNearestDCWithFallBack instead
 // Will be removed after March 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-func PreferLocalDCWithFallBack(balancer *balancerConfig.Config) *balancerConfig.Config {
-	balancer = PreferNearestDC(balancer)
-	balancer.AllowFallback = true
-
-	return balancer
+func PreferLocalDCWithFallBack(p policy.Policy) policy.Policy {
+	return PreferNearestDCWithFallBack(p)
 }
 
-// PreferNearestDCWithFallBack creates balancer which use endpoints only in location such as initial endpoint location
-// Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-// If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferNearestDCWithFallBack(balancer *balancerConfig.Config) *balancerConfig.Config {
-	balancer = PreferNearestDC(balancer)
-	balancer.AllowFallback = true
-
-	return balancer
+// PreferNearestDCWithFallBack prioritizes endpoints in the location nearest to the client.
+// Endpoints in other locations are used when all nearer endpoints are unavailable.
+func PreferNearestDCWithFallBack(p policy.Policy) policy.Policy {
+	return policy.PreferNearestDCWithFallback(p, "LocalDC", func(info policy.Info, candidate endpoint.Info) bool {
+		return candidate.Location() == info.SelfLocation
+	})
 }
 
-type filterLocations []string
-
-func (locations filterLocations) Allow(_ balancerConfig.Info, e endpoint.Info) bool {
-	location := strings.ToUpper(e.Location())
-
-	return slices.Contains(locations, location)
-}
-
-func (locations filterLocations) String() string {
+func locationsString(locations []string) string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 
@@ -101,33 +70,36 @@ func (locations filterLocations) String() string {
 	return buffer.String()
 }
 
-// PreferLocations creates balancer which use endpoints only in selected locations (such as "ABC", "DEF", etc.)
-// Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-func PreferLocations(balancer *balancerConfig.Config, locations ...string) *balancerConfig.Config {
+// PreferLocations uses only endpoints in the selected locations (such as "ABC", "DEF", etc.).
+func PreferLocations(p policy.Policy, locations ...string) policy.Policy {
+	return preferLocations(p, false, locations)
+}
+
+func preferLocations(p policy.Policy, allowFallback bool, locations []string) policy.Policy {
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
 
-	// Prevent modify source locations
 	locations = slices.Clone(locations)
-
 	for i := range locations {
 		locations[i] = strings.ToUpper(locations[i])
 	}
 	sort.Strings(locations)
-	balancer.Filter = filterLocations(locations)
 
-	return balancer
+	match := func(_ policy.Info, candidate endpoint.Info) bool {
+		return slices.Contains(locations, strings.ToUpper(candidate.Location()))
+	}
+	if allowFallback {
+		return policy.PreferWithFallback(p, locationsString(locations), match)
+	}
+
+	return policy.Prefer(p, locationsString(locations), match)
 }
 
-// PreferLocationsWithFallback creates balancer which use endpoints only in selected locations
-// Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-// If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferLocationsWithFallback(balancer *balancerConfig.Config, locations ...string) *balancerConfig.Config {
-	balancer = PreferLocations(balancer, locations...)
-	balancer.AllowFallback = true
-
-	return balancer
+// PreferLocationsWithFallback prioritizes endpoints in the selected locations.
+// Endpoints in other locations are used when all preferred endpoints are unavailable.
+func PreferLocationsWithFallback(p policy.Policy, locations ...string) policy.Policy {
+	return preferLocations(p, true, locations)
 }
 
 type Endpoint interface {
@@ -142,37 +114,22 @@ type Endpoint interface {
 	LocalDC() bool
 }
 
-type filterFunc func(info balancerConfig.Info, e endpoint.Info) bool
-
-func (p filterFunc) Allow(info balancerConfig.Info, e endpoint.Info) bool {
-	return p(info, e)
-}
-
-func (p filterFunc) String() string {
-	return "Custom"
-}
-
-// Prefer creates balancer which use endpoints by filter
-// Balancer "balancer" defines balancing algorithm between endpoints selected with filter
-func Prefer(balancer *balancerConfig.Config, filter func(endpoint Endpoint) bool) *balancerConfig.Config {
-	balancer.Filter = filterFunc(func(_ balancerConfig.Info, e endpoint.Info) bool {
-		return filter(e)
+// Prefer uses only endpoints accepted by filter.
+func Prefer(p policy.Policy, filter func(endpoint Endpoint) bool) policy.Policy {
+	return policy.Prefer(p, "Custom", func(_ policy.Info, candidate endpoint.Info) bool {
+		return filter(candidate)
 	})
-
-	return balancer
 }
 
-// PreferWithFallback creates balancer which use endpoints by filter
-// Balancer "balancer" defines balancing algorithm between endpoints selected with filter
-// If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferWithFallback(balancer *balancerConfig.Config, filter func(endpoint Endpoint) bool) *balancerConfig.Config {
-	balancer = Prefer(balancer, filter)
-	balancer.AllowFallback = true
-
-	return balancer
+// PreferWithFallback prioritizes endpoints accepted by filter.
+// Other endpoints are used when all preferred endpoints are unavailable.
+func PreferWithFallback(p policy.Policy, filter func(endpoint Endpoint) bool) policy.Policy {
+	return policy.PreferWithFallback(p, "Custom", func(_ policy.Info, candidate endpoint.Info) bool {
+		return filter(candidate)
+	})
 }
 
 // Default balancer used by default
-func Default() *balancerConfig.Config {
+func Default() policy.Policy {
 	return RandomChoice()
 }
