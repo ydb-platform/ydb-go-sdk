@@ -284,7 +284,7 @@ func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryServi
 		}
 
 		if msg.GetSessionShutdown() != nil {
-			if core.poolName != "" && core.closedReported.CompareAndSwap(false, true) {
+			if !core.closed.Load() && core.poolName != "" && core.closedReported.CompareAndSwap(false, true) {
 				gtrace.QueryOnSessionClosed(core.Trace, core.poolName, "session_shutdown")
 			}
 			core.releaseSession()
@@ -293,7 +293,7 @@ func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryServi
 		}
 		if msg.GetNodeShutdown() != nil {
 			core.onNodeShutdown(errNodeShutdownHint)
-			if core.poolName != "" && core.closedReported.CompareAndSwap(false, true) {
+			if !core.closed.Load() && core.poolName != "" && core.closedReported.CompareAndSwap(false, true) {
 				gtrace.QueryOnSessionClosed(core.Trace, core.poolName, "node_shutdown")
 			}
 			core.releaseSession()

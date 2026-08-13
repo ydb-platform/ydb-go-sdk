@@ -183,40 +183,72 @@ func TestSessionCoreClosedReasons(t *testing.T) {
 	}
 }
 
-func TestSessionCoreLocalCloseDoesNotReportTransportError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	attachStream := NewMockQueryService_AttachSessionClient(ctrl)
-	recvStarted := make(chan struct{})
-	unblockRecv := make(chan struct{})
-	attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
-		close(recvStarted)
-		<-unblockRecv
-
-		return nil, context.Canceled
-	})
-
-	var events atomic.Uint32
-	core := &sessionCore{
-		Trace: &trace.Query{
-			OnSessionClosed: func(trace.QuerySessionClosedInfo) {
-				events.Add(1)
+func TestSessionCoreLocalCloseDoesNotReportClosedMetric(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  *Ydb_Query.SessionState
+		err  error
+	}{
+		{
+			name: "TransportError",
+			err:  context.Canceled,
+		},
+		{
+			name: "SessionShutdown",
+			msg: &Ydb_Query.SessionState{
+				SessionHint: &Ydb_Query.SessionState_SessionShutdown{
+					SessionShutdown: &Ydb_Query.SessionShutdownHint{},
+				},
 			},
 		},
-		poolName: "/local",
+		{
+			name: "NodeShutdown",
+			msg: &Ydb_Query.SessionState{
+				SessionHint: &Ydb_Query.SessionState_NodeShutdown{
+					NodeShutdown: &Ydb_Query.NodeShutdownHint{},
+				},
+			},
+		},
 	}
-	core.status.Store(uint32(StatusIdle))
 
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		core.listenAttachStream(attachStream)
-	}()
-	<-recvStarted
-	core.closed.Store(true)
-	close(unblockRecv)
-	<-done
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			attachStream := NewMockQueryService_AttachSessionClient(ctrl)
+			recvStarted := make(chan struct{})
+			unblockRecv := make(chan struct{})
+			attachStream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.SessionState, error) {
+				close(recvStarted)
+				<-unblockRecv
 
-	require.Zero(t, events.Load())
+				return test.msg, test.err
+			})
+
+			var events atomic.Uint32
+			core := &sessionCore{
+				Trace: &trace.Query{
+					OnSessionClosed: func(trace.QuerySessionClosedInfo) {
+						events.Add(1)
+					},
+				},
+				poolName:       "/local",
+				onNodeShutdown: func(error) {},
+			}
+			core.status.Store(uint32(StatusIdle))
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				core.listenAttachStream(attachStream)
+			}()
+			<-recvStarted
+			core.closed.Store(true)
+			close(unblockRecv)
+			<-done
+
+			require.Zero(t, events.Load())
+		})
+	}
 }
 
 func TestSessionCoreClosedMetricDisabledWithoutClientPool(t *testing.T) {

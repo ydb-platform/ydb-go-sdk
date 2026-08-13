@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -165,6 +166,52 @@ func TestSessionClosedIgnoresUnrelatedYDBError(t *testing.T) {
 	require.NoError(t, err)
 	_, err = r.nextPart(t.Context())
 	require.Error(t, err)
+	require.Empty(t, events)
+	require.True(t, s.IsAlive())
+}
+
+func TestSessionClosedIgnoresEOFAfterContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	ctrl := gomock.NewController(t)
+	stream := newExecuteQueryStreamMock(ctrl)
+	gomock.InOrder(
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+		}, nil),
+		stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+			cancel()
+
+			return nil, io.EOF
+		}),
+	)
+	client := NewMockQueryServiceClient(ctrl)
+	client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+
+	var events []trace.QuerySessionClosedInfo
+	queryTrace := &trace.Query{
+		OnSessionClosed: func(info trace.QuerySessionClosedInfo) {
+			events = append(events, info)
+		},
+	}
+	core := &sessionCore{
+		Client:   client,
+		Trace:    queryTrace,
+		id:       "123",
+		poolName: "/local",
+	}
+	core.status.Store(uint32(StatusIdle))
+	s := &Session{
+		Core:   core,
+		client: client,
+		trace:  queryTrace,
+	}
+
+	r, err := s.execute(t.Context(), "SELECT 1", options.ExecuteSettings(), options.ResultSetsTypeOrdered)
+	require.NoError(t, err)
+	_, err = r.nextPart(ctx)
+	require.ErrorIs(t, err, io.EOF)
 	require.Empty(t, events)
 	require.True(t, s.IsAlive())
 }

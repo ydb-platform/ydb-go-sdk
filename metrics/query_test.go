@@ -41,3 +41,17 @@ func TestQuerySessionClosedMetrics(t *testing.T) {
 		}))
 	}
 }
+
+func TestQuerySessionClosedMetricsDisabled(t *testing.T) {
+	registry := newRecordingRegistry()
+	tracer := query(recordingConfig{registry: registry})
+
+	tracer.OnSessionClosed(trace.QuerySessionClosedInfo{
+		PoolName: "/local",
+		Reason:   "attach_closed",
+	})
+	require.Zero(t, registry.value("query.session.closed", map[string]string{
+		"ydb.query.session.pool.name": "/local",
+		"reason":                      "attach_closed",
+	}))
+}

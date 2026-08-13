@@ -138,7 +138,7 @@ func onNextPartErr(callback func(err error)) resultOption {
 }
 
 func (r *streamResult) notifyNextPartErr(ctx context.Context, err error) error {
-	if ctxErr := ctx.Err(); ctxErr != nil {
+	if ctxErr := ctx.Err(); ctxErr != nil && !xerrors.Is(err, io.EOF) {
 		err = ctxErr
 	}
 	for _, callback := range r.onNextPartErr {
