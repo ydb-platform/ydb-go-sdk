@@ -14,9 +14,14 @@ import (
 )
 
 func TestReceiveLoopUpdatesLastGoodResponseTimeBeforeSessionStarted(t *testing.T) {
+	const testTimeout = 5 * time.Second
+
 	ctrl := gomock.NewController(t)
 	client := NewMockCoordinationService_SessionClient(ctrl)
+	testCtx, cancelTest := context.WithTimeout(context.Background(), testTimeout)
+	defer cancelTest()
 	streamCtx, cancelStream := context.WithCancel(context.Background())
+	defer cancelStream()
 	startedResponse := &Ydb_Coordination.SessionResponse_SessionStarted{
 		SessionId: 42,
 	}
@@ -46,22 +51,54 @@ func TestReceiveLoopUpdatesLastGoodResponseTimeBeforeSessionStarted(t *testing.T
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	s.mutex.Lock()
-	go s.receiveLoop(&wg, client, cancelStream, sessionStarted, sessionStopped)
+	receiveLoopDone := make(chan struct{})
+	go func() {
+		defer close(receiveLoopDone)
+		s.receiveLoop(&wg, client, cancelStream, sessionStarted, sessionStopped)
+	}()
 
-	<-recvReturned
+	select {
+	case <-recvReturned:
+	case <-receiveLoopDone:
+		s.mutex.Unlock()
+		t.Fatal("receive loop exited before the first Recv returned")
+	case <-testCtx.Done():
+		s.mutex.Unlock()
+		t.Fatal("timed out waiting for the first Recv")
+	}
 	var start *Ydb_Coordination.SessionResponse_SessionStarted
+	orderCheckTimer := time.NewTimer(100 * time.Millisecond) //nolint:mnd
 	select {
 	case start = <-sessionStarted:
-	case <-time.After(100 * time.Millisecond): //nolint:mnd
+	case <-orderCheckTimer.C:
+	case <-receiveLoopDone:
+		orderCheckTimer.Stop()
+		s.mutex.Unlock()
+		t.Fatal("receive loop exited before publishing session started")
+	case <-testCtx.Done():
+		orderCheckTimer.Stop()
+		s.mutex.Unlock()
+		t.Fatal("timed out checking session started publication order")
 	}
+	orderCheckTimer.Stop()
 	publishedBeforeTimestamp := start != nil
 	s.mutex.Unlock()
 	if start == nil {
-		start = <-sessionStarted
+		select {
+		case start = <-sessionStarted:
+		case <-receiveLoopDone:
+			t.Fatal("receive loop exited before publishing session started")
+		case <-testCtx.Done():
+			t.Fatal("timed out waiting for session started")
+		}
 	}
 
 	cancelStream()
-	wg.Wait()
+	select {
+	case <-receiveLoopDone:
+	case <-testCtx.Done():
+		t.Fatal("timed out waiting for receive loop to stop")
+	}
 	require.False(t, publishedBeforeTimestamp, "session started was published before the keep-alive timestamp update")
 	require.Same(t, startedResponse, start)
 	require.False(t, s.getLastGoodResponseTime().IsZero())
