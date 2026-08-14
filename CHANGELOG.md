@@ -1,3 +1,5 @@
+* Fixed coordination sessions spuriously reconnecting immediately after creation, which could cause non-idempotent operations to fail with `operation status is unknown`
+
 ## v3.149.0
 * Added `balancers.PreferPrimaryPile` and `balancers.PreferPrimaryPileWithFallback` endpoint selection policies
 
