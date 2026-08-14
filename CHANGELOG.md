@@ -1,3 +1,4 @@
+## v3.150.1
 * Fixed coordination sessions spuriously reconnecting immediately after creation, which could cause non-idempotent operations to fail with `operation status is unknown`
 
 ## v3.150.0
