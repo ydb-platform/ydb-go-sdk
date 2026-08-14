@@ -42,6 +42,7 @@ type Policy struct {
 	preferences      []preference
 	singleConnection bool
 	detectNearestDC  bool
+	maxConnections   int
 }
 
 func (p preference) String() string {
@@ -54,6 +55,13 @@ func (p preference) String() string {
 
 func SingleConn() Policy {
 	return Policy{singleConnection: true}
+}
+
+// WithMaxConnections returns a policy with a soft limit on its active connection set.
+func WithMaxConnections(policy Policy, maxConnections int) Policy {
+	policy.maxConnections = max(maxConnections, 0)
+
+	return policy
 }
 
 func Prefer(
@@ -170,19 +178,31 @@ func (p Policy) DetectsNearestDC() bool {
 	return p.detectNearestDC
 }
 
+// MaxConnections returns the active connection limit. Zero means unlimited.
+func (p Policy) MaxConnections() int {
+	return p.maxConnections
+}
+
 func (p Policy) String() string {
 	mode := "Priority"
 	if p.singleConnection {
 		mode = "SingleConn"
 	}
-	if len(p.preferences) == 0 {
+	if p.maxConnections == 0 && len(p.preferences) == 0 {
 		return mode
 	}
 
-	names := make([]string, len(p.preferences))
-	for i := range p.preferences {
-		names[len(p.preferences)-1-i] = p.preferences[i].String()
+	settings := make([]string, 0, 2)
+	if p.maxConnections > 0 {
+		settings = append(settings, fmt.Sprintf("MaxConnections=%d", p.maxConnections))
+	}
+	if len(p.preferences) > 0 {
+		names := make([]string, len(p.preferences))
+		for i := range p.preferences {
+			names[len(p.preferences)-1-i] = p.preferences[i].String()
+		}
+		settings = append(settings, fmt.Sprintf("Preferences=[%s]", strings.Join(names, ",")))
 	}
 
-	return fmt.Sprintf("%s{Preferences=[%s]}", mode, strings.Join(names, ","))
+	return fmt.Sprintf("%s{%s}", mode, strings.Join(settings, ","))
 }

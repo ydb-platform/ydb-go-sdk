@@ -30,6 +30,14 @@ func TestPolicy(t *testing.T) {
 		require.Equal(t, "SingleConn", policy.String())
 		require.True(t, policy.SingleConnection())
 		require.False(t, policy.DetectsNearestDC())
+		require.Zero(t, policy.MaxConnections())
+	})
+
+	t.Run("max connections", func(t *testing.T) {
+		policy := WithMaxConnections(Policy{}, 9)
+
+		require.Equal(t, "Priority{MaxConnections=9}", policy.String())
+		require.Equal(t, 9, policy.MaxConnections())
 	})
 
 	t.Run("nearest DC", func(t *testing.T) {
@@ -63,10 +71,20 @@ func TestPolicy(t *testing.T) {
 
 func TestPolicyIsImmutable(t *testing.T) {
 	base := Prefer(Policy{}, "LocalDC", locationMatch("local"))
-	composed := Prefer(base, "RemoteDC", locationMatch("remote"))
+	limited := WithMaxConnections(base, 9)
+	composed := Prefer(limited, "RemoteDC", locationMatch("remote"))
 
 	require.Equal(t, "Priority{Preferences=[LocalDC]}", base.String())
-	require.Equal(t, "Priority{Preferences=[RemoteDC,LocalDC]}", composed.String())
+	require.Zero(t, base.MaxConnections())
+	require.Equal(t, "Priority{MaxConnections=9,Preferences=[LocalDC]}", limited.String())
+	require.Equal(t, 9, limited.MaxConnections())
+	require.Equal(t, "Priority{MaxConnections=9,Preferences=[RemoteDC,LocalDC]}", composed.String())
+}
+
+func TestPolicyMaxConnectionsNormalizesNonPositiveValues(t *testing.T) {
+	require.Zero(t, WithMaxConnections(Policy{}, 0).MaxConnections())
+	require.Zero(t, WithMaxConnections(Policy{}, -1).MaxConnections())
+	require.Equal(t, "SingleConn{MaxConnections=1}", WithMaxConnections(SingleConn(), 1).String())
 }
 
 func TestApplyPreference(t *testing.T) {
