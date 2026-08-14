@@ -1,3 +1,5 @@
+* Added `balancers.WithMaxConnections` to configure a soft limit on the active gRPC connection set; `balancers.WithNodeID` may exceed the limit to preserve node affinity
+
 ## v3.149.0
 * Added `balancers.PreferPrimaryPile` and `balancers.PreferPrimaryPileWithFallback` endpoint selection policies
 

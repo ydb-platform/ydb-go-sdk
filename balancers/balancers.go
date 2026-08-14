@@ -25,6 +25,17 @@ func SingleConn() policy.Policy {
 	return policy.SingleConn()
 }
 
+// WithMaxConnections limits the number of discovered endpoints kept in the
+// balancer's active connection set. The limit is sticky across discovery
+// updates: healthy active endpoints are retained when possible.
+//
+// [WithNodeID] may create an additional connection outside the active set to
+// preserve node-affinity contracts, so the limit is intentionally soft.
+// Zero disables the limit. Negative values are treated as zero.
+func WithMaxConnections(p policy.Policy, maxConnections int) policy.Policy {
+	return policy.WithMaxConnections(p, maxConnections)
+}
+
 // Deprecated: use PreferNearestDC instead
 // Will be removed after March 2025.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
