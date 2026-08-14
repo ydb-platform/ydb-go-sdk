@@ -442,8 +442,10 @@ func (s *session) receiveLoop( //nolint:funlen
 
 			return
 		case *Ydb_Coordination.SessionResponse_SessionStarted_:
-			sessionStarted <- message.GetSessionStarted()
+			// mainLoop may enter the keep-alive loop as soon as the notification is received.
+			// Publish it only after the timestamp used by that loop has been initialized.
 			s.updateLastGoodResponseTime()
+			sessionStarted <- message.GetSessionStarted()
 		case *Ydb_Coordination.SessionResponse_SessionStopped_:
 			sessionStopped <- message.GetSessionStopped()
 			s.cancel()
