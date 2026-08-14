@@ -28,6 +28,53 @@ func TestPreferNearestDC(t *testing.T) {
 	require.True(t, p.DetectsNearestDC())
 }
 
+func TestPreferPrimaryPile(t *testing.T) {
+	endpoints := []endpoint.Endpoint{
+		endpoint.New("primary", endpoint.WithMetadata(endpoint.Metadata{
+			BridgePileState: endpoint.PileStatePrimary,
+		})),
+		endpoint.New("synchronized", endpoint.WithMetadata(endpoint.Metadata{
+			BridgePileState: endpoint.PileStateSynchronized,
+		})),
+		endpoint.New("unknown"),
+	}
+
+	strict := PreferPrimaryPile(RandomChoice()).Prioritize(policy.Info{}, endpoints)
+	fallback := PreferPrimaryPileWithFallback(RandomChoice()).Prioritize(policy.Info{}, endpoints)
+
+	require.Equal(t, []policy.EndpointPriority{
+		{Key: endpoints[0].Key()},
+		{Key: endpoints[1].Key(), Excluded: true},
+		{Key: endpoints[2].Key(), Excluded: true},
+	}, strict)
+	require.Equal(t, []policy.EndpointPriority{
+		{Key: endpoints[0].Key()},
+		{Key: endpoints[1].Key(), Priority: 1},
+		{Key: endpoints[2].Key(), Priority: 1},
+	}, fallback)
+}
+
+func TestPreferPrimaryPileComposesWithNearestDC(t *testing.T) {
+	endpoints := []endpoint.Endpoint{
+		endpoint.New("primary-local", endpoint.WithLocation("local"), endpoint.WithMetadata(endpoint.Metadata{
+			BridgePileState: endpoint.PileStatePrimary,
+		})),
+		endpoint.New("primary-remote", endpoint.WithLocation("remote"), endpoint.WithMetadata(endpoint.Metadata{
+			BridgePileState: endpoint.PileStatePrimary,
+		})),
+		endpoint.New("secondary-local", endpoint.WithLocation("local")),
+		endpoint.New("secondary-remote", endpoint.WithLocation("remote")),
+	}
+	p := PreferPrimaryPileWithFallback(PreferNearestDCWithFallBack(RandomChoice()))
+
+	require.Equal(t, []policy.EndpointPriority{
+		{Key: endpoints[0].Key()},
+		{Key: endpoints[1].Key(), Priority: 1},
+		{Key: endpoints[2].Key(), Priority: 2},
+		{Key: endpoints[3].Key(), Priority: 3},
+	}, p.Prioritize(policy.Info{SelfLocation: "local"}, endpoints))
+}
+
 func TestPreferLocations(t *testing.T) {
 	connections := []conn.Conn{
 		&mock.Conn{AddrField: "1", LocationField: "zero", StateField: state.Online},
@@ -106,6 +153,11 @@ func TestStrictAndFallbackPreferencesDiffer(t *testing.T) {
 			name:     "custom",
 			strict:   Prefer(RandomChoice(), filter),
 			fallback: PreferWithFallback(RandomChoice(), filter),
+		},
+		{
+			name:     "primary pile",
+			strict:   PreferPrimaryPile(RandomChoice()),
+			fallback: PreferPrimaryPileWithFallback(RandomChoice()),
 		},
 	}
 

@@ -2124,6 +2124,30 @@ func TestUserBalancerConfigurations(t *testing.T) {
 			},
 			allowed: nodeIDSet(2),
 		},
+		{
+			name: "prefer primary pile",
+			option: config.WithBalancer(userBalancers.PreferPrimaryPile(
+				userBalancers.RandomChoice(),
+			)),
+			connections: []conn.Conn{
+				userBalancerConnWithPileState(1, endpoint.PileStatePrimary, state.Online),
+				userBalancerConnWithPileState(2, endpoint.PileStateSynchronized, state.Online),
+				userBalancerConnWithPileState(3, endpoint.PileStateUnknown, state.Online),
+			},
+			allowed: nodeIDSet(1),
+		},
+		{
+			name: "prefer primary pile with fallback",
+			option: config.WithBalancer(userBalancers.PreferPrimaryPileWithFallback(
+				userBalancers.RandomChoice(),
+			)),
+			connections: []conn.Conn{
+				userBalancerConnWithPileState(1, endpoint.PileStatePrimary, state.Banned),
+				userBalancerConnWithPileState(2, endpoint.PileStateSynchronized, state.Online),
+				userBalancerConnWithPileState(3, endpoint.PileStateUnknown, state.Online),
+			},
+			allowed: nodeIDSet(2, 3),
+		},
 	}
 
 	for _, test := range tests {
@@ -2166,6 +2190,21 @@ func userBalancerConn(nodeID uint32, location string, connectionState state.Stat
 		LocationField: location,
 		NodeIDField:   nodeID,
 		StateField:    connectionState,
+	}
+}
+
+func userBalancerConnWithPileState(
+	nodeID uint32,
+	pileState endpoint.PileState,
+	connectionState state.State,
+) conn.Conn {
+	return &mock.Conn{
+		AddrField:   fmt.Sprintf("node-%d", nodeID),
+		NodeIDField: nodeID,
+		StateField:  connectionState,
+		MetadataField: endpoint.Metadata{
+			BridgePileState: pileState,
+		},
 	}
 }
 
