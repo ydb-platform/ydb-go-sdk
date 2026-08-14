@@ -20,6 +20,7 @@ ignore:
   - internal/cmd
   - pkg/xtest
   - tests
+  - internal/tracefuzz
 
 # Cross-repo uniform metric: every YDB SDK repo defines this same component_id,
 # so native-SDK coverage is queryable identically via the Codecov API
