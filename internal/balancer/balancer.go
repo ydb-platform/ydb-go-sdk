@@ -36,12 +36,7 @@ import (
 
 var ErrNoEndpoints = xerrors.Wrap(xerrors.Retryable(fmt.Errorf("no endpoints"), xerrors.WithBackoff(backoff.TypeSlow)))
 
-var (
-	errBalancerClosed            = xerrors.Wrap(fmt.Errorf("internal ydb sdk balancer closed"))
-	errPeriodicDiscoveryDisabled = xerrors.Wrap(fmt.Errorf(
-		"periodic discovery must be enabled for non-single-connection balancer",
-	))
-)
+var errBalancerClosed = xerrors.Wrap(fmt.Errorf("internal ydb sdk balancer closed"))
 
 // streamWrapper wraps grpc.ClientStream and triggers pool.Ban on RecvMsg/SendMsg/CloseSend
 // errors that qualify as bad connection (same logic as wrapCall defer).
@@ -444,9 +439,6 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	}
 
 	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
-	if !policy.SingleConnection() && b.discoveryConfig.Interval() <= 0 {
-		return nil, xerrors.WithStackTrace(errPeriodicDiscoveryDisabled)
-	}
 
 	if policy.SingleConnection() {
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
@@ -456,11 +448,13 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		if err := b.clusterDiscovery(ctx); err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		b.discoveryRepeater = repeater.New(xcontext.ValueOnly(ctx),
-			b.discoveryConfig.Interval(), b.clusterDiscoveryAttemptWithDial,
-			repeater.WithName("discovery"),
-			repeater.WithTrace(b.driverConfig.Trace()),
-		)
+		if interval := b.discoveryConfig.Interval(); interval > 0 {
+			b.discoveryRepeater = repeater.New(xcontext.ValueOnly(ctx),
+				interval, b.clusterDiscoveryAttemptWithDial,
+				repeater.WithName("discovery"),
+				repeater.WithTrace(b.driverConfig.Trace()),
+			)
+		}
 	}
 
 	return b, nil

@@ -1,3 +1,5 @@
+* Restored support for disabling background endpoint discovery with `WithDiscoveryInterval(-1)` for all balancer policies
+
 ## v3.150.1
 * Fixed coordination sessions spuriously reconnecting immediately after creation, which could cause non-idempotent operations to fail with `operation status is unknown`
 

@@ -145,9 +145,7 @@ func WithTrace(t trace.Discovery) Option {
 //
 // If Interval is zero then the DefaultInterval is used.
 //
-// A negative interval disables background discovery. This is supported only by
-// a single-connection balancer; other policies require periodic discovery and
-// make driver initialization fail.
+// If Interval is negative, background discovery is disabled.
 func WithInterval(interval time.Duration) Option {
 	return func(c *Config) {
 		switch {

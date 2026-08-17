@@ -407,8 +407,7 @@ func MergeOptions(opts ...Option) Option {
 }
 
 // WithDiscoveryInterval sets interval between cluster discovery calls.
-// A negative interval is supported only with balancers.SingleConn; other policies
-// require periodic discovery and make driver initialization return an error.
+// A negative interval disables background cluster discovery.
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.discoveryOptions = append(d.discoveryOptions, discoveryConfig.WithInterval(discoveryInterval))

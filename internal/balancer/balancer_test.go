@@ -836,16 +836,23 @@ func TestNew(t *testing.T) {
 		require.Nil(t, b.discoveryRepeater)
 		require.NoError(t, b.Close(ctx))
 	})
-	t.Run("non-single policy requires periodic discovery", func(t *testing.T) {
+	t.Run("non-single policy supports disabled periodic discovery", func(t *testing.T) {
 		ctx := t.Context()
-		cfg := config.New()
+		srv := startDynamicDiscoveryServer(t, []uint32{1})
+		cfg := config.New(
+			config.WithEndpoint(srv.endpoint()),
+			config.WithDatabase("/local"),
+			config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		)
 		pool := conn.NewPool(ctx, cfg)
 		defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
 
 		b, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(-time.Nanosecond))
 
-		require.ErrorIs(t, err, errPeriodicDiscoveryDisabled)
-		require.Nil(t, b)
+		require.NoError(t, err)
+		require.Len(t, b.connections().All(), 1)
+		require.Nil(t, b.discoveryRepeater)
+		require.NoError(t, b.Close(ctx))
 	})
 }
 
