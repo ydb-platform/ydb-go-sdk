@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
@@ -666,18 +667,20 @@ func TestSchemeList(t *testing.T) {
 	db := connect(t)
 
 	topicPath := createTopic(ctx, t, db)
-	list, err := db.Scheme().ListDirectory(ctx, db.Name())
-	require.NoError(t, err)
-
 	topicName := path.Base(topicPath)
 
-	hasTopic := false
-	for _, e := range list.Children {
-		if e.IsTopic() && topicName == e.Name {
-			hasTopic = true
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		list, err := db.Scheme().ListDirectory(ctx, db.Name())
+		require.NoError(collect, err)
+
+		hasTopic := false
+		for _, e := range list.Children {
+			if e.IsTopic() && topicName == e.Name {
+				hasTopic = true
+			}
 		}
-	}
-	require.True(t, hasTopic)
+		require.True(collect, hasTopic)
+	}, 10*time.Second, 100*time.Millisecond)
 }
 
 func TestReaderWithoutConsumer(t *testing.T) {
