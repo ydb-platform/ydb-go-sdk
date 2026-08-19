@@ -1,3 +1,5 @@
+* Fixed query transaction and session result-set streams not being closed when reading the initial result set failed
+
 ## v3.150.1
 * Fixed coordination sessions spuriously reconnecting immediately after creation, which could cause non-idempotent operations to fail with `operation status is unknown`
 
