@@ -1,3 +1,4 @@
+## v3.150.2
 * Fixed query transaction and session result-set streams not being closed when reading the initial result set failed
 
 ## v3.150.1
