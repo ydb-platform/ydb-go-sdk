@@ -702,6 +702,28 @@ func TestExecute(t *testing.T) {
 	})
 }
 
+func TestReadResultSetClosesStreamOnError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+	executeCtx, opts := executeQueryStreamContextWithOnClose(stream)
+	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		Status:         Ydb.StatusIds_SUCCESS,
+		ResultSetIndex: 0,
+		ResultSet:      &Ydb.ResultSet{},
+	}, nil)
+
+	r, err := newResult(t.Context(), stream, opts...)
+	require.NoError(t, err)
+
+	readCtx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	rs, err := readResultSet(readCtx, r)
+	require.ErrorIs(t, err, context.Canceled)
+	require.Nil(t, rs)
+	require.ErrorIs(t, executeCtx.Err(), context.Canceled)
+}
+
 // TestNewResult_DecoupledExecuteCtx verifies the semantic contract that
 // newResult succeeds when passed executeCtx (derived from a cancelled parent
 // via xcontext.ValueOnly), which is exactly what execute() does after the fix
