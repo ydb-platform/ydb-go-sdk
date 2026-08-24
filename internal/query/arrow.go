@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 
@@ -17,6 +18,8 @@ type (
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
 		resultSetIndex int64
 		close          context.CancelFunc
+		onError        func(error)
+		done           atomic.Bool
 	}
 
 	arrowPart struct {
@@ -45,12 +48,17 @@ func (r *arrowResult) Parts(ctx context.Context) xiter.Seq2[arrow.Part, error] {
 }
 
 func (r *arrowResult) nextPart(ctx context.Context) (arrow.Part, error) {
-	if ctx.Err() != nil {
-		return nil, xerrors.WithStackTrace(ctx.Err())
+	if err := ctx.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(r.finish(ctx, err))
 	}
+
+	stopCancel := context.AfterFunc(ctx, r.close)
+	defer stopCancel()
 
 	part, err := r.stream.Recv()
 	if err != nil {
+		err = r.finish(ctx, err)
+
 		if xerrors.Is(err, io.EOF) {
 			return nil, io.EOF
 		}
@@ -59,7 +67,7 @@ func (r *arrowResult) nextPart(ctx context.Context) (arrow.Part, error) {
 	}
 
 	if part.GetResultSetIndex() <= 0 && r.resultSetIndex > 0 {
-		return nil, io.EOF
+		return nil, r.finish(ctx, io.EOF)
 	}
 	r.resultSetIndex = part.GetResultSetIndex()
 
@@ -74,9 +82,28 @@ func (r *arrowResult) nextPart(ctx context.Context) (arrow.Part, error) {
 }
 
 func (r *arrowResult) Close(ctx context.Context) error {
+	if r.done.CompareAndSwap(false, true) && r.onError != nil {
+		r.onError(context.Canceled)
+	}
 	r.close()
 
 	return nil
+}
+
+func (r *arrowResult) finish(ctx context.Context, err error) error {
+	if xerrors.Is(err, io.EOF) {
+		r.done.Store(true)
+
+		return io.EOF
+	}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		err = ctxErr
+	}
+	if r.done.CompareAndSwap(false, true) && r.onError != nil {
+		r.onError(err)
+	}
+
+	return err
 }
 
 func (p *arrowPart) Bytes() []byte {

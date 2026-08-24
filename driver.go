@@ -509,6 +509,7 @@ func (d *Driver) connect(ctx context.Context) error {
 					// prepend common params from root config
 					[]queryConfig.Option{
 						queryConfig.With(d.config.Common),
+						queryConfig.WithPoolName(d.Name()),
 					},
 					d.queryOptions...,
 				)...,

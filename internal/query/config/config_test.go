@@ -14,6 +14,7 @@ func TestNew(t *testing.T) {
 		cfg := New()
 		require.NotNil(t, cfg)
 		require.Equal(t, DefaultPoolMaxSize, cfg.PoolLimit())
+		require.Empty(t, cfg.PoolName())
 		require.Equal(t, DefaultSessionCreateTimeout, cfg.SessionCreateTimeout())
 		require.Equal(t, DefaultSessionDeleteTimeout, cfg.SessionDeleteTimeout())
 		require.NotNil(t, cfg.Trace())
@@ -29,6 +30,11 @@ func TestNew(t *testing.T) {
 	t.Run("WithPoolLimit", func(t *testing.T) {
 		cfg := New(WithPoolLimit(100))
 		require.Equal(t, 100, cfg.PoolLimit())
+	})
+
+	t.Run("WithPoolName", func(t *testing.T) {
+		cfg := New(WithPoolName("/local"))
+		require.Equal(t, "/local", cfg.PoolName())
 	})
 
 	t.Run("WithPoolLimitZero", func(t *testing.T) {
