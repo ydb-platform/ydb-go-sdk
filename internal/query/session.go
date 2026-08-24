@@ -133,7 +133,7 @@ func (s *Session) Begin(
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Begin"), s)
 	defer func() {
 		if finalErr != nil {
-			applyStatusByError(s, finalErr)
+			s.onSessionErrorWithContext(ctx, finalErr)
 			onDone(finalErr, nil)
 		} else {
 			onDone(nil, tx)
@@ -171,11 +171,7 @@ func (s *Session) execute(ctx context.Context,
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		if finalErr != nil {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				s.onQueryError(ctxErr)
-			} else {
-				s.onQueryError(finalErr)
-			}
+			s.onSessionErrorWithContext(ctx, finalErr)
 			cancel()
 		}
 	}()
@@ -187,12 +183,19 @@ func (s *Session) execute(ctx context.Context,
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	r.onNextPartErr = append(r.onNextPartErr, s.onQueryError)
+	r.onNextPartErr = append(r.onNextPartErr, s.onSessionError)
 
 	return r, nil
 }
 
-func (s *Session) onQueryError(err error) {
+func (s *Session) onSessionErrorWithContext(ctx context.Context, err error) {
+	if ctxErr := ctx.Err(); ctxErr != nil && !xerrors.Is(err, io.EOF) {
+		err = ctxErr
+	}
+	s.onSessionError(err)
+}
+
+func (s *Session) onSessionError(err error) {
 	if err == nil || xerrors.Is(err, io.EOF) {
 		return
 	}
@@ -302,7 +305,7 @@ func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Exec
 
 	defer func() {
 		if finalErr != nil {
-			applyStatusByError(s, finalErr)
+			s.onSessionErrorWithContext(ctx, finalErr)
 		}
 	}()
 
@@ -314,6 +317,8 @@ func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Exec
 	request.ResultSetFormat = Ydb.ResultSet_FORMAT_ARROW
 
 	executeCtx, executeCancel := context.WithCancel(xcontext.ValueOnly(ctx))
+	stopCancel := context.AfterFunc(ctx, executeCancel)
+	defer stopCancel()
 	defer func() {
 		if finalErr != nil {
 			executeCancel()
@@ -324,6 +329,13 @@ func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Exec
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+	if err = ctx.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
-	return &arrowResult{stream: stream, close: executeCancel}, nil
+	return &arrowResult{
+		stream:  stream,
+		close:   executeCancel,
+		onError: s.onSessionError,
+	}, nil
 }

@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
@@ -253,6 +255,343 @@ func TestSessionClosedOnInitialQueryTimeout(t *testing.T) {
 	}}, events)
 }
 
+func TestSessionClosedOnCanceledResultOperations(t *testing.T) {
+	tests := []struct {
+		name string
+		run  func(activeCtx, cancelCtx context.Context, cancel context.CancelFunc, r query.Result) error
+	}{
+		{
+			name: "NextResultSet",
+			run: func(_ context.Context, cancelCtx context.Context, cancel context.CancelFunc, r query.Result) error {
+				cancel()
+				_, err := r.NextResultSet(cancelCtx)
+
+				return err
+			},
+		},
+		{
+			name: "NextRowBetweenParts",
+			run: func(activeCtx, cancelCtx context.Context, cancel context.CancelFunc, r query.Result) error {
+				rs, err := r.NextResultSet(cancelCtx)
+				if err != nil {
+					return err
+				}
+				cancel()
+				_, err = rs.NextRow(activeCtx)
+
+				return err
+			},
+		},
+		{
+			name: "NextRow",
+			run: func(activeCtx, cancelCtx context.Context, cancel context.CancelFunc, r query.Result) error {
+				rs, err := r.NextResultSet(activeCtx)
+				if err != nil {
+					return err
+				}
+				cancel()
+				_, err = rs.NextRow(cancelCtx)
+
+				return err
+			},
+		},
+		{
+			name: "Close",
+			run: func(_ context.Context, cancelCtx context.Context, cancel context.CancelFunc, r query.Result) error {
+				cancel()
+
+				return r.Close(cancelCtx)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			stream := newExecuteQueryStreamMock(ctrl)
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				ResultSetIndex: 0,
+				ResultSet:      &Ydb.ResultSet{},
+			}, nil)
+			client := NewMockQueryServiceClient(ctrl)
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+			s, events := newPooledSessionClosedRecorder(client)
+
+			activeCtx := t.Context()
+			cancelCtx, cancel := context.WithCancel(activeCtx)
+			r, err := s.Query(activeCtx, "SELECT 1")
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				cancel()
+				_ = r.Close(cancelCtx)
+			})
+
+			err = test.run(activeCtx, cancelCtx, cancel, r)
+
+			require.ErrorIs(t, err, context.Canceled)
+			require.Equal(t, []trace.QuerySessionClosedInfo{{
+				PoolName: "/local",
+				Reason:   "client_cancelled",
+			}}, *events)
+			require.False(t, s.IsAlive())
+		})
+	}
+}
+
+func TestSessionClosedOnBeginError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	client := NewMockQueryServiceClient(ctrl)
+	client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(nil,
+		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION)),
+	)
+	s, events := newPooledSessionClosedRecorder(client)
+
+	_, err := s.Begin(t.Context(), query.TxSettings())
+
+	require.Error(t, err)
+	require.Equal(t, []trace.QuerySessionClosedInfo{{
+		PoolName: "/local",
+		Reason:   "bad_session",
+	}}, *events)
+	require.False(t, s.IsAlive())
+}
+
+func TestSessionClosedOnUnLazyError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	client := NewMockQueryServiceClient(ctrl)
+	client.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(nil,
+		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION)),
+	)
+	s, events := newPooledSessionClosedRecorder(client)
+	tx := &Transaction{
+		LazyID:     baseTx.LazyID{},
+		s:          s,
+		txSettings: query.TxSettings(),
+	}
+
+	err := tx.UnLazy(t.Context())
+
+	require.Error(t, err)
+	require.Equal(t, []trace.QuerySessionClosedInfo{{
+		PoolName: "/local",
+		Reason:   "bad_session",
+	}}, *events)
+	require.False(t, s.IsAlive())
+}
+
+func TestSessionClosedOnTransactionRPCError(t *testing.T) {
+	tests := []struct {
+		name   string
+		reason string
+		setup  func(*MockQueryServiceClient)
+		run    func(context.Context, *Transaction) error
+	}{
+		{
+			name:   "CommitTx",
+			reason: "transport_error",
+			setup: func(client *MockQueryServiceClient) {
+				client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(nil,
+					grpcStatus.Error(grpcCodes.Unavailable, "commit failed"),
+				)
+			},
+			run: func(ctx context.Context, tx *Transaction) error {
+				return tx.CommitTx(ctx)
+			},
+		},
+		{
+			name:   "Rollback",
+			reason: "session_busy",
+			setup: func(client *MockQueryServiceClient) {
+				client.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(nil,
+					xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY)),
+				)
+			},
+			run: func(ctx context.Context, tx *Transaction) error {
+				return tx.Rollback(ctx)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			client := NewMockQueryServiceClient(ctrl)
+			test.setup(client)
+			s, events := newPooledSessionClosedRecorder(client)
+			tx := &Transaction{LazyID: baseTx.ID("456"), s: s}
+
+			err := test.run(t.Context(), tx)
+
+			require.Error(t, err)
+			require.Equal(t, []trace.QuerySessionClosedInfo{{
+				PoolName: "/local",
+				Reason:   test.reason,
+			}}, *events)
+			require.False(t, s.IsAlive())
+		})
+	}
+}
+
+func TestSessionClosedOnInitialArrowError(t *testing.T) {
+	t.Run("ClientCancelled", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		ctx, cancel := context.WithCancel(t.Context())
+		stream := newExecuteQueryStreamMock(ctrl)
+		client := NewMockQueryServiceClient(ctrl)
+		client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(context.Context, *Ydb_Query.ExecuteQueryRequest, ...grpc.CallOption) (
+				Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+			) {
+				cancel()
+
+				return stream, nil
+			},
+		)
+		s, events := newPooledSessionClosedRecorder(client)
+
+		r, err := s.QueryArrow(ctx, "SELECT 1")
+
+		require.ErrorIs(t, err, context.Canceled)
+		require.Nil(t, r)
+		require.Equal(t, []trace.QuerySessionClosedInfo{{
+			PoolName: "/local",
+			Reason:   "client_cancelled",
+		}}, *events)
+		require.False(t, s.IsAlive())
+	})
+
+	t.Run("TransportError", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		client := NewMockQueryServiceClient(ctrl)
+		client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(nil,
+			grpcStatus.Error(grpcCodes.Unavailable, "execute failed"),
+		)
+		s, events := newPooledSessionClosedRecorder(client)
+
+		r, err := s.QueryArrow(t.Context(), "SELECT 1")
+
+		require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
+		require.Nil(t, r)
+		require.Equal(t, []trace.QuerySessionClosedInfo{{
+			PoolName: "/local",
+			Reason:   "transport_error",
+		}}, *events)
+		require.False(t, s.IsAlive())
+	})
+}
+
+func TestSessionClosedOnArrowStreamError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	stream := newExecuteQueryStreamMock(ctrl)
+	stream.EXPECT().Recv().Return(nil, grpcStatus.Error(grpcCodes.Unavailable, "stream failed"))
+	client := NewMockQueryServiceClient(ctrl)
+	client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+	s, events := newPooledSessionClosedRecorder(client)
+
+	r, err := s.QueryArrow(t.Context(), "SELECT 1")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = r.Close(t.Context())
+	})
+	var streamErr error
+	for _, err = range r.Parts(t.Context()) {
+		streamErr = err
+	}
+	require.NoError(t, r.Close(t.Context()))
+
+	require.Error(t, streamErr)
+	require.True(t, xerrors.IsTransportError(streamErr, grpcCodes.Unavailable))
+	require.Equal(t, []trace.QuerySessionClosedInfo{{
+		PoolName: "/local",
+		Reason:   "transport_error",
+	}}, *events)
+	require.False(t, s.IsAlive())
+}
+
+func TestSessionClosedOnUnfinishedArrowClose(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	stream := newExecuteQueryStreamMock(ctrl)
+	client := NewMockQueryServiceClient(ctrl)
+	client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+	s, events := newPooledSessionClosedRecorder(client)
+
+	r, err := s.QueryArrow(t.Context(), "SELECT 1")
+	require.NoError(t, err)
+
+	err = r.Close(t.Context())
+
+	require.NoError(t, err)
+	require.Equal(t, []trace.QuerySessionClosedInfo{{
+		PoolName: "/local",
+		Reason:   "client_cancelled",
+	}}, *events)
+	require.False(t, s.IsAlive())
+}
+
+func TestSessionClosedOnCanceledArrowRead(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	var executeCtx context.Context
+	stream := newExecuteQueryStreamMock(ctrl)
+	stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+		cancel()
+		<-executeCtx.Done()
+
+		return nil, executeCtx.Err()
+	})
+	client := NewMockQueryServiceClient(ctrl)
+	client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, _ *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
+			Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+		) {
+			executeCtx = ctx
+
+			return stream, nil
+		},
+	)
+	s, events := newPooledSessionClosedRecorder(client)
+
+	r, err := s.QueryArrow(t.Context(), "SELECT 1")
+	require.NoError(t, err)
+	var streamErr error
+	for _, err = range r.Parts(ctx) {
+		streamErr = err
+	}
+	require.NoError(t, r.Close(t.Context()))
+
+	require.ErrorIs(t, streamErr, context.Canceled)
+	require.Equal(t, []trace.QuerySessionClosedInfo{{
+		PoolName: "/local",
+		Reason:   "client_cancelled",
+	}}, *events)
+	require.False(t, s.IsAlive())
+}
+
+func TestSessionClosedIgnoresArrowEOFAfterContextCancellation(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	stream := newExecuteQueryStreamMock(ctrl)
+	stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+		cancel()
+
+		return nil, io.EOF
+	})
+	client := NewMockQueryServiceClient(ctrl)
+	client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
+	s, events := newPooledSessionClosedRecorder(client)
+
+	r, err := s.QueryArrow(t.Context(), "SELECT 1")
+	require.NoError(t, err)
+	for _, partErr := range r.Parts(ctx) {
+		require.NoError(t, partErr)
+	}
+	require.NoError(t, r.Close(t.Context()))
+
+	require.Empty(t, *events)
+	require.True(t, s.IsAlive())
+}
+
 func TestCreateSession(t *testing.T) {
 	trace := &trace.Query{
 		OnSessionCreate: func(info trace.QuerySessionCreateStartInfo) func(info trace.QuerySessionCreateDoneInfo) {
@@ -361,4 +700,28 @@ func TestCreateSession(t *testing.T) {
 			})
 		})
 	})
+}
+
+func newPooledSessionClosedRecorder(
+	client *MockQueryServiceClient,
+) (*Session, *[]trace.QuerySessionClosedInfo) {
+	var events []trace.QuerySessionClosedInfo
+	queryTrace := &trace.Query{
+		OnSessionClosed: func(info trace.QuerySessionClosedInfo) {
+			events = append(events, info)
+		},
+	}
+	core := &sessionCore{
+		Client:   client,
+		Trace:    queryTrace,
+		id:       "123",
+		poolName: "/local",
+	}
+	core.status.Store(uint32(StatusIdle))
+
+	return &Session{
+		Core:   core,
+		client: client,
+		trace:  queryTrace,
+	}, &events
 }

@@ -412,9 +412,3 @@ func StatusFromErr(err error) Status {
 		return StatusUnknown
 	}
 }
-
-func applyStatusByError(s interface{ SetStatus(status Status) }, err error) {
-	if status := StatusFromErr(err); status != StatusUnknown {
-		s.SetStatus(status)
-	}
-}
