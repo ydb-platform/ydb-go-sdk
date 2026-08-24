@@ -3,6 +3,22 @@
   `transport_error`, `node_shutdown`, `session_shutdown`, `bad_session`, and `session_busy`; bumped the metrics
   observability-chain version to `ydb-sdk-metrics/0.2.0`
 
+## v3.150.2
+* Fixed query transaction and session result-set streams not being closed when reading the initial result set failed
+
+## v3.150.1
+* Fixed coordination sessions spuriously reconnecting immediately after creation, which could cause non-idempotent operations to fail with `operation status is unknown`
+
+## v3.150.0
+* Added `balancers.WithMaxConnections` to configure a soft limit on the active gRPC connection set; `balancers.WithNodeID` may exceed the limit to preserve node affinity
+
+## v3.149.0
+* Added `balancers.PreferPrimaryPile` and `balancers.PreferPrimaryPileWithFallback` endpoint selection policies
+
+## v3.148.0
+* Refactored balancer configuration into an immutable priority pipeline without changing existing configuration call sites or strict `Prefer*` and `*WithFallback` behavior
+* Prevented temporary errors from banning the only `SingleConn` endpoint; disabling periodic discovery is now rejected for other balancer policies
+
 ## v3.147.2
 * Updated ydb-go-genproto and added bridge pile state to discovered endpoint metadata
 

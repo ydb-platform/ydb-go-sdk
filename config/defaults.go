@@ -107,7 +107,7 @@ func defaultConfig() (c *Config) {
 		credentials: credentials.NewAnonymousCredentials(
 			credentials.WithSourceInfo(stack.Record(0)),
 		),
-		balancerConfig:     balancers.Default(),
+		balancerPolicy:     balancers.Default(),
 		tlsConfig:          defaultTLSConfig(),
 		dialTimeout:        DefaultDialTimeout,
 		trace:              &trace.Driver{},
