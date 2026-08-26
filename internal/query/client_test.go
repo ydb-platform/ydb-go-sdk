@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -29,6 +30,34 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestCreateSessionDoesNotRetryNonRetryableErrorAfterAttemptContextDeadline(t *testing.T) {
+	const createSessionTimeout = 10 * time.Millisecond
+
+	nonRetryableErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_REQUEST))
+	ctrl := gomock.NewController(t)
+	client := NewMockQueryServiceClient(ctrl)
+	client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil, nonRetryableErr)
+
+	cfg := config.New(
+		config.WithSessionCreateTimeout(createSessionTimeout),
+		config.WithTrace(&trace.Query{
+			OnSessionCreate: func(info trace.QuerySessionCreateStartInfo) func(trace.QuerySessionCreateDoneInfo) {
+				createCtx := *info.Context
+
+				return func(info trace.QuerySessionCreateDoneInfo) {
+					if info.Error != nil {
+						<-createCtx.Done()
+					}
+				}
+			},
+		}),
+	)
+
+	_, err := CreateSession(t.Context(), client, cfg)
+
+	require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_BAD_REQUEST))
+}
 
 func TestClient(t *testing.T) {
 	ctx := t.Context()

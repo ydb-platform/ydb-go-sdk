@@ -422,6 +422,14 @@ func (p *Pool[PT, T]) try(ctx context.Context,
 		return xerrors.WithStackTrace(err)
 	}
 
+	// Keep a successfully created item in the pool when the caller gives up, so
+	// the next request can reuse it.
+	if err := ctx.Err(); err != nil {
+		_ = p.putItem(ctx, info, batchChanges)
+
+		return xerrors.WithStackTrace(err)
+	}
+
 	batchChanges.InUse++
 
 	defer func() {

@@ -772,22 +772,24 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 
 func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, cfg *config.Config) (*Session, error) {
 	s, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*Session, error) {
-		var (
-			createCtx    context.Context
-			cancelCreate context.CancelFunc
-		)
+		createCtx := ctx
 		if d := cfg.SessionCreateTimeout(); d > 0 {
+			var cancelCreate context.CancelFunc
 			createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
-		} else {
-			createCtx, cancelCreate = xcontext.WithCancel(ctx)
+			defer cancelCreate()
 		}
-		defer cancelCreate()
 
 		s, err := createSession(createCtx, client,
 			WithDeleteTimeout(cfg.SessionDeleteTimeout()),
 			WithTrace(cfg.Trace()),
 		)
 		if err != nil {
+			// Do not fail the request on an internal session creation timeout while
+			// the caller is still willing to wait.
+			if xerrors.IsContextError(err) && ctx.Err() == nil {
+				err = xerrors.Retryable(err)
+			}
+
 			return nil, xerrors.WithStackTrace(err)
 		}
 

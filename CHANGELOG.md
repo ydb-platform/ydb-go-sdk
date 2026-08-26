@@ -1,3 +1,5 @@
+* Fixed `database/sql` Query Service requests failing on session creation attempt timeouts while the caller context remained active
+
 ## v3.151.0
 * Added the `ydb.query.session.closed` counter with query session pool name and close reason attributes:
   `pool_idle_timeout`, `pool_graceful_shutdown`, `client_timeout`, `client_cancelled`, `attach_closed`,
