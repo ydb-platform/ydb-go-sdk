@@ -1,5 +1,6 @@
-* Fixed Query Service session handling: `database/sql` retries internal session creation timeouts while the caller context remains active, and the native Query session pool reuses a session that finished creating after caller cancellation
+* Fixed `database/sql` Query Service requests failing on session creation attempt timeouts while the caller context remained active
 
+## v3.151.0
 * Added the `ydb.query.session.closed` counter with query session pool name and close reason attributes:
   `pool_idle_timeout`, `pool_graceful_shutdown`, `client_timeout`, `client_cancelled`, `attach_closed`,
   `transport_error`, `node_shutdown`, `session_shutdown`, `bad_session`, and `session_busy`; bumped the metrics
