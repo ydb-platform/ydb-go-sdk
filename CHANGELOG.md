@@ -1,3 +1,4 @@
+## v3.151.1
 * Fixed `database/sql` Query Service requests failing on session creation attempt timeouts while the caller context remained active
 
 ## v3.151.0
