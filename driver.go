@@ -97,6 +97,7 @@ type (
 
 		topic        *xsync.Once[*topicclientinternal.Client]
 		topicOptions []topicoptions.TopicOption
+		clientCloses []func(context.Context) error
 
 		databaseSQLOptions []xsql.Option
 
@@ -162,32 +163,8 @@ func (d *Driver) cleanupConnectFailure(ctx context.Context) {
 	// Cancel background work before tearing down the clients it may use.
 	d.ctxCancel()
 
-	if d.ratelimiter != nil {
-		_ = d.ratelimiter.Close(ctx)
-	}
-	if d.coordination != nil {
-		_ = d.coordination.Close(ctx)
-	}
-	if d.scheme != nil {
-		_ = d.scheme.Close(ctx)
-	}
-	if d.scripting != nil {
-		_ = d.scripting.Close(ctx)
-	}
-	if d.table != nil {
-		_ = d.table.Close(ctx)
-	}
-	if d.operation != nil {
-		_ = d.operation.Close(ctx)
-	}
-	if d.query != nil {
-		_ = d.query.Close(ctx)
-	}
-	if d.topic != nil {
-		_ = d.topic.Close(ctx)
-	}
-	if d.discovery != nil {
-		_ = d.discovery.Close(ctx)
+	for _, closeClient := range d.clientCloses {
+		_ = closeClient(ctx)
 	}
 	if d.metaBalancer != nil && d.metaBalancer.close != nil {
 		_ = d.metaBalancer.Close(ctx)
@@ -233,20 +210,8 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 		d.children = nil
 	})
 
-	closes = append(
-		closes,
-		d.ratelimiter.Close,
-		d.coordination.Close,
-		d.scheme.Close,
-		d.scripting.Close,
-		d.table.Close,
-		d.operation.Close,
-		d.query.Close,
-		d.topic.Close,
-		d.discovery.Close,
-		d.metaBalancer.Close,
-		d.pool.RemoveRef,
-	)
+	closes = append(closes, d.clientCloses...)
+	closes = append(closes, d.metaBalancer.Close, d.pool.RemoveRef)
 
 	var issues []error
 	for _, f := range closes {
@@ -673,6 +638,17 @@ func (d *Driver) connect(ctx context.Context) error {
 			)...,
 		), nil
 	})
+	d.clientCloses = []func(context.Context) error{
+		d.ratelimiter.Close,
+		d.coordination.Close,
+		d.scheme.Close,
+		d.scripting.Close,
+		d.table.Close,
+		d.operation.Close,
+		d.query.Close,
+		d.topic.Close,
+		d.discovery.Close,
+	}
 
 	err := d.warmUpSessionPools(
 		tableClientConfig.PoolWarmUpSize() > 0,

@@ -279,13 +279,15 @@ func TestSessionPoolWarmUpReportsBothClientFailures(t *testing.T) {
 
 func TestCleanupConnectFailureClosesLazyClients(t *testing.T) {
 	var schemeInitCalls atomic.Int32
-	d := &Driver{
-		ctxCancel: func() {},
-		scheme: xsync.OnceValue(func() (*internalScheme.Client, error) {
-			schemeInitCalls.Add(1)
+	scheme := xsync.OnceValue(func() (*internalScheme.Client, error) {
+		schemeInitCalls.Add(1)
 
-			return nil, context.Canceled
-		}),
+		return nil, context.Canceled
+	})
+	d := &Driver{
+		ctxCancel:    func() {},
+		scheme:       scheme,
+		clientCloses: []func(context.Context) error{scheme.Close},
 	}
 
 	d.cleanupConnectFailure(t.Context())
