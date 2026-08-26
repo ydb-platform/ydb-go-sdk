@@ -2,6 +2,8 @@ package query
 
 import (
 	"context"
+	"errors"
+	"io"
 	"os"
 	"runtime/pprof"
 	"strconv"
@@ -40,14 +42,16 @@ type (
 		SetStatus(code Status)
 	}
 	sessionCore struct {
-		cc     grpc.ClientConnInterface
-		Client Ydb_Query_V1.QueryServiceClient
-		Trace  *trace.Query
-		closed atomic.Bool
+		cc             grpc.ClientConnInterface
+		Client         Ydb_Query_V1.QueryServiceClient
+		Trace          *trace.Query
+		closed         atomic.Bool
+		closedReported atomic.Bool
 
 		deleteTimeout  time.Duration
 		id             string
 		nodeID         uint32
+		poolName       string
 		status         atomic.Uint32
 		onChangeStatus []func(status Status)
 		onNodeShutdown func(cause error)
@@ -132,6 +136,12 @@ func OnChangeStatus(onChangeStatus func(status Status)) Option {
 func WithDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(c *sessionCore) {
 		c.deleteTimeout = deleteTimeout
+	}
+}
+
+func WithPoolName(name string) Option {
+	return func(c *sessionCore) {
+		c.poolName = name
 	}
 }
 
@@ -261,18 +271,31 @@ func (core *sessionCore) listenAttachStream(attachStream Ydb_Query_V1.QueryServi
 	for core.IsAlive() {
 		msg, recvErr := attachStream.Recv()
 		if recvErr != nil {
+			if !core.closed.Load() && core.poolName != "" && core.closedReported.CompareAndSwap(false, true) {
+				if errors.Is(recvErr, io.EOF) {
+					gtrace.QueryOnSessionClosed(core.Trace, core.poolName, "attach_closed")
+				} else {
+					gtrace.QueryOnSessionClosed(core.Trace, core.poolName, "transport_error")
+				}
+			}
 			core.releaseSession()
 
 			return
 		}
 
 		if msg.GetSessionShutdown() != nil {
+			if !core.closed.Load() && core.poolName != "" && core.closedReported.CompareAndSwap(false, true) {
+				gtrace.QueryOnSessionClosed(core.Trace, core.poolName, "session_shutdown")
+			}
 			core.releaseSession()
 
 			return
 		}
 		if msg.GetNodeShutdown() != nil {
 			core.onNodeShutdown(errNodeShutdownHint)
+			if !core.closed.Load() && core.poolName != "" && core.closedReported.CompareAndSwap(false, true) {
+				gtrace.QueryOnSessionClosed(core.Trace, core.poolName, "node_shutdown")
+			}
 			core.releaseSession()
 
 			return
@@ -387,11 +410,5 @@ func StatusFromErr(err error) Status {
 		return StatusClosed
 	default:
 		return StatusUnknown
-	}
-}
-
-func applyStatusByError(s interface{ SetStatus(status Status) }, err error) {
-	if status := StatusFromErr(err); status != StatusUnknown {
-		s.SetStatus(status)
 	}
 }

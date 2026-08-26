@@ -69,6 +69,8 @@ func (tx *Transaction) UnLazy(ctx context.Context) error {
 
 	txID, err := begin(ctx, tx.s, tx.txSettings)
 	if err != nil {
+		tx.s.onSessionErrorWithContext(ctx, err)
+
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -360,7 +362,7 @@ func (tx *Transaction) CommitTx(ctx context.Context) (finalErr error) {
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).CommitTx"), tx.s, tx)
 	defer func() {
 		if finalErr != nil {
-			applyStatusByError(tx.s, finalErr)
+			tx.s.onSessionErrorWithContext(ctx, finalErr)
 		}
 		onDone(finalErr)
 	}()
@@ -417,7 +419,7 @@ func (tx *Transaction) Rollback(ctx context.Context) (finalErr error) {
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Rollback"), tx.s, tx)
 	defer func() {
 		if finalErr != nil {
-			applyStatusByError(tx.s, finalErr)
+			tx.s.onSessionErrorWithContext(ctx, finalErr)
 		}
 		onDone(finalErr)
 	}()

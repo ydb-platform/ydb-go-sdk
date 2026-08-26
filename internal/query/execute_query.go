@@ -181,6 +181,8 @@ func readAll(ctx context.Context, r *streamResult) error {
 func readResultSet(ctx context.Context, r *streamResult) (_ *resultSetWithClose, finalErr error) {
 	rs, err := r.nextResultSet(ctx)
 	if err != nil {
+		_ = r.Close(ctx)
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 	rs.mustBeLastResultSet = true

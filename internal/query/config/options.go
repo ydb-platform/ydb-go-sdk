@@ -39,6 +39,12 @@ func WithPoolLimit(size int) Option {
 	}
 }
 
+func WithPoolName(name string) Option {
+	return func(c *Config) {
+		c.poolName = name
+	}
+}
+
 // WithSessionPoolSessionUsageLimit set pool session max usage:
 // - if argument type is uint64 - WithSessionPoolSessionUsageLimit limits max usage count of pool session
 // - if argument type is time.Duration - WithSessionPoolSessionUsageLimit limits max time to live of pool session

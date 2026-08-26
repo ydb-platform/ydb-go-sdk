@@ -1,5 +1,38 @@
 * Fixed `WithSessionPoolWarmUpSessions` to initialize table and query clients before driver initialization completes
 
+* Added the `ydb.query.session.closed` counter with query session pool name and close reason attributes:
+  `pool_idle_timeout`, `pool_graceful_shutdown`, `client_timeout`, `client_cancelled`, `attach_closed`,
+  `transport_error`, `node_shutdown`, `session_shutdown`, `bad_session`, and `session_busy`; bumped the metrics
+  observability-chain version to `ydb-sdk-metrics/0.2.0`
+
+## v3.150.2
+* Fixed query transaction and session result-set streams not being closed when reading the initial result set failed
+
+## v3.150.1
+* Fixed coordination sessions spuriously reconnecting immediately after creation, which could cause non-idempotent operations to fail with `operation status is unknown`
+
+## v3.150.0
+* Added `balancers.WithMaxConnections` to configure a soft limit on the active gRPC connection set; `balancers.WithNodeID` may exceed the limit to preserve node affinity
+
+## v3.149.0
+* Added `balancers.PreferPrimaryPile` and `balancers.PreferPrimaryPileWithFallback` endpoint selection policies
+
+## v3.148.0
+* Refactored balancer configuration into an immutable priority pipeline without changing existing configuration call sites or strict `Prefer*` and `*WithFallback` behavior
+* Prevented temporary errors from banning the only `SingleConn` endpoint; disabling periodic discovery is now rejected for other balancer policies
+
+## v3.147.2
+* Updated ydb-go-genproto and added bridge pile state to discovered endpoint metadata
+
+## v3.147.1
+* Fixed table session not being deleted on the server when `Session.Close` is called with an already canceled or expired context (pool shutdown, expired caller deadline); `DeleteSession` is now sent on a detached context, as the query service session already does
+
+## v3.147.0
+* Added Coordination `DescribeSemaphore` one-shot watch via `options.WithSemaphoreWatch`
+
+## v3.146.3
+* Fixed custom topic decoders registered for the raw codec being ignored; raw decoder overrides are discouraged and will be rejected in a future release
+
 ## v3.146.2
 * Fixed server-side gRPC stream errors being incorrectly classified as client-side context cancellation
 

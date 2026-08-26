@@ -6,6 +6,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Bridge"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"go.uber.org/mock/gomock"
@@ -47,18 +48,35 @@ func TestDiscover(t *testing.T) {
 							Ssl:      true,
 						},
 						{
-							Address: "node3",
-							Port:    3,
-							Ssl:     false,
+							Address:        "node3",
+							Port:           3,
+							Ssl:            false,
+							BridgePileName: "pile-a",
 						},
 						{
-							Address:  "node4",
-							Port:     4,
-							Location: "AZ0",
-							Ssl:      false,
+							Address:        "node4",
+							Port:           4,
+							Location:       "AZ0",
+							Ssl:            false,
+							BridgePileName: "pile-b",
+						},
+						{
+							Address:        "node5",
+							Port:           5,
+							Ssl:            false,
+							BridgePileName: "missing-pile",
+						},
+						{
+							Address: "node6",
+							Port:    6,
+							Ssl:     false,
 						},
 					},
 					SelfLocation: "AZ0",
+					PileStates: []*Ydb_Bridge.PileState{
+						{PileName: "pile-a", State: Ydb_Bridge.PileState_PRIMARY},
+						{PileName: "pile-b", State: Ydb_Bridge.PileState_SYNCHRONIZED},
+					},
 				})),
 			},
 		}, nil)
@@ -71,12 +89,23 @@ func TestDiscover(t *testing.T) {
 		require.EqualValues(t, "AZ0", location)
 		require.EqualValues(t, []endpoint.Endpoint{
 			endpoint.New("node3:3",
-				endpoint.WithLocalDC(false),
+				endpoint.WithMetadata(endpoint.Metadata{BridgePileState: endpoint.PileStatePrimary}),
 				endpoint.WithLastUpdated(clock.Now()),
 			),
 			endpoint.New("node4:4",
-				endpoint.WithLocalDC(true),
 				endpoint.WithLocation("AZ0"),
+				endpoint.WithMetadata(endpoint.Metadata{
+					LocalDC:         true,
+					BridgePileState: endpoint.PileStateSynchronized,
+				}),
+				endpoint.WithLastUpdated(clock.Now()),
+			),
+			endpoint.New("node5:5",
+				endpoint.WithMetadata(endpoint.Metadata{BridgePileState: endpoint.PileStateUnknown}),
+				endpoint.WithLastUpdated(clock.Now()),
+			),
+			endpoint.New("node6:6",
+				endpoint.WithMetadata(endpoint.Metadata{BridgePileState: endpoint.PileStateUnknown}),
 				endpoint.WithLastUpdated(clock.Now()),
 			),
 		}, endpoints)
@@ -165,6 +194,26 @@ func TestDiscover(t *testing.T) {
 			),
 		}, endpoints)
 	})
+}
+
+func TestBridgePileState(t *testing.T) {
+	tests := []struct {
+		proto    Ydb_Bridge.PileState_State
+		expected endpoint.PileState
+	}{
+		{Ydb_Bridge.PileState_UNSPECIFIED, endpoint.PileStateUnknown},
+		{Ydb_Bridge.PileState_PRIMARY, endpoint.PileStatePrimary},
+		{Ydb_Bridge.PileState_PROMOTED, endpoint.PileStatePromoted},
+		{Ydb_Bridge.PileState_SYNCHRONIZED, endpoint.PileStateSynchronized},
+		{Ydb_Bridge.PileState_NOT_SYNCHRONIZED, endpoint.PileStateNotSynchronized},
+		{Ydb_Bridge.PileState_SUSPENDED, endpoint.PileStateSuspended},
+		{Ydb_Bridge.PileState_DISCONNECTED, endpoint.PileStateDisconnected},
+		{Ydb_Bridge.PileState_State(100), endpoint.PileStateUnknown},
+	}
+
+	for _, test := range tests {
+		require.Equal(t, test.expected, bridgePileState(test.proto))
+	}
 }
 
 func TestClientCloseSkipsConnWithoutIOCloser(t *testing.T) {

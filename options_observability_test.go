@@ -13,6 +13,8 @@ import (
 )
 
 func TestWithObservabilityBuildInfoChains(t *testing.T) {
+	require.Equal(t, "0.2.0", observability.MetricsChainVersion)
+
 	for _, tt := range []struct {
 		name              string
 		opts              []Option

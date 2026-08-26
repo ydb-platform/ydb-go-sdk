@@ -137,6 +137,17 @@ func onNextPartErr(callback func(err error)) resultOption {
 	}
 }
 
+func (r *streamResult) notifyNextPartErr(ctx context.Context, err error) error {
+	if ctxErr := ctx.Err(); ctxErr != nil && !xerrors.Is(err, io.EOF) {
+		err = ctxErr
+	}
+	for _, callback := range r.onNextPartErr {
+		callback(err)
+	}
+
+	return err
+}
+
 func onTxMeta(callback func(txMeta *Ydb_Query.TransactionMeta)) resultOption {
 	return func(s *streamResult) {
 		s.onTxMeta = append(s.onTxMeta, callback)
@@ -194,7 +205,7 @@ func newResult(
 	}
 
 	if err := ctx.Err(); err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(r.notifyNextPartErr(ctx, err))
 	}
 
 	part, err := r.nextPart(ctx)
@@ -230,6 +241,8 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	}
 
 	if ctxErr := ctx.Err(); ctxErr != nil {
+		_ = r.notifyNextPartErr(ctx, ctxErr)
+
 		return nil, ctxErr
 	}
 
@@ -258,9 +271,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		}
 	}
 	if err != nil {
-		for _, callback := range r.onNextPartErr {
-			callback(err)
-		}
+		err = r.notifyNextPartErr(ctx, err)
 
 		if xerrors.Is(err, io.EOF) {
 			return nil, io.EOF
@@ -326,7 +337,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 
 	for {
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return ctxErr
+			return r.notifyNextPartErr(ctx, ctxErr)
 		}
 
 		_, err := r.nextPart(ctx)
@@ -354,13 +365,15 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishE
 	nextResultSetIndex := r.resultSetIndex + 1
 	for {
 		if err := ctx.Err(); err != nil {
-			return nil, xerrors.WithStackTrace(err)
+			return nil, xerrors.WithStackTrace(r.notifyNextPartErr(ctx, err))
 		}
 
 		if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex {
 			r.resultSetIndex = resultSetIndex
+			rs := newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart)
+			rs.notifyError = r.notifyNextPartErr
 
-			return newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart), nil
+			return rs, nil
 		}
 		if r.stream == nil {
 			return nil, io.EOF
@@ -394,7 +407,7 @@ func (r *streamResult) nextPartFunc(
 ) func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
 	return func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
 		if err := ctx.Err(); err != nil {
-			return nil, xerrors.WithStackTrace(err)
+			return nil, xerrors.WithStackTrace(r.notifyNextPartErr(ctx, err))
 		}
 
 		if r.stream == nil {

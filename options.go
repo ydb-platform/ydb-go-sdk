@@ -11,7 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
@@ -350,9 +350,9 @@ func WithCredentials(c credentials.Credentials) Option {
 	})
 }
 
-func WithBalancer(balancer *balancerConfig.Config) Option {
+func WithBalancer(policy policy.Policy) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.options = append(d.options, config.WithBalancer(balancer))
+		d.options = append(d.options, config.WithBalancer(policy))
 
 		return nil
 	}
@@ -407,6 +407,8 @@ func MergeOptions(opts ...Option) Option {
 }
 
 // WithDiscoveryInterval sets interval between cluster discovery calls.
+// A negative interval is supported only with balancers.SingleConn; other policies
+// require periodic discovery and make driver initialization return an error.
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.discoveryOptions = append(d.discoveryOptions, discoveryConfig.WithInterval(discoveryInterval))

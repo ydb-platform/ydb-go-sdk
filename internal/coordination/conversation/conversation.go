@@ -120,9 +120,14 @@ type Conversation struct {
 	message           func() *Ydb_Coordination.SessionRequest
 	responseFilter    ResponseFilter
 	acknowledgeFilter ResponseFilter
+	keepAlive         func(response *Ydb_Coordination.SessionResponse) bool
+	notifyFilter      ResponseFilter
+	onNotify          func(response *Ydb_Coordination.SessionResponse)
+	onAbandoned       func()
 	cancelMessage     func(req *Ydb_Coordination.SessionRequest) *Ydb_Coordination.SessionRequest
 	cancelFilter      ResponseFilter
 	conflictKey       string
+	conflictHeld      bool
 	requestSent       *Ydb_Coordination.SessionRequest
 	cancelRequestSent *Ydb_Coordination.SessionRequest
 	response          *Ydb_Coordination.SessionResponse
@@ -130,6 +135,7 @@ type Conversation struct {
 	done              chan struct{}
 	idempotent        bool
 	canceled          bool
+	resultDelivered   bool
 }
 
 // NewController creates a new conversation controller. You usually have one controller per one session.
@@ -143,9 +149,44 @@ func NewController() *Controller {
 // WithResponseFilter returns an Option that specifies the filter function that is used to detect the last response
 // message in the conversation. If such a message was found, the conversation is immediately ended and the response
 // becomes available by the Conversation.Await method.
+//
+// When used together with WithKeepAlive, Await still completes on the matching response, but the conversation may stay
+// in the queue until a later notify message (see WithNotifyFilter) or until it is abandoned.
 func WithResponseFilter(filter ResponseFilter) Option {
 	return func(c *Conversation) {
 		c.responseFilter = filter
+	}
+}
+
+// WithKeepAlive returns an Option that keeps the conversation in the queue after a responseFilter match when keepAlive
+// returns true for that response. The conflict key is cleared either way so a superseding conversation with the same
+// key can be sent. Await completes on the responseFilter match regardless of keepAlive.
+func WithKeepAlive(keepAlive func(response *Ydb_Coordination.SessionResponse) bool) Option {
+	return func(c *Conversation) {
+		c.keepAlive = keepAlive
+	}
+}
+
+// WithNotifyFilter returns an Option that handles a post-result notification for a conversation kept alive after its
+// responseFilter match. When the filter matches, onNotify is invoked (if non-nil) and the conversation is removed.
+//
+// onNotify is invoked on a dedicated goroutine, not on the receive goroutine and not under the controller lock, so it
+// is safe for the handler to call back into the controller (for example to re-subscribe).
+func WithNotifyFilter(filter ResponseFilter, onNotify func(response *Ydb_Coordination.SessionResponse)) Option {
+	return func(c *Conversation) {
+		c.notifyFilter = filter
+		c.onNotify = onNotify
+	}
+}
+
+// WithOnAbandoned returns an Option that registers a callback invoked when a conversation that already delivered its
+// Await result is removed without a notify match (for example on session close or stream detach).
+//
+// Like onNotify, onAbandoned is invoked on a dedicated goroutine, not under the controller lock, so it is safe for the
+// handler to call back into the controller.
+func WithOnAbandoned(onAbandoned func()) Option {
+	return func(c *Conversation) {
+		c.onAbandoned = onAbandoned
 	}
 }
 
@@ -275,8 +316,9 @@ func (c *Controller) sendFront() *Ydb_Coordination.SessionRequest {
 
 		if req.conflictKey != "" {
 			c.conflicts[req.conflictKey] = struct{}{}
+			req.conflictHeld = true
 		}
-		if req.responseFilter == nil && req.acknowledgeFilter == nil {
+		if req.responseFilter == nil && req.acknowledgeFilter == nil && req.notifyFilter == nil {
 			c.queue = append(c.queue[:i], c.queue[i+1:]...)
 		}
 		c.notify()
@@ -332,10 +374,27 @@ func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool {
 			if !req.canceled {
 				req.succeed(resp)
 
-				if req.conflictKey != "" {
-					delete(c.conflicts, req.conflictKey)
+				if c.releaseConflict(req) {
 					notify = true
 				}
+
+				if req.keepAlive == nil || !req.keepAlive(resp) {
+					c.queue = append(c.queue[:i], c.queue[i+1:]...)
+				}
+			}
+
+			handled = true
+		case req.resultDelivered && req.notifyFilter != nil && req.notifyFilter(req.requestSent, resp):
+			if !req.canceled {
+				if req.onNotify != nil {
+					// Dispatch the user handler on a separate goroutine. It must not run on the
+					// receive goroutine nor under c.mutex: the handler may call back into the
+					// session (e.g. re-subscribe via DescribeSemaphore -> PushBack), which would
+					// deadlock on c.mutex or on a nested Await waiting for this same goroutine to
+					// receive the reply. A slow handler must not stall keep-alive/reconnect/close.
+					go req.onNotify(resp)
+				}
+				req.onAbandoned = nil
 
 				c.queue = append(c.queue[:i], c.queue[i+1:]...)
 			}
@@ -343,16 +402,14 @@ func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool {
 			handled = true
 		case req.acknowledgeFilter != nil && req.acknowledgeFilter(req.requestSent, resp):
 			if !req.canceled {
-				if req.conflictKey != "" {
-					delete(c.conflicts, req.conflictKey)
+				if c.releaseConflict(req) {
 					notify = true
 				}
 			}
 
 			handled = true
 		case req.cancelRequestSent != nil && req.cancelFilter(req.cancelRequestSent, resp):
-			if req.conflictKey != "" {
-				delete(c.conflicts, req.conflictKey)
+			if c.releaseConflict(req) {
 				notify = true
 			}
 			c.queue = append(c.queue[:i], c.queue[i+1:]...)
@@ -369,18 +426,26 @@ func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool {
 
 // OnDetach fails all non-idempotent conversations if there are any in the queue. You should call this method when the
 // underlying gRPC stream of the session is closed.
+//
+// Conversations that already delivered an Await result and are waiting for a notify (for example an active semaphore
+// watch) are abandoned: onAbandoned is invoked and they are removed instead of being retried on the next attach.
 func (c *Controller) OnDetach() {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	for i := len(c.queue) - 1; i >= 0; i-- {
 		req := c.queue[i]
+		if req.resultDelivered && req.notifyFilter != nil {
+			c.abandon(req)
+			c.queue = append(c.queue[:i], c.queue[i+1:]...)
+
+			continue
+		}
+
 		if !req.idempotent {
 			req.fail(coordination.ErrOperationStatusUnknown)
 
-			if req.requestSent != nil && req.conflictKey != "" {
-				delete(c.conflicts, req.conflictKey)
-			}
+			c.releaseConflict(req)
 
 			c.queue = append(c.queue[:i], c.queue[i+1:]...)
 		}
@@ -397,6 +462,16 @@ func (c *Controller) Close(byeConversation *Conversation) {
 
 	for i := len(c.queue) - 1; i >= 0; i-- {
 		req := c.queue[i]
+		if req.resultDelivered {
+			c.abandon(req)
+			// Remove abandoned conversations from the queue, same as OnDetach. Otherwise a late
+			// OnRecv racing with Close could still match notifyFilter and fire onNotify after
+			// onAbandoned already ran, violating the at-most-once guarantee.
+			c.queue = append(c.queue[:i], c.queue[i+1:]...)
+
+			continue
+		}
+
 		if !req.canceled {
 			req.fail(coordination.ErrSessionClosed)
 		}
@@ -410,6 +485,29 @@ func (c *Controller) Close(byeConversation *Conversation) {
 	c.notify()
 }
 
+func (c *Controller) abandon(req *Conversation) {
+	if req.onAbandoned != nil {
+		// Dispatch asynchronously for the same reason as onNotify in OnRecv: the handler may
+		// call back into the session and must not run under c.mutex or block the caller
+		// (OnDetach/Close).
+		go req.onAbandoned()
+		req.onAbandoned = nil
+	}
+
+	c.releaseConflict(req)
+}
+
+func (c *Controller) releaseConflict(req *Conversation) bool {
+	if !req.conflictHeld {
+		return false
+	}
+
+	delete(c.conflicts, req.conflictKey)
+	req.conflictHeld = false
+
+	return true
+}
+
 // OnAttach retries all idempotent conversations if there are any in the queue. You should call this method when the
 // underlying gRPC stream of the session is connected.
 func (c *Controller) OnAttach() {
@@ -420,9 +518,7 @@ func (c *Controller) OnAttach() {
 	for i := len(c.queue) - 1; i >= 0; i-- {
 		req := c.queue[i]
 		if req.idempotent && req.requestSent != nil {
-			if req.conflictKey != "" {
-				delete(c.conflicts, req.conflictKey)
-			}
+			c.releaseConflict(req)
 
 			// If the request has been canceled, re-send the cancellation message, otherwise re-send the original one.
 			if req.canceled {
@@ -507,16 +603,34 @@ func (c *Conversation) sendCancel() {
 }
 
 func (c *Conversation) succeed(response *Ydb_Coordination.SessionResponse) {
+	if c.resultDelivered {
+		return
+	}
+
+	c.resultDelivered = true
 	c.response = response
 	close(c.done)
 }
 
 func (c *Conversation) fail(err error) {
+	if c.resultDelivered {
+		return
+	}
+
+	// Set resultDelivered before closing done, mirroring succeed. Otherwise a fail -> succeed
+	// sequence on the same conversation would pass both guards and close done twice (panic).
+	c.resultDelivered = true
 	c.responseErr = err
 	close(c.done)
 }
 
 func (c *Conversation) cancel() {
+	if c.resultDelivered {
+		c.canceled = true
+
+		return
+	}
+
 	c.canceled = true
 	close(c.done)
 }

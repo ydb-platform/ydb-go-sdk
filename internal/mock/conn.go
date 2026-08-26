@@ -21,6 +21,7 @@ type Conn struct {
 	NodeIDField   uint32
 	StateField    state.State
 	LocalDCField  bool
+	MetadataField endpoint.Metadata
 }
 
 func (c *Conn) Endpoint() endpoint.Endpoint {
@@ -29,6 +30,7 @@ func (c *Conn) Endpoint() endpoint.Endpoint {
 		LocalDCField:  c.LocalDCField,
 		LocationField: c.LocationField,
 		NodeIDField:   c.NodeIDField,
+		MetadataField: c.MetadataField,
 	}
 }
 
@@ -50,6 +52,7 @@ type Endpoint struct {
 	NodeIDField       uint32
 	LocalDCField      bool
 	OverrideHostField string
+	MetadataField     endpoint.Metadata
 }
 
 func (e *Endpoint) Key() endpoint.Key {
@@ -81,6 +84,13 @@ func (e *Endpoint) LocalDC() bool {
 
 func (e *Endpoint) Location() string {
 	return e.LocationField
+}
+
+func (e *Endpoint) Metadata() endpoint.Metadata {
+	metadata := e.MetadataField
+	metadata.LocalDC = e.LocalDCField
+
+	return metadata
 }
 
 func (e *Endpoint) LastUpdated() time.Time {
