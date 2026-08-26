@@ -1,5 +1,9 @@
 * Fixed `WithSessionPoolWarmUpSessions` to initialize table and query clients before driver initialization completes
 
+## v3.151.1
+* Fixed `database/sql` Query Service requests failing on session creation attempt timeouts while the caller context remained active
+
+## v3.151.0
 * Added the `ydb.query.session.closed` counter with query session pool name and close reason attributes:
   `pool_idle_timeout`, `pool_graceful_shutdown`, `client_timeout`, `client_cancelled`, `attach_closed`,
   `transport_error`, `node_shutdown`, `session_shutdown`, `bad_session`, and `session_busy`; bumped the metrics
