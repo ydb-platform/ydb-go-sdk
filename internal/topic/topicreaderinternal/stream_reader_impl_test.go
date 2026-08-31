@@ -27,6 +27,66 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+func TestTopicStreamReaderImpl_MessagesReceivedTraceUsesConfiguredEndpointAfterStreamReplacement(t *testing.T) {
+	e := newTopicReaderTestEnv(t)
+	e.reader.cfg.ReaderInfo = topicreadercommon.ReaderInfo{
+		Endpoint: "configured:2135",
+		Database: "/local",
+		Consumer: "consumer",
+	}
+
+	var events []trace.TopicReaderMessagesReceivedInfo
+	e.reader.cfg.Trace = &trace.Topic{
+		OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
+			events = append(events, info)
+		},
+	}
+
+	readResponse := func(firstOffset int64) *rawtopicreader.ReadResponse {
+		return &rawtopicreader.ReadResponse{
+			BytesSize: 2,
+			PartitionData: []rawtopicreader.PartitionData{
+				{
+					PartitionSessionID: e.partitionSessionID,
+					Batches: []rawtopicreader.Batch{
+						{
+							Codec: rawtopiccommon.CodecRaw,
+							MessageData: []rawtopicreader.MessageData{
+								{Offset: rawtopiccommon.Offset(firstOffset)},
+								{Offset: rawtopiccommon.Offset(firstOffset + 1)},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	require.NoError(t, e.reader.onReadResponse(readResponse(1)))
+
+	// Reconnection replaces the stream but keeps the reader configuration.
+	e.reader.stream = topicreadercommon.NewSyncedStream(e.stream)
+	require.NoError(t, e.reader.onReadResponse(readResponse(3)))
+
+	require.Len(t, events, 2)
+	for _, event := range events {
+		require.Equal(t, "configured:2135", event.Endpoint)
+		require.Equal(t, "/local", event.Database)
+		require.Equal(t, "/test", event.Topic)
+		require.Equal(t, "consumer", event.Consumer)
+		require.Equal(t, 2, event.MessagesCount)
+	}
+
+	invalidResponse := readResponse(5)
+	invalidResponse.PartitionData[0].PartitionSessionID++
+	require.Error(t, e.reader.onReadResponse(invalidResponse))
+	require.Len(t, events, 2)
+
+	require.NoError(t, e.reader.batcher.Close(errors.New("test batcher closed")))
+	require.Error(t, e.reader.onReadResponse(readResponse(7)))
+	require.Len(t, events, 2)
+}
+
 func TestTopicStreamReaderImpl_BufferCounterOnStopPartition(t *testing.T) {
 	table := []struct {
 		name     string

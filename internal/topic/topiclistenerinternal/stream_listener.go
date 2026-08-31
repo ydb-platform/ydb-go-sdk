@@ -449,13 +449,25 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 	// Route each batch to its partition worker
 	for _, batch := range batches {
 		partitionSession := topicreadercommon.BatchGetPartitionSession(batch)
+		accepted := false
 		routed := l.routeToWorker(partitionSession.StreamPartitionSessionID, func(worker *PartitionWorker) {
-			worker.AddMessagesBatch(m.ServerMessageMetadata, batch)
+			accepted = worker.AddMessagesBatch(m.ServerMessageMetadata, batch)
 		})
 		if !routed {
 			// Worker missing: batch is dropped but buffer was already charged above.
 			// Return credit here; routeToWorker stays non-fatal for protocol mismatch.
 			l.ReadBufferRelease(batchReadBufferSize(batch))
+
+			continue
+		}
+		if accepted {
+			topicreadercommon.TraceMessagesReceived(
+				l.background.Context(),
+				l.tracer,
+				l.cfg.ReaderInfo,
+				batch.Topic(),
+				len(batch.Messages),
+			)
 		}
 	}
 

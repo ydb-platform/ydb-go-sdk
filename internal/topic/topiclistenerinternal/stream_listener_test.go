@@ -17,7 +17,86 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestStreamListener_MessagesReceivedTrace(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+	session := PartitionSession(e)
+	session.Topic = "/local/topic"
+	listener.cfg = &StreamListenerConfig{
+		Decoders: topicreadercommon.NewMultiDecoder(),
+		ReaderInfo: topicreadercommon.ReaderInfo{
+			Endpoint: "configured:2135",
+			Database: "/local",
+			Consumer: "consumer",
+		},
+	}
+
+	var events []trace.TopicReaderMessagesReceivedInfo
+	listener.tracer = &trace.Topic{
+		OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
+			events = append(events, info)
+		},
+	}
+	listener.stream = StreamMock(e)
+
+	worker := NewPartitionWorker(
+		session.StreamPartitionSessionID,
+		session,
+		listener,
+		EventHandlerMock(e),
+		func(rawtopicreader.PartitionSessionID, error) {},
+		listener.tracer,
+		listener.listenerID,
+	)
+	listener.workers[session.StreamPartitionSessionID] = worker
+
+	readResponse := func(firstOffset int64) *rawtopicreader.ReadResponse {
+		return &rawtopicreader.ReadResponse{
+			BytesSize: 2,
+			PartitionData: []rawtopicreader.PartitionData{
+				{
+					PartitionSessionID: session.StreamPartitionSessionID,
+					Batches: []rawtopicreader.Batch{
+						{
+							Codec: rawtopiccommon.CodecRaw,
+							MessageData: []rawtopicreader.MessageData{
+								{Offset: rawtopiccommon.Offset(firstOffset)},
+								{Offset: rawtopiccommon.Offset(firstOffset + 1)},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	require.NoError(t, listener.splitAndRouteReadResponse(readResponse(1)))
+	require.Len(t, events, 1)
+	require.Equal(t, "configured:2135", events[0].Endpoint)
+	require.Equal(t, "/local", events[0].Database)
+	require.Equal(t, "/local/topic", events[0].Topic)
+	require.Equal(t, "consumer", events[0].Consumer)
+	require.Equal(t, 2, events[0].MessagesCount)
+
+	invalidResponse := readResponse(3)
+	invalidResponse.PartitionData[0].PartitionSessionID++
+	require.Error(t, listener.splitAndRouteReadResponse(invalidResponse))
+	require.Len(t, events, 1)
+
+	worker.messageQueue.Close()
+	require.NoError(t, listener.splitAndRouteReadResponse(readResponse(5)))
+	require.Len(t, events, 1)
+
+	<-listener.freeBytes
+	listener.m.WithLock(func() {
+		delete(listener.workers, session.StreamPartitionSessionID)
+	})
+	require.NoError(t, listener.splitAndRouteReadResponse(readResponse(7)))
+	require.Len(t, events, 1)
+}
 
 func TestStreamListener_WorkerCreationAndRouting(t *testing.T) {
 	e := fixenv.New(t)

@@ -625,6 +625,8 @@ func (d *Driver) connect(ctx context.Context) error {
 				[]topicoptions.TopicOption{
 					topicoptions.WithOperationTimeout(d.config.OperationTimeout()),
 					topicoptions.WithOperationCancelAfter(d.config.OperationCancelAfter()),
+					internalTopic.WithEndpoint(d.Endpoint()),
+					internalTopic.WithDatabase(d.Name()),
 					internalTopic.WithGrpcMessageSize(d.config.GrpcMaxMessageSize()),
 				},
 				d.topicOptions...,

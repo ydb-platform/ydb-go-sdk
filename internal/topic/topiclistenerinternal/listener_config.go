@@ -10,10 +10,11 @@ import (
 )
 
 type StreamListenerConfig struct {
+	topicreadercommon.ReaderInfo
+
 	BufferSize             int
 	Decoders               *topicreadercommon.MultiDecoder
 	Selectors              []*topicreadercommon.PublicReadSelector
-	Consumer               string
 	ConnectWithoutConsumer bool
 	readerID               int64
 	Tracer                 *trace.Topic
@@ -24,7 +25,6 @@ func NewStreamListenerConfig() StreamListenerConfig {
 		BufferSize: topicreadercommon.DefaultBufferSize,
 		Decoders:   topicreadercommon.NewMultiDecoder(),
 		Selectors:  nil,
-		Consumer:   "",
 		readerID:   topicreadercommon.NextReaderID(),
 		Tracer:     &trace.Topic{},
 	}

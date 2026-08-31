@@ -67,13 +67,14 @@ type topicStreamReaderImpl struct {
 }
 
 type topicStreamReaderConfig struct {
+	topicreadercommon.ReaderInfo
+
 	CommitterBatchTimeLag           time.Duration
 	CommitterBatchCounterTrigger    int
 	BaseContext                     context.Context //nolint:containedctx
 	BufferSizeProtoBytes            int
 	Cred                            credentials.Credentials
 	CredUpdateInterval              time.Duration
-	Consumer                        string
 	ReadWithoutConsumer             bool
 	ReadSelectors                   []*topicreadercommon.PublicReadSelector
 	Trace                           *trace.Topic
@@ -840,6 +841,14 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 		if err := r.batcher.PushBatches(batches[i]); err != nil {
 			return err
 		}
+
+		topicreadercommon.TraceMessagesReceived(
+			r.cfg.BaseContext,
+			r.cfg.Trace,
+			r.cfg.ReaderInfo,
+			batches[i].Topic(),
+			len(batches[i].Messages),
+		)
 	}
 
 	return nil
