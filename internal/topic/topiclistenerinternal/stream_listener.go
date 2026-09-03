@@ -141,7 +141,7 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 		l.streamClose(reason)
 	}
 
-	if err := l.background.Close(ctx, reason); err != nil {
+	if err := l.background.Close(ctx, reason); err != nil && !errors.Is(err, background.ErrAlreadyClosed) {
 		resErrors = append(resErrors, err)
 	}
 
