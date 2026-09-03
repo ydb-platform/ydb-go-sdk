@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
@@ -130,7 +131,8 @@ func (c *reconnectorTestClient) callCount() int {
 }
 
 type reconnectorTestHandler struct {
-	readMessages chan *PublicReadMessages
+	readMessages        chan *PublicReadMessages
+	readMessagesRelease <-chan struct{}
 }
 
 func newReconnectorTestHandler() *reconnectorTestHandler {
@@ -150,6 +152,9 @@ func (h *reconnectorTestHandler) OnStartPartitionSessionRequest(
 
 func (h *reconnectorTestHandler) OnReadMessages(_ context.Context, event *PublicReadMessages) error {
 	h.readMessages <- event
+	if h.readMessagesRelease != nil {
+		<-h.readMessagesRelease
+	}
 
 	return nil
 }
@@ -356,5 +361,144 @@ func TestTopicListenerReconnectorCloseUnblocksWaitInit(t *testing.T) {
 
 	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
 	require.ErrorIs(t, listener.WaitInit(ctx), ErrUserCloseTopic)
+	require.NoError(t, listener.WaitStop(ctx))
+}
+
+func TestNewTopicListenerReconnectorAndWaitStopContextCancellation(t *testing.T) {
+	ctx := xtest.Context(t)
+	stream := newReconnectorTestStream("session-1")
+	client := newReconnectorTestClient(reconnectorTestConnectResult{stream: stream})
+	cfg := NewStreamListenerConfig()
+	cfg.Consumer = "test-consumer"
+	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "test-topic"}}
+
+	listener, err := NewTopicListenerReconnector(client, &cfg, newReconnectorTestHandler())
+	require.NoError(t, err)
+	require.NoError(t, listener.WaitInit(ctx))
+	waitReconnectorCall(ctx, t, client, 0)
+
+	waitCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	require.ErrorIs(t, listener.WaitStop(waitCtx), context.Canceled)
+
+	closeTestTopicListenerReconnector(ctx, t, listener)
+}
+
+func TestTopicListenerReconnectorWaitInitContextCancellation(t *testing.T) {
+	ctx := xtest.Context(t)
+	client := newReconnectorTestClient(reconnectorTestConnectResult{block: true})
+	listener, _ := newTestTopicListenerReconnector(t, client)
+	waitReconnectorCall(ctx, t, client, 0)
+
+	waitCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	require.ErrorIs(t, listener.WaitInit(waitCtx), context.Canceled)
+
+	closeTestTopicListenerReconnector(ctx, t, listener)
+}
+
+func TestTopicListenerReconnectorCloseWhileWaitingRetry(t *testing.T) {
+	ctx := xtest.Context(t)
+	clock := clockwork.NewFakeClock()
+	client := newReconnectorTestClient(reconnectorTestConnectResult{
+		err: xerrors.Transport(status.Error(codes.Unavailable, "connect failed")),
+	})
+	cfg := NewStreamListenerConfig()
+	cfg.Consumer = "test-consumer"
+	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "test-topic"}}
+	listener := newTopicListenerReconnector(client, &cfg, newReconnectorTestHandler(), clock)
+	waitReconnectorCall(ctx, t, client, 0)
+	require.NoError(t, clock.BlockUntilContext(ctx, 1))
+
+	closeTestTopicListenerReconnector(ctx, t, listener)
+	require.ErrorIs(t, listener.WaitInit(ctx), ErrUserCloseTopic)
+}
+
+func TestTopicListenerReconnectorCloseReturnsDeadlineExceeded(t *testing.T) {
+	ctx := xtest.Context(t)
+	listenerRelease := make(chan struct{})
+	streamRelease := make(chan struct{})
+	t.Cleanup(func() {
+		close(listenerRelease)
+		close(streamRelease)
+	})
+
+	listenerStarted := make(chan struct{})
+	listener := &TopicListenerReconnector{
+		connectionCompleted: make(chan struct{}),
+	}
+	listener.background.Start("blocked listener", func(context.Context) {
+		close(listenerStarted)
+		<-listenerRelease
+	})
+	xtest.WaitChannelClosed(t, listenerStarted)
+
+	streamStarted := make(chan struct{})
+	streamListener := &streamListener{
+		tracer:     &trace.Topic{},
+		listenerID: "test-listener-id",
+		sessionID:  "test-session-id",
+	}
+	streamListener.initVars(&listener.connectionIDCounter)
+	streamListener.background.Start("blocked stream", func(context.Context) {
+		close(streamStarted)
+		<-streamRelease
+	})
+	streamListener.syncCommitter = topicreadercommon.NewCommitterStopped(
+		streamListener.tracer,
+		ctx,
+		topicreadercommon.CommitModeSync,
+		func(rawtopicreader.ClientMessage) error { return nil },
+	)
+	listener.streamListener = streamListener
+	xtest.WaitChannelClosed(t, streamStarted)
+
+	closeCtx, cancel := context.WithDeadline(ctx, time.Now().Add(-time.Second))
+	defer cancel()
+	require.ErrorIs(t, listener.Close(closeCtx, ErrUserCloseTopic), context.DeadlineExceeded)
+}
+
+func TestTopicListenerReconnectorStopsWhenContextCanceledDuringStreamCleanup(t *testing.T) {
+	ctx := xtest.Context(t)
+	stream := newReconnectorTestStream("session-1")
+	client := newReconnectorTestClient(reconnectorTestConnectResult{stream: stream})
+	listener, handler := newTestTopicListenerReconnector(t, client)
+	readMessagesRelease := make(chan struct{})
+	handler.readMessagesRelease = readMessagesRelease
+	t.Cleanup(func() {
+		select {
+		case <-readMessagesRelease:
+		default:
+			close(readMessagesRelease)
+		}
+	})
+
+	require.NoError(t, listener.WaitInit(ctx))
+	waitReconnectorCall(ctx, t, client, 0)
+	listener.m.Lock()
+	streamListener := listener.streamListener
+	listener.m.Unlock()
+	require.NotNil(t, streamListener)
+
+	stream.messages <- testStartPartitionSessionMessage()
+	stream.messages <- testReadMessage()
+	select {
+	case <-handler.readMessages:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for blocked read handler")
+	}
+
+	stream.recvErr <- xerrors.Transport(status.Error(codes.Unavailable, "stream failed"))
+	require.Eventually(t, streamListener.closing.Load, time.Second, time.Millisecond)
+
+	closeCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer cancel()
+	require.ErrorIs(
+		t,
+		listener.background.Close(closeCtx, ErrUserCloseTopic),
+		context.DeadlineExceeded,
+	)
+	close(readMessagesRelease)
+
 	require.NoError(t, listener.WaitStop(ctx))
 }
