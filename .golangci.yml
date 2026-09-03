@@ -182,6 +182,9 @@ linters:
       - path: _test\.go
         text: ydb.Connection is deprecated
       - linters:
+          - staticcheck
+        text: StreamExecuteScanQuery is deprecated
+      - linters:
           - funlen
         path: examples
       - linters:
