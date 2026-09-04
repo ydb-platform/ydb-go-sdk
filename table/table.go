@@ -170,6 +170,9 @@ type Session interface {
 		opts ...options.ReadTableOption,
 	) (r result.StreamResult, err error)
 
+	// Deprecated: use query service client (db.Query()) instead.
+	// Will be removed after Mar 2027.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	StreamExecuteScanQuery(ctx context.Context, sql string, params *params.Params,
 		opts ...options.ExecuteScanQueryOption,
 	) (_ result.StreamResult, err error)

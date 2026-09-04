@@ -1,3 +1,5 @@
+* Deprecated `table.Session.StreamExecuteScanQuery`, use the query service client (`db.Query()`) instead
+
 ## v3.151.1
 * Fixed `database/sql` Query Service requests failing on session creation attempt timeouts while the caller context remained active
 
