@@ -135,8 +135,8 @@ func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) bool {
 }
 
 // AddRawServerMessage sends a raw server message
-func (w *PartitionWorker) AddRawServerMessage(msg rawtopicreader.ServerMessage) bool {
-	return w.AddUnifiedMessage(unifiedMessage{RawServerMessage: &msg})
+func (w *PartitionWorker) AddRawServerMessage(msg rawtopicreader.ServerMessage) {
+	w.AddUnifiedMessage(unifiedMessage{RawServerMessage: &msg})
 }
 
 // AddMessagesBatch sends a ready batch message

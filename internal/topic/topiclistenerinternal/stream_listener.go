@@ -463,7 +463,7 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 			continue
 		}
 		if accepted {
-			topicreadercommon.TraceListenerMessagesReceived(
+			topicreadercommon.TraceMessagesReceived(
 				l.background.Context(),
 				l.tracer,
 				l.cfg.ReaderInfo,

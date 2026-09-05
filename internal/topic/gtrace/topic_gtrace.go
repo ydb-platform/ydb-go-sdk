@@ -1181,25 +1181,6 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 		}
 	}
 	{
-		h1 := lhs.OnListenerMessagesReceived
-		h2 := rhs.OnListenerMessagesReceived
-		ret.OnListenerMessagesReceived = func(t trace.TopicListenerMessagesReceivedInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			if h1 != nil {
-				h1(t)
-			}
-			if h2 != nil {
-				h2(t)
-			}
-		}
-	}
-	{
 		h1 := lhs.OnListenerRouteMessage
 		h2 := rhs.OnListenerRouteMessage
 		ret.OnListenerRouteMessage = func(t trace.TopicListenerRouteMessageInfo) {
@@ -1936,13 +1917,6 @@ func onListenerReceiveMessage(t *trace.Topic, t1 trace.TopicListenerReceiveMessa
 	}
 	fn(t1)
 }
-func onListenerMessagesReceived(t *trace.Topic, t1 trace.TopicListenerMessagesReceivedInfo) {
-	fn := t.OnListenerMessagesReceived
-	if fn == nil {
-		return
-	}
-	fn(t1)
-}
 func onListenerRouteMessage(t *trace.Topic, t1 trace.TopicListenerRouteMessageInfo) {
 	fn := t.OnListenerRouteMessage
 	if fn == nil {
@@ -2559,17 +2533,6 @@ func TopicOnListenerReceiveMessage(t *trace.Topic, c *context.Context, listenerI
 	p.BytesSize = bytesSize
 	p.Error = e
 	onListenerReceiveMessage(t, p)
-}
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnListenerMessagesReceived(t *trace.Topic, c *context.Context, endpoint string, database string, topic string, consumer string, messagesCount int) {
-	var p trace.TopicListenerMessagesReceivedInfo
-	p.Context = c
-	p.Endpoint = endpoint
-	p.Database = database
-	p.Topic = topic
-	p.Consumer = consumer
-	p.MessagesCount = messagesCount
-	onListenerMessagesReceived(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TopicOnListenerRouteMessage(t *trace.Topic, c *context.Context, listenerID string, sessionID string, messageType string, partitionSessionID *int64, workerFound bool, e error) {

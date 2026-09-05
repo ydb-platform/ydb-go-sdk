@@ -34,9 +34,9 @@ func TestStreamListener_MessagesReceivedTrace(t *testing.T) {
 		},
 	}
 
-	var events []trace.TopicListenerMessagesReceivedInfo
+	var events []trace.TopicReaderMessagesReceivedInfo
 	listener.tracer = &trace.Topic{
-		OnListenerMessagesReceived: func(info trace.TopicListenerMessagesReceivedInfo) {
+		OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
 			events = append(events, info)
 		},
 	}
@@ -116,9 +116,9 @@ func TestStreamListener_MessagesReceivedTraceOwnsBatchMetadata(t *testing.T) {
 
 	batchMutated := make(chan struct{})
 	traceInfoReceived := make(chan struct{})
-	var traceInfo trace.TopicListenerMessagesReceivedInfo
+	var traceInfo trace.TopicReaderMessagesReceivedInfo
 	listener.tracer = &trace.Topic{
-		OnListenerMessagesReceived: func(info trace.TopicListenerMessagesReceivedInfo) {
+		OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
 			// The listener must have copied the metadata before handing the batch
 			// to the worker. Waiting here makes the handoff and user mutation real
 			// without relying on scheduler timing.
