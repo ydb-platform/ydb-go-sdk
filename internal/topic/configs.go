@@ -12,6 +12,8 @@ type Config struct {
 	config.Common
 
 	Trace              *trace.Topic
+	Endpoint           string
+	Database           string
 	MaxGrpcMessageSize int
 }
 
@@ -42,5 +44,17 @@ func PublicWithOperationCancelAfter(operationCancelAfter time.Duration) Option {
 func WithGrpcMessageSize(sizeBytes int) Option {
 	return func(c *Config) {
 		c.MaxGrpcMessageSize = sizeBytes
+	}
+}
+
+func WithDatabase(database string) Option {
+	return func(c *Config) {
+		c.Database = database
+	}
+}
+
+func WithEndpoint(endpoint string) Option {
+	return func(c *Config) {
+		c.Endpoint = endpoint
 	}
 }

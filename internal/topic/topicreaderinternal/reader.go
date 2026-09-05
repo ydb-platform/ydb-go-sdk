@@ -274,6 +274,12 @@ func WithCredentials(cred credentials.Credentials) PublicReaderOption {
 	}
 }
 
+func WithReaderInfo(readerInfo topicreadercommon.ReaderInfo) PublicReaderOption {
+	return func(cfg *ReaderConfig) {
+		cfg.ReaderInfo = readerInfo
+	}
+}
+
 func WithTrace(tracer *trace.Topic) PublicReaderOption {
 	return func(cfg *ReaderConfig) {
 		cfg.Trace = gtrace.Compose(cfg.Trace, tracer)
@@ -286,7 +292,7 @@ func convertNewParamsToStreamConfig(
 	opts ...PublicReaderOption,
 ) (cfg ReaderConfig) {
 	cfg.topicStreamReaderConfig = newTopicStreamReaderConfig()
-	cfg.Consumer = consumer
+	cfg.ReaderInfo.Consumer = consumer
 
 	// make own copy, for prevent changing internal states if readSelectors will change outside
 	cfg.ReadSelectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))

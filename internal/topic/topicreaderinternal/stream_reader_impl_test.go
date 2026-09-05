@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -26,6 +27,166 @@ import (
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestTopicStreamReaderImpl_MessagesReceivedTraceUsesConfiguredEndpointAfterStreamReplacement(t *testing.T) {
+	e := newTopicReaderTestEnv(t)
+	e.reader.cfg.ReaderInfo = topicreadercommon.ReaderInfo{
+		Endpoint: "configured:2135",
+		Database: "/local",
+		Consumer: "consumer",
+	}
+
+	var events []trace.TopicReaderMessagesReceivedInfo
+	e.reader.cfg.Trace = &trace.Topic{
+		OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
+			events = append(events, info)
+		},
+	}
+
+	readResponse := func(firstOffset int64) *rawtopicreader.ReadResponse {
+		return &rawtopicreader.ReadResponse{
+			BytesSize: 2,
+			PartitionData: []rawtopicreader.PartitionData{
+				{
+					PartitionSessionID: e.partitionSessionID,
+					Batches: []rawtopicreader.Batch{
+						{
+							Codec: rawtopiccommon.CodecRaw,
+							MessageData: []rawtopicreader.MessageData{
+								{Offset: rawtopiccommon.Offset(firstOffset)},
+								{Offset: rawtopiccommon.Offset(firstOffset + 1)},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	require.NoError(t, e.reader.onReadResponse(readResponse(1)))
+
+	// Reconnection replaces the stream but keeps the reader configuration.
+	e.reader.stream = topicreadercommon.NewSyncedStream(e.stream)
+	require.NoError(t, e.reader.onReadResponse(readResponse(3)))
+
+	require.Len(t, events, 2)
+	for _, event := range events {
+		require.Equal(t, "configured:2135", event.Endpoint)
+		require.Equal(t, "/local", event.Database)
+		require.Equal(t, "/test", event.Topic)
+		require.Equal(t, "consumer", event.Consumer)
+		require.Equal(t, 2, event.MessagesCount)
+	}
+
+	invalidResponse := readResponse(5)
+	invalidResponse.PartitionData[0].PartitionSessionID++
+	require.Error(t, e.reader.onReadResponse(invalidResponse))
+	require.Len(t, events, 2)
+
+	require.NoError(t, e.reader.batcher.Close(errors.New("test batcher closed")))
+	require.Error(t, e.reader.onReadResponse(readResponse(7)))
+	require.Len(t, events, 2)
+}
+
+func TestTopicStreamReaderImpl_MessagesReceivedTraceSnapshotsBatchBeforeHandoff(t *testing.T) {
+	xtest.TestManyTimesWithName(t, "ConcurrentBatchOwnership", func(t testing.TB) {
+		e := newTopicReaderTestEnv(t)
+		e.reader.freeBytes = make(chan int, 1)
+		e.reader.cfg.ReaderInfo = topicreadercommon.ReaderInfo{
+			Endpoint: "configured:2135",
+			Database: "/local",
+			Consumer: "consumer",
+		}
+
+		events := make(chan trace.TopicReaderMessagesReceivedInfo, 1)
+		e.reader.cfg.Trace = &trace.Topic{
+			OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
+				events <- info
+			},
+		}
+
+		readResponse := &rawtopicreader.ReadResponse{
+			BytesSize: 2,
+			PartitionData: []rawtopicreader.PartitionData{
+				{
+					PartitionSessionID: e.partitionSessionID,
+					Batches: []rawtopicreader.Batch{
+						{
+							Codec: rawtopiccommon.CodecRaw,
+							MessageData: []rawtopicreader.MessageData{
+								{Offset: 1},
+								{Offset: 2},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		type readResult struct {
+			batch *topicreadercommon.PublicBatch
+			err   error
+		}
+		readResultCh := make(chan readResult)
+		go func() {
+			batch, err := e.reader.ReadMessageBatch(e.ctx, ReadMessageBatchOptions{
+				batcherGetOptions: batcherGetOptions{MinCount: 1},
+			})
+			readResultCh <- readResult{batch: batch, err: err}
+		}()
+
+		// Ensure the reader is waiting for the batcher notification before handing it a response.
+		e.reader.batcher.notifyAboutNewMessages()
+		xtest.SpinWaitCondition(t, &e.reader.batcher.m, func() bool {
+			return len(e.reader.batcher.hasNewMessages) == 0
+		})
+
+		responseFinished := make(chan struct{})
+		var responseErr error
+		go func() {
+			responseErr = e.reader.onReadResponse(readResponse)
+			close(responseFinished)
+		}()
+
+		result := <-readResultCh
+		require.NoError(t, result.err)
+		require.NotNil(t, result.batch)
+		originalMessages := result.batch.Messages
+
+		// The batch pointer is now owned by the caller. Keep mutating its public slice while
+		// the receive path finishes to exercise the handoff that used to race with len(Messages).
+		mutationFinished := make(chan struct{})
+		go func() {
+			defer close(mutationFinished)
+			for {
+				select {
+				case <-responseFinished:
+					return
+				default:
+				}
+
+				result.batch.Messages = nil
+				result.batch.Messages = originalMessages
+				runtime.Gosched()
+			}
+		}()
+
+		<-responseFinished
+		<-mutationFinished
+		require.NoError(t, responseErr)
+
+		select {
+		case event := <-events:
+			require.Equal(t, "configured:2135", event.Endpoint)
+			require.Equal(t, "/local", event.Database)
+			require.Equal(t, "/test", event.Topic)
+			require.Equal(t, "consumer", event.Consumer)
+			require.Equal(t, 2, event.MessagesCount)
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for received messages trace")
+		}
+	})
+}
 
 func TestTopicStreamReaderImpl_BufferCounterOnStopPartition(t *testing.T) {
 	table := []struct {

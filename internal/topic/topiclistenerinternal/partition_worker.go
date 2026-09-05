@@ -125,10 +125,13 @@ func (w *PartitionWorker) Start(ctx context.Context) {
 }
 
 // AddUnifiedMessage adds a unified message to the processing queue
-func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) {
-	if !w.messageQueue.SendWithMerge(msg, w.tryMergeMessages) {
+func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) bool {
+	accepted := w.messageQueue.SendWithMerge(msg, w.tryMergeMessages)
+	if !accepted {
 		w.freeBatchCredit(msg)
 	}
+
+	return accepted
 }
 
 // AddRawServerMessage sends a raw server message
@@ -140,8 +143,8 @@ func (w *PartitionWorker) AddRawServerMessage(msg rawtopicreader.ServerMessage) 
 func (w *PartitionWorker) AddMessagesBatch(
 	metadata rawtopiccommon.ServerMessageMetadata,
 	batch *topicreadercommon.PublicBatch,
-) {
-	w.AddUnifiedMessage(unifiedMessage{
+) bool {
+	return w.AddUnifiedMessage(unifiedMessage{
 		BatchMessage: &batchMessage{
 			ServerMessageMetadata: metadata,
 			Batch:                 batch,
