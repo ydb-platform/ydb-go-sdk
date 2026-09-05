@@ -24,3 +24,15 @@ type Registry interface {
 	// If histogram by args nothing - create and return newest histogram
 	HistogramVec(name string, buckets []float64, labelNames ...string) HistogramVec
 }
+
+// RegistryWithDescriptors is an optional Registry capability for creating a
+// counter with an explicit instrument name and unit.
+//
+// The name passed to CounterVecWithDescriptor is used as a complete instrument
+// name by implementations that support this capability. Registries that do
+// not implement RegistryWithDescriptors continue to use Registry.CounterVec.
+// This capability is intentionally additive so existing Registry and Config
+// implementations remain valid.
+type RegistryWithDescriptors interface {
+	CounterVecWithDescriptor(name, unit string, labelNames ...string) CounterVec
+}

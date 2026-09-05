@@ -158,6 +158,8 @@ type (
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnListenerReceiveMessage func(TopicListenerReceiveMessageInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnListenerMessagesReceived func(TopicListenerMessagesReceivedInfo)
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnListenerRouteMessage func(TopicListenerRouteMessageInfo)
@@ -731,6 +733,16 @@ type (
 		MessageType string
 		BytesSize   int
 		Error       error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicListenerMessagesReceivedInfo struct {
+		Context       *context.Context
+		Endpoint      string
+		Database      string
+		Topic         string
+		Consumer      string
+		MessagesCount int
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

@@ -25,3 +25,23 @@ func TraceMessagesReceived(
 		messagesCount,
 	)
 }
+
+// TraceListenerMessagesReceived emits a listener message reception trace
+// event.
+func TraceListenerMessagesReceived(
+	ctx context.Context,
+	tracer *trace.Topic,
+	readerInfo ReaderInfo,
+	topic string,
+	messagesCount int,
+) {
+	gtrace.TopicOnListenerMessagesReceived(
+		tracer,
+		&ctx,
+		readerInfo.Endpoint,
+		readerInfo.Database,
+		topic,
+		readerInfo.Consumer,
+		messagesCount,
+	)
+}

@@ -77,3 +77,205 @@ func TestTopicReaderReceivedMessagesMetricDisabled(t *testing.T) {
 		"consumer": "consumer-a",
 	}))
 }
+
+func TestTopicReaderReceivedMessagesMetricDescriptorAndBatchAdd(t *testing.T) {
+	registry := newRecordingRegistry()
+	descriptor := &recordingDescriptor{}
+	config := descriptorRecordingConfig{
+		recordingConfig: recordingConfig{
+			registry: registry,
+			details:  trace.TopicReaderMessageEvents,
+		},
+		descriptor: descriptor,
+	}
+	tracer := topic(config.WithSystem("ydb"))
+
+	require.Equal(t, topicReaderReceivedMessagesName, descriptor.name)
+	require.Equal(t, topicReaderReceivedMessagesUnit, descriptor.unit)
+	require.Equal(t, "counter", registry.kinds[topicReaderReceivedMessagesName])
+
+	info := trace.TopicReaderMessagesReceivedInfo{
+		Endpoint:      "node-a:2135",
+		Database:      "/local",
+		Topic:         "/local/topic-a",
+		Consumer:      "consumer-a",
+		MessagesCount: 3,
+	}
+	tracer.OnReaderMessagesReceived(info)
+	tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{MessagesCount: 0})
+	tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{MessagesCount: -1})
+
+	require.Equal(t, []int64{3}, descriptor.adds)
+	require.Equal(t, float64(3), registry.value(topicReaderReceivedMessagesName, map[string]string{
+		"endpoint": "node-a:2135",
+		"database": "/local",
+		"topic":    "/local/topic-a",
+		"consumer": "consumer-a",
+	}))
+}
+
+func TestTopicReaderReceivedMessagesMetricDescriptorSurvivesScopedConfig(t *testing.T) {
+	registry := newRecordingRegistry()
+	descriptor := &recordingDescriptor{}
+	config := descriptorRecordingConfig{
+		recordingConfig: recordingConfig{
+			registry: registry,
+			details:  trace.TopicReaderMessageEvents,
+		},
+		descriptor:  descriptor,
+		dropOnScope: true,
+	}
+	option := WithTraces(config)
+	require.NotNil(t, option)
+
+	require.Equal(t, topicReaderReceivedMessagesName, descriptor.name)
+	require.Equal(t, topicReaderReceivedMessagesUnit, descriptor.unit)
+}
+
+func TestTopicListenerReceivedMessagesMetricUsesListenerDetails(t *testing.T) {
+	registry := newRecordingRegistry()
+	tracer := topic(recordingConfig{
+		registry: registry,
+		details:  trace.TopicListenerEvents,
+	})
+	info := trace.TopicListenerMessagesReceivedInfo{
+		Endpoint:      "node-a:2135",
+		Database:      "/local",
+		Topic:         "/local/topic-a",
+		Consumer:      "consumer-a",
+		MessagesCount: 2,
+	}
+
+	tracer.OnListenerMessagesReceived(info)
+	tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
+		Endpoint:      info.Endpoint,
+		Database:      info.Database,
+		Topic:         info.Topic,
+		Consumer:      info.Consumer,
+		MessagesCount: info.MessagesCount,
+	})
+
+	labels := map[string]string{
+		"endpoint": info.Endpoint,
+		"database": info.Database,
+		"topic":    info.Topic,
+		"consumer": info.Consumer,
+	}
+	require.Equal(t, float64(2), registry.value("topic.reader.received.messages", labels))
+}
+
+func TestTopicReaderReceivedMessagesMetricDoesNotUseListenerDetailsForReader(t *testing.T) {
+	registry := newRecordingRegistry()
+	tracer := topic(recordingConfig{
+		registry: registry,
+		details:  trace.TopicReaderMessageEvents,
+	})
+
+	tracer.OnListenerMessagesReceived(trace.TopicListenerMessagesReceivedInfo{
+		Endpoint:      "node-a:2135",
+		Database:      "/local",
+		Topic:         "/local/topic-a",
+		Consumer:      "consumer-a",
+		MessagesCount: 2,
+	})
+
+	require.Zero(t, registry.value("topic.reader.received.messages", map[string]string{
+		"endpoint": "node-a:2135",
+		"database": "/local",
+		"topic":    "/local/topic-a",
+		"consumer": "consumer-a",
+	}))
+}
+
+func TestAddCounterIgnoresNonPositiveDelta(t *testing.T) {
+	counter := &batchRecordingCounter{}
+
+	addCounter(counter, 0)
+	addCounter(counter, -1)
+
+	require.Empty(t, counter.adds)
+	require.Zero(t, counter.incs)
+}
+
+type recordingDescriptor struct {
+	name string
+	unit string
+	adds []int64
+}
+
+type descriptorRecordingConfig struct {
+	recordingConfig
+
+	descriptor  *recordingDescriptor
+	dropOnScope bool
+}
+
+func (c descriptorRecordingConfig) WithSystem(system string) Config {
+	if c.dropOnScope {
+		return c.recordingConfig.WithSystem(system)
+	}
+
+	scoped := c.recordingConfig.WithSystem(system).(recordingConfig)
+	c.recordingConfig = scoped
+
+	return c
+}
+
+func (c descriptorRecordingConfig) CounterVecWithDescriptor(
+	name, unit string,
+	labelNames ...string,
+) CounterVec {
+	c.descriptor.name = name
+	c.descriptor.unit = unit
+	c.registry.register(name, "counter", labelNames)
+
+	return descriptorRecordingCounterVec{
+		registry:   c.registry,
+		path:       name,
+		descriptor: c.descriptor,
+	}
+}
+
+type descriptorRecordingCounterVec struct {
+	registry   *recordingRegistry
+	path       string
+	descriptor *recordingDescriptor
+}
+
+func (v descriptorRecordingCounterVec) With(labels map[string]string) Counter {
+	return descriptorRecordingCounter{
+		registry:   v.registry,
+		path:       v.path,
+		labels:     labels,
+		descriptor: v.descriptor,
+	}
+}
+
+type descriptorRecordingCounter struct {
+	registry   *recordingRegistry
+	path       string
+	labels     map[string]string
+	descriptor *recordingDescriptor
+}
+
+func (c descriptorRecordingCounter) Inc() {
+	c.registry.add(c.path, c.labels, 1)
+}
+
+func (c descriptorRecordingCounter) Add(delta int64) {
+	c.descriptor.adds = append(c.descriptor.adds, delta)
+	c.registry.add(c.path, c.labels, float64(delta))
+}
+
+type batchRecordingCounter struct {
+	incs int
+	adds []int64
+}
+
+func (c *batchRecordingCounter) Inc() {
+	c.incs++
+}
+
+func (c *batchRecordingCounter) Add(delta int64) {
+	c.adds = append(c.adds, delta)
+}

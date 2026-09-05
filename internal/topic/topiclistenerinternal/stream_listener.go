@@ -449,6 +449,8 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 	// Route each batch to its partition worker
 	for _, batch := range batches {
 		partitionSession := topicreadercommon.BatchGetPartitionSession(batch)
+		topic := batch.Topic()
+		messagesCount := len(batch.Messages)
 		accepted := false
 		routed := l.routeToWorker(partitionSession.StreamPartitionSessionID, func(worker *PartitionWorker) {
 			accepted = worker.AddMessagesBatch(m.ServerMessageMetadata, batch)
@@ -461,12 +463,12 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 			continue
 		}
 		if accepted {
-			topicreadercommon.TraceMessagesReceived(
+			topicreadercommon.TraceListenerMessagesReceived(
 				l.background.Context(),
 				l.tracer,
 				l.cfg.ReaderInfo,
-				batch.Topic(),
-				len(batch.Messages),
+				topic,
+				messagesCount,
 			)
 		}
 	}

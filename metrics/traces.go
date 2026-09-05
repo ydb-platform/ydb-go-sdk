@@ -10,6 +10,7 @@ func WithTraces(config Config) ydb.Option {
 	if config == nil {
 		return nil
 	}
+	rootConfig := config
 	config = config.WithSystem("ydb")
 
 	return ydb.MergeOptions(
@@ -17,7 +18,7 @@ func WithTraces(config Config) ydb.Option {
 		ydb.WithTraceDriver(driver(config)),
 		ydb.WithTraceTable(table(config)),
 		ydb.WithTraceQuery(query(config)),
-		ydb.WithTraceTopic(topic(config)),
+		ydb.WithTraceTopic(topicWithRoot(config, rootConfig)),
 		ydb.WithTraceScripting(scripting(config)),
 		ydb.WithTraceScheme(scheme(config)),
 		ydb.WithTraceCoordination(coordination(config)),

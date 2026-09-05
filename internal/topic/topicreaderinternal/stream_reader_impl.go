@@ -838,6 +838,9 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 	}
 
 	for i := range batches {
+		topic := batches[i].Topic()
+		messagesCount := len(batches[i].Messages)
+
 		if err := r.batcher.PushBatches(batches[i]); err != nil {
 			return err
 		}
@@ -846,8 +849,8 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 			r.cfg.BaseContext,
 			r.cfg.Trace,
 			r.cfg.ReaderInfo,
-			batches[i].Topic(),
-			len(batches[i].Messages),
+			topic,
+			messagesCount,
 		)
 	}
 
