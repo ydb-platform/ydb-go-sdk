@@ -969,9 +969,6 @@ func (r *topicStreamReaderImpl) finalizeLocalBuffer() {
 	r.localBufferMu.Unlock()
 
 	for topic, balance := range balances {
-		if balance == 0 {
-			continue
-		}
 		topicreadercommon.TraceLocalBufferChanged(
 			r.cfg.BaseContext,
 			r.cfg.Trace,

@@ -583,9 +583,6 @@ func (l *streamListener) finalizeLocalBuffer() {
 	l.localBufferMu.Unlock()
 
 	for topic, balance := range balances {
-		if balance == 0 {
-			continue
-		}
 		topicreadercommon.TraceLocalBufferChanged(
 			l.background.Context(),
 			l.tracer,

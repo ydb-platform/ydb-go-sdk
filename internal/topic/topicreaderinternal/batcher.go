@@ -53,9 +53,9 @@ func (b *batcher) Close(err error) error {
 	return nil
 }
 
-// Drain removes all queued items and returns them to the owner. Callers must
-// release any resources associated with returned batches outside the batcher
-// mutex.
+// Drain removes all queued items and returns the queued batches to the owner.
+// Callers must release any resources associated with returned batches outside
+// the batcher mutex.
 func (b *batcher) Drain() []batcherMessageOrderItem {
 	b.m.Lock()
 	defer b.m.Unlock()
