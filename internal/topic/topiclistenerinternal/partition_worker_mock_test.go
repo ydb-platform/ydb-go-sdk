@@ -130,3 +130,100 @@ func (c *MockReadBufferReleaserReadBufferReleaseCall) DoAndReturn(f func(int)) *
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
+
+// MocklocalBufferTracker is a mock of localBufferTracker interface.
+type MocklocalBufferTracker struct {
+	ctrl     *gomock.Controller
+	recorder *MocklocalBufferTrackerMockRecorder
+}
+
+// MocklocalBufferTrackerMockRecorder is the mock recorder for MocklocalBufferTracker.
+type MocklocalBufferTrackerMockRecorder struct {
+	mock *MocklocalBufferTracker
+}
+
+// NewMocklocalBufferTracker creates a new mock instance.
+func NewMocklocalBufferTracker(ctrl *gomock.Controller) *MocklocalBufferTracker {
+	mock := &MocklocalBufferTracker{ctrl: ctrl}
+	mock.recorder = &MocklocalBufferTrackerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MocklocalBufferTracker) EXPECT() *MocklocalBufferTrackerMockRecorder {
+	return m.recorder
+}
+
+// releaseLocalBuffer mocks base method.
+func (m *MocklocalBufferTracker) releaseLocalBuffer(topic string, messagesCount int) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "releaseLocalBuffer", topic, messagesCount)
+}
+
+// releaseLocalBuffer indicates an expected call of releaseLocalBuffer.
+func (mr *MocklocalBufferTrackerMockRecorder) releaseLocalBuffer(topic, messagesCount any) *MocklocalBufferTrackerreleaseLocalBufferCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "releaseLocalBuffer", reflect.TypeOf((*MocklocalBufferTracker)(nil).releaseLocalBuffer), topic, messagesCount)
+	return &MocklocalBufferTrackerreleaseLocalBufferCall{Call: call}
+}
+
+// MocklocalBufferTrackerreleaseLocalBufferCall wrap *gomock.Call
+type MocklocalBufferTrackerreleaseLocalBufferCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MocklocalBufferTrackerreleaseLocalBufferCall) Return() *MocklocalBufferTrackerreleaseLocalBufferCall {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MocklocalBufferTrackerreleaseLocalBufferCall) Do(f func(string, int)) *MocklocalBufferTrackerreleaseLocalBufferCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MocklocalBufferTrackerreleaseLocalBufferCall) DoAndReturn(f func(string, int)) *MocklocalBufferTrackerreleaseLocalBufferCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// reserveLocalBuffer mocks base method.
+func (m *MocklocalBufferTracker) reserveLocalBuffer(topic string, messagesCount int) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "reserveLocalBuffer", topic, messagesCount)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// reserveLocalBuffer indicates an expected call of reserveLocalBuffer.
+func (mr *MocklocalBufferTrackerMockRecorder) reserveLocalBuffer(topic, messagesCount any) *MocklocalBufferTrackerreserveLocalBufferCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "reserveLocalBuffer", reflect.TypeOf((*MocklocalBufferTracker)(nil).reserveLocalBuffer), topic, messagesCount)
+	return &MocklocalBufferTrackerreserveLocalBufferCall{Call: call}
+}
+
+// MocklocalBufferTrackerreserveLocalBufferCall wrap *gomock.Call
+type MocklocalBufferTrackerreserveLocalBufferCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MocklocalBufferTrackerreserveLocalBufferCall) Return(arg0 bool) *MocklocalBufferTrackerreserveLocalBufferCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MocklocalBufferTrackerreserveLocalBufferCall) Do(f func(string, int) bool) *MocklocalBufferTrackerreserveLocalBufferCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MocklocalBufferTrackerreserveLocalBufferCall) DoAndReturn(f func(string, int) bool) *MocklocalBufferTrackerreserveLocalBufferCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
