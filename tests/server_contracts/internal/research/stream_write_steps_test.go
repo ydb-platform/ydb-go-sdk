@@ -18,6 +18,7 @@ const streamWriteStepPrefix = `^TopicService\.StreamWrite(?: "([^"]+)")?: `
 const streamWriteRequestStepPattern = streamWriteStepPrefix + `WriteRequest(?:\{([^}]*)\})? messages:$`
 
 func initializeStreamWriteSteps(sc *godog.ScenarioContext) {
+	sc.Step(`^research runner: pipeline TopicService\.StreamWrite requests$`, stepPipelineWrites)
 	sc.Step(
 		streamWriteStepPrefix+`InitRequest\{([^}]*)\}$`,
 		stepOpenStreamWrite,
@@ -153,12 +154,35 @@ func stepSendWriteRequest(ctx context.Context, name, parameters string, table *g
 	} else if ctx.Err() != nil {
 		return ctx.Err()
 	}
+	if session.pipelineWrites {
+		return nil
+	}
 	// A transport error is an observation too; still drain any final server response.
 	if err := session.observeWriteResponses(ctx, session.takePendingResponses()); err != nil {
 		return err
 	}
 
 	return session.observeStreamEndOrIdle(ctx)
+}
+
+func stepPipelineWrites(ctx context.Context) error {
+	research, err := ensureStreamWriteResearch(ctx)
+	if err != nil {
+		return err
+	}
+	research.pipelineWrites = true
+
+	return nil
+}
+
+func (r *streamWriteResearch) drainPendingWrites(ctx context.Context) error {
+	for _, session := range r.writeSessions {
+		if err := session.observeWriteResponses(ctx, session.takePendingResponses()); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func buildWriteRequest(

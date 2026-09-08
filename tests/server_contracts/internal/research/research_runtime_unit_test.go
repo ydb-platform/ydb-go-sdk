@@ -255,23 +255,28 @@ func TestTopicFixtureStepParameters(t *testing.T) {
 		step       string
 		partitions int64
 		consumer   string
+		paused     bool
 	}{
 		{step: "an empty topic", partitions: 1},
 		{step: "an empty topic with 2 partitions", partitions: 2},
+		{step: "an empty topic with 1 partitions with paused auto partitioning", partitions: 1, paused: true},
 		{step: `an empty topic with consumer "reader" for observation`, partitions: 1, consumer: "reader"},
 		{step: `an empty topic with 3 partitions with consumer "reader" for observation`, partitions: 3, consumer: "reader"},
 	} {
 		t.Run(test.step, func(t *testing.T) {
 			matches := pattern.FindStringSubmatch(test.step)
-			if len(matches) != 3 {
+			if len(matches) != 4 {
 				t.Fatalf("step does not match fixture vocabulary: %q", test.step)
 			}
 			count, err := parseTopicPartitionCount(matches[1])
 			if err != nil {
 				t.Fatal(err)
 			}
-			if count != test.partitions || matches[2] != test.consumer {
-				t.Fatalf("parsed partitions=%d consumer=%q, want %d %q", count, matches[2], test.partitions, test.consumer)
+			if count != test.partitions || matches[3] != test.consumer {
+				t.Fatalf("parsed partitions=%d consumer=%q, want %d %q", count, matches[3], test.partitions, test.consumer)
+			}
+			if (matches[2] != "") != test.paused {
+				t.Fatalf("parsed paused=%q, want %t", matches[2], test.paused)
 			}
 		})
 	}
@@ -288,7 +293,8 @@ func TestFormatTopicPartitionStats(t *testing.T) {
 		{PartitionID: 1, PartitionStats: topictypes.PartitionStats{PartitionsOffset: topictypes.OffsetRange{End: 2}}},
 	}
 	want := `Decoded Ydb.Topic.DescribeTopicResult: path="/local/topic", partitions=[` +
-		`{partition_id=5, partition_stats={end_offset=3}}; {partition_id=1, partition_stats={end_offset=2}}].`
+		`{partition_id=5, active=false, parent_partition_ids=[], child_partition_ids=[], partition_stats={end_offset=3}}; ` +
+		`{partition_id=1, active=false, parent_partition_ids=[], child_partition_ids=[], partition_stats={end_offset=2}}].`
 	if got := formatTopicPartitionStats("/local/topic", partitions); got != want {
 		t.Fatalf("unexpected partition statistics: %s, want %s", got, want)
 	}
@@ -607,6 +613,66 @@ func TestUnselectedStreamKeepsReceiving(t *testing.T) {
 	}
 	if _, err := session.receive(ctx); !errors.Is(err, io.EOF) {
 		t.Fatalf("lost terminal stream error: %v", err)
+	}
+}
+
+func TestPipelineWritesDoNotWaitForACKs(t *testing.T) {
+	research := &streamWriteResearch{}
+	session, wire := startControlledSession(t, research, "P0")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	ctx = context.WithValue(ctx, worldContextKey{}, &researchWorld{research: research})
+	if err := stepPipelineWrites(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, seq := range []string{"1", "2"} {
+		if err := stepSendWriteRequest(ctx, "P0", "", messageTableForTest(
+			[]string{"data", "seq_no"}, []string{"message", seq},
+		)); err != nil {
+			t.Fatalf("pipelined send waited for an ACK: %v", err)
+		}
+	}
+	if len(wire.sent) != 2 {
+		t.Fatalf("sent %d requests before ACKs, want 2", len(wire.sent))
+	}
+	wire.received <- streamWriteReceive{message: writeAckForTest(2)}
+	wire.received <- streamWriteReceive{message: writeAckForTest(1)}
+	if err := research.drainPendingWrites(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if pending := session.takePendingResponses(); pending != 0 {
+		t.Fatalf("remaining pending responses: %d", pending)
+	}
+}
+
+func TestReadPartitionIDs(t *testing.T) {
+	ids, err := parseReadPartitionIDs("0, 1, 42")
+	if err != nil || fmt.Sprint(ids) != "[0 1 42]" {
+		t.Fatalf("parsed %v: %v", ids, err)
+	}
+	for _, invalid := range []string{"", "0,", "0,0", "-1", "other", "9223372036854775808"} {
+		if _, err := parseReadPartitionIDs(invalid); err == nil {
+			t.Errorf("accepted invalid partitions %q", invalid)
+		}
+	}
+}
+
+func TestAlterTopicParameters(t *testing.T) {
+	request, err := parseAlterTopicRequest(
+		"alter_partitioning_settings: {set_min_active_partitions: 2, set_max_active_partitions: 2}", "/local/fixture",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.GetPath() != "/local/fixture" || request.GetOperationParams().GetOperationMode().String() != "SYNC" ||
+		request.GetAlterPartitioningSettings().GetSetMinActivePartitions() != 2 ||
+		request.GetAlterPartitioningSettings().GetSetMaxActivePartitions() != 2 {
+		t.Fatalf("unexpected AlterTopicRequest: %v", request)
+	}
+	for _, invalid := range []string{`path: "/other/topic"`, "operation_params: {}", "unknown: 1"} {
+		if _, err := parseAlterTopicRequest(invalid, "/local/fixture"); err == nil {
+			t.Errorf("accepted invalid alteration %q", invalid)
+		}
 	}
 }
 

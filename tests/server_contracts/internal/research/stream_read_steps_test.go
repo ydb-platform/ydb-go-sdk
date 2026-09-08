@@ -21,7 +21,7 @@ const streamReadResponseIdleTimeout = 2 * time.Second
 
 func initializeStreamReadSteps(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^TopicService\.StreamRead: InitRequest\{consumer: ([^,}]+), partition_ids: \[0\]\}$`,
+		`^TopicService\.StreamRead: InitRequest\{consumer: ([^,}]+), partition_ids: \[([0-9, ]+)\]\}$`,
 		stepOpenStreamRead,
 	)
 	sc.Step(
@@ -34,7 +34,11 @@ func initializeStreamReadSteps(sc *godog.ScenarioContext) {
 	)
 }
 
-func stepOpenStreamRead(ctx context.Context, consumer string) error {
+func stepOpenStreamRead(ctx context.Context, consumer, partitions string) error {
+	partitionIDs, err := parseReadPartitionIDs(partitions)
+	if err != nil {
+		return err
+	}
 	research, err := researchFromContext(ctx)
 	if err != nil {
 		return err
@@ -59,7 +63,7 @@ func stepOpenStreamRead(ctx context.Context, consumer string) error {
 			InitRequest: &Ydb_Topic.StreamReadMessage_InitRequest{
 				TopicsReadSettings: []*Ydb_Topic.StreamReadMessage_InitRequest_TopicReadSettings{{
 					Path:         research.world.topicPath,
-					PartitionIds: []int64{0},
+					PartitionIds: partitionIDs,
 				}},
 				Consumer: consumer,
 			},
@@ -73,8 +77,10 @@ func stepOpenStreamRead(ctx context.Context, consumer string) error {
 	}
 
 	initObserved := false
-	for !initObserved || !research.readPartitionReady {
-		response, recvErr := research.receiveRead(ctx)
+	windowCtx, windowCancel := context.WithTimeout(ctx, streamReadResponseIdleTimeout)
+	defer windowCancel()
+	for !initObserved || len(research.readPartitionSessions) < len(partitionIDs) {
+		response, recvErr := research.receiveRead(windowCtx)
 		if recvErr != nil {
 			return ctx.Err()
 		}
@@ -85,12 +91,27 @@ func stepOpenStreamRead(ctx context.Context, consumer string) error {
 			initObserved = true
 		}
 		if start := response.GetStartPartitionSessionRequest(); start != nil {
-			research.readPartitionSessionID = start.GetPartitionSession().GetPartitionSessionId()
-			research.readPartitionReady = true
+			sessionID := start.GetPartitionSession().GetPartitionSessionId()
+			research.readPartitionSessions = append(research.readPartitionSessions, sessionID)
 		}
 	}
 
 	return nil
+}
+
+func parseReadPartitionIDs(value string) ([]int64, error) {
+	var ids []int64
+	seen := make(map[int64]bool)
+	for text := range strings.SplitSeq(value, ",") {
+		id, err := strconv.ParseInt(strings.TrimSpace(text), 10, 64)
+		if err != nil || id < 0 || seen[id] {
+			return nil, fmt.Errorf("invalid or repeated StreamRead partition_id %q", text)
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+
+	return ids, nil
 }
 
 func stepStartReadPartition(ctx context.Context) error {
@@ -98,27 +119,36 @@ func stepStartReadPartition(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if research.readStream == nil || !research.readPartitionReady {
+	if research.readStream == nil || len(research.readPartitionSessions) == 0 {
 		research.observe("Research client has no StartPartitionSessionRequest to answer.")
 
 		return nil
 	}
 
+	for _, sessionID := range research.readPartitionSessions {
+		if err := research.startReadPartition(sessionID); err != nil {
+			research.observeStreamReadEnd(err)
+
+			break
+		}
+	}
+
+	return nil
+}
+
+func (r *streamWriteResearch) startReadPartition(sessionID int64) error {
 	readOffset := int64(0)
 	request := &Ydb_Topic.StreamReadMessage_FromClient{
 		ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_StartPartitionSessionResponse{
 			StartPartitionSessionResponse: &Ydb_Topic.StreamReadMessage_StartPartitionSessionResponse{
-				PartitionSessionId: research.readPartitionSessionID,
+				PartitionSessionId: sessionID,
 				ReadOffset:         &readOffset,
 			},
 		},
 	}
-	research.observeStreamReadRequest(request)
-	if sendErr := research.readStream.Send(request); sendErr != nil {
-		research.observeStreamReadEnd(sendErr)
-	}
+	r.observeStreamReadRequest(request)
 
-	return nil
+	return r.readStream.Send(request)
 }
 
 func stepReadTopicMessages(ctx context.Context, bytesSizeText string) error {
@@ -126,7 +156,7 @@ func stepReadTopicMessages(ctx context.Context, bytesSizeText string) error {
 	if err != nil {
 		return err
 	}
-	if research.readStream == nil || !research.readPartitionReady {
+	if research.readStream == nil || len(research.readPartitionSessions) == 0 {
 		research.observe("Research client has no active partition session for ReadRequest.")
 
 		return nil

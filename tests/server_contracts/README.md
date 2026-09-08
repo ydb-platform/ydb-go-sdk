@@ -11,7 +11,7 @@ Each scenario has an adjacent `# Observed on YDB ...` comment containing the cur
 version on which it was observed. These comments are dated evidence, not assertions; update them after intentionally rerunning
 the scenario against another server version.
 
-The full suite (21 scenarios in 10 feature files) was recorded with the race detector on 2026-09-08 against
+The full suite (27 scenarios in 14 feature files) was recorded with the race detector on 2026-09-08 against
 `ydbplatform/local-ydb:trunk`, reporting `main.7f40cb4` through the YDB API. The image digest was
 `sha256:7437fab163ffcc3594d3f2498d6e2888cc31928d3d5a00f7372a2d8455408789`.
 Query transaction experiments use serializable read-write isolation; they do not compare isolation levels or test SDK pooling.
@@ -124,7 +124,16 @@ Live event order is client-observed order, not a claim about the server's intern
 
 The fixture step `* an empty topic` creates one partition by default. Use `* an empty topic with 2 partitions` to set both
 minimum and maximum active partition counts. It can also include `with consumer "reader" for observation` when reading payloads
-is needed. `DescribeTopic` prints the statistics of all returned partitions, including before a write session is opened.
+is needed. `with paused auto partitioning` enables manual splitting via `AlterTopic` without load-triggered scaling.
+`DescribeTopic` prints all partition offsets, active flags, and parent/child IDs, including before a write session is opened.
+
+`TopicService.AlterTopic: AlterTopicRequest{...}` accepts protobuf text-format fields. The topic path is always the scenario's
+fixture and the operation mode is synchronous. For example, `alter_partitioning_settings: {set_min_active_partitions: 2,
+set_max_active_partitions: 2}` splits a fresh one-partition topic created with paused auto partitioning on the tested version.
+Splitting is verified from the observed parent/child topology, not inferred from the partition count alone.
+
+`StreamRead` accepts multiple explicit `partition_ids`, such as `[0, 1]`; the start step answers each observed partition session.
+The trace preserves partition-session IDs so payloads and offsets can be attributed to the correct partition.
 
 Use Gherkin's neutral `*` step keyword and describe only controlled client actions with actual gRPC method and protobuf message
 names. Do not describe expected responses: the live trace prints whatever the server returns. `Recv` is implicit; keep
@@ -187,3 +196,12 @@ partially sent batch. The old `tx` column is rejected rather than silently split
 Send and receive still run in separate goroutines; the step implicitly observes responses after sending its batch. Use
 separate single-row steps when the experiment requires separate WriteRequests. Add a Go step only when an experiment
 introduces a protocol action that the shared vocabulary cannot express.
+
+`* research runner: pipeline TopicService.StreamWrite requests` stops waiting for ACKs between write steps. The single sender
+per stream still serializes gRPC Send calls while the receiver records responses concurrently. Commit implicitly observes
+pending responses; it does not assert that a response succeeded. This lets multiple transactions have requests in flight
+through one stream without introducing concurrent Send calls on that stream.
+
+Recovery scenarios explicitly replay the entire logical transaction after rollback or an observed commit rejection. The ACK
+fault control records a real server WriteResponse, withholds it from the scenario, and cancels the stream. It does not simulate
+an ambiguous commit result. Split replay uses new per-child producers; no SDK retry, routing, or ACK-dispatch behavior is tested.

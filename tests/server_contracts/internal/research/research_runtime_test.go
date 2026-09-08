@@ -23,14 +23,14 @@ import (
 type streamWriteResearch struct {
 	world *researchWorld
 
-	writeSessions          []*streamWriteSession
-	namedStreams           map[string]*streamWriteSession
-	readStream             Ydb_Topic_V1.TopicService_StreamReadClient
-	readCancel             context.CancelFunc
-	readResults            chan streamReadReceive
-	readDone               chan struct{}
-	readPartitionSessionID int64
-	readPartitionReady     bool
+	writeSessions         []*streamWriteSession
+	namedStreams          map[string]*streamWriteSession
+	readStream            Ydb_Topic_V1.TopicService_StreamReadClient
+	readCancel            context.CancelFunc
+	readResults           chan streamReadReceive
+	readDone              chan struct{}
+	readPartitionSessions []int64
+	pipelineWrites        bool
 
 	transactions       []*leasedQueryTransaction
 	namedTransactions  map[string]*leasedQueryTransaction
@@ -113,8 +113,11 @@ func stepNamedQueryTransactionOpen(ctx context.Context, name string) error {
 }
 
 func stepNamedQueryTransactionCommit(ctx context.Context, name string) error {
-	_, transaction, err := namedQueryTransactionFromContext(ctx, name)
+	research, transaction, err := namedQueryTransactionFromContext(ctx, name)
 	if err != nil {
+		return err
+	}
+	if err := research.drainPendingWrites(ctx); err != nil {
 		return err
 	}
 	_ = transaction.transaction.CommitTx(ctx)
@@ -135,12 +138,15 @@ func stepNamedQueryTransactionRollback(ctx context.Context, name string) error {
 }
 
 func stepNamedQueryTransactionsCommitConcurrently(ctx context.Context, firstName, secondName string) error {
-	_, first, err := namedQueryTransactionFromContext(ctx, firstName)
+	research, first, err := namedQueryTransactionFromContext(ctx, firstName)
 	if err != nil {
 		return err
 	}
 	_, second, err := namedQueryTransactionFromContext(ctx, secondName)
 	if err != nil {
+		return err
+	}
+	if err := research.drainPendingWrites(ctx); err != nil {
 		return err
 	}
 
@@ -255,8 +261,11 @@ func formatTopicPartitionStats(topicPath string, partitions []topictypes.Partiti
 	details := make([]string, 0, len(partitions))
 	for _, partition := range partitions {
 		details = append(details, fmt.Sprintf(
-			"{partition_id=%d, partition_stats={end_offset=%d}}",
+			"{partition_id=%d, active=%t, parent_partition_ids=%v, child_partition_ids=%v, partition_stats={end_offset=%d}}",
 			partition.PartitionID,
+			partition.Active,
+			partition.ParentPartitionIDs,
+			partition.ChildPartitionIDs,
 			partition.PartitionStats.PartitionsOffset.End,
 		))
 	}

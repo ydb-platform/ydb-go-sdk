@@ -23,7 +23,8 @@ import (
 const (
 	defaultConnectionString = "grpc://localhost:2136/local"
 	scenarioTimeout         = 45 * time.Second
-	emptyTopicStepPattern   = `^an empty topic(?: with ([0-9]+) partitions)?(?: with consumer "([^"]+)" for observation)?$`
+	emptyTopicStepPattern   = `^an empty topic(?: with ([0-9]+) partitions)?` +
+		`( with paused auto partitioning)?(?: with consumer "([^"]+)" for observation)?$`
 )
 
 type worldContextKey struct{}
@@ -73,6 +74,7 @@ func initializeScenario() func(*godog.ScenarioContext) {
 		initializeConcurrentTransactionSteps(sc)
 		initializeStreamWriteSteps(sc)
 		initializeStreamReadSteps(sc)
+		initializeTopicPartitionSteps(sc)
 	}
 }
 
@@ -107,7 +109,7 @@ func formatResearchScenario(scenario *godog.Scenario) string {
 	return strings.Join(lines, "\n")
 }
 
-func stepEmptyTopic(ctx context.Context, partitions, consumer string) error {
+func stepEmptyTopic(ctx context.Context, partitions, paused, consumer string) error {
 	world, err := worldFromContext(ctx)
 	if err != nil {
 		return err
@@ -118,7 +120,7 @@ func stepEmptyTopic(ctx context.Context, partitions, consumer string) error {
 		return err
 	}
 
-	return world.CreateTopic(ctx, partitionCount, consumer)
+	return world.CreateTopic(ctx, partitionCount, paused != "", consumer)
 }
 
 func parseTopicPartitionCount(value string) (int64, error) {
@@ -145,7 +147,7 @@ func worldFromContext(ctx context.Context) (*researchWorld, error) {
 	return world, nil
 }
 
-func (w *researchWorld) CreateTopic(ctx context.Context, partitionCount int64, consumer string) error {
+func (w *researchWorld) CreateTopic(ctx context.Context, partitionCount int64, paused bool, consumer string) error {
 	if w.driver != nil {
 		return errors.New("topic fixture is already initialized")
 	}
@@ -171,6 +173,12 @@ func (w *researchWorld) CreateTopic(ctx context.Context, partitionCount int64, c
 	createOptions := []topicoptions.CreateOption{
 		topicoptions.CreateWithMinActivePartitions(partitionCount),
 		topicoptions.CreateWithMaxActivePartitions(partitionCount),
+	}
+	if paused {
+		settings := topictypes.AutoPartitioningSettings{
+			AutoPartitioningStrategy: topictypes.AutoPartitioningStrategyPaused,
+		}
+		createOptions = append(createOptions, topicoptions.CreateWithAutoPartitioningSettings(settings))
 	}
 	if consumer != "" {
 		createOptions = append(createOptions, topicoptions.CreateWithConsumer(topictypes.Consumer{Name: consumer}))
