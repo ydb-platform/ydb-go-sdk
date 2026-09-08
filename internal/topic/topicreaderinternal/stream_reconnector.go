@@ -93,6 +93,10 @@ type readSessionIDer interface {
 	ReadSessionID() string
 }
 
+type streamErrorer interface {
+	streamError() error
+}
+
 func (r *readerReconnector) ReadSessionID() string {
 	// RLock is required: streamVal may be replaced by the reconnect goroutine.
 	// No deadlock risk: ReadSessionID() on the underlying stream is a simple getter
@@ -201,7 +205,7 @@ func (r *readerReconnector) readWithReconnections(
 
 			continue
 		case err != nil:
-			r.traceSessionStopAfterRead(ctx, err)
+			r.traceSessionStopAfterRead(ctx, nil, err)
 
 			return nil, err
 		default:
@@ -235,7 +239,7 @@ func (r *readerReconnector) readOnce(
 		}
 	}
 	if err != nil {
-		r.traceSessionStopAfterRead(ctx, err)
+		r.traceSessionStopAfterRead(ctx, stream, err)
 	}
 
 	return res, false, err
@@ -585,12 +589,24 @@ func (r *readerReconnector) traceSessionStopIf(ctx context.Context, err error, r
 	topicreadercommon.TraceReaderSessionError(ctx, r.tracer, r.readerInfo, "stop", err)
 }
 
-func (r *readerReconnector) traceSessionStopAfterRead(ctx context.Context, err error) {
+func (r *readerReconnector) traceSessionStopAfterRead(
+	ctx context.Context,
+	stream batchedStreamReader,
+	readErr error,
+) {
 	if ctx != nil && ctx.Err() != nil {
 		return
 	}
 
-	r.traceSessionStop(ctx, err)
+	if streamErrer, ok := stream.(streamErrorer); ok {
+		streamErr := streamErrer.streamError()
+		if streamErr == nil || r.isRetriableError(streamErr) {
+			return
+		}
+		readErr = streamErr
+	}
+
+	r.traceSessionStop(ctx, readErr)
 }
 
 func suppressReaderSessionError(ctx context.Context, err error) bool {

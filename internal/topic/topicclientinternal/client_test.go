@@ -45,4 +45,13 @@ func TestReaderAndListenerConfigsPropagateDriverAttributes(t *testing.T) {
 			Consumer: "consumer",
 		}, cfg.ReaderInfo)
 	})
+
+	t.Run("reader info preserves reader name", func(t *testing.T) {
+		require.Equal(t, topicreadercommon.ReaderInfo{
+			Endpoint:   configuredEndpoint,
+			Database:   configuredDatabase,
+			Consumer:   "consumer",
+			ReaderName: "reader-name",
+		}, client.readerInfo("consumer", "reader-name"))
+	})
 }

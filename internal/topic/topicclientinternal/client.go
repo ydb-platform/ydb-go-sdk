@@ -328,9 +328,7 @@ func (c *Client) newStreamListenerConfig(
 	readSelectors topicoptions.ReadSelectors,
 ) topiclistenerinternal.StreamListenerConfig {
 	cfg := topiclistenerinternal.NewStreamListenerConfig()
-	readerInfo := c.readerInfo(consumer)
-	readerInfo.ReaderName = cfg.ReaderName
-	cfg.ReaderInfo = readerInfo
+	cfg.ReaderInfo = c.readerInfo(consumer, cfg.ReaderName)
 	cfg.Tracer = c.cfg.Trace
 	cfg.Selectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))
 	for i := range readSelectors {
@@ -373,17 +371,18 @@ func (c *Client) defaultReaderOptions(consumer string) []topicoptions.ReaderOpti
 	return []topicoptions.ReaderOption{
 		topicoptions.WithCommonConfig(c.cfg.Common),
 		topicreaderinternal.WithCredentials(c.cred),
-		topicreaderinternal.WithReaderInfo(c.readerInfo(consumer)),
+		topicreaderinternal.WithReaderInfo(c.readerInfo(consumer, "")),
 		topicreaderinternal.WithTrace(c.cfg.Trace),
 		topicoptions.WithReaderStartTimeout(topic.DefaultStartTimeout),
 	}
 }
 
-func (c *Client) readerInfo(consumer string) topicreadercommon.ReaderInfo {
+func (c *Client) readerInfo(consumer, readerName string) topicreadercommon.ReaderInfo {
 	return topicreadercommon.ReaderInfo{
-		Endpoint: c.cfg.Endpoint,
-		Database: c.cfg.Database,
-		Consumer: consumer,
+		Endpoint:   c.cfg.Endpoint,
+		Database:   c.cfg.Database,
+		Consumer:   consumer,
+		ReaderName: readerName,
 	}
 }
 

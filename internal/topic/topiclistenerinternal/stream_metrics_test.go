@@ -448,16 +448,20 @@ func listenerMetricStartPartition(
 	t.Helper()
 
 	const sessionID = rawtopicreader.PartitionSessionID(100)
-	startHandled := make(chan struct{})
+	startSent := make(chan struct{})
 	EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(
 		gomock.Any(), gomock.Any(),
 	).DoAndReturn(func(_ context.Context, event *PublicEventStartPartitionSession) error {
 		event.Confirm()
-		close(startHandled)
 
 		return nil
 	})
-	StreamMock(e).EXPECT().Send(gomock.AssignableToTypeOf(&rawtopicreader.StartPartitionSessionResponse{})).Return(nil)
+	StreamMock(e).EXPECT().Send(gomock.AssignableToTypeOf(&rawtopicreader.StartPartitionSessionResponse{})).
+		DoAndReturn(func(rawtopicreader.ClientMessage) error {
+			close(startSent)
+
+			return nil
+		})
 	listener.background.Start("metrics test listener send loop", listener.sendMessagesLoop)
 	require.NoError(t, listener.handleStartPartition(sf.Context(e), &rawtopicreader.StartPartitionSessionRequest{
 		PartitionSession: rawtopicreader.PartitionSession{
@@ -468,9 +472,9 @@ func listenerMetricStartPartition(
 		CommittedOffset: rawtopiccommon.NewOffset(0),
 	}))
 	select {
-	case <-startHandled:
+	case <-startSent:
 	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for listener partition start")
+		t.Fatal("timed out waiting for listener partition start response")
 	}
 
 	session, err := listener.sessions.Get(sessionID)

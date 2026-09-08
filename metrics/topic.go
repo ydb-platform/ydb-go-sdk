@@ -248,6 +248,11 @@ func addCounter(counter Counter, delta int) {
 
 		return
 	}
+	if adder, ok := counter.(interface{ Add(delta float64) }); ok {
+		adder.Add(float64(delta))
+
+		return
+	}
 	for range delta {
 		counter.Inc()
 	}

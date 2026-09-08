@@ -331,6 +331,60 @@ func TestTopicReaderCountersUseBatchAddAndIgnoreNonPositive(t *testing.T) {
 	require.Equal(t, float64(3), fallbackRegistry.value("topic.reader.received.messages", messageLabels))
 }
 
+func TestTopicReaderCountersUseFloatAddForLargeDeltas(t *testing.T) {
+	const largeDelta = 1 << 20
+
+	registry := newRecordingRegistry()
+	capture := &topicCounterCapture{}
+	tracer := topic(topicBatchCounterConfig{
+		recordingConfig: recordingConfig{registry: registry, details: trace.DetailsAll},
+		capture:         capture,
+		floatAdd:        true,
+	})
+
+	tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", Bytes: largeDelta,
+	})
+	tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{Bytes: 0})
+	tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{Bytes: -1})
+	tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
+		Endpoint:      "node",
+		Database:      "/db",
+		Topic:         "/topic",
+		Consumer:      "consumer",
+		ReaderName:    "reader",
+		MessagesCount: largeDelta,
+	})
+	tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{MessagesCount: 0})
+	tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{MessagesCount: -1})
+	tracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{
+		Endpoint:      "node",
+		Database:      "/db",
+		Topic:         "/topic",
+		Consumer:      "consumer",
+		ReaderName:    "reader",
+		MessagesCount: largeDelta,
+	})
+	tracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{MessagesCount: 0})
+	tracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{MessagesCount: -1})
+
+	require.Equal(t, map[string][]float64{
+		topicReaderReceivedBytesName:      {float64(largeDelta)},
+		topicReaderCommitQueuedName:       {float64(largeDelta)},
+		topicReaderCommitAcknowledgedName: {float64(largeDelta)},
+	}, capture.floatAdds)
+	require.Empty(t, capture.incs)
+	require.Equal(t, float64(largeDelta), registry.value(topicReaderReceivedBytesName, map[string]string{
+		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",
+	}))
+	require.Equal(t, float64(largeDelta), registry.value(topicReaderCommitQueuedName, map[string]string{
+		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
+	}))
+	require.Equal(t, float64(largeDelta), registry.value(topicReaderCommitAcknowledgedName, map[string]string{
+		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
+	}))
+}
+
 func TestTopicReaderGaugesApplyDeltasWithoutSet(t *testing.T) {
 	registry := newRecordingRegistry()
 	capture := &topicGaugeCapture{}
@@ -379,21 +433,23 @@ type topicMetricDescriptor struct {
 }
 
 type topicCounterCapture struct {
-	units map[string]string
-	adds  map[string][]int64
-	incs  map[string]int
+	units     map[string]string
+	adds      map[string][]int64
+	floatAdds map[string][]float64
+	incs      map[string]int
 }
 
 type topicBatchCounterConfig struct {
 	recordingConfig
 
-	capture *topicCounterCapture
+	capture  *topicCounterCapture
+	floatAdd bool
 }
 
 func (c topicBatchCounterConfig) WithSystem(system string) Config {
 	scoped := c.recordingConfig.WithSystem(system).(recordingConfig)
 
-	return topicBatchCounterConfig{recordingConfig: scoped, capture: c.capture}
+	return topicBatchCounterConfig{recordingConfig: scoped, capture: c.capture, floatAdd: c.floatAdd}
 }
 
 func (c topicBatchCounterConfig) CounterVecWithDescriptor(name, unit string, labels ...string) CounterVec {
@@ -402,6 +458,9 @@ func (c topicBatchCounterConfig) CounterVecWithDescriptor(name, unit string, lab
 	}
 	c.capture.units[name] = unit
 	c.registry.register(name, "counter", labels)
+	if c.floatAdd {
+		return topicFloatCounterVec{registry: c.registry, path: name, capture: c.capture}
+	}
 
 	return topicBatchCounterVec{registry: c.registry, path: name, capture: c.capture}
 }
@@ -449,6 +508,37 @@ func (c topicBatchCounter) Add(delta int64) {
 	}
 	c.capture.adds[c.path] = append(c.capture.adds[c.path], delta)
 	c.registry.add(c.path, c.labels, float64(delta))
+}
+
+type topicFloatCounterVec struct {
+	registry *recordingRegistry
+	path     string
+
+	capture *topicCounterCapture
+}
+
+func (v topicFloatCounterVec) With(labels map[string]string) Counter {
+	return topicFloatCounter{registry: v.registry, path: v.path, labels: labels, capture: v.capture}
+}
+
+type topicFloatCounter struct {
+	registry *recordingRegistry
+	path     string
+	labels   map[string]string
+
+	capture *topicCounterCapture
+}
+
+func (topicFloatCounter) Inc() {
+	panic("topic float counter unexpectedly used Inc")
+}
+
+func (c topicFloatCounter) Add(delta float64) {
+	if c.capture.floatAdds == nil {
+		c.capture.floatAdds = make(map[string][]float64)
+	}
+	c.capture.floatAdds[c.path] = append(c.capture.floatAdds[c.path], delta)
+	c.registry.add(c.path, c.labels, delta)
 }
 
 type topicFallbackCounterConfig struct {

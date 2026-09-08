@@ -200,6 +200,15 @@ func (r *topicStreamReaderImpl) ReadSessionID() string {
 	return r.readConnectionID
 }
 
+func (r *topicStreamReaderImpl) streamError() error {
+	var err error
+	r.m.WithRLock(func() {
+		err = r.err
+	})
+
+	return err
+}
+
 func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 	if !r.started {
 		return errors.New("not started: can be started only after initialize from constructor")
