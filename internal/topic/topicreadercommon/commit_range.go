@@ -53,7 +53,7 @@ func NewCommitRangesFromPublicCommits(ranges []PublicCommitRange) CommitRanges {
 	res := CommitRanges{}
 	res.Ranges = make([]CommitRange, len(ranges))
 	for i := 0; i < len(res.Ranges); i++ {
-		res.Ranges[i] = commitRangeSnapshot(ranges[i].priv)
+		res.Ranges[i] = ranges[i].priv
 	}
 
 	return res
@@ -63,7 +63,7 @@ func (r *CommitRanges) Append(ranges ...PublicCommitRangeGetter) {
 	converted := make([]CommitRange, len(ranges))
 
 	for i := range ranges {
-		converted[i] = commitRangeSnapshot(ranges[i].getCommitRange().priv)
+		converted[i] = ranges[i].getCommitRange().priv
 		r.Ranges = append(r.Ranges, converted...)
 	}
 }
@@ -78,15 +78,11 @@ func (r *CommitRanges) AppendMessages(messages ...PublicMessage) {
 }
 
 func (r *CommitRanges) AppendCommitRange(cr CommitRange) {
-	r.Ranges = append(r.Ranges, commitRangeSnapshot(cr))
+	r.Ranges = append(r.Ranges, cr)
 }
 
 func (r *CommitRanges) AppendCommitRanges(ranges []CommitRange) {
-	converted := make([]CommitRange, len(ranges))
-	for i := range ranges {
-		converted[i] = commitRangeSnapshot(ranges[i])
-	}
-	r.Ranges = append(r.Ranges, converted...)
+	r.Ranges = append(r.Ranges, ranges...)
 }
 
 func (r *CommitRanges) Reset() {
@@ -106,9 +102,6 @@ func (r *CommitRanges) ToPartitionsOffsets() []rawtopicreader.PartitionCommitOff
 func (r *CommitRanges) Optimize() {
 	if r.Len() == 0 {
 		return
-	}
-	for i := range r.Ranges {
-		r.Ranges[i] = commitRangeSnapshot(r.Ranges[i])
 	}
 
 	sort.Slice(r.Ranges, func(i, j int) bool {
@@ -132,10 +125,6 @@ func (r *CommitRanges) Optimize() {
 		if lastCommit.PartitionSession.StreamPartitionSessionID == commit.PartitionSession.StreamPartitionSessionID &&
 			lastCommit.CommitOffsetEnd == commit.CommitOffsetStart {
 			lastCommit.CommitOffsetEnd = commit.CommitOffsetEnd
-			lastCommit.messageMetadata = mergeCommitMessageMetadata(
-				lastCommit.messageMetadata,
-				commit.messageMetadata,
-			)
 		} else {
 			newCommits = append(newCommits, *commit)
 			lastCommit = &newCommits[len(newCommits)-1]
@@ -184,8 +173,6 @@ type PublicCommitRange struct {
 }
 
 func (p PublicCommitRange) getCommitRange() PublicCommitRange {
-	p.priv = commitRangeSnapshot(p.priv)
-
 	return p
 }
 
@@ -193,13 +180,9 @@ type CommitRange struct {
 	CommitOffsetStart rawtopiccommon.Offset
 	CommitOffsetEnd   rawtopiccommon.Offset
 	PartitionSession  *PartitionSession
-
-	messageMetadata []commitMessageMetadata
 }
 
 func (c CommitRange) getCommitRange() PublicCommitRange {
-	c = commitRangeSnapshot(c)
-
 	return PublicCommitRange{priv: c}
 }
 
@@ -209,14 +192,4 @@ func (c *CommitRange) session() *PartitionSession {
 
 func GetCommitRange(item PublicCommitRangeGetter) CommitRange {
 	return item.getCommitRange().priv
-}
-
-// commitRangeSnapshot prevents append operations on a copied range from
-// modifying spare capacity owned by the source batch or range.
-func commitRangeSnapshot(cr CommitRange) CommitRange {
-	if cr.messageMetadata != nil {
-		cr.messageMetadata = cr.messageMetadata[:len(cr.messageMetadata):len(cr.messageMetadata)]
-	}
-
-	return cr
 }

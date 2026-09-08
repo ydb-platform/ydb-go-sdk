@@ -191,7 +191,7 @@ func TestTopicStreamReader_LocalBufferRollbackAfterFinalization(t *testing.T) {
 	mu.Unlock()
 }
 
-func TestTopicReader_CommitMetricsUseLogicalMessageCount(t *testing.T) {
+func TestTopicReader_CommitMetricsUseCommitRangeLength(t *testing.T) {
 	for _, test := range []struct {
 		name            string
 		closeOnPublish  bool
@@ -285,7 +285,9 @@ func TestTopicReader_CommitMetricsUseLogicalMessageCount(t *testing.T) {
 					return nil
 				})
 			require.NoError(t, reader.Commit(e.ctx, result.batch))
-			require.Equal(t, 2, readerMetricDelta(t, queued))
+			// The wire range is checked below as [20, 25), so its span is five
+			// even though this fixture contains a gap between messages.
+			require.Equal(t, 5, readerMetricDelta(t, queued))
 			select {
 			case request := <-commitSent:
 				require.Equal(t, e.partitionSessionID, request.CommitOffsets[0].PartitionSessionID)
@@ -304,7 +306,7 @@ func TestTopicReader_CommitMetricsUseLogicalMessageCount(t *testing.T) {
 			}))
 			readerMetricNoDelta(t, acknowledged)
 			require.NoError(t, e.reader.onCommitResponse(readerMetricCommitResponse(&e, 25)))
-			require.Equal(t, 2, readerMetricDelta(t, acknowledged))
+			require.Equal(t, 5, readerMetricDelta(t, acknowledged))
 			select {
 			case committedOffset := <-committedOffsets:
 				require.Equal(t, int64(25), committedOffset)

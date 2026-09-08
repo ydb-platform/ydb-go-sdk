@@ -2,7 +2,6 @@ package topicreadercommon
 
 import (
 	"context"
-	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -10,68 +9,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
-
-type commitMessageMetadata struct {
-	start  rawtopiccommon.Offset
-	end    rawtopiccommon.Offset
-	offset rawtopiccommon.Offset
-}
-
-func mergeCommitMessageMetadata(lhs, rhs []commitMessageMetadata) []commitMessageMetadata {
-	if lhs == nil || rhs == nil {
-		return nil
-	}
-
-	return appendCommitMessageMetadata(lhs, rhs, len(lhs), len(rhs))
-}
-
-func appendCommitMessageMetadata(
-	lhs []commitMessageMetadata,
-	rhs []commitMessageMetadata,
-	lhsMessagesCount int,
-	rhsMessagesCount int,
-) []commitMessageMetadata {
-	if lhsMessagesCount == 0 {
-		return rhs
-	}
-	if rhsMessagesCount == 0 {
-		return lhs
-	}
-
-	return append(slices.Grow(lhs, len(rhs)), rhs...)
-}
-
-func singleCommitMessageMetadata(start, end, offset rawtopiccommon.Offset) []commitMessageMetadata {
-	return []commitMessageMetadata{{
-		start:  start,
-		end:    end,
-		offset: offset,
-	}}
-}
-
-func commitMessageMetadataForMessage(message *PublicMessage) ([]commitMessageMetadata, bool) {
-	if message.commitRange.messageMetadata != nil {
-		if len(message.commitRange.messageMetadata) != 1 {
-			return nil, false
-		}
-
-		return message.commitRange.messageMetadata, true
-	}
-
-	if message.commitRange.CommitOffsetEnd != message.commitRange.CommitOffsetStart+1 {
-		return nil, false
-	}
-
-	return singleCommitMessageMetadata(
-		message.commitRange.CommitOffsetStart,
-		message.commitRange.CommitOffsetEnd,
-		message.commitRange.CommitOffsetStart,
-	), true
-}
-
-func commitMessageMetadataComplete(commitRange CommitRange, messagesCount int) bool {
-	return len(commitRange.messageMetadata) == messagesCount
-}
 
 type partitionSessionCommitMetrics struct {
 	tracer     *trace.Topic
@@ -90,8 +27,9 @@ func (m *partitionSessionCommitMetrics) close() {
 	}
 }
 
-// SetupCommitMetrics enables commit identity tracking and commit trace events
-// for the partition session. It must be called before messages are delivered.
+// SetupCommitMetrics enables commit range trace events and acknowledgement
+// tracking for the partition session. It must be called before messages are
+// delivered.
 func (s *PartitionSession) SetupCommitMetrics(tracer *trace.Topic, readerInfo ReaderInfo) {
 	if s == nil || tracer == nil {
 		return
@@ -116,29 +54,17 @@ func (s *PartitionSession) SetupCommitMetrics(tracer *trace.Topic, readerInfo Re
 	s.commitMetrics = metrics
 }
 
-func (s *PartitionSession) commitMetricsEnabled() bool {
-	return s != nil && s.commitMetrics != nil
-}
-
-// MessageOffsets returns a copy of the immutable logical message offsets
-// captured for this range. It returns nil when the range was created without
-// commit identity tracking or when the range contains no messages.
-func (c CommitRange) MessageOffsets() []rawtopiccommon.Offset {
-	if len(c.messageMetadata) == 0 {
-		return nil
+func commitRangeMessageCount(start, end rawtopiccommon.Offset) int {
+	if end <= start {
+		return 0
 	}
 
-	res := make([]rawtopiccommon.Offset, len(c.messageMetadata))
-	for i := range c.messageMetadata {
-		res[i] = c.messageMetadata[i].offset
-	}
-
-	return res
+	return int(end - start)
 }
 
-// RegisterCommitQueued records an accepted commit and returns its logical
-// message count. Callers that need to synchronize admission with another
-// lock must call this before making the commit visible to a sender.
+// RegisterCommitQueued records an accepted commit and returns its range span.
+// Callers that need to synchronize admission with another lock must call this
+// before making the commit visible to a sender.
 func RegisterCommitQueued(commitRange CommitRange) int {
 	session := commitRange.PartitionSession
 	if session == nil || session.commitMetrics == nil {
@@ -149,10 +75,9 @@ func RegisterCommitQueued(commitRange CommitRange) int {
 	if metrics.closed.Load() {
 		return 0
 	}
-	offsets := commitRange.MessageOffsets()
-	messagesCount := len(offsets)
+	messagesCount := commitRangeMessageCount(commitRange.CommitOffsetStart, commitRange.CommitOffsetEnd)
 	if metrics.tracker != nil {
-		messagesCount = metrics.tracker.Queue(offsets)
+		messagesCount = metrics.tracker.Queue(commitRange.CommitOffsetStart, commitRange.CommitOffsetEnd)
 	}
 
 	return messagesCount
@@ -180,7 +105,7 @@ func TraceCommitQueuedAfterRegistration(ctx context.Context, commitRange CommitR
 		return
 	}
 
-	// The metric consumer only needs MessagesCount. Keep the exact offsets
+	// The metric consumer only needs MessagesCount. Keep range boundaries
 	// private to the tracker instead of allocating another representation for
 	// every trace callback.
 	gtrace.TopicOnReaderCommitQueued(
@@ -198,9 +123,8 @@ func TraceCommitQueuedAfterRegistration(ctx context.Context, commitRange CommitR
 }
 
 // RegisterCommitAcknowledged records a successful commit acknowledgement and
-// returns only the newly acknowledged logical message count. The caller must
-// perform this before publishing the committed offset or waking commit
-// waiters.
+// returns only the newly completed range span. The caller must perform this
+// before publishing the committed offset or waking commit waiters.
 func RegisterCommitAcknowledged(session *PartitionSession, exclusiveOffset rawtopiccommon.Offset) int {
 	if session == nil || session.commitMetrics == nil || session.commitMetrics.tracker == nil {
 		return 0
@@ -247,25 +171,31 @@ func TraceCommitAcknowledgedAfterRegistration(
 }
 
 // TraceCommitAcknowledged records a successful commit acknowledgement and
-// emits only the newly acknowledged logical messages.
+// emits only the newly completed range span.
 func TraceCommitAcknowledged(ctx context.Context, session *PartitionSession, exclusiveOffset rawtopiccommon.Offset) {
 	messagesCount := RegisterCommitAcknowledged(session, exclusiveOffset)
 	TraceCommitAcknowledgedAfterRegistration(ctx, session, messagesCount)
 }
 
-// CommitMessageTracker tracks the logical message offsets admitted to a
-// partition session until the server acknowledges them.
+// CommitMessageTracker tracks accepted commit ranges until the server
+// acknowledges them.
 //
-// The acknowledgement offset is an exclusive upper bound: an offset is
-// acknowledged when it is less than the supplied value. Queue and
-// Acknowledge are safe to call concurrently. The tracker does not emit
-// metrics; callers use their returned counts for that purpose.
+// The acknowledgement offset is an exclusive upper bound. Ranges are kept in
+// admission order so an acknowledgement only completes a prefix, matching
+// the commit request semantics. Queue and Acknowledge are safe to call
+// concurrently. The tracker does not emit metrics; callers use their returned
+// counts for that purpose.
 type CommitMessageTracker struct {
 	mu sync.Mutex
 
 	committedOffset rawtopiccommon.Offset
-	pending         map[rawtopiccommon.Offset]struct{}
+	pending         []commitMetricRange
 	closed          bool
+}
+
+type commitMetricRange struct {
+	end   rawtopiccommon.Offset
+	count int
 }
 
 // NewCommitMessageTracker creates a tracker with the initial exclusive
@@ -276,12 +206,13 @@ func NewCommitMessageTracker(committedOffset rawtopiccommon.Offset) *CommitMessa
 	}
 }
 
-// Queue records submitted message offsets and returns the number of submitted
-// offsets. Repeated offsets are counted in the return value but retained only
-// once for acknowledgement accounting. Offsets below the committed watermark
-// are accepted but are not retained.
-func (t *CommitMessageTracker) Queue(offsets []rawtopiccommon.Offset) int {
-	if len(offsets) == 0 {
+// Queue records a submitted commit range and returns its offset span. Ranges
+// ending before the committed watermark are already complete and are not
+// retained. A range ending exactly at the watermark is retained so an equal
+// acknowledgement can complete it.
+func (t *CommitMessageTracker) Queue(start, end rawtopiccommon.Offset) int {
+	count := commitRangeMessageCount(start, end)
+	if count == 0 {
 		return 0
 	}
 
@@ -291,52 +222,49 @@ func (t *CommitMessageTracker) Queue(offsets []rawtopiccommon.Offset) int {
 	if t.closed {
 		return 0
 	}
-
-	for _, offset := range offsets {
-		if offset < t.committedOffset {
-			continue
-		}
-
-		if t.pending == nil {
-			t.pending = make(map[rawtopiccommon.Offset]struct{})
-		}
-		t.pending[offset] = struct{}{}
+	if end < t.committedOffset {
+		return count
 	}
 
-	return len(offsets)
+	t.pending = append(t.pending, commitMetricRange{end: end, count: count})
+
+	return count
 }
 
-// Acknowledge advances the exclusive committed offset and returns the number
-// of unique queued messages newly covered by it. Backward and duplicate
-// acknowledgements return zero.
+// Acknowledge advances the exclusive committed offset and returns the sum of
+// the ranges at the head of the queue newly covered by it. Backward
+// acknowledgements return zero; an equal acknowledgement can complete ranges
+// admitted at the current watermark.
 func (t *CommitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset) int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.closed || exclusiveOffset <= t.committedOffset {
+	if t.closed || exclusiveOffset < t.committedOffset {
 		return 0
 	}
 
-	t.committedOffset = exclusiveOffset
-
-	var acknowledged int
-	for offset := range t.pending {
-		if offset >= exclusiveOffset {
-			continue
-		}
-
-		delete(t.pending, offset)
-		acknowledged++
+	if exclusiveOffset > t.committedOffset {
+		t.committedOffset = exclusiveOffset
 	}
 
-	if len(t.pending) == 0 {
-		t.pending = nil
+	var acknowledged int
+	completed := 0
+	for completed < len(t.pending) && t.pending[completed].end <= t.committedOffset {
+		acknowledged += t.pending[completed].count
+		completed++
+	}
+
+	if completed > 0 {
+		t.pending = t.pending[completed:]
+		if len(t.pending) == 0 {
+			t.pending = nil
+		}
 	}
 
 	return acknowledged
 }
 
-// Close marks the tracker terminal and releases all pending offsets.
+// Close marks the tracker terminal and releases all pending ranges.
 func (t *CommitMessageTracker) Close() {
 	t.mu.Lock()
 	defer t.mu.Unlock()

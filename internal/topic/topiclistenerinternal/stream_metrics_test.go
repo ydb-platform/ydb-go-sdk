@@ -281,8 +281,9 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 
 		event := NewPublicReadMessages(session.ToPublic(), batch, listener)
 		event.Confirm()
-		require.Equal(t, 2, listenerMetricDelta(t, queued))
-		require.Equal(t, 2, listenerMetricDelta(t, acknowledged))
+		// The wire range is checked above as [0, 5), so its span is five.
+		require.Equal(t, 5, listenerMetricDelta(t, queued))
+		require.Equal(t, 5, listenerMetricDelta(t, acknowledged))
 		require.NoError(t, listener.onCommitResponse(listenerMetricCommitResponse(session, rawydb.StatusSuccess, 5)))
 		require.NoError(t, listener.onCommitResponse(listenerMetricCommitResponse(session, rawydb.StatusSuccess, 4)))
 		listenerMetricNoDelta(t, acknowledged)
@@ -332,8 +333,8 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 
 		event := NewPublicReadMessages(session.ToPublic(), batch, listener)
 		require.NoError(t, event.ConfirmWithAck(ctx))
-		require.Equal(t, 2, listenerMetricDelta(t, queued))
-		require.Equal(t, 2, listenerMetricDelta(t, acknowledged))
+		require.Equal(t, 5, listenerMetricDelta(t, queued))
+		require.Equal(t, 5, listenerMetricDelta(t, acknowledged))
 		require.NoError(t, listener.Close(ctx, errors.New("test close")))
 		topicreadercommon.TraceCommitQueued(ctx, topicreadercommon.GetCommitRange(batch))
 		topicreadercommon.TraceCommitAcknowledged(ctx, session, rawtopiccommon.NewOffset(5))
