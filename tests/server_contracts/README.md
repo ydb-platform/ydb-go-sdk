@@ -11,9 +11,11 @@ Each scenario has an adjacent `# Observed on YDB ...` comment containing the cur
 version on which it was observed. These comments are dated evidence, not assertions; update them after intentionally rerunning
 the scenario against another server version.
 
-The full suite (27 scenarios in 14 feature files) was recorded with the race detector on 2026-09-08 against
+The initial full run (27 scenarios in 14 feature files) was recorded with the race detector on 2026-09-08 against
 `ydbplatform/local-ydb:trunk`, reporting `main.7f40cb4` through the YDB API. The image digest was
 `sha256:7437fab163ffcc3594d3f2498d6e2888cc31928d3d5a00f7372a2d8455408789`.
+Three additional [partition-ID-only split scenarios](features/topic/research/partition_id_without_producer_split.feature)
+were recorded separately with the race detector on the same date and image, bringing the suite to 30 scenarios in 15 files.
 Query transaction experiments use serializable read-write isolation; they do not compare isolation levels or test SDK pooling.
 
 ## Layout
@@ -204,4 +206,12 @@ through one stream without introducing concurrent Send calls on that stream.
 
 Recovery scenarios explicitly replay the entire logical transaction after rollback or an observed commit rejection. The ACK
 fault control records a real server WriteResponse, withholds it from the scenario, and cancels the stream. It does not simulate
-an ambiguous commit result. Split replay uses new per-child producers; no SDK retry, routing, or ACK-dispatch behavior is tested.
+an ambiguous commit result. Split replay covers both new per-child producers and producerless sessions with explicit child
+partition IDs; no SDK retry, routing, or ACK-dispatch behavior is tested.
+
+The partition-ID-only experiment observes that omitting `producer_id` permits ordinary and transactional writes, but does not
+make split transparent. An ordinary write on the old parent stream gets `OVERLOADED`; an already-writing transaction can still
+receive `written_in_tx` after split and then get `ABORTED` at commit. A transaction first writing through the old stream after
+split observes EOF and an aborted commit. New child sessions accept writes without a producer, and replay after the known
+abort commits successfully. These observations do not establish deduplication across sessions or safe replay after an ambiguous
+commit outcome. All messages in this experiment use positive `seq_no`.
