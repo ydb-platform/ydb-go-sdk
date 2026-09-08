@@ -16,6 +16,9 @@ The initial full run (27 scenarios in 14 feature files) was recorded with the ra
 `sha256:7437fab163ffcc3594d3f2498d6e2888cc31928d3d5a00f7372a2d8455408789`.
 Three additional [partition-ID-only split scenarios](features/topic/research/partition_id_without_producer_split.feature)
 were recorded separately with the race detector on the same date and image, bringing the suite to 30 scenarios in 15 files.
+The six transaction-delivery scenarios and the related pipelined ACK scenario were subsequently rerun on that same version
+without `producer_id` (seven scenarios in five files). Their adjacent comments describe the producerless runs, not the earlier
+deduplicating runs.
 Query transaction experiments use serializable read-write isolation; they do not compare isolation levels or test SDK pooling.
 
 ## Layout
@@ -206,8 +209,16 @@ through one stream without introducing concurrent Send calls on that stream.
 
 Recovery scenarios explicitly replay the entire logical transaction after rollback or an observed commit rejection. The ACK
 fault control records a real server WriteResponse, withholds it from the scenario, and cancels the stream. It does not simulate
-an ambiguous commit result. Split replay covers both new per-child producers and producerless sessions with explicit child
-partition IDs; no SDK retry, routing, or ACK-dispatch behavior is tested.
+an ambiguous commit result. The delivery experiments (`multi_partition_transaction`, `overlapping_transaction_batches`,
+`transaction_batches`, `lost_ack_transaction_retry`, and `split_transaction_retry`) omit `producer_id` and `get_last_seq_no` in
+every InitRequest, including replacement and child streams. They retain explicit partition IDs and positive sequence numbers.
+Split replay uses producerless sessions with explicit child partition IDs; no SDK retry, routing, or ACK-dispatch behavior is
+tested. Producer-specific experiments elsewhere in the suite keep their explicit producer IDs.
+
+Without a producer ID, overlapping transactional batches `[1,2]` and `[2,3]` commit all four messages, including both messages
+numbered 2. Two open transactions using `[1,2]` on the same stream also both commit successfully. The observed ACKs retain those
+repeated numbers, and `WriteResponse` has no transaction ID, so `seq_no` alone cannot distinguish their transactions. The
+separate pipelined experiment uses distinct ranges `[1,2]` and `[3,4]` and records ACKs matching both batches.
 
 The partition-ID-only experiment observes that omitting `producer_id` permits ordinary and transactional writes, but does not
 make split transparent. An ordinary write on the old parent stream gets `OVERLOADED`; an already-writing transaction can still

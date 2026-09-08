@@ -1,18 +1,20 @@
 Feature: Lost ACK and complete retry of a multi-partition transaction
+  All write sessions specify partition_id without producer_id; sequence numbers remain explicit.
   The runner records a real WriteResponse, withholds it from the scenario, and cancels its stream.
   Rollback and replay are explicit protocol actions, not SDK retries or a simulated lost commit response.
 
-  # Observed on YDB main.7f40cb4 (trunk): the P0 ACK is delivered, the P1 ACK is
-  # recorded but withheld, and that stream is cancelled. Explicit rollback succeeds;
-  # both partitions stay empty. Replacement streams with the same per-partition
-  # producers report last_seq_no=0. Replaying both complete batches in Attempt 2
-  # commits successfully: two payloads per partition, four total, no duplicates.
-  # This injects loss of a WriteResponse, not loss of the CommitTransaction response.
+  # Observed on YDB main.7f40cb4 (trunk, 2026-09-08), without producer_id:
+  # P0's ACK is delivered, P1's real ACK is recorded but withheld, and its stream
+  # is cancelled. Explicit rollback succeeds; both partitions remain empty.
+  # New producerless streams replay both complete batches in Attempt 2. Commit succeeds;
+  # each partition ends at offset 2, and StreamRead returns all four payloads once.
+  # The absent duplicates follow a known rollback, not deduplication of a committed attempt.
+  # The CommitTransaction response is not lost in this experiment.
   Scenario: Rollback after losing one partition ACK and replay both partitions in a new transaction
     * an empty topic with 2 partitions with consumer "research-reader" for observation
     * QueryService.BeginTransaction: BeginTransactionRequest; alias returned tx_id as "Attempt 1"
-    * TopicService.StreamWrite "P0": InitRequest{producer_id: multi-p0, partition_id: 0, get_last_seq_no: true}
-    * TopicService.StreamWrite "P1": InitRequest{producer_id: multi-p1, partition_id: 1, get_last_seq_no: true}
+    * TopicService.StreamWrite "P0": InitRequest{partition_id: 0}
+    * TopicService.StreamWrite "P1": InitRequest{partition_id: 1}
     * TopicService.StreamWrite "P0": WriteRequest{txId: Attempt 1} messages:
       | data        | seq_no |
       | left-first  | 1      |
@@ -27,8 +29,8 @@ Feature: Lost ACK and complete retry of a multi-partition transaction
     * QueryService.RollbackTransaction: RollbackTransactionRequest for "Attempt 1"
     * TopicService.DescribeTopic: DescribeTopicRequest with include_stats=true
     * QueryService.BeginTransaction: BeginTransactionRequest; alias returned tx_id as "Attempt 2"
-    * TopicService.StreamWrite "P0": InitRequest{producer_id: multi-p0, partition_id: 0, get_last_seq_no: true}
-    * TopicService.StreamWrite "P1": InitRequest{producer_id: multi-p1, partition_id: 1, get_last_seq_no: true}
+    * TopicService.StreamWrite "P0": InitRequest{partition_id: 0}
+    * TopicService.StreamWrite "P1": InitRequest{partition_id: 1}
     * TopicService.StreamWrite "P0": WriteRequest{txId: Attempt 2} messages:
       | data        | seq_no |
       | left-first  | 1      |

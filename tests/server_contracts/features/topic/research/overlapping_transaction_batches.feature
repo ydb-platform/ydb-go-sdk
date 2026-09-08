@@ -1,14 +1,15 @@
 Feature: Overlapping sequence numbers between transactional batches
+  All write sessions specify partition_id without producer_id; sequence numbers remain explicit.
   Keep each batch sorted but repeat sequence numbers across separate WriteRequests.
 
-  # Observed on YDB main.7f40cb4 (trunk): [1,2] receives written_in_tx ACKs;
-  # the next request [2,3] receives skipped for 2 and written_in_tx for 3.
-  # Commit succeeds, end_offset=3. StreamRead returns first-1, first-2, next-3;
-  # replacement-2 does not replace the earlier payload with the same sequence number.
+  # Observed on YDB main.7f40cb4 (trunk, 2026-09-08), without producer_id:
+  # requests [1,2] and [2,3] receive written_in_tx for all four messages, including both 2s.
+  # Commit succeeds, end_offset=4. StreamRead returns first-1, first-2, replacement-2,
+  # next-3 at offsets 0..3: the repeated sequence number is not deduplicated.
   Scenario: Overlap two batches within one transaction
     * an empty topic with 1 partitions with consumer "research-reader" for observation
     * QueryService.BeginTransaction: BeginTransactionRequest; alias returned tx_id as "Transaction A"
-    * TopicService.StreamWrite "P0": InitRequest{producer_id: overlap-producer, partition_id: 0, get_last_seq_no: true}
+    * TopicService.StreamWrite "P0": InitRequest{partition_id: 0}
     * TopicService.StreamWrite "P0": WriteRequest{txId: Transaction A} messages:
       | data    | seq_no |
       | first-1 | 1      |
@@ -24,16 +25,17 @@ Feature: Overlapping sequence numbers between transactional batches
     * TopicService.StreamRead: StartPartitionSessionResponse{read_offset: 0}
     * TopicService.StreamRead: ReadRequest{bytes_size: 1048576}
 
-  # Observed on YDB main.7f40cb4 (trunk): both transactions receive written_in_tx
-  # ACKs for [1,2] on the same stream and partition. A commits; B's commit is ABORTED
-  # with #2011 MinSeqNo violation. Only a-1 and a-2 are read, end_offset=2.
-  # ACK seq_no values are not unique across open transactions when the client reuses them;
-  # WriteResponse has no tx_id, and written_in_tx does not promise a successful commit.
+  # Observed on YDB main.7f40cb4 (trunk, 2026-09-08), without producer_id:
+  # both transactions receive written_in_tx ACKs for [1,2] on the same stream.
+  # Both commits succeed; end_offset advances to 2 and then 4, with no MinSeqNo violation.
+  # StreamRead returns a-1, a-2, b-1, b-2 at offsets 0..3. ACK seq_no values repeat
+  # across the transactions, and WriteResponse has no tx_id: seq_no alone cannot
+  # distinguish their ACKs. Here the steps observe ACKs between sends.
   Scenario: Overlap two batches belonging to different open transactions
     * an empty topic with 1 partitions with consumer "research-reader" for observation
     * QueryService.BeginTransaction: BeginTransactionRequest; alias returned tx_id as "Transaction A"
     * QueryService.BeginTransaction: BeginTransactionRequest; alias returned tx_id as "Transaction B"
-    * TopicService.StreamWrite "P0": InitRequest{producer_id: overlap-producer, partition_id: 0, get_last_seq_no: true}
+    * TopicService.StreamWrite "P0": InitRequest{partition_id: 0}
     * TopicService.StreamWrite "P0": WriteRequest{txId: Transaction A} messages:
       | data | seq_no |
       | a-1  | 1      |
