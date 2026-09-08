@@ -1,4 +1,4 @@
-package main
+package runner
 
 import (
 	"bufio"
@@ -17,10 +17,8 @@ import (
 )
 
 type featureTest struct {
-	title       string
-	path        string
-	featurePath string
-	packagePath string
+	title string
+	path  string
 }
 
 type testMenu struct {
@@ -31,6 +29,7 @@ type testMenu struct {
 }
 
 func discoverTests(root string) ([]featureTest, error) {
+	root = filepath.Join(root, "features")
 	var tests []featureTest
 	err := filepath.WalkDir(root, func(directory string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -47,11 +46,7 @@ func discoverTests(root string) ([]featureTest, error) {
 			return err
 		}
 		relativePath = filepath.ToSlash(relativePath)
-		packageDirectory := featurePackage(relativePath)
-		if packageDirectory == "" {
-			return nil
-		}
-		test, err := parseFeatureTest(root, relativePath, packageDirectory)
+		test, err := parseFeatureTest(root, relativePath)
 		if err != nil {
 			return err
 		}
@@ -63,25 +58,14 @@ func discoverTests(root string) ([]featureTest, error) {
 		return nil, fmt.Errorf("discover feature files: %w", err)
 	}
 	if len(tests) == 0 {
-		return nil, errors.New("no feature files found in package features directories")
+		return nil, errors.New("no feature files found under features")
 	}
 	sort.Slice(tests, func(i, j int) bool { return tests[i].path < tests[j].path })
 
 	return tests, nil
 }
 
-func featurePackage(filePath string) string {
-	parts := strings.Split(filePath, "/")
-	for i, part := range parts[:len(parts)-1] {
-		if part == "features" {
-			return path.Clean(strings.Join(parts[:i], "/"))
-		}
-	}
-
-	return ""
-}
-
-func parseFeatureTest(root, relativePath, packageDirectory string) (featureTest, error) {
+func parseFeatureTest(root, relativePath string) (featureTest, error) {
 	suite := godog.TestSuite{Options: &godog.Options{
 		FS:    os.DirFS(root),
 		Paths: []string{relativePath},
@@ -97,16 +81,10 @@ func parseFeatureTest(root, relativePath, packageDirectory string) (featureTest,
 	if feature.Feature == nil || strings.TrimSpace(feature.Feature.Name) == "" {
 		return featureTest{}, fmt.Errorf("%s: missing Feature title", relativePath)
 	}
-	featurePath, err := filepath.Rel(filepath.FromSlash(packageDirectory), filepath.FromSlash(relativePath))
-	if err != nil {
-		return featureTest{}, err
-	}
 
 	return featureTest{
-		title:       feature.Feature.Name,
-		path:        relativePath,
-		featurePath: filepath.ToSlash(featurePath),
-		packagePath: "./" + packageDirectory,
+		title: feature.Feature.Name,
+		path:  relativePath,
 	}, nil
 }
 
@@ -189,7 +167,7 @@ func resolveTest(tests []featureTest, supplied string) (featureTest, error) {
 }
 
 func printTests(out io.Writer, menu *testMenu) {
-	fmt.Fprintln(out, "Available tests (relative to this module):")
+	fmt.Fprintln(out, "Available tests (relative to features/):")
 	var printChildren func(*testMenu, string)
 	printChildren = func(parent *testMenu, indent string) {
 		for _, child := range parent.children {

@@ -1,4 +1,4 @@
-package main
+package runner
 
 import (
 	"bufio"
@@ -16,26 +16,26 @@ import (
 
 func TestInteractiveMenuReturnsToPreviousLevelAfterEachRun(t *testing.T) {
 	tests := []featureTest{
-		{path: "topic/features/research/sample.feature", title: "Research feature"},
-		{path: "topic/features/new-category/deep/other.feature", title: "Another feature"},
+		{path: "topic/research/sample.feature", title: "Research feature"},
+		{path: "table/research/deep/other.feature", title: "Another feature"},
 	}
 	input := strings.Join([]string{
 		"latest", // version
-		"1",      // topic
-		"1",      // features
-		"2",      // research
+		"2",      // topic
+		"1",      // research
 		"99",     // invalid choice stays here
 		"text",   // invalid choice stays here
 		"1",      // run the feature
 		"1",      // run again from the same menu
-		"0",      // research -> features
-		"1",      // new-category
+		"0",      // research -> topic
+		"0",      // topic -> root
+		"1",      // table
+		"1",      // research
 		"1",      // deep
 		"1",      // run the other feature
-		"0",      // deep -> new-category
-		"0",      // new-category -> features
-		"0",      // features -> topic
-		"0",      // topic -> root
+		"0",      // deep -> research
+		"0",      // research -> table
+		"0",      // table -> root
 		"0",      // root -> version
 		"0",      // exit
 		"",
@@ -73,7 +73,7 @@ func TestInteractiveMenuReturnsToPreviousLevelAfterEachRun(t *testing.T) {
 	if strings.Join(executed, ",") != strings.Join(wantExecuted, ",") {
 		t.Fatalf("executed %v, want %v", executed, wantExecuted)
 	}
-	if count := strings.Count(output.String(), "Tests /topic/features/research:"); count != 5 {
+	if count := strings.Count(output.String(), "Tests /topic/research:"); count != 5 {
 		t.Fatalf("research menu printed %d times, want 5:\n%s", count, output.String())
 	}
 	for _, expected := range []string{
@@ -82,6 +82,9 @@ func TestInteractiveMenuReturnsToPreviousLevelAfterEachRun(t *testing.T) {
 		if !strings.Contains(output.String(), expected) {
 			t.Fatalf("interactive output does not contain %q:\n%s", expected, output.String())
 		}
+	}
+	if strings.Contains(output.String(), "features/") {
+		t.Fatalf("features root must not appear in the menu:\n%s", output.String())
 	}
 }
 
@@ -132,22 +135,22 @@ func TestExecuteOnceUsesResearchResultVocabulary(t *testing.T) {
 
 func TestDiscoverTests(t *testing.T) {
 	root := t.TempDir()
-	writeFeature(t, root, "topic/features/research/first.feature", `@research
+	writeFeature(t, root, "features/topic/research/first.feature", `@research
 Feature: Exact Feature title — имя теста
   Scenario: Scenario title must not become a menu entry
     * something
   Scenario: Another scenario in the same feature
     * something else
 `)
-	writeFeature(t, root, "table/features/contracts/table.feature", `Feature: Table behavior
+	writeFeature(t, root, "features/table/research/table.feature", `Feature: Table behavior
   Scenario: Untagged scenario
     * something
 `)
-	writeFeature(t, root, "topic/features/new-category/nested/second.feature", `@contract
-Feature: Exact Feature title — имя теста
+	writeFeature(t, root, "features/topic/research/nested/second.feature", `Feature: Exact Feature title — имя теста
   Scenario: Same title in a different file is allowed
     * something
 `)
+	writeFeature(t, root, "topic/features/research/ignored.feature", "invalid content outside the features root")
 	tests, err := discoverTests(root)
 	if err != nil {
 		t.Fatal(err)
@@ -155,42 +158,38 @@ Feature: Exact Feature title — имя теста
 	if len(tests) != 3 {
 		t.Fatalf("got %d entries, want one per feature file", len(tests))
 	}
-	selected, err := resolveTest(tests, "./topic/features/research/first.feature")
+	selected, err := resolveTest(tests, "./topic/research/first.feature")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if selected.title != "Exact Feature title — имя теста" ||
-		selected.featurePath != "features/research/first.feature" ||
-		selected.packagePath != "./topic" {
+		selected.path != "topic/research/first.feature" {
 		t.Fatalf("unexpected selected feature: %+v", selected)
 	}
 	var output bytes.Buffer
 	printTests(&output, buildTestMenu(tests))
-	want := `Available tests (relative to this module):
+	want := `Available tests (relative to features/):
   table/
-    features/
-      contracts/
-        Table behavior (table.feature)
+    research/
+      Table behavior (table.feature)
   topic/
-    features/
-      new-category/
-        nested/
-          Exact Feature title — имя теста (second.feature)
-      research/
-        Exact Feature title — имя теста (first.feature)
+    research/
+      nested/
+        Exact Feature title — имя теста (second.feature)
+      Exact Feature title — имя теста (first.feature)
 `
 	if output.String() != want {
 		t.Fatalf("unexpected feature tree:\n%s\nwant:\n%s", output.String(), want)
 	}
 	for _, unknown := range []string{
-		"1", "topic/scenario-title", "missing.feature", "../topic/features/research/first.feature",
+		"1", "topic/scenario-title", "missing.feature", "../topic/research/first.feature",
 	} {
 		if _, err := resolveTest(tests, unknown); err == nil {
 			t.Errorf("accepted unknown feature %q", unknown)
 		}
 	}
 
-	writeFeature(t, root, "topic/features/added-later/deeper/third.feature", `Feature: Newly added
+	writeFeature(t, root, "features/query/research/added-later/deeper/third.feature", `Feature: Newly added
   Scenario: New scenario
     * something
 `)
@@ -203,7 +202,8 @@ Feature: Exact Feature title — имя теста
 	}
 	output.Reset()
 	printTests(&output, buildTestMenu(reloaded))
-	if !strings.Contains(output.String(), "added-later/\n        deeper/\n          Newly added (third.feature)") {
+	wantNewService := "query/\n    research/\n      added-later/\n        deeper/\n          Newly added (third.feature)"
+	if !strings.Contains(output.String(), wantNewService) {
 		t.Fatalf("new folder is absent from reloaded menu:\n%s", output.String())
 	}
 }
@@ -217,7 +217,7 @@ func TestDiscoverTestsRejectsInvalidFeatures(t *testing.T) {
 	} {
 		t.Run(contents, func(t *testing.T) {
 			root := t.TempDir()
-			writeFeature(t, root, "topic/features/research/broken.feature", contents)
+			writeFeature(t, root, "features/topic/research/broken.feature", contents)
 			if _, err := discoverTests(root); err == nil || !strings.Contains(err.Error(), "broken.feature") {
 				t.Fatalf("expected error identifying the feature file, got %v", err)
 			}

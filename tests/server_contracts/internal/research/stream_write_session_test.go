@@ -1,4 +1,4 @@
-package topicresearch_test
+package research_test
 
 import (
 	"context"

@@ -1,7 +1,6 @@
-package topicresearch_test
+package research_test
 
 import (
-	"embed"
 	"io"
 	"io/fs"
 	"os"
@@ -11,9 +10,6 @@ import (
 	"github.com/cucumber/godog"
 	messages "github.com/cucumber/messages/go/v34"
 )
-
-//go:embed all:features
-var featureFiles embed.FS
 
 func TestServerFeatures(t *testing.T) {
 	options := featureSuiteOptions()
@@ -59,15 +55,16 @@ func TestFormatResearchScenario(t *testing.T) {
 }
 
 func TestEveryResearchScenarioDocumentsCurrentObservation(t *testing.T) {
+	featureFiles := os.DirFS("../../features")
 	scenarios := 0
-	err := fs.WalkDir(featureFiles, "features/research", func(path string, entry fs.DirEntry, walkErr error) error {
+	err := fs.WalkDir(featureFiles, ".", func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 		if entry.IsDir() || !strings.HasSuffix(path, ".feature") {
 			return nil
 		}
-		contents, err := featureFiles.ReadFile(path)
+		contents, err := fs.ReadFile(featureFiles, path)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -103,17 +100,17 @@ func TestEveryResearchScenarioDocumentsCurrentObservation(t *testing.T) {
 }
 
 func featureSuiteOptions() *godog.Options {
-	format := os.Getenv("YDB_TOPIC_RESEARCH_FORMAT")
+	format := os.Getenv("YDB_RESEARCH_FORMAT")
 	if format == "" {
 		format = "pretty"
 	}
-	paths := []string{"features"}
+	paths := []string{"."}
 	if featurePath := os.Getenv("YDB_SERVER_FEATURE_PATH"); featurePath != "" {
 		paths = []string{featurePath}
 	}
 	options := &godog.Options{
 		Format:   format,
-		FS:       featureFiles,
+		FS:       os.DirFS("../../features"),
 		Paths:    paths,
 		Strict:   true,
 		NoColors: os.Getenv("YDB_RESEARCH_NO_COLORS") != "",

@@ -1,4 +1,4 @@
-package main
+package runner
 
 import (
 	"bufio"
@@ -86,7 +86,7 @@ func runGoTest(
 		"-count=1",
 		"-run",
 		"^TestServerFeatures$",
-		test.packagePath,
+		"./internal/research",
 	)
 	command.Dir = root
 	command.WaitDelay = 5 * time.Second
@@ -96,10 +96,10 @@ func runGoTest(
 		"YDB_SSL_ROOT_CERTIFICATES_FILE",
 	)
 	command.Env = replaceEnvironment(baseEnvironment, map[string]string{
-		"YDB_CONNECTION_STRING":     connectionString,
-		"YDB_SERVER_FEATURE_PATH":   test.featurePath,
-		"YDB_RESEARCH_NO_COLORS":    "1",
-		"YDB_TOPIC_RESEARCH_FORMAT": "pretty",
+		"YDB_CONNECTION_STRING":   connectionString,
+		"YDB_SERVER_FEATURE_PATH": test.path,
+		"YDB_RESEARCH_NO_COLORS":  "1",
+		"YDB_RESEARCH_FORMAT":     "pretty",
 	})
 	stdout, err := command.StdoutPipe()
 	if err != nil {

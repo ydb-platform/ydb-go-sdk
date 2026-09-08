@@ -1,4 +1,4 @@
-package topicresearch_test
+package research_test
 
 import (
 	"regexp"
@@ -80,7 +80,7 @@ func TestEveryFeatureUsesRequestScopedTransactions(t *testing.T) {
 }
 
 func TestFeatureSuiteSelection(t *testing.T) {
-	const selectedPath = "features/new-category/nested/selected.feature"
+	const selectedPath = "topic/research/nested/selected.feature"
 	files := fstest.MapFS{
 		selectedPath: {Data: []byte(`Feature: Selected
   Scenario: First
@@ -88,7 +88,7 @@ func TestFeatureSuiteSelection(t *testing.T) {
   Scenario: Second
     * action
 `)},
-		"features/research/other.feature": {Data: []byte("Feature: Other\n  Scenario: Not selected\n    * action\n")},
+		"query/research/other.feature": {Data: []byte("Feature: Other\n  Scenario: Not selected\n    * action\n")},
 	}
 	for _, selected := range []string{"", selectedPath} {
 		t.Run(selected, func(t *testing.T) {

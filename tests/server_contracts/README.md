@@ -1,7 +1,7 @@
 # YDB server research tests
 
 This nested Go module contains executable experiments for YDB server behavior observable through public gRPC protocols.
-Research is grouped by service; the current suite covers [Topics](topic/features/research/).
+Research is grouped by service; the current suite covers [Topics](features/topic/research/).
 
 Research scenarios live in a `research/` subdirectory. They record behavior without asserting an expected server response. A run ends
 with `RECORDED` when the experiment and its observation machinery worked, or `ERROR` when the experiment itself could not be
@@ -16,6 +16,23 @@ The full suite (21 scenarios in 10 feature files) was recorded with the race det
 `sha256:7437fab163ffcc3594d3f2498d6e2888cc31928d3d5a00f7372a2d8455408789`.
 Query transaction experiments use serializable read-write isolation; they do not compare isolation levels or test SDK pooling.
 
+## Layout
+
+```text
+server_contracts/
+  features/
+    topic/
+      research/       # Executable .feature scenarios and observations
+  internal/
+    research/         # Shared scenario runner, protocol steps, and unit checks
+    runner/           # Shared CLI, discovery, Docker lifecycle, and output
+  cmd/
+    server-contracts/ # Thin CLI entry point
+  go.mod
+```
+
+All services use the same Go runner and step vocabulary. The feature directory does not select a Go package.
+
 ## Interactive runner
 
 The runner needs Go and Docker Compose v2. Start it from this module:
@@ -24,7 +41,8 @@ The runner needs Go and Docker Compose v2. Start it from this module:
 go run ./cmd/server-contracts
 ```
 
-It asks for a YDB Docker image tag and then shows the directory tree containing the tests. Each folder is a submenu; each
+It asks for a YDB Docker image tag and then shows the directory tree inside `features/`, starting with `topic/`.
+The `features/` root is not a menu item. Each folder is a submenu; each
 `.feature` file is a runnable item named exactly after its `Feature:` title, with the filename in parentheses. Selecting a file
 runs **all scenarios in that file**. Every menu has a `0` choice to return one level up; from version selection it exits.
 After a run, including an unsuccessful one, the runner returns to the same folder with the selected YDB version unchanged.
@@ -42,43 +60,42 @@ For every run the utility:
 
 If cleanup fails, the run reports `ERROR` and retains the Compose file and project name for a manual retry.
 
-List or run a feature non-interactively (the path is relative to this module):
+List or run a feature non-interactively (the path is relative to `features/`):
 
 ```bash
 go run ./cmd/server-contracts -list
 go run ./cmd/server-contracts \
   -version trunk \
-  -test topic/features/research/concurrent_query_transactions.feature
+  -test topic/research/concurrent_query_transactions.feature
 ```
 
 ### Test discovery
 
-At startup the runner finds `features/` directories under Go packages and recursively reads their `.feature` files using the
-Gherkin parser. There is no test registry, generated ID, category list, or tag filter. The menu mirrors the actual directory
-structure, including arbitrary nesting. Only folders containing feature files are shown.
+At startup the runner recursively reads `.feature` files under the module's single `features/` root using the Gherkin parser.
+There is no test registry, generated ID, service-to-package mapping, or tag filter. The menu mirrors the actual directory
+structure below that root, including arbitrary nesting. Only folders containing feature files are shown.
 
-For example, adding `topic/features/research/ordering/new_case.feature` adds the `ordering/` submenu and a runnable feature.
-Adding `topic/features/contracts/new_case.feature` adds a sibling `contracts/` submenu. Restart the utility to reload the catalog.
-Tags are optional metadata and do not determine where a test appears or whether it runs. Existing observations and research
-behavior are unchanged; no contract scenarios are provided yet.
+For example, adding `features/topic/research/ordering/new_case.feature` adds the `ordering/` submenu and a runnable feature.
+Adding `features/query/research/new_case.feature` adds a top-level `query/` submenu. Restart the utility to reload the catalog.
+Only research scenarios are included. Tags are optional metadata and do not determine where a scenario appears or whether it runs.
 
-A new feature can use the existing Go steps without code changes. A new service needs a Go test package with a
-`TestServerFeatures` entry point that honors `YDB_SERVER_FEATURE_PATH`, plus that service's protocol steps.
+A new feature can use the existing Go steps without code changes, regardless of its directory. New protocol actions are added
+to the shared steps in `internal/research`; no separate service-specific Go package or entry point is needed.
 
 ## Direct run
 
 With an already running YDB:
 
 ```bash
-YDB_CONNECTION_STRING=grpc://localhost:2136/local go test -v -run '^TestServerFeatures$' ./topic
+YDB_CONNECTION_STRING=grpc://localhost:2136/local go test -v -run '^TestServerFeatures$' ./internal/research
 ```
 
-Set `YDB_SERVER_FEATURE_PATH=features/research/concurrent_query_transactions.feature` to run one file; without it the package
-runs all files recursively under `features/`.
+Set `YDB_SERVER_FEATURE_PATH=topic/research/concurrent_query_transactions.feature` to run one file; without it the shared runner
+runs all files recursively under `features/`. Scenarios are read from disk when a run starts, not embedded into the Go binary.
 
 The module also reads `YDB_ACCESS_TOKEN_CREDENTIALS` and `YDB_SSL_ROOT_CERTIFICATES_FILE`; both `grpc://` and `grpcs://`
 connection strings are supported. TLS uses normal certificate verification; the certificate file adds a custom CA.
-`YDB_TOPIC_RESEARCH_FORMAT` can select another Godog formatter.
+`YDB_RESEARCH_FORMAT` can select another Godog formatter.
 
 Run the runner's unit tests and static checks without starting YDB:
 
@@ -120,7 +137,7 @@ Place the current observation immediately before the scenario:
 Scenario: Write one message
 ```
 
-Compose StreamWrite experiments from the parameterized steps in `topic/stream_write_steps_test.go`. Write `InitRequest` as a
+Compose StreamWrite experiments from the parameterized steps in `internal/research/stream_write_steps_test.go`. Write `InitRequest` as a
 compact protobuf-like object and omit fields that are not set:
 
 ```gherkin
