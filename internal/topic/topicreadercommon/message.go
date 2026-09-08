@@ -175,6 +175,13 @@ func (pmb *PublicMessageBuilder) Offset(offset int64) *PublicMessageBuilder {
 	pmb.mess.Offset = offset
 	pmb.mess.commitRange.CommitOffsetStart = rawtopiccommon.Offset(offset)
 	pmb.mess.commitRange.CommitOffsetEnd = rawtopiccommon.Offset(offset + 1)
+	if pmb.mess.commitRange.PartitionSession.commitMetricsEnabled() {
+		pmb.mess.commitRange.messageMetadata = singleCommitMessageMetadata(
+			pmb.mess.commitRange.CommitOffsetStart,
+			pmb.mess.commitRange.CommitOffsetEnd,
+			rawtopiccommon.Offset(offset),
+		)
+	}
 
 	return pmb
 }
@@ -207,6 +214,15 @@ func (pmb *PublicMessageBuilder) DataAndUncompressedSize(data []byte) *PublicMes
 
 func (pmb *PublicMessageBuilder) CommitRange(cr CommitRange) *PublicMessageBuilder {
 	pmb.mess.commitRange = cr
+	if pmb.mess.commitRange.PartitionSession.commitMetricsEnabled() &&
+		pmb.mess.commitRange.messageMetadata == nil &&
+		pmb.mess.commitRange.CommitOffsetEnd == pmb.mess.commitRange.CommitOffsetStart+1 {
+		pmb.mess.commitRange.messageMetadata = singleCommitMessageMetadata(
+			pmb.mess.commitRange.CommitOffsetStart,
+			pmb.mess.commitRange.CommitOffsetEnd,
+			pmb.mess.commitRange.CommitOffsetStart,
+		)
+	}
 
 	return pmb
 }
@@ -241,6 +257,15 @@ func (pmb *PublicMessageBuilder) PartitionID(partitionID int64) *PublicMessageBu
 
 func (pmb *PublicMessageBuilder) PartitionSession(session *PartitionSession) *PublicMessageBuilder {
 	pmb.mess.commitRange.PartitionSession = session
+	if session.commitMetricsEnabled() &&
+		pmb.mess.commitRange.messageMetadata == nil &&
+		pmb.mess.commitRange.CommitOffsetEnd == pmb.mess.commitRange.CommitOffsetStart+1 {
+		pmb.mess.commitRange.messageMetadata = singleCommitMessageMetadata(
+			pmb.mess.commitRange.CommitOffsetStart,
+			pmb.mess.commitRange.CommitOffsetEnd,
+			pmb.mess.commitRange.CommitOffsetStart,
+		)
+	}
 
 	return pmb
 }

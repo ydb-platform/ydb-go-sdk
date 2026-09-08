@@ -38,6 +38,7 @@ type Reader struct {
 	defaultBatchConfig ReadMessageBatchOptions
 	tracer             *trace.Topic
 	readerID           int64
+	readerInfo         topicreadercommon.ReaderInfo
 }
 
 func (r *Reader) TopicOnReaderStart(consumer string, err error) {
@@ -88,6 +89,9 @@ func NewReader(
 	}
 
 	readerID := topicreadercommon.NextReaderID()
+	if cfg.ReaderInfo.ReaderName == "" {
+		cfg.ReaderInfo.ReaderName = fmt.Sprintf("reader-%d", readerID)
+	}
 
 	readerConnector := func(ctx context.Context) (batchedStreamReader, error) {
 		stream, err := connector(ctx, readerID, cfg.Trace)
@@ -105,6 +109,7 @@ func NewReader(
 		cfg.OperationTimeout(),
 		cfg.RetrySettings,
 		cfg.Trace,
+		cfg.ReaderInfo,
 	)
 
 	res := Reader{
@@ -112,6 +117,7 @@ func NewReader(
 		defaultBatchConfig: cfg.DefaultBatchConfig,
 		tracer:             cfg.Trace,
 		readerID:           readerID,
+		readerInfo:         cfg.ReaderInfo,
 	}
 
 	return res, nil
@@ -148,7 +154,13 @@ func (r *Reader) PopBatchTx(
 ) (*topicreadercommon.PublicBatch, error) {
 	batchOptions := r.getBatchOptions(opts)
 
-	return r.reader.PopMessagesBatchTx(ctx, tx, batchOptions)
+	batch, err := r.reader.PopMessagesBatchTx(ctx, tx, batchOptions)
+	if err != nil {
+		return nil, err
+	}
+	r.traceMessagesDelivered(ctx, batch)
+
+	return batch, nil
 }
 
 // ReadMessage read exactly one message
@@ -185,9 +197,24 @@ func (r *Reader) ReadMessageBatch(
 		// if batch context is canceled - do not return it to client
 		// and read next batch
 		if batch.Context().Err() == nil {
+			r.traceMessagesDelivered(ctx, batch)
+
 			return batch, nil
 		}
 	}
+}
+
+func (r *Reader) traceMessagesDelivered(ctx context.Context, batch *topicreadercommon.PublicBatch) {
+	if batch == nil || len(batch.Messages) == 0 {
+		return
+	}
+	topicreadercommon.TraceMessagesDelivered(
+		ctx,
+		r.tracer,
+		r.readerInfo,
+		batch.Topic(),
+		len(batch.Messages),
+	)
 }
 
 func (r *Reader) getBatchOptions(opts []PublicReadBatchOption) ReadMessageBatchOptions {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -42,6 +43,7 @@ type readerReconnector struct {
 	streamErr                  error
 	initErr                    error
 	tracer                     *trace.Topic
+	readerInfo                 topicreadercommon.ReaderInfo
 	readerConnect              readerConnectFunc
 	reconnectFromBadStream     chan reconnectRequest
 	connectTimeout             time.Duration
@@ -50,6 +52,7 @@ type readerReconnector struct {
 	initDoneCh                 empty.Chan
 	m                          xsync.RWMutex
 	closeOnce                  sync.Once
+	stopSessionErrorReported   atomic.Bool
 	initDone                   bool
 }
 
@@ -60,6 +63,7 @@ func newReaderReconnector(
 	connectTimeout time.Duration,
 	retrySettings topic.RetrySettings,
 	tracer *trace.Topic,
+	readerInfo topicreadercommon.ReaderInfo,
 ) *readerReconnector {
 	res := &readerReconnector{
 		readerID:       readerID,
@@ -69,6 +73,7 @@ func newReaderReconnector(
 		connectTimeout: connectTimeout,
 		logContext:     logContext,
 		tracer:         tracer,
+		readerInfo:     readerInfo,
 		retrySettings:  retrySettings,
 	}
 
@@ -191,26 +196,49 @@ func (r *readerReconnector) readWithReconnections(
 		stream, err := r.stream(ctx)
 		switch {
 		case r.isRetriableError(err):
-			r.fireReconnectOnRetryableError(stream, err)
+			r.fireReconnectOnRetryableErrorWithContext(ctx, stream, err)
 			runtime.Gosched()
 
 			continue
 		case err != nil:
+			r.traceSessionStopAfterRead(ctx, err)
+
 			return nil, err
 		default:
 			// pass
 		}
 
-		res, err := read(ctx, stream)
-		if r.isRetriableError(err) {
-			r.fireReconnectOnRetryableError(stream, err)
-			runtime.Gosched()
-
+		res, retry, err := r.readOnce(ctx, stream, read)
+		if retry {
 			continue
 		}
 
 		return res, err
 	}
+}
+
+func (r *readerReconnector) readOnce(
+	ctx context.Context,
+	stream batchedStreamReader,
+	read func(context.Context, batchedStreamReader) (*topicreadercommon.PublicBatch, error),
+) (*topicreadercommon.PublicBatch, bool, error) {
+	res, err := read(ctx, stream)
+	if r.isRetriableError(err) {
+		r.fireReconnectOnRetryableErrorWithContext(ctx, stream, err)
+		runtime.Gosched()
+
+		return nil, true, err
+	}
+	if err == nil && res != nil {
+		if releaser, ok := stream.(localBufferBatchReleaser); ok {
+			releaser.releaseLocalBufferForBatch(res)
+		}
+	}
+	if err != nil {
+		r.traceSessionStopAfterRead(ctx, err)
+	}
+
+	return res, false, err
 }
 
 func (r *readerReconnector) Commit(
@@ -268,7 +296,7 @@ func (r *readerReconnector) start() {
 	r.background.Start("reconnector-loop", r.reconnectionLoop)
 
 	// start first connection
-	r.reconnectFromBadStream <- newReconnectRequest(nil, nil)
+	r.reconnectFromBadStream <- newReconnectRequest(nil)
 }
 
 func (r *readerReconnector) initChannelsAndClock() {
@@ -328,6 +356,7 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 					return
 				}
 			} else {
+				r.traceSessionStopIf(ctx, stopRetryReason, request.reportSessionError)
 				_ = r.CloseWithError(ctx, stopRetryReason)
 				logCtx := r.logContext
 				gtrace.TopicOnReaderReconnect(r.tracer, &logCtx, request.reason)(stopRetryReason)
@@ -336,14 +365,24 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 			}
 		}
 
-		err := r.reconnect(ctx, request.reason, request.oldReader)
+		err := r.reconnect(ctx, request.reason, request.oldReader, request.reportSessionError)
 		logCtx := r.logContext
 		gtrace.TopicOnReaderReconnect(r.tracer, &logCtx, request.reason)(err)
 	}
 }
 
 //nolint:funlen
-func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldReader batchedStreamReader) (err error) {
+func (r *readerReconnector) reconnect(
+	ctx context.Context,
+	reason error,
+	oldReader batchedStreamReader,
+	reportSessionError ...bool,
+) (err error) {
+	reportRetry := true
+	if len(reportSessionError) > 0 {
+		reportRetry = reportSessionError[0]
+	}
+
 	defer func() {
 		logCtx := r.logContext
 		gtrace.TopicOnReaderReconnect(r.tracer, &logCtx, reason)(err)
@@ -375,6 +414,9 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 	if oldReader != nil {
 		_ = oldReader.CloseWithError(ctx, xerrors.WithStackTrace(errReconnect))
 	}
+	if reportRetry && reason != nil {
+		r.traceSessionRetry(ctx, reason)
+	}
 
 	newStream, newStreamClose, err := r.connectWithTimeout()
 
@@ -385,7 +427,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 		sendReason := err
 		r.background.Start("ydb topic reader send reconnect message", func(ctx context.Context) {
 			select {
-			case r.reconnectFromBadStream <- newReconnectRequest(oldReader, sendReason):
+			case r.reconnectFromBadStream <- newReconnectRequestWithReport(oldReader, sendReason, true):
 				{
 					logCtx := r.logContext
 					gtrace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, err, true)
@@ -399,6 +441,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 		})
 	default:
 		// unretriable error
+		r.traceSessionStopIf(ctx, err, true)
 		_ = r.CloseWithError(ctx, err)
 	}
 
@@ -489,12 +532,21 @@ func (r *readerReconnector) WaitInit(ctx context.Context) error {
 }
 
 func (r *readerReconnector) fireReconnectOnRetryableError(stream batchedStreamReader, err error) {
+	r.fireReconnectOnRetryableErrorWithContext(r.background.Context(), stream, err)
+}
+
+func (r *readerReconnector) fireReconnectOnRetryableErrorWithContext(
+	ctx context.Context,
+	stream batchedStreamReader,
+	err error,
+) {
 	if !r.isRetriableError(err) {
 		return
 	}
+	reportSessionError := ctx == nil || ctx.Err() == nil
 
 	select {
-	case r.reconnectFromBadStream <- newReconnectRequest(stream, err):
+	case r.reconnectFromBadStream <- newReconnectRequestWithReport(stream, err, reportSessionError):
 		{
 			// send signal
 			logCtx := r.logContext
@@ -507,6 +559,52 @@ func (r *readerReconnector) fireReconnectOnRetryableError(stream batchedStreamRe
 			gtrace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, err, false)
 		}
 	}
+}
+
+func (r *readerReconnector) traceSessionRetry(ctx context.Context, err error) {
+	if suppressReaderSessionError(ctx, err) {
+		return
+	}
+
+	topicreadercommon.TraceReaderSessionError(ctx, r.tracer, r.readerInfo, "retry", err)
+}
+
+func (r *readerReconnector) traceSessionStop(ctx context.Context, err error) {
+	r.traceSessionStopIf(ctx, err, true)
+}
+
+func (r *readerReconnector) traceSessionStopIf(ctx context.Context, err error, report bool) {
+	if !report {
+		return
+	}
+	if suppressReaderSessionError(ctx, err) ||
+		!r.stopSessionErrorReported.CompareAndSwap(false, true) {
+		return
+	}
+
+	topicreadercommon.TraceReaderSessionError(ctx, r.tracer, r.readerInfo, "stop", err)
+}
+
+func (r *readerReconnector) traceSessionStopAfterRead(ctx context.Context, err error) {
+	if ctx != nil && ctx.Err() != nil {
+		return
+	}
+
+	r.traceSessionStop(ctx, err)
+}
+
+func suppressReaderSessionError(ctx context.Context, err error) bool {
+	if err == nil {
+		return true
+	}
+	if ctx != nil && errors.Is(ctx.Err(), context.Canceled) {
+		return true
+	}
+	if xerrors.Is(err, errReaderClosed, errReconnect, errReconnectRequestOutdated, errUnconnected) {
+		return true
+	}
+
+	return false
 }
 
 func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, error) {
@@ -535,7 +633,7 @@ func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, er
 			reader = r.streamVal
 			err = r.streamErr
 		})
-		r.fireReconnectOnRetryableError(reader, err)
+		r.fireReconnectOnRetryableErrorWithContext(ctx, reader, err)
 
 		return reader, err
 	}
@@ -548,13 +646,23 @@ func (r *readerReconnector) handlePanic() {
 }
 
 type reconnectRequest struct {
-	oldReader batchedStreamReader
-	reason    error
+	oldReader          batchedStreamReader
+	reason             error
+	reportSessionError bool
 }
 
-func newReconnectRequest(oldReader batchedStreamReader, reason error) reconnectRequest {
+func newReconnectRequest(oldReader batchedStreamReader) reconnectRequest {
+	return newReconnectRequestWithReport(oldReader, nil, true)
+}
+
+func newReconnectRequestWithReport(
+	oldReader batchedStreamReader,
+	reason error,
+	reportSessionError bool,
+) reconnectRequest {
 	return reconnectRequest{
-		oldReader: oldReader,
-		reason:    reason,
+		oldReader:          oldReader,
+		reason:             reason,
+		reportSessionError: reportSessionError,
 	}
 }

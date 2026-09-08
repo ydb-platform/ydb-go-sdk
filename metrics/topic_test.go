@@ -19,7 +19,7 @@ func TestTopicReaderReceivedMessagesMetric(t *testing.T) {
 	tracer := topic(config.WithSystem("ydb"))
 
 	require.Equal(t, "counter", registry.kinds[metricPath])
-	require.Equal(t, []string{"endpoint", "database", "topic", "consumer"},
+	require.Equal(t, []string{"endpoint", "database", "topic", "consumer", "reader.name"},
 		registry.labelNames[metricPath])
 
 	tests := []trace.TopicReaderMessagesReceivedInfo{
@@ -28,12 +28,14 @@ func TestTopicReaderReceivedMessagesMetric(t *testing.T) {
 			Database:      "/local",
 			Topic:         "/local/topic-a",
 			Consumer:      "consumer-a",
+			ReaderName:    "reader-a",
 			MessagesCount: 3,
 		},
 		{
 			Endpoint:      "node-b:2135",
 			Database:      "/other",
 			Topic:         "/other/topic-b",
+			ReaderName:    "reader-b",
 			MessagesCount: 2,
 		},
 	}
@@ -42,16 +44,18 @@ func TestTopicReaderReceivedMessagesMetric(t *testing.T) {
 	}
 
 	require.Equal(t, float64(3), registry.value(metricPath, map[string]string{
-		"endpoint": "node-a:2135",
-		"database": "/local",
-		"topic":    "/local/topic-a",
-		"consumer": "consumer-a",
+		"endpoint":    "node-a:2135",
+		"database":    "/local",
+		"topic":       "/local/topic-a",
+		"consumer":    "consumer-a",
+		"reader.name": "reader-a",
 	}))
 	require.Equal(t, float64(2), registry.value(metricPath, map[string]string{
-		"endpoint": "node-b:2135",
-		"database": "/other",
-		"topic":    "/other/topic-b",
-		"consumer": "",
+		"endpoint":    "node-b:2135",
+		"database":    "/other",
+		"topic":       "/other/topic-b",
+		"consumer":    "",
+		"reader.name": "reader-b",
 	}))
 }
 
@@ -67,14 +71,16 @@ func TestTopicReaderReceivedMessagesMetricDisabled(t *testing.T) {
 		Database:      "/local",
 		Topic:         "/local/topic-a",
 		Consumer:      "consumer-a",
+		ReaderName:    "reader-a",
 		MessagesCount: 3,
 	})
 
 	require.Zero(t, registry.value("topic.reader.received.messages", map[string]string{
-		"endpoint": "node-a:2135",
-		"database": "/local",
-		"topic":    "/local/topic-a",
-		"consumer": "consumer-a",
+		"endpoint":    "node-a:2135",
+		"database":    "/local",
+		"topic":       "/local/topic-a",
+		"consumer":    "consumer-a",
+		"reader.name": "reader-a",
 	}))
 }
 
@@ -90,8 +96,22 @@ func TestTopicReaderReceivedMessagesMetricDescriptorAndBatchAdd(t *testing.T) {
 	}
 	tracer := topic(config.WithSystem("ydb"))
 
-	require.Equal(t, topicReaderReceivedMessagesName, descriptor.name)
-	require.Equal(t, topicReaderReceivedMessagesUnit, descriptor.unit)
+	require.Equal(t, []string{
+		topicReaderReceivedMessagesName,
+		topicReaderDeliveredMessagesName,
+		topicReaderReceivedBytesName,
+		topicReaderSessionErrorsName,
+		topicReaderCommitQueuedName,
+		topicReaderCommitAcknowledgedName,
+	}, descriptor.names)
+	require.Equal(t, []string{
+		topicReaderReceivedMessagesUnit,
+		topicReaderDeliveredMessagesUnit,
+		topicReaderReceivedBytesUnit,
+		topicReaderSessionErrorsUnit,
+		topicReaderCommitQueuedUnit,
+		topicReaderCommitAcknowledgedUnit,
+	}, descriptor.units)
 	require.Equal(t, "counter", registry.kinds[topicReaderReceivedMessagesName])
 
 	info := trace.TopicReaderMessagesReceivedInfo{
@@ -99,6 +119,7 @@ func TestTopicReaderReceivedMessagesMetricDescriptorAndBatchAdd(t *testing.T) {
 		Database:      "/local",
 		Topic:         "/local/topic-a",
 		Consumer:      "consumer-a",
+		ReaderName:    "reader-a",
 		MessagesCount: 3,
 	}
 	tracer.OnReaderMessagesReceived(info)
@@ -107,17 +128,20 @@ func TestTopicReaderReceivedMessagesMetricDescriptorAndBatchAdd(t *testing.T) {
 
 	require.Equal(t, []int64{3}, descriptor.adds)
 	require.Equal(t, float64(3), registry.value(topicReaderReceivedMessagesName, map[string]string{
-		"endpoint": "node-a:2135",
-		"database": "/local",
-		"topic":    "/local/topic-a",
-		"consumer": "consumer-a",
+		"endpoint":    "node-a:2135",
+		"database":    "/local",
+		"topic":       "/local/topic-a",
+		"consumer":    "consumer-a",
+		"reader.name": "reader-a",
 	}))
 }
 
 type recordingDescriptor struct {
-	name string
-	unit string
-	adds []int64
+	names      []string
+	units      []string
+	gaugeNames []string
+	gaugeUnits []string
+	adds       []int64
 }
 
 type descriptorRecordingConfig struct {
@@ -137,8 +161,8 @@ func (c descriptorRecordingConfig) CounterVecWithDescriptor(
 	name, unit string,
 	labelNames ...string,
 ) CounterVec {
-	c.descriptor.name = name
-	c.descriptor.unit = unit
+	c.descriptor.names = append(c.descriptor.names, name)
+	c.descriptor.units = append(c.descriptor.units, unit)
 	c.registry.register(name, "counter", labelNames)
 
 	return descriptorRecordingCounterVec{
@@ -146,6 +170,17 @@ func (c descriptorRecordingConfig) CounterVecWithDescriptor(
 		path:       name,
 		descriptor: c.descriptor,
 	}
+}
+
+func (c descriptorRecordingConfig) GaugeVecWithDescriptor(
+	name, unit string,
+	labelNames ...string,
+) GaugeVec {
+	c.descriptor.gaugeNames = append(c.descriptor.gaugeNames, name)
+	c.descriptor.gaugeUnits = append(c.descriptor.gaugeUnits, unit)
+	c.registry.register(name, "gauge", labelNames)
+
+	return descriptorRecordingGaugeVec{registry: c.registry, path: name}
 }
 
 type descriptorRecordingCounterVec struct {
@@ -177,4 +212,13 @@ func (c descriptorRecordingCounter) Inc() {
 func (c descriptorRecordingCounter) Add(delta int64) {
 	c.descriptor.adds = append(c.descriptor.adds, delta)
 	c.registry.add(c.path, c.labels, float64(delta))
+}
+
+type descriptorRecordingGaugeVec struct {
+	registry *recordingRegistry
+	path     string
+}
+
+func (v descriptorRecordingGaugeVec) With(labels map[string]string) Gauge {
+	return recordingGauge{registry: v.registry, path: v.path, labels: labels}
 }

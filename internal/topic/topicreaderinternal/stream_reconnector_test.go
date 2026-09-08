@@ -282,9 +282,9 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 		<-stream1Ready
 
 		// skip bad (old) stream
-		reconnector.reconnectFromBadStream <- newReconnectRequest(NewMockbatchedStreamReader(mc), nil)
+		reconnector.reconnectFromBadStream <- newReconnectRequest(NewMockbatchedStreamReader(mc))
 
-		reconnector.reconnectFromBadStream <- newReconnectRequest(newStream1, nil)
+		reconnector.reconnectFromBadStream <- newReconnectRequest(newStream1)
 
 		<-stream2Ready
 
@@ -494,7 +494,7 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 	fillChannel:
 		for {
 			select {
-			case reconnector.reconnectFromBadStream <- newReconnectRequest(nil, nil):
+			case reconnector.reconnectFromBadStream <- newReconnectRequest(nil):
 				// repeat
 			default:
 				break fillChannel

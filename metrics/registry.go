@@ -36,3 +36,15 @@ type Registry interface {
 type RegistryWithDescriptors interface {
 	CounterVecWithDescriptor(name, unit string, labelNames ...string) CounterVec
 }
+
+// RegistryWithGaugeDescriptors is an optional Registry capability for creating
+// a gauge with an explicit instrument name and unit.
+//
+// The name passed to GaugeVecWithDescriptor is used as a complete instrument
+// name by implementations that support this capability. Registries that do
+// not implement RegistryWithGaugeDescriptors continue to use Registry.GaugeVec.
+// This capability is intentionally additive so existing Registry and Config
+// implementations remain valid.
+type RegistryWithGaugeDescriptors interface {
+	GaugeVecWithDescriptor(name, unit string, labelNames ...string) GaugeVec
+}

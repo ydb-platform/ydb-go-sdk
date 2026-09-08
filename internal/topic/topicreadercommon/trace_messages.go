@@ -22,6 +22,48 @@ func TraceMessagesReceived(
 		readerInfo.Database,
 		topic,
 		readerInfo.Consumer,
+		readerInfo.ReaderName,
 		messagesCount,
+	)
+}
+
+// TraceMessagesDelivered emits a shared reader/listener message delivery event.
+func TraceMessagesDelivered(
+	ctx context.Context,
+	tracer *trace.Topic,
+	readerInfo ReaderInfo,
+	topic string,
+	messagesCount int,
+) {
+	gtrace.TopicOnReaderMessagesDelivered(
+		tracer,
+		&ctx,
+		readerInfo.Endpoint,
+		readerInfo.Database,
+		topic,
+		readerInfo.Consumer,
+		readerInfo.ReaderName,
+		messagesCount,
+	)
+}
+
+// TraceLocalBufferChanged emits the owned-message balance delta for a topic
+// reader or listener.
+func TraceLocalBufferChanged(
+	ctx context.Context,
+	tracer *trace.Topic,
+	readerInfo ReaderInfo,
+	topic string,
+	messagesDelta int,
+) {
+	gtrace.TopicOnReaderLocalBufferChanged(
+		tracer,
+		&ctx,
+		readerInfo.Endpoint,
+		readerInfo.Database,
+		topic,
+		readerInfo.Consumer,
+		readerInfo.ReaderName,
+		messagesDelta,
 	)
 }

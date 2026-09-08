@@ -51,6 +51,22 @@ func NewBatch(session *PartitionSession, messages []*PublicMessage) (*PublicBatc
 		commitRange.CommitOffsetStart = messages[0].commitRange.CommitOffsetStart
 		commitRange.CommitOffsetEnd = messages[len(messages)-1].commitRange.CommitOffsetEnd
 	}
+	if session.commitMetricsEnabled() {
+		metadata := make([]commitMessageMetadata, 0, len(messages))
+		metadataComplete := true
+		for i := range messages {
+			messageMetadata, ok := commitMessageMetadataForMessage(messages[i])
+			if !ok {
+				metadataComplete = false
+
+				break
+			}
+			metadata = append(metadata, messageMetadata...)
+		}
+		if metadataComplete && len(metadata) == len(messages) {
+			commitRange.messageMetadata = metadata
+		}
+	}
 
 	return &PublicBatch{
 		Messages:    messages,
@@ -85,6 +101,13 @@ func NewBatchFromStream(
 		dstMess.commitRange.PartitionSession = session
 		dstMess.commitRange.CommitOffsetStart = prevOffset + 1
 		dstMess.commitRange.CommitOffsetEnd = sMess.Offset + 1
+		if session.commitMetricsEnabled() {
+			dstMess.commitRange.messageMetadata = singleCommitMessageMetadata(
+				dstMess.commitRange.CommitOffsetStart,
+				dstMess.commitRange.CommitOffsetEnd,
+				sMess.Offset,
+			)
+		}
 
 		if len(sMess.MetadataItems) > 0 {
 			dstMess.Metadata = make(map[string][]byte, len(sMess.MetadataItems))
@@ -194,8 +217,21 @@ func BatchAppend(original, appended *PublicBatch) (*PublicBatch, error) {
 		return nil, xerrors.WithStackTrace(errors.New("ydb: bad offset interval for merge"))
 	}
 
+	originalMessagesCount := len(res.Messages)
+	appendedMessagesCount := len(appended.Messages)
 	res.Messages = append(res.Messages, appended.Messages...)
 	res.commitRange.CommitOffsetEnd = appended.commitRange.CommitOffsetEnd
+	if commitMessageMetadataComplete(res.commitRange, originalMessagesCount) &&
+		commitMessageMetadataComplete(appended.commitRange, appendedMessagesCount) {
+		res.commitRange.messageMetadata = appendCommitMessageMetadata(
+			res.commitRange.messageMetadata,
+			appended.commitRange.messageMetadata,
+			originalMessagesCount,
+			appendedMessagesCount,
+		)
+	} else {
+		res.commitRange.messageMetadata = nil
+	}
 
 	return res, nil
 }
@@ -209,11 +245,39 @@ func BatchCutMessages(b *PublicBatch, count int) (head, rest *PublicBatch) {
 	default:
 		// slice[0:count:count] - limit slice capacity and prevent overwrite rest by append messages to head
 		// explicit 0 need for prevent typos, when type slice[count:count] instead of slice[:count:count]
+		if len(b.commitRange.messageMetadata) == len(b.Messages) {
+			return cutBatchWithMetadata(b, count)
+		}
+
 		head, _ = NewBatch(b.commitRange.PartitionSession, b.Messages[0:count:count])
 		rest, _ = NewBatch(b.commitRange.PartitionSession, b.Messages[count:])
 
 		return head, rest
 	}
+}
+
+func cutBatchWithMetadata(b *PublicBatch, count int) (head, rest *PublicBatch) {
+	metadata := b.commitRange.messageMetadata
+
+	headCommitRange := b.commitRange
+	headCommitRange.CommitOffsetStart = metadata[0].start
+	headCommitRange.CommitOffsetEnd = metadata[count-1].end
+	headCommitRange.messageMetadata = metadata[:count:count]
+	head = &PublicBatch{
+		Messages:    b.Messages[0:count:count],
+		commitRange: headCommitRange,
+	}
+
+	restCommitRange := b.commitRange
+	restCommitRange.CommitOffsetStart = metadata[count].start
+	restCommitRange.CommitOffsetEnd = metadata[len(metadata)-1].end
+	restCommitRange.messageMetadata = metadata[count:len(metadata):len(metadata)]
+	rest = &PublicBatch{
+		Messages:    b.Messages[count:],
+		commitRange: restCommitRange,
+	}
+
+	return head, rest
 }
 
 func BatchIsEmpty(b *PublicBatch) bool {

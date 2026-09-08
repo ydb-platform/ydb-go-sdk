@@ -328,7 +328,9 @@ func (c *Client) newStreamListenerConfig(
 	readSelectors topicoptions.ReadSelectors,
 ) topiclistenerinternal.StreamListenerConfig {
 	cfg := topiclistenerinternal.NewStreamListenerConfig()
-	cfg.ReaderInfo = c.readerInfo(consumer)
+	readerInfo := c.readerInfo(consumer)
+	readerInfo.ReaderName = cfg.ReaderName
+	cfg.ReaderInfo = readerInfo
 	cfg.Tracer = c.cfg.Trace
 	cfg.Selectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))
 	for i := range readSelectors {

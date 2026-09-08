@@ -103,6 +103,7 @@ func (c *Committer) Commit(ctx context.Context, commitRange CommitRange) error {
 
 func (c *Committer) pushCommit(commitRange CommitRange) (commitWaiter, error) {
 	var resErr error
+	var messagesCount int
 	waiter := newCommitWaiter(commitRange.PartitionSession, commitRange.CommitOffsetEnd)
 	c.m.WithLock(func() {
 		if err := c.backgroundWorker.Context().Err(); err != nil {
@@ -112,10 +113,20 @@ func (c *Committer) pushCommit(commitRange CommitRange) (commitWaiter, error) {
 		}
 
 		c.commits.Append(&commitRange)
+		messagesCount = RegisterCommitQueued(commitRange)
 		if c.mode == CommitModeSync {
 			c.addWaiterNeedLock(waiter)
 		}
 	})
+	if resErr != nil {
+		return waiter, resErr
+	}
+
+	traceCtx := c.backgroundWorker.Context()
+	if commitRange.PartitionSession != nil {
+		traceCtx = commitRange.PartitionSession.Context()
+	}
+	TraceCommitQueuedAfterRegistration(traceCtx, commitRange, messagesCount)
 
 	select {
 	case c.commitLoopSignal <- struct{}{}:
@@ -257,6 +268,26 @@ func (c *Committer) waitCommitAck(ctx context.Context, waiter commitWaiter) erro
 }
 
 func (c *Committer) OnCommitNotify(session *PartitionSession, offset rawtopiccommon.Offset) {
+	messagesCount := RegisterCommitAcknowledged(session, offset)
+	c.onCommitNotify(session, offset, messagesCount)
+}
+
+// OnCommitNotifyAfterAcknowledgedRegistration wakes synchronous commit
+// waiters after the caller has registered the acknowledgement. Registration
+// must happen before the session publishes its committed offset.
+func (c *Committer) OnCommitNotifyAfterAcknowledgedRegistration(
+	session *PartitionSession,
+	offset rawtopiccommon.Offset,
+	messagesCount int,
+) {
+	c.onCommitNotify(session, offset, messagesCount)
+}
+
+func (c *Committer) onCommitNotify(
+	session *PartitionSession,
+	offset rawtopiccommon.Offset,
+	messagesCount int,
+) {
 	c.m.WithLock(func() {
 		for i := range c.waiters {
 			waiter := c.waiters[i]
@@ -268,6 +299,9 @@ func (c *Committer) OnCommitNotify(session *PartitionSession, offset rawtopiccom
 			}
 		}
 	})
+	if session != nil {
+		TraceCommitAcknowledgedAfterRegistration(session.Context(), session, messagesCount)
+	}
 }
 
 func (c *Committer) addWaiterNeedLock(waiter commitWaiter) {
