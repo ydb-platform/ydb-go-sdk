@@ -47,8 +47,13 @@ func TestStreamListener_CreditBalanceTracksSendAndClose(t *testing.T) {
 		require.NoError(t, listener.Close(ctx, errors.New("test close")))
 		require.Equal(t, -17, listenerMetricDelta(t, creditDeltas))
 
+		listener.finalizeCreditBalance()
+		listenerMetricNoDelta(t, creditDeltas)
+		require.Zero(t, listener.creditBalance)
+
 		listener.changeCreditBalance(1)
 		listenerMetricNoDelta(t, creditDeltas)
+		require.Zero(t, listener.creditBalance)
 	})
 
 	t.Run("failed send", func(t *testing.T) {
