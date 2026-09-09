@@ -12,7 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 )
 
 var (
@@ -161,10 +160,10 @@ func (lr *TopicListenerReconnector) waitRetry(
 }
 
 func (lr *TopicListenerReconnector) closeStreamListener(sl *streamListener, reason error) {
-	closeCtx, cancel := context.WithTimeout(xcontext.ValueOnly(lr.background.Context()), time.Second)
-	defer cancel()
-
-	_ = sl.Close(closeCtx, reason)
+	// The connection loop must not start a replacement stream until every
+	// callback in the old stream has finished. Its own worker context is
+	// already cancelled on shutdown, so it cannot be used as a cleanup timeout.
+	_ = sl.Close(context.Background(), reason)
 }
 
 func (lr *TopicListenerReconnector) connectStreamListener(ctx context.Context) (*streamListener, error) {
