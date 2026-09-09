@@ -22,6 +22,8 @@ type Conn struct {
 	connector *Connector
 }
 
+var _ driver.SessionResetter = (*Conn)(nil)
+
 func (c *Conn) ID() string {
 	return c.cc.ID()
 }
@@ -109,6 +111,18 @@ func (c *Conn) Close() (finalErr error) {
 // If IsValid returns false, the connection is discarded and a new one is requested.
 func (c *Conn) IsValid() bool {
 	return c.cc.IsValid()
+}
+
+// ResetSession implements driver.SessionResetter.
+//
+// A YDB session can become invalid while its database/sql connection is idle.
+// database/sql calls ResetSession before reusing such a connection.
+func (c *Conn) ResetSession(context.Context) error {
+	if !c.IsValid() {
+		return badconn.New("session is not valid for reuse")
+	}
+
+	return nil
 }
 
 func (c *Conn) Begin() (_ driver.Tx, finalErr error) {

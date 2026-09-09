@@ -47,8 +47,7 @@ func TestDiscovery(sourceTest *testing.T) {
 				t.Fatalf("unknown request type: %s", requestTypes[0])
 			}
 		}
-		parking = make(chan struct{})
-		ctx     = xtest.Context(t)
+		ctx = xtest.Context(t)
 	)
 
 	db, err := ydb.Open(ctx,
@@ -61,7 +60,6 @@ func TestDiscovery(sourceTest *testing.T) {
 			config.WithOperationCancelAfter(time.Second*2),
 		),
 		ydb.WithBalancer(balancers.SingleConn()),
-		ydb.WithConnectionTTL(time.Second*1),
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
 			newLoggerWithMinLevel(t, log.WARN),
@@ -95,13 +93,6 @@ func TestDiscovery(sourceTest *testing.T) {
 				}),
 			),
 		),
-		ydb.WithTraceDriver(trace.Driver{
-			OnConnPark: func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
-				return func(info trace.DriverConnParkDoneInfo) {
-					parking <- struct{}{}
-				}
-			},
-		}),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -118,17 +109,5 @@ func TestDiscovery(sourceTest *testing.T) {
 		} else {
 			t.Log(endpoints)
 		}
-		t.Run("wait", func(t *testing.T) {
-			t.Run("parking", func(t *testing.T) {
-				<-parking // wait for parking conn
-				t.Run("re-discover", func(t *testing.T) {
-					if endpoints, err := db.Discovery().Discover(ctx); err != nil {
-						t.Fatal(err)
-					} else {
-						t.Log(endpoints)
-					}
-				})
-			})
-		})
 	})
 }

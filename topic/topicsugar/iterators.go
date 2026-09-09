@@ -5,6 +5,7 @@ package topicsugar
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 
 	"google.golang.org/protobuf/proto"
@@ -82,12 +83,32 @@ func JSONIterator[T any](
 
 // ProtobufIterator produce iterator over topic messages with Data is T, created unmarshalled from message
 //
+// T must be a concrete generated protobuf type (for example *examplepb.Message),
+// not the proto.Message interface itself, otherwise iteration yields an error.
+//
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func ProtobufIterator[T proto.Message](
 	ctx context.Context,
 	r TopicMessageReader,
 ) xiter.Seq2[*TypedTopicMessage[T], error] {
 	var unmarshalFunc TypedUnmarshalFunc[*T] = func(data []byte, dst *T) error {
+		// *dst is the zero value of T (a nil proto.Message), so a concrete
+		// message must be allocated before unmarshaling into it. Without this
+		// proto.Unmarshal dereferences the nil pointer and panics.
+		var zero T
+
+		// A non-concrete instantiation (T == proto.Message) has a nil interface
+		// zero value; calling ProtoReflect on it would panic, so reject it here.
+		if any(zero) == nil {
+			return fmt.Errorf("ydb: topicsugar: ProtobufIterator requires a concrete protobuf message type, got %T", zero)
+		}
+
+		msg, ok := zero.ProtoReflect().New().Interface().(T)
+		if !ok {
+			return fmt.Errorf("ydb: topicsugar: failed to allocate message of type %T", zero)
+		}
+		*dst = msg
+
 		return proto.Unmarshal(data, *dst)
 	}
 

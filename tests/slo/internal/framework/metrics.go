@@ -241,38 +241,14 @@ func (m *Metrics) initInstruments() error {
 		for attrs, vals := range percentiles {
 			a := otelmetric.WithAttributes(attrs.ToSlice()...)
 			observer.ObserveFloat64(m.latencyP50, float64(vals[0])/1e6, a)
-		}
-
-		return nil
-	}, m.latencyP50)
-	if err != nil {
-		return fmt.Errorf("failed to register callback for latencyP50: %w", err)
-	}
-
-	_, err = m.meter.RegisterCallback(func(ctx context.Context, observer otelmetric.Observer) error {
-		percentiles := m.latency.GetPercentilesByAttrs()
-		for attrs, vals := range percentiles {
-			a := otelmetric.WithAttributes(attrs.ToSlice()...)
 			observer.ObserveFloat64(m.latencyP95, float64(vals[1])/1e6, a)
-		}
-
-		return nil
-	}, m.latencyP95)
-	if err != nil {
-		return fmt.Errorf("failed to register callback for latencyP95: %w", err)
-	}
-
-	_, err = m.meter.RegisterCallback(func(ctx context.Context, observer otelmetric.Observer) error {
-		percentiles := m.latency.GetPercentilesByAttrs()
-		for attrs, vals := range percentiles {
-			a := otelmetric.WithAttributes(attrs.ToSlice()...)
 			observer.ObserveFloat64(m.latencyP99, float64(vals[2])/1e6, a)
 		}
 
 		return nil
-	}, m.latencyP99)
+	}, m.latencyP50, m.latencyP95, m.latencyP99)
 	if err != nil {
-		return fmt.Errorf("failed to register callback for latencyP99: %w", err)
+		return fmt.Errorf("failed to register callback for latency percentiles: %w", err)
 	}
 
 	return nil

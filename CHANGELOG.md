@@ -1,3 +1,124 @@
+## v3.151.1
+* Fixed `database/sql` Query Service requests failing on session creation attempt timeouts while the caller context remained active
+
+## v3.151.0
+* Added the `ydb.query.session.closed` counter with query session pool name and close reason attributes:
+  `pool_idle_timeout`, `pool_graceful_shutdown`, `client_timeout`, `client_cancelled`, `attach_closed`,
+  `transport_error`, `node_shutdown`, `session_shutdown`, `bad_session`, and `session_busy`; bumped the metrics
+  observability-chain version to `ydb-sdk-metrics/0.2.0`
+
+## v3.150.2
+* Fixed query transaction and session result-set streams not being closed when reading the initial result set failed
+
+## v3.150.1
+* Fixed coordination sessions spuriously reconnecting immediately after creation, which could cause non-idempotent operations to fail with `operation status is unknown`
+
+## v3.150.0
+* Added `balancers.WithMaxConnections` to configure a soft limit on the active gRPC connection set; `balancers.WithNodeID` may exceed the limit to preserve node affinity
+
+## v3.149.0
+* Added `balancers.PreferPrimaryPile` and `balancers.PreferPrimaryPileWithFallback` endpoint selection policies
+
+## v3.148.0
+* Refactored balancer configuration into an immutable priority pipeline without changing existing configuration call sites or strict `Prefer*` and `*WithFallback` behavior
+* Prevented temporary errors from banning the only `SingleConn` endpoint; disabling periodic discovery is now rejected for other balancer policies
+
+## v3.147.2
+* Updated ydb-go-genproto and added bridge pile state to discovered endpoint metadata
+
+## v3.147.1
+* Fixed table session not being deleted on the server when `Session.Close` is called with an already canceled or expired context (pool shutdown, expired caller deadline); `DeleteSession` is now sent on a detached context, as the query service session already does
+
+## v3.147.0
+* Added Coordination `DescribeSemaphore` one-shot watch via `options.WithSemaphoreWatch`
+
+## v3.146.3
+* Fixed custom topic decoders registered for the raw codec being ignored; raw decoder overrides are discouraged and will be rejected in a future release
+
+## v3.146.2
+* Fixed server-side gRPC stream errors being incorrectly classified as client-side context cancellation
+
+## v3.146.1
+* Fixed YQL issue logs to preserve the event message and include bounded nested issue details
+
+## v3.146.0
+* Added `ydb.WithDefaultIdempotent(bool)` driver option
+
+## v3.145.1
+* Fixed a TopicListener read buffer credit leak when a batch raced with partition worker shutdown
+* Fixed `WithConnectionTTL` being a no-op and restored parking of idle gRPC connections without preventing removal of nodes missing from Discovery
+
+## v3.145.0
+* Added `topicoptions.WithListenerBufferSizeBytes` option for `TopicListener` to configure the read-ahead buffer size (default 1 MiB, same as topic reader).
+
+## v3.144.6
+* Fixed expired idle sessions being starved behind frequently reused sessions in Table and Query session pools
+
+## v3.144.5
+* Send observability adoption chains (`ydb-sdk-tracing`, `ydb-sdk-metrics`) in `x-ydb-sdk-build-info` only on Discovery, so `.sys/query_sessions.ClientSdkBuildInfo` stays free of telemetry markers
+
+## v3.144.4
+* Changed driver connection metrics to expose `conns` by state and count `conn.banned` events with a counter
+
+## v3.144.3
+* Fixed gRPC connections to cluster nodes removed from Discovery staying open in the connection pool
+* Refactored connection pool lifecycle to reference-counted `Get`/`Put` with balancer-side quarantine
+
+## v3.144.2
+* Fixed `database/sql` reusing a QueryService session after its attach stream closed
+
+## v3.144.1
+* Fixed topic multi-writer initialization failures caused by concurrent partition splits
+
+## v3.144.0
+* Added observability chain tokens `ydb-sdk-tracing/0.1.0` and `ydb-sdk-metrics/0.1.0` to `x-ydb-sdk-build-info` when tracing/metrics adapters are enabled via SDK observability options
+* Removed background connection parking (`connParker`), `conn.lastUsage` tracking and `xsync.LastUsage`
+* Deprecated `WithConnectionTTL`: the option is now a no-op
+
+## v3.143.0
+* Added experimental helper `sugar.NewKVClientBuilder(ctx, db)` to use `YDB` with Redis-like commands: `Get`, `Set`, `Del` and `Keys`.
+
+## v3.142.0
+* Removed intermediate `bytes.Buffer` allocation in topic message decoding: `MultiDecoder.Decode` now returns a streaming reader that releases the underlying decoder back to the pool on EOF/Close, instead of buffering the whole decoded payload into memory before returning.
+* Fixed `CodecRaw` decoder pooling resettable inputs: when a caller passed an `io.Reader` that happened to implement `PublicResettableReader`, the raw codec previously stored it in its decoder pool and `Reset()` it on subsequent reads, hijacking caller-owned reader state. The raw codec no longer maintains a pool.
+* Added public package `github.com/ydb-platform/ydb-go-sdk/v3/types` and marked all public API in `github.com/ydb-platform/ydb-go-sdk/v3/table/types` as deprecated
+* Propagated the call-level `trace.Query` in `db.Query().{Do,DoTx}(..., query.WithTrace(&tracer))`
+
+## v3.141.3
+* Deprecated `query.WithConcurrentResultSets`: the option is now a no-op; `Client.Query` always enables concurrent result sets internally because it materializes the full response. Session, transaction, and other streaming paths always send `concurrent_result_sets=false`
+
+## v3.141.2
+* Option `table.WithIdempotent()` allowed single optional `bool` argument now 
+
+## v3.141.1
+* Added connection pessimization when creating table or query session fails with `OVERLOADED`, `UNAVAILABLE`, or client-side `context.DeadlineExceeded`
+
+## v3.141.0
+* Added `ydb.WithPrefetchQueryResultParts(n)` connector option and `prefetch_query_result_parts` connection string parameter for the `database/sql` driver to enable `query.WithResponsePartPrefetch` on every query executed over Query Service
+
+## v3.140.2
+* Added `topicwriter.ErrWriterClosed` sentinel error returned by `Writer.Write` when the writer has been closed due to a terminal error or an explicit `Close` call; use `errors.Is` to detect this condition and recreate the writer if needed
+
+## v3.140.1
+* Fixed `Topic().Alter()` consumer alters (`AlterConsumerWithImportant`, `AlterConsumerWithReadFrom`, `AlterConsumerWithAttributes`, `AlterConsumerWithAvailabilityPeriod`) silently resetting the consumer's supported-codecs restriction: `set_supported_codecs` is now sent only when `AlterConsumerWithSupportedCodecs` is used
+
+## v3.140.0
+* Added `topicoptions.WithWriterDirectWrite(bool)` and `topicoptions.WithMultiWriterDirectWrite(bool)` options to send topic writes to the node that hosts the target partition, bypassing the topic proxy
+
+## v3.139.8
+* Masked access tokens in topic gRPC debug logs for `UpdateTokenRequest` messages
+
+## v3.139.7
+* Fixed YSON scanning in `TableService` to support both underlying `TextValue` and `BytesValue` wire representations
+* Fixed inverted success/error handling in the `ExampleWriter_Write` doc example for `topicwriter`, which printed `OK` on failure and aborted on success
+* Fixed nil pointer dereference panic in `topicsugar.ProtobufIterator` on the first received message by allocating a concrete protobuf message before unmarshaling
+
+## v3.139.6
+* Fixed panics in built-in trace handlers (`spans`, `log`, and `metrics`) when callback info contains typed-nil interfaces (for example, nil `SessionInfo` or `TxInfo`) or nil context pointers
+
+## v3.139.5
+* Fixed panic and data race in `TopicListener` when partition workers were closed while the read stream still delivered messages: `internal/xsync.UnboundedChan` no longer closes its signal channel on shutdown, stop the read loop before closing partition workers, and ignore routed messages after listener shutdown starts
+
 ## v3.139.4
 * Fixed query result stream draining when `Close` is called with a fresh context after `NextResultSet` used a cancelled per-call context while `ExecStats` arrive in later stream parts ([#2187](https://github.com/ydb-platform/ydb-go-sdk/issues/2187))
 * Fixed query result `Close` to succeed when the execute stream is already closed (for example after full iteration or per-call context cancellation), matching `database/sql` expectations and table result close behavior ([#2187](https://github.com/ydb-platform/ydb-go-sdk/issues/2187))

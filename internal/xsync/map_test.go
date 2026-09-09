@@ -22,7 +22,7 @@ func TestMap(t *testing.T) {
 		m.m.Store(2, 2)
 		v = m.Must(2)
 	})
-	m.m.Delete(2)
+	require.True(t, m.Delete(2))
 	v, ok = m.Extract(2)
 	require.False(t, ok)
 	require.Equal(t, "", v)
@@ -42,7 +42,6 @@ func TestMap(t *testing.T) {
 		2: "two",
 		3: "three",
 	}
-	require.Equal(t, 2, m.Len())
 	var unexp map[int]string
 	m.Range(func(key int, value string) bool {
 		if v, ok := exp[key]; ok && v == value {
@@ -56,7 +55,6 @@ func TestMap(t *testing.T) {
 	require.Empty(t, exp)
 	require.Empty(t, unexp)
 	m.Clear()
-	require.Zero(t, m.Len())
 	empty := true
 	m.Range(func(key int, value string) bool {
 		empty = false

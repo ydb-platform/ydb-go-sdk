@@ -619,6 +619,25 @@ func Compose(lhs *trace.Query, rhs *trace.Query, opts ...QueryComposeOption) *tr
 		}
 	}
 	{
+		h1 := lhs.OnSessionClosed
+		h2 := rhs.OnSessionClosed
+		ret.OnSessionClosed = func(q trace.QuerySessionClosedInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(q)
+			}
+			if h2 != nil {
+				h2(q)
+			}
+		}
+	}
+	{
 		h1 := lhs.OnSessionDelete
 		h2 := rhs.OnSessionDelete
 		ret.OnSessionDelete = func(q trace.QuerySessionDeleteStartInfo) func(trace.QuerySessionDeleteDoneInfo) {
@@ -1462,6 +1481,13 @@ func onSessionAttach(t *trace.Query, q trace.QuerySessionAttachStartInfo) func(i
 	}
 	return res
 }
+func onSessionClosed(t *trace.Query, q trace.QuerySessionClosedInfo) {
+	fn := t.OnSessionClosed
+	if fn == nil {
+		return
+	}
+	fn(q)
+}
 func onSessionDelete(t *trace.Query, q trace.QuerySessionDeleteStartInfo) func(info trace.QuerySessionDeleteDoneInfo) {
 	fn := t.OnSessionDelete
 	if fn == nil {
@@ -1937,6 +1963,13 @@ func QueryOnSessionAttach(t *trace.Query, c *context.Context, c1 trace.Call, ses
 		p.Error = e
 		res(p)
 	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnSessionClosed(t *trace.Query, poolName string, reason string) {
+	var p trace.QuerySessionClosedInfo
+	p.PoolName = poolName
+	p.Reason = reason
+	onSessionClosed(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func QueryOnSessionDelete(t *trace.Query, c *context.Context, c1 trace.Call, session trace.SessionInfo) func(error) {

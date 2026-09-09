@@ -32,7 +32,10 @@ on:
 
 jobs:
   ydb-slo-action:
-    if: contains(github.event.pull_request.labels.*.name, 'SLO')
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.labels.*.name, 'SLO')
 
     name: Run YDB SLO Tests
     runs-on: "large-runner"
@@ -64,7 +67,7 @@ jobs:
                   query: sum by(ref) (workload_node_hints_misses)
           - name: native-query-node-hints
             path: native/query-node-hints
-            command: "-min-partition-count 10"
+            command: "-min-partition-count=10"
             metrics_yaml: |
               metrics:
                 - name: node_hints_misses
@@ -79,7 +82,6 @@ jobs:
       - name: Install dependencies
         run: |
           YQ_VERSION=v4.48.2
-          BUILDX_VERSION=0.30.1
           COMPOSE_VERSION=2.40.3
 
           sudo curl -L https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64 -o /usr/local/bin/yq && \
@@ -87,11 +89,6 @@ jobs:
 
           echo "Updating Docker plugins..."
           sudo mkdir -p /usr/local/lib/docker/cli-plugins
-
-          echo "Installing Docker Buildx ${BUILDX_VERSION}..."
-          sudo curl -fLo /usr/local/lib/docker/cli-plugins/docker-buildx \
-            "https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-amd64"
-          sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
 
           echo "Installing Docker Compose ${COMPOSE_VERSION}..."
           sudo curl -fLo /usr/local/lib/docker/cli-plugins/docker-compose \
@@ -101,8 +98,15 @@ jobs:
           echo "Installed versions:"
           yq --version
           docker --version
-          docker buildx version
           docker compose version
+
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: v0.30.1
+          # Keep Docker Compose on the default builder used by the SLO action.
+          use: false
 
       - name: Checkout current version
         uses: actions/checkout@v5
@@ -144,21 +148,53 @@ jobs:
           path: baseline
           fetch-depth: 1
 
-      - name: Build workload images
+      - name: Build current workload image
+        uses: docker/build-push-action@v7
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: current
+          file: current/tests/slo/Dockerfile
+          load: true
+          platforms: linux/amd64
+          tags: ydb-app-current
+          build-args: |
+            SRC_PATH=${{ matrix.sdk.path }}
+          cache-from: type=gha,scope=slo-deps
+          # Use one producer to avoid concurrent writes to the shared cache scope.
+          cache-to: ${{ matrix.sdk.name == 'native-query' && 'type=gha,scope=slo-deps,mode=max,ignore-error=true' || '' }}
+
+      - name: Sync baseline workload sources
         run: |
-          SCRIPT="$GITHUB_WORKSPACE/current/.github/scripts/build-slo-image.sh"
-          CURRENT_REF="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+          SYNC="$GITHUB_WORKSPACE/current/.github/scripts/sync-slo-workload-from-current.sh"
+          chmod +x "$SYNC"
 
-          bash "$SCRIPT" \
-            --context "$GITHUB_WORKSPACE/current" \
-            --tag "ydb-app-current" \
-            --src-path "${{ matrix.sdk.path }}"
+          # Keep workload code (and shared internal helpers) on current so baseline
+          # runs the same workload against the baseline SDK via tests/slo/go.mod replace.
+          bash "$SYNC" \
+            --target "$GITHUB_WORKSPACE/baseline" \
+            --source "$GITHUB_WORKSPACE/current" \
+            --workload-path "${{ matrix.sdk.path }}"
 
-          bash "$SCRIPT" \
-            --context "$GITHUB_WORKSPACE/baseline" \
-            --tag "ydb-app-baseline" \
-            --src-path "${{ matrix.sdk.path }}" \
-            --fallback-image "ydb-app-current"
+      - name: Build baseline workload image
+        id: build-baseline
+        continue-on-error: true
+        uses: docker/build-push-action@v7
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: baseline
+          file: baseline/tests/slo/Dockerfile
+          load: true
+          platforms: linux/amd64
+          tags: ydb-app-baseline
+          build-args: |
+            SRC_PATH=${{ matrix.sdk.path }}
+          cache-from: type=gha,scope=slo-deps
+
+      - name: Use current workload image as baseline fallback
+        if: steps.build-baseline.outcome == 'failure'
+        run: |
+          echo "::warning::Baseline Docker build failed; using the current workload image"
+          docker tag ydb-app-current ydb-app-baseline
 
       - name: Run SLO Tests
         uses: ydb-platform/ydb-slo-action/init@v2
@@ -176,3 +212,18 @@ jobs:
           workload_baseline_command: ${{ matrix.sdk.command }}
           disable_compose_profiles: "${{ (matrix.sdk.name == 'native-table-node-hints' || matrix.sdk.name == 'native-query-node-hints') && 'chaos' || '' }}"
           metrics_yaml: ${{ matrix.sdk.metrics_yaml }}
+
+      - name: Setup Go
+        if: always()
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: false
+
+      - name: Collect flamegraphs
+        if: always()
+        run: |
+          chmod +x "$GITHUB_WORKSPACE/current/.github/scripts/collect-slo-flamegraphs.sh"
+          bash "$GITHUB_WORKSPACE/current/.github/scripts/collect-slo-flamegraphs.sh" \
+            --output-dir "$GITHUB_WORKSPACE/.slo/extra/flamegraphs" \
+            --workload "${{ matrix.sdk.name }}"

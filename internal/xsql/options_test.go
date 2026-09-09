@@ -199,6 +199,16 @@ func TestWithRetryBudget(t *testing.T) {
 	require.Equal(t, b, connector.retryBudget)
 }
 
+func TestWithDefaultIdempotent(t *testing.T) {
+	opt := WithDefaultIdempotent(true)
+	require.NotNil(t, opt)
+
+	connector := &Connector{}
+	err := opt.Apply(connector)
+	require.NoError(t, err)
+	require.True(t, connector.defaultIdempotent)
+}
+
 func TestWithTablePathPrefix(t *testing.T) {
 	opt := WithTablePathPrefix("/test/path")
 	require.NotNil(t, opt)

@@ -69,6 +69,8 @@ func (tx *Transaction) UnLazy(ctx context.Context) error {
 
 	txID, err := begin(ctx, tx.s, tx.txSettings)
 	if err != nil {
+		tx.s.onSessionErrorWithContext(ctx, err)
+
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -118,7 +120,7 @@ func (tx *Transaction) QueryResultSet(
 			}),
 		)
 	}
-	r, err := tx.s.execute(ctx, q, txSettings, resultOpts...)
+	r, err := tx.s.execute(ctx, q, txSettings, options.ResultSetsTypeOrdered, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -168,7 +170,7 @@ func (tx *Transaction) QueryRow(
 			}),
 		)
 	}
-	r, err := tx.s.execute(ctx, q, txSettings, resultOpts...)
+	r, err := tx.s.execute(ctx, q, txSettings, options.ResultSetsTypeOrdered, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -243,7 +245,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 		)
 	}
 
-	r, err := tx.s.execute(ctx, q, txSettings, resultOpts...)
+	r, err := tx.s.execute(ctx, q, txSettings, options.ResultSetsTypeOrdered, resultOpts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -335,7 +337,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 			}),
 		)
 	}
-	r, err := tx.s.execute(ctx, q, txSettings, resultOpts...)
+	r, err := tx.s.execute(ctx, q, txSettings, options.ResultSetsTypeOrdered, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -360,7 +362,7 @@ func (tx *Transaction) CommitTx(ctx context.Context) (finalErr error) {
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).CommitTx"), tx.s, tx)
 	defer func() {
 		if finalErr != nil {
-			applyStatusByError(tx.s, finalErr)
+			tx.s.onSessionErrorWithContext(ctx, finalErr)
 		}
 		onDone(finalErr)
 	}()
@@ -417,7 +419,7 @@ func (tx *Transaction) Rollback(ctx context.Context) (finalErr error) {
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Transaction).Rollback"), tx.s, tx)
 	defer func() {
 		if finalErr != nil {
-			applyStatusByError(tx.s, finalErr)
+			tx.s.onSessionErrorWithContext(ctx, finalErr)
 		}
 		onDone(finalErr)
 	}()

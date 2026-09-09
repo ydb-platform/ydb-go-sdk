@@ -1,6 +1,7 @@
 package balancer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -137,4 +138,32 @@ func TestBanOnOperationError(t *testing.T) {
 	require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(
 		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_ABORTED))),
 	))
+}
+
+func TestBanOnContextDeadlineExceeded(t *testing.T) {
+	ctx := xtest.Context(t)
+
+	require.False(t, IsBadConn(ctx, context.DeadlineExceeded))
+	require.False(t, IsBadConn(ctx, xerrors.WithStackTrace(context.DeadlineExceeded)))
+
+	ctx = BanOnContextDeadlineExceeded(ctx)
+	require.False(t, IsBadConn(ctx, context.Canceled))
+	require.True(t, IsBadConn(ctx, context.DeadlineExceeded))
+	require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(context.DeadlineExceeded)))
+}
+
+func TestBanOnSessionCreate(t *testing.T) {
+	ctx := BanOnSessionCreate(xtest.Context(t))
+
+	require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(
+		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))),
+	))
+	require.True(t, IsBadConn(ctx, xerrors.WithStackTrace(
+		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))),
+	))
+	require.False(t, IsBadConn(ctx, xerrors.WithStackTrace(
+		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_NOT_FOUND))),
+	))
+	require.True(t, IsBadConn(ctx, context.DeadlineExceeded))
+	require.False(t, IsBadConn(ctx, context.Canceled))
 }

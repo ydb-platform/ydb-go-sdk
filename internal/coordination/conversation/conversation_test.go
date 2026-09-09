@@ -338,6 +338,7 @@ func TestOnRecv(t *testing.T) {
 			) bool {
 				return response.GetAcquireSemaphorePending().GetReqId() == request.GetAcquireSemaphore().GetReqId()
 			}),
+			WithConflictKey("test"),
 		)
 		err := controller.PushBack(conv)
 		require.NoError(t, err)
@@ -360,6 +361,129 @@ func TestOnRecv(t *testing.T) {
 		}
 		handled := controller.OnRecv(ackResponse)
 		require.True(t, handled)
+
+		controller.mutex.Lock()
+		_, hasConflict := controller.conflicts["test"]
+		controller.mutex.Unlock()
+		require.False(t, hasConflict)
+		require.False(t, conv.conflictHeld)
+	})
+	t.Run("NotifyBeforeResultIsIgnored", func(t *testing.T) {
+		controller := NewController()
+		conv := NewConversation(
+			func() *Ydb_Coordination.SessionRequest {
+				return &Ydb_Coordination.SessionRequest{
+					Request: &Ydb_Coordination.SessionRequest_DescribeSemaphore_{
+						DescribeSemaphore: &Ydb_Coordination.SessionRequest_DescribeSemaphore{
+							ReqId: 123,
+							Name:  "test",
+						},
+					},
+				}
+			},
+			WithNotifyFilter(func(
+				request *Ydb_Coordination.SessionRequest,
+				response *Ydb_Coordination.SessionResponse,
+			) bool {
+				return response.GetDescribeSemaphoreChanged().GetReqId() ==
+					request.GetDescribeSemaphore().GetReqId()
+			}, nil),
+			WithConflictKey("test"),
+		)
+		require.NoError(t, controller.PushBack(conv))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+		_, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+
+		handled := controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged_{
+				DescribeSemaphoreChanged: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged{
+					ReqId: 123,
+				},
+			},
+		})
+		require.False(t, handled)
+
+		controller.mutex.Lock()
+		_, hasConflict := controller.conflicts["test"]
+		queueLen := len(controller.queue)
+		controller.mutex.Unlock()
+		require.True(t, hasConflict)
+		require.True(t, conv.conflictHeld)
+		require.Equal(t, 1, queueLen)
+	})
+	t.Run("CancelResponseReleasesConflict", func(t *testing.T) {
+		controller := NewController()
+		conv := NewConversation(
+			func() *Ydb_Coordination.SessionRequest {
+				return &Ydb_Coordination.SessionRequest{
+					Request: &Ydb_Coordination.SessionRequest_AcquireSemaphore_{
+						AcquireSemaphore: &Ydb_Coordination.SessionRequest_AcquireSemaphore{
+							ReqId: 123,
+							Name:  "test",
+							Count: 1,
+						},
+					},
+				}
+			},
+			WithResponseFilter(func(
+				request *Ydb_Coordination.SessionRequest,
+				response *Ydb_Coordination.SessionResponse,
+			) bool {
+				return response.GetAcquireSemaphoreResult().GetReqId() ==
+					request.GetAcquireSemaphore().GetReqId()
+			}),
+			WithCancelMessage(
+				func(request *Ydb_Coordination.SessionRequest) *Ydb_Coordination.SessionRequest {
+					return &Ydb_Coordination.SessionRequest{
+						Request: &Ydb_Coordination.SessionRequest_ReleaseSemaphore_{
+							ReleaseSemaphore: &Ydb_Coordination.SessionRequest_ReleaseSemaphore{
+								ReqId: 456,
+								Name:  request.GetAcquireSemaphore().GetName(),
+							},
+						},
+					}
+				},
+				func(
+					request *Ydb_Coordination.SessionRequest,
+					response *Ydb_Coordination.SessionResponse,
+				) bool {
+					return response.GetReleaseSemaphoreResult().GetReqId() ==
+						request.GetReleaseSemaphore().GetReqId()
+				},
+			),
+			WithConflictKey("test"),
+		)
+		require.NoError(t, controller.PushBack(conv))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+		_, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.True(t, controller.cancel(conv))
+
+		cancelRequest, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(456), cancelRequest.GetReleaseSemaphore().GetReqId())
+
+		handled := controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_ReleaseSemaphoreResult_{
+				ReleaseSemaphoreResult: &Ydb_Coordination.SessionResponse_ReleaseSemaphoreResult{
+					ReqId: 456,
+				},
+			},
+		})
+		require.True(t, handled)
+
+		controller.mutex.Lock()
+		_, hasConflict := controller.conflicts["test"]
+		queueLen := len(controller.queue)
+		controller.mutex.Unlock()
+		require.False(t, hasConflict)
+		require.False(t, conv.conflictHeld)
+		require.Zero(t, queueLen)
 	})
 }
 
@@ -759,5 +883,426 @@ func TestOnRecvWithFailure(t *testing.T) {
 		}
 		handled := controller.OnRecv(response)
 		require.True(t, handled)
+	})
+}
+
+func TestDescribeSemaphoreWatch(t *testing.T) {
+	// The watch handlers (onNotify/onAbandoned) are dispatched on a dedicated goroutine, so tests
+	// synchronize on a buffered channel instead of asserting a slice appended in-place. The buffer
+	// keeps the handler goroutine from blocking when a test does not consume the event.
+	newDescribeConversation := func(
+		reqID uint64,
+		events chan<- bool,
+	) *Conversation {
+		return NewConversation(
+			func() *Ydb_Coordination.SessionRequest {
+				return &Ydb_Coordination.SessionRequest{
+					Request: &Ydb_Coordination.SessionRequest_DescribeSemaphore_{
+						DescribeSemaphore: &Ydb_Coordination.SessionRequest_DescribeSemaphore{
+							ReqId:       reqID,
+							Name:        "sem",
+							WatchData:   true,
+							WatchOwners: true,
+						},
+					},
+				}
+			},
+			WithResponseFilter(func(
+				request *Ydb_Coordination.SessionRequest,
+				response *Ydb_Coordination.SessionResponse,
+			) bool {
+				result := response.GetDescribeSemaphoreResult()
+
+				return result != nil && result.GetReqId() == request.GetDescribeSemaphore().GetReqId()
+			}),
+			WithKeepAlive(func(response *Ydb_Coordination.SessionResponse) bool {
+				return response.GetDescribeSemaphoreResult().GetWatchAdded()
+			}),
+			WithNotifyFilter(
+				func(
+					request *Ydb_Coordination.SessionRequest,
+					response *Ydb_Coordination.SessionResponse,
+				) bool {
+					changed := response.GetDescribeSemaphoreChanged()
+
+					return changed != nil && changed.GetReqId() == request.GetDescribeSemaphore().GetReqId()
+				},
+				func(response *Ydb_Coordination.SessionResponse) {
+					changed := response.GetDescribeSemaphoreChanged()
+					events <- changed.GetDataChanged() || changed.GetOwnersChanged()
+				},
+			),
+			WithOnAbandoned(func() {
+				events <- false
+			}),
+			WithConflictKey("sem"),
+			WithIdempotence(true),
+		)
+	}
+
+	// recvEvent waits for a single async watch callback.
+	recvEvent := func(t *testing.T, events <-chan bool) bool {
+		t.Helper()
+		select {
+		case v := <-events:
+			return v
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for watch callback")
+
+			return false
+		}
+	}
+
+	// requireNoEvent asserts that no watch callback fires within a short window.
+	requireNoEvent := func(t *testing.T, events <-chan bool) {
+		t.Helper()
+		select {
+		case v := <-events:
+			t.Fatalf("unexpected watch callback: %v", v)
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+
+	t.Run("ResultWithoutWatchRemovesConversation", func(t *testing.T) {
+		controller := NewController()
+		events := make(chan bool, 8)
+		conv := newDescribeConversation(1, events)
+		require.NoError(t, controller.PushBack(conv))
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		msg, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), msg.GetDescribeSemaphore().GetReqId())
+
+		handled := controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult_{
+				DescribeSemaphoreResult: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult{
+					ReqId:      1,
+					WatchAdded: false,
+				},
+			},
+		})
+		require.True(t, handled)
+
+		resp, err := controller.Await(ctx, conv)
+		require.NoError(t, err)
+		require.False(t, resp.GetDescribeSemaphoreResult().GetWatchAdded())
+
+		controller.mutex.Lock()
+		queueLen := len(controller.queue)
+		_, hasConflict := controller.conflicts["sem"]
+		controller.mutex.Unlock()
+		require.Equal(t, 0, queueLen)
+		require.False(t, hasConflict)
+		requireNoEvent(t, events)
+	})
+
+	t.Run("WatchAddedThenChanged", func(t *testing.T) {
+		controller := NewController()
+		events := make(chan bool, 8)
+		conv := newDescribeConversation(2, events)
+		require.NoError(t, controller.PushBack(conv))
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		_, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+
+		handled := controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult_{
+				DescribeSemaphoreResult: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult{
+					ReqId:      2,
+					WatchAdded: true,
+				},
+			},
+		})
+		require.True(t, handled)
+
+		resp, err := controller.Await(ctx, conv)
+		require.NoError(t, err)
+		require.True(t, resp.GetDescribeSemaphoreResult().GetWatchAdded())
+
+		controller.mutex.Lock()
+		queueLen := len(controller.queue)
+		_, hasConflict := controller.conflicts["sem"]
+		controller.mutex.Unlock()
+		require.Equal(t, 1, queueLen)
+		require.False(t, hasConflict)
+
+		// Conflict cleared: a superseding describe can be sent.
+		secondEvents := make(chan bool, 8)
+		second := newDescribeConversation(3, secondEvents)
+		require.NoError(t, controller.PushBack(second))
+		msg, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(3), msg.GetDescribeSemaphore().GetReqId())
+
+		handled = controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged_{
+				DescribeSemaphoreChanged: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged{
+					ReqId:         2,
+					DataChanged:   true,
+					OwnersChanged: false,
+				},
+			},
+		})
+		require.True(t, handled)
+		require.True(t, recvEvent(t, events))
+
+		controller.mutex.Lock()
+		queueLen = len(controller.queue)
+		_, hasConflict = controller.conflicts["sem"]
+		controller.mutex.Unlock()
+		require.Equal(t, 1, queueLen) // only second conversation remains
+		require.True(t, hasConflict)  // first watch must not release the second conversation's key
+	})
+
+	t.Run("FalseWakeOnChanged", func(t *testing.T) {
+		controller := NewController()
+		events := make(chan bool, 8)
+		conv := newDescribeConversation(4, events)
+		require.NoError(t, controller.PushBack(conv))
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		_, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.True(t, controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult_{
+				DescribeSemaphoreResult: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult{
+					ReqId:      4,
+					WatchAdded: true,
+				},
+			},
+		}))
+		_, err = controller.Await(ctx, conv)
+		require.NoError(t, err)
+
+		require.True(t, controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged_{
+				DescribeSemaphoreChanged: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged{
+					ReqId:         4,
+					DataChanged:   false,
+					OwnersChanged: false,
+				},
+			},
+		}))
+		require.False(t, recvEvent(t, events))
+	})
+
+	t.Run("AbandonedOnDetach", func(t *testing.T) {
+		controller := NewController()
+		events := make(chan bool, 8)
+		conv := newDescribeConversation(5, events)
+		require.NoError(t, controller.PushBack(conv))
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		_, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.True(t, controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult_{
+				DescribeSemaphoreResult: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult{
+					ReqId:      5,
+					WatchAdded: true,
+				},
+			},
+		}))
+		_, err = controller.Await(ctx, conv)
+		require.NoError(t, err)
+
+		controller.OnDetach()
+
+		controller.mutex.Lock()
+		queueLen := len(controller.queue)
+		controller.mutex.Unlock()
+		require.Equal(t, 0, queueLen)
+		require.False(t, recvEvent(t, events))
+	})
+
+	t.Run("AbandonedOnClose", func(t *testing.T) {
+		controller := NewController()
+		events := make(chan bool, 8)
+		conv := newDescribeConversation(6, events)
+		require.NoError(t, controller.PushBack(conv))
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		_, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.True(t, controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult_{
+				DescribeSemaphoreResult: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult{
+					ReqId:      6,
+					WatchAdded: true,
+				},
+			},
+		}))
+		_, err = controller.Await(ctx, conv)
+		require.NoError(t, err)
+
+		controller.Close(nil)
+		require.False(t, recvEvent(t, events))
+
+		// The abandoned conversation is removed from the queue, so a late OnRecv cannot fire the
+		// handler a second time.
+		controller.mutex.Lock()
+		queueLen := len(controller.queue)
+		controller.mutex.Unlock()
+		require.Equal(t, 0, queueLen)
+	})
+
+	t.Run("UnexpectedChangedNotHandledWithoutWatch", func(t *testing.T) {
+		controller := NewController()
+		handled := controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged_{
+				DescribeSemaphoreChanged: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged{
+					ReqId:       7,
+					DataChanged: true,
+				},
+			},
+		})
+		require.False(t, handled)
+	})
+
+	t.Run("SucceedFailCancelAfterResultDelivered", func(t *testing.T) {
+		controller := NewController()
+		events := make(chan bool, 8)
+		conv := newDescribeConversation(8, events)
+		require.NoError(t, controller.PushBack(conv))
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		_, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.True(t, controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult_{
+				DescribeSemaphoreResult: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult{
+					ReqId:      8,
+					WatchAdded: true,
+				},
+			},
+		}))
+		_, err = controller.Await(ctx, conv)
+		require.NoError(t, err)
+
+		// Duplicate result must be ignored after Await completed.
+		require.True(t, controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult_{
+				DescribeSemaphoreResult: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult{
+					ReqId:      8,
+					WatchAdded: true,
+				},
+			},
+		}))
+
+		conv.fail(coordination.ErrSessionClosed) // no-op after resultDelivered
+		conv.cancel()                            // marks canceled without closing done twice
+		require.True(t, conv.canceled)
+
+		require.True(t, controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged_{
+				DescribeSemaphoreChanged: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged{
+					ReqId:       8,
+					DataChanged: true,
+				},
+			},
+		}))
+		requireNoEvent(t, events) // canceled watch does not invoke onNotify
+	})
+
+	t.Run("HandlerReSubscribesWithoutDeadlock", func(t *testing.T) {
+		// Regression: a handler that re-subscribes by calling back into the controller must not
+		// deadlock. If onNotify ran under c.mutex (or on the receive goroutine), the PushBack below
+		// would block forever and OnRecv would never return.
+		controller := NewController()
+		secondEvents := make(chan bool, 8)
+		resubscribed := make(chan error, 1)
+
+		conv := NewConversation(
+			func() *Ydb_Coordination.SessionRequest {
+				return &Ydb_Coordination.SessionRequest{
+					Request: &Ydb_Coordination.SessionRequest_DescribeSemaphore_{
+						DescribeSemaphore: &Ydb_Coordination.SessionRequest_DescribeSemaphore{
+							ReqId:     9,
+							Name:      "sem",
+							WatchData: true,
+						},
+					},
+				}
+			},
+			WithResponseFilter(func(
+				request *Ydb_Coordination.SessionRequest,
+				response *Ydb_Coordination.SessionResponse,
+			) bool {
+				result := response.GetDescribeSemaphoreResult()
+
+				return result != nil && result.GetReqId() == request.GetDescribeSemaphore().GetReqId()
+			}),
+			WithKeepAlive(func(response *Ydb_Coordination.SessionResponse) bool {
+				return response.GetDescribeSemaphoreResult().GetWatchAdded()
+			}),
+			WithNotifyFilter(
+				func(
+					request *Ydb_Coordination.SessionRequest,
+					response *Ydb_Coordination.SessionResponse,
+				) bool {
+					changed := response.GetDescribeSemaphoreChanged()
+
+					return changed != nil && changed.GetReqId() == request.GetDescribeSemaphore().GetReqId()
+				},
+				func(response *Ydb_Coordination.SessionResponse) {
+					// Re-subscribe from inside the handler.
+					resubscribed <- controller.PushBack(newDescribeConversation(10, secondEvents))
+				},
+			),
+			WithConflictKey("sem"),
+			WithIdempotence(true),
+		)
+		require.NoError(t, controller.PushBack(conv))
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		_, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.True(t, controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult_{
+				DescribeSemaphoreResult: &Ydb_Coordination.SessionResponse_DescribeSemaphoreResult{
+					ReqId:      9,
+					WatchAdded: true,
+				},
+			},
+		}))
+		_, err = controller.Await(ctx, conv)
+		require.NoError(t, err)
+
+		require.True(t, controller.OnRecv(&Ydb_Coordination.SessionResponse{
+			Response: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged_{
+				DescribeSemaphoreChanged: &Ydb_Coordination.SessionResponse_DescribeSemaphoreChanged{
+					ReqId:       9,
+					DataChanged: true,
+				},
+			},
+		}))
+
+		select {
+		case err := <-resubscribed:
+			require.NoError(t, err)
+		case <-time.After(5 * time.Second):
+			t.Fatal("re-subscribe from watch handler deadlocked")
+		}
+
+		// The re-subscribed conversation is queued and can be sent.
+		msg, err := controller.OnSend(ctx)
+		require.NoError(t, err)
+		require.Equal(t, uint64(10), msg.GetDescribeSemaphore().GetReqId())
 	})
 }

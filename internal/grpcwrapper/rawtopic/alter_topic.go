@@ -86,6 +86,7 @@ type AlterConsumer struct {
 	SetImportant            rawoptional.Bool
 	SetReadFrom             rawoptional.Time
 	SetSupportedCodecs      rawtopiccommon.SupportedCodecs
+	NeedSetSupportedCodecs  bool
 	SetAvailabilityPeriod   rawoptional.Duration
 	ResetAvailabilityPeriod bool
 	AlterAttributes         map[string]string
@@ -93,11 +94,14 @@ type AlterConsumer struct {
 
 func (c *AlterConsumer) ToProto() *Ydb_Topic.AlterConsumer {
 	res := &Ydb_Topic.AlterConsumer{
-		Name:               c.Name,
-		SetImportant:       c.SetImportant.ToProto(),
-		SetReadFrom:        c.SetReadFrom.ToProto(),
-		SetSupportedCodecs: c.SetSupportedCodecs.ToProto(),
-		AlterAttributes:    c.AlterAttributes,
+		Name:            c.Name,
+		SetImportant:    c.SetImportant.ToProto(),
+		SetReadFrom:     c.SetReadFrom.ToProto(),
+		AlterAttributes: c.AlterAttributes,
+	}
+
+	if c.NeedSetSupportedCodecs {
+		res.SetSupportedCodecs = c.SetSupportedCodecs.ToProto()
 	}
 
 	if c.SetAvailabilityPeriod.HasValue {

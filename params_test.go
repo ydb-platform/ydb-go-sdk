@@ -13,7 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
 var (
@@ -165,7 +165,7 @@ func TestParams(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, fmt.Sprint(exp), fmt.Sprint(pb))
 	})
-	t.Run("table/types", func(t *testing.T) {
+	t.Run("types", func(t *testing.T) {
 		params := makeParamsUsingTableTypes(t)
 		pb, err := params.ToYDB()
 		require.NoError(t, err)
@@ -195,7 +195,7 @@ func BenchmarkParams(b *testing.B) {
 			_, _ = params.ToYDB()
 		}
 	})
-	b.Run("table/types", func(b *testing.B) {
+	b.Run("types", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			params := makeParamsUsingTableTypes(b)

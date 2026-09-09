@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
+	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"google.golang.org/grpc"
@@ -13,7 +14,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
-	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
@@ -26,15 +27,20 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var ErrNoEndpoints = xerrors.Wrap(xerrors.Retryable(fmt.Errorf("no endpoints"), xerrors.WithBackoff(backoff.TypeSlow)))
+
 var (
-	ErrNoEndpoints    = xerrors.Wrap(xerrors.Retryable(fmt.Errorf("no endpoints"), xerrors.WithBackoff(backoff.TypeSlow)))
-	errBalancerClosed = xerrors.Wrap(fmt.Errorf("internal ydb sdk balancer closed"))
+	errBalancerClosed            = xerrors.Wrap(fmt.Errorf("internal ydb sdk balancer closed"))
+	errPeriodicDiscoveryDisabled = xerrors.Wrap(fmt.Errorf(
+		"periodic discovery must be enabled for non-single-connection balancer",
+	))
 )
 
 // streamWrapper wraps grpc.ClientStream and triggers pool.Ban on RecvMsg/SendMsg/CloseSend
@@ -65,7 +71,7 @@ func (s *streamWrapper) RecvMsg(m any) error {
 
 type Balancer struct {
 	driverConfig      *config.Config
-	balancerConfig    balancerConfig.Config
+	policy            policy.Policy
 	discoveryConfig   *discoveryConfig.Config
 	pool              *conn.Pool
 	discoveryRepeater repeater.Repeater
@@ -77,7 +83,11 @@ type Balancer struct {
 	localDCDetector func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
 	connectionsState atomic.Pointer[connectionsState]
-	closed           atomic.Bool
+	random           xrand.Rand
+	lastDiscovered   []endpoint.Endpoint
+
+	closeMu sync.Mutex
+	closed  bool
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -142,9 +152,26 @@ func (b *Balancer) discoveryConn(ctx context.Context) (*grpc.ClientConn, error) 
 		)
 	}
 
-	b.cc.Store(cc)
+	if err := b.tryStoreDiscoveryConn(cc); err != nil {
+		_ = cc.Close()
+
+		return nil, xerrors.WithStackTrace(err)
+	}
 
 	return cc, nil
+}
+
+func (b *Balancer) tryStoreDiscoveryConn(cc *grpc.ClientConn) error {
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+
+	if b.closed {
+		return xerrors.WithStackTrace(errBalancerClosed)
+	}
+
+	b.cc.Store(cc)
+
+	return nil
 }
 
 func (b *Balancer) clusterDiscoveryAttemptWithDial(ctx context.Context) (finalErr error) {
@@ -190,71 +217,142 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 		return xerrors.WithStackTrace(err)
 	}
 
-	if b.balancerConfig.DetectNearestDC {
-		location, err := b.localDCDetector(ctx, endpoints)
+	if b.policy.DetectsNearestDC() {
+		location, err = b.localDCDetector(ctx, endpoints)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
-
-		b.applyDiscoveredEndpoints(ctx, endpoints, location)
-	} else {
-		b.applyDiscoveredEndpoints(ctx, endpoints, location)
 	}
+	b.applyDiscoveredEndpoints(ctx, endpoints, location)
 
 	return nil
 }
 
-func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, newest []endpoint.Endpoint, localDC string) {
+func nextState(ctx context.Context, pool interface {
+	Get(e endpoint.Endpoint) conn.Conn
+	Put(ctx context.Context, cc conn.Conn)
+}, quarantine []conn.Conn, active []conn.Conn, endpoints []endpoint.Endpoint) (
+	newQuarantine []conn.Conn,
+	newActive []conn.Conn,
+) {
+	newActive = xslices.Filter(
+		xslices.Transform(endpoints, func(e endpoint.Endpoint) conn.Conn {
+			return pool.Get(e)
+		}),
+		func(cc conn.Conn) bool { return cc != nil },
+	)
+
+	for _, cc := range quarantine {
+		pool.Put(ctx, cc)
+	}
+
+	for _, cc := range newActive {
+		cc.Unban(ctx)
+	}
+
+	return active, newActive
+}
+
+// releaseStateConns releases connections from state
+//
+// quarantine refs were acquired in discovery round N-1,
+// all refs in round N — each Put matches its own Get.
+func (b *Balancer) releaseStateConns(ctx context.Context, state *connectionsState) {
+	if state == nil {
+		return
+	}
+
+	for _, c := range state.quarantine {
+		b.pool.Put(ctx, c)
+	}
+
+	for _, cc := range state.all {
+		b.pool.Put(ctx, cc)
+	}
+}
+
+func (b *Balancer) applyDiscoveredEndpoints(
+	ctx context.Context,
+	endpoints []endpoint.Endpoint,
+	selfLocation string,
+) {
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+
+	if b.closed {
+		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
+
+		return
+	}
+
 	var (
 		onDone = gtrace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
 			stack.FunctionID(
 				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
-			b.balancerConfig.DetectNearestDC,
+			b.policy.DetectsNearestDC(),
 			b.driverConfig.Database(),
 		)
-		previous = b.connections().All()
+		state              = b.connectionsState.Load()
+		active             []conn.Conn
+		quarantine         []conn.Conn
+		selectedEndpoints  []endpoint.Endpoint
+		selectedPriorities []policy.EndpointPriority
+		previousPriorities []policy.EndpointPriority
 	)
-	defer func() {
-		_, added, dropped := xslices.Diff(previous, newest, func(lhs, rhs endpoint.Endpoint) int {
-			cmp := strings.Compare(lhs.Address(), rhs.Address())
-			if cmp != 0 {
-				return cmp
-			}
-			cmp = int(lhs.NodeID()) - int(rhs.NodeID())
-			if cmp != 0 {
-				return cmp
-			}
+	if state != nil {
+		active = state.All()
+		quarantine = state.quarantine
+		previousPriorities = state.elector.priorities
+	}
 
-			return strings.Compare(lhs.OverrideHost(), rhs.OverrideHost())
-		})
+	defer func() {
+		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
+			return cc.Endpoint()
+		}), selectedEndpoints, endpoint.Compare)
+
 		onDone(
-			xslices.Transform(newest, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
-			xslices.Transform(added, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
-			xslices.Transform(dropped, func(t endpoint.Endpoint) trace.EndpointInfo { return t }),
-			localDC,
+			xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+			xslices.Transform(added, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+			xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+			selfLocation,
 		)
 	}()
 
-	connections := conn.EndpointsToConnections(b.pool, newest)
-	for _, c := range connections {
-		b.pool.Allow(ctx, c)
-		c.Endpoint().Touch()
+	info := policy.Info{SelfLocation: selfLocation}
+	priorities := b.policy.Prioritize(info, endpoints)
+	selectedEndpoints, selectedPriorities = selectActiveEndpoints(
+		active, quarantine, previousPriorities, endpoints, priorities, b.policy.MaxConnections(), b.random,
+	)
+	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selectedEndpoints)
+
+	if b.policy.MaxConnections() > 0 {
+		b.lastDiscovered = append(b.lastDiscovered[:0], endpoints...)
 	}
-
-	info := balancerConfig.Info{SelfLocation: localDC}
-	state := newConnectionsState(connections, b.balancerConfig.Filter, info, b.balancerConfig.AllowFallback)
-
-	endpointsInfo := make([]endpoint.Info, len(newest))
-	for i, e := range newest {
-		endpointsInfo[i] = e
-	}
-
-	b.connectionsState.Store(state)
+	b.connectionsState.Store(newConnectionsStateWithPriorities(
+		connections, selectedPriorities, quarantine, nil,
+	))
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
-	b.closed.Store(true)
+	b.closeMu.Lock()
+	if b.closed {
+		b.closeMu.Unlock()
+
+		return xerrors.WithStackTrace(errBalancerClosed)
+	}
+
+	b.closed = true
+	b.lastDiscovered = nil
+
+	oldState := b.connectionsState.Swap(nil)
+
+	discoveryRepeater := b.discoveryRepeater
+	b.discoveryRepeater = nil
+
+	discoveryCC := b.cc.Swap(nil)
+
+	b.closeMu.Unlock()
 
 	onDone := gtrace.DriverOnBalancerClose(
 		b.driverConfig.Trace(), &ctx,
@@ -264,12 +362,14 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	if b.discoveryRepeater != nil {
-		b.discoveryRepeater.Stop()
+	if discoveryRepeater != nil {
+		discoveryRepeater.Stop()
 	}
 
-	if cc := b.cc.Load(); cc != nil {
-		_ = cc.Close()
+	b.releaseStateConns(ctx, oldState)
+
+	if discoveryCC != nil {
+		_ = discoveryCC.Close()
 	}
 
 	return nil
@@ -286,7 +386,7 @@ func makeDiscoveryFunc(
 			)
 		}
 
-		ctx, err = driverConfig.Meta().Context(ctx)
+		ctx, err = driverConfig.Meta().DiscoveryContext(ctx)
 		if err != nil {
 			return endpoints, location, xerrors.WithStackTrace(
 				fmt.Errorf("failed to enrich context with meta, traceID %q: %w", traceID, err),
@@ -315,9 +415,11 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	}
 
+	policy := driverConfig.Balancer()
+
 	onDone := gtrace.DriverOnBalancerInit(driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.New"),
-		driverConfig.Balancer().String(),
+		policy.String(),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -325,6 +427,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 
 	b = &Balancer{
 		driverConfig: driverConfig,
+		policy:       policy,
 		pool:         pool,
 		address:      "ydb:///" + driverConfig.Endpoint(),
 		discoveryConfig: discoveryConfig.New(append(opts,
@@ -336,32 +439,28 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		)...),
 		localDCDetector: detectLocalDC,
 	}
-
-	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
-
-	if config := driverConfig.Balancer(); config == nil {
-		b.balancerConfig = balancerConfig.Config{}
-	} else {
-		b.balancerConfig = *config
+	if policy.MaxConnections() > 0 {
+		b.random = xrand.New(xrand.WithSeed(time.Now().UnixNano()))
 	}
 
-	if b.balancerConfig.SingleConn {
+	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
+	if !policy.SingleConnection() && b.discoveryConfig.Interval() <= 0 {
+		return nil, xerrors.WithStackTrace(errPeriodicDiscoveryDisabled)
+	}
+
+	if policy.SingleConnection() {
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
-			endpoint.New(driverConfig.Endpoint()),
+			endpoint.New(b.driverConfig.Endpoint()),
 		}, "")
 	} else {
-		// initialization of balancer state
 		if err := b.clusterDiscovery(ctx); err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		// run background discovering
-		if d := b.discoveryConfig.Interval(); d > 0 {
-			b.discoveryRepeater = repeater.New(xcontext.ValueOnly(ctx),
-				d, b.clusterDiscoveryAttemptWithDial,
-				repeater.WithName("discovery"),
-				repeater.WithTrace(b.driverConfig.Trace()),
-			)
-		}
+		b.discoveryRepeater = repeater.New(xcontext.ValueOnly(ctx),
+			b.discoveryConfig.Interval(), b.clusterDiscoveryAttemptWithDial,
+			repeater.WithName("discovery"),
+			repeater.WithTrace(b.driverConfig.Trace()),
+		)
 	}
 
 	return b, nil
@@ -374,10 +473,6 @@ func (b *Balancer) Invoke(
 	reply any,
 	opts ...grpc.CallOption,
 ) error {
-	if b.closed.Load() {
-		return xerrors.WithStackTrace(errBalancerClosed)
-	}
-
 	return b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
 		return cc.Invoke(ctx, method, args, reply, opts...)
 	})
@@ -389,10 +484,6 @@ func (b *Balancer) NewStream(
 	method string,
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
-	if b.closed.Load() {
-		return nil, xerrors.WithStackTrace(errBalancerClosed)
-	}
-
 	var stream grpc.ClientStream
 	if err := b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
 		inner, innerErr := cc.NewStream(ctx, desc, method, opts...)
@@ -403,7 +494,7 @@ func (b *Balancer) NewStream(
 			ClientStream: inner,
 			onErr: func(err error) {
 				if IsBadConn(ctx, err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
-					b.pool.Ban(ctx, cc, err)
+					b.ban(ctx, cc, err)
 				}
 			},
 		}
@@ -423,14 +514,14 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 	}
 
 	defer func() {
-		if err != nil && cc.GetState() != state.Banned &&
+		if err != nil && cc.State() != state.Banned &&
 			IsBadConn(ctx, err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
-			b.pool.Ban(ctx, cc, err)
+			b.ban(ctx, cc, err)
 		}
 	}()
 
 	if err = f(conn.WithBanCallback(ctx, func(cause error) {
-		b.pool.Ban(ctx, cc, cause)
+		b.ban(ctx, cc, cause)
 	}), cc); err != nil {
 		if conn.UseWrapping(ctx) {
 			if credentials.IsAccessError(err) {
@@ -454,11 +545,22 @@ func (b *Balancer) connections() *connectionsState {
 	return b.connectionsState.Load()
 }
 
-func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
-	if b.closed.Load() {
-		return nil, xerrors.WithStackTrace(errBalancerClosed)
-	}
+func (b *Balancer) forceDiscovery() {
+	discoveryRepeater := b.currentDiscoveryRepeater()
 
+	if discoveryRepeater != nil {
+		discoveryRepeater.Force()
+	}
+}
+
+func (b *Balancer) currentDiscoveryRepeater() repeater.Repeater {
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+
+	return b.discoveryRepeater
+}
+
+func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 	onDone := gtrace.DriverOnBalancerChooseEndpoint(
 		b.driverConfig.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).nextConn"),
@@ -475,23 +577,163 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	var (
-		state       = b.connections()
-		failedCount int
-	)
+	state := b.connections()
 
-	defer func() {
-		if failedCount*2 > state.PreferredCount() && b.discoveryRepeater != nil {
-			b.discoveryRepeater.Force()
+	if state == nil {
+		return nil, xerrors.WithStackTrace(errBalancerClosed)
+	}
+
+	if nodeID, ok := endpoint.ContextNodeID(ctx); ok {
+		var handled bool
+		c, handled, err = b.pinnedConnection(ctx, state, nodeID)
+		if handled {
+			return c, err
 		}
-	}()
+	}
+	if state.elector.CandidateCount() == 0 {
+		return nil, xerrors.WithStackTrace(ErrNoEndpoints)
+	}
 
-	c, failedCount = state.GetConnection(ctx)
-	if c == nil {
-		return nil, xerrors.WithStackTrace(
-			fmt.Errorf("%w: cannot get connection from Balancer after %d attempts", ErrNoEndpoints, failedCount),
+	c, failedCount := b.nextAvailableConn(ctx, state)
+	if c != nil {
+		return c, nil
+	}
+	if err = ctx.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return nil, xerrors.WithStackTrace(
+		fmt.Errorf("%w: cannot get connection from Balancer after %d attempts", ErrNoEndpoints, failedCount),
+	)
+}
+
+func (b *Balancer) pinnedConnection(
+	ctx context.Context,
+	current *connectionsState,
+	nodeID uint32,
+) (connection conn.Conn, handled bool, err error) {
+	if connection := current.preferConnection(ctx); connection != nil {
+		return connection, true, nil
+	}
+	if b.policy.MaxConnections() > 0 {
+		connection, rejected := b.tryAddPinnedConnection(nodeID)
+		if rejected != nil {
+			b.pool.Put(ctx, rejected)
+		}
+		if connection != nil {
+			return connection, true, nil
+		}
+	}
+	if !endpoint.ContextFallback(ctx) {
+		return nil, true, xerrors.WithStackTrace(
+			fmt.Errorf("%w: pinned node %d is not available", ErrNoEndpoints, nodeID),
 		)
 	}
 
-	return c, nil
+	return nil, false, nil
+}
+
+func (b *Balancer) nextAvailableConn(ctx context.Context, state *connectionsState) (conn.Conn, int) {
+	var failedCount int
+	attemptsLeft := state.elector.CandidateCount()
+	for attemptsLeft > 0 {
+		attemptsLeft--
+		if ctx.Err() != nil {
+			break
+		}
+		selected, allowBanned, ok := state.elector.Next()
+		if !ok {
+			break
+		}
+		if isConnectionStateUsable(selected.State(), allowBanned) {
+			return selected, failedCount
+		}
+		failedCount++
+		b.refreshElection(state.elector)
+		if current := b.connections(); current != state {
+			if current == nil {
+				break
+			}
+			b.refreshElection(current.elector)
+			state = current
+			attemptsLeft = max(attemptsLeft, state.elector.CandidateCount())
+		}
+	}
+
+	return nil, failedCount
+}
+
+func (b *Balancer) ban(ctx context.Context, connection conn.Conn, cause error) {
+	if b.policy.SingleConnection() {
+		return
+	}
+
+	alreadyBanned := connection.State() == state.Banned
+	b.pool.Ban(ctx, connection, cause)
+	forceDiscovery := b.policy.MaxConnections() > 0 && !alreadyBanned
+	if current := b.connections(); current != nil {
+		forceDiscovery = current.elector.Refresh() || forceDiscovery
+	}
+	if forceDiscovery {
+		b.forceDiscovery()
+	}
+}
+
+func (b *Balancer) tryAddPinnedConnection(nodeID uint32) (connection, rejected conn.Conn) {
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+
+	if b.closed {
+		return nil, nil
+	}
+
+	current := b.connectionsState.Load()
+	if current == nil {
+		return nil, nil
+	}
+	if existing := current.connByNodeID[nodeID]; existing != nil {
+		if isConnectionStateUsable(existing.State(), false) {
+			return existing, nil
+		}
+
+		return nil, nil
+	}
+
+	var discovered endpoint.Endpoint
+	for _, candidate := range b.lastDiscovered {
+		if candidate.NodeID() == nodeID {
+			discovered = candidate
+
+			break
+		}
+	}
+	if discovered == nil {
+		return nil, nil
+	}
+
+	connection = b.pool.Get(discovered)
+	if connection == nil {
+		return nil, nil
+	}
+	if !isConnectionStateUsable(connection.State(), false) {
+		return nil, connection
+	}
+
+	connections := append(current.All(), connection)
+	priorities := append([]policy.EndpointPriority(nil), current.elector.priorities...)
+	priorities = append(priorities, policy.EndpointPriority{
+		Key:      discovered.Key(),
+		Excluded: true,
+	})
+	b.connectionsState.Store(newConnectionsStateWithPriorities(
+		connections, priorities, current.quarantine, current.elector.rand,
+	))
+
+	return connection, nil
+}
+
+func (b *Balancer) refreshElection(elector *endpointElector) {
+	if elector.Refresh() {
+		b.forceDiscovery()
+	}
 }

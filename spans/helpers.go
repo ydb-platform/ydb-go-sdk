@@ -15,7 +15,11 @@ func childSpanWithReplaceCtx(
 	operationName string,
 	fields ...KeyValue,
 ) (s Span) {
-	*ctx, s = childSpan(cfg, *ctx, operationName, fields...)
+	c := safeContextPtr(ctx)
+	newCtx, s := childSpan(cfg, c, operationName, fields...)
+	if ctx != nil {
+		*ctx = newCtx
+	}
 
 	return s
 }

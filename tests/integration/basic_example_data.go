@@ -6,7 +6,7 @@ package integration
 import (
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
 func seriesData(id uint64, released time.Time, title, info, comment string) types.Value {

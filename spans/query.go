@@ -1,6 +1,7 @@
 package spans
 
 import (
+	"context"
 	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/kv"
@@ -47,7 +48,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
 			return func(info trace.QueryNewDoneInfo) {
@@ -61,7 +62,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
 			return func(info trace.QueryCloseDoneInfo) {
@@ -78,7 +79,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
 			return func(info trace.QueryPoolNewDoneInfo) {
@@ -94,7 +95,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 			)
 
 			return func(info trace.QueryPoolCloseDoneInfo) {
@@ -124,7 +125,7 @@ func query(adapter Adapter) trace.Query {
 						info.Error,
 						kv.Int("attempts", info.Attempts),
 					)
-				} else if info.Session != nil {
+				} else if !isNil(info.Session) {
 					finish(
 						start,
 						nil,
@@ -154,7 +155,7 @@ func query(adapter Adapter) trace.Query {
 				info.Context,
 				SpanNameExecuteQuery,
 			)
-			*info.Context = withClientSpan(*info.Context, start)
+			withContextPtr(info.Context, func(c context.Context) context.Context { return withClientSpan(c, start) })
 
 			return func(info trace.QueryExecDoneInfo) {
 				finish(
@@ -172,7 +173,7 @@ func query(adapter Adapter) trace.Query {
 				info.Context,
 				SpanNameExecuteQuery,
 			)
-			*info.Context = withClientSpan(*info.Context, start)
+			withContextPtr(info.Context, func(c context.Context) context.Context { return withClientSpan(c, start) })
 
 			return func(info trace.QueryQueryDoneInfo) {
 				finish(
@@ -190,7 +191,7 @@ func query(adapter Adapter) trace.Query {
 				info.Context,
 				SpanNameExecuteQuery,
 			)
-			*info.Context = withClientSpan(*info.Context, start)
+			withContextPtr(info.Context, func(c context.Context) context.Context { return withClientSpan(c, start) })
 
 			return func(info trace.QueryQueryResultSetDoneInfo) {
 				finish(
@@ -208,7 +209,7 @@ func query(adapter Adapter) trace.Query {
 				info.Context,
 				SpanNameExecuteQuery,
 			)
-			*info.Context = withClientSpan(*info.Context, start)
+			withContextPtr(info.Context, func(c context.Context) context.Context { return withClientSpan(c, start) })
 
 			return func(info trace.QueryQueryRowDoneInfo) {
 				finish(
@@ -235,7 +236,7 @@ func query(adapter Adapter) trace.Query {
 						info.Error,
 						kv.Int64(AttrYDBNodeID, 0),
 					)
-				case info.Session != nil:
+				case !isNil(info.Session):
 					finish(
 						start,
 						nil,
@@ -255,8 +256,8 @@ func query(adapter Adapter) trace.Query {
 				return nil
 			}
 
-			ctx := *info.Context
-			call := info.Call.String()
+			ctx := safeContextPtr(info.Context)
+			call := safeCall(info.Call)
 
 			return func(info trace.QuerySessionAttachDoneInfo) {
 				if info.Error == nil {
@@ -352,7 +353,7 @@ func query(adapter Adapter) trace.Query {
 			start := childSpanWithReplaceCtx(
 				adapter,
 				info.Context,
-				info.Call.String(),
+				safeCall(info.Call),
 				kv.Int64(AttrYDBNodeID, safeNodeIDInt64(info.Session)),
 			)
 
@@ -360,7 +361,7 @@ func query(adapter Adapter) trace.Query {
 				switch {
 				case info.Error != nil:
 					finish(start, info.Error)
-				case info.Tx != nil:
+				case !isNil(info.Tx):
 					finish(
 						start,
 						nil,
@@ -435,8 +436,8 @@ func query(adapter Adapter) trace.Query {
 				return nil
 			}
 
-			ctx := *info.Context
-			call := info.Call.String()
+			ctx := safeContextPtr(info.Context)
+			call := safeCall(info.Call)
 
 			return func(info trace.QueryResultNewDoneInfo) {
 				if info.Error == nil {
@@ -451,8 +452,8 @@ func query(adapter Adapter) trace.Query {
 				return nil
 			}
 
-			ctx := *info.Context
-			call := info.Call.String()
+			ctx := safeContextPtr(info.Context)
+			call := safeCall(info.Call)
 
 			return func(info trace.QueryResultNextPartDoneInfo) {
 				if info.Error == nil {
@@ -470,8 +471,8 @@ func query(adapter Adapter) trace.Query {
 				return nil
 			}
 
-			ctx := *info.Context
-			call := info.Call.String()
+			ctx := safeContextPtr(info.Context)
+			call := safeCall(info.Call)
 
 			return func(info trace.QueryResultNextResultSetDoneInfo) {
 				if info.Error == nil {
@@ -488,8 +489,8 @@ func query(adapter Adapter) trace.Query {
 				return nil
 			}
 
-			ctx := *info.Context
-			call := info.Call.String()
+			ctx := safeContextPtr(info.Context)
+			call := safeCall(info.Call)
 
 			return func(info trace.QueryResultCloseDoneInfo) {
 				if info.Error == nil {

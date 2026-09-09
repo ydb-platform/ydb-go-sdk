@@ -15,11 +15,11 @@ func TestWriterImpl_CreateInitMessage(t *testing.T) {
 		ctx := xtest.Context(t)
 		cfg := SingleStreamWriterConfig{
 			WritersCommonConfig: WritersCommonConfig{
-				producerID:          "producer",
-				topic:               "topic",
-				writerMeta:          map[string]string{"key": "val"},
-				defaultPartitioning: rawtopicwriter.NewPartitioningPartitionID(5),
-				compressorCount:     1,
+				producerID:      "producer",
+				topic:           "topic",
+				writerMeta:      map[string]string{"key": "val"},
+				partitioning:    rawtopicwriter.NewPartitioningPartitionID(5),
+				compressorCount: 1,
 			},
 			getLastSeqNum: true,
 		}
@@ -28,7 +28,7 @@ func TestWriterImpl_CreateInitMessage(t *testing.T) {
 			Path:             w.cfg.topic,
 			ProducerID:       w.cfg.producerID,
 			WriteSessionMeta: w.cfg.writerMeta,
-			Partitioning:     w.cfg.defaultPartitioning,
+			Partitioning:     w.cfg.partitioning,
 			GetLastSeqNo:     true,
 		}
 		require.Equal(t, expected, w.createInitRequest())

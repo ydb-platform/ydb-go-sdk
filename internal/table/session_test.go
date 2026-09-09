@@ -926,3 +926,60 @@ func TestRenameTables(t *testing.T) {
 		})
 	}
 }
+
+func TestCloseTableSessionSendsDeleteOnDoneContext(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		ctx  func() (context.Context, context.CancelFunc)
+	}{
+		{
+			name: "live context",
+			ctx: func() (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+		},
+		{
+			name: "canceled context",
+			ctx: func() (context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+
+				return ctx, func() {}
+			},
+		},
+		{
+			name: "expired deadline",
+			ctx: func() (context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithDeadline(context.Background(), time.Unix(0, 0))
+
+				return ctx, cancel
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var deleted int
+			cc := testutil.NewBalancer(
+				testutil.WithInvokeHandlers(
+					testutil.InvokeHandlers{
+						testutil.TableDeleteSession: func(any) (proto.Message, error) {
+							deleted++
+
+							return &Ydb_Table.DeleteSessionResponse{}, nil
+						},
+					},
+				),
+			)
+
+			ctx, cancel := tt.ctx()
+			defer cancel()
+
+			// A done caller context must not prevent DeleteSession: the session id is
+			// known, and skipping the call leaves the session on the server until the
+			// server-side idle timeout expires.
+			require.NoError(t, closeTableSession(
+				Ydb_Table_V1.NewTableServiceClient(cc), config.New(), "test-session",
+			)(ctx))
+			require.Equal(t, 1, deleted)
+		})
+	}
+}

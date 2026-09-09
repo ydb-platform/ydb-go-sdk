@@ -89,9 +89,7 @@ func newOrchestrator(
 		})
 	})
 	o.partitionSplitReceiver = newPartitionSplitReceiver(
-		func(partitionID int64) error {
-			return o.onPartitionSplit(partitionID)
-		},
+		o.onPartitionSplit,
 		o.stopWithError,
 	)
 	o.writerPool = newPartitionWriterPool(
@@ -116,17 +114,19 @@ func newOrchestrator(
 		o.stopWithError,
 	)
 
-	background.Start("ack receiver", func(ctx context.Context) {
+	return o
+}
+
+func (o *orchestrator) startWorkers() {
+	o.background.Start("ack receiver", func(ctx context.Context) {
 		o.ackReceiver.run(o.ctx)
 	})
-	background.Start("partition splitter", func(ctx context.Context) {
+	o.background.Start("partition splitter", func(ctx context.Context) {
 		o.partitionSplitReceiver.run(ctx)
 	})
-	background.Start("sender", func(ctx context.Context) {
+	o.background.Start("sender", func(ctx context.Context) {
 		o.sender.run()
 	})
-
-	return o
 }
 
 func isOperationErrorOverloaded(err error) bool {
@@ -190,6 +190,8 @@ func (o *orchestrator) init() (err error) {
 
 		return err
 	}
+
+	o.startWorkers()
 
 	return nil
 }

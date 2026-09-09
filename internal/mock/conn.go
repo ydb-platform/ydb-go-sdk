@@ -19,8 +19,9 @@ type Conn struct {
 	AddrField     string
 	LocationField string
 	NodeIDField   uint32
-	State         state.State
+	StateField    state.State
 	LocalDCField  bool
+	MetadataField endpoint.Metadata
 }
 
 func (c *Conn) Endpoint() endpoint.Endpoint {
@@ -29,27 +30,20 @@ func (c *Conn) Endpoint() endpoint.Endpoint {
 		LocalDCField:  c.LocalDCField,
 		LocationField: c.LocationField,
 		NodeIDField:   c.NodeIDField,
+		MetadataField: c.MetadataField,
 	}
 }
 
-func (c *Conn) LastUsage() (*time.Time, error) {
-	panic("not implemented in mock")
+func (c *Conn) State() state.State {
+	return c.StateField
 }
 
-func (c *Conn) GetState() state.State {
-	return c.State
+func (c *Conn) Unban(ctx context.Context) {
+	c.StateField = state.Online
 }
 
-func (c *Conn) SetState(ctx context.Context, state state.State) state.State {
-	c.State = state
-
-	return c.State
-}
-
-func (c *Conn) Unban(ctx context.Context) state.State {
-	c.SetState(ctx, state.Online)
-
-	return state.Online
+func (c *Conn) Ban(ctx context.Context) {
+	c.StateField = state.Banned
 }
 
 type Endpoint struct {
@@ -58,6 +52,7 @@ type Endpoint struct {
 	NodeIDField       uint32
 	LocalDCField      bool
 	OverrideHostField string
+	MetadataField     endpoint.Metadata
 }
 
 func (e *Endpoint) Key() endpoint.Key {
@@ -91,6 +86,13 @@ func (e *Endpoint) Location() string {
 	return e.LocationField
 }
 
+func (e *Endpoint) Metadata() endpoint.Metadata {
+	metadata := e.MetadataField
+	metadata.LocalDC = e.LocalDCField
+
+	return metadata
+}
+
 func (e *Endpoint) LastUpdated() time.Time {
 	panic("not implemented in mock")
 }
@@ -107,11 +109,8 @@ func (e *Endpoint) String() string {
 	panic("not implemented in mock")
 }
 
-func (e *Endpoint) Copy() endpoint.Endpoint {
+func (e *Endpoint) Copy(...endpoint.Option) endpoint.Endpoint {
 	c := *e
 
 	return &c
-}
-
-func (e *Endpoint) Touch(opts ...endpoint.Option) {
 }

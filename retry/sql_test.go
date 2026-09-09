@@ -18,11 +18,12 @@ import (
 )
 
 type mockConnector struct {
-	t         testing.TB
-	conns     uint32
-	queryErr  error
-	execErr   error
-	commitErr error
+	t                 testing.TB
+	conns             uint32
+	queryErr          error
+	execErr           error
+	commitErr         error
+	defaultIdempotent bool
 }
 
 var _ driver.Connector = &mockConnector{}
@@ -48,6 +49,32 @@ func (m *mockConnector) Driver() driver.Driver {
 	m.t.Log(stack.Record(0))
 
 	return m
+}
+
+func (m *mockConnector) DefaultIdempotent() bool {
+	return m.defaultIdempotent
+}
+
+type idempotentRetryableError struct{}
+
+func (idempotentRetryableError) Error() string {
+	return "idempotent retryable error"
+}
+
+func (idempotentRetryableError) Code() int32 {
+	return -1
+}
+
+func (idempotentRetryableError) Name() string {
+	return "idempotent retryable error"
+}
+
+func (idempotentRetryableError) Type() xerrors.Type {
+	return xerrors.TypeConditionallyRetryable
+}
+
+func (idempotentRetryableError) BackoffType() backoff.Type {
+	return backoff.TypeInstant
 }
 
 type mockConn struct {
@@ -234,6 +261,102 @@ func TestDoTx(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDefaultIdempotent(t *testing.T) {
+	retryErr := idempotentRetryableError{}
+
+	t.Run("Do retries with connector default", func(t *testing.T) {
+		db := sql.OpenDB(&mockConnector{
+			t:                 t,
+			defaultIdempotent: true,
+		})
+		defer func() {
+			require.NoError(t, db.Close())
+		}()
+
+		attempts := 0
+		err := Do(context.Background(), db, func(context.Context, *sql.Conn) error {
+			attempts++
+			if attempts == 1 {
+				return retryErr
+			}
+
+			return nil
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, 2, attempts)
+	})
+
+	t.Run("Do per-call false overrides connector default", func(t *testing.T) {
+		db := sql.OpenDB(&mockConnector{
+			t:                 t,
+			defaultIdempotent: true,
+		})
+		defer func() {
+			require.NoError(t, db.Close())
+		}()
+
+		attempts := 0
+		err := Do(context.Background(), db, func(context.Context, *sql.Conn) error {
+			attempts++
+			if attempts == 1 {
+				return retryErr
+			}
+
+			return nil
+		}, WithDoRetryOptions(WithIdempotent(false)))
+
+		require.Error(t, err)
+		require.Equal(t, 1, attempts)
+	})
+
+	t.Run("DoTx retries with connector default", func(t *testing.T) {
+		db := sql.OpenDB(&mockConnector{
+			t:                 t,
+			defaultIdempotent: true,
+		})
+		defer func() {
+			require.NoError(t, db.Close())
+		}()
+
+		attempts := 0
+		err := DoTx(context.Background(), db, func(context.Context, *sql.Tx) error {
+			attempts++
+			if attempts == 1 {
+				return retryErr
+			}
+
+			return nil
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, 2, attempts)
+	})
+
+	t.Run("DoTx per-call false overrides connector default", func(t *testing.T) {
+		db := sql.OpenDB(&mockConnector{
+			t:                 t,
+			defaultIdempotent: true,
+		})
+		defer func() {
+			require.NoError(t, db.Close())
+		}()
+
+		attempts := 0
+		err := DoTx(context.Background(), db, func(context.Context, *sql.Tx) error {
+			attempts++
+			if attempts == 1 {
+				return retryErr
+			}
+
+			return nil
+		}, WithDoTxRetryOptions(WithIdempotent(false)))
+
+		require.Error(t, err)
+		require.Equal(t, 1, attempts)
+	})
 }
 
 func TestCleanUpResourcesOnPanicInRetryOperation(t *testing.T) {

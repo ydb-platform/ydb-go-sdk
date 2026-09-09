@@ -1,0 +1,4 @@
+name: ydb
+
+include:
+  - path: https://github.com/ydb-platform/ydb-slo-action.git#v2:deploy/compose.yml

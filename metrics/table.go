@@ -39,12 +39,12 @@ func table(config Config) (t trace.Table) {
 				return
 			}
 
-			if info.Error != nil || info.Session == nil {
+			if info.Error != nil || isNil(info.Session) {
 				return
 			}
 
 			alive.With(map[string]string{
-				"node_id": idToString(info.Session.NodeID()),
+				"node_id": idToString(safeSessionNodeID(info.Session)),
 			}).Add(1)
 		}
 	}
@@ -54,7 +54,7 @@ func table(config Config) (t trace.Table) {
 		}
 
 		alive.With(map[string]string{
-			"node_id": idToString(info.Session.NodeID()),
+			"node_id": idToString(safeSessionNodeID(info.Session)),
 		}).Add(-1)
 
 		return nil
@@ -79,7 +79,7 @@ func table(config Config) (t trace.Table) {
 				return
 			}
 
-			if info.Error == nil && info.Session != nil {
+			if info.Error == nil && !isNil(info.Session) {
 				get.With(nil).Inc()
 			}
 			if info.NodeHintInfo != nil {

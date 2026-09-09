@@ -24,7 +24,7 @@ func internalCoordination(
 			if d.Details()&trace.CoordinationEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "coordination", "new")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "coordination", "new")
 			l.Log(ctx, "coordination client starting...")
 			start := time.Now()
 
@@ -39,7 +39,7 @@ func internalCoordination(
 			if d.Details()&trace.CoordinationEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "create")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "coordination", "node", "create")
 			l.Log(ctx, "coordination node create starting...",
 				kv.String("path", info.Path),
 			)
@@ -62,7 +62,7 @@ func internalCoordination(
 			if d.Details()&trace.CoordinationEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "alter")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "coordination", "node", "alter")
 			l.Log(ctx, "coordination alter node starting...",
 				kv.String("path", info.Path),
 			)
@@ -85,7 +85,7 @@ func internalCoordination(
 			if d.Details()&trace.CoordinationEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "drop")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "coordination", "node", "drop")
 			l.Log(ctx, "drop coordination node starting...",
 				kv.String("path", info.Path),
 			)
@@ -108,7 +108,7 @@ func internalCoordination(
 			if d.Details()&trace.CoordinationEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "describe")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "coordination", "node", "describe")
 			l.Log(ctx, "describe coordination node starting...",
 				kv.String("path", info.Path),
 			)
@@ -131,7 +131,7 @@ func internalCoordination(
 			if d.Details()&trace.CoordinationEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "describe")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "coordination", "session")
 			l.Log(ctx, "create coordination session starting...")
 			start := time.Now()
 
@@ -152,7 +152,7 @@ func internalCoordination(
 			if d.Details()&trace.CoordinationEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "coordination", "close")
+			ctx := withFromPtr(info.Context, TRACE, "ydb", "coordination", "close")
 			l.Log(ctx, "close coordination client starting...")
 			start := time.Now()
 

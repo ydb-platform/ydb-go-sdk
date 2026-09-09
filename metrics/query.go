@@ -239,6 +239,17 @@ func query(config Config) (t trace.Query) {
 	{
 		sessionConfig := queryConfig.WithSystem("session")
 		count := sessionConfig.GaugeVec("count")
+		closed := sessionConfig.CounterVec("closed", "ydb.query.session.pool.name", "reason")
+		t.OnSessionClosed = func(info trace.QuerySessionClosedInfo) {
+			if sessionConfig.Details()&trace.QuerySessionEvents == 0 {
+				return
+			}
+
+			closed.With(map[string]string{
+				"ydb.query.session.pool.name": info.PoolName,
+				"reason":                      info.Reason,
+			}).Inc()
+		}
 		{
 			createConfig := sessionConfig.WithSystem("create")
 			errs := createConfig.CounterVec("errs", "status")
@@ -251,7 +262,7 @@ func query(config Config) (t trace.Query) {
 						return
 					}
 
-					if info.Error == nil && info.Session != nil {
+					if info.Error == nil && !isNil(info.Session) {
 						count.With(nil).Add(1)
 					}
 					errs.With(map[string]string{

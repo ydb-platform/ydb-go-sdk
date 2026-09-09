@@ -442,8 +442,10 @@ func (s *session) receiveLoop( //nolint:funlen
 
 			return
 		case *Ydb_Coordination.SessionResponse_SessionStarted_:
-			sessionStarted <- message.GetSessionStarted()
+			// mainLoop may enter the keep-alive loop as soon as the notification is received.
+			// Publish it only after the timestamp used by that loop has been initialized.
 			s.updateLastGoodResponseTime()
+			sessionStarted <- message.GetSessionStarted()
 		case *Ydb_Coordination.SessionResponse_SessionStopped_:
 			sessionStopped <- message.GetSessionStopped()
 			s.cancel()
@@ -681,37 +683,79 @@ func (s *session) DeleteSemaphore(
 	return nil
 }
 
-func (s *session) DescribeSemaphore(
+func (s *session) DescribeSemaphore( //nolint:funlen
 	ctx context.Context,
 	name string,
 	opts ...options.DescribeSemaphoreOption,
 ) (*coordination.SemaphoreDescription, error) {
-	req := conversation.NewConversation(
-		func() *Ydb_Coordination.SessionRequest {
-			describeSemaphore := Ydb_Coordination.SessionRequest_DescribeSemaphore{
-				ReqId: newReqID(),
-				Name:  name,
-			}
-			for _, o := range opts {
-				if o != nil {
-					o(&describeSemaphore)
-				}
-			}
+	cfg := &options.DescribeSemaphoreConfig{}
+	for _, o := range opts {
+		if o != nil {
+			o(cfg)
+		}
+	}
 
-			return &Ydb_Coordination.SessionRequest{
-				Request: &Ydb_Coordination.SessionRequest_DescribeSemaphore_{
-					DescribeSemaphore: &describeSemaphore,
-				},
-			}
-		},
+	watch := cfg.OneShotHandler != nil && (cfg.WatchData || cfg.WatchOwners)
+	conversationOpts := []conversation.Option{
 		conversation.WithResponseFilter(func(
 			request *Ydb_Coordination.SessionRequest,
 			response *Ydb_Coordination.SessionResponse,
 		) bool {
-			return response.GetDescribeSemaphoreResult().GetReqId() == request.GetDescribeSemaphore().GetReqId()
+			result := response.GetDescribeSemaphoreResult()
+
+			return result != nil && result.GetReqId() == request.GetDescribeSemaphore().GetReqId()
 		}),
 		conversation.WithConflictKey(name),
 		conversation.WithIdempotence(true),
+	}
+
+	if watch {
+		oneShotHandler := cfg.OneShotHandler
+		conversationOpts = append(conversationOpts,
+			conversation.WithKeepAlive(func(response *Ydb_Coordination.SessionResponse) bool {
+				return response.GetDescribeSemaphoreResult().GetWatchAdded()
+			}),
+			conversation.WithNotifyFilter(
+				func(
+					request *Ydb_Coordination.SessionRequest,
+					response *Ydb_Coordination.SessionResponse,
+				) bool {
+					changed := response.GetDescribeSemaphoreChanged()
+
+					return changed != nil && changed.GetReqId() == request.GetDescribeSemaphore().GetReqId()
+				},
+				func(response *Ydb_Coordination.SessionResponse) {
+					changed := response.GetDescribeSemaphoreChanged()
+					event := options.SemaphoreWatchEvent{
+						DataChanged:   cfg.WatchData && changed.GetDataChanged(),
+						OwnersChanged: cfg.WatchOwners && changed.GetOwnersChanged(),
+					}
+					event.Lost = !event.DataChanged && !event.OwnersChanged
+					oneShotHandler(event)
+				},
+			),
+			conversation.WithOnAbandoned(func() {
+				oneShotHandler(options.SemaphoreWatchEvent{Lost: true})
+			}),
+		)
+	}
+
+	req := conversation.NewConversation(
+		func() *Ydb_Coordination.SessionRequest {
+			return &Ydb_Coordination.SessionRequest{
+				Request: &Ydb_Coordination.SessionRequest_DescribeSemaphore_{
+					DescribeSemaphore: &Ydb_Coordination.SessionRequest_DescribeSemaphore{
+						ReqId:          newReqID(),
+						Name:           name,
+						IncludeOwners:  cfg.IncludeOwners,
+						IncludeWaiters: cfg.IncludeWaiters,
+						WatchData:      watch && cfg.WatchData,
+						WatchOwners:    watch && cfg.WatchOwners,
+					},
+				},
+			}
+		},
+		conversationOpts...,
 	)
 	if err := s.controller.PushBack(req); err != nil {
 		return nil, err

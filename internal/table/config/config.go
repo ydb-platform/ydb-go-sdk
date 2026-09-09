@@ -155,6 +155,12 @@ func WithDisableSessionBalancer() Option {
 	}
 }
 
+func WithDefaultIdempotent(idempotent bool) Option {
+	return func(c *Config) {
+		c.defaultIdempotent = idempotent
+	}
+}
+
 // WithClock replaces default clock
 func WithClock(clock clockwork.Clock) Option {
 	return func(c *Config) {
@@ -178,6 +184,7 @@ type Config struct {
 	ignoreTruncated                  bool
 	useQuerySession                  bool
 	executeDataQueryOverQueryService bool
+	defaultIdempotent                bool
 
 	maxRequestMessageSize int
 
@@ -234,6 +241,10 @@ func (c *Config) UseQuerySession() bool {
 // ExecuteDataQueryOverQueryService specifies behavior on execute handle
 func (c *Config) ExecuteDataQueryOverQueryService() bool {
 	return c.executeDataQueryOverQueryService
+}
+
+func (c *Config) DefaultIdempotent() bool {
+	return c.defaultIdempotent
 }
 
 // IdleThreshold is a maximum duration between any activity within session.

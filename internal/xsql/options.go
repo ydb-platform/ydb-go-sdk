@@ -38,9 +38,13 @@ type (
 	retryBudgetOption           struct {
 		budget budget.Budget
 	}
+
 	BindOption struct {
 		bind.Bind
 	}
+
+	defaultIdempotentOption bool
+
 	queryProcessorOption Engine
 )
 
@@ -65,6 +69,12 @@ func (opt BindOption) Apply(c *Connector) error {
 
 func (opt retryBudgetOption) Apply(c *Connector) error {
 	c.retryBudget = opt.budget
+
+	return nil
+}
+
+func (opt defaultIdempotentOption) Apply(c *Connector) error {
+	c.defaultIdempotent = bool(opt)
 
 	return nil
 }
@@ -150,6 +160,10 @@ func WithRetryBudget(budget budget.Budget) Option {
 	return retryBudgetOption{
 		budget: budget,
 	}
+}
+
+func WithDefaultIdempotent(idempotent bool) Option {
+	return defaultIdempotentOption(idempotent)
 }
 
 func WithTablePathPrefix(tablePathPrefix string) QueryBindOption {

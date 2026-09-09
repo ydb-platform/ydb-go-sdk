@@ -53,6 +53,7 @@ type (
 		traceRetry           *trace.Retry
 		composePanicCallback func(e any)
 		retryBudget          budget.Budget
+		defaultIdempotent    bool
 		pathNormalizer       bind.TablePathPrefix
 		bindings             bind.Bindings
 	}
@@ -82,6 +83,10 @@ func (c *Connector) Parent() ydbDriver {
 
 func (c *Connector) RetryBudget() budget.Budget {
 	return c.retryBudget
+}
+
+func (c *Connector) DefaultIdempotent() bool {
+	return c.defaultIdempotent
 }
 
 func (c *Connector) Bindings() bind.Bindings {

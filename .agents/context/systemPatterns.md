@@ -1,0 +1,258 @@
+# System Patterns
+
+## Repository layout
+
+```
+ydb-go-sdk/
+├── driver.go, with.go, sql.go    # ydb.Open, Driver, ydb.Option, database/sql driver
+├── table/, query/, scheme/, topic/ # public service client packages (+ types/options/result)
+├── coordination/, discovery/, scripting/, operation/, ratelimiter/
+├── config/, balancers/, credentials/, retry/, sugar/, trace/
+├── log/, metrics/, spans/        # trace adapters
+├── internal/                     # implementations (unstable; do not expose in public API)
+├── tests/integration/            # //go:build integration
+├── examples/                     # separate go.mod
+└── .agents/                      # agent workspace
+```
+
+Public packages define interfaces and option types. Implementations live under `internal/<service>/` and are wired in `driver.go`.
+
+## Driver lifecycle
+
+### Entry points
+
+| API | File | Role |
+|-----|------|------|
+| `ydb.Open(ctx, dsn, opts...)` | `driver.go` | Parse DSN, apply `ydb.Option`s, connect, return `*Driver` |
+| `ydb.New(ctx, opts...)` | `driver.go` | Same without DSN in args (endpoint/database from options) |
+| `sql.Open("ydb", dsn)` | `sql.go` | Registers `database/sql` driver; uses same `Driver` underneath |
+| `ydb.Connector(driver)` | `internal/xsql` | Wrap native driver for `sql.OpenDB` |
+
+`ydb.Option` functions (`with.go`) mutate `*Driver` before connect: credentials, balancer, trace, timeouts, table/query config, etc.
+
+### `connect()` sequence (`driver.go`)
+
+```
+driverFromOptions()
+  → apply env defaults (YDB_SSL_ROOT_CERTIFICATES_FILE, YDB_LOG_SEVERITY_LEVEL)
+  → apply user opts
+  → build config.Config
+
+connect(ctx)
+  1. conn.NewPool(ctx, config)           # gRPC connection pool (if not preset)
+  2. balancer.New(ctx, config, pool)     # discovery + endpoint selection
+  3. metaBalancer.meta = config.Meta()   # request metadata (database, credentials hints)
+  4. xsync.OnceValue per service client  # lazy init on first Table()/Query()/...
+```
+
+Service clients are **lazy**: `d.Table()` calls `d.table.Must()` which runs the `OnceValue` factory only once.
+
+### `balancerWithMeta` — shared RPC transport
+
+All service clients receive the same `*balancerWithMeta` (implements `grpc.ClientConnInterface`):
+
+- `Invoke()` / `NewStream()` inject `meta.Meta` into context, then delegate to `internal/balancer.Balancer`.
+- Discovery maps fresh endpoints to pooled connection wrappers. `Balancer.nextConn` chooses one wrapper and executes the RPC.
+- On stream/call errors that indicate a bad connection, the endpoint may be **banned** (pessimization) and rediscovered.
+
+This is the single production path for gRPC — do not dial around the balancer.
+
+## Two pool layers
+
+### 1. gRPC connection pool (`internal/conn/pool.go`)
+
+- One `*conn` per `endpoint.Endpoint` (host:port + node metadata).
+- `Get` / `Put` reference-count pooled wrappers; gRPC dial is lazy on first RPC.
+- Refcount and map updates run under `p.mu` with `defer p.mu.Unlock()` in helpers (`tryPut`, `release`); blocking `Close()` runs **after** the helper returns. See mutex rules in [`.agents/rules/coding-standards.md`](../rules/coding-standards.md).
+- Used by balancer to obtain `grpc.ClientConn` for a chosen node.
+
+Connection state lifecycle:
+
+```text
+Created → Online ↔ Banned
+             ↕
+           Offline
+             ↓
+          Destroyed
+```
+
+- `newConn` stores `Created` directly; there is no state-change event at wrapper creation. The first successful lazy dial emits `Created → Online`.
+- `Ban` moves the wrapper to `Banned`; `Unban` chooses `Online` or `Offline` from the underlying gRPC transport readiness.
+- Closing the gRPC transport moves the wrapper to `Offline`; closing the wrapper finishes with `Destroyed`.
+- `conn.setState` is the central transition point and emits `trace.Driver.OnConnStateChange` with the previous and new states. `Online`, `Offline`, and `Banned` are valid operational states; `Created`, `Destroyed`, and `Unknown` are lifecycle sentinels.
+
+### Driver connection metrics
+
+- The `metrics.Registry` API is push-based (`Gauge.Add` / `Gauge.Set`); it has no scrape-time callback or connection-pool snapshot API.
+- Derive current connection state from the existing `OnConnStateChange` trace. Moving one connection between valid states decrements the old state and increments the new state, so `sum(conns)` remains invariant. Entering the first valid state increments the sum; moving to `Destroyed` decrements it.
+- Do not create a `Created` series from the first `Created → Online` transition: there was no preceding creation event, so decrementing it would produce `-1`.
+- A ban with `cause` is an event and belongs in a counter. Current banned connection cardinality belongs in the `state="banned"` partition of the connection gauge.
+- Adding `state` changes the raw `conns` series shape, but dashboards using only `sum(conns)` retain their query and intended total. Direct selectors, grouping, joins, and alerts must account for the new label.
+- The former dial/close event accounting could drift: redial could add twice after an internal transport reset, while closing a never-dialed wrapper could subtract without a prior add. State transitions avoid both cases.
+
+### 2. YDB session pool (`internal/pool/pool.go`)
+
+- Generic pool used by **table** and **query** clients for YDB `Session` objects.
+- Configurable: limit, warm-up size, idle TTL, usage limit/TTL, create/delete timeouts.
+- `MustDelete` predicate drops sessions on `xerrors.MustDeleteTableOrQuerySession(err)`.
+
+Table and query each maintain their own session pool instance inside `internal/table.Client` / `internal/query.Client`.
+
+Query additionally has **implicit** session pool for server-side session management (see `internal/query/client.go`).
+
+### Session-pool reuse and expiration
+
+- Session expiration is lazy: idle TTL, usage TTL, and usage-limit checks run while an item is acquired from the pool. There is no background idle-session reaper in `internal/pool`.
+- LIFO reuse must not starve older sessions from expiration checks. Inspect the oldest item for configured expiry before the normal LIFO or node-hint selection, without running its liveness predicate merely for inspection.
+- The idle container supports efficient removal from both ends while preserving its length, limit, clear, LIFO, and node-specific semantics.
+
+### Session metrics: client state vs server state
+
+- SDK session and pool metrics describe client lifecycle and pool state; they do not prove that a session was deleted on the server.
+- Diagnose server-session leaks with server-side active-session metrics, correlated with SDK pool state and session RPC activity.
+
+## Balancer and discovery (`internal/balancer/`)
+
+```
+Balancer
+  ├── clusterDiscovery()       # periodic / on-init endpoint refresh
+  ├── evaluate fresh endpoints # current discovery attributes before pool lookup
+  ├── Policy.Prioritize()      # immutable preference pipeline → key/priority
+  ├── endpointElector          # health + random hot-path snapshot
+  └── wrapCall / wrapStream    # pessimization on retriable connection failures
+```
+
+User-facing presets: `balancers/RandomChoice`, `SingleConn`, `PreferNearestDC`, `PreferNearestDCWithFallBack`.
+
+Configured via `config.WithBalancer(...)` or `ydb.WithBalancer(...)`.
+
+### Selection policy and runtime health
+
+Balancer configuration is one concrete immutable `policy.Policy`. Preference constructors append a predicate to
+the policy. Each predicate classifies an endpoint as preferred, fallback, or excluded. `Policy.Prioritize` assigns one
+bit per fallback-capable stage in pipeline construction order: an inner constructor gets the least significant bit and
+each outer constructor gets the next bit, so outer preferences dominate inner ones. Preferred contributes `0`,
+fallback contributes `1 << stage`, and excluded endpoints do not participate in policy-based selection.
+
+```text
+PreferNearestDCWithFallBack(PreferLocationsWithFallback(RandomChoice(), "A", "B"))
+  → stages: Locations{A,B} at bit 0, NearestDC at bit 1
+  → priorities: nearest+A/B=0, nearest+other=1, remote+A/B=2, remote+other=3
+```
+
+Strict `Prefer*` constructors exclude non-matching endpoints, preserving their existing fail-fast behavior.
+`*WithFallback` constructors retain non-matching endpoints in a lower-priority bucket. Any strict exclusion in a
+composed pipeline wins immediately. `balancers.WithNodeID` still bypasses these policy decisions.
+
+The policy runs once for each fresh discovery snapshot, before endpoints are mapped to pooled wrappers. This ensures
+selection uses current endpoint attributes even when `conn.Pool` reuses a wrapper from an older discovery response.
+
+`conn.State()` is the only source of mutable endpoint health. `endpointElector` stores policy priorities and the
+`endpoint.Key → conn.Conn` mapping, and atomically publishes immutable election snapshots after discovery or a state
+change. The RPC hot path only loads that snapshot and randomly chooses among healthy connections with the lowest
+policy priority. If every connection is banned, banned connections remain a randomized last resort.
+
+Pessimization forces discovery only when the share of banned records among policy-eligible connections crosses
+strictly above 50%. The threshold is edge-triggered, so repeated reports for an already banned connection do not
+schedule additional discovery attempts. `SingleConn` does not ban its only connection and does not run periodic
+discovery.
+
+`nextConn` handles contracts outside policy calculation:
+
+- `balancers.WithNodeID` addresses the requested node before policy selection; its context option independently controls node-ID fallback;
+- `Created`, `Online`, and `Offline` wrappers are usable; `Banned` is eligible only as the last resort;
+- a selected wrapper that becomes unusable refreshes the election snapshot, and a newly lost majority of all
+  connections forces discovery.
+
+Keep these responsibilities separate: `Policy` expresses static endpoint preference, `endpointElector` owns runtime
+health and hot-path choice, and `conn.Pool` owns wrapper lifecycle.
+
+Compatibility tests must keep existing public constructor expressions source-usable and verify persisted
+`balancers.FromConfig(string)` values. Serialized `fallback=false` retains strict exclusion, while `fallback=true`
+retains lower-priority fallback selection.
+
+`Driver.Discovery()` exposes a separate discovery client (uses bootstrap connection from pool, not the main balancer loop).
+
+## Service client map
+
+| `Driver` accessor | Public package | Internal impl | Session pool? | Notes |
+|-------------------|----------------|---------------|---------------|-------|
+| `Table()` | `table/` | `internal/table/` | Yes | `Do`/`DoTx`, bulk ops |
+| `Query()` | `query/` | `internal/query/` | Yes (+ implicit) | Streaming `ResultSets`, `Do`/`DoTx` |
+| `Scheme()` | `scheme/` | `internal/scheme/` | No | Directory, describe path |
+| `Topic()` | `topic/` | `internal/topic/` | No | Reader/writer/listener; own connection semantics |
+| `Coordination()` | `coordination/` | `internal/coordination/` | No | Semaphores, distributed locks |
+| `Scripting()` | `scripting/` | `internal/scripting/` | No | YQL scripts (legacy path) |
+| `Ratelimiter()` | `ratelimiter/` | `internal/ratelimiter/` | No | Quota control |
+| `Discovery()` | `discovery/` | `internal/discovery/` | No | Endpoint discovery API |
+| `Operation()` | `operation/` | `operation/` | No | Long-running ops (experimental) |
+
+`database/sql` path: `internal/xsql` connector acquires table sessions via the same table client stack.
+
+## Do / DoTx pattern
+
+Canonical pattern for **table** and **query** (public API mirrors internal):
+
+```go
+err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
+    rs, err := s.Query(ctx, "SELECT 1")
+    if err != nil { return err }
+    defer func() { _ = rs.Close(ctx) }()
+    // ...
+    return nil  // success → exit retry loop
+}, query.WithIdempotent())
+```
+
+Internal flow (`internal/table/client.go`, `internal/query/client.go`):
+
+```
+Do(ctx, op, opts)
+  → merge retry options (label, idempotent, backoff, trace)
+  → retry loop (retry.Retry / do+backoff)
+      → sessionPool.Get(ctx)     # acquire Session
+      → op(ctx, session)         # user callback
+      → on error: classify retryable, maybe delete session, retry
+      → on success: return nil
+```
+
+`DoTx`: acquire session → `BeginTransaction` → user op → `Commit` (rollback on error). Retries whole transaction when safe.
+
+**Rules for agents:**
+
+- Return non-nil error from callback to trigger retry; nil means success.
+- Use `WithIdempotent()` for operations safe to repeat.
+- Always `Close()` result sets / streams in callback.
+- Unbounded `context.Context` can retry indefinitely — use deadlines.
+
+## Retry package (`retry/`)
+
+- `retry.Retry()` — core loop with fast/slow backoff (`internal/backoff`).
+- `xerrors.Retryable(err)` — mark errors for retry.
+- `retry/budget/` — optional retry budget from driver config.
+- Wired into `Do`/`DoTx` and balancer discovery.
+
+## Trace and codegen
+
+- Callback structs in `trace/` (per service).
+- `go generate ./trace` → `*_gtrace.go` wrappers in public and internal packages.
+- `internal/cmd/gstack/` — `stack.FunctionID` for trace spans.
+- CI `check-codegen.yml` enforces clean generated diff.
+
+## `database/sql` integration
+
+- Driver registered as `"ydb"` in `sql.go`.
+- `internal/xsql/connector.go` — `CreateSession` uses native table client; balancing happens at session creation.
+- See `SQL.md` for DSN params, balancing, and connector options.
+
+Topic / multiwriter details (load only when needed): [`topicContext.md`](topicContext.md), [`topicMultiwriterContext.md`](topicMultiwriterContext.md).
+
+## Adding a new RPC surface
+
+1. Confirm protobuf in `ydb-go-genproto`.
+2. Add `internal/grpcwrapper/` or service-specific raw client methods.
+3. Implement `internal/<service>/client.go` using `balancerWithMeta` as `grpc.ClientConnInterface`.
+4. Expose public package with stable types; add `trace/` callbacks + regenerate.
+5. Wire lazy `xsync.OnceValue` factory in `driver.go` `connect()`.
+6. Unit tests co-located; `tests/integration/` if server interaction needed.
+
+Checklist and coding anti-patterns: [`.agents/rules/coding-standards.md`](../rules/coding-standards.md).

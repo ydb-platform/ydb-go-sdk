@@ -187,7 +187,7 @@ func (w *SingleStreamWriter) createInitRequest() rawtopicwriter.InitRequest {
 		Path:             w.cfg.topic,
 		ProducerID:       w.cfg.producerID,
 		WriteSessionMeta: w.cfg.writerMeta,
-		Partitioning:     w.cfg.defaultPartitioning,
+		Partitioning:     w.cfg.partitioning,
 		GetLastSeqNo:     w.cfg.getLastSeqNum,
 	}
 }

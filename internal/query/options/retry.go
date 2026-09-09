@@ -26,6 +26,7 @@ type (
 	doSettings struct {
 		retryOpts []retry.Option
 		trace     *trace.Query
+		callTrace *trace.Query
 		label     string
 	}
 
@@ -76,6 +77,10 @@ func (s *doSettings) Trace() *trace.Query {
 	return s.trace
 }
 
+func (s *doSettings) CallTrace() *trace.Query {
+	return s.callTrace
+}
+
 func (s *doSettings) RetryOpts() []retry.Option {
 	return s.retryOpts
 }
@@ -94,6 +99,7 @@ func (s *doTxSettings) LazyTx() *bool {
 
 func (opt TraceOption) applyDoOption(s *doSettings) {
 	s.trace = gtrace.Compose(s.trace, opt.t)
+	s.callTrace = gtrace.Compose(s.callTrace, opt.t)
 }
 
 func (opt TraceOption) applyDoTxOption(s *doTxSettings) {
@@ -124,8 +130,17 @@ func WithLazyTx(lazyTx bool) lazyTxOption {
 	return lazyTxOption{lazyTx: lazyTx}
 }
 
-func WithIdempotent() RetryOptionsOption {
-	return []retry.Option{retry.WithIdempotent(true)}
+func WithIdempotent(bb ...bool) RetryOptionsOption {
+	idempotent := true
+	switch len(bb) {
+	case 0:
+	case 1:
+		idempotent = bb[0]
+	default:
+		panic("only one bool arg allowed")
+	}
+
+	return []retry.Option{retry.WithIdempotent(idempotent)}
 }
 
 func WithLabel(lbl string) LabelOption {

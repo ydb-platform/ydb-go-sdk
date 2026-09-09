@@ -38,25 +38,49 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const pullRequests = context.payload.workflow_run.pull_requests;
-            if (pullRequests && pullRequests.length > 0) {
-              for (const pr of pullRequests) {
-                try {
-                  await github.rest.issues.removeLabel({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: pr.number,
-                    name: 'SLO'
-                  });
-                  console.log(`Removed SLO label from PR #${pr.number}`);
-                } catch (error) {
-                  if (error.status === 404) {
-                    console.log(`SLO label not found on PR #${pr.number}, skipping`);
-                  } else {
-                    throw error;
-                  }
-                }
+            const workflowRun = context.payload.workflow_run;
+            let pullRequestNumbers = [];
+
+            if (workflowRun.pull_requests?.length > 0) {
+              pullRequestNumbers = workflowRun.pull_requests.map((pr) => pr.number);
+            } else if (workflowRun.head_branch && workflowRun.head_repository?.owner?.login) {
+              const head = `${workflowRun.head_repository.owner.login}:${workflowRun.head_branch}`;
+              const { data: pulls } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head,
+                state: 'all',
+                per_page: 100,
+              });
+
+              const matched = workflowRun.head_sha
+                ? pulls.filter((pr) => pr.head.sha === workflowRun.head_sha)
+                : pulls;
+              pullRequestNumbers = (matched.length > 0 ? matched : pulls).map((pr) => pr.number);
+
+              if (pullRequestNumbers.length === 0) {
+                console.log(`No pull requests found for head ${head}`);
+              } else {
+                console.log(`Resolved pull request(s) from head ${head}: #${pullRequestNumbers.join(', #')}`);
               }
             } else {
-              console.log('No pull requests associated with this workflow run');
+              console.log('No pull requests associated with this workflow run and unable to resolve head');
+            }
+
+            for (const number of pullRequestNumbers) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: number,
+                  name: 'SLO'
+                });
+                console.log(`Removed SLO label from PR #${number}`);
+              } catch (error) {
+                if (error.status === 404) {
+                  console.log(`SLO label not found on PR #${number}, skipping`);
+                } else {
+                  throw error;
+                }
+              }
             }

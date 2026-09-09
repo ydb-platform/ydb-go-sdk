@@ -5,7 +5,9 @@ import (
 	"errors"
 	"io"
 	"math/rand"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -28,6 +30,34 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestCreateSessionDoesNotRetryNonRetryableErrorAfterAttemptContextDeadline(t *testing.T) {
+	const createSessionTimeout = 10 * time.Millisecond
+
+	nonRetryableErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_REQUEST))
+	ctrl := gomock.NewController(t)
+	client := NewMockQueryServiceClient(ctrl)
+	client.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil, nonRetryableErr)
+
+	cfg := config.New(
+		config.WithSessionCreateTimeout(createSessionTimeout),
+		config.WithTrace(&trace.Query{
+			OnSessionCreate: func(info trace.QuerySessionCreateStartInfo) func(trace.QuerySessionCreateDoneInfo) {
+				createCtx := *info.Context
+
+				return func(info trace.QuerySessionCreateDoneInfo) {
+					if info.Error != nil {
+						<-createCtx.Done()
+					}
+				}
+			},
+		}),
+	)
+
+	_, err := CreateSession(t.Context(), client, cfg)
+
+	require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_BAD_REQUEST))
+}
 
 func TestClient(t *testing.T) {
 	ctx := t.Context()
@@ -260,7 +290,7 @@ func TestClient(t *testing.T) {
 					}()
 
 					return tx.Exec(ctx, "")
-				}, tx.NewSettings(tx.WithDefaultTxMode()))
+				}, tx.NewSettings(tx.WithDefaultTxMode()), nil)
 				require.NoError(t, err)
 			})
 			t.Run("NoLazyTx", func(t *testing.T) {
@@ -364,7 +394,7 @@ func TestClient(t *testing.T) {
 					}()
 
 					return tx.Exec(ctx, "")
-				}, tx.NewSettings(tx.WithDefaultTxMode()))
+				}, tx.NewSettings(tx.WithDefaultTxMode()), nil)
 				require.NoError(t, err)
 			})
 		})
@@ -390,7 +420,7 @@ func TestClient(t *testing.T) {
 				}
 
 				return nil
-			}, tx.NewSettings(tx.WithDefaultTxMode()))
+			}, tx.NewSettings(tx.WithDefaultTxMode()), nil)
 			require.NoError(t, err)
 			require.Equal(t, 10, counter)
 		})
@@ -444,7 +474,7 @@ func TestClient(t *testing.T) {
 							return newTestSessionWithClient("123", client, true), nil
 						}), func(ctx context.Context, tx query.TxActor) error {
 							return tx.Exec(ctx, "")
-						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						}, tx.NewSettings(tx.WithSerializableReadWrite()), nil)
 						require.NoError(t, err)
 						require.Zero(t, txInFlight)
 					})
@@ -496,7 +526,7 @@ func TestClient(t *testing.T) {
 							return newTestSessionWithClient("123", client, true), nil
 						}), func(ctx context.Context, tx query.TxActor) error {
 							return tx.Exec(ctx, "", options.WithCommit())
-						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						}, tx.NewSettings(tx.WithSerializableReadWrite()), nil)
 						require.NoError(t, err)
 						require.Zero(t, txInFlight)
 					})
@@ -589,7 +619,7 @@ func TestClient(t *testing.T) {
 							}
 
 							return tx.Exec(ctx, "")
-						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						}, tx.NewSettings(tx.WithSerializableReadWrite()), nil)
 						require.NoError(t, err)
 					})
 				})
@@ -670,7 +700,7 @@ func TestClient(t *testing.T) {
 							}
 
 							return tx.Exec(ctx, "", options.WithCommit())
-						}, tx.NewSettings(tx.WithSerializableReadWrite()))
+						}, tx.NewSettings(tx.WithSerializableReadWrite()), nil)
 						require.NoError(t, err)
 					})
 				})
@@ -1128,7 +1158,7 @@ func TestClient(t *testing.T) {
 				require.Nil(t, row)
 			}
 		})
-		t.Run("ConcurrentResultSets", func(t *testing.T) {
+		t.Run("ResultSetsType", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			colsAB := []*Ydb.Column{
@@ -1189,7 +1219,7 @@ func TestClient(t *testing.T) {
 
 			r, err := clientQuery(ctx, testPool(t, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
-			}), "", query.WithConcurrentResultSets(true))
+			}), "")
 			require.NoError(t, err)
 
 			{
@@ -1269,7 +1299,7 @@ func TestClient(t *testing.T) {
 
 			_, err := clientQuery(executeCtx, testPool(t, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
-			}), "", query.WithConcurrentResultSets(true))
+			}), "")
 
 			require.ErrorIs(t, err, context.Canceled)
 		})
@@ -1300,7 +1330,7 @@ func TestClient(t *testing.T) {
 
 			r, err := clientQuery(ctx, testPool(t, func(context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client, true), nil
-			}), "", query.WithConcurrentResultSets(true))
+			}), "")
 			require.NoError(t, err)
 
 			rs, err := r.NextResultSet(ctx)
@@ -1791,13 +1821,22 @@ func TestClient(t *testing.T) {
 
 	t.Run("Close", func(t *testing.T) {
 		t.Run("AllowImplicitSessions", func(t *testing.T) {
-			client := mockClientForImplicitSessionTest(ctx, t)
+			var closedEvents atomic.Uint32
+			client := mockClientForImplicitSessionTest(ctx, t,
+				config.WithPoolName("/local"),
+				config.WithTrace(&trace.Query{
+					OnSessionClosed: func(trace.QuerySessionClosedInfo) {
+						closedEvents.Add(1)
+					},
+				}),
+			)
 			_, err := client.QueryRow(ctx, "SELECT 1")
 			require.NoError(t, err)
 
 			err = client.Close(t.Context())
 
 			require.NoError(t, err)
+			require.Zero(t, closedEvents.Load())
 		})
 	})
 }
@@ -1805,7 +1844,7 @@ func TestClient(t *testing.T) {
 // mockClientForImplicitSessionTest creates a new Client with a test balancer
 // for simulating implicit session scenarios in query client testing. It configures
 // the mock in such way that calling `CreateSession` or `AttachSession` will result in an error.
-func mockClientForImplicitSessionTest(ctx context.Context, t *testing.T) *Client {
+func mockClientForImplicitSessionTest(ctx context.Context, t *testing.T, opts ...config.Option) *Client {
 	ctrl := gomock.NewController(t)
 
 	stream := newExecuteQueryStreamMock(ctrl)
@@ -1817,7 +1856,7 @@ func mockClientForImplicitSessionTest(ctx context.Context, t *testing.T) *Client
 	queryService := NewMockQueryServiceClient(ctrl)
 	queryService.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 
-	cfg := config.New(config.AllowImplicitSessions())
+	cfg := config.New(append([]config.Option{config.AllowImplicitSessions()}, opts...)...)
 
 	c, err := newWithQueryServiceClient(ctx, queryService, nil, cfg)
 	require.NoError(t, err)

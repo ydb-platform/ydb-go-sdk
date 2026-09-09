@@ -18,6 +18,7 @@ type Config struct {
 	config.Common
 
 	poolLimit             int
+	poolName              string
 	poolSessionUsageLimit uint64
 	poolSessionUsageTTL   time.Duration
 
@@ -28,7 +29,8 @@ type Config struct {
 
 	allowImplicitSessions bool
 
-	lazyTx bool
+	lazyTx            bool
+	defaultIdempotent bool
 
 	trace *trace.Query
 }
@@ -66,6 +68,10 @@ func (c *Config) PoolLimit() int {
 	return c.poolLimit
 }
 
+func (c *Config) PoolName() string {
+	return c.poolName
+}
+
 func (c *Config) AllowImplicitSessions() bool {
 	return c.allowImplicitSessions
 }
@@ -98,6 +104,10 @@ func (c *Config) SessionIdleTimeToLive() time.Duration {
 
 func (c *Config) LazyTx() bool {
 	return c.lazyTx
+}
+
+func (c *Config) DefaultIdempotent() bool {
+	return c.defaultIdempotent
 }
 
 // PoolWarmUpSize is the number of sessions to pre-create in the explicit session pool at client initialization.

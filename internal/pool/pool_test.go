@@ -63,6 +63,8 @@ func defaultTrace[PT ItemConstraint[T], T any]() *Trace[PT, T] {
 			return func(err error) {
 			}
 		},
+		OnCloseItem: func(info PT, reason string) {
+		},
 		OnGet: func(ctx *context.Context, call stack.Caller) func(
 			info PT,
 			nodeHintInfo *trace.NodeHintInfo,
@@ -189,6 +191,118 @@ func poolStats(limit int, mutate func(*Stats)) Stats {
 func requirePoolStats(t testing.TB, p *Pool[*testItem, testItem], want Stats, msg ...any) {
 	t.Helper()
 	require.Equal(t, want, p.Stats(), msg...)
+}
+
+func TestPoolIdleTTLDoesNotStarveBehindHotItem(t *testing.T) {
+	const (
+		limit         = 3
+		idleThreshold = 4 * time.Second
+	)
+
+	var (
+		created   atomic.Int32
+		closed    atomic.Int32
+		fakeClock = clockwork.NewFakeClock()
+	)
+	p := mustNewPool[*testItem, testItem](t,
+		WithLimit[*testItem, testItem](limit),
+		WithClock[*testItem, testItem](fakeClock),
+		WithIdleTimeToLive[*testItem, testItem](idleThreshold),
+		WithCreateItemFunc(func(context.Context) (*testItem, error) {
+			return &testItem{
+				v: created.Add(1),
+				onClose: func() error {
+					closed.Add(1)
+
+					return nil
+				},
+			}, nil
+		}),
+	)
+	defer mustClose(t, p)
+
+	infos := make([]*itemInfo[*testItem, testItem], limit)
+	for i := range limit {
+		infos[i] = mustGetItem(t, p)
+	}
+	for _, info := range infos {
+		mustPutItem(t, p, info)
+	}
+
+	fakeClock.Advance(idleThreshold / 2)
+	hot := mustGetItem(t, p)
+	require.EqualValues(t, limit, hot.item.v)
+	mustPutItem(t, p, hot)
+
+	fakeClock.Advance(idleThreshold/2 + time.Nanosecond)
+	for range limit - 1 {
+		err := p.With(t.Context(), func(_ context.Context, item *testItem) error {
+			require.EqualValues(t, limit, item.v)
+
+			return nil
+		})
+		require.NoError(t, err)
+	}
+
+	require.Equal(t, int32(limit-1), closed.Load())
+	requirePoolStats(t, p, poolStats(limit, func(s *Stats) {
+		s.Size = 1
+		s.Idle = 1
+	}))
+}
+
+func TestPoolIdleTTLWithPreferredNode(t *testing.T) {
+	const (
+		preferredNodeID = 42
+		idleThreshold   = 4 * time.Second
+	)
+
+	var (
+		closed    atomic.Int32
+		fakeClock = clockwork.NewFakeClock()
+	)
+	p := mustNewPool[*testItem, testItem](t,
+		WithLimit[*testItem, testItem](2),
+		WithClock[*testItem, testItem](fakeClock),
+		WithIdleTimeToLive[*testItem, testItem](idleThreshold),
+		WithCreateItemFunc(func(ctx context.Context) (*testItem, error) {
+			nodeID, _ := endpoint.ContextNodeID(ctx)
+
+			return &testItem{
+				onClose: func() error {
+					closed.Add(1)
+
+					return nil
+				},
+				onNodeID: func() uint32 {
+					return nodeID
+				},
+			}, nil
+		}),
+	)
+	defer mustClose(t, p)
+
+	oldest := mustGetItem(t, p)
+	mustPutItem(t, p, oldest)
+
+	fakeClock.Advance(idleThreshold / 2)
+	ctx := endpoint.WithNodeID(t.Context(), preferredNodeID)
+	preferred, err := getItemWithFlush(ctx, p)
+	require.NoError(t, err)
+	require.EqualValues(t, preferredNodeID, preferred.item.NodeID())
+	mustPutItem(t, p, preferred)
+
+	fakeClock.Advance(idleThreshold/2 + time.Nanosecond)
+	preferred, err = getItemWithFlush(ctx, p)
+	require.NoError(t, err)
+	require.EqualValues(t, preferredNodeID, preferred.item.NodeID())
+	require.Equal(t, int32(1), closed.Load())
+	mustPutItem(t, p, preferred)
+
+	requirePoolStats(t, p, poolStats(2, func(s *Stats) {
+		s.Size = 1
+		s.Idle = 1
+	}))
 }
 
 func TestPool(t *testing.T) { //nolint:gocyclo
@@ -442,7 +556,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 		t.Run("WithItemUsageLimit", func(t *testing.T) {
 			var (
 				newCounter        int64
-				errMustDeleteItem = xerrors.Retryable(errors.New("test"))
+				errMustDeleteItem = xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 			)
 			p := mustNewPool[*testItem, testItem](t,
 				WithLimit[*testItem, testItem](1),
@@ -455,9 +569,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					var v testItem
 
 					return &v, nil
-				}),
-				WithMustDeleteItemFunc[*testItem, testItem](func(item *testItem, err error) bool {
-					return !item.IsAlive() || xerrors.Is(err, errMustDeleteItem)
 				}),
 			)
 			require.EqualValues(t, 1, p.config.limit)
@@ -571,20 +682,18 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 					WithCreateItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCloseItemTimeout[*testItem, testItem](50*time.Millisecond),
 					WithCreateItemFunc(func(context.Context) (*testItem, error) {
-						var v testItem
+						// Count how many items get closed.
+						return &testItem{
+							onClose: func() error {
+								closedCount.Add(1)
 
-						return &v, nil
+								return nil
+							},
+						}, nil
 					}),
 					WithTrace[*testItem, testItem](defaultTrace[*testItem, testItem]()),
 				)
 				requirePoolStats(t, p, poolStats(3, nil))
-
-				// Override the close func to detect context-cancelled failures.
-				// In a real scenario (e.g. gRPC session close), a cancelled context
-				// would cause the close call to fail immediately.
-				p.config.closeItemFunc = func(ctx context.Context, info *testItem) {
-					closedCount.Add(1)
-				}
 
 				info1 := mustGetItem(t, p)
 				info2 := mustGetItem(t, p)
@@ -964,6 +1073,31 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 				requirePoolStats(t, p, poolStats(2, nil))
 				require.Equal(t, 0, p.Stats().Size)
 			})
+		})
+		t.Run("CloseReasons", func(t *testing.T) {
+			var reasons []string
+			fakeClock := clockwork.NewFakeClock()
+			poolTrace := defaultTrace[*testItem, testItem]()
+			poolTrace.OnCloseItem = func(_ *testItem, reason string) {
+				reasons = append(reasons, reason)
+			}
+
+			p := mustNewPool[*testItem, testItem](t,
+				WithLimit[*testItem, testItem](1),
+				WithClock[*testItem, testItem](fakeClock),
+				WithIdleTimeToLive[*testItem, testItem](time.Second),
+				WithTrace[*testItem, testItem](poolTrace),
+			)
+
+			info := mustGetItem(t, p)
+			mustPutItem(t, p, info)
+			fakeClock.Advance(time.Second)
+
+			info = mustGetItem(t, p)
+			require.Equal(t, []string{"pool_idle_timeout"}, reasons)
+			mustPutItem(t, p, info)
+			require.NoError(t, p.Close(t.Context()))
+			require.Equal(t, []string{"pool_idle_timeout", "pool_graceful_shutdown"}, reasons)
 		})
 	})
 	t.Run("Retry", func(t *testing.T) {
@@ -1634,7 +1768,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				var (
 					created           atomic.Int32
-					errMustDeleteItem = errors.New("info must be deleted")
+					errMustDeleteItem = xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 				)
 				p := mustNewPool[*testItem, testItem](t,
 					WithLimit[*testItem, testItem](1),
@@ -1646,9 +1780,6 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						}
 
 						return &v, nil
-					}),
-					WithMustDeleteItemFunc[*testItem, testItem](func(info *testItem, err error) bool {
-						return errors.Is(err, errMustDeleteItem)
 					}),
 				)
 				defer func() {
@@ -1670,7 +1801,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						errThrown = true
 					}()
 
-					return xerrors.Retryable(errMustDeleteItem)
+					return xerrors.WithStackTrace(errMustDeleteItem)
 				})
 
 				require.NoError(t, err)
@@ -2411,7 +2542,7 @@ const (
 	benchCloseItemTimeout  = time.Second
 )
 
-var errBenchDeleteItem = errors.New("bench: delete pool item")
+var errBenchDeleteItem = xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 
 func newBenchPool(ctx context.Context) (*Pool[*testItem, testItem], error) {
 	var created atomic.Uint64
@@ -2424,9 +2555,6 @@ func newBenchPool(ctx context.Context) (*Pool[*testItem, testItem], error) {
 			id := created.Add(1)
 
 			return &testItem{v: int32(id)}, nil
-		}),
-		WithMustDeleteItemFunc[*testItem, testItem](func(_ *testItem, err error) bool {
-			return errors.Is(err, errBenchDeleteItem)
 		}),
 		WithWarmUpItems[*testItem, testItem](benchPrefillItems),
 	)
@@ -2444,7 +2572,7 @@ var benchRetryOpts = []retry.Option{
 
 func benchPoolWithWork(ops *atomic.Uint64) error {
 	if ops.Add(1)%benchDeleteProbability == 0 {
-		return xerrors.Retryable(errBenchDeleteItem)
+		return xerrors.WithStackTrace(errBenchDeleteItem)
 	}
 
 	return nil

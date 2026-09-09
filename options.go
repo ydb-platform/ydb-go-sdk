@@ -11,7 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
@@ -214,9 +214,9 @@ func WithConnectionString(connectionString string) Option {
 	}
 }
 
-// WithConnectionTTL defines duration for parking idle connections
+// WithConnectionTTL configures the idle interval after which gRPC connections are parked.
 func WithConnectionTTL(ttl time.Duration) Option {
-	return func(ctx context.Context, d *Driver) error {
+	return func(_ context.Context, d *Driver) error {
 		d.options = append(d.options, config.WithConnectionTTL(ttl))
 
 		return nil
@@ -350,9 +350,9 @@ func WithCredentials(c credentials.Credentials) Option {
 	})
 }
 
-func WithBalancer(balancer *balancerConfig.Config) Option {
+func WithBalancer(policy policy.Policy) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.options = append(d.options, config.WithBalancer(balancer))
+		d.options = append(d.options, config.WithBalancer(policy))
 
 		return nil
 	}
@@ -407,6 +407,8 @@ func MergeOptions(opts ...Option) Option {
 }
 
 // WithDiscoveryInterval sets interval between cluster discovery calls.
+// A negative interval is supported only with balancers.SingleConn; other policies
+// require periodic discovery and make driver initialization return an error.
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.discoveryOptions = append(d.discoveryOptions, discoveryConfig.WithInterval(discoveryInterval))
@@ -421,6 +423,19 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 func WithRetryBudget(b budget.Budget) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.options = append(d.options, config.WithRetryBudget(b))
+
+		return nil
+	}
+}
+
+// WithDefaultIdempotent sets the default idempotency flag for retrying operations
+// in the native Table and Query clients and in database/sql retry helpers.
+// Per-call idempotency options override this default.
+func WithDefaultIdempotent(idempotent bool) Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.tableOptions = append(d.tableOptions, tableConfig.WithDefaultIdempotent(idempotent))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithDefaultIdempotent(idempotent))
+		d.databaseSQLOptions = append(d.databaseSQLOptions, xsql.WithDefaultIdempotent(idempotent))
 
 		return nil
 	}
@@ -530,6 +545,7 @@ func WithQueryConfigOption(option queryConfig.Option) Option {
 }
 
 // WithSessionPoolSizeLimit set max size of internal sessions pool in table.Client
+// If sizeLimit is less than or equal to zero then the default pool size limit is used.
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.tableOptions = append(d.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
@@ -802,6 +818,6 @@ func withConnPool(pool *conn.Pool) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.pool = pool
 
-		return pool.Take(ctx)
+		return pool.AddRef(ctx)
 	}
 }

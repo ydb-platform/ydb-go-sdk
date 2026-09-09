@@ -32,18 +32,16 @@ type (
 		Item
 	}
 	Config[PT ItemConstraint[T], T any] struct {
-		trace              *Trace[PT, T]
-		clock              clockwork.Clock
-		limit              int
-		createTimeout      time.Duration
-		createItemFunc     func(ctx context.Context) (PT, error)
-		mustDeleteItemFunc func(item PT, err error) bool
-		closeTimeout       time.Duration
-		closeItemFunc      func(ctx context.Context, item PT)
-		idleTimeToLive     time.Duration
-		itemUsageLimit     uint64
-		itemUsageTTL       time.Duration
-		warmUpItems        int
+		trace          *Trace[PT, T]
+		clock          clockwork.Clock
+		limit          int
+		createTimeout  time.Duration
+		createItemFunc func(ctx context.Context) (PT, error)
+		closeTimeout   time.Duration
+		idleTimeToLive time.Duration
+		itemUsageLimit uint64
+		itemUsageTTL   time.Duration
+		warmUpItems    int
 	}
 	itemInfo[PT ItemConstraint[T], T any] struct {
 		item       PT
@@ -67,12 +65,6 @@ type (
 func WithCreateItemFunc[PT ItemConstraint[T], T any](f func(ctx context.Context) (PT, error)) Option[PT, T] {
 	return func(c *Config[PT, T]) {
 		c.createItemFunc = f
-	}
-}
-
-func WithMustDeleteItemFunc[PT ItemConstraint[T], T any](f func(item PT, err error) bool) Option[PT, T] {
-	return func(c *Config[PT, T]) {
-		c.mustDeleteItemFunc = f
 	}
 }
 
@@ -138,7 +130,6 @@ func WithWarmUpItems[PT ItemConstraint[T], T any](size int) Option[PT, T] {
 	}
 }
 
-//nolint:funlen
 func New[PT ItemConstraint[T], T any](
 	ctx context.Context,
 	opts ...Option[PT, T],
@@ -153,14 +144,8 @@ func New[PT ItemConstraint[T], T any](
 
 				return &item, nil
 			},
-			closeItemFunc: func(ctx context.Context, item PT) {
-				_ = item.Close(ctx)
-			},
 			createTimeout: defaultCreateTimeout,
 			closeTimeout:  defaultCloseTimeout,
-			mustDeleteItemFunc: func(item PT, err error) bool {
-				return !item.IsAlive()
-			},
 		},
 		idle: &sliceContainer[PT, T]{},
 		done: make(chan struct{}),
@@ -339,7 +324,7 @@ func (p *Pool[PT, T]) createItem(ctx context.Context, batchChanges *dynamicStats
 	return item, nil
 }
 
-// closeItem wraps the Config.closeItemFunc function with timeout handling
+// closeItem closes the item with timeout handling
 // closeItem called only under p.sema lock
 func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT, batchChanges *dynamicStats) {
 	defer func() {
@@ -356,7 +341,7 @@ func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT, batchChanges *dyna
 		defer cancelClose()
 	}
 
-	p.config.closeItemFunc(closeCtx, item)
+	_ = item.Close(closeCtx)
 }
 
 func (p *Pool[PT, T]) Stats() Stats {
@@ -376,7 +361,7 @@ func (p *Pool[PT, T]) checkItemAndError(item PT, err error) error {
 		return nil
 	}
 
-	if p.config.mustDeleteItemFunc(item, err) {
+	if xerrors.MustDeleteTableOrQuerySession(err) {
 		return err
 	}
 
@@ -433,6 +418,14 @@ func (p *Pool[PT, T]) try(ctx context.Context,
 		if xerrors.IsYdb(err) && !xerrors.IsOperationError(err, Ydb.StatusIds_UNAUTHORIZED) {
 			return xerrors.WithStackTrace(xerrors.Retryable(err))
 		}
+
+		return xerrors.WithStackTrace(err)
+	}
+
+	// Keep a successfully created item in the pool when the caller gives up, so
+	// the next request can reuse it.
+	if err := ctx.Err(); err != nil {
+		_ = p.putItem(ctx, info, batchChanges)
 
 		return xerrors.WithStackTrace(err)
 	}
@@ -574,6 +567,9 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 
 		closes.Add(len(data))
 		for _, info := range data {
+			if onCloseItem := p.config.trace.OnCloseItem; onCloseItem != nil {
+				onCloseItem(info.item, "pool_graceful_shutdown")
+			}
 			go func(ctx context.Context, info *itemInfo[PT, T]) {
 				defer closes.Done()
 
@@ -583,7 +579,7 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 					defer cancel()
 				}
 
-				p.config.closeItemFunc(ctx, info.item)
+				_ = info.item.Close(ctx)
 			}(ctx, info)
 		}
 		closes.Wait()
@@ -627,21 +623,12 @@ func needCloseItemByIdleTTL[PT ItemConstraint[T], T any](c *Config[PT, T], info 
 	return true
 }
 
-func needCloseItem[PT ItemConstraint[T], T any](c *Config[PT, T], info *itemInfo[PT, T]) bool {
-	if !info.item.IsAlive() {
-		return true
-	}
-	if needCloseItemByMaxUsage(c, info) {
-		return true
-	}
-	if needCloseItemByTTL(c, info) {
-		return true
-	}
-	if needCloseItemByIdleTTL(c, info) {
-		return true
-	}
-
-	return false
+func needCloseOldestItem[PT ItemConstraint[T], T any](c *Config[PT, T], info *itemInfo[PT, T]) bool {
+	// Do not call IsAlive while only inspecting the oldest item. The item selected
+	// from the container goes through the full needCloseItem check afterwards.
+	return needCloseItemByMaxUsage(c, info) ||
+		needCloseItemByTTL(c, info) ||
+		needCloseItemByIdleTTL(c, info)
 }
 
 func getNodeHintInfo[PT ItemConstraint[T], T any](
@@ -663,7 +650,7 @@ func getNodeHintInfo[PT ItemConstraint[T], T any](
 	return res
 }
 
-func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID bool, batchChanges *dynamicStats) (
+func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID, checkOldest bool, batchChanges *dynamicStats) (
 	info *itemInfo[PT, T], _ error,
 ) {
 	defer func() {
@@ -671,6 +658,17 @@ func (p *Pool[PT, T]) popItem(nodeID uint32, useNodeID bool, batchChanges *dynam
 			batchChanges.Idle--
 		}
 	}()
+
+	if checkOldest {
+		predicate := func(info *itemInfo[PT, T]) bool {
+			return needCloseOldestItem(p.config, info)
+		}
+		if useNodeID {
+			return p.idle.PopByNodeIDOrOldestIf(nodeID, predicate)
+		}
+
+		return p.idle.PopOrOldestIf(predicate)
+	}
 
 	if useNodeID {
 		return p.idle.PopByNodeID(nodeID)
@@ -705,16 +703,25 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 		}
 	}
 
-	for range 2 {
+	for i := range 2 {
 		attempts++
 
-		info, err := p.popItem(nodeID, hasPreferredNodeID, batchChanges)
+		info, err := p.popItem(nodeID, hasPreferredNodeID, i == 0, batchChanges)
 		if err != nil {
 			break
 		}
 
 		switch {
-		case needCloseItem(p.config, info):
+		case !info.item.IsAlive():
+			p.closeItem(ctx, info.item, batchChanges)
+		case needCloseItemByMaxUsage(p.config, info):
+			p.closeItem(ctx, info.item, batchChanges)
+		case needCloseItemByTTL(p.config, info):
+			p.closeItem(ctx, info.item, batchChanges)
+		case needCloseItemByIdleTTL(p.config, info):
+			if onCloseItem := p.config.trace.OnCloseItem; onCloseItem != nil {
+				onCloseItem(info.item, "pool_idle_timeout")
+			}
 			p.closeItem(ctx, info.item, batchChanges)
 		default:
 			return info, nil
@@ -726,7 +733,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context, batchChanges *dynamicStats) (
 		size := st.Size + batchChanges.Size
 		if st.Concurrency == p.config.limit || size >= p.config.limit {
 			// Free a slot before createItem: full concurrent load or pool already at limit.
-			info, err := p.popItem(0, false, batchChanges)
+			info, err := p.popItem(0, false, false, batchChanges)
 			if err != nil {
 				return nil, errNothingIdleItems
 			}
@@ -777,6 +784,9 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, info *itemInfo[PT, T], batchC
 
 	select {
 	case <-p.done:
+		if onCloseItem := p.config.trace.OnCloseItem; onCloseItem != nil {
+			onCloseItem(info.item, "pool_graceful_shutdown")
+		}
 		p.closeItem(ctx, info.item, batchChanges)
 
 		return xerrors.WithStackTrace(errClosedPool)

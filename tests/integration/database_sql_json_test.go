@@ -13,7 +13,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
 var _ json.Marshaler = (*testJson)(nil)
@@ -69,7 +69,7 @@ func (j *jsonRawScanner) Scan(src any) error {
 }
 
 func TestDatabaseSqlJson(t *testing.T) {
-	t.Run("table/types", func(t *testing.T) {
+	t.Run("types", func(t *testing.T) {
 		var (
 			scope = newScope(t)
 			db    = scope.SQLDriver(
@@ -158,7 +158,7 @@ func TestDatabaseSqlJson(t *testing.T) {
 			)
 		)
 
-		t.Run("table/types", func(t *testing.T) {
+		t.Run("types", func(t *testing.T) {
 			t.Run("check ydb type", func(t *testing.T) {
 				row := db.QueryRowContext(scope.Ctx, "SELECT FormatType(TypeOf($a))",
 					sql.Named("a", types.JSONDocumentValue(`{"a":1,"b":"2"}`)),
@@ -220,7 +220,7 @@ func TestDatabaseSqlJson(t *testing.T) {
 				)
 			)
 
-			t.Run("table/types", func(t *testing.T) {
+			t.Run("types", func(t *testing.T) {
 				t.Run("check ydb type", func(t *testing.T) {
 					row := db.QueryRowContext(scope.Ctx, "SELECT FormatType(TypeOf($1))",
 						types.JSONDocumentValue(`{"a":1,"b":"2"}`),
@@ -274,7 +274,7 @@ func TestDatabaseSqlJson(t *testing.T) {
 				)
 			)
 
-			t.Run("table/types", func(t *testing.T) {
+			t.Run("types", func(t *testing.T) {
 				t.Run("check ydb type", func(t *testing.T) {
 					row := db.QueryRowContext(scope.Ctx, "SELECT FormatType(TypeOf(?))",
 						types.JSONDocumentValue(`{"a":1,"b":"2"}`),

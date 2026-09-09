@@ -21,6 +21,14 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
 
+func TestWithConnectionTTL(t *testing.T) {
+	const ttl = 30 * time.Second
+
+	db, err := driverFromOptions(t.Context(), WithConnectionTTL(ttl))
+	require.NoError(t, err)
+	require.Equal(t, ttl, db.config.ConnectionTTL())
+}
+
 func TestWithCertificatesCached(t *testing.T) {
 	ca := &x509.Certificate{
 		SerialNumber: big.NewInt(2019),

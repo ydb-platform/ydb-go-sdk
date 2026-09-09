@@ -14,6 +14,7 @@ func TestNew(t *testing.T) {
 		cfg := New()
 		require.NotNil(t, cfg)
 		require.Equal(t, DefaultPoolMaxSize, cfg.PoolLimit())
+		require.Empty(t, cfg.PoolName())
 		require.Equal(t, DefaultSessionCreateTimeout, cfg.SessionCreateTimeout())
 		require.Equal(t, DefaultSessionDeleteTimeout, cfg.SessionDeleteTimeout())
 		require.NotNil(t, cfg.Trace())
@@ -22,12 +23,18 @@ func TestNew(t *testing.T) {
 		require.Equal(t, time.Duration(0), cfg.PoolSessionUsageTTL())
 		require.Equal(t, time.Duration(0), cfg.SessionIdleTimeToLive())
 		require.False(t, cfg.LazyTx())
+		require.False(t, cfg.DefaultIdempotent())
 		require.Equal(t, 0, cfg.PoolWarmUpSize())
 	})
 
 	t.Run("WithPoolLimit", func(t *testing.T) {
 		cfg := New(WithPoolLimit(100))
 		require.Equal(t, 100, cfg.PoolLimit())
+	})
+
+	t.Run("WithPoolName", func(t *testing.T) {
+		cfg := New(WithPoolName("/local"))
+		require.Equal(t, "/local", cfg.PoolName())
 	})
 
 	t.Run("WithPoolLimitZero", func(t *testing.T) {
@@ -88,6 +95,11 @@ func TestNew(t *testing.T) {
 	t.Run("WithLazyTx", func(t *testing.T) {
 		cfg := New(WithLazyTx(true))
 		require.True(t, cfg.LazyTx())
+	})
+
+	t.Run("WithDefaultIdempotent", func(t *testing.T) {
+		cfg := New(WithDefaultIdempotent(true))
+		require.True(t, cfg.DefaultIdempotent())
 	})
 
 	t.Run("WithTrace", func(t *testing.T) {

@@ -19,6 +19,7 @@ type DescribeTopicRequest struct {
 	OperationParams rawydb.OperationParams
 	Path            string
 	IncludeStats    bool
+	IncludeLocation bool
 }
 
 func (req *DescribeTopicRequest) ToProto() *Ydb_Topic.DescribeTopicRequest {
@@ -26,6 +27,7 @@ func (req *DescribeTopicRequest) ToProto() *Ydb_Topic.DescribeTopicRequest {
 		OperationParams: req.OperationParams.ToProto(),
 		Path:            req.Path,
 		IncludeStats:    req.IncludeStats,
+		IncludeLocation: req.IncludeLocation,
 	}
 }
 
@@ -103,6 +105,7 @@ type PartitionInfo struct {
 	ChildPartitionIDs  []int64
 	ParentPartitionIDs []int64
 	PartitionStats     PartitionStats
+	PartitionLocation  PartitionLocation
 	FromBound          []byte
 	ToBound            []byte
 }
@@ -120,5 +123,42 @@ func (pi *PartitionInfo) FromProto(proto *Ydb_Topic.DescribeTopicResult_Partitio
 		pi.ToBound = keyRange.GetToBound()
 	}
 
+	pi.PartitionLocation.FromProto(proto.GetPartitionLocation())
+
 	return pi.PartitionStats.FromProto(proto.GetPartitionStats())
+}
+
+// PartitionLocation describes which node currently hosts a partition.
+// It is populated only when DescribeTopicRequest.IncludeLocation is set to true.
+type PartitionLocation struct {
+	NodeID     int32
+	Generation int64
+}
+
+// FromProto fills location from proto. Accepts nil (location info not requested).
+func (pl *PartitionLocation) FromProto(proto *Ydb_Topic.PartitionLocation) {
+	if proto == nil {
+		*pl = PartitionLocation{}
+
+		return
+	}
+
+	pl.NodeID = proto.GetNodeId()
+	pl.Generation = proto.GetGeneration()
+}
+
+// NodeIDUint32 returns the node ID as uint32 for endpoint routing.
+func (pl PartitionLocation) NodeIDUint32() uint32 {
+	return uint32(pl.NodeID)
+}
+
+// LocationOf returns the location of the partition with the given ID.
+func (res DescribeTopicResult) LocationOf(partitionID int64) (PartitionLocation, bool) {
+	for i := range res.Partitions {
+		if res.Partitions[i].PartitionID == partitionID {
+			return res.Partitions[i].PartitionLocation, true
+		}
+	}
+
+	return PartitionLocation{}, false
 }

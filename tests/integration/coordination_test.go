@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
@@ -110,4 +113,189 @@ func TestCoordinationSemaphore(sourceTest *testing.T) {
 	}
 
 	fmt.Printf("deleted semaphore my-semaphore\n")
+}
+
+func TestCoordinationSemaphoreWatch(sourceTest *testing.T) {
+	t := xtest.MakeSyncedTest(sourceTest)
+	ctx := xtest.Context(t)
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+		ydb.WithLogger(
+			log.Default(os.Stderr, log.WithMinLevel(log.TRACE)),
+			trace.MatchDetails(`ydb\.(coordination).*`),
+		),
+	)
+	require.NoError(t, err)
+	defer db.Close(ctx)
+
+	const nodePath = "/local/coordination/node/watch-test"
+
+	err = db.Coordination().DropNode(ctx, nodePath)
+	if err != nil && !ydb.IsOperationErrorSchemeError(err) {
+		t.Fatalf("failed to drop node: %v", err)
+	}
+
+	err = db.Coordination().CreateNode(ctx, nodePath, coordination.NodeConfig{
+		SelfCheckPeriodMillis:    1000,
+		SessionGracePeriodMillis: 1000,
+		ReadConsistencyMode:      coordination.ConsistencyModeStrict,
+		AttachConsistencyMode:    coordination.ConsistencyModeStrict,
+		RatelimiterCountersMode:  coordination.RatelimiterCountersModeDetailed,
+	})
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, db.Coordination().DropNode(ctx, nodePath))
+	}()
+
+	s, err := db.Coordination().Session(ctx, nodePath)
+	require.NoError(t, err)
+	defer s.Close(ctx)
+
+	const semaphoreName = "watch-semaphore"
+
+	t.Run("WatchData", func(t *testing.T) {
+		require.NoError(t, s.CreateSemaphore(ctx, semaphoreName, 5))
+		defer func() {
+			require.NoError(t, s.DeleteSemaphore(ctx, semaphoreName, options.WithForceDelete(true)))
+		}()
+
+		changed := make(chan options.SemaphoreWatchEvent, 1)
+		desc, err := s.DescribeSemaphore(
+			ctx,
+			semaphoreName,
+			options.WithSemaphoreWatch(options.WatchData, func(event options.SemaphoreWatchEvent) {
+				changed <- event
+			}),
+		)
+		require.NoError(t, err)
+		require.EqualValues(t, 0, desc.Count)
+
+		// Acquire must not trigger a data watch.
+		lease, err := s.AcquireSemaphore(ctx, semaphoreName, 1)
+		require.NoError(t, err)
+		select {
+		case event := <-changed:
+			t.Fatalf("unexpected watch notification after acquire: %+v", event)
+		case <-time.After(50 * time.Millisecond):
+		}
+
+		// Trigger the watch synchronously from the test goroutine. The watch
+		// notification is delivered by the session receive loop into the
+		// buffered channel independently, so this cannot deadlock, and keeping
+		// require out of a goroutine avoids failing the test after it returns.
+		require.NoError(t, s.UpdateSemaphore(
+			ctx,
+			semaphoreName,
+			options.WithUpdateData([]byte("some data")),
+		))
+
+		select {
+		case event := <-changed:
+			require.True(t, event.DataChanged)
+			require.False(t, event.OwnersChanged)
+			require.False(t, event.Lost)
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting for WatchData notification")
+		}
+
+		require.NoError(t, lease.Release())
+
+		desc, err = s.DescribeSemaphore(ctx, semaphoreName)
+		require.NoError(t, err)
+		require.Equal(t, []byte("some data"), desc.Data)
+		require.EqualValues(t, 0, desc.Count)
+	})
+
+	t.Run("WatchOwners", func(t *testing.T) {
+		require.NoError(t, s.CreateSemaphore(ctx, semaphoreName, 5))
+		defer func() {
+			require.NoError(t, s.DeleteSemaphore(ctx, semaphoreName, options.WithForceDelete(true)))
+		}()
+
+		changed := make(chan options.SemaphoreWatchEvent, 1)
+		desc, err := s.DescribeSemaphore(
+			ctx,
+			semaphoreName,
+			options.WithSemaphoreWatch(options.WatchOwners, func(event options.SemaphoreWatchEvent) {
+				changed <- event
+			}),
+		)
+		require.NoError(t, err)
+		require.EqualValues(t, 0, desc.Count)
+
+		// Update must not trigger an owners watch.
+		require.NoError(t, s.UpdateSemaphore(
+			ctx,
+			semaphoreName,
+			options.WithUpdateData([]byte("some data")),
+		))
+		select {
+		case event := <-changed:
+			t.Fatalf("unexpected watch notification after update: %+v", event)
+		case <-time.After(50 * time.Millisecond):
+		}
+
+		// The owners watch is one-shot: Acquire fires it once, and Release does
+		// not fire it again, so running this synchronously keeps require in the
+		// test goroutine without blocking the session receive loop.
+		lease, err := s.AcquireSemaphore(ctx, semaphoreName, 1)
+		require.NoError(t, err)
+		require.NoError(t, lease.Release())
+
+		select {
+		case event := <-changed:
+			require.True(t, event.OwnersChanged)
+			require.False(t, event.DataChanged)
+			require.False(t, event.Lost)
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting for WatchOwners notification")
+		}
+	})
+
+	t.Run("WatchReplace", func(t *testing.T) {
+		require.NoError(t, s.CreateSemaphore(ctx, semaphoreName, 5))
+
+		changed1 := make(chan options.SemaphoreWatchEvent, 1)
+		_, err := s.DescribeSemaphore(
+			ctx,
+			semaphoreName,
+			options.WithSemaphoreWatch(options.WatchOwners, func(event options.SemaphoreWatchEvent) {
+				changed1 <- event
+			}),
+		)
+		require.NoError(t, err)
+
+		changed2 := make(chan options.SemaphoreWatchEvent, 1)
+		_, err = s.DescribeSemaphore(
+			ctx,
+			semaphoreName,
+			options.WithSemaphoreWatch(options.WatchOwners, func(event options.SemaphoreWatchEvent) {
+				changed2 <- event
+			}),
+		)
+		require.NoError(t, err)
+
+		select {
+		case event := <-changed1:
+			require.True(t, event.Lost, "replaced watch must get a lost/false wake")
+			require.False(t, event.DataChanged)
+			require.False(t, event.OwnersChanged)
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting for replaced watch false wake")
+		}
+
+		// Delete synchronously so the require stays in the test goroutine; the
+		// resulting owners-changed notification is delivered into changed2 by
+		// the session receive loop.
+		require.NoError(t, s.DeleteSemaphore(ctx, semaphoreName, options.WithForceDelete(true)))
+
+		select {
+		case event := <-changed2:
+			require.True(t, event.OwnersChanged)
+			require.False(t, event.Lost)
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting for second watch notification after delete")
+		}
+	})
 }

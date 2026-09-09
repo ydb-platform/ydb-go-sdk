@@ -41,11 +41,15 @@ func isTraceRetry(ctx context.Context) bool {
 }
 
 func fieldsStoreFromContext(ctx *context.Context) *fieldsStore {
-	if store, has := (*ctx).Value(ctxRetryFieldsKey{}).(*fieldsStore); has {
+	if ctx == nil {
+		return &fieldsStore{}
+	}
+	c := safeContextPtr(ctx)
+	if store, has := c.Value(ctxRetryFieldsKey{}).(*fieldsStore); has {
 		return store
 	}
 	store := &fieldsStore{}
-	*ctx = context.WithValue(*ctx, ctxRetryFieldsKey{}, store)
+	*ctx = context.WithValue(c, ctxRetryFieldsKey{}, store)
 
 	return store
 }
@@ -80,11 +84,11 @@ func fieldsFromStore(ctx context.Context) []kv.KeyValue {
 //     causing error (e.g. "*errors.errorString" for context.Canceled).
 func Retry(adapter Adapter) (t trace.Retry) {
 	t.OnRetry = func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-		if adapter.Details()&trace.RetryEvents == 0 || !isTraceRetry(*info.Context) {
+		if adapter.Details()&trace.RetryEvents == 0 || !isTraceRetry(safeContextPtr(info.Context)) {
 			return nil
 		}
 		operationName := SpanNameRunWithRetry
-		if functionID := functionID(*info.Context); functionID != "" {
+		if functionID := functionID(safeContextPtr(info.Context)); functionID != "" {
 			// Preserve a per-call label that callers may have attached via
 			// retry.WithLabel / function id, useful for grouping spans.
 			operationName = functionID
@@ -99,7 +103,7 @@ func Retry(adapter Adapter) (t trace.Retry) {
 		if info.NestedCall {
 			start.Warn(errNestedCall)
 		}
-		ctx := *info.Context
+		ctx := safeContextPtr(info.Context)
 
 		return func(info trace.RetryLoopDoneInfo) {
 			fields := []KeyValue{
@@ -116,7 +120,7 @@ func Retry(adapter Adapter) (t trace.Retry) {
 	}
 
 	t.OnRetryAttempt = func(info trace.RetryAttemptStartInfo) func(trace.RetryAttemptDoneInfo) {
-		if adapter.Details()&trace.RetryEvents == 0 || !isTraceRetry(*info.Context) {
+		if adapter.Details()&trace.RetryEvents == 0 || !isTraceRetry(safeContextPtr(info.Context)) {
 			return nil
 		}
 		// The first attempt's span carries no extra tags; only retry

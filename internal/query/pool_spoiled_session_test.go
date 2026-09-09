@@ -151,13 +151,6 @@ func testExplicitSessionPool(
 		pool.WithLimit[*Session](cfg.PoolLimit()),
 		pool.WithCreateItemTimeout[*Session](cfg.SessionCreateTimeout()),
 		pool.WithCloseItemTimeout[*Session](cfg.SessionDeleteTimeout()),
-		pool.WithMustDeleteItemFunc(func(s *Session, err error) bool {
-			if !s.IsAlive() {
-				return true
-			}
-
-			return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
-		}),
 		pool.WithCreateItemFunc(func(ctx context.Context) (*Session, error) {
 			s, err := createSession(ctx, client, WithTrace(cfg.Trace()))
 			if err != nil {

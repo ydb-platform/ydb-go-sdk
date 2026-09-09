@@ -120,14 +120,17 @@ All commands must be called from project directory.
 ##### Only unit tests
 
 ```sh
-go test -race -tags fast ./... 
+go test -race ./...
 ```
+
+Integration tests live under `tests/integration/` with build tag `integration` and are excluded by default.
 
 ##### All tests
 
 ```sh
 docker run -itd --name ydb -dp 2135:2135 -dp 2136:2136 -dp 8765:8765 -v `pwd`/ydb_certs:/ydb_certs -e YDB_LOCAL_SURVIVE_RESTART=true -e YDB_USE_IN_MEMORY_PDISKS=true -h localhost ydbplatform/local-ydb:latest
-export YDB_CONNECTION_STRING="grpcs://localhost:2135/local"
+export YDB_CONNECTION_STRING="grpc://localhost:2136/local"
+export YDB_CONNECTION_STRING_SECURE="grpcs://localhost:2135/local"
 export YDB_SSL_ROOT_CERTIFICATES_FILE="`pwd`/ydb_certs/ca.pem"
 export YDB_SESSIONS_SHUTDOWN_URLS="http://localhost:8765/actors/kqp_proxy?force_shutdown=all"
 go test -race ./... 

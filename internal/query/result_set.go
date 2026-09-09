@@ -38,6 +38,7 @@ type (
 		rowIndex            int
 		ended               atomic.Bool
 		mustBeLastResultSet bool
+		notifyError         func(context.Context, error) error
 	}
 	resultSetWithClose struct {
 		*resultSet
@@ -160,6 +161,10 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 		}
 
 		if err := ctx.Err(); err != nil {
+			if rs.notifyError != nil {
+				err = rs.notifyError(ctx, err)
+			}
+
 			return nil, xerrors.WithStackTrace(err)
 		}
 

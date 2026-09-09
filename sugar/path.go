@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
@@ -90,7 +91,7 @@ func MakeRecursive(ctx context.Context, db dbForMakeRecursive, pathToCreate stri
 // RemoveRecursive method is equivalent to the bash command `rm -rf ~/path/to/remove`
 // where `~` is the root of the database.
 func RemoveRecursive(ctx context.Context, db driver, pathToRemove string) error {
-	pathToRemove = normalizePathUnderDatabase(db, pathToRemove)
+	pathToRemove = normalizePath(db, pathToRemove)
 	fullSysTablePath := path.Join(db.Name(), sysDirectory)
 
 	exists, err := IsDirectoryExists(ctx, db.Scheme(), pathToRemove)
@@ -152,12 +153,32 @@ func RemoveRecursive(ctx context.Context, db driver, pathToRemove string) error 
 	return nil
 }
 
-func normalizePathUnderDatabase(db dbName, pathToRemove string) string {
-	if strings.HasPrefix(pathToRemove, db.Name()) {
-		return pathToRemove
+func normalizePath(db dbName, path string) string {
+	var (
+		paths = xslices.Filter(strings.Split(strings.Trim(path, "`"), "/"), func(s string) bool {
+			return s != ""
+		})
+		dbName = xslices.Filter(strings.Split(strings.Trim(db.Name(), "`"), "/"), func(s string) bool {
+			return s != ""
+		})
+	)
+
+	if func() bool {
+		for i := range dbName {
+			if i >= len(paths) {
+				return false
+			}
+			if paths[i] != dbName[i] {
+				return false
+			}
+		}
+
+		return true
+	}() {
+		return "/" + strings.Join(paths, "/")
 	}
 
-	return path.Join(db.Name(), pathToRemove)
+	return "/" + strings.Join(append(dbName, paths...), "/")
 }
 
 // removeDeferredExternalDataSources drops paths collected while listing directory children.

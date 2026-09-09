@@ -55,3 +55,26 @@ func FieldsFromContext(ctx context.Context) []Field {
 func with(ctx context.Context, lvl Level, names ...string) context.Context {
 	return WithLevel(WithNames(ctx, names...), lvl)
 }
+
+func safeContextPtr(ctx *context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	if isNil(*ctx) {
+		return context.Background()
+	}
+
+	return *ctx
+}
+
+func withContext(ctx context.Context, lvl Level, names ...string) context.Context {
+	if isNil(ctx) {
+		return with(context.Background(), lvl, names...)
+	}
+
+	return with(ctx, lvl, names...)
+}
+
+func withFromPtr(ctx *context.Context, lvl Level, names ...string) context.Context {
+	return with(safeContextPtr(ctx), lvl, names...)
+}

@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -14,8 +15,8 @@ type (
 		NodeID
 		Address() string
 		Location() string
-		LastUpdated() time.Time
 		LoadFactor() float32
+		Metadata() Metadata
 		OverrideHost() string
 
 		// Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
@@ -33,10 +34,26 @@ type (
 		Info
 
 		String() string
-		Copy() Endpoint
-		Touch(opts ...Option)
 		Key() Key
+		LastUpdated() time.Time
+
+		Copy(opts ...Option) Endpoint
 	}
+	Metadata struct {
+		LocalDC         bool
+		BridgePileState PileState
+	}
+	PileState uint8
+)
+
+const (
+	PileStateUnknown PileState = iota
+	PileStatePrimary
+	PileStatePromoted
+	PileStateSynchronized
+	PileStateNotSynchronized
+	PileStateSuspended
+	PileStateDisconnected
 )
 
 type endpoint struct {
@@ -48,11 +65,10 @@ type endpoint struct {
 	ipv4            []string
 	ipv6            []string
 	sslNameOverride string
+	metadata        Metadata
 
 	loadFactor  float32
 	lastUpdated time.Time
-
-	local bool
 }
 
 func (e *endpoint) Key() Key {
@@ -63,11 +79,11 @@ func (e *endpoint) Key() Key {
 	}
 }
 
-func (e *endpoint) Copy() Endpoint {
+func (e *endpoint) Copy(opts ...Option) Endpoint {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	return &endpoint{
+	c := &endpoint{
 		id:              e.id,
 		address:         e.address,
 		location:        e.location,
@@ -75,10 +91,18 @@ func (e *endpoint) Copy() Endpoint {
 		ipv4:            append(make([]string, 0, len(e.ipv4)), e.ipv4...),
 		ipv6:            append(make([]string, 0, len(e.ipv6)), e.ipv6...),
 		sslNameOverride: e.sslNameOverride,
+		metadata:        e.metadata,
 		loadFactor:      e.loadFactor,
-		local:           e.local,
 		lastUpdated:     e.lastUpdated,
 	}
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt(c)
+		}
+	}
+
+	return c
 }
 
 func (e *endpoint) String() string {
@@ -88,7 +112,7 @@ func (e *endpoint) String() string {
 	return fmt.Sprintf(`{id:%d,address:%q,local:%t,location:%q,loadFactor:%f,lastUpdated:%q}`,
 		e.id,
 		e.getAddress(), // Use getAddress() to avoid deadlock from nested RLock in Address()
-		e.local,
+		e.metadata.LocalDC,
 		e.location,
 		e.loadFactor,
 		e.lastUpdated.Format(time.RFC3339),
@@ -156,6 +180,13 @@ func (e *endpoint) Location() string {
 	return e.location
 }
 
+func (e *endpoint) Metadata() Metadata {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	return e.metadata
+}
+
 // Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
 // It work good only if connection url always point to local dc.
 // Will be removed after Oct 2024.
@@ -164,7 +195,7 @@ func (e *endpoint) LocalDC() bool {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	return e.local
+	return e.metadata.LocalDC
 }
 
 func (e *endpoint) LoadFactor() float32 {
@@ -179,16 +210,6 @@ func (e *endpoint) LastUpdated() time.Time {
 	defer e.mu.RUnlock()
 
 	return e.lastUpdated
-}
-
-func (e *endpoint) Touch(opts ...Option) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	for _, opt := range append([]Option{WithLastUpdated(time.Now())}, opts...) {
-		if opt != nil {
-			opt(e)
-		}
-	}
 }
 
 type Option func(e *endpoint)
@@ -207,7 +228,7 @@ func WithLocation(location string) Option {
 
 func WithLocalDC(local bool) Option {
 	return func(e *endpoint) {
-		e.local = local
+		e.metadata.LocalDC = local
 	}
 }
 
@@ -247,6 +268,12 @@ func WithSslTargetNameOverride(nameOverride string) Option {
 	}
 }
 
+func WithMetadata(metadata Metadata) Option {
+	return func(e *endpoint) {
+		e.metadata = metadata
+	}
+}
+
 func New(address string, opts ...Option) *endpoint {
 	e := &endpoint{
 		address:     address,
@@ -259,4 +286,20 @@ func New(address string, opts ...Option) *endpoint {
 	}
 
 	return e
+}
+
+// Compare orders two discovery endpoints for stable diffing of endpoint snapshots.
+func Compare(lhs, rhs Endpoint) int {
+	cmp := strings.Compare(lhs.Address(), rhs.Address())
+	if cmp != 0 {
+		return cmp
+	}
+	if lhs.NodeID() < rhs.NodeID() {
+		return -1
+	}
+	if lhs.NodeID() > rhs.NodeID() {
+		return 1
+	}
+
+	return strings.Compare(lhs.OverrideHost(), rhs.OverrideHost())
 }

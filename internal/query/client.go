@@ -348,6 +348,28 @@ func do(
 	return nil
 }
 
+func (c *Client) withDefaultRetryOptions(opts ...retry.Option) []retry.Option {
+	if !c.config.DefaultIdempotent() {
+		return opts
+	}
+
+	return append(
+		[]retry.Option{retry.WithIdempotent(true)},
+		opts...,
+	)
+}
+
+func (c *Client) withDefaultExecuteOptions(opts ...options.Execute) []options.Execute {
+	if !c.config.DefaultIdempotent() {
+		return opts
+	}
+
+	return append(
+		[]options.Execute{options.WithIdempotent(true)},
+		opts...,
+	)
+}
+
 func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) (finalErr error) {
 	ctx, leave, err := c.enter(ctx)
 	if err != nil {
@@ -367,25 +389,44 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 		onDone(attempts, finalErr)
 	}()
 
+	retryOpts := c.withDefaultRetryOptions(
+		// Driver-level trace.Retry (e.g. spans.WithTraces) so retry
+		// callers see ydb.RunWithRetry / ydb.Try spans for Do().
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithTrace(&trace.Retry{
+			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+				return func(info trace.RetryLoopDoneInfo) {
+					attempts = info.Attempts
+				}
+			},
+		}),
+	)
+	retryOpts = append(retryOpts, settings.RetryOpts()...)
+
 	err = do(ctx, c.explicitSessionPool,
 		func(ctx context.Context, s *Session) error {
-			return op(ctx, s)
+			return withSessionTrace(s, settings.CallTrace(), func() error {
+				return op(ctx, s)
+			})
 		},
-		append([]retry.Option{
-			// Driver-level trace.Retry (e.g. spans.WithTraces) so retry
-			// callers see ydb.RunWithRetry / ydb.Try spans for Do().
-			retry.WithTrace(c.config.TraceRetry()),
-			retry.WithTrace(&trace.Retry{
-				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-					return func(info trace.RetryLoopDoneInfo) {
-						attempts = info.Attempts
-					}
-				},
-			}),
-		}, settings.RetryOpts()...)...,
+		retryOpts...,
 	)
 
 	return err
+}
+
+func withSessionTrace(s *Session, callTrace *trace.Query, op func() error) error {
+	if callTrace == nil {
+		return op()
+	}
+
+	prev := s.trace
+	s.trace = gtrace.Compose(s.trace, callTrace)
+	defer func() {
+		s.trace = prev
+	}()
+
+	return op()
 }
 
 func doTx(
@@ -393,29 +434,32 @@ func doTx(
 	pool sessionPool,
 	op query.TxOperation,
 	txSettings tx.Settings,
+	callTrace *trace.Query,
 	opts ...retry.Option,
 ) (finalErr error) {
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (opErr error) {
-		tx, err := s.Begin(ctx, txSettings)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
+		return withSessionTrace(s, callTrace, func() error {
+			tx, err := s.Begin(ctx, txSettings)
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
 
-		defer func() {
-			_ = tx.Rollback(ctx)
-		}()
+			defer func() {
+				_ = tx.Rollback(ctx)
+			}()
 
-		err = op(ctx, tx)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
+			err = op(ctx, tx)
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
 
-		err = tx.CommitTx(ctx)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
+			err = tx.CommitTx(ctx)
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
 
-		return nil
+			return nil
+		})
 	}, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -466,7 +510,7 @@ func (c *Client) QueryRow(ctx context.Context, q string, opts ...options.Execute
 	}
 	defer leave()
 
-	settings := options.ExecuteSettings(opts...)
+	settings := options.ExecuteSettings(c.withDefaultExecuteOptions(opts...)...)
 
 	onDone := gtrace.QueryOnQueryRow(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).QueryRow"),
@@ -495,7 +539,7 @@ func clientExec(ctx context.Context, pool sessionPool, q string, opts ...options
 	}
 
 	err := do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := s.execute(ctx, q, settings,
+		streamResult, err := s.execute(ctx, q, settings, options.ResultSetsTypeOrdered,
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -525,6 +569,7 @@ func (c *Client) Exec(ctx context.Context, q string, opts ...options.Execute) (f
 	}
 	defer leave()
 
+	opts = c.withDefaultExecuteOptions(opts...)
 	settings := options.ExecuteSettings(opts...)
 	onDone := gtrace.QueryOnExec(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Exec"),
@@ -553,7 +598,7 @@ func clientQuery(ctx context.Context, pool sessionPool, q string, opts ...option
 	}
 
 	err = do(ctx, pool, func(ctx context.Context, s *Session) (err error) {
-		streamResult, err := s.execute(ctx, q, settings,
+		streamResult, err := s.execute(ctx, q, settings, options.ResultSetsTypeConcurrent,
 			withStreamResultTrace(s.trace), withIssuesHandler(settings.IssuesOpts()))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -583,6 +628,7 @@ func (c *Client) Query(ctx context.Context, q string, opts ...options.Execute) (
 	}
 	defer leave()
 
+	opts = c.withDefaultExecuteOptions(opts...)
 	settings := options.ExecuteSettings(opts...)
 	onDone := gtrace.QueryOnQuery(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Client).Query"),
@@ -608,7 +654,7 @@ func clientQueryResultSet(
 	}
 
 	err := do(ctx, pool, func(ctx context.Context, s *Session) error {
-		streamResult, err := s.execute(ctx, q, settings, resultOpts...)
+		streamResult, err := s.execute(ctx, q, settings, options.ResultSetsTypeOrdered, resultOpts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -641,7 +687,7 @@ func (c *Client) QueryResultSet(
 	defer leave()
 
 	var (
-		settings  = options.ExecuteSettings(opts...)
+		settings  = options.ExecuteSettings(c.withDefaultExecuteOptions(opts...)...)
 		rowsCount int
 	)
 
@@ -698,23 +744,24 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 		ctx = tx.WithLazyTx(ctx, *lazyTx)
 	}
 
+	retryOpts := c.withDefaultRetryOptions(
+		// Driver-level trace.Retry (e.g. spans.WithTraces) so retry
+		// callers see ydb.RunWithRetry / ydb.Try spans for DoTx().
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithTrace(&trace.Retry{
+			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+				return func(info trace.RetryLoopDoneInfo) {
+					attempts = info.Attempts
+				}
+			},
+		}),
+	)
+	retryOpts = append(retryOpts, settings.RetryOpts()...)
+
 	err = doTx(ctx, c.explicitSessionPool, op,
 		settings.TxSettings(),
-		append(
-			[]retry.Option{
-				// Driver-level trace.Retry (e.g. spans.WithTraces) so retry
-				// callers see ydb.RunWithRetry / ydb.Try spans for DoTx().
-				retry.WithTrace(c.config.TraceRetry()),
-				retry.WithTrace(&trace.Retry{
-					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-						return func(info trace.RetryLoopDoneInfo) {
-							attempts = info.Attempts
-						}
-					},
-				}),
-			},
-			settings.RetryOpts()...,
-		)...,
+		settings.CallTrace(),
+		retryOpts...,
 	)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -725,22 +772,24 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 
 func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, cfg *config.Config) (*Session, error) {
 	s, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*Session, error) {
-		var (
-			createCtx    context.Context
-			cancelCreate context.CancelFunc
-		)
+		createCtx := ctx
 		if d := cfg.SessionCreateTimeout(); d > 0 {
+			var cancelCreate context.CancelFunc
 			createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
-		} else {
-			createCtx, cancelCreate = xcontext.WithCancel(ctx)
+			defer cancelCreate()
 		}
-		defer cancelCreate()
 
 		s, err := createSession(createCtx, client,
 			WithDeleteTimeout(cfg.SessionDeleteTimeout()),
 			WithTrace(cfg.Trace()),
 		)
 		if err != nil {
+			// Do not fail the request on an internal session creation timeout while
+			// the caller is still willing to wait.
+			if xerrors.IsContextError(err) && ctx.Err() == nil {
+				err = xerrors.Retryable(err)
+			}
+
 			return nil, xerrors.WithStackTrace(err)
 		}
 
@@ -766,7 +815,6 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) (
 	return newWithQueryServiceClient(ctx, client, cc, cfg)
 }
 
-//nolint:funlen
 func newWithQueryServiceClient(ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
 	cc grpc.ClientConnInterface,
@@ -784,16 +832,9 @@ func newWithQueryServiceClient(ctx context.Context,
 		pool.WithWarmUpItems[*Session](cfg.PoolWarmUpSize()),
 		pool.WithItemUsageLimit[*Session](cfg.PoolSessionUsageLimit()),
 		pool.WithItemUsageTTL[*Session](cfg.PoolSessionUsageTTL()),
-		pool.WithTrace[*Session](poolTrace(cfg.Trace())),
+		pool.WithTrace[*Session](poolTrace(cfg.Trace(), cfg.PoolName())),
 		pool.WithCreateItemTimeout[*Session](cfg.SessionCreateTimeout()),
 		pool.WithCloseItemTimeout[*Session](cfg.SessionDeleteTimeout()),
-		pool.WithMustDeleteItemFunc(func(s *Session, err error) bool {
-			if !s.IsAlive() {
-				return true
-			}
-
-			return err != nil && xerrors.MustDeleteTableOrQuerySession(err)
-		}),
 		pool.WithIdleTimeToLive[*Session](cfg.SessionIdleTimeToLive()),
 		pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
 			if !cfg.DisableSessionBalancer() {
@@ -803,6 +844,7 @@ func newWithQueryServiceClient(ctx context.Context,
 			s, err := createSession(ctx, client,
 				WithConn(cc),
 				WithDeleteTimeout(cfg.SessionDeleteTimeout()),
+				WithPoolName(cfg.PoolName()),
 				WithRegisterCloseCancel(c.registerCloseCancel),
 				WithTrace(cfg.Trace()),
 			)
@@ -833,7 +875,7 @@ func newWithQueryServiceClient(ctx context.Context,
 	return c, nil
 }
 
-func poolTrace(t *trace.Query) *pool.Trace[*Session, Session] {
+func poolTrace(t *trace.Query, poolName string) *pool.Trace[*Session, Session] {
 	return &pool.Trace[*Session, Session]{
 		OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
 			onDone := gtrace.QueryOnPoolNew(t, ctx, call)
@@ -870,6 +912,14 @@ func poolTrace(t *trace.Query) *pool.Trace[*Session, Session] {
 				onDone(err)
 			}
 		},
+		OnCloseItem: func(item *Session, reason string) {
+			core, ok := item.Core.(*sessionCore)
+			if poolName == "" || !ok || !core.closedReported.CompareAndSwap(false, true) {
+				return
+			}
+
+			gtrace.QueryOnSessionClosed(t, poolName, reason)
+		},
 		OnGet: func(ctx *context.Context, call stack.Caller) func(
 			session *Session,
 			hint *trace.NodeHintInfo,
@@ -895,7 +945,7 @@ func createImplicitSessionPool(ctx context.Context,
 ) (sessionPool, error) {
 	return pool.New(ctx,
 		pool.WithLimit[*Session](cfg.PoolLimit()),
-		pool.WithTrace[*Session](poolTrace(cfg.Trace())),
+		pool.WithTrace[*Session](poolTrace(cfg.Trace(), "")),
 		pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
 			core := &implicitSessionCore{
 				sessionCore{
