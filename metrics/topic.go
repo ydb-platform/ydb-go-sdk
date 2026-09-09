@@ -257,15 +257,17 @@ func messageLabels(endpoint, database, topic, consumer string, readerName *strin
 }
 
 func streamLabels(endpoint, database, consumer string, readerName *string) map[string]string {
-	labels := map[string]string{"endpoint": endpoint, "database": database}
-	if consumer != "" {
-		labels["consumer"] = consumer
-	}
+	readerNameValue := ""
 	if readerName != nil {
-		labels["reader.name"] = *readerName
+		readerNameValue = *readerName
 	}
 
-	return labels
+	return map[string]string{
+		"endpoint":    endpoint,
+		"database":    database,
+		"consumer":    consumer,
+		"reader.name": readerNameValue,
+	}
 }
 
 func addCounter(counter Counter, delta int) {

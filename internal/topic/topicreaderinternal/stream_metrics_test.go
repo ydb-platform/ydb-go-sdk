@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
@@ -244,7 +245,13 @@ func TestTopicReader_CommitMetricsUseCommitRangeLength(t *testing.T) {
 			require.NoError(t, err)
 			e.partitionSessionID = startedSessionID
 			e.partitionSession = startedSession
-			e.stream.EXPECT().Send(gomock.AssignableToTypeOf(&rawtopicreader.StartPartitionSessionResponse{})).Return(nil)
+			startResponseSent := make(empty.Chan)
+			e.stream.EXPECT().Send(gomock.AssignableToTypeOf(&rawtopicreader.StartPartitionSessionResponse{})).
+				DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
+					close(startResponseSent)
+
+					return nil
+				})
 			e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: 50}).Return(nil)
 			e.Start()
 			reader := newMetricsReader(&e)
@@ -260,6 +267,11 @@ func TestTopicReader_CommitMetricsUseCommitRangeLength(t *testing.T) {
 					err   error
 				}{batch: batch, err: err}
 			}()
+			select {
+			case <-startResponseSent:
+			case <-time.After(time.Second):
+				t.Fatal("timed out waiting for start partition session response")
+			}
 			e.SendFromServer(readerMetricResponseWithOffsets(&e, 50, 20, 24))
 			var result struct {
 				batch *topicreadercommon.PublicBatch

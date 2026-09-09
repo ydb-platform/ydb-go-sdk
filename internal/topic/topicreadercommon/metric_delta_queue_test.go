@@ -46,3 +46,37 @@ func TestMetricDeltaQueueCanFinalizeAfterObserverPanic(t *testing.T) {
 	queue.Emit(func(_ string, delta int) { deltas = append(deltas, delta) })
 	require.Equal(t, []int{-1}, deltas)
 }
+
+func TestMetricDeltaQueueCompactsConsumedPrefixDuringReentrantEmission(t *testing.T) {
+	const (
+		initialBacklog = 4
+		totalEvents    = 10_000
+		maxCapacity    = 1_024
+	)
+
+	var queue MetricDeltaQueue
+	for delta := range initialBacklog {
+		queue.Enqueue("topic", delta+1)
+	}
+
+	observations := make([]int, 0, totalEvents)
+	maxObservedCapacity := cap(queue.pending)
+	nestedEmitAttempted := false
+	queue.Emit(func(_ string, delta int) {
+		observations = append(observations, delta)
+		if !nestedEmitAttempted {
+			nestedEmitAttempted = true
+			queue.Emit(func(string, int) { require.FailNow(t, "nested emit callback must not run") })
+		}
+		if len(observations) <= totalEvents-initialBacklog {
+			queue.Enqueue("topic", initialBacklog+len(observations))
+		}
+		maxObservedCapacity = max(maxObservedCapacity, cap(queue.pending))
+	})
+
+	require.Len(t, observations, totalEvents)
+	for index, observed := range observations {
+		require.Equal(t, index+1, observed)
+	}
+	require.LessOrEqual(t, maxObservedCapacity, maxCapacity)
+}

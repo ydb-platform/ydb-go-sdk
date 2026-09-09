@@ -2,6 +2,8 @@ package topicreadercommon
 
 import "sync"
 
+const metricDeltaQueueCompactionThreshold = 256
+
 // MetricDeltaQueue preserves balance-event order across concurrent and reentrant
 // trace callbacks. Enqueue while holding the balance lock; Emit after releasing it.
 // No user callback runs under either mutex.
@@ -75,6 +77,13 @@ func (q *MetricDeltaQueue) next() (metricDelta, bool) {
 	event := q.pending[q.head]
 	q.pending[q.head] = metricDelta{}
 	q.head++
+	if q.head >= metricDeltaQueueCompactionThreshold && q.head >= len(q.pending)-q.head {
+		newLength := len(q.pending) - q.head
+		copy(q.pending, q.pending[q.head:])
+		clear(q.pending[newLength:])
+		q.pending = q.pending[:newLength]
+		q.head = 0
+	}
 
 	return event, true
 }

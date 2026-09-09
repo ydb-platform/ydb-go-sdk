@@ -455,11 +455,135 @@ func TestTopicReaderGaugesApplyDeltasWithoutSet(t *testing.T) {
 	}))
 }
 
+func TestTopicMetricCallbacksProvideAllDeclaredLabels(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		consumer   string
+		readerName *string
+	}{
+		{name: "without consumer or reader name"},
+		{name: "without consumer with reader name", readerName: readerNamePointer("generated-reader")},
+		{name: "with consumer and reader name", consumer: "consumer", readerName: readerNamePointer("reader")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			tracer := topic(strictTopicConfig{
+				recordingConfig: recordingConfig{details: trace.DetailsAll},
+				t:               t,
+			})
+
+			tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
+				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: test.consumer,
+				ReaderName: test.readerName, MessagesCount: 1,
+			})
+			tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{
+				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: test.consumer,
+				ReaderName: test.readerName, MessagesCount: 1,
+			})
+			tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{
+				Endpoint: "node", Database: "/db", Consumer: test.consumer,
+				ReaderName: test.readerName, Bytes: 1,
+			})
+			tracer.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{
+				Endpoint: "node", Database: "/db", Consumer: test.consumer, ReaderName: test.readerName,
+				RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
+			})
+			tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
+				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: test.consumer,
+				ReaderName: test.readerName, MessagesCount: 1,
+			})
+			tracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{
+				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: test.consumer,
+				ReaderName: test.readerName, MessagesCount: 1,
+			})
+			tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
+				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: test.consumer,
+				ReaderName: test.readerName, MessagesDelta: 1,
+			})
+			tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
+				Endpoint: "node", Database: "/db", Consumer: test.consumer,
+				ReaderName: test.readerName, BytesDelta: 1,
+			})
+		})
+	}
+}
+
 type topicMetricDescriptor struct {
 	name   string
 	unit   string
 	kind   string
 	labels []string
+}
+
+type strictTopicConfig struct {
+	recordingConfig
+
+	t testing.TB
+}
+
+func (c strictTopicConfig) WithSystem(system string) Config {
+	scoped := c.recordingConfig.WithSystem(system).(recordingConfig)
+
+	return strictTopicConfig{recordingConfig: scoped, t: c.t}
+}
+
+func (c strictTopicConfig) CounterVec(_ string, labelNames ...string) CounterVec {
+	return strictCounterVec{t: c.t, labelNames: labelNameSet(labelNames)}
+}
+
+func (c strictTopicConfig) GaugeVec(_ string, labelNames ...string) GaugeVec {
+	return strictGaugeVec{t: c.t, labelNames: labelNameSet(labelNames)}
+}
+
+func labelNameSet(labelNames []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(labelNames))
+	for _, name := range labelNames {
+		set[name] = struct{}{}
+	}
+
+	return set
+}
+
+type strictCounterVec struct {
+	t          testing.TB
+	labelNames map[string]struct{}
+}
+
+func (v strictCounterVec) With(labels map[string]string) Counter {
+	v.t.Helper()
+	require.Equal(v.t, v.labelNames, labelNameSetFromValues(labels))
+
+	return strictCounter{}
+}
+
+type strictCounter struct{}
+
+func (strictCounter) Inc() {}
+
+type strictGaugeVec struct {
+	t          testing.TB
+	labelNames map[string]struct{}
+}
+
+func (v strictGaugeVec) With(labels map[string]string) Gauge {
+	v.t.Helper()
+	require.Equal(v.t, v.labelNames, labelNameSetFromValues(labels))
+
+	return strictGauge{}
+}
+
+type strictGauge struct{}
+
+func (strictGauge) Add(float64) {}
+
+func (strictGauge) Set(float64) {}
+
+func labelNameSetFromValues(labels map[string]string) map[string]struct{} {
+	set := make(map[string]struct{}, len(labels))
+	for name := range labels {
+		set[name] = struct{}{}
+	}
+
+	return set
 }
 
 type topicCounterCapture struct {
@@ -717,10 +841,12 @@ func TestTopicMetricsSeparateReaderAndListenerDetails(t *testing.T) {
 	}
 }
 
-func TestTopicMetricOptionalLabelsMatchDotNet(t *testing.T) {
-	require.Equal(t, map[string]string{"endpoint": "node", "database": "/db"}, streamLabels("node", "/db", "", nil))
+func TestTopicMetricOptionalLabelsUseEmptyValues(t *testing.T) {
 	require.Equal(t, map[string]string{
-		"endpoint": "node", "database": "/db", "topic": "/topic", "reader.name": "",
+		"endpoint": "node", "database": "/db", "consumer": "", "reader.name": "",
+	}, streamLabels("node", "/db", "", nil))
+	require.Equal(t, map[string]string{
+		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "", "reader.name": "",
 	}, messageLabels("node", "/db", "/topic", "", readerNamePointer("")))
 	require.Equal(t, map[string]string{
 		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "named",

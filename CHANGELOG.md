@@ -19,9 +19,9 @@
   | `ydb.topic.reader.local_buffer.messages` | `{message}` | Tracked accepted messages held by the SDK until delivery, discard, or close |
   | `ydb.topic.reader.credit_balance_bytes` | `By` | Tracked successful read-request bytes minus response bytes, with remaining balance compensated on close |
 
-  All instruments carried `endpoint`, `database`, and `reader.name`, plus
-  `consumer` when set. Reader names defaulted to a process-local `reader-N`
-  when omitted or empty.
+  All instruments carried `endpoint`, `database`, `consumer`, and
+  `reader.name`; absent optional values were emitted as empty strings. Reader
+  names defaulted to a process-local `reader-N` when omitted or empty.
   Message, commit, and local-buffer instruments also carried `topic`; byte,
   credit, and session-error instruments omitted it. Session errors additionally
   carried `retry_decision`, `status_code`, and `error.type`.
