@@ -1,3 +1,5 @@
+* Fixed topic listener reconnects to wait for active partition callbacks before replacing a stream and to preserve the original shutdown reason across stream cancellation
+
 ## v3.151.1
 * Fixed `database/sql` Query Service requests failing on session creation attempt timeouts while the caller context remained active
 

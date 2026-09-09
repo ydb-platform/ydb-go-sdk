@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -54,9 +53,29 @@ type streamListener struct {
 	closing atomic.Bool
 	tracer  *trace.Topic
 
+	shutdownInit       sync.Once
+	shutdownOnce       sync.Once
+	shutdownReasonOnce sync.Once
+	shutdownDone       chan struct{}
+	shutdownReason     error
+	shutdownErr        error
+
 	m              xsync.Mutex
 	workers        map[rawtopicreader.PartitionSessionID]*PartitionWorker
+	workerStates   map[*PartitionWorker]*partitionWorkerState
 	messagesToSend []rawtopicreader.ClientMessage
+}
+
+type partitionWorkerState struct {
+	worker       *PartitionWorker
+	closeDone    chan struct{}
+	closeStarted bool
+	closeErr     error
+}
+
+type partitionWorkerCloseTask struct {
+	state    *partitionWorkerState
+	closeNow bool
 }
 
 func newStreamListener(
@@ -92,7 +111,11 @@ func newStreamListener(
 
 	if err := res.initStream(connectionCtx, client); err != nil {
 		initDone("", err)
-		res.goClose(connectionCtx, err)
+		// Initialization may have created a stream and a stream-cancellation
+		// watchdog even though the listener itself was not returned. Complete
+		// that partial listener cleanup before allowing a reconnect attempt, but
+		// keep the initialization error as the constructor result.
+		_ = res.Close(context.Background(), err)
 
 		return nil, err
 	}
@@ -116,65 +139,133 @@ func newStreamListener(
 }
 
 func (l *streamListener) Close(ctx context.Context, reason error) error {
-	if !l.closing.CompareAndSwap(false, true) {
-		return errTopicListenerClosed
+	l.beginClose(ctx, reason)
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
-	logCtx := ctx
-	closeDone := gtrace.TopicOnListenerClose(l.tracer, &logCtx, l.listenerID, l.sessionID, reason)
-
-	var resErrors []error
-
-	// Stop all partition workers first
-	// Copy workers to avoid holding mutex while closing them (to prevent deadlock)
-	var workers []*PartitionWorker
-	l.m.WithLock(func() {
-		workers = make([]*PartitionWorker, 0, len(l.workers))
-		for _, worker := range l.workers {
-			workers = append(workers, worker)
-		}
-	})
-
-	// Stop the read stream and background workers before closing partition workers,
-	// so receiveMessagesLoop does not route messages into shutting-down workers.
-	if l.stream != nil {
-		l.streamClose(reason)
+	select {
+	case <-l.shutdownDone:
+		return l.shutdownErr
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-
-	if err := l.background.Close(ctx, reason); err != nil {
-		resErrors = append(resErrors, err)
-	}
-
-	// Close workers without holding the mutex
-	for _, worker := range workers {
-		if err := worker.Close(ctx, reason); err != nil {
-			resErrors = append(resErrors, err)
-		}
-	}
-
-	if err := l.syncCommitter.Close(ctx, reason); err != nil {
-		resErrors = append(resErrors, err)
-	}
-
-	for _, session := range l.sessions.GetAll() {
-		session.Close()
-		// For shutdown, we don't need to process stop partition requests through workers
-		// since all workers are already being closed above
-	}
-
-	finalErr := errors.Join(resErrors...)
-
-	closeDone(len(workers), finalErr)
-
-	return finalErr
 }
 
 func (l *streamListener) goClose(ctx context.Context, reason error) {
-	ctx, cancel := context.WithTimeout(xcontext.ValueOnly(ctx), time.Second)
-	l.streamClose(reason)
+	l.beginClose(ctx, reason)
+}
+
+func (l *streamListener) beginClose(ctx context.Context, reason error) {
+	l.shutdownInit.Do(func() {
+		l.shutdownDone = make(chan struct{})
+	})
+
+	l.shutdownOnce.Do(func() {
+		l.closing.Store(true)
+		l.recordShutdownReason(reason)
+
+		go func() {
+			var resErrors []error
+			logCtx := ctx
+			closeDone := gtrace.TopicOnListenerClose(
+				l.tracer,
+				&logCtx,
+				l.listenerID,
+				l.sessionID,
+				l.shutdownReason,
+			)
+
+			// Stop the read stream and wait for its receiver and sender loops before
+			// taking the worker snapshot. This prevents a receiver from creating a
+			// worker after the snapshot while shutdown is already in progress.
+			if l.streamClose != nil {
+				l.streamClose(l.shutdownReason)
+			}
+
+			// Shutdown owns this worker and must continue draining after the caller's
+			// context expires. Partition callbacks are drained below with the same
+			// detached lifetime.
+			_ = l.background.Close(context.Background(), l.shutdownReason)
+
+			// Claim all workers after the stream loops have stopped. A worker may
+			// already have stopped naturally and been removed from the routing map;
+			// its state remains retained until this close/join completes.
+			workerTasks := l.claimWorkersForClose()
+			for _, task := range workerTasks {
+				if task.closeNow {
+					l.finishWorkerClose(task.state, l.shutdownReason)
+				}
+
+				<-task.state.closeDone
+				if task.state.closeErr != nil {
+					resErrors = append(resErrors, task.state.closeErr)
+				}
+			}
+
+			if l.syncCommitter != nil {
+				_ = l.syncCommitter.Close(context.Background(), l.shutdownReason)
+			}
+
+			if l.sessions != nil {
+				for _, session := range l.sessions.GetAll() {
+					session.Close()
+					// For shutdown, we don't need to process stop partition requests through workers
+					// since all workers are already being closed above.
+				}
+			}
+
+			l.shutdownErr = errors.Join(resErrors...)
+			// The done hook is part of listener shutdown. Publish shutdownDone only
+			// after it returns so WaitStop cannot report completion while tracing is
+			// still running.
+			closeDone(len(workerTasks), l.shutdownErr)
+			close(l.shutdownDone)
+		}()
+	})
+}
+
+func (l *streamListener) claimWorkersForClose() []partitionWorkerCloseTask {
+	var tasks []partitionWorkerCloseTask
+	l.m.WithLock(func() {
+		tasks = make([]partitionWorkerCloseTask, 0, len(l.workerStates))
+		for _, state := range l.workerStates {
+			closeNow := !state.closeStarted
+			state.closeStarted = true
+			tasks = append(tasks, partitionWorkerCloseTask{state: state, closeNow: closeNow})
+		}
+	})
+
+	return tasks
+}
+
+func (l *streamListener) workerStateLocked(worker *PartitionWorker) *partitionWorkerState {
+	if state, ok := l.workerStates[worker]; ok {
+		return state
+	}
+
+	state := &partitionWorkerState{
+		worker:    worker,
+		closeDone: make(chan struct{}),
+	}
+	l.workerStates[worker] = state
+
+	return state
+}
+
+func (l *streamListener) finishWorkerClose(state *partitionWorkerState, reason error) {
+	state.closeErr = state.worker.Close(context.Background(), reason)
+	l.m.WithLock(func() {
+		if current, ok := l.workerStates[state.worker]; ok && current == state {
+			delete(l.workerStates, state.worker)
+		}
+	})
+	close(state.closeDone)
+}
+
+func (l *streamListener) closeWorkerAfterStop(state *partitionWorkerState, reason error) {
 	go func() {
-		_ = l.background.Close(ctx, reason)
-		cancel()
+		l.finishWorkerClose(state, reason)
 	}()
 }
 
@@ -191,6 +282,7 @@ func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	l.sessions = &topicreadercommon.PartitionSessionStorage{}
 	l.sessionIDCounter = sessionIDCounter
 	l.workers = make(map[rawtopicreader.PartitionSessionID]*PartitionWorker)
+	l.workerStates = make(map[*PartitionWorker]*partitionWorkerState)
 	if l.cfg == nil {
 		l.cfg = &StreamListenerConfig{}
 	}
@@ -209,7 +301,7 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 			err := xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 				"ydb: topic listener stream init timeout: %w", ctx.Err(),
 			)))
-			l.goClose(ctx, err)
+			l.recordShutdownReason(err)
 			l.streamClose(err)
 		case <-initDone:
 			// pass
@@ -262,6 +354,12 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 	l.sessionID = initResp.SessionID
 
 	return nil
+}
+
+func (l *streamListener) recordShutdownReason(reason error) {
+	l.shutdownReasonOnce.Do(func() {
+		l.shutdownReason = reason
+	})
 }
 
 func (l *streamListener) sendMessagesLoop(ctx context.Context) {
@@ -609,11 +707,33 @@ func (l *streamListener) SendRaw(msg rawtopicreader.ClientMessage) {
 }
 
 // onWorkerStopped handles worker stopped notifications
-func (l *streamListener) onWorkerStopped(sessionID rawtopicreader.PartitionSessionID, reason error) {
-	// Remove worker from workers map
+func (l *streamListener) onWorkerStopped(
+	worker *PartitionWorker,
+	sessionID rawtopicreader.PartitionSessionID,
+	reason error,
+) {
+	var (
+		state       *partitionWorkerState
+		closeWorker bool
+	)
 	l.m.WithLock(func() {
-		delete(l.workers, sessionID)
+		// Do not remove a replacement worker that has already claimed this
+		// session ID. Production workers pass their identity through the callback.
+		if current := l.workers[sessionID]; current == worker {
+			delete(l.workers, sessionID)
+		}
+
+		state = l.workerStateLocked(worker)
+		closeWorker = !state.closeStarted
+		state.closeStarted = true
 	})
+
+	if closeWorker {
+		// onStopped runs from the worker callback itself. Closing synchronously
+		// would wait for that callback and deadlock; the detached join also keeps
+		// the retired-worker set bounded during normal operation.
+		l.closeWorkerAfterStop(state, reason)
+	}
 
 	// Remove corresponding session
 	for _, session := range l.sessions.GetAll() {
@@ -637,19 +757,24 @@ func (l *streamListener) onWorkerStopped(sessionID rawtopicreader.PartitionSessi
 
 // createWorkerForPartition creates a new PartitionWorker for the given session
 func (l *streamListener) createWorkerForPartition(session *topicreadercommon.PartitionSession) *PartitionWorker {
-	worker := NewPartitionWorker(
+	var worker *PartitionWorker
+	worker = NewPartitionWorker(
 		session.StreamPartitionSessionID,
 		session,
 		l,
 		l.handler,
-		l.onWorkerStopped,
+		func(sessionID rawtopicreader.PartitionSessionID, reason error) {
+			l.onWorkerStopped(worker, sessionID, reason)
+		},
 		l.tracer,
 		l.listenerID,
 	)
 
-	// Store worker in map
+	// Register ownership before starting the worker. Shutdown snapshots this
+	// same state under the mutex after the stream loops have stopped.
 	l.m.WithLock(func() {
 		l.workers[session.StreamPartitionSessionID] = worker
+		l.workerStateLocked(worker)
 	})
 
 	// Start worker
