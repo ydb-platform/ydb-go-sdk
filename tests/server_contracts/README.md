@@ -21,6 +21,14 @@ without `producer_id` (seven scenarios in five files). Their adjacent comments d
 deduplicating runs.
 Query transaction experiments use serializable read-write isolation; they do not compare isolation levels or test SDK pooling.
 
+The six [auto partitioning enablement scenarios](features/topic/research/enable_auto_partitioning.feature) were recorded on
+2026-09-09 against `main.db11cbd` (`trunk`, image digest
+`sha256:71917a5c5d7f23ce956355d191ce1442b6b9a31e951606648feee57546c9da32`). With both partition limits fixed at 2,
+changing `DISABLED` to `SCALE_UP` preserves ordinary writes and transactions spanning the change on existing raw write streams.
+The experiment covers partition-ID-only, producer-plus-partition-ID, and producer-selected routing, and reads back all payloads.
+Nonempty partition bounds are printed in hexadecimal.
+It isolates enabling the setting; a later automatic split is outside its scope.
+
 ## Layout
 
 ```text

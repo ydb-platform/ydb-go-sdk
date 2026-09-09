@@ -253,6 +253,13 @@ func stepInspectTopicPartition(ctx context.Context) error {
 		return fmt.Errorf("describe Topic after writes: %w", err)
 	}
 	research.observe(formatTopicPartitionStats(research.world.topicPath, description.Partitions))
+	settings := description.PartitionSettings
+	research.observe(fmt.Sprintf(
+		"Decoded Ydb.Topic.DescribeTopicResult: partitioning_settings={min_active_partitions=%d, "+
+			"max_active_partitions=%d, auto_partitioning_settings={strategy=%s}}.",
+		settings.MinActivePartitions, settings.MaxActivePartitions,
+		Ydb_Topic.AutoPartitioningStrategy(settings.AutoPartitioningSettings.AutoPartitioningStrategy),
+	))
 
 	return nil
 }
@@ -260,13 +267,21 @@ func stepInspectTopicPartition(ctx context.Context) error {
 func formatTopicPartitionStats(topicPath string, partitions []topictypes.PartitionInfo) string {
 	details := make([]string, 0, len(partitions))
 	for _, partition := range partitions {
+		var bounds string
+		if len(partition.FromBound) > 0 {
+			bounds += fmt.Sprintf(", from_bound=0x%x", partition.FromBound)
+		}
+		if len(partition.ToBound) > 0 {
+			bounds += fmt.Sprintf(", to_bound=0x%x", partition.ToBound)
+		}
 		details = append(details, fmt.Sprintf(
-			"{partition_id=%d, active=%t, parent_partition_ids=%v, child_partition_ids=%v, partition_stats={end_offset=%d}}",
+			"{partition_id=%d, active=%t, parent_partition_ids=%v, child_partition_ids=%v, partition_stats={end_offset=%d}%s}",
 			partition.PartitionID,
 			partition.Active,
 			partition.ParentPartitionIDs,
 			partition.ChildPartitionIDs,
 			partition.PartitionStats.PartitionsOffset.End,
+			bounds,
 		))
 	}
 
