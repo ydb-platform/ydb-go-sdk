@@ -28,7 +28,7 @@ func ReadTopic(path string) ReadSelectors {
 type ReaderOption = topicreaderinternal.PublicReaderOption
 
 // WithReaderName sets the stable name used to identify this reader in metrics.
-// If omitted, the reader.name attribute is absent. An explicitly empty name is preserved.
+// If omitted or empty, the SDK assigns a process-local name in the form reader-N.
 func WithReaderName(name string) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.ReaderInfo.ReaderName = &name

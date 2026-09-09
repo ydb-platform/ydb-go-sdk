@@ -19,23 +19,24 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestReaderNameIsOptional(t *testing.T) {
+func TestReaderNameDefaultsToGeneratedName(t *testing.T) {
 	for _, names := range [][]string{nil, {""}, {"reader-custom"}} {
 		t.Run(fmt.Sprint(names), func(t *testing.T) {
 			reader := newNameTestReader(t, names...)
 			defer closeNameTestReader(t, &reader)
 			name := internalReaderName(reader)
-			if len(names) == 0 {
-				require.Nil(t, name)
+			require.NotNil(t, name)
+			if len(names) == 0 || names[0] == "" {
+				require.Regexp(t, `^reader-[0-9]+$`, *name)
 			} else {
-				require.NotNil(t, name)
 				require.Equal(t, names[0], *name)
 			}
+			require.Equal(t, name, internalReaderName(reader))
 		})
 	}
 }
 
-func TestListenerNameIsOptional(t *testing.T) {
+func TestListenerNameDefaultsToGeneratedName(t *testing.T) {
 	for _, names := range [][]string{nil, {""}, {"listener-custom"}} {
 		t.Run(fmt.Sprint(names), func(t *testing.T) {
 			cfg := topiclistenerinternal.NewStreamListenerConfig()
@@ -49,14 +50,47 @@ func TestListenerNameIsOptional(t *testing.T) {
 			)
 			require.NoError(t, err)
 			defer closeNameTestListener(t, reconnector)
-			if len(names) == 0 {
-				require.Nil(t, cfg.ReaderName)
+			require.NotNil(t, cfg.ReaderName)
+			if len(names) == 0 || names[0] == "" {
+				require.Regexp(t, `^reader-[0-9]+$`, *cfg.ReaderName)
 			} else {
-				require.NotNil(t, cfg.ReaderName)
 				require.Equal(t, names[0], *cfg.ReaderName)
 			}
 		})
 	}
+}
+
+func TestDefaultNamesAreUniqueAcrossReadersAndListeners(t *testing.T) {
+	firstReader := newNameTestReader(t, "")
+	secondReader := newNameTestReader(t, "")
+	defer closeNameTestReader(t, &firstReader)
+	defer closeNameTestReader(t, &secondReader)
+
+	firstListenerConfig := topiclistenerinternal.NewStreamListenerConfig()
+	firstListenerConfig.Consumer = "consumer"
+	firstListenerConfig.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "/topic"}}
+	firstListener, err := topiclistenerinternal.NewTopicListenerReconnector(
+		nameTestTopicClient{}, &firstListenerConfig, nameTestEventHandler{},
+	)
+	require.NoError(t, err)
+	defer closeNameTestListener(t, firstListener)
+
+	secondListenerConfig := topiclistenerinternal.NewStreamListenerConfig()
+	secondListenerConfig.Consumer = "consumer"
+	secondListenerConfig.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "/topic"}}
+	secondListener, err := topiclistenerinternal.NewTopicListenerReconnector(
+		nameTestTopicClient{}, &secondListenerConfig, nameTestEventHandler{},
+	)
+	require.NoError(t, err)
+	defer closeNameTestListener(t, secondListener)
+
+	names := map[string]struct{}{
+		*internalReaderName(firstReader):  {},
+		*internalReaderName(secondReader): {},
+		*firstListenerConfig.ReaderName:   {},
+		*secondListenerConfig.ReaderName:  {},
+	}
+	require.Len(t, names, 4)
 }
 
 func newNameTestReader(t *testing.T, names ...string) topicreaderinternal.Reader {

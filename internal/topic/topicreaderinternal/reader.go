@@ -89,6 +89,10 @@ func NewReader(
 	}
 
 	readerID := topicreadercommon.NextReaderID()
+	if cfg.ReaderInfo.ReaderName == nil || *cfg.ReaderInfo.ReaderName == "" {
+		name := fmt.Sprintf("reader-%d", readerID)
+		cfg.ReaderInfo.ReaderName = &name
+	}
 
 	readerConnector := func(ctx context.Context) (batchedStreamReader, error) {
 		stream, err := connector(ctx, readerID, cfg.Trace)
