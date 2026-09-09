@@ -5,7 +5,6 @@
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/ydb-platform/ydb-go-sdk/v3)](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3)
 [![tests](https://github.com/ydb-platform/ydb-go-sdk/workflows/tests/badge.svg)](https://github.com/ydb-platform/ydb-go-sdk/actions/workflows/tests.yml)
 [![lint](https://github.com/ydb-platform/ydb-go-sdk/workflows/lint/badge.svg)](https://github.com/ydb-platform/ydb-go-sdk/actions/workflows/lint.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/ydb-platform/ydb-go-sdk/v3)](https://goreportcard.com/report/github.com/ydb-platform/ydb-go-sdk/v3)
 [![codecov](https://codecov.io/gh/ydb-platform/ydb-go-sdk/badge.svg?precision=2)](https://app.codecov.io/gh/ydb-platform/ydb-go-sdk)
 ![Code lines](https://sloc.xyz/github/ydb-platform/ydb-go-sdk/?category=code)
 [![View examples](https://img.shields.io/badge/learn-examples-brightgreen.svg)](https://github.com/ydb-platform/ydb-go-sdk/tree/master/examples)
