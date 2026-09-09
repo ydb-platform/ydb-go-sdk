@@ -139,22 +139,13 @@ func TestTopicStreamReader_LocalBufferTracksQueueAndDelivery(t *testing.T) {
 	e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: 50}).Return(nil)
 	e.Start()
 	reader := newMetricsReader(&e)
-	readResult := make(chan struct {
-		batch *topicreadercommon.PublicBatch
-		err   error
-	}, 1)
+	readResult := make(chan readerBatchResult, 1)
 	go func() {
 		batch, err := reader.ReadMessageBatch(e.ctx)
-		readResult <- struct {
-			batch *topicreadercommon.PublicBatch
-			err   error
-		}{batch: batch, err: err}
+		readResult <- readerBatchResult{batch: batch, err: err}
 	}()
 	e.SendFromServer(readerMetricResponse(&e, 50))
-	var result struct {
-		batch *topicreadercommon.PublicBatch
-		err   error
-	}
+	var result readerBatchResult
 	select {
 	case result = <-readResult:
 	case <-time.After(time.Second):
@@ -192,154 +183,69 @@ func TestTopicStreamReader_LocalBufferRollbackAfterFinalization(t *testing.T) {
 	mu.Unlock()
 }
 
-func TestTopicReader_CommitMetricsUseCommitRangeLength(t *testing.T) {
-	for _, test := range []struct {
-		name            string
-		closeOnPublish  bool
-		checkDuplicates bool
-	}{
-		{
-			name:            "live tracker suppresses duplicate and stale acknowledgements",
-			checkDuplicates: true,
-		},
-		{
-			name:           "acknowledged count survives close after publication",
-			closeOnPublish: true,
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			e := newTopicReaderTestEnv(t)
-			e.reader.cfg.ReaderInfo = topicreadercommon.ReaderInfo{
-				Endpoint:   "node:2135",
-				Database:   "/db",
-				Consumer:   "consumer",
-				ReaderName: readerNamePointer("reader"),
-			}
-			queued := make(chan int, 4)
-			acknowledged := make(chan int, 4)
-			committedOffsets := make(chan int64, 4)
-			e.reader.cfg.Trace = &trace.Topic{
-				OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
-					queued <- info.MessagesCount
-				},
-				OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
-					acknowledged <- info.MessagesCount
-				},
-				OnReaderCommittedNotify: func(trace.TopicReaderCommittedNotifyInfo) {
-					committedOffsets <- e.partitionSession.CommittedOffset().ToInt64()
-					if test.closeOnPublish {
-						e.partitionSession.Close()
-					}
-				},
-			}
-			startedSessionID := rawtopicreader.PartitionSessionID(42)
-			require.NoError(t, e.reader.onStartPartitionSessionRequest(&rawtopicreader.StartPartitionSessionRequest{
-				PartitionSession: rawtopicreader.PartitionSession{
-					PartitionSessionID: startedSessionID,
-					Path:               e.partitionSession.Topic,
-					PartitionID:        e.partitionSession.PartitionID,
-				},
-				CommittedOffset: rawtopiccommon.NewOffset(20),
-			}))
-			startedSession, err := e.reader.sessionController.Get(startedSessionID)
-			require.NoError(t, err)
-			e.partitionSessionID = startedSessionID
-			e.partitionSession = startedSession
-			startResponseSent := make(empty.Chan)
-			e.stream.EXPECT().Send(gomock.AssignableToTypeOf(&rawtopicreader.StartPartitionSessionResponse{})).
-				DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
-					close(startResponseSent)
-
-					return nil
-				})
-			e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: 50}).Return(nil)
-			e.Start()
-			reader := newMetricsReader(&e)
-
-			readResult := make(chan struct {
-				batch *topicreadercommon.PublicBatch
-				err   error
-			}, 1)
-			go func() {
-				batch, err := reader.ReadMessageBatch(e.ctx)
-				readResult <- struct {
-					batch *topicreadercommon.PublicBatch
-					err   error
-				}{batch: batch, err: err}
-			}()
-			select {
-			case <-startResponseSent:
-			case <-time.After(time.Second):
-				t.Fatal("timed out waiting for start partition session response")
-			}
-			e.SendFromServer(readerMetricResponseWithOffsets(&e, 50, 20, 24))
-			var result struct {
-				batch *topicreadercommon.PublicBatch
-				err   error
-			}
-			select {
-			case result = <-readResult:
-			case <-time.After(time.Second):
-				t.Fatal("timed out waiting for reader batch")
-			}
-			require.NoError(t, result.err)
-			require.NotNil(t, result.batch)
-			require.Equal(t, []int64{20, 24}, []int64{
-				result.batch.Messages[0].Offset,
-				result.batch.Messages[1].Offset,
-			})
-
-			commitSent := make(chan *rawtopicreader.CommitOffsetRequest, 1)
-			e.stream.EXPECT().Send(gomock.AssignableToTypeOf(&rawtopicreader.CommitOffsetRequest{})).
-				DoAndReturn(func(msg rawtopicreader.ClientMessage) error {
-					commitSent <- msg.(*rawtopicreader.CommitOffsetRequest)
-
-					return nil
-				})
-			require.NoError(t, reader.Commit(e.ctx, result.batch))
-			// The wire range is checked below as [20, 25), so its span is five
-			// even though this fixture contains a gap between messages.
-			require.Equal(t, 5, readerMetricDelta(t, queued))
-			select {
-			case request := <-commitSent:
-				require.Equal(t, e.partitionSessionID, request.CommitOffsets[0].PartitionSessionID)
-				require.Equal(t, rawtopiccommon.NewOffset(20), request.CommitOffsets[0].Offsets[0].Start)
-				require.Equal(t, rawtopiccommon.NewOffset(25), request.CommitOffsets[0].Offsets[0].End)
-			case <-time.After(time.Second):
-				t.Fatal("timed out waiting for reader commit request")
-			}
-
-			require.NoError(t, e.reader.onCommitResponse(&rawtopicreader.CommitOffsetResponse{
-				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusInternalError},
-				PartitionsCommittedOffsets: []rawtopicreader.PartitionCommittedOffset{{
-					PartitionSessionID: e.partitionSessionID,
-					CommittedOffset:    rawtopiccommon.NewOffset(25),
-				}},
-			}))
-			readerMetricNoDelta(t, acknowledged)
-			require.NoError(t, e.reader.onCommitResponse(readerMetricCommitResponse(&e, 25)))
-			require.Equal(t, 5, readerMetricDelta(t, acknowledged))
-			select {
-			case committedOffset := <-committedOffsets:
-				require.Equal(t, int64(25), committedOffset)
-			case <-time.After(time.Second):
-				t.Fatal("timed out waiting for committed offset publication")
-			}
-
-			if test.checkDuplicates {
-				// Direct calls provide a processing barrier for duplicate/stale ACKs.
-				require.NoError(t, e.reader.onCommitResponse(readerMetricCommitResponse(&e, 25)))
-				require.NoError(t, e.reader.onCommitResponse(readerMetricCommitResponse(&e, 24)))
-				readerMetricNoDelta(t, acknowledged)
-			}
-
-			require.NoError(t, reader.Close(context.Background()))
-			topicreadercommon.TraceCommitQueued(e.ctx, topicreadercommon.GetCommitRange(result.batch))
-			topicreadercommon.TraceCommitAcknowledged(e.ctx, e.partitionSession, rawtopiccommon.NewOffset(25))
-			readerMetricNoDelta(t, queued)
-			readerMetricNoDelta(t, acknowledged)
-		})
+func TestTopicReader_CommitMetricsRegisterBeforeSynchronousAckAndClose(t *testing.T) {
+	test := newReaderCommitMetricsTest(t)
+	committedOffsets := make(chan int64, 1)
+	test.env.reader.cfg.Trace.OnReaderCommittedNotify = func(trace.TopicReaderCommittedNotifyInfo) {
+		committedOffsets <- test.env.partitionSession.CommittedOffset().ToInt64()
+		test.env.partitionSession.Close()
 	}
+	commitSent := make(chan *rawtopicreader.CommitOffsetRequest, 1)
+	test.env.stream.EXPECT().Send(gomock.AssignableToTypeOf(&rawtopicreader.CommitOffsetRequest{})).
+		DoAndReturn(func(msg rawtopicreader.ClientMessage) error {
+			request := msg.(*rawtopicreader.CommitOffsetRequest)
+			commitSent <- request
+
+			// Register the acknowledgement before Send returns. This is the
+			// ordering that matters when the server replies synchronously.
+			return test.env.reader.onCommitResponse(readerMetricCommitResponse(test.env, 25))
+		})
+	require.NoError(t, test.reader.Commit(test.env.ctx, test.batch))
+	// The wire range is [20, 25), so its span is five even though this
+	// fixture contains a gap between messages.
+	request := readerMetricCommitRequest(t, commitSent)
+	require.Equal(t, test.env.partitionSessionID, request.CommitOffsets[0].PartitionSessionID)
+	require.Equal(t, rawtopiccommon.NewOffset(20), request.CommitOffsets[0].Offsets[0].Start)
+	require.Equal(t, rawtopiccommon.NewOffset(25), request.CommitOffsets[0].Offsets[0].End)
+	require.Equal(t, 5, readerMetricDelta(t, test.queued))
+	require.Equal(t, 5, readerMetricDelta(t, test.acknowledged))
+	select {
+	case committedOffset := <-committedOffsets:
+		require.Equal(t, int64(25), committedOffset)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for committed offset publication")
+	}
+
+	// Registration happened before the callback closed the session, so the
+	// acknowledgement remains observable even after the session is closed.
+	require.NoError(t, test.reader.Close(context.Background()))
+	topicreadercommon.TraceCommitQueued(test.env.ctx, topicreadercommon.GetCommitRange(test.batch))
+	topicreadercommon.TraceCommitAcknowledged(test.env.ctx, test.env.partitionSession, rawtopiccommon.NewOffset(25))
+	readerMetricNoDelta(t, test.queued)
+	readerMetricNoDelta(t, test.acknowledged)
+}
+
+func TestTopicReader_CommitMetricsIgnoreDuplicateAndStaleAcknowledgements(t *testing.T) {
+	test := newReaderCommitMetricsTest(t)
+	test.env.stream.EXPECT().Send(gomock.AssignableToTypeOf(&rawtopicreader.CommitOffsetRequest{})).
+		Return(nil)
+	require.NoError(t, test.reader.Commit(test.env.ctx, test.batch))
+	require.Equal(t, 5, readerMetricDelta(t, test.queued))
+	require.NoError(t, test.env.reader.onCommitResponse(&rawtopicreader.CommitOffsetResponse{
+		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusInternalError},
+		PartitionsCommittedOffsets: []rawtopicreader.PartitionCommittedOffset{{
+			PartitionSessionID: test.env.partitionSessionID,
+			CommittedOffset:    rawtopiccommon.NewOffset(25),
+		}},
+	}))
+	readerMetricNoDelta(t, test.acknowledged)
+	require.NoError(t, test.env.reader.onCommitResponse(readerMetricCommitResponse(test.env, 25)))
+	require.Equal(t, 5, readerMetricDelta(t, test.acknowledged))
+
+	// Direct calls provide a processing barrier for duplicate and stale ACKs.
+	require.NoError(t, test.env.reader.onCommitResponse(readerMetricCommitResponse(test.env, 25)))
+	require.NoError(t, test.env.reader.onCommitResponse(readerMetricCommitResponse(test.env, 24)))
+	readerMetricNoDelta(t, test.acknowledged)
 }
 
 func TestTopicStreamReader_MetricBalancesArePerStreamForSameReaderName(t *testing.T) {
@@ -441,6 +347,113 @@ func readerMetricCommitResponse(e *streamEnv, offset int64) *rawtopicreader.Comm
 	}
 }
 
+type readerBatchResult struct {
+	batch *topicreadercommon.PublicBatch
+	err   error
+}
+
+type readerCommitMetricsTest struct {
+	env          *streamEnv
+	reader       *Reader
+	batch        *topicreadercommon.PublicBatch
+	queued       chan int
+	acknowledged chan int
+}
+
+func newReaderCommitMetricsTest(t *testing.T) *readerCommitMetricsTest {
+	t.Helper()
+
+	e := newTopicReaderTestEnv(t)
+	e.reader.cfg.ReaderInfo = topicreadercommon.ReaderInfo{
+		Endpoint:   "node:2135",
+		Database:   "/db",
+		Consumer:   "consumer",
+		ReaderName: readerNamePointer("reader"),
+	}
+	queued := make(chan int, 4)
+	acknowledged := make(chan int, 4)
+	e.reader.cfg.Trace = &trace.Topic{
+		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
+			queued <- info.MessagesCount
+		},
+		OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
+			acknowledged <- info.MessagesCount
+		},
+	}
+
+	startedSessionID := rawtopicreader.PartitionSessionID(42)
+	require.NoError(t, e.reader.onStartPartitionSessionRequest(&rawtopicreader.StartPartitionSessionRequest{
+		PartitionSession: rawtopicreader.PartitionSession{
+			PartitionSessionID: startedSessionID,
+			Path:               e.partitionSession.Topic,
+			PartitionID:        e.partitionSession.PartitionID,
+		},
+		CommittedOffset: rawtopiccommon.NewOffset(20),
+	}))
+	startedSession, err := e.reader.sessionController.Get(startedSessionID)
+	require.NoError(t, err)
+	e.partitionSessionID = startedSessionID
+	e.partitionSession = startedSession
+	startResponseSent := make(empty.Chan)
+	e.stream.EXPECT().Send(gomock.AssignableToTypeOf(&rawtopicreader.StartPartitionSessionResponse{})).
+		DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
+			close(startResponseSent)
+
+			return nil
+		})
+	e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: 50}).Return(nil)
+	e.Start()
+	reader := newMetricsReader(&e)
+	readResult := make(chan readerBatchResult, 1)
+	go func() {
+		batch, err := reader.ReadMessageBatch(e.ctx)
+		readResult <- readerBatchResult{batch: batch, err: err}
+	}()
+	select {
+	case <-startResponseSent:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for start partition session response")
+	}
+	e.SendFromServer(readerMetricResponseWithOffsets(&e, 50, 20, 24))
+	select {
+	case result := <-readResult:
+		require.NoError(t, result.err)
+		require.NotNil(t, result.batch)
+		require.Equal(t, []int64{20, 24}, []int64{
+			result.batch.Messages[0].Offset,
+			result.batch.Messages[1].Offset,
+		})
+
+		return &readerCommitMetricsTest{
+			env:          &e,
+			reader:       reader,
+			batch:        result.batch,
+			queued:       queued,
+			acknowledged: acknowledged,
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for reader batch")
+
+		return nil
+	}
+}
+
+func readerMetricCommitRequest(
+	t *testing.T,
+	requests <-chan *rawtopicreader.CommitOffsetRequest,
+) *rawtopicreader.CommitOffsetRequest {
+	t.Helper()
+
+	select {
+	case request := <-requests:
+		return request
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for reader commit request")
+
+		return nil
+	}
+}
+
 func readerMetricDelta(t *testing.T, deltas <-chan int) int {
 	t.Helper()
 
@@ -485,4 +498,8 @@ func newMetricsReader(e *streamEnv) *Reader {
 	})
 
 	return reader
+}
+
+func readerNamePointer(name string) *string {
+	return &name
 }

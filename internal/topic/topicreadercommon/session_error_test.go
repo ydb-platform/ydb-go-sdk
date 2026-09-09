@@ -7,11 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -36,6 +34,12 @@ func TestClassifySessionError(t *testing.T) {
 			errorType:  "transport_error",
 		},
 		{
+			name:       "unknown grpc status",
+			err:        grpcStatus.Error(grpcCodes.Code(99), "future transport code"),
+			statusCode: "Code(99)",
+			errorType:  "transport_error",
+		},
+		{
 			name:       "ydb",
 			err:        xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION)),
 			statusCode: "BAD_SESSION",
@@ -44,6 +48,12 @@ func TestClassifySessionError(t *testing.T) {
 		{
 			name:       "unknown ydb status",
 			err:        xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_StatusCode(499999))),
+			statusCode: "499999",
+			errorType:  "ydb_error",
+		},
+		{
+			name:       "unspecified ydb status",
+			err:        xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED)),
 			statusCode: "unknown",
 			errorType:  "ydb_error",
 		},
@@ -101,35 +111,40 @@ func TestTraceReaderSessionError(t *testing.T) {
 	require.Error(t, got.Error)
 }
 
-func TestClassifySessionErrorPreservesRawTopicStatus(t *testing.T) {
-	reader := rawtopicreader.StreamReader{
-		Stream: &rawTopicSessionErrorStream{
-			response: &Ydb_Topic.StreamReadMessage_FromServer{
-				Status: Ydb.StatusIds_UNAUTHORIZED,
-			},
-		},
-		Tracer: &trace.Topic{},
+func TestTraceReaderSessionErrorHandlesNoOpAndUnknownTransportCode(t *testing.T) {
+	readerInfo := ReaderInfo{
+		Endpoint:   "endpoint",
+		Database:   "database",
+		Consumer:   "consumer",
+		ReaderName: readerNamePointer("reader"),
 	}
+	unknownTransportError := grpcStatus.Error(grpcCodes.Code(99), "future transport code")
 
-	_, err := reader.Recv()
-	require.Error(t, err)
+	TraceReaderSessionError(context.Background(), nil, readerInfo, "stop", unknownTransportError)
+	TraceReaderSessionError(context.Background(), &trace.Topic{}, readerInfo, "stop", unknownTransportError)
+
+	calls := 0
+	tracer := &trace.Topic{
+		OnReaderSessionError: func(trace.TopicReaderSessionErrorInfo) {
+			calls++
+		},
+	}
+	TraceReaderSessionError(context.Background(), tracer, readerInfo, "stop", nil)
+	require.Zero(t, calls)
+
+	var actual trace.TopicReaderSessionErrorInfo
+	tracer.OnReaderSessionError = func(info trace.TopicReaderSessionErrorInfo) {
+		actual = info
+	}
+	TraceReaderSessionError(context.Background(), tracer, readerInfo, "stop", unknownTransportError)
+
+	require.Equal(t, "stop", actual.RetryDecision)
+	require.Equal(t, "Code(99)", actual.StatusCode)
+	require.Equal(t, "transport_error", actual.ErrorType)
+	require.Error(t, actual.Error)
 	require.Equal(t, SessionErrorClassification{
-		StatusCode: "UNAUTHORIZED", ErrorType: "ydb_error",
-	}, ClassifySessionError(err))
-}
-
-type rawTopicSessionErrorStream struct {
-	response *Ydb_Topic.StreamReadMessage_FromServer
-}
-
-func (s *rawTopicSessionErrorStream) Send(*Ydb_Topic.StreamReadMessage_FromClient) error {
-	return nil
-}
-
-func (s *rawTopicSessionErrorStream) Recv() (*Ydb_Topic.StreamReadMessage_FromServer, error) {
-	return s.response, nil
-}
-
-func (s *rawTopicSessionErrorStream) CloseSend() error {
-	return nil
+		StatusCode: "Code(99)",
+		ErrorType:  "transport_error",
+	}, ClassifySessionError(unknownTransportError))
+	require.ErrorIs(t, actual.Error, unknownTransportError)
 }

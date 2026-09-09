@@ -243,28 +243,7 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 		e := fixenv.New(t)
 		ctx := sf.Context(e)
 		listener := StreamListener(e)
-		t.Cleanup(func() {
-			_ = listener.Close(context.Background(), errors.New("test cleanup"))
-		})
-		listener.cfg = &StreamListenerConfig{
-			Decoders: topicreadercommon.NewMultiDecoder(),
-			ReaderInfo: topicreadercommon.ReaderInfo{
-				Endpoint:   "node:2135",
-				Database:   "/db",
-				Consumer:   "consumer",
-				ReaderName: readerNamePointer("reader"),
-			},
-		}
-		queued := make(chan int, 4)
-		acknowledged := make(chan int, 4)
-		listener.tracer = &trace.Topic{
-			OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
-				queued <- info.MessagesCount
-			},
-			OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
-				acknowledged <- info.MessagesCount
-			},
-		}
+		queued, acknowledged := setupListenerCommitMetrics(t, listener)
 		session := listenerMetricStartPartition(t, e, listener)
 		batch := listenerMetricCommitBatch(t, listener.cfg.Decoders, session)
 
@@ -306,28 +285,7 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 		ctx, cancel := context.WithTimeout(sf.Context(e), time.Second)
 		defer cancel()
 		listener := StreamListener(e)
-		t.Cleanup(func() {
-			_ = listener.Close(context.Background(), errors.New("test cleanup"))
-		})
-		listener.cfg = &StreamListenerConfig{
-			Decoders: topicreadercommon.NewMultiDecoder(),
-			ReaderInfo: topicreadercommon.ReaderInfo{
-				Endpoint:   "node:2135",
-				Database:   "/db",
-				Consumer:   "consumer",
-				ReaderName: readerNamePointer("reader"),
-			},
-		}
-		queued := make(chan int, 4)
-		acknowledged := make(chan int, 4)
-		listener.tracer = &trace.Topic{
-			OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
-				queued <- info.MessagesCount
-			},
-			OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
-				acknowledged <- info.MessagesCount
-			},
-		}
+		queued, acknowledged := setupListenerCommitMetrics(t, listener)
 		session := listenerMetricStartPartition(t, e, listener)
 		batch := listenerMetricCommitBatch(t, listener.cfg.Decoders, session)
 
@@ -396,6 +354,38 @@ func TestStreamListener_MetricBalancesArePerStreamForSameReaderName(t *testing.T
 	require.NoError(t, listener2.Close(context.Background(), errors.New("close second listener")))
 	require.Equal(t, -10, listenerMetricDelta(t, listener2Credits))
 	require.Equal(t, -2, listenerMetricDelta(t, listener2Locals))
+}
+
+func setupListenerCommitMetrics(
+	t *testing.T,
+	listener *streamListener,
+) (queued, acknowledged chan int) {
+	t.Helper()
+
+	t.Cleanup(func() {
+		_ = listener.Close(context.Background(), errors.New("test cleanup"))
+	})
+	listener.cfg = &StreamListenerConfig{
+		Decoders: topicreadercommon.NewMultiDecoder(),
+		ReaderInfo: topicreadercommon.ReaderInfo{
+			Endpoint:   "node:2135",
+			Database:   "/db",
+			Consumer:   "consumer",
+			ReaderName: readerNamePointer("reader"),
+		},
+	}
+	queued = make(chan int, 4)
+	acknowledged = make(chan int, 4)
+	listener.tracer = &trace.Topic{
+		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
+			queued <- info.MessagesCount
+		},
+		OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
+			acknowledged <- info.MessagesCount
+		},
+	}
+
+	return queued, acknowledged
 }
 
 func listenerMetricResponse(session *topicreadercommon.PartitionSession, bytesSize int) *rawtopicreader.ReadResponse {
@@ -574,4 +564,8 @@ func newStreamMetricsListener(e fixenv.Env, listenerID string) *streamListener {
 	listener.background = *background.NewWorker(sf.Context(e), "metrics-test-listener")
 
 	return listener
+}
+
+func readerNamePointer(name string) *string {
+	return &name
 }

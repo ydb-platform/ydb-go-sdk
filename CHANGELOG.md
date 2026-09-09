@@ -1,39 +1,7 @@
-* Fixed topic metric opt-in and Reader/Listener detail filtering, preserved server
-  error status and normalized database attributes, and ordered balance deltas
-  across concurrent delivery and close callbacks. Reader and listener names
-  default to a process-local `reader-N` when omitted or empty.
-
 * Added topic reader and listener metrics for message flow, session errors,
   commit progress, local ownership, and read-ahead credit balance; bumped the
-  metrics observability-chain version from `ydb-sdk-metrics/0.2.0` to
-  `ydb-sdk-metrics/0.3.0`.
-
-  | Metric | Unit | Description |
-  | --- | --- | --- |
-  | `ydb.topic.reader.received.messages` | `{message}` | Counted messages accepted from the topic stream |
-  | `ydb.topic.reader.delivered.messages` | `{message}` | Counted messages delivered to the application |
-  | `ydb.topic.reader.received.bytes` | `By` | Counted each `ReadResponse.BytesSize` once, including discarded or unknown partition data |
-  | `ydb.topic.reader.session.errors` | `{error}` | Counted retry or stop decisions for failed sessions |
-  | `ydb.topic.reader.commit.queued` | `{message}` | Counted accepted commit-range spans |
-  | `ydb.topic.reader.commit.acknowledged` | `{message}` | Counted fully covered queued commit-range spans once in admission order |
-  | `ydb.topic.reader.local_buffer.messages` | `{message}` | Tracked accepted messages held by the SDK until delivery, discard, or close |
-  | `ydb.topic.reader.credit_balance_bytes` | `By` | Tracked successful read-request bytes minus response bytes, with remaining balance compensated on close |
-
-  All instruments carried `endpoint`, `database`, `consumer`, and
-  `reader.name`; absent optional values were emitted as empty strings. Reader
-  names defaulted to a process-local `reader-N` when omitted or empty.
-  Message, commit, and local-buffer instruments also carried `topic`; byte,
-  credit, and session-error instruments omitted it. Session errors additionally
-  carried `retry_decision`, `status_code`, and `error.type`.
-
-  Queued commits counted accepted request spans, including repeats and
-  overlaps; offset gaps contributed to each span. Fully covered ranges counted
-  once in admission order. Partial and backward acknowledgements did not
-  increment; a repeated acknowledgement without new requests added zero.
-  Transactional commits were excluded. Balance instruments were exposed
-  through `GaugeVec` and signed `Gauge.Add`
-  deltas, allowing adapters to map them to up/down instruments. `WithReaderName`
-  and `WithListenerName` set the stable `reader.name` attribute for both APIs.
+  metrics observability chain to `ydb-sdk-metrics/0.3.0`. See
+  [METRICS.md](METRICS.md).
 
 ## v3.151.1
 * Fixed `database/sql` Query Service requests failing on session creation attempt timeouts while the caller context remained active

@@ -109,7 +109,17 @@ func setupTopicReaderReceivedBytes(t *trace.Topic, config Config) {
 		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderMessageEvents) {
 			return
 		}
-		addCounter(receivedBytes.With(streamLabels(info.Endpoint, info.Database, info.Consumer, info.ReaderName)), info.Bytes)
+		if info.Bytes <= 0 {
+			return
+		}
+
+		counter := receivedBytes.With(streamLabels(info.Endpoint, info.Database, info.Consumer, info.ReaderName))
+		adder, ok := counter.(interface{ Add(delta float64) })
+		if !ok {
+			return
+		}
+
+		adder.Add(float64(info.Bytes))
 	}
 }
 
@@ -272,11 +282,6 @@ func streamLabels(endpoint, database, consumer string, readerName *string) map[s
 
 func addCounter(counter Counter, delta int) {
 	if delta <= 0 {
-		return
-	}
-	if adder, ok := counter.(CounterAdder); ok {
-		adder.Add(int64(delta))
-
 		return
 	}
 	if adder, ok := counter.(interface{ Add(delta float64) }); ok {

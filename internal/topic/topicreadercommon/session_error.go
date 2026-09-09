@@ -2,6 +2,7 @@ package topicreadercommon
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
@@ -19,7 +20,7 @@ const (
 	unknownSessionErrorType       = "unknown"
 )
 
-// SessionErrorClassification contains the bounded labels derived from an
+// SessionErrorClassification contains the labels derived from an
 // error reported by a topic reader session.
 type SessionErrorClassification struct {
 	StatusCode string
@@ -54,7 +55,7 @@ func ClassifySessionError(err error) SessionErrorClassification {
 	return classification
 }
 
-// TraceReaderSessionError emits one bounded session error event for a caller
+// TraceReaderSessionError emits one session error event for a caller
 // that has already made the retry or stop decision.
 func TraceReaderSessionError(
 	ctx context.Context,
@@ -84,18 +85,17 @@ func TraceReaderSessionError(
 }
 
 func grpcStatusCodeName(code grpcCodes.Code) string {
-	if code > grpcCodes.Unauthenticated {
-		return unknownSessionErrorStatusCode
-	}
-
 	return code.String()
 }
 
 func ydbStatusCodeName(code int32) string {
 	name, ok := Ydb.StatusIds_StatusCode_name[code]
-	if !ok || name == "STATUS_CODE_UNSPECIFIED" {
+	if ok && name != "STATUS_CODE_UNSPECIFIED" {
+		return name
+	}
+	if code == int32(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED) {
 		return unknownSessionErrorStatusCode
 	}
 
-	return name
+	return strconv.FormatInt(int64(code), 10)
 }

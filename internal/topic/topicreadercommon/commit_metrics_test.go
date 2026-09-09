@@ -12,6 +12,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -78,6 +79,62 @@ func TestCommitMetricsSetupAfterSessionCloseIsIgnored(t *testing.T) {
 
 	TraceCommitQueued(session.Context(), GetCommitRange(message))
 	require.Zero(t, queued)
+}
+
+func TestSetupCommitMetricsGuardsAndRepeatedInitialization(t *testing.T) {
+	var nilSession *PartitionSession
+	require.NotPanics(t, func() {
+		nilSession.SetupCommitMetrics(&trace.Topic{}, ReaderInfo{})
+	})
+
+	session := NewPartitionSession(context.Background(), "topic", 1, 1, "", 2, 3, 0)
+	t.Cleanup(session.Close)
+	require.NotPanics(t, func() {
+		session.SetupCommitMetrics(nil, ReaderInfo{})
+	})
+	require.Nil(t, session.commitMetrics)
+
+	session.SetupCommitMetrics(&trace.Topic{}, ReaderInfo{})
+	require.Nil(t, session.commitMetrics)
+
+	cancelledContext, cancel := context.WithCancel(context.Background())
+	cancel()
+	cancelledSession := NewPartitionSession(cancelledContext, "topic", 1, 1, "", 2, 3, 0)
+	t.Cleanup(cancelledSession.Close)
+	cancelledSession.SetupCommitMetrics(&trace.Topic{
+		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {},
+	}, ReaderInfo{})
+	require.Nil(t, cancelledSession.commitMetrics)
+
+	queuedTracer := &trace.Topic{OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {}}
+	session.SetupCommitMetrics(queuedTracer, ReaderInfo{})
+	require.NotNil(t, session.commitMetrics)
+	initialMetrics := session.commitMetrics
+
+	session.SetupCommitMetrics(&trace.Topic{
+		OnReaderCommitAcknowledged: func(trace.TopicReaderCommitAcknowledgedInfo) {},
+	}, ReaderInfo{})
+	require.Same(t, initialMetrics, session.commitMetrics)
+	require.Nil(t, session.commitMetrics.tracker)
+}
+
+func TestTraceCommitAcknowledgedAfterRegistrationWithoutHook(t *testing.T) {
+	session := newCommitMetricsTestSession(t, &trace.Topic{
+		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {},
+	})
+
+	require.NotPanics(t, func() {
+		TraceCommitAcknowledgedAfterRegistration(context.Background(), session, 1)
+	})
+}
+
+func TestComposedEmptyTraceDoesNotAllocateCommitTracking(t *testing.T) {
+	session := NewPartitionSession(context.Background(), "topic", 1, 1, "", 2, 3, 0)
+	defer session.Close()
+	tracer := gtrace.Compose(&trace.Topic{}, &trace.Topic{})
+	tracer = gtrace.Compose(tracer, &trace.Topic{})
+	session.SetupCommitMetrics(tracer, ReaderInfo{})
+	require.Nil(t, session.commitMetrics)
 }
 
 func TestPublicMessageBuilderPreservesCommitRangeBoundaries(t *testing.T) {
@@ -515,4 +572,8 @@ func newCommitMetricsTestSession(t testing.TB, tracer *trace.Topic) *PartitionSe
 	t.Cleanup(session.Close)
 
 	return session
+}
+
+func readerNamePointer(name string) *string {
+	return &name
 }

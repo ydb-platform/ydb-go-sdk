@@ -307,7 +307,13 @@ func (c *Client) StartListener(
 	readSelectors topicoptions.ReadSelectors,
 	opts ...topicoptions.ListenerOption,
 ) (*topiclistener.TopicListener, error) {
-	cfg := c.newStreamListenerConfig(consumer, readSelectors)
+	cfg := topiclistenerinternal.NewStreamListenerConfig()
+	cfg.ReaderInfo = c.readerInfo(consumer, cfg.ReaderName)
+	cfg.Tracer = c.cfg.Trace
+	cfg.Selectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))
+	for i := range readSelectors {
+		cfg.Selectors[i] = readSelectors[i].Clone()
+	}
 
 	for _, opt := range opts {
 		if opt == nil {
@@ -322,21 +328,6 @@ func (c *Client) StartListener(
 	}
 
 	return topiclistener.NewTopicListener(&c.rawClient, &cfg, handler)
-}
-
-func (c *Client) newStreamListenerConfig(
-	consumer string,
-	readSelectors topicoptions.ReadSelectors,
-) topiclistenerinternal.StreamListenerConfig {
-	cfg := topiclistenerinternal.NewStreamListenerConfig()
-	cfg.ReaderInfo = c.readerInfo(consumer, cfg.ReaderName)
-	cfg.Tracer = c.cfg.Trace
-	cfg.Selectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))
-	for i := range readSelectors {
-		cfg.Selectors[i] = readSelectors[i].Clone()
-	}
-
-	return cfg
 }
 
 // StartReader create new topic reader and start pull messages from server
@@ -356,7 +347,13 @@ func (c *Client) StartReader(
 		return c.rawClient.StreamRead(ctx, readerID, tracer)
 	}
 
-	opts = append(c.defaultReaderOptions(consumer), opts...)
+	opts = append([]topicoptions.ReaderOption{
+		topicoptions.WithCommonConfig(c.cfg.Common),
+		topicreaderinternal.WithCredentials(c.cred),
+		topicreaderinternal.WithReaderInfo(c.readerInfo(consumer, nil)),
+		topicreaderinternal.WithTrace(c.cfg.Trace),
+		topicoptions.WithReaderStartTimeout(topic.DefaultStartTimeout),
+	}, opts...)
 
 	internalReader, err := topicreaderinternal.NewReader(&c.rawClient, connector, consumer, readSelectors, opts...)
 	if err != nil {
@@ -366,16 +363,6 @@ func (c *Client) StartReader(
 	internalReader.TopicOnReaderStart(consumer, err)
 
 	return topicreader.NewReader(internalReader), nil
-}
-
-func (c *Client) defaultReaderOptions(consumer string) []topicoptions.ReaderOption {
-	return []topicoptions.ReaderOption{
-		topicoptions.WithCommonConfig(c.cfg.Common),
-		topicreaderinternal.WithCredentials(c.cred),
-		topicreaderinternal.WithReaderInfo(c.readerInfo(consumer, nil)),
-		topicreaderinternal.WithTrace(c.cfg.Trace),
-		topicoptions.WithReaderStartTimeout(topic.DefaultStartTimeout),
-	}
 }
 
 func (c *Client) readerInfo(consumer string, readerName *string) topicreadercommon.ReaderInfo {

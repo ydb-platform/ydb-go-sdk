@@ -7,10 +7,9 @@ import (
 
 	internalTopic "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 )
 
-func TestReaderAndListenerConfigsPropagateDriverAttributes(t *testing.T) {
+func TestReaderInfoPropagatesDriverAttributes(t *testing.T) {
 	const (
 		configuredEndpoint = "configured:2135"
 		configuredDatabase = "/local"
@@ -23,40 +22,21 @@ func TestReaderAndListenerConfigsPropagateDriverAttributes(t *testing.T) {
 		),
 	}
 
-	t.Run("reader", func(t *testing.T) {
-		cfg := &topicreaderinternal.ReaderConfig{}
-		for _, opt := range client.defaultReaderOptions("consumer") {
-			opt(cfg)
-		}
+	require.Equal(t, topicreadercommon.ReaderInfo{
+		Endpoint: configuredEndpoint,
+		Database: configuredDatabase,
+		Consumer: "consumer",
+	}, client.readerInfo("consumer", nil))
 
-		require.Equal(t, topicreadercommon.ReaderInfo{
-			Endpoint: configuredEndpoint,
-			Database: configuredDatabase,
-			Consumer: "consumer",
-		}, cfg.ReaderInfo)
-	})
-
-	t.Run("listener", func(t *testing.T) {
-		cfg := client.newStreamListenerConfig("consumer", nil)
-
-		require.Equal(t, topicreadercommon.ReaderInfo{
-			Endpoint: configuredEndpoint,
-			Database: configuredDatabase,
-			Consumer: "consumer",
-		}, cfg.ReaderInfo)
-	})
-
-	t.Run("reader info preserves reader name", func(t *testing.T) {
-		require.Equal(t, topicreadercommon.ReaderInfo{
-			Endpoint:   configuredEndpoint,
-			Database:   configuredDatabase,
-			Consumer:   "consumer",
-			ReaderName: readerNamePointer("reader-name"),
-		}, client.readerInfo("consumer", readerNamePointer("reader-name")))
-	})
+	require.Equal(t, topicreadercommon.ReaderInfo{
+		Endpoint:   configuredEndpoint,
+		Database:   configuredDatabase,
+		Consumer:   "consumer",
+		ReaderName: readerNamePointer("reader-name"),
+	}, client.readerInfo("consumer", readerNamePointer("reader-name")))
 }
 
-func TestReaderMetricsNormalizeConfiguredDatabase(t *testing.T) {
+func TestReaderInfoNormalizesConfiguredDatabase(t *testing.T) {
 	for _, database := range []string{"/local", "/local//", "/local/./", "/local/child/..", "local/"} {
 		t.Run(database, func(t *testing.T) {
 			client := &Client{cfg: newTopicConfig(internalTopic.WithDatabase(database))}
@@ -65,4 +45,8 @@ func TestReaderMetricsNormalizeConfiguredDatabase(t *testing.T) {
 		})
 	}
 	require.Empty(t, (&Client{}).readerInfo("", readerNamePointer("")).Database)
+}
+
+func readerNamePointer(name string) *string {
+	return &name
 }

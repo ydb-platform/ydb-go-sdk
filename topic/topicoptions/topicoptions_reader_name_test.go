@@ -39,16 +39,7 @@ func TestReaderNameDefaultsToGeneratedName(t *testing.T) {
 func TestListenerNameDefaultsToGeneratedName(t *testing.T) {
 	for _, names := range [][]string{nil, {""}, {"listener-custom"}} {
 		t.Run(fmt.Sprint(names), func(t *testing.T) {
-			cfg := topiclistenerinternal.NewStreamListenerConfig()
-			cfg.Consumer = "consumer"
-			cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "/topic"}}
-			if len(names) != 0 {
-				WithListenerName(names[0])(&cfg)
-			}
-			reconnector, err := topiclistenerinternal.NewTopicListenerReconnector(
-				nameTestTopicClient{}, &cfg, nameTestEventHandler{},
-			)
-			require.NoError(t, err)
+			cfg, reconnector := newNameTestListener(t, names...)
 			defer closeNameTestListener(t, reconnector)
 			require.NotNil(t, cfg.ReaderName)
 			if len(names) == 0 || names[0] == "" {
@@ -66,22 +57,10 @@ func TestDefaultNamesAreUniqueAcrossReadersAndListeners(t *testing.T) {
 	defer closeNameTestReader(t, &firstReader)
 	defer closeNameTestReader(t, &secondReader)
 
-	firstListenerConfig := topiclistenerinternal.NewStreamListenerConfig()
-	firstListenerConfig.Consumer = "consumer"
-	firstListenerConfig.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "/topic"}}
-	firstListener, err := topiclistenerinternal.NewTopicListenerReconnector(
-		nameTestTopicClient{}, &firstListenerConfig, nameTestEventHandler{},
-	)
-	require.NoError(t, err)
+	firstListenerConfig, firstListener := newNameTestListener(t)
 	defer closeNameTestListener(t, firstListener)
 
-	secondListenerConfig := topiclistenerinternal.NewStreamListenerConfig()
-	secondListenerConfig.Consumer = "consumer"
-	secondListenerConfig.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "/topic"}}
-	secondListener, err := topiclistenerinternal.NewTopicListenerReconnector(
-		nameTestTopicClient{}, &secondListenerConfig, nameTestEventHandler{},
-	)
-	require.NoError(t, err)
+	secondListenerConfig, secondListener := newNameTestListener(t)
 	defer closeNameTestListener(t, secondListener)
 
 	names := map[string]struct{}{
@@ -100,13 +79,10 @@ func newNameTestReader(t *testing.T, names ...string) topicreaderinternal.Reader
 	if len(names) != 0 {
 		opts = append(opts, WithReaderName(names[0]))
 	}
-	connectorStarted := make(chan struct{})
 	stream := &nameTestRawStream{closed: make(chan struct{})}
 	reader, err := topicreaderinternal.NewReader(
 		nil,
 		func(context.Context, int64, *trace.Topic) (topicreadercommon.RawTopicReaderStream, error) {
-			close(connectorStarted)
-
 			return stream, nil
 		},
 		"consumer",
@@ -114,16 +90,35 @@ func newNameTestReader(t *testing.T, names ...string) topicreaderinternal.Reader
 		opts...,
 	)
 	require.NoError(t, err)
-	select {
-	case <-connectorStarted:
-	case <-time.After(time.Second):
-		t.Fatal("reader connector was not called")
-	}
-	require.Eventually(t, func() bool {
-		return reader.ReadSessionID() == "name-test-session"
-	}, time.Second, time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, reader.WaitInit(ctx))
+	require.Equal(t, "name-test-session", reader.ReadSessionID())
 
 	return reader
+}
+
+func newNameTestListener(
+	t *testing.T,
+	names ...string,
+) (topiclistenerinternal.StreamListenerConfig, *topiclistenerinternal.TopicListenerReconnector) {
+	t.Helper()
+
+	cfg := topiclistenerinternal.NewStreamListenerConfig()
+	cfg.Consumer = "consumer"
+	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "/topic"}}
+	if len(names) != 0 {
+		WithListenerName(names[0])(&cfg)
+	}
+	reconnector, err := topiclistenerinternal.NewTopicListenerReconnector(
+		nameTestTopicClient{}, &cfg, nameTestEventHandler{},
+	)
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.ErrorIs(t, reconnector.WaitInit(ctx), context.Canceled)
+
+	return cfg, reconnector
 }
 
 func internalReaderName(reader topicreaderinternal.Reader) *string {
