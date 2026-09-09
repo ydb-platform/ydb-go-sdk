@@ -56,8 +56,11 @@ func setupTopicReaderReceivedMessages(t *trace.Topic, config Config) {
 		topicReaderReceivedMessagesUnit,
 		topicMessageLabels,
 	)
+	if config.Details()&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) == 0 {
+		return
+	}
 	t.OnReaderMessagesReceived = func(info trace.TopicReaderMessagesReceivedInfo) {
-		if config.Details()&trace.TopicReaderMessageEvents == 0 {
+		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderMessageEvents) {
 			return
 		}
 		addCounter(
@@ -76,8 +79,11 @@ func setupTopicReaderDeliveredMessages(t *trace.Topic, config Config) {
 		topicReaderDeliveredMessagesUnit,
 		topicMessageLabels,
 	)
+	if config.Details()&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) == 0 {
+		return
+	}
 	t.OnReaderMessagesDelivered = func(info trace.TopicReaderMessagesDeliveredInfo) {
-		if config.Details()&trace.TopicReaderMessageEvents == 0 {
+		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderMessageEvents) {
 			return
 		}
 		addCounter(
@@ -96,8 +102,11 @@ func setupTopicReaderReceivedBytes(t *trace.Topic, config Config) {
 		topicReaderReceivedBytesUnit,
 		topicStreamLabels,
 	)
+	if config.Details()&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) == 0 {
+		return
+	}
 	t.OnReaderReceivedBytes = func(info trace.TopicReaderReceivedBytesInfo) {
-		if config.Details()&trace.TopicReaderMessageEvents == 0 {
+		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderMessageEvents) {
 			return
 		}
 		addCounter(receivedBytes.With(streamLabels(info.Endpoint, info.Database, info.Consumer, info.ReaderName)), info.Bytes)
@@ -113,15 +122,18 @@ func setupTopicReaderSessionErrors(t *trace.Topic, config Config) {
 		topicReaderSessionErrorsUnit,
 		topicSessionErrorLabels,
 	)
+	if config.Details()&(trace.TopicReaderStreamEvents|trace.TopicListenerStreamEvents) == 0 {
+		return
+	}
 	t.OnReaderSessionError = func(info trace.TopicReaderSessionErrorInfo) {
-		if config.Details()&trace.TopicReaderStreamEvents == 0 {
+		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderStreamEvents) {
 			return
 		}
-		addCounter(sessionErrors.With(map[string]string{
-			"endpoint": info.Endpoint, "database": info.Database, "consumer": info.Consumer,
-			"reader.name": info.ReaderName, "retry_decision": info.RetryDecision,
-			"status_code": info.StatusCode, "error.type": info.ErrorType,
-		}), 1)
+		labels := streamLabels(info.Endpoint, info.Database, info.Consumer, info.ReaderName)
+		labels["retry_decision"] = info.RetryDecision
+		labels["status_code"] = info.StatusCode
+		labels["error.type"] = info.ErrorType
+		addCounter(sessionErrors.With(labels), 1)
 	}
 }
 
@@ -134,8 +146,11 @@ func setupTopicReaderCommitQueued(t *trace.Topic, config Config) {
 		topicReaderCommitQueuedUnit,
 		topicMessageLabels,
 	)
+	if config.Details()&(trace.TopicReaderStreamEvents|trace.TopicListenerStreamEvents) == 0 {
+		return
+	}
 	t.OnReaderCommitQueued = func(info trace.TopicReaderCommitQueuedInfo) {
-		if config.Details()&trace.TopicReaderStreamEvents == 0 {
+		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderStreamEvents) {
 			return
 		}
 		addCounter(
@@ -154,8 +169,11 @@ func setupTopicReaderCommitAcknowledged(t *trace.Topic, config Config) {
 		topicReaderCommitAcknowledgedUnit,
 		topicMessageLabels,
 	)
+	if config.Details()&(trace.TopicReaderStreamEvents|trace.TopicListenerStreamEvents) == 0 {
+		return
+	}
 	t.OnReaderCommitAcknowledged = func(info trace.TopicReaderCommitAcknowledgedInfo) {
-		if config.Details()&trace.TopicReaderStreamEvents == 0 {
+		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderStreamEvents) {
 			return
 		}
 		addCounter(
@@ -174,8 +192,11 @@ func setupTopicReaderLocalBufferMessages(t *trace.Topic, config Config) {
 		topicReaderLocalBufferMessagesUnit,
 		topicMessageLabels,
 	)
+	if config.Details()&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) == 0 {
+		return
+	}
 	t.OnReaderLocalBufferChanged = func(info trace.TopicReaderLocalBufferChangedInfo) {
-		if config.Details()&trace.TopicReaderMessageEvents == 0 {
+		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderMessageEvents) {
 			return
 		}
 		addGauge(
@@ -194,8 +215,11 @@ func setupTopicReaderCreditBalanceBytes(t *trace.Topic, config Config) {
 		topicReaderCreditBalanceBytesUnit,
 		topicStreamLabels,
 	)
+	if config.Details()&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) == 0 {
+		return
+	}
 	t.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
-		if config.Details()&trace.TopicReaderMessageEvents == 0 {
+		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderMessageEvents) {
 			return
 		}
 		addGauge(
@@ -225,18 +249,23 @@ func topicGauge(readerConfig Config, legacySystem, legacyName, name, unit string
 	return readerConfig.WithSystem(legacySystem).GaugeVec(legacyName, labels...)
 }
 
-func messageLabels(endpoint, database, topic, consumer, readerName string) map[string]string {
-	return map[string]string{
-		"endpoint": endpoint, "database": database, "topic": topic,
-		"consumer": consumer, "reader.name": readerName,
-	}
+func messageLabels(endpoint, database, topic, consumer string, readerName *string) map[string]string {
+	labels := streamLabels(endpoint, database, consumer, readerName)
+	labels["topic"] = topic
+
+	return labels
 }
 
-func streamLabels(endpoint, database, consumer, readerName string) map[string]string {
-	return map[string]string{
-		"endpoint": endpoint, "database": database, "consumer": consumer,
-		"reader.name": readerName,
+func streamLabels(endpoint, database, consumer string, readerName *string) map[string]string {
+	labels := map[string]string{"endpoint": endpoint, "database": database}
+	if consumer != "" {
+		labels["consumer"] = consumer
 	}
+	if readerName != nil {
+		labels["reader.name"] = *readerName
+	}
+
+	return labels
 }
 
 func addCounter(counter Counter, delta int) {
@@ -263,4 +292,13 @@ func addGauge(gauge Gauge, delta float64) {
 		return
 	}
 	gauge.Add(delta)
+}
+
+// Listener stream events carry the shared reader metrics for the listener API.
+func topicMetricEnabled(details trace.Details, listener bool, readerEvents trace.Details) bool {
+	if listener {
+		return details&trace.TopicListenerStreamEvents != 0
+	}
+
+	return details&readerEvents != 0
 }

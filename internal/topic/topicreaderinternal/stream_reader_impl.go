@@ -59,10 +59,12 @@ type topicStreamReaderImpl struct {
 	readConnectionID string
 	readerID         int64
 
+	creditEvents    topicreadercommon.MetricDeltaQueue
 	creditMu        sync.Mutex
 	creditBalance   int64
 	creditFinalized bool
 
+	localBufferEvents    topicreadercommon.MetricDeltaQueue
 	localBufferMu        sync.Mutex
 	localBufferByTopic   map[string]int64
 	localBufferFinalized bool
@@ -843,6 +845,10 @@ func (r *topicStreamReaderImpl) freeBufferFromMessages(batch *topicreadercommon.
 }
 
 func (r *topicStreamReaderImpl) changeCreditBalance(delta int) {
+	if r.cfg.Trace == nil || r.cfg.Trace.OnReaderCreditBalanceChanged == nil {
+		return
+	}
+
 	r.creditMu.Lock()
 	if r.creditFinalized {
 		r.creditMu.Unlock()
@@ -850,21 +856,17 @@ func (r *topicStreamReaderImpl) changeCreditBalance(delta int) {
 		return
 	}
 	r.creditBalance += int64(delta)
+	r.creditEvents.Enqueue("", delta)
 	r.creditMu.Unlock()
 
-	logCtx := r.cfg.BaseContext
-	gtrace.TopicOnReaderCreditBalanceChanged(
-		r.cfg.Trace,
-		&logCtx,
-		r.cfg.ReaderInfo.Endpoint,
-		r.cfg.ReaderInfo.Database,
-		r.cfg.ReaderInfo.Consumer,
-		r.cfg.ReaderInfo.ReaderName,
-		delta,
-	)
+	r.creditEvents.Emit(r.traceCreditDelta)
 }
 
 func (r *topicStreamReaderImpl) finalizeCreditBalance() {
+	if r.cfg.Trace == nil || r.cfg.Trace.OnReaderCreditBalanceChanged == nil {
+		return
+	}
+
 	r.creditMu.Lock()
 	if r.creditFinalized {
 		r.creditMu.Unlock()
@@ -874,21 +876,23 @@ func (r *topicStreamReaderImpl) finalizeCreditBalance() {
 	balance := r.creditBalance
 	r.creditBalance = 0
 	r.creditFinalized = true
+	r.creditEvents.Enqueue("", -int(balance))
 	r.creditMu.Unlock()
 
-	if balance == 0 {
-		return
-	}
+	r.creditEvents.Emit(r.traceCreditDelta)
+}
+
+func (r *topicStreamReaderImpl) traceCreditDelta(_ string, delta int) {
 	logCtx := r.cfg.BaseContext
 	gtrace.TopicOnReaderCreditBalanceChanged(
-		r.cfg.Trace,
-		&logCtx,
-		r.cfg.ReaderInfo.Endpoint,
-		r.cfg.ReaderInfo.Database,
-		r.cfg.ReaderInfo.Consumer,
-		r.cfg.ReaderInfo.ReaderName,
-		-int(balance),
+		r.cfg.Trace, &logCtx,
+		r.cfg.ReaderInfo.Endpoint, r.cfg.ReaderInfo.Database, r.cfg.ReaderInfo.Consumer,
+		r.cfg.ReaderInfo.ReaderName, r.cfg.ReaderInfo.Listener, delta,
 	)
+}
+
+func (r *topicStreamReaderImpl) traceLocalBufferDelta(topic string, delta int) {
+	topicreadercommon.TraceLocalBufferChanged(r.cfg.BaseContext, r.cfg.Trace, r.cfg.ReaderInfo, topic, delta)
 }
 
 func (r *topicStreamReaderImpl) localBufferTrackingEnabled() bool {
@@ -910,15 +914,10 @@ func (r *topicStreamReaderImpl) reserveLocalBuffer(topic string, messagesCount i
 		r.localBufferByTopic = make(map[string]int64)
 	}
 	r.localBufferByTopic[topic] += int64(messagesCount)
+	r.localBufferEvents.Enqueue(topic, messagesCount)
 	r.localBufferMu.Unlock()
 
-	topicreadercommon.TraceLocalBufferChanged(
-		r.cfg.BaseContext,
-		r.cfg.Trace,
-		r.cfg.ReaderInfo,
-		topic,
-		messagesCount,
-	)
+	r.localBufferEvents.Emit(r.traceLocalBufferDelta)
 
 	return true
 }
@@ -950,15 +949,10 @@ func (r *topicStreamReaderImpl) releaseLocalBuffer(topic string, messagesCount i
 	} else {
 		r.localBufferByTopic[topic] = balance - int64(messagesCount)
 	}
+	r.localBufferEvents.Enqueue(topic, -messagesCount)
 	r.localBufferMu.Unlock()
 
-	topicreadercommon.TraceLocalBufferChanged(
-		r.cfg.BaseContext,
-		r.cfg.Trace,
-		r.cfg.ReaderInfo,
-		topic,
-		-messagesCount,
-	)
+	r.localBufferEvents.Emit(r.traceLocalBufferDelta)
 }
 
 func (r *topicStreamReaderImpl) finalizeLocalBuffer() {
@@ -972,20 +966,13 @@ func (r *topicStreamReaderImpl) finalizeLocalBuffer() {
 
 		return
 	}
-	balances := r.localBufferByTopic
+	for topic, balance := range r.localBufferByTopic {
+		r.localBufferEvents.Enqueue(topic, -int(balance))
+	}
 	r.localBufferByTopic = nil
 	r.localBufferFinalized = true
 	r.localBufferMu.Unlock()
-
-	for topic, balance := range balances {
-		topicreadercommon.TraceLocalBufferChanged(
-			r.cfg.BaseContext,
-			r.cfg.Trace,
-			r.cfg.ReaderInfo,
-			topic,
-			-int(balance),
-		)
-	}
+	r.localBufferEvents.Emit(r.traceLocalBufferDelta)
 }
 
 func (r *topicStreamReaderImpl) updateTokenLoop(ctx context.Context) {
@@ -1012,6 +999,7 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 		r.cfg.ReaderInfo.Database,
 		r.cfg.ReaderInfo.Consumer,
 		r.cfg.ReaderInfo.ReaderName,
+		r.cfg.ReaderInfo.Listener,
 		msg.BytesSize,
 	)
 	r.changeCreditBalance(-msg.BytesSize)

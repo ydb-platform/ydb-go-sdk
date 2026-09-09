@@ -75,6 +75,7 @@ func TraceReaderSessionError(
 		readerInfo.Database,
 		readerInfo.Consumer,
 		readerInfo.ReaderName,
+		readerInfo.Listener,
 		retryDecision,
 		classification.StatusCode,
 		classification.ErrorType,

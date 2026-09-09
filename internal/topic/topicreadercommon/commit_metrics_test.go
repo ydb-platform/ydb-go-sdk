@@ -123,7 +123,7 @@ func TestCommitTraceUsesRangeCountsAndFIFOAcknowledgements(t *testing.T) {
 	require.Equal(t, "endpoint", queued[0].Endpoint)
 	require.Equal(t, "database", queued[0].Database)
 	require.Equal(t, "consumer", queued[0].Consumer)
-	require.Equal(t, "reader", queued[0].ReaderName)
+	require.Equal(t, readerNamePointer("reader"), queued[0].ReaderName)
 	require.Equal(t, int64(1), queued[0].PartitionID)
 	require.Equal(t, int64(2), queued[0].PartitionSessionID)
 
@@ -510,7 +510,7 @@ func newCommitMetricsTestSession(t testing.TB, tracer *trace.Topic) *PartitionSe
 		Endpoint:   "endpoint",
 		Database:   "database",
 		Consumer:   "consumer",
-		ReaderName: "reader",
+		ReaderName: readerNamePointer("reader"),
 	})
 	t.Cleanup(session.Close)
 

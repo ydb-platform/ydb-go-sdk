@@ -36,7 +36,6 @@ func NewTopicListenerReconnector(
 	streamConfig *StreamListenerConfig,
 	handler EventHandler,
 ) (*TopicListenerReconnector, error) {
-	streamConfig.EnsureReaderName()
 	res := &TopicListenerReconnector{
 		streamConfig:        streamConfig,
 		client:              client,

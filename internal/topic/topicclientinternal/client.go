@@ -3,6 +3,7 @@ package topicclientinternal
 import (
 	"context"
 	"errors"
+	"path"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"google.golang.org/grpc"
@@ -371,16 +372,21 @@ func (c *Client) defaultReaderOptions(consumer string) []topicoptions.ReaderOpti
 	return []topicoptions.ReaderOption{
 		topicoptions.WithCommonConfig(c.cfg.Common),
 		topicreaderinternal.WithCredentials(c.cred),
-		topicreaderinternal.WithReaderInfo(c.readerInfo(consumer, "")),
+		topicreaderinternal.WithReaderInfo(c.readerInfo(consumer, nil)),
 		topicreaderinternal.WithTrace(c.cfg.Trace),
 		topicoptions.WithReaderStartTimeout(topic.DefaultStartTimeout),
 	}
 }
 
-func (c *Client) readerInfo(consumer, readerName string) topicreadercommon.ReaderInfo {
+func (c *Client) readerInfo(consumer string, readerName *string) topicreadercommon.ReaderInfo {
+	database := c.cfg.Database
+	if database != "" {
+		database = path.Clean("/" + database)
+	}
+
 	return topicreadercommon.ReaderInfo{
 		Endpoint:   c.cfg.Endpoint,
-		Database:   c.cfg.Database,
+		Database:   database,
 		Consumer:   consumer,
 		ReaderName: readerName,
 	}

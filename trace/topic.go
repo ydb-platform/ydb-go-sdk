@@ -51,10 +51,13 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderCommittedNotify func(TopicReaderCommittedNotifyInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// gtrace:optional
 		OnReaderCommitQueued func(TopicReaderCommitQueuedInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// gtrace:optional
 		OnReaderCommitAcknowledged func(TopicReaderCommitAcknowledgedInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// gtrace:optional
 		OnReaderSessionError func(TopicReaderSessionErrorInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderClose func(TopicReaderCloseStartInfo) func(TopicReaderCloseDoneInfo)
@@ -114,14 +117,19 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderReceiveDataResponse func(TopicReaderReceiveDataResponseStartInfo) func(TopicReaderReceiveDataResponseDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// gtrace:optional
 		OnReaderMessagesReceived func(TopicReaderMessagesReceivedInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// gtrace:optional
 		OnReaderMessagesDelivered func(TopicReaderMessagesDeliveredInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// gtrace:optional
 		OnReaderLocalBufferChanged func(TopicReaderLocalBufferChangedInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// gtrace:optional
 		OnReaderReceivedBytes func(TopicReaderReceivedBytesInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// gtrace:optional
 		OnReaderCreditBalanceChanged func(TopicReaderCreditBalanceChangedInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderReadMessages func(TopicReaderReadMessagesStartInfo) func(TopicReaderReadMessagesDoneInfo)
@@ -335,7 +343,8 @@ type (
 		Database      string
 		Topic         string
 		Consumer      string
-		ReaderName    string
+		ReaderName    *string
+		Listener      bool
 		MessagesCount int
 	}
 
@@ -346,7 +355,8 @@ type (
 		Database      string
 		Topic         string
 		Consumer      string
-		ReaderName    string
+		ReaderName    *string
+		Listener      bool
 		MessagesCount int
 	}
 
@@ -357,7 +367,8 @@ type (
 		Database      string
 		Topic         string
 		Consumer      string
-		ReaderName    string
+		ReaderName    *string
+		Listener      bool
 		MessagesDelta int
 	}
 
@@ -367,7 +378,8 @@ type (
 		Endpoint   string
 		Database   string
 		Consumer   string
-		ReaderName string
+		ReaderName *string
+		Listener   bool
 		Bytes      int
 	}
 
@@ -377,7 +389,8 @@ type (
 		Endpoint   string
 		Database   string
 		Consumer   string
-		ReaderName string
+		ReaderName *string
+		Listener   bool
 		BytesDelta int
 	}
 
@@ -387,7 +400,8 @@ type (
 		Endpoint      string
 		Database      string
 		Consumer      string
-		ReaderName    string
+		ReaderName    *string
+		Listener      bool
 		RetryDecision string
 		StatusCode    string
 		ErrorType     string
@@ -401,7 +415,8 @@ type (
 		Database           string
 		Topic              string
 		Consumer           string
-		ReaderName         string
+		ReaderName         *string
+		Listener           bool
 		PartitionID        int64
 		PartitionSessionID int64
 		MessagesCount      int
@@ -414,7 +429,8 @@ type (
 		Database           string
 		Topic              string
 		Consumer           string
-		ReaderName         string
+		ReaderName         *string
+		Listener           bool
 		PartitionID        int64
 		PartitionSessionID int64
 		MessagesCount      int

@@ -129,6 +129,18 @@ func TestTopicReaderLegacyMetricsKeepDottedScopeAndCreditLeaf(t *testing.T) {
 	require.NotContains(t, registry.kinds, "custom.topic.reader.credit_balance.bytes")
 }
 
+func TestDisabledTopicMetricsDoNotEnableTracking(t *testing.T) {
+	tracer := topic(recordingConfig{registry: newRecordingRegistry(), details: trace.TopicReaderCustomerEvents})
+	require.Nil(t, tracer.OnReaderMessagesReceived)
+	require.Nil(t, tracer.OnReaderMessagesDelivered)
+	require.Nil(t, tracer.OnReaderReceivedBytes)
+	require.Nil(t, tracer.OnReaderLocalBufferChanged)
+	require.Nil(t, tracer.OnReaderCreditBalanceChanged)
+	require.Nil(t, tracer.OnReaderCommitQueued)
+	require.Nil(t, tracer.OnReaderCommitAcknowledged)
+	require.Nil(t, tracer.OnReaderSessionError)
+}
+
 func TestTopicReaderMetricsHonorDetailsGroups(t *testing.T) {
 	t.Run("message events", func(t *testing.T) {
 		registry := newRecordingRegistry()
@@ -141,34 +153,39 @@ func TestTopicReaderMetricsHonorDetailsGroups(t *testing.T) {
 		require.NotNil(t, tracer.OnReaderCreditBalanceChanged)
 
 		tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
-			Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 3,
+			Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+			ReaderName: readerNamePointer("reader"), MessagesCount: 3,
 		})
 		tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{
-			Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 2,
+			Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+			ReaderName: readerNamePointer("reader"), MessagesCount: 2,
 		})
 		tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{
-			Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", Bytes: 11,
+			Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"), Bytes: 11,
 		})
 		tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
-			Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesDelta: 4,
+			Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+			ReaderName: readerNamePointer("reader"), MessagesDelta: 4,
 		})
 		tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
-			Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", BytesDelta: -7,
+			Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"), BytesDelta: -7,
 		})
 
 		if tracer.OnReaderCommitQueued != nil {
 			tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
-				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 9,
+				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+				ReaderName: readerNamePointer("reader"), MessagesCount: 9,
 			})
 		}
 		if tracer.OnReaderCommitAcknowledged != nil {
 			tracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{
-				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 8,
+				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+				ReaderName: readerNamePointer("reader"), MessagesCount: 8,
 			})
 		}
 		if tracer.OnReaderSessionError != nil {
 			tracer.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{
-				Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader",
+				Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"),
 				RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
 			})
 		}
@@ -203,38 +220,43 @@ func TestTopicReaderMetricsHonorDetailsGroups(t *testing.T) {
 
 		if tracer.OnReaderMessagesReceived != nil {
 			tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
-				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 3,
+				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+				ReaderName: readerNamePointer("reader"), MessagesCount: 3,
 			})
 		}
 		if tracer.OnReaderMessagesDelivered != nil {
 			tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{
-				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 2,
+				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+				ReaderName: readerNamePointer("reader"), MessagesCount: 2,
 			})
 		}
 		if tracer.OnReaderReceivedBytes != nil {
 			tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{
-				Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", Bytes: 11,
+				Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"), Bytes: 11,
 			})
 		}
 		if tracer.OnReaderLocalBufferChanged != nil {
 			tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
-				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesDelta: 4,
+				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+				ReaderName: readerNamePointer("reader"), MessagesDelta: 4,
 			})
 		}
 		if tracer.OnReaderCreditBalanceChanged != nil {
 			tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
-				Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", BytesDelta: -7,
+				Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"), BytesDelta: -7,
 			})
 		}
 
 		tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
-			Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 9,
+			Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+			ReaderName: readerNamePointer("reader"), MessagesCount: 9,
 		})
 		tracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{
-			Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 8,
+			Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+			ReaderName: readerNamePointer("reader"), MessagesCount: 8,
 		})
 		tracer.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{
-			Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader",
+			Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"),
 			RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
 		})
 
@@ -268,26 +290,30 @@ func TestTopicReaderCountersUseBatchAddAndIgnoreNonPositive(t *testing.T) {
 	})
 
 	tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 4,
+		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+		ReaderName: readerNamePointer("reader"), MessagesCount: 4,
 	})
 	tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{MessagesCount: 0})
 	tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{MessagesCount: -1})
 	tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 3,
+		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+		ReaderName: readerNamePointer("reader"), MessagesCount: 3,
 	})
 	tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", Bytes: 12,
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"), Bytes: 12,
 	})
 	tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{Bytes: 0})
 	tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{Bytes: -2})
 	tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 2,
+		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+		ReaderName: readerNamePointer("reader"), MessagesCount: 2,
 	})
 	tracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 1,
+		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+		ReaderName: readerNamePointer("reader"), MessagesCount: 1,
 	})
 	tracer.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader",
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"),
 		RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
 	})
 
@@ -323,7 +349,8 @@ func TestTopicReaderCountersUseBatchAddAndIgnoreNonPositive(t *testing.T) {
 		capture:         fallbackCapture,
 	})
 	fallbackTracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 3,
+		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+		ReaderName: readerNamePointer("reader"), MessagesCount: 3,
 	})
 
 	require.Empty(t, fallbackCapture.adds)
@@ -343,7 +370,7 @@ func TestTopicReaderCountersUseFloatAddForLargeDeltas(t *testing.T) {
 	})
 
 	tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", Bytes: largeDelta,
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"), Bytes: largeDelta,
 	})
 	tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{Bytes: 0})
 	tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{Bytes: -1})
@@ -352,7 +379,7 @@ func TestTopicReaderCountersUseFloatAddForLargeDeltas(t *testing.T) {
 		Database:      "/db",
 		Topic:         "/topic",
 		Consumer:      "consumer",
-		ReaderName:    "reader",
+		ReaderName:    readerNamePointer("reader"),
 		MessagesCount: largeDelta,
 	})
 	tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{MessagesCount: 0})
@@ -362,7 +389,7 @@ func TestTopicReaderCountersUseFloatAddForLargeDeltas(t *testing.T) {
 		Database:      "/db",
 		Topic:         "/topic",
 		Consumer:      "consumer",
-		ReaderName:    "reader",
+		ReaderName:    readerNamePointer("reader"),
 		MessagesCount: largeDelta,
 	})
 	tracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{MessagesCount: 0})
@@ -394,23 +421,26 @@ func TestTopicReaderGaugesApplyDeltasWithoutSet(t *testing.T) {
 	})
 
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesDelta: 5,
+		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+		ReaderName: readerNamePointer("reader"), MessagesDelta: 5,
 	})
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesDelta: -2,
+		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+		ReaderName: readerNamePointer("reader"), MessagesDelta: -2,
 	})
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesDelta: -3,
+		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+		ReaderName: readerNamePointer("reader"), MessagesDelta: -3,
 	})
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{MessagesDelta: 0})
 	tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", BytesDelta: 100,
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"), BytesDelta: 100,
 	})
 	tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", BytesDelta: -40,
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"), BytesDelta: -40,
 	})
 	tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", BytesDelta: -60,
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"), BytesDelta: -60,
 	})
 	tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{BytesDelta: 0})
 
@@ -644,4 +674,55 @@ func (g topicTrackingGauge) Set(value float64) {
 	}
 	g.capture.sets[g.path]++
 	g.registry.set(g.path, g.labels, value)
+}
+
+func TestTopicMetricsSeparateReaderAndListenerDetails(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		details trace.Details
+		want    float64
+	}{
+		{"reader", trace.TopicReaderEvents, 1},
+		{"listener", trace.TopicListenerEvents, 10},
+		{"both", trace.TopicEvents, 11},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			registry := newRecordingRegistry()
+			tracer := topic(recordingConfig{registry: registry, details: test.details})
+			for _, listener := range []bool{false, true} {
+				count := 1
+				if listener {
+					count = 10
+				}
+				tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{Listener: listener, MessagesCount: count})
+				tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{Listener: listener, MessagesCount: count})
+				tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{Listener: listener, Bytes: count})
+				tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{Listener: listener, MessagesDelta: count})
+				tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
+					Listener: listener, BytesDelta: count,
+				})
+				tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{Listener: listener, MessagesCount: count})
+				tracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{Listener: listener, MessagesCount: count})
+				for range count {
+					tracer.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{Listener: listener})
+				}
+			}
+			for _, name := range []string{
+				"received.messages", "delivered.messages", "received.bytes", "local_buffer.messages",
+				"credit_balance_bytes", "commit.queued", "commit.acknowledged", "session.errors",
+			} {
+				require.Equal(t, test.want, registry.value("topic.reader."+name, nil), name)
+			}
+		})
+	}
+}
+
+func TestTopicMetricOptionalLabelsMatchDotNet(t *testing.T) {
+	require.Equal(t, map[string]string{"endpoint": "node", "database": "/db"}, streamLabels("node", "/db", "", nil))
+	require.Equal(t, map[string]string{
+		"endpoint": "node", "database": "/db", "topic": "/topic", "reader.name": "",
+	}, messageLabels("node", "/db", "/topic", "", readerNamePointer("")))
+	require.Equal(t, map[string]string{
+		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "named",
+	}, streamLabels("node", "/db", "consumer", readerNamePointer("named")))
 }

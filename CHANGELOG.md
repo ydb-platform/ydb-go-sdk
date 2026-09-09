@@ -1,3 +1,8 @@
+* Fixed topic metric opt-in and Reader/Listener detail filtering, preserved server
+  error status and normalized database attributes, and ordered balance deltas
+  across concurrent delivery and close callbacks. Reader names are now optional:
+  omitted names have no attribute, while explicitly empty names are preserved.
+
 * Added topic reader and listener metrics for message flow, session errors,
   commit progress, local ownership, and read-ahead credit balance; bumped the
   metrics observability-chain version from `ydb-sdk-metrics/0.2.0` to
@@ -14,7 +19,8 @@
   | `ydb.topic.reader.local_buffer.messages` | `{message}` | Tracked accepted messages held by the SDK until delivery, discard, or close |
   | `ydb.topic.reader.credit_balance_bytes` | `By` | Tracked successful read-request bytes minus response bytes, with remaining balance compensated on close |
 
-  All instruments carried `endpoint`, `database`, `consumer`, and `reader.name`.
+  All instruments carried `endpoint` and `database`, plus `consumer` when set
+  and `reader.name` only when explicitly configured.
   Message, commit, and local-buffer instruments also carried `topic`; byte,
   credit, and session-error instruments omitted it. Session errors additionally
   carried `retry_decision`, `status_code`, and `error.type`.

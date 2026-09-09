@@ -23,6 +23,7 @@ func TraceMessagesReceived(
 		topic,
 		readerInfo.Consumer,
 		readerInfo.ReaderName,
+		readerInfo.Listener,
 		messagesCount,
 	)
 }
@@ -43,6 +44,7 @@ func TraceMessagesDelivered(
 		topic,
 		readerInfo.Consumer,
 		readerInfo.ReaderName,
+		readerInfo.Listener,
 		messagesCount,
 	)
 }
@@ -64,6 +66,7 @@ func TraceLocalBufferChanged(
 		topic,
 		readerInfo.Consumer,
 		readerInfo.ReaderName,
+		readerInfo.Listener,
 		messagesDelta,
 	)
 }

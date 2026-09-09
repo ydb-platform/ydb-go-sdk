@@ -308,6 +308,9 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 				h2(t)
 			}
 		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderCommitQueued = nil
+		}
 	}
 	{
 		h1 := lhs.OnReaderCommitAcknowledged
@@ -327,6 +330,9 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 				h2(t)
 			}
 		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderCommitAcknowledged = nil
+		}
 	}
 	{
 		h1 := lhs.OnReaderSessionError
@@ -345,6 +351,9 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 			if h2 != nil {
 				h2(t)
 			}
+		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderSessionError = nil
 		}
 	}
 	{
@@ -772,6 +781,9 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 				h2(t)
 			}
 		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderMessagesReceived = nil
+		}
 	}
 	{
 		h1 := lhs.OnReaderMessagesDelivered
@@ -790,6 +802,9 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 			if h2 != nil {
 				h2(t)
 			}
+		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderMessagesDelivered = nil
 		}
 	}
 	{
@@ -810,6 +825,9 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 				h2(t)
 			}
 		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderLocalBufferChanged = nil
+		}
 	}
 	{
 		h1 := lhs.OnReaderReceivedBytes
@@ -829,6 +847,9 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 				h2(t)
 			}
 		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderReceivedBytes = nil
+		}
 	}
 	{
 		h1 := lhs.OnReaderCreditBalanceChanged
@@ -847,6 +868,9 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 			if h2 != nil {
 				h2(t)
 			}
+		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderCreditBalanceChanged = nil
 		}
 	}
 	{
@@ -2316,7 +2340,7 @@ func TopicOnReaderCommittedNotify(t *trace.Topic, c *context.Context, readerConn
 	onReaderCommittedNotify(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderCommitQueued(t *trace.Topic, c *context.Context, endpoint string, database string, topic string, consumer string, readerName string, partitionID int64, partitionSessionID int64, messagesCount int) {
+func TopicOnReaderCommitQueued(t *trace.Topic, c *context.Context, endpoint string, database string, topic string, consumer string, readerName *string, listener bool, partitionID int64, partitionSessionID int64, messagesCount int) {
 	var p trace.TopicReaderCommitQueuedInfo
 	p.Context = c
 	p.Endpoint = endpoint
@@ -2324,13 +2348,14 @@ func TopicOnReaderCommitQueued(t *trace.Topic, c *context.Context, endpoint stri
 	p.Topic = topic
 	p.Consumer = consumer
 	p.ReaderName = readerName
+	p.Listener = listener
 	p.PartitionID = partitionID
 	p.PartitionSessionID = partitionSessionID
 	p.MessagesCount = messagesCount
 	onReaderCommitQueued(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderCommitAcknowledged(t *trace.Topic, c *context.Context, endpoint string, database string, topic string, consumer string, readerName string, partitionID int64, partitionSessionID int64, messagesCount int) {
+func TopicOnReaderCommitAcknowledged(t *trace.Topic, c *context.Context, endpoint string, database string, topic string, consumer string, readerName *string, listener bool, partitionID int64, partitionSessionID int64, messagesCount int) {
 	var p trace.TopicReaderCommitAcknowledgedInfo
 	p.Context = c
 	p.Endpoint = endpoint
@@ -2338,19 +2363,21 @@ func TopicOnReaderCommitAcknowledged(t *trace.Topic, c *context.Context, endpoin
 	p.Topic = topic
 	p.Consumer = consumer
 	p.ReaderName = readerName
+	p.Listener = listener
 	p.PartitionID = partitionID
 	p.PartitionSessionID = partitionSessionID
 	p.MessagesCount = messagesCount
 	onReaderCommitAcknowledged(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderSessionError(t *trace.Topic, c *context.Context, endpoint string, database string, consumer string, readerName string, retryDecision string, statusCode string, errorType string, e error) {
+func TopicOnReaderSessionError(t *trace.Topic, c *context.Context, endpoint string, database string, consumer string, readerName *string, listener bool, retryDecision string, statusCode string, errorType string, e error) {
 	var p trace.TopicReaderSessionErrorInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	p.Database = database
 	p.Consumer = consumer
 	p.ReaderName = readerName
+	p.Listener = listener
 	p.RetryDecision = retryDecision
 	p.StatusCode = statusCode
 	p.ErrorType = errorType
@@ -2532,7 +2559,7 @@ func TopicOnReaderReceiveDataResponse(t *trace.Topic, c *context.Context, reader
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderMessagesReceived(t *trace.Topic, c *context.Context, endpoint string, database string, topic string, consumer string, readerName string, messagesCount int) {
+func TopicOnReaderMessagesReceived(t *trace.Topic, c *context.Context, endpoint string, database string, topic string, consumer string, readerName *string, listener bool, messagesCount int) {
 	var p trace.TopicReaderMessagesReceivedInfo
 	p.Context = c
 	p.Endpoint = endpoint
@@ -2540,11 +2567,12 @@ func TopicOnReaderMessagesReceived(t *trace.Topic, c *context.Context, endpoint 
 	p.Topic = topic
 	p.Consumer = consumer
 	p.ReaderName = readerName
+	p.Listener = listener
 	p.MessagesCount = messagesCount
 	onReaderMessagesReceived(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderMessagesDelivered(t *trace.Topic, c *context.Context, endpoint string, database string, topic string, consumer string, readerName string, messagesCount int) {
+func TopicOnReaderMessagesDelivered(t *trace.Topic, c *context.Context, endpoint string, database string, topic string, consumer string, readerName *string, listener bool, messagesCount int) {
 	var p trace.TopicReaderMessagesDeliveredInfo
 	p.Context = c
 	p.Endpoint = endpoint
@@ -2552,11 +2580,12 @@ func TopicOnReaderMessagesDelivered(t *trace.Topic, c *context.Context, endpoint
 	p.Topic = topic
 	p.Consumer = consumer
 	p.ReaderName = readerName
+	p.Listener = listener
 	p.MessagesCount = messagesCount
 	onReaderMessagesDelivered(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderLocalBufferChanged(t *trace.Topic, c *context.Context, endpoint string, database string, topic string, consumer string, readerName string, messagesDelta int) {
+func TopicOnReaderLocalBufferChanged(t *trace.Topic, c *context.Context, endpoint string, database string, topic string, consumer string, readerName *string, listener bool, messagesDelta int) {
 	var p trace.TopicReaderLocalBufferChangedInfo
 	p.Context = c
 	p.Endpoint = endpoint
@@ -2564,28 +2593,31 @@ func TopicOnReaderLocalBufferChanged(t *trace.Topic, c *context.Context, endpoin
 	p.Topic = topic
 	p.Consumer = consumer
 	p.ReaderName = readerName
+	p.Listener = listener
 	p.MessagesDelta = messagesDelta
 	onReaderLocalBufferChanged(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderReceivedBytes(t *trace.Topic, c *context.Context, endpoint string, database string, consumer string, readerName string, bytes int) {
+func TopicOnReaderReceivedBytes(t *trace.Topic, c *context.Context, endpoint string, database string, consumer string, readerName *string, listener bool, bytes int) {
 	var p trace.TopicReaderReceivedBytesInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	p.Database = database
 	p.Consumer = consumer
 	p.ReaderName = readerName
+	p.Listener = listener
 	p.Bytes = bytes
 	onReaderReceivedBytes(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderCreditBalanceChanged(t *trace.Topic, c *context.Context, endpoint string, database string, consumer string, readerName string, bytesDelta int) {
+func TopicOnReaderCreditBalanceChanged(t *trace.Topic, c *context.Context, endpoint string, database string, consumer string, readerName *string, listener bool, bytesDelta int) {
 	var p trace.TopicReaderCreditBalanceChangedInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	p.Database = database
 	p.Consumer = consumer
 	p.ReaderName = readerName
+	p.Listener = listener
 	p.BytesDelta = bytesDelta
 	onReaderCreditBalanceChanged(t, p)
 }

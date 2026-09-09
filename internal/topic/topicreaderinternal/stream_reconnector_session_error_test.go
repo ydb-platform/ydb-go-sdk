@@ -316,6 +316,6 @@ func sessionErrorTestReaderInfo() topicreadercommon.ReaderInfo {
 		Endpoint:   "endpoint",
 		Database:   "/database",
 		Consumer:   "consumer",
-		ReaderName: "reader",
+		ReaderName: readerNamePointer("reader"),
 	}
 }

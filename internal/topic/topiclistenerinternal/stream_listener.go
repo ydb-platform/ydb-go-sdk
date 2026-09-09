@@ -51,10 +51,12 @@ type streamListener struct {
 
 	freeBytes chan int
 
+	creditEvents    topicreadercommon.MetricDeltaQueue
 	creditMu        sync.Mutex
 	creditBalance   int64
 	creditFinalized bool
 
+	localBufferEvents    topicreadercommon.MetricDeltaQueue
 	localBufferMu        sync.Mutex
 	localBufferByTopic   map[string]int64
 	localBufferFinalized bool
@@ -76,6 +78,7 @@ func newStreamListener(
 	config *StreamListenerConfig,
 	sessionIDCounter *atomic.Int64,
 ) (*streamListener, error) {
+	config.ReaderInfo.Listener = true
 	// Generate unique listener ID
 	listenerIDRand, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
 	if err != nil {
@@ -435,6 +438,10 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 }
 
 func (l *streamListener) changeCreditBalance(delta int) {
+	if l.tracer == nil || l.tracer.OnReaderCreditBalanceChanged == nil {
+		return
+	}
+
 	l.creditMu.Lock()
 	if l.creditFinalized {
 		l.creditMu.Unlock()
@@ -442,18 +449,10 @@ func (l *streamListener) changeCreditBalance(delta int) {
 		return
 	}
 	l.creditBalance += int64(delta)
+	l.creditEvents.Enqueue("", delta)
 	l.creditMu.Unlock()
 
-	logCtx := l.background.Context()
-	gtrace.TopicOnReaderCreditBalanceChanged(
-		l.tracer,
-		&logCtx,
-		l.cfg.ReaderInfo.Endpoint,
-		l.cfg.ReaderInfo.Database,
-		l.cfg.ReaderInfo.Consumer,
-		l.cfg.ReaderInfo.ReaderName,
-		delta,
-	)
+	l.creditEvents.Emit(l.traceCreditDelta)
 }
 
 func (l *streamListener) traceReceivedBytes(bytes int) {
@@ -465,11 +464,16 @@ func (l *streamListener) traceReceivedBytes(bytes int) {
 		l.cfg.ReaderInfo.Database,
 		l.cfg.ReaderInfo.Consumer,
 		l.cfg.ReaderInfo.ReaderName,
+		l.cfg.ReaderInfo.Listener,
 		bytes,
 	)
 }
 
 func (l *streamListener) finalizeCreditBalance() {
+	if l.tracer == nil || l.tracer.OnReaderCreditBalanceChanged == nil {
+		return
+	}
+
 	l.creditMu.Lock()
 	if l.creditFinalized {
 		l.creditMu.Unlock()
@@ -479,21 +483,23 @@ func (l *streamListener) finalizeCreditBalance() {
 	balance := l.creditBalance
 	l.creditBalance = 0
 	l.creditFinalized = true
+	l.creditEvents.Enqueue("", -int(balance))
 	l.creditMu.Unlock()
 
-	if balance == 0 {
-		return
-	}
+	l.creditEvents.Emit(l.traceCreditDelta)
+}
+
+func (l *streamListener) traceCreditDelta(_ string, delta int) {
 	logCtx := l.background.Context()
 	gtrace.TopicOnReaderCreditBalanceChanged(
-		l.tracer,
-		&logCtx,
-		l.cfg.ReaderInfo.Endpoint,
-		l.cfg.ReaderInfo.Database,
-		l.cfg.ReaderInfo.Consumer,
-		l.cfg.ReaderInfo.ReaderName,
-		-int(balance),
+		l.tracer, &logCtx,
+		l.cfg.ReaderInfo.Endpoint, l.cfg.ReaderInfo.Database, l.cfg.ReaderInfo.Consumer,
+		l.cfg.ReaderInfo.ReaderName, l.cfg.ReaderInfo.Listener, delta,
 	)
+}
+
+func (l *streamListener) traceLocalBufferDelta(topic string, delta int) {
+	topicreadercommon.TraceLocalBufferChanged(l.background.Context(), l.tracer, l.cfg.ReaderInfo, topic, delta)
 }
 
 func (l *streamListener) localBufferTrackingEnabled() bool {
@@ -515,15 +521,10 @@ func (l *streamListener) reserveLocalBuffer(topic string, messagesCount int) boo
 		l.localBufferByTopic = make(map[string]int64)
 	}
 	l.localBufferByTopic[topic] += int64(messagesCount)
+	l.localBufferEvents.Enqueue(topic, messagesCount)
 	l.localBufferMu.Unlock()
 
-	topicreadercommon.TraceLocalBufferChanged(
-		l.background.Context(),
-		l.tracer,
-		l.cfg.ReaderInfo,
-		topic,
-		messagesCount,
-	)
+	l.localBufferEvents.Emit(l.traceLocalBufferDelta)
 
 	return true
 }
@@ -555,15 +556,10 @@ func (l *streamListener) releaseLocalBuffer(topic string, messagesCount int) {
 	} else {
 		l.localBufferByTopic[topic] = balance - int64(messagesCount)
 	}
+	l.localBufferEvents.Enqueue(topic, -messagesCount)
 	l.localBufferMu.Unlock()
 
-	topicreadercommon.TraceLocalBufferChanged(
-		l.background.Context(),
-		l.tracer,
-		l.cfg.ReaderInfo,
-		topic,
-		-messagesCount,
-	)
+	l.localBufferEvents.Emit(l.traceLocalBufferDelta)
 }
 
 func (l *streamListener) finalizeLocalBuffer() {
@@ -577,20 +573,13 @@ func (l *streamListener) finalizeLocalBuffer() {
 
 		return
 	}
-	balances := l.localBufferByTopic
+	for topic, balance := range l.localBufferByTopic {
+		l.localBufferEvents.Enqueue(topic, -int(balance))
+	}
 	l.localBufferByTopic = nil
 	l.localBufferFinalized = true
 	l.localBufferMu.Unlock()
-
-	for topic, balance := range balances {
-		topicreadercommon.TraceLocalBufferChanged(
-			l.background.Context(),
-			l.tracer,
-			l.cfg.ReaderInfo,
-			topic,
-			-int(balance),
-		)
-	}
+	l.localBufferEvents.Emit(l.traceLocalBufferDelta)
 }
 
 // routeMessage routes messages to appropriate handlers/workers

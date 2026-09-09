@@ -17,15 +17,20 @@ func TestTopicOnReaderMetricHooksForwardFields(t *testing.T) {
 	// Generated forwarding helpers must remain safe when the corresponding
 	// optional callback is not configured.
 	require.NotPanics(t, func() {
-		TopicOnReaderCommitQueued(&trace.Topic{}, &ctx, "endpoint", "database", "topic", "consumer", "reader", 7, 8, 9)
-		TopicOnReaderCommitAcknowledged(&trace.Topic{}, &ctx, "endpoint", "database", "topic", "consumer", "reader", 7, 8, 9)
+		TopicOnReaderCommitQueued(&trace.Topic{}, &ctx, "endpoint", "database", "topic",
+			"consumer", readerNamePointer("reader"), false, 7, 8, 9)
+		TopicOnReaderCommitAcknowledged(&trace.Topic{}, &ctx, "endpoint", "database", "topic",
+			"consumer", readerNamePointer("reader"), false, 7, 8, 9)
 		TopicOnReaderSessionError(
-			&trace.Topic{}, &ctx, "endpoint", "database", "consumer", "reader",
+			&trace.Topic{}, &ctx, "endpoint", "database", "consumer", readerNamePointer("reader"), false,
 			"retry", "UNAVAILABLE", "transport_error", sessionError,
 		)
-		TopicOnReaderLocalBufferChanged(&trace.Topic{}, &ctx, "endpoint", "database", "topic", "consumer", "reader", -3)
-		TopicOnReaderReceivedBytes(&trace.Topic{}, &ctx, "endpoint", "database", "consumer", "reader", 123)
-		TopicOnReaderCreditBalanceChanged(&trace.Topic{}, &ctx, "endpoint", "database", "consumer", "reader", -456)
+		TopicOnReaderLocalBufferChanged(&trace.Topic{}, &ctx, "endpoint", "database", "topic",
+			"consumer", readerNamePointer("reader"), false, -3)
+		TopicOnReaderReceivedBytes(&trace.Topic{}, &ctx, "endpoint", "database",
+			"consumer", readerNamePointer("reader"), false, 123)
+		TopicOnReaderCreditBalanceChanged(&trace.Topic{}, &ctx, "endpoint", "database",
+			"consumer", readerNamePointer("reader"), false, -456)
 	})
 
 	var queued trace.TopicReaderCommitQueuedInfo
@@ -55,15 +60,19 @@ func TestTopicOnReaderMetricHooksForwardFields(t *testing.T) {
 		},
 	}
 
-	TopicOnReaderCommitQueued(tracer, &ctx, "endpoint", "database", "topic", "consumer", "reader", 7, 8, 9)
-	TopicOnReaderCommitAcknowledged(tracer, &ctx, "endpoint", "database", "topic", "consumer", "reader", 7, 8, 9)
+	TopicOnReaderCommitQueued(tracer, &ctx, "endpoint", "database", "topic",
+		"consumer", readerNamePointer("reader"), false, 7, 8, 9)
+	TopicOnReaderCommitAcknowledged(tracer, &ctx, "endpoint", "database", "topic",
+		"consumer", readerNamePointer("reader"), false, 7, 8, 9)
 	TopicOnReaderSessionError(
-		tracer, &ctx, "endpoint", "database", "consumer", "reader",
+		tracer, &ctx, "endpoint", "database", "consumer", readerNamePointer("reader"), false,
 		"retry", "UNAVAILABLE", "transport_error", sessionError,
 	)
-	TopicOnReaderLocalBufferChanged(tracer, &ctx, "endpoint", "database", "topic", "consumer", "reader", -3)
-	TopicOnReaderReceivedBytes(tracer, &ctx, "endpoint", "database", "consumer", "reader", 123)
-	TopicOnReaderCreditBalanceChanged(tracer, &ctx, "endpoint", "database", "consumer", "reader", -456)
+	TopicOnReaderLocalBufferChanged(tracer, &ctx, "endpoint", "database", "topic",
+		"consumer", readerNamePointer("reader"), false, -3)
+	TopicOnReaderReceivedBytes(tracer, &ctx, "endpoint", "database", "consumer", readerNamePointer("reader"), false, 123)
+	TopicOnReaderCreditBalanceChanged(tracer, &ctx, "endpoint", "database",
+		"consumer", readerNamePointer("reader"), false, -456)
 
 	require.Equal(t, trace.TopicReaderCommitQueuedInfo{
 		Context:            &ctx,
@@ -71,7 +80,7 @@ func TestTopicOnReaderMetricHooksForwardFields(t *testing.T) {
 		Database:           "database",
 		Topic:              "topic",
 		Consumer:           "consumer",
-		ReaderName:         "reader",
+		ReaderName:         readerNamePointer("reader"),
 		PartitionID:        7,
 		PartitionSessionID: 8,
 		MessagesCount:      9,
@@ -82,7 +91,7 @@ func TestTopicOnReaderMetricHooksForwardFields(t *testing.T) {
 		Database:           "database",
 		Topic:              "topic",
 		Consumer:           "consumer",
-		ReaderName:         "reader",
+		ReaderName:         readerNamePointer("reader"),
 		PartitionID:        7,
 		PartitionSessionID: 8,
 		MessagesCount:      9,
@@ -92,7 +101,7 @@ func TestTopicOnReaderMetricHooksForwardFields(t *testing.T) {
 		Endpoint:      "endpoint",
 		Database:      "database",
 		Consumer:      "consumer",
-		ReaderName:    "reader",
+		ReaderName:    readerNamePointer("reader"),
 		RetryDecision: "retry",
 		StatusCode:    "UNAVAILABLE",
 		ErrorType:     "transport_error",
@@ -104,7 +113,7 @@ func TestTopicOnReaderMetricHooksForwardFields(t *testing.T) {
 		Database:      "database",
 		Topic:         "topic",
 		Consumer:      "consumer",
-		ReaderName:    "reader",
+		ReaderName:    readerNamePointer("reader"),
 		MessagesDelta: -3,
 	}, localBuffer)
 	require.Equal(t, trace.TopicReaderReceivedBytesInfo{
@@ -112,7 +121,7 @@ func TestTopicOnReaderMetricHooksForwardFields(t *testing.T) {
 		Endpoint:   "endpoint",
 		Database:   "database",
 		Consumer:   "consumer",
-		ReaderName: "reader",
+		ReaderName: readerNamePointer("reader"),
 		Bytes:      123,
 	}, receivedBytes)
 	require.Equal(t, trace.TopicReaderCreditBalanceChangedInfo{
@@ -120,22 +129,21 @@ func TestTopicOnReaderMetricHooksForwardFields(t *testing.T) {
 		Endpoint:   "endpoint",
 		Database:   "database",
 		Consumer:   "consumer",
-		ReaderName: "reader",
+		ReaderName: readerNamePointer("reader"),
 		BytesDelta: -456,
 	}, creditBalance)
 }
 
 func TestComposeReaderMetricHooksWithNilCallbacks(t *testing.T) {
 	composed := Compose(&trace.Topic{}, &trace.Topic{})
-
-	require.NotPanics(t, func() {
-		composed.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{})
-		composed.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{})
-		composed.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{})
-		composed.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{})
-		composed.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{})
-		composed.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{})
-	})
+	require.Nil(t, composed.OnReaderMessagesReceived)
+	require.Nil(t, composed.OnReaderMessagesDelivered)
+	require.Nil(t, composed.OnReaderLocalBufferChanged)
+	require.Nil(t, composed.OnReaderReceivedBytes)
+	require.Nil(t, composed.OnReaderCreditBalanceChanged)
+	require.Nil(t, composed.OnReaderSessionError)
+	require.Nil(t, composed.OnReaderCommitQueued)
+	require.Nil(t, composed.OnReaderCommitAcknowledged)
 }
 
 func TestComposeReaderMetricHooksCallsBothCallbacks(t *testing.T) {

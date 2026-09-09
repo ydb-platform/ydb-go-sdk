@@ -28,14 +28,14 @@ func TestTopicReaderReceivedMessagesMetric(t *testing.T) {
 			Database:      "/local",
 			Topic:         "/local/topic-a",
 			Consumer:      "consumer-a",
-			ReaderName:    "reader-a",
+			ReaderName:    readerNamePointer("reader-a"),
 			MessagesCount: 3,
 		},
 		{
 			Endpoint:      "node-b:2135",
 			Database:      "/other",
 			Topic:         "/other/topic-b",
-			ReaderName:    "reader-b",
+			ReaderName:    readerNamePointer("reader-b"),
 			MessagesCount: 2,
 		},
 	}
@@ -66,14 +66,7 @@ func TestTopicReaderReceivedMessagesMetricDisabled(t *testing.T) {
 		details:  trace.TopicReaderCustomerEvents,
 	})
 
-	tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
-		Endpoint:      "node-a:2135",
-		Database:      "/local",
-		Topic:         "/local/topic-a",
-		Consumer:      "consumer-a",
-		ReaderName:    "reader-a",
-		MessagesCount: 3,
-	})
+	require.Nil(t, tracer.OnReaderMessagesReceived)
 
 	require.Zero(t, registry.value("topic.reader.received.messages", map[string]string{
 		"endpoint":    "node-a:2135",
@@ -119,7 +112,7 @@ func TestTopicReaderReceivedMessagesMetricDescriptorAndBatchAdd(t *testing.T) {
 		Database:      "/local",
 		Topic:         "/local/topic-a",
 		Consumer:      "consumer-a",
-		ReaderName:    "reader-a",
+		ReaderName:    readerNamePointer("reader-a"),
 		MessagesCount: 3,
 	}
 	tracer.OnReaderMessagesReceived(info)

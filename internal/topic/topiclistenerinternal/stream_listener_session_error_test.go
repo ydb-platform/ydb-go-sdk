@@ -30,7 +30,7 @@ func TestStreamListenerSessionErrorReportsActualStopOnce(t *testing.T) {
 		require.Equal(t, "endpoint", event.Endpoint)
 		require.Equal(t, "/database", event.Database)
 		require.Equal(t, "consumer", event.Consumer)
-		require.Equal(t, "reader", event.ReaderName)
+		require.Equal(t, readerNamePointer("reader"), event.ReaderName)
 		require.Equal(t, "stop", event.RetryDecision)
 		require.Equal(t, "Unavailable", event.StatusCode)
 		require.Equal(t, "transport_error", event.ErrorType)
@@ -93,7 +93,7 @@ func TestTopicListenerReconnectorSessionErrorReportsInitialFailure(t *testing.T)
 		Endpoint:   "endpoint",
 		Database:   "/database",
 		Consumer:   "consumer",
-		ReaderName: "reader",
+		ReaderName: readerNamePointer("reader"),
 	}
 	cfg.Tracer = &trace.Topic{
 		OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
@@ -131,7 +131,7 @@ func newSessionErrorTestListener(events chan<- trace.TopicReaderSessionErrorInfo
 				Endpoint:   "endpoint",
 				Database:   "/database",
 				Consumer:   "consumer",
-				ReaderName: "reader",
+				ReaderName: readerNamePointer("reader"),
 			},
 		},
 		background: *background.NewWorker(ctx, "session-error-test"),

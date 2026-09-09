@@ -12,17 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestStreamListenerConfig_EnsureReaderName(t *testing.T) {
-	cfg := StreamListenerConfig{readerID: 42}
-
-	cfg.EnsureReaderName()
-	require.Equal(t, "reader-42", cfg.ReaderName)
-
-	cfg.ReaderName = "explicit-reader"
-	cfg.EnsureReaderName()
-	require.Equal(t, "explicit-reader", cfg.ReaderName)
-}
-
 func TestStreamListenerSessionErrorSkipsUninitializedConfig(t *testing.T) {
 	events := make(chan trace.TopicReaderSessionErrorInfo, 1)
 	listener := &streamListener{
@@ -50,7 +39,7 @@ func TestStreamListener_LocalBufferGuardsAndPartialRelease(t *testing.T) {
 		Endpoint:   "node:2135",
 		Database:   "/db",
 		Consumer:   "consumer",
-		ReaderName: "reader",
+		ReaderName: readerNamePointer("reader"),
 	}
 	deltas := make(chan int, 8)
 	listener.tracer = &trace.Topic{
@@ -97,7 +86,7 @@ func TestStreamListener_LocalBufferFinalizeWithoutOutstandingMessages(t *testing
 	t.Run("empty", func(t *testing.T) {
 		e := fixenv.New(t)
 		listener := StreamListener(e)
-		listener.cfg.ReaderInfo = topicreadercommon.ReaderInfo{ReaderName: "reader"}
+		listener.cfg.ReaderInfo = topicreadercommon.ReaderInfo{ReaderName: readerNamePointer("reader")}
 		deltas := make(chan int, 2)
 		listener.tracer = &trace.Topic{
 			OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
@@ -112,7 +101,7 @@ func TestStreamListener_LocalBufferFinalizeWithoutOutstandingMessages(t *testing
 	t.Run("fully released", func(t *testing.T) {
 		e := fixenv.New(t)
 		listener := StreamListener(e)
-		listener.cfg.ReaderInfo = topicreadercommon.ReaderInfo{ReaderName: "reader"}
+		listener.cfg.ReaderInfo = topicreadercommon.ReaderInfo{ReaderName: readerNamePointer("reader")}
 		deltas := make(chan int, 2)
 		listener.tracer = &trace.Topic{
 			OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {

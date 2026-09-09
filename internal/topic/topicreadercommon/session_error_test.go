@@ -80,7 +80,7 @@ func TestTraceReaderSessionError(t *testing.T) {
 		Endpoint:   "endpoint",
 		Database:   "/database",
 		Consumer:   "consumer",
-		ReaderName: "reader",
+		ReaderName: readerNamePointer("reader"),
 	}
 
 	TraceReaderSessionError(
@@ -94,14 +94,14 @@ func TestTraceReaderSessionError(t *testing.T) {
 	require.Equal(t, "endpoint", got.Endpoint)
 	require.Equal(t, "/database", got.Database)
 	require.Equal(t, "consumer", got.Consumer)
-	require.Equal(t, "reader", got.ReaderName)
+	require.Equal(t, readerNamePointer("reader"), got.ReaderName)
 	require.Equal(t, "retry", got.RetryDecision)
 	require.Equal(t, "Unavailable", got.StatusCode)
 	require.Equal(t, "transport_error", got.ErrorType)
 	require.Error(t, got.Error)
 }
 
-func TestClassifySessionErrorOnRawTopicStatusLoss(t *testing.T) {
+func TestClassifySessionErrorPreservesRawTopicStatus(t *testing.T) {
 	reader := rawtopicreader.StreamReader{
 		Stream: &rawTopicSessionErrorStream{
 			response: &Ydb_Topic.StreamReadMessage_FromServer{
@@ -113,7 +113,9 @@ func TestClassifySessionErrorOnRawTopicStatusLoss(t *testing.T) {
 
 	_, err := reader.Recv()
 	require.Error(t, err)
-	require.Equal(t, SessionErrorClassification{StatusCode: "unknown", ErrorType: "unknown"}, ClassifySessionError(err))
+	require.Equal(t, SessionErrorClassification{
+		StatusCode: "UNAUTHORIZED", ErrorType: "ydb_error",
+	}, ClassifySessionError(err))
 }
 
 type rawTopicSessionErrorStream struct {

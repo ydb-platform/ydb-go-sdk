@@ -23,7 +23,7 @@ func TestTopicStreamReader_CreditBalanceTracksSendReceiveAndClose(t *testing.T) 
 		Endpoint:   "node:2135",
 		Database:   "/db",
 		Consumer:   "consumer",
-		ReaderName: "reader",
+		ReaderName: readerNamePointer("reader"),
 	}
 
 	creditDeltas := make(chan int, 8)
@@ -111,7 +111,7 @@ func TestTopicStreamReader_ReceivedBytesUsesProtocolSizeWhenBatchIsDropped(t *te
 
 func TestTopicStreamReader_LocalBufferTracksQueueAndDelivery(t *testing.T) {
 	e := newTopicReaderTestEnv(t)
-	e.reader.cfg.ReaderInfo.ReaderName = "reader"
+	e.reader.cfg.ReaderInfo.ReaderName = readerNamePointer("reader")
 
 	var (
 		mu          sync.Mutex
@@ -212,7 +212,7 @@ func TestTopicReader_CommitMetricsUseCommitRangeLength(t *testing.T) {
 				Endpoint:   "node:2135",
 				Database:   "/db",
 				Consumer:   "consumer",
-				ReaderName: "reader",
+				ReaderName: readerNamePointer("reader"),
 			}
 			queued := make(chan int, 4)
 			acknowledged := make(chan int, 4)
@@ -344,7 +344,7 @@ func TestTopicStreamReader_MetricBalancesArePerStreamForSameReaderName(t *testin
 			Endpoint:   "node:2135",
 			Database:   "/db",
 			Consumer:   "consumer",
-			ReaderName: "same-reader",
+			ReaderName: readerNamePointer("same-reader"),
 		}
 		reader.cfg.Trace = &trace.Topic{
 			OnReaderCreditBalanceChanged: func(info trace.TopicReaderCreditBalanceChangedInfo) {

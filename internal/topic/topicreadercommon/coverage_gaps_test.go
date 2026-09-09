@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -65,7 +66,7 @@ func TestTraceReaderSessionErrorHandlesNoOpAndUnknownTransportCode(t *testing.T)
 		Endpoint:   "endpoint",
 		Database:   "database",
 		Consumer:   "consumer",
-		ReaderName: "reader",
+		ReaderName: readerNamePointer("reader"),
 	}
 	unknownTransportError := status.Error(codes.Code(99), "future transport code")
 
@@ -96,4 +97,13 @@ func TestTraceReaderSessionErrorHandlesNoOpAndUnknownTransportCode(t *testing.T)
 		ErrorType:  "transport_error",
 	}, ClassifySessionError(unknownTransportError))
 	require.ErrorIs(t, actual.Error, unknownTransportError)
+}
+
+func TestComposedEmptyTraceDoesNotAllocateCommitTracking(t *testing.T) {
+	session := NewPartitionSession(context.Background(), "topic", 1, 1, "", 2, 3, 0)
+	defer session.Close()
+	tracer := gtrace.Compose(&trace.Topic{}, &trace.Topic{})
+	tracer = gtrace.Compose(tracer, &trace.Topic{})
+	session.SetupCommitMetrics(tracer, ReaderInfo{})
+	require.Nil(t, session.commitMetrics)
 }

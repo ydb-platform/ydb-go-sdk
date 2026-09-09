@@ -30,7 +30,7 @@ func TestStreamListener_CreditBalanceTracksSendAndClose(t *testing.T) {
 			Endpoint:   "node:2135",
 			Database:   "/db",
 			Consumer:   "consumer",
-			ReaderName: "reader",
+			ReaderName: readerNamePointer("reader"),
 		}
 		creditDeltas := make(chan int, 4)
 		listener.tracer = &trace.Topic{
@@ -82,7 +82,7 @@ func TestStreamListener_ReceivedBytesUsesProtocolSizeForDroppedBatch(t *testing.
 		Endpoint:   "node:2135",
 		Database:   "/db",
 		Consumer:   "consumer",
-		ReaderName: "reader",
+		ReaderName: readerNamePointer("reader"),
 	}
 	listener.tracer = &trace.Topic{}
 
@@ -135,7 +135,7 @@ func TestStreamListener_LocalBufferTracksQueueAndHandler(t *testing.T) {
 			Endpoint:   "node:2135",
 			Database:   "/db",
 			Consumer:   "consumer",
-			ReaderName: "reader",
+			ReaderName: readerNamePointer("reader"),
 		},
 	}
 	var (
@@ -194,7 +194,7 @@ func TestStreamListener_LocalBufferRollbackAfterFinalization(t *testing.T) {
 			Endpoint:   "node:2135",
 			Database:   "/db",
 			Consumer:   "consumer",
-			ReaderName: "reader",
+			ReaderName: readerNamePointer("reader"),
 		},
 	}
 	var (
@@ -247,7 +247,7 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 				Endpoint:   "node:2135",
 				Database:   "/db",
 				Consumer:   "consumer",
-				ReaderName: "reader",
+				ReaderName: readerNamePointer("reader"),
 			},
 		}
 		queued := make(chan int, 4)
@@ -310,7 +310,7 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 				Endpoint:   "node:2135",
 				Database:   "/db",
 				Consumer:   "consumer",
-				ReaderName: "reader",
+				ReaderName: readerNamePointer("reader"),
 			},
 		}
 		queued := make(chan int, 4)
@@ -542,7 +542,7 @@ func streamMetricsReaderInfo() topicreadercommon.ReaderInfo {
 		Endpoint:   "node:2135",
 		Database:   "/db",
 		Consumer:   "consumer",
-		ReaderName: "same-reader",
+		ReaderName: readerNamePointer("same-reader"),
 	}
 }
 

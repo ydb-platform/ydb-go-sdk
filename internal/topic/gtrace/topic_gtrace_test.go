@@ -12,7 +12,8 @@ import (
 func TestTopicOnReaderMessagesReceived(t *testing.T) {
 	ctx := context.Background()
 	require.NotPanics(t, func() {
-		TopicOnReaderMessagesReceived(&trace.Topic{}, &ctx, "endpoint", "/local", "topic", "consumer", "reader", 3)
+		TopicOnReaderMessagesReceived(&trace.Topic{}, &ctx, "endpoint", "/local", "topic",
+			"consumer", readerNamePointer("reader"), false, 3)
 	})
 
 	var actual trace.TopicReaderMessagesReceivedInfo
@@ -20,14 +21,14 @@ func TestTopicOnReaderMessagesReceived(t *testing.T) {
 		OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
 			actual = info
 		},
-	}, &ctx, "endpoint", "/local", "topic", "consumer", "reader", 3)
+	}, &ctx, "endpoint", "/local", "topic", "consumer", readerNamePointer("reader"), false, 3)
 	require.Equal(t, trace.TopicReaderMessagesReceivedInfo{
 		Context:       &ctx,
 		Endpoint:      "endpoint",
 		Database:      "/local",
 		Topic:         "topic",
 		Consumer:      "consumer",
-		ReaderName:    "reader",
+		ReaderName:    readerNamePointer("reader"),
 		MessagesCount: 3,
 	}, actual)
 }
@@ -36,9 +37,7 @@ func TestComposeOnReaderMessagesReceived(t *testing.T) {
 	t.Run("NilCallbacks", func(t *testing.T) {
 		composed := Compose(&trace.Topic{}, &trace.Topic{})
 
-		require.NotPanics(t, func() {
-			composed.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{})
-		})
+		require.Nil(t, composed.OnReaderMessagesReceived)
 	})
 
 	t.Run("CallsBothCallbacks", func(t *testing.T) {
@@ -69,9 +68,7 @@ func TestComposeOnReaderMessagesReceived(t *testing.T) {
 			}),
 		)
 
-		require.NotPanics(t, func() {
-			composed.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{})
-		})
+		require.NotPanics(t, func() { composed.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{}) })
 		require.Equal(t, "messages received panic", recovered)
 	})
 }
@@ -79,7 +76,8 @@ func TestComposeOnReaderMessagesReceived(t *testing.T) {
 func TestTopicOnReaderMessagesDelivered(t *testing.T) {
 	ctx := context.Background()
 	require.NotPanics(t, func() {
-		TopicOnReaderMessagesDelivered(&trace.Topic{}, &ctx, "endpoint", "/local", "topic", "consumer", "reader", 3)
+		TopicOnReaderMessagesDelivered(&trace.Topic{}, &ctx, "endpoint", "/local", "topic",
+			"consumer", readerNamePointer("reader"), false, 3)
 	})
 
 	var actual trace.TopicReaderMessagesDeliveredInfo
@@ -87,14 +85,14 @@ func TestTopicOnReaderMessagesDelivered(t *testing.T) {
 		OnReaderMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
 			actual = info
 		},
-	}, &ctx, "endpoint", "/local", "topic", "consumer", "reader", 3)
+	}, &ctx, "endpoint", "/local", "topic", "consumer", readerNamePointer("reader"), false, 3)
 	require.Equal(t, trace.TopicReaderMessagesDeliveredInfo{
 		Context:       &ctx,
 		Endpoint:      "endpoint",
 		Database:      "/local",
 		Topic:         "topic",
 		Consumer:      "consumer",
-		ReaderName:    "reader",
+		ReaderName:    readerNamePointer("reader"),
 		MessagesCount: 3,
 	}, actual)
 }
@@ -103,9 +101,7 @@ func TestComposeOnReaderMessagesDelivered(t *testing.T) {
 	t.Run("NilCallbacks", func(t *testing.T) {
 		composed := Compose(&trace.Topic{}, &trace.Topic{})
 
-		require.NotPanics(t, func() {
-			composed.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{})
-		})
+		require.Nil(t, composed.OnReaderMessagesDelivered)
 	})
 
 	t.Run("CallsBothCallbacks", func(t *testing.T) {
