@@ -11,6 +11,7 @@ import (
 
 const (
 	mask uint32 = 0x7FFFFFFF
+	seed uint32 = 0x9747b28c
 )
 
 type HashPartitionChooser struct {
@@ -29,7 +30,7 @@ func (c *HashPartitionChooser) ChoosePartition(msg topicwriterinternal.PublicMes
 	// Same as Kafka Partitioner
 	//nolint:lll
 	// See: https://github.com/apache/kafka/blob/4.2/clients/src/main/java/org/apache/kafka/clients/producer/internals/BuiltInPartitioner.java#L330
-	hash := xhash.Murmur2Hash32([]byte(msg.Key), 0)
+	hash := xhash.Murmur2Hash32([]byte(msg.Key), seed)
 
 	return c.partitions[(hash&mask)%uint32(len(c.partitions))], nil
 }
