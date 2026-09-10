@@ -48,3 +48,18 @@ type RegistryWithDescriptors interface {
 type RegistryWithGaugeDescriptors interface {
 	GaugeVecWithDescriptor(name, unit string, labelNames ...string) GaugeVec
 }
+
+// RegistryWithObservableGaugeDescriptors is an optional Registry capability
+// for creating an observable gauge with an explicit instrument name, unit,
+// and label names.
+//
+// The name passed to ObservableGaugeVecWithDescriptor is used as a complete
+// instrument name by implementations that support this capability. Registries
+// that do not implement RegistryWithObservableGaugeDescriptors simply omit
+// the observable instruments; the SDK does not emulate observable values with
+// a synchronous gauge.
+// This capability is intentionally additive so existing Registry and Config
+// implementations remain valid.
+type RegistryWithObservableGaugeDescriptors interface {
+	ObservableGaugeVecWithDescriptor(name, unit string, labelNames ...string) ObservableGaugeVec
+}

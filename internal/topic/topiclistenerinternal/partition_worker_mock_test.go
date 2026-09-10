@@ -10,6 +10,7 @@ import (
 	reflect "reflect"
 
 	rawtopicreader "github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	topicreadercommon "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -224,6 +225,124 @@ func (c *MocklocalBufferTrackerreserveLocalBufferCall) Do(f func(string, int) bo
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MocklocalBufferTrackerreserveLocalBufferCall) DoAndReturn(f func(string, int) bool) *MocklocalBufferTrackerreserveLocalBufferCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// MockretainedBatchTracker is a mock of retainedBatchTracker interface.
+type MockretainedBatchTracker struct {
+	ctrl     *gomock.Controller
+	recorder *MockretainedBatchTrackerMockRecorder
+}
+
+// MockretainedBatchTrackerMockRecorder is the mock recorder for MockretainedBatchTracker.
+type MockretainedBatchTrackerMockRecorder struct {
+	mock *MockretainedBatchTracker
+}
+
+// NewMockretainedBatchTracker creates a new mock instance.
+func NewMockretainedBatchTracker(ctrl *gomock.Controller) *MockretainedBatchTracker {
+	mock := &MockretainedBatchTracker{ctrl: ctrl}
+	mock.recorder = &MockretainedBatchTrackerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockretainedBatchTracker) EXPECT() *MockretainedBatchTrackerMockRecorder {
+	return m.recorder
+}
+
+// releaseBatch mocks base method.
+func (m *MockretainedBatchTracker) releaseBatch(batch *topicreadercommon.PublicBatch) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "releaseBatch", batch)
+}
+
+// releaseBatch indicates an expected call of releaseBatch.
+func (mr *MockretainedBatchTrackerMockRecorder) releaseBatch(batch any) *MockretainedBatchTrackerreleaseBatchCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "releaseBatch", reflect.TypeOf((*MockretainedBatchTracker)(nil).releaseBatch), batch)
+	return &MockretainedBatchTrackerreleaseBatchCall{Call: call}
+}
+
+// MockretainedBatchTrackerreleaseBatchCall wrap *gomock.Call
+type MockretainedBatchTrackerreleaseBatchCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockretainedBatchTrackerreleaseBatchCall) Return() *MockretainedBatchTrackerreleaseBatchCall {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockretainedBatchTrackerreleaseBatchCall) Do(f func(*topicreadercommon.PublicBatch)) *MockretainedBatchTrackerreleaseBatchCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockretainedBatchTrackerreleaseBatchCall) DoAndReturn(f func(*topicreadercommon.PublicBatch)) *MockretainedBatchTrackerreleaseBatchCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// MockpartitionSessionTracker is a mock of partitionSessionTracker interface.
+type MockpartitionSessionTracker struct {
+	ctrl     *gomock.Controller
+	recorder *MockpartitionSessionTrackerMockRecorder
+}
+
+// MockpartitionSessionTrackerMockRecorder is the mock recorder for MockpartitionSessionTracker.
+type MockpartitionSessionTrackerMockRecorder struct {
+	mock *MockpartitionSessionTracker
+}
+
+// NewMockpartitionSessionTracker creates a new mock instance.
+func NewMockpartitionSessionTracker(ctrl *gomock.Controller) *MockpartitionSessionTracker {
+	mock := &MockpartitionSessionTracker{ctrl: ctrl}
+	mock.recorder = &MockpartitionSessionTrackerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockpartitionSessionTracker) EXPECT() *MockpartitionSessionTrackerMockRecorder {
+	return m.recorder
+}
+
+// unregisterPartitionSession mocks base method.
+func (m *MockpartitionSessionTracker) unregisterPartitionSession(session *topicreadercommon.PartitionSession) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "unregisterPartitionSession", session)
+}
+
+// unregisterPartitionSession indicates an expected call of unregisterPartitionSession.
+func (mr *MockpartitionSessionTrackerMockRecorder) unregisterPartitionSession(session any) *MockpartitionSessionTrackerunregisterPartitionSessionCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "unregisterPartitionSession", reflect.TypeOf((*MockpartitionSessionTracker)(nil).unregisterPartitionSession), session)
+	return &MockpartitionSessionTrackerunregisterPartitionSessionCall{Call: call}
+}
+
+// MockpartitionSessionTrackerunregisterPartitionSessionCall wrap *gomock.Call
+type MockpartitionSessionTrackerunregisterPartitionSessionCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockpartitionSessionTrackerunregisterPartitionSessionCall) Return() *MockpartitionSessionTrackerunregisterPartitionSessionCall {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockpartitionSessionTrackerunregisterPartitionSessionCall) Do(f func(*topicreadercommon.PartitionSession)) *MockpartitionSessionTrackerunregisterPartitionSessionCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockpartitionSessionTrackerunregisterPartitionSessionCall) DoAndReturn(f func(*topicreadercommon.PartitionSession)) *MockpartitionSessionTrackerunregisterPartitionSessionCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

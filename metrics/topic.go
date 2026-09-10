@@ -43,6 +43,7 @@ func topic(config Config) (t trace.Topic) {
 	setupTopicReaderCommitAcknowledged(&t, readerConfig)
 	setupTopicReaderLocalBufferMessages(&t, readerConfig)
 	setupTopicReaderCreditBalanceBytes(&t, readerConfig)
+	setupTopicReaderObservableMetrics(&t, readerConfig)
 
 	return t
 }
@@ -114,12 +115,12 @@ func setupTopicReaderReceivedBytes(t *trace.Topic, config Config) {
 		}
 
 		counter := receivedBytes.With(streamLabels(info.Endpoint, info.Database, info.Consumer, info.ReaderName))
-		adder, ok := counter.(interface{ Add(delta float64) })
+		adder, ok := counter.(interface{ Add(delta int64) })
 		if !ok {
 			return
 		}
 
-		adder.Add(float64(info.Bytes))
+		adder.Add(int64(info.Bytes))
 	}
 }
 
@@ -284,8 +285,8 @@ func addCounter(counter Counter, delta int) {
 	if delta <= 0 {
 		return
 	}
-	if adder, ok := counter.(interface{ Add(delta float64) }); ok {
-		adder.Add(float64(delta))
+	if adder, ok := counter.(interface{ Add(delta int64) }); ok {
+		adder.Add(int64(delta))
 
 		return
 	}

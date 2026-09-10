@@ -67,7 +67,13 @@ func commitRangeMessageCount(start, end rawtopiccommon.Offset) int {
 // before making the commit visible to a sender.
 func RegisterCommitQueued(commitRange CommitRange) int {
 	session := commitRange.PartitionSession
-	if session == nil || session.commitMetrics == nil {
+	if session == nil {
+		return 0
+	}
+	if session.metricsSource != nil {
+		session.metricsSource.RegisterCommit(session, commitRange.CommitOffsetEnd.ToInt64())
+	}
+	if session.commitMetrics == nil {
 		return 0
 	}
 
@@ -127,7 +133,13 @@ func TraceCommitQueuedAfterRegistration(ctx context.Context, commitRange CommitR
 // returns only the newly completed range span. The caller must perform this
 // before publishing the committed offset or waking commit waiters.
 func RegisterCommitAcknowledged(session *PartitionSession, exclusiveOffset rawtopiccommon.Offset) int {
-	if session == nil || session.commitMetrics == nil || session.commitMetrics.tracker == nil {
+	if session == nil {
+		return 0
+	}
+	if session.metricsSource != nil {
+		session.metricsSource.AcknowledgeCommit(session, exclusiveOffset.ToInt64())
+	}
+	if session.commitMetrics == nil || session.commitMetrics.tracker == nil {
 		return 0
 	}
 

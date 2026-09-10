@@ -19,6 +19,7 @@ type StreamListenerConfig struct {
 	ConnectWithoutConsumer bool
 	readerID               int64
 	Tracer                 *trace.Topic
+	metricsSource          *topicreadercommon.ReaderMetricsSource
 }
 
 func NewStreamListenerConfig() StreamListenerConfig {

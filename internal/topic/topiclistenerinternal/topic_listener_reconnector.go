@@ -8,6 +8,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 )
 
 var (
@@ -26,6 +28,9 @@ type TopicListenerReconnector struct {
 	connectionCompleted empty.Chan
 	connectionIDCounter atomic.Int64
 	closing             atomic.Bool
+	metricsSource       *topicreadercommon.ReaderMetricsSource
+	metricsSourceDone   func()
+	metricsSourceClose  sync.Once
 
 	m              sync.Mutex
 	streamListener *streamListener
@@ -37,11 +42,25 @@ func NewTopicListenerReconnector(
 	handler EventHandler,
 ) (*TopicListenerReconnector, error) {
 	streamConfig.EnsureReaderName()
+	streamConfig.ReaderInfo.Listener = true
 	res := &TopicListenerReconnector{
 		streamConfig:        streamConfig,
 		client:              client,
 		handler:             handler,
 		connectionCompleted: make(empty.Chan),
+	}
+	if streamConfig.Tracer != nil && streamConfig.Tracer.OnReaderMetricsSource != nil {
+		res.metricsSource = topicreadercommon.NewReaderMetricsSource()
+		streamConfig.metricsSource = res.metricsSource
+		res.metricsSourceDone = gtrace.TopicOnReaderMetricsSource(
+			streamConfig.Tracer,
+			streamConfig.ReaderInfo.Endpoint,
+			streamConfig.ReaderInfo.Database,
+			streamConfig.ReaderInfo.Consumer,
+			streamConfig.ReaderInfo.ReaderName,
+			true,
+			res.metricsSource,
+		)
 	}
 
 	res.background.Start("connection", res.connect)
@@ -64,6 +83,7 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 	if !lr.closing.CompareAndSwap(false, true) {
 		return errTopicListenerClosed
 	}
+	defer lr.closeMetricsSource()
 	var closeErrors []error
 	err := lr.background.Close(ctx, reason)
 	closeErrors = append(closeErrors, err)
@@ -94,8 +114,34 @@ func (lr *TopicListenerReconnector) connect(connectionCtx context.Context) {
 	lr.streamListener = sl
 	lr.connectionResult = connRes
 	lr.m.Unlock()
+	if sl == nil {
+		lr.closeMetricsSource()
+	}
 
 	close(lr.connectionCompleted)
+	if sl != nil && lr.metricsSource != nil {
+		go lr.waitMetricsSourceStop(sl)
+	}
+}
+
+func (lr *TopicListenerReconnector) closeMetricsSource() {
+	lr.metricsSourceClose.Do(func() {
+		if lr.metricsSource != nil {
+			lr.metricsSource.Close()
+		}
+		if lr.metricsSourceDone != nil {
+			lr.metricsSourceDone()
+		}
+	})
+}
+
+func (lr *TopicListenerReconnector) waitMetricsSourceStop(sl *streamListener) {
+	select {
+	case <-sl.background.StopDone():
+		lr.closeMetricsSource()
+	case <-lr.background.Done():
+		lr.closeMetricsSource()
+	}
 }
 
 func (lr *TopicListenerReconnector) WaitInit(ctx context.Context) error {

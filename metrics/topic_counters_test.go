@@ -11,7 +11,7 @@ import (
 func TestTopicReaderMetricDescriptorsAndLegacyNames(t *testing.T) {
 	descriptorRegistry := newRecordingRegistry()
 	capture := &topicCounterCapture{}
-	topic(topicFloatCounterConfig{
+	topic(topicAddCounterConfig{
 		recordingConfig: recordingConfig{
 			registry: descriptorRegistry,
 			system:   "custom",
@@ -187,7 +187,7 @@ func TestTopicReaderMetricsHonorDetailsGroups(t *testing.T) {
 func TestTopicReaderCountersIgnoreNonPositiveDeltas(t *testing.T) {
 	registry := newRecordingRegistry()
 	capture := &topicCounterCapture{}
-	tracer := topic(topicFloatCounterConfig{
+	tracer := topic(topicAddCounterConfig{
 		recordingConfig: recordingConfig{registry: registry, details: trace.DetailsAll},
 		capture:         capture,
 	})
@@ -221,14 +221,14 @@ func TestTopicReaderCountersIgnoreNonPositiveDeltas(t *testing.T) {
 		RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
 	})
 
-	require.Equal(t, map[string][]float64{
+	require.Equal(t, map[string][]int64{
 		"ydb.topic.reader.received.messages":   {4},
 		"ydb.topic.reader.delivered.messages":  {3},
 		"ydb.topic.reader.received.bytes":      {12},
 		"ydb.topic.reader.commit.queued":       {2},
 		"ydb.topic.reader.commit.acknowledged": {1},
 		"ydb.topic.reader.session.errors":      {1},
-	}, capture.floatAdds)
+	}, capture.adds)
 	require.Empty(t, capture.incs)
 
 	messageLabels := map[string]string{
@@ -265,7 +265,7 @@ func TestTopicReaderCountersFallBackToIncExceptBytes(t *testing.T) {
 		ReaderName: readerNamePointer("reader"), Bytes: 1024,
 	})
 
-	require.Empty(t, fallbackCapture.floatAdds)
+	require.Empty(t, fallbackCapture.adds)
 	require.Equal(t, map[string]int{"topic.reader.received.messages": 3}, fallbackCapture.incs)
 	require.Equal(t, float64(3), fallbackRegistry.value("topic.reader.received.messages", map[string]string{
 		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
@@ -275,12 +275,12 @@ func TestTopicReaderCountersFallBackToIncExceptBytes(t *testing.T) {
 	}))
 }
 
-func TestTopicReaderCountersUseFloatAddForLargeDeltas(t *testing.T) {
-	const largeDelta = 1 << 20
+func TestTopicReaderCountersUseInt64AddForLargeDeltas(t *testing.T) {
+	largeDelta := int(^uint(0) >> 1)
 
 	registry := newRecordingRegistry()
 	capture := &topicCounterCapture{}
-	tracer := topic(topicFloatCounterConfig{
+	tracer := topic(topicAddCounterConfig{
 		recordingConfig: recordingConfig{registry: registry, details: trace.DetailsAll},
 		capture:         capture,
 	})
@@ -305,21 +305,12 @@ func TestTopicReaderCountersUseFloatAddForLargeDeltas(t *testing.T) {
 		MessagesCount: largeDelta,
 	})
 
-	require.Equal(t, map[string][]float64{
-		"ydb.topic.reader.received.bytes":      {float64(largeDelta)},
-		"ydb.topic.reader.commit.queued":       {float64(largeDelta)},
-		"ydb.topic.reader.commit.acknowledged": {float64(largeDelta)},
-	}, capture.floatAdds)
+	require.Equal(t, map[string][]int64{
+		"ydb.topic.reader.received.bytes":      {int64(largeDelta)},
+		"ydb.topic.reader.commit.queued":       {int64(largeDelta)},
+		"ydb.topic.reader.commit.acknowledged": {int64(largeDelta)},
+	}, capture.adds)
 	require.Empty(t, capture.incs)
-	require.Equal(t, float64(largeDelta), registry.value("ydb.topic.reader.received.bytes", map[string]string{
-		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",
-	}))
-	require.Equal(t, float64(largeDelta), registry.value("ydb.topic.reader.commit.queued", map[string]string{
-		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
-	}))
-	require.Equal(t, float64(largeDelta), registry.value("ydb.topic.reader.commit.acknowledged", map[string]string{
-		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
-	}))
 }
 
 func TestTopicReaderGaugesApplyDeltasWithoutSet(t *testing.T) {
@@ -410,7 +401,7 @@ func TestTopicMetricsSeparateReaderAndListenerDetails(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			registry := newRecordingRegistry()
-			tracer := topic(topicFloatCounterConfig{
+			tracer := topic(topicAddCounterConfig{
 				recordingConfig: recordingConfig{registry: registry, details: test.details},
 				capture:         &topicCounterCapture{},
 			})
@@ -525,34 +516,34 @@ func labelNameSetFromValues(labels map[string]string) map[string]struct{} {
 }
 
 type topicCounterCapture struct {
-	units     map[string]string
-	floatAdds map[string][]float64
-	incs      map[string]int
+	units map[string]string
+	adds  map[string][]int64
+	incs  map[string]int
 }
 
-type topicFloatCounterConfig struct {
+type topicAddCounterConfig struct {
 	recordingConfig
 
 	capture *topicCounterCapture
 }
 
-func (c topicFloatCounterConfig) WithSystem(system string) Config {
+func (c topicAddCounterConfig) WithSystem(system string) Config {
 	scoped := c.recordingConfig.WithSystem(system).(recordingConfig)
 
-	return topicFloatCounterConfig{recordingConfig: scoped, capture: c.capture}
+	return topicAddCounterConfig{recordingConfig: scoped, capture: c.capture}
 }
 
-func (c topicFloatCounterConfig) CounterVecWithDescriptor(name, unit string, labels ...string) CounterVec {
+func (c topicAddCounterConfig) CounterVecWithDescriptor(name, unit string, labels ...string) CounterVec {
 	if c.capture.units == nil {
 		c.capture.units = make(map[string]string)
 	}
 	c.capture.units[name] = unit
 	c.registry.register(name, "counter", labels)
 
-	return topicFloatCounterVec{registry: c.registry, path: name, capture: c.capture}
+	return topicAddCounterVec{registry: c.registry, path: name, capture: c.capture}
 }
 
-func (c topicFloatCounterConfig) GaugeVecWithDescriptor(name, unit string, labels ...string) GaugeVec {
+func (c topicAddCounterConfig) GaugeVecWithDescriptor(name, unit string, labels ...string) GaugeVec {
 	if c.capture.units == nil {
 		c.capture.units = make(map[string]string)
 	}
@@ -562,18 +553,18 @@ func (c topicFloatCounterConfig) GaugeVecWithDescriptor(name, unit string, label
 	return recordingGaugeVec{registry: c.registry, path: name}
 }
 
-type topicFloatCounterVec struct {
+type topicAddCounterVec struct {
 	registry *recordingRegistry
 	path     string
 
 	capture *topicCounterCapture
 }
 
-func (v topicFloatCounterVec) With(labels map[string]string) Counter {
-	return topicFloatCounter{registry: v.registry, path: v.path, labels: labels, capture: v.capture}
+func (v topicAddCounterVec) With(labels map[string]string) Counter {
+	return topicAddCounter{registry: v.registry, path: v.path, labels: labels, capture: v.capture}
 }
 
-type topicFloatCounter struct {
+type topicAddCounter struct {
 	registry *recordingRegistry
 	path     string
 	labels   map[string]string
@@ -581,16 +572,16 @@ type topicFloatCounter struct {
 	capture *topicCounterCapture
 }
 
-func (topicFloatCounter) Inc() {
-	panic("topic float counter unexpectedly used Inc")
+func (topicAddCounter) Inc() {
+	panic("topic Add counter unexpectedly used Inc")
 }
 
-func (c topicFloatCounter) Add(delta float64) {
-	if c.capture.floatAdds == nil {
-		c.capture.floatAdds = make(map[string][]float64)
+func (c topicAddCounter) Add(delta int64) {
+	if c.capture.adds == nil {
+		c.capture.adds = make(map[string][]int64)
 	}
-	c.capture.floatAdds[c.path] = append(c.capture.floatAdds[c.path], delta)
-	c.registry.add(c.path, c.labels, delta)
+	c.capture.adds[c.path] = append(c.capture.adds[c.path], delta)
+	c.registry.add(c.path, c.labels, float64(delta))
 }
 
 type topicFallbackCounterConfig struct {

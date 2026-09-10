@@ -18,6 +18,9 @@ are selected by the corresponding `TopicReaderMessageEvents` or
 | `ydb.topic.reader.commit.acknowledged` | counter | `{message}` | `endpoint`, `database`, `topic`, `consumer`, `reader.name` | Fully covered queued commit-range spans, counted once in admission order |
 | `ydb.topic.reader.local_buffer.messages` | gauge | `{message}` | `endpoint`, `database`, `topic`, `consumer`, `reader.name` | Accepted messages held by the SDK until delivery, discard, or close |
 | `ydb.topic.reader.credit_balance_bytes` | gauge | `By` | `endpoint`, `database`, `consumer`, `reader.name` | Successful read-request bytes minus response bytes, with remaining balance compensated on close |
+| `ydb.topic.reader.local_buffer.message_age.max` | observable gauge | `s` | `endpoint`, `database`, `consumer`, `reader.name` | Maximum age of the oldest retained message; zero when the source buffer is empty |
+| `ydb.topic.reader.commit_offset.lag.max` | observable gauge | `1` | `endpoint`, `database`, `consumer`, `reader.name` | Maximum non-negative requested-minus-acknowledged offset lag across active sessions |
+| `ydb.topic.reader.partition_session.count` | observable gauge | `{session}` | `endpoint`, `database`, `consumer`, `reader.name` | Number of active partition sessions |
 
 Absent optional values are emitted as empty strings. `endpoint` is the
 configured endpoint authority, and `database` is the normalized configured
@@ -34,6 +37,21 @@ Session-error `retry_decision` records the retry or stop decision. Its
 `Code(n)`, unknown YDB codes use their numeric value, and unspecified or
 unclassified errors use `unknown`. `error.type` is `transport_error`,
 `ydb_error`, or `unknown`.
+
+Observable gauges are collected on demand through the optional
+`RegistryWithObservableGaugeDescriptors` capability. They do not start polling
+goroutines or issue RPCs. The SDK aggregates sources with identical stream
+attributes before emitting a collection: age and lag use the maximum, while
+session count uses the sum. This aggregation is scoped to one metrics owner;
+independent `WithMetrics` owners are not merged. These observable gauges use
+the same stream attributes and omit `topic`.
+
+An observable source follows the logical reader or listener lifetime and
+remains attached across stream reconnects. It is unregistered on logical close
+and terminal completion. For pull readers, terminal-failure cleanup occurs
+when the terminal error is surfaced to `Read`; an idle raw-stream failure alone
+does not immediately unregister the source. Listener retry behavior is not
+part of this lifecycle guarantee.
 
 ## Commit ranges
 
@@ -67,10 +85,10 @@ the registry adapter (an adapter using `_` emits names such as
 units. The canonical names and units are the metric contract, while legacy
 names are compatibility adapter behavior.
 
-Counters other than `received.bytes` may optionally provide `Add(float64)` for
-a batch increment; otherwise the SDK uses the existing `Inc()` fallback, one
-increment per positive unit. `received.bytes` requires `Add(float64)` instead:
-an Inc-only adapter suppresses a positive byte sample rather than expanding it
+Counters other than `received.bytes` may optionally provide `Add(int64)` for a
+batch increment; otherwise the SDK uses the existing `Inc()` fallback, one
+increment per positive unit. `received.bytes` requires `Add(int64)` instead: an
+Inc-only adapter suppresses a positive byte sample rather than expanding it
 into unit increments. The [`ydb-go-sdk-otel` v0.11.1 adapter](https://github.com/ydb-platform/ydb-go-sdk-otel/tree/v0.11.1)
 therefore suppresses `received.bytes` samples, while other counters retain the
 `Inc()` fallback. That adapter also lacks descriptor-aware vector creation, so

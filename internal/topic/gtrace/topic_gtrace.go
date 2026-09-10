@@ -59,6 +59,44 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 		}
 	}
 	{
+		h1 := lhs.OnReaderMetricsSource
+		h2 := rhs.OnReaderMetricsSource
+		ret.OnReaderMetricsSource = func(t trace.TopicReaderMetricsSourceStartInfo) func(trace.TopicReaderMetricsSourceDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(trace.TopicReaderMetricsSourceDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t trace.TopicReaderMetricsSourceDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderMetricsSource = nil
+		}
+	}
+	{
 		h1 := lhs.OnReaderReconnect
 		h2 := rhs.OnReaderReconnect
 		ret.OnReaderReconnect = func(t trace.TopicReaderReconnectStartInfo) func(trace.TopicReaderReconnectDoneInfo) {
@@ -1600,6 +1638,21 @@ func onReaderStart(t *trace.Topic, info trace.TopicReaderStartInfo) {
 	}
 	fn(info)
 }
+func onReaderMetricsSource(t *trace.Topic, t1 trace.TopicReaderMetricsSourceStartInfo) func(trace.TopicReaderMetricsSourceDoneInfo) {
+	fn := t.OnReaderMetricsSource
+	if fn == nil {
+		return func(trace.TopicReaderMetricsSourceDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(trace.TopicReaderMetricsSourceDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func onReaderReconnect(t *trace.Topic, t1 trace.TopicReaderReconnectStartInfo) func(trace.TopicReaderReconnectDoneInfo) {
 	fn := t.OnReaderReconnect
 	if fn == nil {
@@ -2233,6 +2286,21 @@ func TopicOnReaderStart(t *trace.Topic, c *context.Context, readerID int64, cons
 	p.Consumer = consumer
 	p.Error = e
 	onReaderStart(t, p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnReaderMetricsSource(t *trace.Topic, endpoint string, database string, consumer string, readerName *string, listener bool, source trace.TopicReaderMetricsSource) func() {
+	var p trace.TopicReaderMetricsSourceStartInfo
+	p.Endpoint = endpoint
+	p.Database = database
+	p.Consumer = consumer
+	p.ReaderName = readerName
+	p.Listener = listener
+	p.Source = source
+	res := onReaderMetricsSource(t, p)
+	return func() {
+		var p trace.TopicReaderMetricsSourceDoneInfo
+		res(p)
+	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TopicOnReaderReconnect(t *trace.Topic, c *context.Context, reason error) func(error) {
