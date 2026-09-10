@@ -1,3 +1,5 @@
+* Fixed `HashPartitionChooser` in topic multiwriter (now it works like in Kafka)
+
 ## v3.151.1
 * Fixed `database/sql` Query Service requests failing on session creation attempt timeouts while the caller context remained active
 
