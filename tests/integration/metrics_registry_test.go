@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/metrics"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -297,9 +299,21 @@ func (g *gauge) Name() string {
 }
 
 func (g *gauge) Value() string {
+	return fmt.Sprintf("%f", g.Float64())
+}
+
+func (g *gauge) Float64() float64 {
 	g.m.RLock()
 	defer g.m.RUnlock()
-	return fmt.Sprintf("%f", g.value)
+
+	return g.value
+}
+
+func (vec *gaugeVec) get(name string) *gauge {
+	vec.m.RLock()
+	defer vec.m.RUnlock()
+
+	return vec.gauges[name]
 }
 
 func (vec *gaugeVec) With(labels map[string]string) metrics.Gauge {
@@ -373,14 +387,53 @@ func (v *vec[T]) iterate(f func(element *T)) {
 	}
 }
 
+func (v *vec[T]) get(key string) *T {
+	v.mtx.RLock()
+	defer v.mtx.RUnlock()
+
+	return v.data[key]
+}
+
+type gaugeCollection struct {
+	*vec[gaugeVec]
+}
+
+// AssertEqual checks an already published gauge without labels; it never creates a missing metric.
+func (gauges *gaugeCollection) AssertEqual(t testing.TB, name string, want float64) {
+	t.Helper()
+
+	key := nameLabelValuesToString(name, nil)
+	vec := gauges.get(key)
+	if !assert.NotNil(t, vec, "metric vector %s must be registered", name) {
+		return
+	}
+
+	g := vec.get(key)
+	if !assert.NotNil(t, g, "metric %s must have been published", name) {
+		return
+	}
+
+	assert.Equal(t, want, g.Float64(), name)
+}
+
 // define custom registryConfig
 type registryConfig struct {
 	prefix     string
 	details    trace.Details
-	gauges     *vec[gaugeVec]
+	gauges     *gaugeCollection
 	counters   *vec[counterVec]
 	timers     *vec[timerVec]
 	histograms *vec[histogramVec]
+}
+
+func newRegistryConfig(details trace.Details) *registryConfig {
+	return &registryConfig{
+		details:    details,
+		gauges:     &gaugeCollection{vec: newVec[gaugeVec]()},
+		counters:   newVec[counterVec](),
+		timers:     newVec[timerVec](),
+		histograms: newVec[histogramVec](),
+	}
 }
 
 func (registry *registryConfig) CounterVec(name string, labelNames ...string) metrics.CounterVec {
@@ -431,13 +484,7 @@ func (registry *registryConfig) Details() trace.Details {
 }
 
 func withMetrics(t testing.TB, details trace.Details, interval time.Duration) ydb.Option {
-	registry := &registryConfig{
-		details:    details,
-		gauges:     newVec[gaugeVec](),
-		counters:   newVec[counterVec](),
-		timers:     newVec[timerVec](),
-		histograms: newVec[histogramVec](),
-	}
+	registry := newRegistryConfig(details)
 	var (
 		done       = make(chan struct{})
 		printState = func(log func(format string, args ...interface{}), header string) {
