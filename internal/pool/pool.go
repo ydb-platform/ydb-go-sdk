@@ -444,6 +444,8 @@ func (p *Pool[PT, T]) try(ctx context.Context,
 		_ = p.putItem(ctx, info, batchChanges)
 	}()
 
+	p.applyBatchStats(batchChanges)
+	*batchChanges = dynamicStats{}
 	err = f(ctx, info.item)
 	if err != nil {
 		return xerrors.WithStackTrace(err)

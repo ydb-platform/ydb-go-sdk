@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
@@ -30,6 +31,32 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestPoolWithPublishesBusyStats(t *testing.T) {
+	// Regression: https://github.com/ydb-platform/ydb-go-sdk/issues/2295
+	var stats Stats
+	p := mustNewPool(t,
+		WithLimit[*testItem, testItem](1),
+		WithTrace(&Trace[*testItem, testItem]{
+			OnChange: func(s Stats) {
+				stats = s
+			},
+		}),
+	)
+	defer mustClose(t, p)
+
+	require.NoError(t, p.With(t.Context(), func(context.Context, *testItem) error {
+		assert.Equal(t, 1, stats.InUse, "InUse")
+
+		return nil
+	}))
+
+	require.NoError(t, p.With(t.Context(), func(context.Context, *testItem) error {
+		assert.Equal(t, 0, stats.Idle, "Idle")
+
+		return nil
+	}))
+}
 
 type testItem struct {
 	v int32

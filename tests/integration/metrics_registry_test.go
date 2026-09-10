@@ -399,8 +399,10 @@ type gaugeCollection struct {
 }
 
 // AssertEqual checks an already published gauge without labels; it never creates a missing metric.
-func (gauges *gaugeCollection) AssertEqual(t testing.TB, name string, want float64) {
-	t.Helper()
+func (gauges *gaugeCollection) AssertEqual(t assert.TestingT, name string, want float64) {
+	if h, ok := t.(interface{ Helper() }); ok {
+		h.Helper()
+	}
 
 	key := nameLabelValuesToString(name, nil)
 	vec := gauges.get(key)
