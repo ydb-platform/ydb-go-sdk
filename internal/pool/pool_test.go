@@ -58,6 +58,28 @@ func TestPoolWithPublishesBusyStats(t *testing.T) {
 	}))
 }
 
+func TestPoolCreateItemPublishesInProgressStats(t *testing.T) {
+	var stats Stats
+	p := mustNewPool(t,
+		WithCreateItemFunc(func(context.Context) (*testItem, error) {
+			assert.Equal(t, 1, stats.CreateInProgress, "CreateInProgress")
+
+			return &testItem{}, nil
+		}),
+		WithTrace(&Trace[*testItem, testItem]{
+			OnChange: func(s Stats) {
+				stats = s
+			},
+		}),
+	)
+	defer mustClose(t, p)
+
+	var batchChanges dynamicStats
+	item, err := p.createItem(t.Context(), &batchChanges)
+	require.NoError(t, err)
+	require.NoError(t, item.Close(t.Context()))
+}
+
 type testItem struct {
 	v int32
 

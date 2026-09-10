@@ -287,11 +287,7 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) er
 // not propagated. Creation is canceled when the pool is done, and
 // Config.createTimeout is applied when configured.
 func (p *Pool[PT, T]) createItem(ctx context.Context, batchChanges *dynamicStats) (PT, error) {
-	p.stats.Change(func(old dynamicStats) dynamicStats {
-		old.CreateInProgress++
-
-		return old
-	})
+	p.applyBatchStats(&dynamicStats{CreateInProgress: 1})
 	defer p.stats.Change(func(old dynamicStats) dynamicStats {
 		old.CreateInProgress--
 
