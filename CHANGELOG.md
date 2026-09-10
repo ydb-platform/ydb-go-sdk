@@ -1,3 +1,4 @@
+## v3.151.2
 * Fixed `HashPartitionChooser` in topic multiwriter (now it works like in Kafka)
 
 ## v3.151.1
