@@ -1605,16 +1605,15 @@ func TestTopicMultiWriter_KafkaHashPartitionStableAcrossWriterRestart(t *testing
 	payloadFirst := []byte("payload-kafka-hash-first-session")
 	payloadSecond := []byte("payload-kafka-hash-second-session")
 
-	multiWriterOpts := []topicoptions.MultiWriterOption{
-		topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
-		topicoptions.WithProducerIDPrefix(producerPrefix),
-	}
-
 	startWriter := func() *topicwriter.Writer {
 		w, wErr := topicClient.StartWriter(
 			topicPath,
 			topicoptions.WithWriterSetAutoSeqNo(true),
-			topicoptions.WithWriteToManyPartitions(multiWriterOpts...),
+			topicoptions.WithWriteToManyPartitions(
+				// Fresh chooser each time: the instance is stateful (AddNewPartitions).
+				topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
+				topicoptions.WithProducerIDPrefix(producerPrefix),
+			),
 		)
 		require.NoError(t, wErr)
 		require.NoError(t, w.WaitInit(ctx))

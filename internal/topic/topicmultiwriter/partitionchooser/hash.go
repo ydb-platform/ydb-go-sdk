@@ -9,6 +9,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
+const (
+	mask uint32 = 0x7FFFFFFF
+	seed uint32 = 0x9747b28c
+)
+
 type HashPartitionChooser struct {
 	partitions []int64
 }
@@ -25,9 +30,9 @@ func (c *HashPartitionChooser) ChoosePartition(msg topicwriterinternal.PublicMes
 	// Same as Kafka Partitioner
 	//nolint:lll
 	// See: https://github.com/apache/kafka/blob/4.2/clients/src/main/java/org/apache/kafka/clients/producer/internals/BuiltInPartitioner.java#L330
-	hash := xhash.Murmur2Hash32([]byte(msg.Key), 0)
+	hash := xhash.Murmur2Hash32([]byte(msg.Key), seed)
 
-	return c.partitions[hash%uint32(len(c.partitions))], nil
+	return c.partitions[(hash&mask)%uint32(len(c.partitions))], nil
 }
 
 func (c *HashPartitionChooser) AddNewPartitions(partitions ...topictypes.PartitionInfo) error {
