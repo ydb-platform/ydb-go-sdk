@@ -70,7 +70,7 @@ func (s StreamReader) Recv() (_ ServerMessage, resErr error) {
 		return nil, err
 	}
 	if !meta.Status.IsSuccess() {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %v", meta.Status))
+		return nil, xerrors.WithStackTrace(&rawtopiccommon.StatusCodeError{Status: meta.Status})
 	}
 
 	switch m := grpcMess.GetServerMessage().(type) {

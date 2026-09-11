@@ -356,6 +356,117 @@ func TestStreamListener_MetricBalancesArePerStreamForSameReaderName(t *testing.T
 	require.Equal(t, -2, listenerMetricDelta(t, listener2Locals))
 }
 
+func TestStreamListenerStartCommitOverrideUpdatesOnlyMetricsBaseline(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+	ctx := sf.Context(e)
+	t.Cleanup(func() {
+		_ = listener.Close(context.Background(), errors.New("test cleanup"))
+	})
+	listener.cfg = &StreamListenerConfig{
+		Decoders: topicreadercommon.NewMultiDecoder(),
+		ReaderInfo: topicreadercommon.ReaderInfo{
+			Endpoint:   "node:2135",
+			Database:   "/db",
+			Consumer:   "consumer",
+			ReaderName: readerNamePointer("reader"),
+		},
+	}
+	listener.metricsSource = topicreadercommon.NewReaderMetricsSource()
+
+	listener.background.Start("metrics start test listener send loop", listener.sendMessagesLoop)
+	startPartition := func(
+		testT *testing.T,
+		sessionID rawtopicreader.PartitionSessionID,
+		committedOffset int64,
+		confirm PublicStartPartitionSessionConfirm,
+	) (*topicreadercommon.PartitionSession, *rawtopicreader.StartPartitionSessionResponse) {
+		testT.Helper()
+		EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, event *PublicEventStartPartitionSession) error {
+				event.ConfirmWithParams(confirm)
+
+				return nil
+			},
+		)
+		startResponses := make(chan *rawtopicreader.StartPartitionSessionResponse, 1)
+		StreamMock(e).EXPECT().Send(gomock.AssignableToTypeOf(&rawtopicreader.StartPartitionSessionResponse{})).DoAndReturn(
+			func(msg rawtopicreader.ClientMessage) error {
+				startResponses <- msg.(*rawtopicreader.StartPartitionSessionResponse)
+
+				return nil
+			},
+		)
+		require.NoError(testT, listener.handleStartPartition(ctx, &rawtopicreader.StartPartitionSessionRequest{
+			PartitionSession: rawtopicreader.PartitionSession{
+				PartitionSessionID: sessionID,
+				Path:               "/topic",
+				PartitionID:        1,
+			},
+			CommittedOffset: rawtopiccommon.NewOffset(committedOffset),
+			PartitionOffsets: rawtopiccommon.OffsetRange{
+				Start: rawtopiccommon.NewOffset(committedOffset),
+				End:   rawtopiccommon.NewOffset(120),
+			},
+		}))
+		var response *rawtopicreader.StartPartitionSessionResponse
+		select {
+		case response = <-startResponses:
+		case <-time.After(time.Second):
+			testT.Fatal("timed out waiting for listener partition start response")
+		}
+
+		session, err := listener.sessions.Get(sessionID)
+		require.NoError(testT, err)
+
+		return session, response
+	}
+
+	session, response := startPartition(
+		t,
+		100,
+		50,
+		(PublicStartPartitionSessionConfirm{}).WithReadOffet(120).WithCommitOffset(100),
+	)
+	require.True(t, response.ReadOffset.HasValue)
+	require.Equal(t, rawtopiccommon.NewOffset(120), response.ReadOffset.Offset)
+	require.True(t, response.CommitOffset.HasValue)
+	require.Equal(t, rawtopiccommon.NewOffset(100), response.CommitOffset.Offset)
+	require.Equal(t, rawtopiccommon.NewOffset(50), session.CommittedOffset())
+	require.Equal(t, rawtopiccommon.NewOffset(49), session.LastReceivedMessageOffset())
+	snapshot := listener.metricsSource.Snapshot()
+	require.Equal(t, int64(1), snapshot.PartitionSessionCount)
+	require.Zero(t, snapshot.CommitOffsetLag)
+
+	listener.metricsSource.RegisterCommit(session, 101)
+	require.Equal(t, int64(1), listener.metricsSource.Snapshot().CommitOffsetLag)
+	listener.metricsSource.AcknowledgeCommit(session, 101)
+	require.Zero(t, listener.metricsSource.Snapshot().CommitOffsetLag)
+	require.Equal(t, rawtopiccommon.NewOffset(50), session.CommittedOffset())
+	require.Equal(t, rawtopiccommon.NewOffset(49), session.LastReceivedMessageOffset())
+
+	for i, test := range []struct {
+		name    string
+		confirm PublicStartPartitionSessionConfirm
+	}{
+		{name: "read only", confirm: (PublicStartPartitionSessionConfirm{}).WithReadOffet(100)},
+		{name: "lower commit", confirm: (PublicStartPartitionSessionConfirm{}).WithCommitOffset(40)},
+		{name: "equal commit", confirm: (PublicStartPartitionSessionConfirm{}).WithCommitOffset(50)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			session, _ := startPartition(t, rawtopicreader.PartitionSessionID(101+i), 50, test.confirm)
+			require.Equal(t, rawtopiccommon.NewOffset(50), session.CommittedOffset())
+			require.Equal(t, rawtopiccommon.NewOffset(49), session.LastReceivedMessageOffset())
+			require.Zero(t, listener.metricsSource.Snapshot().CommitOffsetLag)
+
+			listener.metricsSource.RegisterCommit(session, 51)
+			require.Equal(t, int64(1), listener.metricsSource.Snapshot().CommitOffsetLag)
+			listener.metricsSource.AcknowledgeCommit(session, 51)
+			require.Zero(t, listener.metricsSource.Snapshot().CommitOffsetLag)
+		})
+	}
+}
+
 func setupListenerCommitMetrics(
 	t *testing.T,
 	listener *streamListener,

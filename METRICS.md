@@ -73,6 +73,9 @@ UpDownCounter instruments: `local_buffer.messages` represents the number of
 messages currently held by the SDK, while `credit_balance_bytes` represents
 the current read-ahead byte balance. Concurrent delivery and close callbacks
 retain the order of these balance deltas.
+For listener start-session confirmations, a supplied commit offset raises the
+commit-lag baseline to the maximum of the server committed offset and the
+requested offset without changing the read position or session state.
 
 ## Registry compatibility
 
@@ -85,14 +88,16 @@ the registry adapter (an adapter using `_` emits names such as
 units. The canonical names and units are the metric contract, while legacy
 names are compatibility adapter behavior.
 
-Counters other than `received.bytes` may optionally provide `Add(int64)` for a
-batch increment; otherwise the SDK uses the existing `Inc()` fallback, one
-increment per positive unit. `received.bytes` requires `Add(int64)` instead: an
-Inc-only adapter suppresses a positive byte sample rather than expanding it
-into unit increments. The [`ydb-go-sdk-otel` v0.11.1 adapter](https://github.com/ydb-platform/ydb-go-sdk-otel/tree/v0.11.1)
-therefore suppresses `received.bytes` samples, while other counters retain the
-`Inc()` fallback. That adapter also lacks descriptor-aware vector creation, so
-canonical names and units still require the optional descriptor interfaces.
-An unsupported byte sample does not remove the instrument: an adapter may
-still register it and expose a zero or empty series. That is not a startup
-failure or evidence of zero traffic.
+`received.bytes`, `commit.queued`, and `commit.acknowledged` require
+`Add(int64)` for a batch increment: an Inc-only adapter suppresses a positive
+sample rather than expanding it into unit increments. `received.messages`,
+`delivered.messages`, and `session.errors` retain the existing `Inc()` fallback
+for adapters without `Add(int64)`. The [`ydb-go-sdk-otel` v0.11.1
+adapter](https://github.com/ydb-platform/ydb-go-sdk-otel/tree/v0.11.1)
+therefore suppresses samples for the required-`Add` counters, while message
+and session-error counters remain compatible with `Inc()`-only adapters. That
+adapter also lacks descriptor-aware vector creation, so canonical names and
+units still require the optional descriptor interfaces. An unsupported sample
+does not remove the instrument: an adapter may still register it and expose a
+zero or empty series. That is not a startup failure or evidence of zero
+traffic.

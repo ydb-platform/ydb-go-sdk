@@ -126,6 +126,11 @@ func (s *PartitionSession) SetLastReceivedMessageOffset(v rawtopiccommon.Offset)
 func (s *PartitionSession) SetInitialCommitOffset(committedOffset rawtopiccommon.Offset) {
 	s.committedOffsetVal.Store(committedOffset.ToInt64())
 	s.lastReceivedOffsetEndVal.Store(committedOffset.ToInt64() - 1)
+	s.SetInitialMetricsCommittedOffset(committedOffset)
+}
+
+// SetInitialMetricsCommittedOffset updates only the observable commit baseline.
+func (s *PartitionSession) SetInitialMetricsCommittedOffset(committedOffset rawtopiccommon.Offset) {
 	if s.metricsSource != nil {
 		s.metricsSource.SetInitialCommittedOffset(s, committedOffset.ToInt64())
 	}

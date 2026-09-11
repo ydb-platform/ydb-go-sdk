@@ -138,7 +138,11 @@ func TestTopicReaderMetricsHonorDetailsGroups(t *testing.T) {
 
 	t.Run("stream events", func(t *testing.T) {
 		registry := newRecordingRegistry()
-		tracer := topic(recordingConfig{registry: registry, details: trace.TopicReaderStreamEvents})
+		capture := &topicCounterCapture{}
+		tracer := topic(topicAddCounterConfig{
+			recordingConfig: recordingConfig{registry: registry, details: trace.TopicReaderStreamEvents},
+			capture:         capture,
+		})
 
 		require.Nil(t, tracer.OnReaderMessagesReceived)
 		require.Nil(t, tracer.OnReaderMessagesDelivered)
@@ -162,22 +166,28 @@ func TestTopicReaderMetricsHonorDetailsGroups(t *testing.T) {
 			Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerName,
 			RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
 		})
+		require.Equal(t, map[string][]int64{
+			"ydb.topic.reader.commit.queued":       {9},
+			"ydb.topic.reader.commit.acknowledged": {8},
+			"ydb.topic.reader.session.errors":      {1},
+		}, capture.adds)
+		require.Empty(t, capture.incs)
 
 		messageLabels := map[string]string{
 			"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
 		}
-		require.Zero(t, registry.value("topic.reader.received.messages", messageLabels))
-		require.Zero(t, registry.value("topic.reader.delivered.messages", messageLabels))
-		require.Zero(t, registry.value("topic.reader.local_buffer.messages", messageLabels))
-		require.Zero(t, registry.value("topic.reader.received.bytes", map[string]string{
+		require.Zero(t, registry.value("ydb.topic.reader.received.messages", messageLabels))
+		require.Zero(t, registry.value("ydb.topic.reader.delivered.messages", messageLabels))
+		require.Zero(t, registry.value("ydb.topic.reader.local_buffer.messages", messageLabels))
+		require.Zero(t, registry.value("ydb.topic.reader.received.bytes", map[string]string{
 			"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",
 		}))
-		require.Zero(t, registry.value("topic.reader.credit_balance_bytes", map[string]string{
+		require.Zero(t, registry.value("ydb.topic.reader.credit_balance_bytes", map[string]string{
 			"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",
 		}))
-		require.Equal(t, float64(9), registry.value("topic.reader.commit.queued", messageLabels))
-		require.Equal(t, float64(8), registry.value("topic.reader.commit.acknowledged", messageLabels))
-		require.Equal(t, float64(1), registry.value("topic.reader.session.errors", map[string]string{
+		require.Equal(t, float64(9), registry.value("ydb.topic.reader.commit.queued", messageLabels))
+		require.Equal(t, float64(8), registry.value("ydb.topic.reader.commit.acknowledged", messageLabels))
+		require.Equal(t, float64(1), registry.value("ydb.topic.reader.session.errors", map[string]string{
 			"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",
 			"retry_decision": "retry", "status_code": "UNAVAILABLE", "error.type": "transport_error",
 		}))
@@ -249,11 +259,12 @@ func TestTopicReaderCountersIgnoreNonPositiveDeltas(t *testing.T) {
 	require.Equal(t, float64(1), registry.value("ydb.topic.reader.session.errors", errorLabels))
 }
 
-func TestTopicReaderCountersFallBackToIncExceptBytes(t *testing.T) {
+func TestTopicReaderCountersFallBackToIncForMessageAndSessionErrors(t *testing.T) {
+	largeDelta := int(^uint(0) >> 1)
 	fallbackRegistry := newRecordingRegistry()
 	fallbackCapture := &topicCounterCapture{}
 	fallbackTracer := topic(topicFallbackCounterConfig{
-		recordingConfig: recordingConfig{registry: fallbackRegistry, details: trace.TopicReaderMessageEvents},
+		recordingConfig: recordingConfig{registry: fallbackRegistry, details: trace.DetailsAll},
 		capture:         fallbackCapture,
 	})
 	fallbackTracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
@@ -264,14 +275,39 @@ func TestTopicReaderCountersFallBackToIncExceptBytes(t *testing.T) {
 		Endpoint: "node", Database: "/db", Consumer: "consumer",
 		ReaderName: readerNamePointer("reader"), Bytes: 1024,
 	})
+	fallbackTracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
+		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+		ReaderName: readerNamePointer("reader"), MessagesCount: largeDelta,
+	})
+	fallbackTracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{
+		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
+		ReaderName: readerNamePointer("reader"), MessagesCount: largeDelta,
+	})
+	fallbackTracer.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"),
+		RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
+	})
 
 	require.Empty(t, fallbackCapture.adds)
-	require.Equal(t, map[string]int{"topic.reader.received.messages": 3}, fallbackCapture.incs)
+	require.Equal(t, map[string]int{
+		"topic.reader.received.messages": 3,
+		"topic.reader.session.errors":    1,
+	}, fallbackCapture.incs)
 	require.Equal(t, float64(3), fallbackRegistry.value("topic.reader.received.messages", map[string]string{
 		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
 	}))
 	require.Zero(t, fallbackRegistry.value("topic.reader.received.bytes", map[string]string{
 		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",
+	}))
+	require.Zero(t, fallbackRegistry.value("topic.reader.commit.queued", map[string]string{
+		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
+	}))
+	require.Zero(t, fallbackRegistry.value("topic.reader.commit.acknowledged", map[string]string{
+		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
+	}))
+	require.Equal(t, float64(1), fallbackRegistry.value("topic.reader.session.errors", map[string]string{
+		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",
+		"retry_decision": "retry", "status_code": "UNAVAILABLE", "error.type": "transport_error",
 	}))
 }
 
@@ -623,6 +659,9 @@ type topicFallbackCounter struct {
 }
 
 func (c topicFallbackCounter) Inc() {
+	if c.path == "topic.reader.commit.queued" || c.path == "topic.reader.commit.acknowledged" {
+		panic("commit counter unexpectedly used Inc")
+	}
 	if c.capture.incs == nil {
 		c.capture.incs = make(map[string]int)
 	}

@@ -113,14 +113,10 @@ func setupTopicReaderReceivedBytes(t *trace.Topic, config Config) {
 		if info.Bytes <= 0 {
 			return
 		}
-
-		counter := receivedBytes.With(streamLabels(info.Endpoint, info.Database, info.Consumer, info.ReaderName))
-		adder, ok := counter.(interface{ Add(delta int64) })
-		if !ok {
-			return
-		}
-
-		adder.Add(int64(info.Bytes))
+		addCounterWithAdd(
+			receivedBytes.With(streamLabels(info.Endpoint, info.Database, info.Consumer, info.ReaderName)),
+			info.Bytes,
+		)
 	}
 }
 
@@ -164,7 +160,7 @@ func setupTopicReaderCommitQueued(t *trace.Topic, config Config) {
 		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderStreamEvents) {
 			return
 		}
-		addCounter(
+		addCounterWithAdd(
 			commitQueued.With(messageLabels(info.Endpoint, info.Database, info.Topic, info.Consumer, info.ReaderName)),
 			info.MessagesCount,
 		)
@@ -187,7 +183,7 @@ func setupTopicReaderCommitAcknowledged(t *trace.Topic, config Config) {
 		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderStreamEvents) {
 			return
 		}
-		addCounter(
+		addCounterWithAdd(
 			commitAcknowledged.With(messageLabels(info.Endpoint, info.Database, info.Topic, info.Consumer, info.ReaderName)),
 			info.MessagesCount,
 		)
@@ -293,6 +289,18 @@ func addCounter(counter Counter, delta int) {
 	for range delta {
 		counter.Inc()
 	}
+}
+
+func addCounterWithAdd(counter Counter, delta int) {
+	if delta <= 0 {
+		return
+	}
+	adder, ok := counter.(interface{ Add(delta int64) })
+	if !ok {
+		return
+	}
+
+	adder.Add(int64(delta))
 }
 
 func addGauge(gauge Gauge, delta float64) {

@@ -604,6 +604,9 @@ func (l *streamListener) routeMessageAt(
 		return l.handleStartPartition(ctx, m)
 	case *rawtopicreader.StopPartitionSessionRequest:
 		l.routeToWorker(m.PartitionSessionID, func(worker *PartitionWorker) {
+			if !m.Graceful {
+				l.unregisterPartitionSession(worker.partitionSession)
+			}
 			worker.AddRawServerMessage(m)
 		})
 

@@ -2,12 +2,14 @@ package topicreadercommon
 
 import (
 	"context"
+	"errors"
 	"strconv"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -41,6 +43,14 @@ func ClassifySessionError(err error) SessionErrorClassification {
 	if xerrors.IsTransportError(err) {
 		classification.ErrorType = transportSessionErrorType
 		classification.StatusCode = grpcStatusCodeName(grpcStatus.Code(err))
+
+		return classification
+	}
+
+	var statusErr *rawtopiccommon.StatusCodeError
+	if errors.As(err, &statusErr) {
+		classification.ErrorType = ydbSessionErrorType
+		classification.StatusCode = ydbStatusCodeName(int32(statusErr.Status))
 
 		return classification
 	}

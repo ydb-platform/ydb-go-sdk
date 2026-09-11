@@ -527,6 +527,9 @@ func (w *PartitionWorker) handleStartPartitionRequest(
 		resp.ReadOffset.HasValue = true
 	}
 	if userResp.CommitOffset != nil {
+		metricsCommittedOffset := max(w.partitionSession.CommittedOffset().ToInt64(), *userResp.CommitOffset)
+		w.partitionSession.SetInitialMetricsCommittedOffset(rawtopiccommon.NewOffset(metricsCommittedOffset))
+
 		resp.CommitOffset.Offset.FromInt64(*userResp.CommitOffset)
 		resp.CommitOffset.HasValue = true
 	}
