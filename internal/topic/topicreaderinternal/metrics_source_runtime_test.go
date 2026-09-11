@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -22,7 +23,9 @@ func TestTopicStreamReaderMetricsSourceTracksPullSplitDiscardAndClose(t *testing
 	source.RegisterPartitionSession(e.partitionSession)
 
 	require.NoError(t, e.reader.onReadResponse(readerMetricResponseWithOffsets(&e, 50, 20, 21, 22)))
-	require.Positive(t, source.Snapshot().OldestMessageAge)
+	require.Eventually(t, func() bool {
+		return source.Snapshot().OldestMessageAge > 0
+	}, time.Second, time.Millisecond)
 
 	first, err := e.reader.consumeMessagesUntilBatch(e.ctx, ReadMessageBatchOptions{
 		batcherGetOptions: batcherGetOptions{MinCount: 1, MaxCount: 1},
