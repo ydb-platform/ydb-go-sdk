@@ -56,6 +56,7 @@ Stress a single flaky integration test: add `-count=N -run 'TestName$'` to the `
 | `check-codegen.yml` | PR | `go generate` trace/gstack diff |
 | `breaking.yml` | PR | `gorelease` (skip: `broken changes`) |
 | `examples.yml` | PR | examples vs local YDB (skip: `no examples`) |
+| `check-slo-label.yml` | PR | requires a developer to add `SLO` manually (skip: `no slo`) |
 | `slo.yml` | push/PR + manual | SLO benchmarks (active in go-sdk) |
 | `publish.yml` | manual | version bump + release |
 
@@ -63,7 +64,7 @@ The `SLO` label is added **manually by a developer**, only after all other revie
 
 ## PR labels that skip CI gates
 
-`no lint`, `no tests`, `no integration tests`, `no changelog`, `no examples`, `broken changes`
+`no lint`, `no tests`, `no integration tests`, `no changelog`, `no examples`, `no slo`, `broken changes`
 
 ## Changelog (unreleased)
 
