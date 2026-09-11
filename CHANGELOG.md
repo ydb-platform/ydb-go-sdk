@@ -1,4 +1,5 @@
 * Fixed query session pool busy and idle metrics being published only after the operation completed
+* Fixed session invalidation to follow the shared error policy for Query Service and Table API requests executed through Query Service, preserving sessions after gRPC `RESOURCE_EXHAUSTED` and `OUT_OF_RANGE`
 
 ## v3.151.2
 * Fixed `HashPartitionChooser` in topic multiwriter (now it works like in Kafka)
