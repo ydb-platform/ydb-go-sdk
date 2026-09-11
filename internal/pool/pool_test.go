@@ -102,6 +102,27 @@ func TestPoolTryPublishesReturnedItemStats(t *testing.T) {
 	assert.Equal(t, 0, stats.InUse, "InUse")
 }
 
+func TestPoolWithPublishesConcurrencyBeforeAttempt(t *testing.T) {
+	var stats Stats
+	p := mustNewPool(t,
+		WithTrace(&Trace[*testItem, testItem]{
+			OnChange: func(s Stats) {
+				stats = s
+			},
+			OnWith: func(*context.Context, stack.Caller) func(int, error) {
+				assert.Equal(t, 1, stats.Concurrency, "Concurrency")
+
+				return nil
+			},
+		}),
+	)
+	defer mustClose(t, p)
+
+	require.NoError(t, p.With(t.Context(), func(context.Context, *testItem) error {
+		return nil
+	}))
+}
+
 type testItem struct {
 	v int32
 

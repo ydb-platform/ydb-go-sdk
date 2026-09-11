@@ -485,11 +485,7 @@ func (p *Pool[PT, T]) With(
 	f func(ctx context.Context, item PT) error,
 	opts ...retry.Option,
 ) (finalErr error) {
-	p.stats.Change(func(old dynamicStats) dynamicStats {
-		old.Concurrency++
-
-		return old
-	})
+	p.applyBatchStats(&dynamicStats{Concurrency: 1})
 
 	var batchChanges dynamicStats
 	defer func() {
