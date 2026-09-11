@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 
@@ -54,6 +55,36 @@ func TestSessionResourceExhaustedKeepsAlive(t *testing.T) {
 	s.onSessionError(xerrors.Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "retry operation")))
 
 	require.True(t, s.IsAlive())
+}
+
+func TestSessionOnErrorRespectsDeletionPolicy(t *testing.T) {
+	testErrors := []error{
+		errors.New("user error"),
+		io.EOF,
+		context.Canceled,
+		context.DeadlineExceeded,
+	}
+	for code := grpcCodes.Canceled; code <= grpcCodes.Unauthenticated; code++ {
+		err := grpcStatus.Error(code, "")
+		testErrors = append(testErrors, err, xerrors.Transport(err))
+	}
+	for code := range Ydb.StatusIds_StatusCode_name {
+		status := Ydb.StatusIds_StatusCode(code)
+		if status != Ydb.StatusIds_SUCCESS {
+			testErrors = append(testErrors, xerrors.Operation(xerrors.WithStatusCode(status)))
+		}
+	}
+
+	for _, err := range testErrors {
+		t.Run(err.Error(), func(t *testing.T) {
+			s := &Session{Core: &sessionCore{}}
+			s.SetStatus(StatusInUse)
+
+			s.onSessionError(err)
+
+			require.Equal(t, !xerrors.MustDeleteTableOrQuerySession(err), s.IsAlive())
+		})
+	}
 }
 
 func TestSessionClosedOnQueryError(t *testing.T) {
