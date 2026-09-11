@@ -178,7 +178,7 @@ func New[PT ItemConstraint[T], T any](
 
 	var batchChanges dynamicStats
 	err = p.warmUp(ctx, &batchChanges)
-	p.applyBatchStats(&batchChanges)
+	p.flushStats(&batchChanges)
 	if err != nil {
 		_ = p.Close(ctx)
 
@@ -221,16 +221,8 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) er
 				defer cancel()
 			}
 
-			p.stats.Change(func(old dynamicStats) dynamicStats {
-				old.CreateInProgress++
-
-				return old
-			})
-			defer p.stats.Change(func(old dynamicStats) dynamicStats {
-				old.CreateInProgress--
-
-				return old
-			})
+			p.changeStats(dynamicStats{CreateInProgress: 1})
+			defer p.changeStats(dynamicStats{CreateInProgress: -1})
 
 			item, err := p.config.createItemFunc(ctx)
 			if err != nil {
@@ -287,12 +279,8 @@ func (p *Pool[PT, T]) warmUp(ctx context.Context, batchChanges *dynamicStats) er
 // not propagated. Creation is canceled when the pool is done, and
 // Config.createTimeout is applied when configured.
 func (p *Pool[PT, T]) createItem(ctx context.Context, batchChanges *dynamicStats) (PT, error) {
-	p.applyBatchStats(&dynamicStats{CreateInProgress: 1})
-	defer p.stats.Change(func(old dynamicStats) dynamicStats {
-		old.CreateInProgress--
-
-		return old
-	})
+	p.changeStats(dynamicStats{CreateInProgress: 1})
+	defer p.changeStats(dynamicStats{CreateInProgress: -1})
 
 	createCtx, cancelCreate := xcontext.WithDone(xcontext.ValueOnly(ctx), p.done)
 	defer cancelCreate()
@@ -370,7 +358,7 @@ func (p *Pool[PT, T]) checkItemAndError(item PT, err error) error {
 
 //nolint:funlen
 func (p *Pool[PT, T]) try(ctx context.Context,
-	f func(ctx context.Context, item PT) error, batchChanges *dynamicStats,
+	f func(ctx context.Context, item PT) error,
 ) (finalErr error) {
 	if onTry := p.config.trace.OnTry; onTry != nil {
 		onDone := onTry(&ctx,
@@ -401,12 +389,10 @@ func (p *Pool[PT, T]) try(ctx context.Context,
 		}()
 	}
 
-	defer func() {
-		p.applyBatchStats(batchChanges)
-		*batchChanges = dynamicStats{}
-	}()
+	var batchChanges dynamicStats
+	defer p.flushStats(&batchChanges)
 
-	info, err := p.getItem(ctx, batchChanges)
+	info, err := p.getItem(ctx, &batchChanges)
 	if err != nil {
 		if isRetriable(err) {
 			return xerrors.WithStackTrace(xerrors.Retryable(err))
@@ -426,7 +412,7 @@ func (p *Pool[PT, T]) try(ctx context.Context,
 	// Keep a successfully created item in the pool when the caller gives up, so
 	// the next request can reuse it.
 	if err := ctx.Err(); err != nil {
-		_ = p.putItem(ctx, info, batchChanges)
+		_ = p.putItem(ctx, info, &batchChanges)
 
 		return xerrors.WithStackTrace(err)
 	}
@@ -437,16 +423,15 @@ func (p *Pool[PT, T]) try(ctx context.Context,
 		batchChanges.InUse--
 
 		if err := p.checkItemAndError(info.item, finalErr); err != nil {
-			p.closeItem(ctx, info.item, batchChanges)
+			p.closeItem(ctx, info.item, &batchChanges)
 
 			return
 		}
 
-		_ = p.putItem(ctx, info, batchChanges)
+		_ = p.putItem(ctx, info, &batchChanges)
 	}()
 
-	p.applyBatchStats(batchChanges)
-	*batchChanges = dynamicStats{}
+	p.flushStats(&batchChanges)
 	err = f(ctx, info.item)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -455,18 +440,23 @@ func (p *Pool[PT, T]) try(ctx context.Context,
 	return nil
 }
 
-func (p *Pool[PT, T]) applyBatchStats(batch *dynamicStats) {
+func (p *Pool[PT, T]) flushStats(batch *dynamicStats) {
+	p.changeStats(*batch)
+	*batch = dynamicStats{}
+}
+
+func (p *Pool[PT, T]) changeStats(delta dynamicStats) {
 	onChange := p.config.trace.OnChange
 
 	var stats dynamicStats
 	p.stats.Change(func(old dynamicStats) dynamicStats {
 		stats = old
 
-		stats.Concurrency += batch.Concurrency
-		stats.CreateInProgress += batch.CreateInProgress
-		stats.InUse += batch.InUse
-		stats.Idle += batch.Idle
-		stats.Size += batch.Size
+		stats.Concurrency += delta.Concurrency
+		stats.CreateInProgress += delta.CreateInProgress
+		stats.InUse += delta.InUse
+		stats.Idle += delta.Idle
+		stats.Size += delta.Size
 
 		return stats
 	})
@@ -485,14 +475,8 @@ func (p *Pool[PT, T]) With(
 	f func(ctx context.Context, item PT) error,
 	opts ...retry.Option,
 ) (finalErr error) {
-	p.applyBatchStats(&dynamicStats{Concurrency: 1})
-
-	var batchChanges dynamicStats
-	defer func() {
-		batchChanges.Concurrency--
-
-		p.applyBatchStats(&batchChanges)
-	}()
+	p.changeStats(dynamicStats{Concurrency: 1})
+	defer p.changeStats(dynamicStats{Concurrency: -1})
 
 	var attempts int
 
@@ -509,7 +493,7 @@ func (p *Pool[PT, T]) With(
 
 	err := retry.Retry(ctx, func(ctx context.Context) error {
 		attempts++
-		err := p.try(ctx, f, &batchChanges)
+		err := p.try(ctx, f)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -547,7 +531,7 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 			batchChanges dynamicStats
 		)
 
-		defer p.applyBatchStats(&batchChanges)
+		defer p.flushStats(&batchChanges)
 
 		// Drain sema with one goroutine per slot (not a single loop) so all tokens are
 		// acquired in parallel: faster occupancy of the semaphore and shorter Close().

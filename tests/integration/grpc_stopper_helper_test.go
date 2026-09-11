@@ -50,6 +50,7 @@ func NewGrpcStopper(closeError error) *GrpcStopper {
 }
 
 // Stop interrupts the listed methods, or all methods if none are listed, until Start.
+// An interrupted RPC may keep running until its caller cancels the RPC context.
 func (l *GrpcStopper) Stop(methods ...string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -87,7 +88,8 @@ func (l *GrpcStopper) Start() {
 
 // Pause holds unary calls and stream creation until Start, Stop, or context cancellation.
 // It applies to the listed methods, or all methods if none are listed.
-// Each call that reaches the pause sends a notification on the returned channel.
+// Repeated calls while paused keep the original methods and notification channel.
+// Each paused call sends a notification unless Start, Stop, or context cancellation releases it first.
 func (l *GrpcStopper) Pause(methods ...string) <-chan struct{} {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -175,22 +177,16 @@ func (l *GrpcStopper) UnaryClientInterceptor(
 		return err
 	}
 
-	result := make(chan error, 1)
-	go func() {
-		result <- invoker(ctx, method, req, reply, cc, opts...)
-	}()
-	select {
-	case <-stopChannel:
-		return l.stopError
-	case <-ctx.Done():
-		return ctx.Err()
-	case err := <-result:
-		if pauseErr := l.wait(ctx, method, stopChannel); pauseErr != nil {
-			return pauseErr
+	return l.intercept(method, func() error {
+		err := invoker(ctx, method, req, reply, cc, opts...)
+		if l.pauseState(method) != nil {
+			if pauseErr := l.wait(ctx, method, stopChannel); pauseErr != nil {
+				return pauseErr
+			}
 		}
 
 		return err
-	}
+	})
 }
 
 func (l *GrpcStopper) StreamClientInterceptor(

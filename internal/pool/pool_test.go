@@ -59,25 +59,36 @@ func TestPoolWithPublishesBusyStats(t *testing.T) {
 }
 
 func TestPoolCreateItemPublishesInProgressStats(t *testing.T) {
-	var stats Stats
-	p := mustNewPool(t,
-		WithCreateItemFunc(func(context.Context) (*testItem, error) {
-			assert.Equal(t, 1, stats.CreateInProgress, "CreateInProgress")
+	for _, createErr := range []error{nil, errors.New("create item failed")} {
+		var stats Stats
+		p := mustNewPool(t,
+			WithCreateItemFunc(func(context.Context) (*testItem, error) {
+				assert.Equal(t, 1, stats.CreateInProgress, "CreateInProgress")
+				if createErr != nil {
+					return nil, createErr
+				}
 
-			return &testItem{}, nil
-		}),
-		WithTrace(&Trace[*testItem, testItem]{
-			OnChange: func(s Stats) {
-				stats = s
-			},
-		}),
-	)
-	defer mustClose(t, p)
+				return &testItem{}, nil
+			}),
+			WithTrace(&Trace[*testItem, testItem]{
+				OnChange: func(s Stats) {
+					stats = s
+				},
+			}),
+		)
+		defer mustClose(t, p)
 
-	var batchChanges dynamicStats
-	item, err := p.createItem(t.Context(), &batchChanges)
-	require.NoError(t, err)
-	require.NoError(t, item.Close(t.Context()))
+		<-p.sema
+		defer func() { p.sema <- struct{}{} }()
+
+		var batchChanges dynamicStats
+		item, err := p.createItem(t.Context(), &batchChanges)
+		require.ErrorIs(t, err, createErr)
+		assert.Zero(t, stats.CreateInProgress, "CreateInProgress after creation (error: %v)", createErr)
+		if item != nil {
+			require.NoError(t, item.Close(t.Context()))
+		}
+	}
 }
 
 func TestPoolTryPublishesReturnedItemStats(t *testing.T) {
@@ -93,10 +104,9 @@ func TestPoolTryPublishesReturnedItemStats(t *testing.T) {
 	defer mustClose(t, p)
 
 	retryErr := grpcStatus.Error(grpcCodes.ResourceExhausted, "retry operation")
-	var batchChanges dynamicStats
 	err := p.try(t.Context(), func(context.Context, *testItem) error {
 		return retryErr
-	}, &batchChanges)
+	})
 	require.ErrorIs(t, err, retryErr)
 	assert.Equal(t, 1, stats.Idle, "Idle")
 	assert.Equal(t, 0, stats.InUse, "InUse")
@@ -218,7 +228,7 @@ func getItemWithFlush[PT ItemConstraint[T], T any](
 	p *Pool[PT, T],
 ) (*itemInfo[PT, T], error) {
 	var batchChanges dynamicStats
-	defer p.applyBatchStats(&batchChanges)
+	defer p.flushStats(&batchChanges)
 
 	return p.getItem(ctx, &batchChanges)
 }
@@ -229,7 +239,7 @@ func putItemWithFlush[PT ItemConstraint[T], T any](
 	info *itemInfo[PT, T],
 ) error {
 	var batchChanges dynamicStats
-	defer p.applyBatchStats(&batchChanges)
+	defer p.flushStats(&batchChanges)
 
 	return p.putItem(ctx, info, &batchChanges)
 }
@@ -1344,7 +1354,7 @@ func TestPool(t *testing.T) { //nolint:gocyclo
 						)
 						defer childCancel()
 						var batchChanges dynamicStats
-						defer p.applyBatchStats(&batchChanges)
+						defer p.flushStats(&batchChanges)
 
 						s, err := p.createItem(childCtx, &batchChanges)
 						if s == nil && err == nil {
@@ -2599,7 +2609,7 @@ func TestPoolPutItemRejectsWhenIdleAtLimit(t *testing.T) {
 	var createBatch dynamicStats
 	extraItem, err := p.createItem(ctx, &createBatch)
 	require.NoError(t, err)
-	p.applyBatchStats(&createBatch)
+	p.flushStats(&createBatch)
 
 	requirePoolStats(t, p, poolStats(limit, func(s *Stats) {
 		s.Size = limit + 1
@@ -2614,7 +2624,7 @@ func TestPoolPutItemRejectsWhenIdleAtLimit(t *testing.T) {
 
 	var putBatch dynamicStats
 	err = p.putItem(ctx, extraInfo, &putBatch)
-	p.applyBatchStats(&putBatch)
+	p.flushStats(&putBatch)
 
 	require.ErrorIs(t, err, errPoolIsOverflow)
 	require.Equal(t, int32(1), closed.Load())
