@@ -13,6 +13,7 @@ import (
 )
 
 // GrpcStopper interrupts gRPC calls with stopError between Stop and Start.
+// Pause holds unary requests and responses, and stream creation, until Start.
 //
 // Usage:
 //
@@ -32,6 +33,13 @@ type GrpcStopper struct {
 	stopped      bool
 	stopChannels map[string]empty.Chan
 	stopError    error
+	pause        *grpcPause
+}
+
+type grpcPause struct {
+	reached empty.Chan
+	resume  empty.Chan
+	methods []string
 }
 
 func NewGrpcStopper(closeError error) *GrpcStopper {
@@ -42,6 +50,7 @@ func NewGrpcStopper(closeError error) *GrpcStopper {
 }
 
 // Stop interrupts the listed methods, or all methods if none are listed, until Start.
+// An interrupted RPC may keep running until its caller cancels the RPC context.
 func (l *GrpcStopper) Stop(methods ...string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -60,7 +69,7 @@ func (l *GrpcStopper) Stop(methods ...string) {
 	}
 }
 
-// Start allows subsequent calls through, including calls on existing streams.
+// Start resumes paused calls and allows subsequent calls through, including calls on existing streams.
 // Calls interrupted by Stop are not retried; closed streams stay closed.
 func (l *GrpcStopper) Start() {
 	l.mu.Lock()
@@ -69,6 +78,72 @@ func (l *GrpcStopper) Start() {
 	for method, ch := range l.stopChannels {
 		if isClosed(ch) {
 			l.stopChannels[method] = make(empty.Chan)
+		}
+	}
+	if l.pause != nil {
+		close(l.pause.resume)
+		l.pause = nil
+	}
+}
+
+// Pause holds unary calls and stream creation until Start, Stop, or context cancellation.
+// It applies to the listed methods, or all methods if none are listed.
+// Repeated calls while paused keep the original methods and notification channel.
+// Each paused call sends a notification unless Start, Stop, or context cancellation releases it first.
+func (l *GrpcStopper) Pause(methods ...string) <-chan struct{} {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.pause == nil {
+		l.pause = &grpcPause{
+			reached: make(empty.Chan),
+			resume:  make(empty.Chan),
+			methods: slices.Clone(methods),
+		}
+	}
+
+	return l.pause.reached
+}
+
+func (l *GrpcStopper) pauseState(method string) *grpcPause {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.pause == nil {
+		return nil
+	}
+	if len(l.pause.methods) > 0 && !slices.Contains(l.pause.methods, method) {
+		return nil
+	}
+
+	return l.pause
+}
+
+func (l *GrpcStopper) wait(ctx context.Context, method string, stopChannel empty.Chan) error {
+	for {
+		if isClosed(stopChannel) {
+			return l.stopError
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		pause := l.pauseState(method)
+		if pause == nil {
+			return nil
+		}
+		select {
+		case pause.reached <- struct{}{}:
+		case <-pause.resume:
+			continue
+		case <-stopChannel:
+			return l.stopError
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		select {
+		case <-pause.resume:
+		case <-stopChannel:
+			return l.stopError
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
 }
@@ -97,8 +172,20 @@ func (l *GrpcStopper) UnaryClientInterceptor(
 	invoker grpc.UnaryInvoker,
 	opts ...grpc.CallOption,
 ) error {
+	stopChannel := l.stopSignal(method)
+	if err := l.wait(ctx, method, stopChannel); err != nil {
+		return err
+	}
+
 	return l.intercept(method, func() error {
-		return invoker(ctx, method, req, reply, cc, opts...)
+		err := invoker(ctx, method, req, reply, cc, opts...)
+		if l.pauseState(method) != nil {
+			if pauseErr := l.wait(ctx, method, stopChannel); pauseErr != nil {
+				return pauseErr
+			}
+		}
+
+		return err
 	})
 }
 
@@ -110,8 +197,8 @@ func (l *GrpcStopper) StreamClientInterceptor(
 	streamer grpc.Streamer,
 	opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
-	if isClosed(l.stopSignal(method)) {
-		return nil, l.stopError
+	if err := l.wait(ctx, method, l.stopSignal(method)); err != nil {
+		return nil, err
 	}
 
 	stream, err := streamer(ctx, desc, cc, method, opts...)
