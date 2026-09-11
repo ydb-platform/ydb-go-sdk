@@ -1,3 +1,5 @@
+* Fixed query sessions being invalidated after gRPC `RESOURCE_EXHAUSTED`
+
 ## v3.151.2
 * Fixed `HashPartitionChooser` in topic multiwriter (now it works like in Kafka)
 

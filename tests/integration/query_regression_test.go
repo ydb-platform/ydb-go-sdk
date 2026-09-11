@@ -14,8 +14,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -384,4 +389,30 @@ func TestCloseSessionOnCustomerErrorsIssue1607(t *testing.T) {
 	})
 
 	scope.Require.Equal(sessionID1, sessionID2)
+}
+
+// https://github.com/ydb-platform/ydb-go-sdk/issues/2297
+func TestQueryResourceExhaustedKeepsSessionIssue2297(t *testing.T) {
+	scope := newScope(t)
+
+	grpcStopper := NewGrpcStopper(status.Error(codes.ResourceExhausted, "retry operation"))
+	grpcStopper.Stop(Ydb_Query_V1.QueryService_ExecuteQuery_FullMethodName)
+
+	db := scope.Driver(
+		ydb.WithSessionPoolSizeLimit(1),
+		ydb.With(config.WithGrpcOptions(
+			grpc.WithChainStreamInterceptor(grpcStopper.StreamClientInterceptor),
+		)),
+	)
+
+	var sessionIDs []string
+	err := db.Query().Do(scope.Ctx, func(ctx context.Context, s query.Session) error {
+		defer grpcStopper.Start()
+		sessionIDs = append(sessionIDs, s.ID())
+
+		return s.Exec(ctx, "SELECT 1")
+	}, query.WithIdempotent())
+	require.NoError(t, err)
+	require.Len(t, sessionIDs, 2)
+	require.Equal(t, sessionIDs[0], sessionIDs[1], "RESOURCE_EXHAUSTED must not recreate the session")
 }
