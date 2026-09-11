@@ -70,7 +70,7 @@ func TestQueryPoolMetricsWhileSessionIsBeingCreated(t *testing.T) {
 		))),
 	)
 	client := db.Query()
-	paused := stopper.PauseOnlyOnMethods(Ydb_Query_V1.QueryService_CreateSession_FullMethodName)
+	paused := stopper.Pause(Ydb_Query_V1.QueryService_CreateSession_FullMethodName)
 
 	go func() {
 		select {
@@ -122,7 +122,7 @@ func TestQueryPoolMetricsWhileWaitingForSession(t *testing.T) {
 		))),
 	)
 	client := db.Query()
-	paused := stopper.PauseOnlyOnMethods(Ydb_Query_V1.QueryService_ExecuteQuery_FullMethodName)
+	paused := stopper.Pause(Ydb_Query_V1.QueryService_ExecuteQuery_FullMethodName)
 	group, ctx := errgroup.WithContext(scope.Ctx)
 	group.Go(func() error {
 		return client.Do(ctx, func(ctx context.Context, s query.Session) error {

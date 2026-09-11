@@ -13,7 +13,7 @@ import (
 )
 
 // GrpcStopper interrupts gRPC calls with stopError between Stop and Start.
-// PauseOnlyOnMethods holds unary requests and responses, and stream creation, until Start.
+// Pause holds unary requests and responses, and stream creation, until Start.
 //
 // Usage:
 //
@@ -85,10 +85,10 @@ func (l *GrpcStopper) Start() {
 	}
 }
 
-// PauseOnlyOnMethods holds unary calls and stream creation until Start, Stop, or context cancellation.
+// Pause holds unary calls and stream creation until Start, Stop, or context cancellation.
 // It applies to the listed methods, or all methods if none are listed.
 // Each call that reaches the pause sends a notification on the returned channel.
-func (l *GrpcStopper) PauseOnlyOnMethods(methods ...string) <-chan struct{} {
+func (l *GrpcStopper) Pause(methods ...string) <-chan struct{} {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.pause == nil {
