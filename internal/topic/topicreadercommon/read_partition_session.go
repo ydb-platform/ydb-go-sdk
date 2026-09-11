@@ -94,6 +94,10 @@ func (s *PartitionSession) CommittedOffset() rawtopiccommon.Offset {
 // SetCommittedOffsetForward set new offset if new offset greater, then old
 func (s *PartitionSession) SetCommittedOffsetForward(v rawtopiccommon.Offset) {
 	newVal := int64(v)
+	if s.metricsSource != nil {
+		s.metricsSource.AcknowledgeCommit(s, newVal)
+	}
+
 	for {
 		old := s.committedOffsetVal.Load()
 		if newVal <= old {
@@ -101,10 +105,6 @@ func (s *PartitionSession) SetCommittedOffsetForward(v rawtopiccommon.Offset) {
 		}
 
 		if s.committedOffsetVal.CompareAndSwap(old, newVal) {
-			if s.metricsSource != nil {
-				s.metricsSource.AcknowledgeCommit(s, newVal)
-			}
-
 			return
 		}
 	}

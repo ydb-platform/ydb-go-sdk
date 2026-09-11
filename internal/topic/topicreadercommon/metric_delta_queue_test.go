@@ -2,77 +2,97 @@ package topicreadercommon
 
 import (
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestMetricDeltaQueueSerializesConcurrentObservers(t *testing.T) {
-	var queue MetricDeltaQueue
-	var stateMu sync.Mutex
+func TestCreditBalanceSerializesConcurrentObservers(t *testing.T) {
+	var balance CreditBalance
 	var workers sync.WaitGroup
-	var observations []int
-	next := 0
-	emit := func(_ string, delta int) { observations = append(observations, delta) }
+	var callbacks atomic.Int32
+	var callbacksInFlight atomic.Int32
+	var maxCallbacksInFlight atomic.Int32
 	const count = 100
+
+	emit := func(_ int) {
+		inFlight := callbacksInFlight.Add(1)
+		for {
+			maxInFlight := maxCallbacksInFlight.Load()
+			if inFlight <= maxInFlight || maxCallbacksInFlight.CompareAndSwap(maxInFlight, inFlight) {
+				break
+			}
+		}
+		callbacks.Add(1)
+		callbacksInFlight.Add(-1)
+	}
+
 	for range 8 {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
 			for range count {
-				stateMu.Lock()
-				next++
-				queue.Enqueue("topic", next)
-				stateMu.Unlock()
-				queue.Emit(emit)
+				balance.Change(1, emit)
 			}
 		}()
 	}
 	workers.Wait()
-	require.Len(t, observations, 8*count)
-	for i, value := range observations {
-		require.Equal(t, i+1, value)
-	}
+
+	require.Equal(t, int32(8*count), callbacks.Load())
+	require.Equal(t, int32(1), maxCallbacksInFlight.Load())
 }
 
-func TestMetricDeltaQueueCanFinalizeAfterObserverPanic(t *testing.T) {
-	var queue MetricDeltaQueue
-	queue.Enqueue("topic", 1)
+func TestCreditBalanceCanRecoverAfterObserverPanic(t *testing.T) {
+	var balance CreditBalance
 	require.Panics(t, func() {
-		queue.Emit(func(string, int) { panic("observer failed") })
+		balance.Change(1, func(int) { panic("observer failed") })
 	})
-	queue.Enqueue("topic", -1)
 	var deltas []int
-	queue.Emit(func(_ string, delta int) { deltas = append(deltas, delta) })
+	balance.Change(-1, func(delta int) { deltas = append(deltas, delta) })
 	require.Equal(t, []int{-1}, deltas)
 }
 
-func TestMetricDeltaQueueCompactsConsumedPrefixDuringReentrantEmission(t *testing.T) {
+func TestCreditBalanceCompactsConsumedPrefixDuringReentrantEmission(t *testing.T) {
 	const (
 		initialBacklog = 4
 		totalEvents    = 10_000
 		maxCapacity    = 1_024
 	)
 
-	var queue MetricDeltaQueue
+	var balance CreditBalance
+	balance.mu.Lock()
 	for delta := range initialBacklog {
-		queue.Enqueue("topic", delta+1)
+		balance.enqueueLocked("", delta+1)
 	}
+	emitOwner := balance.startLocked()
+	balance.mu.Unlock()
+	require.True(t, emitOwner)
 
 	observations := make([]int, 0, totalEvents)
-	maxObservedCapacity := cap(queue.pending)
 	nestedEmitAttempted := false
-	queue.Emit(func(_ string, delta int) {
+	maxObservedCapacity := cap(balance.pending)
+	tryEmit := func(emit func(int)) {
+		balance.mu.Lock()
+		emitOwner := balance.startLocked()
+		balance.mu.Unlock()
+		if emitOwner {
+			balance.emit(emit)
+		}
+	}
+	var emit func(int)
+	emit = func(delta int) {
 		observations = append(observations, delta)
 		if !nestedEmitAttempted {
 			nestedEmitAttempted = true
-			queue.Emit(func(string, int) { require.FailNow(t, "nested emit callback must not run") })
+			tryEmit(func(int) { require.FailNow(t, "nested emit callback must not run") })
 		}
 		if len(observations) <= totalEvents-initialBacklog {
-			queue.Enqueue("topic", initialBacklog+len(observations))
+			balance.Change(initialBacklog+len(observations), emit)
 		}
-		maxObservedCapacity = max(maxObservedCapacity, cap(queue.pending))
-	})
+		maxObservedCapacity = max(maxObservedCapacity, cap(balance.pending))
+	}
+	balance.emit(emit)
 
 	require.Len(t, observations, totalEvents)
 	for index, observed := range observations {

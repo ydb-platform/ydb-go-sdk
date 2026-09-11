@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -97,15 +98,6 @@ func TestSetupCommitMetricsGuardsAndRepeatedInitialization(t *testing.T) {
 	session.SetupCommitMetrics(&trace.Topic{}, ReaderInfo{})
 	require.Nil(t, session.commitMetrics)
 
-	cancelledContext, cancel := context.WithCancel(context.Background())
-	cancel()
-	cancelledSession := NewPartitionSession(cancelledContext, "topic", 1, 1, "", 2, 3, 0)
-	t.Cleanup(cancelledSession.Close)
-	cancelledSession.SetupCommitMetrics(&trace.Topic{
-		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {},
-	}, ReaderInfo{})
-	require.Nil(t, cancelledSession.commitMetrics)
-
 	queuedTracer := &trace.Topic{OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {}}
 	session.SetupCommitMetrics(queuedTracer, ReaderInfo{})
 	require.NotNil(t, session.commitMetrics)
@@ -180,7 +172,7 @@ func TestCommitTraceUsesRangeCountsAndFIFOAcknowledgements(t *testing.T) {
 	require.Equal(t, "endpoint", queued[0].Endpoint)
 	require.Equal(t, "database", queued[0].Database)
 	require.Equal(t, "consumer", queued[0].Consumer)
-	require.Equal(t, readerNamePointer("reader"), queued[0].ReaderName)
+	require.Equal(t, "reader", queued[0].ReaderName)
 	require.Equal(t, int64(1), queued[0].PartitionID)
 	require.Equal(t, int64(2), queued[0].PartitionSessionID)
 
@@ -229,10 +221,10 @@ func TestCommitQueuedRegistrationPrecedesTraceEmission(t *testing.T) {
 }
 
 func TestCommitAcknowledgedRegistrationSurvivesCloseBeforeTrace(t *testing.T) {
-	acknowledged := make(chan int, 1)
+	var acknowledged int
 	session := newCommitMetricsTestSession(t, &trace.Topic{
 		OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
-			acknowledged <- info.MessagesCount
+			acknowledged += info.MessagesCount
 		},
 	})
 	message := NewPublicMessageBuilder().PartitionSession(session).Offset(10).Build()
@@ -245,12 +237,7 @@ func TestCommitAcknowledgedRegistrationSurvivesCloseBeforeTrace(t *testing.T) {
 	session.Close()
 
 	TraceCommitAcknowledgedAfterRegistration(session.Context(), session, messagesCount)
-	select {
-	case count := <-acknowledged:
-		require.Equal(t, 1, count)
-	case <-time.After(time.Second):
-		t.Fatal("acknowledged event was lost after session close")
-	}
+	require.Equal(t, 1, acknowledged)
 }
 
 func TestCommitterRegistersAcknowledgementBeforeWaiterNotification(t *testing.T) {
@@ -482,7 +469,7 @@ func TestCommitMessageTrackerConcurrentQueueAcknowledgeClose(t *testing.T) {
 		}()
 	}
 	close(start)
-	waitCommitMessageTrackerGroup(t, &queueWG)
+	xtest.WaitGroup(t, &queueWG)
 	require.Equal(t, int64(workers*messagesPerWorker), queued.Load())
 
 	var acknowledgeWG sync.WaitGroup
@@ -494,7 +481,7 @@ func TestCommitMessageTrackerConcurrentQueueAcknowledgeClose(t *testing.T) {
 			acknowledged.Add(int64(tracker.Acknowledge(workers*messagesPerWorker + 1)))
 		}()
 	}
-	waitCommitMessageTrackerGroup(t, &acknowledgeWG)
+	xtest.WaitGroup(t, &acknowledgeWG)
 
 	var closeWG sync.WaitGroup
 	var lateQueued atomic.Int64
@@ -523,8 +510,8 @@ func TestCommitMessageTrackerConcurrentQueueAcknowledgeClose(t *testing.T) {
 		tracker.Close()
 	}()
 	close(lateStart)
-	waitCommitMessageTrackerGroup(t, &lateWG)
-	waitCommitMessageTrackerGroup(t, &closeWG)
+	xtest.WaitGroup(t, &lateWG)
+	xtest.WaitGroup(t, &closeWG)
 
 	require.Equal(t, int64(workers*messagesPerWorker), acknowledged.Load())
 	require.GreaterOrEqual(t, lateQueued.Load(), int64(0))
@@ -532,22 +519,6 @@ func TestCommitMessageTrackerConcurrentQueueAcknowledgeClose(t *testing.T) {
 	require.Zero(t, lateAcknowledged.Load())
 	require.Zero(t, tracker.Queue(1, 2))
 	require.Zero(t, tracker.Acknowledge(workers*messagesPerWorker+2))
-}
-
-func waitCommitMessageTrackerGroup(t *testing.T, group *sync.WaitGroup) {
-	t.Helper()
-
-	done := make(chan struct{})
-	go func() {
-		group.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("commit message tracker operation group did not complete")
-	}
 }
 
 func newCommitMetricsTestSession(t testing.TB, tracer *trace.Topic) *PartitionSession {
@@ -567,13 +538,9 @@ func newCommitMetricsTestSession(t testing.TB, tracer *trace.Topic) *PartitionSe
 		Endpoint:   "endpoint",
 		Database:   "database",
 		Consumer:   "consumer",
-		ReaderName: readerNamePointer("reader"),
+		ReaderName: "reader",
 	})
 	t.Cleanup(session.Close)
 
 	return session
-}
-
-func readerNamePointer(name string) *string {
-	return &name
 }

@@ -52,15 +52,8 @@ type streamListener struct {
 
 	freeBytes chan int
 
-	creditEvents    topicreadercommon.MetricDeltaQueue
-	creditMu        sync.Mutex
-	creditBalance   int64
-	creditFinalized bool
-
-	localBufferEvents    topicreadercommon.MetricDeltaQueue
-	localBufferMu        sync.Mutex
-	localBufferByTopic   map[string]int64
-	localBufferFinalized bool
+	creditBalance      topicreadercommon.CreditBalance
+	localBufferBalance topicreadercommon.LocalBufferBalance
 
 	closing atomic.Bool
 	tracer  *trace.Topic
@@ -406,7 +399,10 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 		}
 
 		mess, err := l.stream.Recv()
-		receivedAt := time.Now()
+		var receivedAt time.Time
+		if l.metricsSource != nil {
+			receivedAt = time.Now()
+		}
 
 		logCtx := ctx
 		if err != nil {
@@ -433,7 +429,7 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 
 		gtrace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, messageType, bytesSize, nil)
 
-		if err := l.routeMessageAt(ctx, mess, receivedAt); err != nil {
+		if err := l.routeMessage(ctx, mess, receivedAt); err != nil {
 			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
 			l.goClose(ctx, err)
 		}
@@ -445,17 +441,7 @@ func (l *streamListener) changeCreditBalance(delta int) {
 		return
 	}
 
-	l.creditMu.Lock()
-	if l.creditFinalized {
-		l.creditMu.Unlock()
-
-		return
-	}
-	l.creditBalance += int64(delta)
-	l.creditEvents.Enqueue("", delta)
-	l.creditMu.Unlock()
-
-	l.creditEvents.Emit(l.traceCreditDelta)
+	l.creditBalance.Change(delta, l.traceCreditDelta)
 }
 
 func (l *streamListener) traceReceivedBytes(bytes int) {
@@ -477,22 +463,10 @@ func (l *streamListener) finalizeCreditBalance() {
 		return
 	}
 
-	l.creditMu.Lock()
-	if l.creditFinalized {
-		l.creditMu.Unlock()
-
-		return
-	}
-	balance := l.creditBalance
-	l.creditBalance = 0
-	l.creditFinalized = true
-	l.creditEvents.Enqueue("", -int(balance))
-	l.creditMu.Unlock()
-
-	l.creditEvents.Emit(l.traceCreditDelta)
+	l.creditBalance.Finalize(l.traceCreditDelta)
 }
 
-func (l *streamListener) traceCreditDelta(_ string, delta int) {
+func (l *streamListener) traceCreditDelta(delta int) {
 	logCtx := l.background.Context()
 	gtrace.TopicOnReaderCreditBalanceChanged(
 		l.tracer, &logCtx,
@@ -514,22 +488,7 @@ func (l *streamListener) reserveLocalBuffer(topic string, messagesCount int) boo
 		return false
 	}
 
-	l.localBufferMu.Lock()
-	if l.localBufferFinalized {
-		l.localBufferMu.Unlock()
-
-		return false
-	}
-	if l.localBufferByTopic == nil {
-		l.localBufferByTopic = make(map[string]int64)
-	}
-	l.localBufferByTopic[topic] += int64(messagesCount)
-	l.localBufferEvents.Enqueue(topic, messagesCount)
-	l.localBufferMu.Unlock()
-
-	l.localBufferEvents.Emit(l.traceLocalBufferDelta)
-
-	return true
+	return l.localBufferBalance.Reserve(topic, messagesCount, l.traceLocalBufferDelta)
 }
 
 func (l *streamListener) releaseLocalBuffer(topic string, messagesCount int) {
@@ -537,32 +496,7 @@ func (l *streamListener) releaseLocalBuffer(topic string, messagesCount int) {
 		return
 	}
 
-	l.localBufferMu.Lock()
-	if l.localBufferFinalized {
-		l.localBufferMu.Unlock()
-
-		return
-	}
-	if l.localBufferByTopic == nil {
-		l.localBufferMu.Unlock()
-
-		return
-	}
-	balance, ok := l.localBufferByTopic[topic]
-	if !ok || balance < int64(messagesCount) {
-		l.localBufferMu.Unlock()
-
-		return
-	}
-	if balance == int64(messagesCount) {
-		delete(l.localBufferByTopic, topic)
-	} else {
-		l.localBufferByTopic[topic] = balance - int64(messagesCount)
-	}
-	l.localBufferEvents.Enqueue(topic, -messagesCount)
-	l.localBufferMu.Unlock()
-
-	l.localBufferEvents.Emit(l.traceLocalBufferDelta)
+	l.localBufferBalance.Release(topic, messagesCount, l.traceLocalBufferDelta)
 }
 
 func (l *streamListener) finalizeLocalBuffer() {
@@ -570,27 +504,11 @@ func (l *streamListener) finalizeLocalBuffer() {
 		return
 	}
 
-	l.localBufferMu.Lock()
-	if l.localBufferFinalized {
-		l.localBufferMu.Unlock()
-
-		return
-	}
-	for topic, balance := range l.localBufferByTopic {
-		l.localBufferEvents.Enqueue(topic, -int(balance))
-	}
-	l.localBufferByTopic = nil
-	l.localBufferFinalized = true
-	l.localBufferMu.Unlock()
-	l.localBufferEvents.Emit(l.traceLocalBufferDelta)
+	l.localBufferBalance.Finalize(l.traceLocalBufferDelta)
 }
 
 // routeMessage routes messages to appropriate handlers/workers
-func (l *streamListener) routeMessage(ctx context.Context, mess rawtopicreader.ServerMessage) error {
-	return l.routeMessageAt(ctx, mess, time.Now())
-}
-
-func (l *streamListener) routeMessageAt(
+func (l *streamListener) routeMessage(
 	ctx context.Context,
 	mess rawtopicreader.ServerMessage,
 	receivedAt time.Time,
@@ -612,7 +530,7 @@ func (l *streamListener) routeMessageAt(
 
 		return nil
 	case *rawtopicreader.ReadResponse:
-		return l.splitAndRouteReadResponseAt(m, receivedAt)
+		return l.splitAndRouteReadResponse(m, receivedAt)
 	case *rawtopicreader.CommitOffsetResponse:
 		return l.onCommitResponse(m)
 	default:
@@ -655,11 +573,7 @@ func (l *streamListener) handleStartPartition(
 }
 
 // splitAndRouteReadResponse splits ReadResponse into batches and routes to workers
-func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadResponse) error {
-	return l.splitAndRouteReadResponseAt(m, time.Now())
-}
-
-func (l *streamListener) splitAndRouteReadResponseAt(
+func (l *streamListener) splitAndRouteReadResponse(
 	m *rawtopicreader.ReadResponse,
 	receivedAt time.Time,
 ) error {
@@ -703,12 +617,6 @@ func (l *streamListener) splitAndRouteReadResponseAt(
 	}
 
 	return nil
-}
-
-func (l *streamListener) releaseBatch(batch *topicreadercommon.PublicBatch) {
-	if l.metricsSource != nil {
-		l.metricsSource.ReleaseBatch(batch)
-	}
 }
 
 func (l *streamListener) unregisterPartitionSession(session *topicreadercommon.PartitionSession) {
@@ -911,6 +819,9 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 		l.onWorkerStopped,
 		l.tracer,
 		l.listenerID,
+		l.metricsSource,
+		l.reserveLocalBuffer,
+		l.releaseLocalBuffer,
 	)
 	worker.readerInfo = l.cfg.ReaderInfo
 

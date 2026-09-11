@@ -28,14 +28,14 @@ func TestTopicReaderReceivedMessagesMetric(t *testing.T) {
 			Database:      "/local",
 			Topic:         "/local/topic-a",
 			Consumer:      "consumer-a",
-			ReaderName:    readerNamePointer("reader-a"),
+			ReaderName:    "reader-a",
 			MessagesCount: 3,
 		},
 		{
 			Endpoint:      "node-b:2135",
 			Database:      "/other",
 			Topic:         "/other/topic-b",
-			ReaderName:    readerNamePointer("reader-b"),
+			ReaderName:    "reader-b",
 			MessagesCount: 2,
 		},
 	}

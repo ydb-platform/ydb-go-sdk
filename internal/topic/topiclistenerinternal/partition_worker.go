@@ -28,19 +28,6 @@ type ReadBufferReleaser interface {
 	ReadBufferRelease(size int)
 }
 
-type localBufferTracker interface {
-	reserveLocalBuffer(topic string, messagesCount int) bool
-	releaseLocalBuffer(topic string, messagesCount int)
-}
-
-type retainedBatchTracker interface {
-	releaseBatch(batch *topicreadercommon.PublicBatch)
-}
-
-type partitionSessionTracker interface {
-	unregisterPartitionSession(session *topicreadercommon.PartitionSession)
-}
-
 // unifiedMessage wraps messages that PartitionWorker can handle
 type unifiedMessage struct {
 	// Only one of these should be set
@@ -76,9 +63,9 @@ type PartitionWorker struct {
 	partitionSession     *topicreadercommon.PartitionSession
 	messageSender        MessageSender
 	readBufferReleaser   ReadBufferReleaser
-	localBufferTracker   localBufferTracker
-	retainedBatchTracker retainedBatchTracker
-	partitionTracker     partitionSessionTracker
+	metricsSource        *topicreadercommon.ReaderMetricsSource
+	reserveLocalBufferFn func(topic string, messagesCount int) bool
+	releaseLocalBufferFn func(topic string, messagesCount int)
 	userHandler          EventHandler
 	onStopped            WorkerStoppedCallback
 
@@ -103,6 +90,9 @@ func NewPartitionWorker[T interface {
 	onStopped WorkerStoppedCallback,
 	tracer *trace.Topic,
 	listenerID string,
+	metricsSource *topicreadercommon.ReaderMetricsSource,
+	reserveLocalBuffer func(topic string, messagesCount int) bool,
+	releaseLocalBuffer func(topic string, messagesCount int),
 ) *PartitionWorker {
 	// Validate required parameters
 	if userHandler == nil {
@@ -110,19 +100,19 @@ func NewPartitionWorker[T interface {
 	}
 
 	worker := &PartitionWorker{
-		partitionSessionID: sessionID,
-		partitionSession:   session,
-		messageSender:      messageSender,
-		readBufferReleaser: messageSender,
-		userHandler:        userHandler,
-		onStopped:          onStopped,
-		tracer:             tracer,
-		listenerID:         listenerID,
-		messageQueue:       xsync.NewUnboundedChan[unifiedMessage](),
+		partitionSessionID:   sessionID,
+		partitionSession:     session,
+		messageSender:        messageSender,
+		readBufferReleaser:   messageSender,
+		metricsSource:        metricsSource,
+		reserveLocalBufferFn: reserveLocalBuffer,
+		releaseLocalBufferFn: releaseLocalBuffer,
+		userHandler:          userHandler,
+		onStopped:            onStopped,
+		tracer:               tracer,
+		listenerID:           listenerID,
+		messageQueue:         xsync.NewUnboundedChan[unifiedMessage](),
 	}
-	worker.localBufferTracker, _ = any(messageSender).(localBufferTracker)
-	worker.retainedBatchTracker, _ = any(messageSender).(retainedBatchTracker)
-	worker.partitionTracker, _ = any(messageSender).(partitionSessionTracker)
 
 	return worker
 }
@@ -166,7 +156,7 @@ func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) bool {
 	accepted := w.messageQueue.SendWithMerge(msg, w.tryMergeMessages)
 	if !accepted {
 		if reserved {
-			w.localBufferTracker.releaseLocalBuffer(localBufferTopic, localBufferMessages)
+			w.releaseLocalBuffer(localBufferTopic, localBufferMessages)
 		}
 		if msg.BatchMessage != nil {
 			w.releaseBatch(msg.BatchMessage.Batch)
@@ -396,11 +386,11 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 	}
 	batchReleased := false
 	releaseBatch := func() {
-		if batchReleased || msg.Batch == nil || w.retainedBatchTracker == nil {
+		if batchReleased || msg.Batch == nil || w.metricsSource == nil {
 			return
 		}
 		batchReleased = true
-		w.retainedBatchTracker.releaseBatch(msg.Batch)
+		w.metricsSource.ReleaseBatch(msg.Batch)
 	}
 	defer releaseLocalBuffer()
 	defer releaseBatch()
@@ -456,10 +446,10 @@ func (w *PartitionWorker) freeBufferedBatchCredits() {
 }
 
 func (w *PartitionWorker) releaseBatch(batch *topicreadercommon.PublicBatch) {
-	if batch == nil || w.retainedBatchTracker == nil {
+	if batch == nil || w.metricsSource == nil {
 		return
 	}
-	w.retainedBatchTracker.releaseBatch(batch)
+	w.metricsSource.ReleaseBatch(batch)
 }
 
 func (w *PartitionWorker) closeQueueAndFreeBufferedBatchCredits() {
@@ -475,18 +465,18 @@ func (w *PartitionWorker) freeBatchCredit(msg unifiedMessage) {
 }
 
 func (w *PartitionWorker) reserveLocalBuffer(topic string, messagesCount int) bool {
-	if messagesCount == 0 || w.localBufferTracker == nil {
+	if messagesCount == 0 || w.reserveLocalBufferFn == nil {
 		return false
 	}
 
-	return w.localBufferTracker.reserveLocalBuffer(topic, messagesCount)
+	return w.reserveLocalBufferFn(topic, messagesCount)
 }
 
 func (w *PartitionWorker) releaseLocalBuffer(topic string, messagesCount int) {
-	if messagesCount == 0 || w.localBufferTracker == nil {
+	if messagesCount == 0 || w.releaseLocalBufferFn == nil {
 		return
 	}
-	w.localBufferTracker.releaseLocalBuffer(topic, messagesCount)
+	w.releaseLocalBufferFn(topic, messagesCount)
 }
 
 // handleStartPartitionRequest processes StartPartitionSessionRequest
@@ -569,8 +559,8 @@ func (w *PartitionWorker) handleStopPartitionRequest(
 		}
 		w.messageSender.SendRaw(resp)
 	}
-	if w.partitionTracker != nil {
-		w.partitionTracker.unregisterPartitionSession(w.partitionSession)
+	if w.metricsSource != nil {
+		w.metricsSource.UnregisterPartitionSession(w.partitionSession)
 	}
 
 	return nil

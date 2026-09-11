@@ -3,6 +3,7 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -31,7 +33,7 @@ func TestStreamListenerMetricsSourceTracksCallbackAndPartitionStop(t *testing.T)
 			Endpoint:   "node:2135",
 			Database:   "/db",
 			Consumer:   "consumer",
-			ReaderName: readerNamePointer("reader"),
+			ReaderName: "reader",
 		},
 	}
 	source := topicreadercommon.NewReaderMetricsSource()
@@ -53,7 +55,7 @@ func TestStreamListenerMetricsSourceTracksCallbackAndPartitionStop(t *testing.T)
 	StreamMock(e).EXPECT().Send(gomock.Any()).AnyTimes().Return(nil)
 
 	receivedAt := time.Now().Add(-time.Minute)
-	require.NoError(t, listener.splitAndRouteReadResponseAt(listenerMetricResponse(session, 50), receivedAt))
+	require.NoError(t, listener.splitAndRouteReadResponse(listenerMetricResponse(session, 50), receivedAt))
 	select {
 	case age := <-callbackAge:
 		require.Zero(t, age)
@@ -74,7 +76,7 @@ func TestStreamListenerMetricsSourceTracksCallbackAndPartitionStop(t *testing.T)
 	require.NoError(t, listener.routeMessage(ctx, &rawtopicreader.StopPartitionSessionRequest{
 		PartitionSessionID: session.StreamPartitionSessionID,
 		Graceful:           true,
-	}))
+	}, time.Time{}))
 	select {
 	case <-stopHandled:
 	case <-time.After(time.Second):
@@ -98,7 +100,7 @@ func TestTopicListenerReconnectorMetricsSourceClosesAfterTerminalStreamStop(t *t
 		Endpoint:   "endpoint",
 		Database:   "/database",
 		Consumer:   "consumer",
-		ReaderName: readerNamePointer("reader"),
+		ReaderName: "reader",
 	}
 	cfg.Tracer = &trace.Topic{
 		OnReaderMetricsSource: func(
@@ -129,6 +131,157 @@ func TestTopicListenerReconnectorMetricsSourceClosesAfterTerminalStreamStop(t *t
 		t.Fatal("metrics source was not closed after terminal stream stop")
 	}
 	require.Zero(t, source.Snapshot())
+}
+
+func TestTopicListenerReconnectorMetricsSourceDoneCanCloseAfterTerminalStop(t *testing.T) {
+	terminal := make(chan error, 1)
+	grpcStream := &terminalMetricsGrpcStream{terminal: terminal}
+	client := &terminalMetricsTopicClient{stream: grpcStream}
+	done := make(chan struct{})
+	closeResult := make(chan error, 1)
+	var reconnector *TopicListenerReconnector
+	cfg := NewStreamListenerConfig()
+	cfg.Consumer = "consumer"
+	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "topic"}}
+	cfg.ReaderInfo = topicreadercommon.ReaderInfo{
+		Endpoint:   "endpoint",
+		Database:   "/database",
+		Consumer:   "consumer",
+		ReaderName: "reader",
+	}
+	cfg.Tracer = &trace.Topic{
+		OnReaderMetricsSource: func(trace.TopicReaderMetricsSourceStartInfo) func(trace.TopicReaderMetricsSourceDoneInfo) {
+			return func(trace.TopicReaderMetricsSourceDoneInfo) {
+				close(done)
+				closeResult <- reconnector.Close(context.Background(), errors.New("reentrant close"))
+			}
+		},
+	}
+
+	var err error
+	reconnector, err = NewTopicListenerReconnector(client, &cfg, nil)
+	require.NoError(t, err)
+
+	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, reconnector.WaitInit(waitCtx))
+	terminal <- errors.New("terminal stream failure")
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("listener metrics source done callback was not called")
+	}
+	select {
+	case <-closeResult:
+	case <-time.After(time.Second):
+		t.Fatal("listener close did not complete from reentrant metrics callback")
+	}
+}
+
+func TestTopicListenerReconnectorMetricsSourceDoneCanCloseAfterInitFailure(t *testing.T) {
+	done := make(chan struct{})
+	closeResult := make(chan error, 1)
+	ready := make(chan struct{})
+	var reconnector *TopicListenerReconnector
+	connectErr := errors.New("initial stream failure")
+	cfg := NewStreamListenerConfig()
+	cfg.Consumer = "consumer"
+	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "topic"}}
+	cfg.Tracer = &trace.Topic{
+		OnReaderMetricsSource: func(trace.TopicReaderMetricsSourceStartInfo) func(trace.TopicReaderMetricsSourceDoneInfo) {
+			return func(trace.TopicReaderMetricsSourceDoneInfo) {
+				<-ready
+				close(done)
+				closeResult <- reconnector.Close(context.Background(), errors.New("reentrant close"))
+			}
+		},
+	}
+
+	var err error
+	reconnector, err = NewTopicListenerReconnector(&failingTopicClient{err: connectErr}, &cfg, nil)
+	require.NoError(t, err)
+	close(ready)
+	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.ErrorIs(t, reconnector.WaitInit(waitCtx), connectErr)
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("listener metrics source done callback was not called after init failure")
+	}
+	select {
+	case <-closeResult:
+	case <-time.After(time.Second):
+		t.Fatal("listener close did not complete from init-failure metrics callback")
+	}
+}
+
+func TestTopicListenerReconnectorExplicitCloseOwnsMetricsSourceFinalization(t *testing.T) {
+	callbackStarted := make(chan struct{})
+	callbackRelease := make(chan struct{})
+	workerRelease := make(chan struct{})
+	closeResult := make(chan error, 1)
+	var callbackCalls atomic.Int32
+
+	lr := &TopicListenerReconnector{
+		background:    *background.NewWorker(context.Background(), "metrics-source-explicit-close"),
+		metricsSource: topicreadercommon.NewReaderMetricsSource(),
+		metricsSourceDone: func() {
+			callbackCalls.Add(1)
+			close(callbackStarted)
+			<-callbackRelease
+		},
+	}
+	lr.background.Start("blocked-worker", func(context.Context) {
+		<-workerRelease
+	})
+
+	// Use a real watcher argument, but invoke the watcher after the parent
+	// cancellation is observable so the explicit close ownership check is
+	// deterministic.
+	sl := &streamListener{background: *background.NewWorker(context.Background(), "metrics-source-watcher")}
+	go func() {
+		closeResult <- lr.Close(context.Background(), errors.New("explicit close"))
+	}()
+	select {
+	case <-lr.background.Done():
+	case <-time.After(time.Second):
+		t.Fatal("listener close did not cancel its background worker")
+	}
+
+	watcherDone := make(chan struct{})
+	go func() {
+		lr.waitMetricsSourceStop(sl)
+		close(watcherDone)
+	}()
+	select {
+	case <-watcherDone:
+		require.Zero(t, callbackCalls.Load())
+	case <-time.After(time.Second):
+		t.Fatal("metrics source watcher did not return during explicit close")
+	}
+
+	close(workerRelease)
+	select {
+	case <-callbackStarted:
+	case <-time.After(time.Second):
+		t.Fatal("explicit close did not invoke metrics source done callback")
+	}
+	select {
+	case err := <-closeResult:
+		t.Fatalf("listener close returned before metrics source done callback release: %v", err)
+	default:
+	}
+
+	close(callbackRelease)
+	select {
+	case err := <-closeResult:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("listener close did not complete after metrics source done callback release")
+	}
 }
 
 type terminalMetricsGrpcStream struct {

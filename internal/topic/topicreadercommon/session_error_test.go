@@ -135,7 +135,7 @@ func TestTraceReaderSessionError(t *testing.T) {
 		Endpoint:   "endpoint",
 		Database:   "/database",
 		Consumer:   "consumer",
-		ReaderName: readerNamePointer("reader"),
+		ReaderName: "reader",
 	}
 
 	TraceReaderSessionError(
@@ -149,7 +149,7 @@ func TestTraceReaderSessionError(t *testing.T) {
 	require.Equal(t, "endpoint", got.Endpoint)
 	require.Equal(t, "/database", got.Database)
 	require.Equal(t, "consumer", got.Consumer)
-	require.Equal(t, readerNamePointer("reader"), got.ReaderName)
+	require.Equal(t, "reader", got.ReaderName)
 	require.Equal(t, "retry", got.RetryDecision)
 	require.Equal(t, "Unavailable", got.StatusCode)
 	require.Equal(t, "transport_error", got.ErrorType)
@@ -161,7 +161,7 @@ func TestTraceReaderSessionErrorHandlesNoOpAndUnknownTransportCode(t *testing.T)
 		Endpoint:   "endpoint",
 		Database:   "database",
 		Consumer:   "consumer",
-		ReaderName: readerNamePointer("reader"),
+		ReaderName: "reader",
 	}
 	unknownTransportError := grpcStatus.Error(grpcCodes.Code(99), "future transport code")
 

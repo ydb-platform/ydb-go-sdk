@@ -108,7 +108,7 @@ func TestReaderReconnectorSessionErrorReportsAdmittedRetries(t *testing.T) {
 
 	// A request for a stream that has already been replaced is stale and does
 	// not count as a retry decision.
-	reconnectErr := reconnector.reconnect(context.Background(), retryErr, nil)
+	reconnectErr := reconnector.reconnect(context.Background(), retryErr, nil, true)
 	require.ErrorIs(t, reconnectErr, errReconnectRequestOutdated)
 	select {
 	case event := <-events:
@@ -118,7 +118,7 @@ func TestReaderReconnectorSessionErrorReportsAdmittedRetries(t *testing.T) {
 
 	// The fresh request reaches the connection attempt, so it is a real retry
 	// decision and is reported once.
-	reconnectErr = reconnector.reconnect(context.Background(), retryErr, stream)
+	reconnectErr = reconnector.reconnect(context.Background(), retryErr, stream, true)
 	require.NoError(t, reconnectErr)
 	select {
 	case event := <-events:
@@ -316,6 +316,6 @@ func sessionErrorTestReaderInfo() topicreadercommon.ReaderInfo {
 		Endpoint:   "endpoint",
 		Database:   "/database",
 		Consumer:   "consumer",
-		ReaderName: readerNamePointer("reader"),
+		ReaderName: "reader",
 	}
 }

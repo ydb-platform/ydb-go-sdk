@@ -83,7 +83,6 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 	if !lr.closing.CompareAndSwap(false, true) {
 		return errTopicListenerClosed
 	}
-	defer lr.closeMetricsSource()
 	var closeErrors []error
 	err := lr.background.Close(ctx, reason)
 	closeErrors = append(closeErrors, err)
@@ -98,6 +97,7 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 			closeErrors = append(closeErrors, err)
 		}
 	}
+	lr.closeMetricsSource()
 
 	return errors.Join(closeErrors...)
 }
@@ -114,32 +114,40 @@ func (lr *TopicListenerReconnector) connect(connectionCtx context.Context) {
 	lr.streamListener = sl
 	lr.connectionResult = connRes
 	lr.m.Unlock()
-	if sl == nil {
-		lr.closeMetricsSource()
-	}
 
 	close(lr.connectionCompleted)
-	if sl != nil && lr.metricsSource != nil {
+	if lr.metricsSource != nil {
 		go lr.waitMetricsSourceStop(sl)
 	}
 }
 
 func (lr *TopicListenerReconnector) closeMetricsSource() {
+	var closeSource bool
 	lr.metricsSourceClose.Do(func() {
+		closeSource = true
 		if lr.metricsSource != nil {
 			lr.metricsSource.Close()
 		}
-		if lr.metricsSourceDone != nil {
-			lr.metricsSourceDone()
-		}
 	})
+	if closeSource && lr.metricsSourceDone != nil {
+		lr.metricsSourceDone()
+	}
 }
 
 func (lr *TopicListenerReconnector) waitMetricsSourceStop(sl *streamListener) {
+	if sl == nil {
+		if !lr.closing.Load() {
+			lr.closeMetricsSource()
+		}
+
+		return
+	}
+
 	select {
 	case <-sl.background.StopDone():
-		lr.closeMetricsSource()
 	case <-lr.background.Done():
+	}
+	if !lr.closing.Load() {
 		lr.closeMetricsSource()
 	}
 }

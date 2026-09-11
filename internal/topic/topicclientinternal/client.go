@@ -308,7 +308,7 @@ func (c *Client) StartListener(
 	opts ...topicoptions.ListenerOption,
 ) (*topiclistener.TopicListener, error) {
 	cfg := topiclistenerinternal.NewStreamListenerConfig()
-	cfg.ReaderInfo = c.readerInfo(consumer, cfg.ReaderName)
+	cfg.ReaderInfo = c.readerInfo(consumer)
 	cfg.Tracer = c.cfg.Trace
 	cfg.Selectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))
 	for i := range readSelectors {
@@ -350,7 +350,7 @@ func (c *Client) StartReader(
 	opts = append([]topicoptions.ReaderOption{
 		topicoptions.WithCommonConfig(c.cfg.Common),
 		topicreaderinternal.WithCredentials(c.cred),
-		topicreaderinternal.WithReaderInfo(c.readerInfo(consumer, nil)),
+		topicreaderinternal.WithReaderInfo(c.readerInfo(consumer)),
 		topicreaderinternal.WithTrace(c.cfg.Trace),
 		topicoptions.WithReaderStartTimeout(topic.DefaultStartTimeout),
 	}, opts...)
@@ -365,17 +365,16 @@ func (c *Client) StartReader(
 	return topicreader.NewReader(internalReader), nil
 }
 
-func (c *Client) readerInfo(consumer string, readerName *string) topicreadercommon.ReaderInfo {
+func (c *Client) readerInfo(consumer string) topicreadercommon.ReaderInfo {
 	database := c.cfg.Database
 	if database != "" {
 		database = path.Clean("/" + database)
 	}
 
 	return topicreadercommon.ReaderInfo{
-		Endpoint:   c.cfg.Endpoint,
-		Database:   database,
-		Consumer:   consumer,
-		ReaderName: readerName,
+		Endpoint: c.cfg.Endpoint,
+		Database: database,
+		Consumer: consumer,
 	}
 }
 

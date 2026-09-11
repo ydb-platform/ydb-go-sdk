@@ -31,7 +31,7 @@ type ReaderOption = topicreaderinternal.PublicReaderOption
 // If omitted or empty, the SDK assigns a process-local name in the form reader-N.
 func WithReaderName(name string) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
-		cfg.ReaderInfo.ReaderName = &name
+		cfg.ReaderInfo.ReaderName = name
 	}
 }
 

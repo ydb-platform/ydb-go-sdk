@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 )
 
-func TestBatcher_DrainPartitionSessionFiltersRawAndPreservesOtherSessions(t *testing.T) {
+func TestBatcher_DrainPartitionSessionTransfersItemsAndPreservesOtherSessions(t *testing.T) {
 	session := &topicreadercommon.PartitionSession{}
 	otherSession := &topicreadercommon.PartitionSession{}
 	targetBatch := mustNewBatch(session, []*topicreadercommon.PublicMessage{{Offset: 0}})
@@ -24,7 +24,10 @@ func TestBatcher_DrainPartitionSessionFiltersRawAndPreservesOtherSessions(t *tes
 	b.FlushPartitionSession(otherSession)
 
 	require.Equal(t,
-		[]batcherMessageOrderItem{newBatcherItemBatch(targetBatch)},
+		[]batcherMessageOrderItem{
+			newBatcherItemBatch(targetBatch),
+			newBatcherItemRawMessage(rawMessage),
+		},
 		b.DrainPartitionSession(session),
 	)
 	_, targetSessionStillQueued := b.messages[session]
@@ -41,7 +44,11 @@ func TestBatcher_DrainPartitionSessionFiltersRawAndPreservesOtherSessions(t *tes
 	require.NoError(t, bAll.PushRawMessage(session, rawMessage))
 	require.NoError(t, bAll.PushBatches(otherBatch))
 	require.ElementsMatch(t,
-		[]batcherMessageOrderItem{newBatcherItemBatch(targetBatch), newBatcherItemBatch(otherBatch)},
+		[]batcherMessageOrderItem{
+			newBatcherItemBatch(targetBatch),
+			newBatcherItemRawMessage(rawMessage),
+			newBatcherItemBatch(otherBatch),
+		},
 		bAll.Drain(),
 	)
 	require.Empty(t, bAll.messages)

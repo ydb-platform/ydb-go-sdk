@@ -127,12 +127,38 @@ func TestTopicStreamReaderImpl_MessagesReceivedTraceSnapshotsBatchBeforeHandoff(
 			batch *topicreadercommon.PublicBatch
 			err   error
 		}
-		readResultCh := make(chan readResult)
+		readResultCh := make(chan readResult, 1)
+		mutationFinished := make(chan struct{})
+		responseFinished := make(chan struct{})
 		go func() {
+			defer close(mutationFinished)
 			batch, err := e.reader.ReadMessageBatch(e.ctx, ReadMessageBatchOptions{
 				batcherGetOptions: batcherGetOptions{MinCount: 1},
 			})
+			if err != nil || batch == nil {
+				readResultCh <- readResult{batch: batch, err: err}
+
+				return
+			}
+
+			originalMessages := batch.Messages
+			batch.Messages = nil
+			batch.Messages = originalMessages
 			readResultCh <- readResult{batch: batch, err: err}
+			for {
+				batch.Messages = nil
+				batch.Messages = originalMessages
+
+				select {
+				case <-responseFinished:
+					return
+				case <-e.ctx.Done():
+					return
+				default:
+				}
+
+				runtime.Gosched()
+			}
 		}()
 
 		// Ensure the reader is waiting for the batcher notification before handing it a response.
@@ -141,38 +167,22 @@ func TestTopicStreamReaderImpl_MessagesReceivedTraceSnapshotsBatchBeforeHandoff(
 			return len(e.reader.batcher.hasNewMessages) == 0
 		})
 
-		responseFinished := make(chan struct{})
 		var responseErr error
 		go func() {
 			responseErr = e.reader.onReadResponse(readResponse)
 			close(responseFinished)
 		}()
 
-		result := <-readResultCh
+		var result readResult
+		select {
+		case result = <-readResultCh:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for reader batch")
+		}
 		require.NoError(t, result.err)
 		require.NotNil(t, result.batch)
-		originalMessages := result.batch.Messages
-
-		// The batch pointer is now owned by the caller. Keep mutating its public slice while
-		// the receive path finishes to exercise the handoff that used to race with len(Messages).
-		mutationFinished := make(chan struct{})
-		go func() {
-			defer close(mutationFinished)
-			for {
-				select {
-				case <-responseFinished:
-					return
-				default:
-				}
-
-				result.batch.Messages = nil
-				result.batch.Messages = originalMessages
-				runtime.Gosched()
-			}
-		}()
-
-		<-responseFinished
-		<-mutationFinished
+		xtest.WaitChannelClosed(t, responseFinished)
+		xtest.WaitChannelClosed(t, mutationFinished)
 		require.NoError(t, responseErr)
 
 		select {

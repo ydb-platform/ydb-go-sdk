@@ -35,9 +35,8 @@ func NewStreamListenerConfig() StreamListenerConfig {
 // EnsureReaderName assigns the process-local default after all options have
 // been applied. An explicitly empty option is equivalent to leaving it unset.
 func (cfg *StreamListenerConfig) EnsureReaderName() {
-	if cfg.ReaderName == nil || *cfg.ReaderName == "" {
-		name := "reader-" + strconv.FormatInt(cfg.readerID, 10)
-		cfg.ReaderName = &name
+	if cfg.ReaderName == "" {
+		cfg.ReaderName = "reader-" + strconv.FormatInt(cfg.readerID, 10)
 	}
 }
 

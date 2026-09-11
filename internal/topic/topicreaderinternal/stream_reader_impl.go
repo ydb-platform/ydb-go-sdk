@@ -9,7 +9,6 @@ import (
 	"math/big"
 	"reflect"
 	"runtime/pprof"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -59,15 +58,8 @@ type topicStreamReaderImpl struct {
 	readConnectionID string
 	readerID         int64
 
-	creditEvents    topicreadercommon.MetricDeltaQueue
-	creditMu        sync.Mutex
-	creditBalance   int64
-	creditFinalized bool
-
-	localBufferEvents    topicreadercommon.MetricDeltaQueue
-	localBufferMu        sync.Mutex
-	localBufferByTopic   map[string]int64
-	localBufferFinalized bool
+	creditBalance      topicreadercommon.CreditBalance
+	localBufferBalance topicreadercommon.LocalBufferBalance
 
 	m       xsync.RWMutex
 	err     error
@@ -857,17 +849,7 @@ func (r *topicStreamReaderImpl) changeCreditBalance(delta int) {
 		return
 	}
 
-	r.creditMu.Lock()
-	if r.creditFinalized {
-		r.creditMu.Unlock()
-
-		return
-	}
-	r.creditBalance += int64(delta)
-	r.creditEvents.Enqueue("", delta)
-	r.creditMu.Unlock()
-
-	r.creditEvents.Emit(r.traceCreditDelta)
+	r.creditBalance.Change(delta, r.traceCreditDelta)
 }
 
 func (r *topicStreamReaderImpl) finalizeCreditBalance() {
@@ -875,22 +857,10 @@ func (r *topicStreamReaderImpl) finalizeCreditBalance() {
 		return
 	}
 
-	r.creditMu.Lock()
-	if r.creditFinalized {
-		r.creditMu.Unlock()
-
-		return
-	}
-	balance := r.creditBalance
-	r.creditBalance = 0
-	r.creditFinalized = true
-	r.creditEvents.Enqueue("", -int(balance))
-	r.creditMu.Unlock()
-
-	r.creditEvents.Emit(r.traceCreditDelta)
+	r.creditBalance.Finalize(r.traceCreditDelta)
 }
 
-func (r *topicStreamReaderImpl) traceCreditDelta(_ string, delta int) {
+func (r *topicStreamReaderImpl) traceCreditDelta(delta int) {
 	logCtx := r.cfg.BaseContext
 	gtrace.TopicOnReaderCreditBalanceChanged(
 		r.cfg.Trace, &logCtx,
@@ -912,22 +882,7 @@ func (r *topicStreamReaderImpl) reserveLocalBuffer(topic string, messagesCount i
 		return false
 	}
 
-	r.localBufferMu.Lock()
-	if r.localBufferFinalized {
-		r.localBufferMu.Unlock()
-
-		return false
-	}
-	if r.localBufferByTopic == nil {
-		r.localBufferByTopic = make(map[string]int64)
-	}
-	r.localBufferByTopic[topic] += int64(messagesCount)
-	r.localBufferEvents.Enqueue(topic, messagesCount)
-	r.localBufferMu.Unlock()
-
-	r.localBufferEvents.Emit(r.traceLocalBufferDelta)
-
-	return true
+	return r.localBufferBalance.Reserve(topic, messagesCount, r.traceLocalBufferDelta)
 }
 
 func (r *topicStreamReaderImpl) releaseLocalBuffer(topic string, messagesCount int) {
@@ -935,32 +890,7 @@ func (r *topicStreamReaderImpl) releaseLocalBuffer(topic string, messagesCount i
 		return
 	}
 
-	r.localBufferMu.Lock()
-	if r.localBufferFinalized {
-		r.localBufferMu.Unlock()
-
-		return
-	}
-	if r.localBufferByTopic == nil {
-		r.localBufferMu.Unlock()
-
-		return
-	}
-	balance, ok := r.localBufferByTopic[topic]
-	if !ok || balance < int64(messagesCount) {
-		r.localBufferMu.Unlock()
-
-		return
-	}
-	if balance == int64(messagesCount) {
-		delete(r.localBufferByTopic, topic)
-	} else {
-		r.localBufferByTopic[topic] = balance - int64(messagesCount)
-	}
-	r.localBufferEvents.Enqueue(topic, -messagesCount)
-	r.localBufferMu.Unlock()
-
-	r.localBufferEvents.Emit(r.traceLocalBufferDelta)
+	r.localBufferBalance.Release(topic, messagesCount, r.traceLocalBufferDelta)
 }
 
 func (r *topicStreamReaderImpl) finalizeLocalBuffer() {
@@ -968,19 +898,7 @@ func (r *topicStreamReaderImpl) finalizeLocalBuffer() {
 		return
 	}
 
-	r.localBufferMu.Lock()
-	if r.localBufferFinalized {
-		r.localBufferMu.Unlock()
-
-		return
-	}
-	for topic, balance := range r.localBufferByTopic {
-		r.localBufferEvents.Enqueue(topic, -int(balance))
-	}
-	r.localBufferByTopic = nil
-	r.localBufferFinalized = true
-	r.localBufferMu.Unlock()
-	r.localBufferEvents.Emit(r.traceLocalBufferDelta)
+	r.localBufferBalance.Finalize(r.traceLocalBufferDelta)
 }
 
 func (r *topicStreamReaderImpl) updateTokenLoop(ctx context.Context) {
@@ -999,7 +917,10 @@ func (r *topicStreamReaderImpl) updateTokenLoop(ctx context.Context) {
 }
 
 func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse) (err error) {
-	receivedAt := time.Now()
+	var receivedAt time.Time
+	if r.cfg.MetricsSource != nil {
+		receivedAt = time.Now()
+	}
 	logCtx := r.cfg.BaseContext
 	gtrace.TopicOnReaderReceivedBytes(
 		r.cfg.Trace,

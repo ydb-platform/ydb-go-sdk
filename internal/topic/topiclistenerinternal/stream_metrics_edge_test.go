@@ -51,7 +51,7 @@ func TestStreamListenerForcedStopUnregistersMetricsWithoutConfirmation(t *testin
 
 	require.NoError(t, listener.routeMessage(context.Background(), &rawtopicreader.StopPartitionSessionRequest{
 		PartitionSessionID: session.StreamPartitionSessionID,
-	}))
+	}, time.Time{}))
 	select {
 	case <-stopHandled:
 	case <-time.After(time.Second):
@@ -80,7 +80,7 @@ func TestStreamListenerForcedStopUnregistersMetricsWithGracefulStopPending(t *te
 	require.NoError(t, listener.routeMessage(context.Background(), &rawtopicreader.StopPartitionSessionRequest{
 		PartitionSessionID: session.StreamPartitionSessionID,
 		Graceful:           true,
-	}))
+	}, time.Time{}))
 	first := waitStopEvent(t, stopHandled)
 	snapshot := source.Snapshot()
 	require.Equal(t, int64(1), snapshot.PartitionSessionCount)
@@ -89,7 +89,7 @@ func TestStreamListenerForcedStopUnregistersMetricsWithGracefulStopPending(t *te
 	require.NoError(t, listener.routeMessage(context.Background(), &rawtopicreader.StopPartitionSessionRequest{
 		PartitionSessionID: session.StreamPartitionSessionID,
 		Graceful:           false,
-	}))
+	}, time.Time{}))
 	snapshot = source.Snapshot()
 	require.Zero(t, snapshot.PartitionSessionCount)
 	require.Zero(t, snapshot.CommitOffsetLag)
@@ -106,7 +106,7 @@ func TestStreamListener_LocalBufferGuardsAndPartialRelease(t *testing.T) {
 		Endpoint:   "node:2135",
 		Database:   "/db",
 		Consumer:   "consumer",
-		ReaderName: readerNamePointer("reader"),
+		ReaderName: "reader",
 	}
 	deltas := make(chan int, 8)
 	listener.tracer = &trace.Topic{
@@ -153,7 +153,7 @@ func TestStreamListener_LocalBufferFinalizeWithoutOutstandingMessages(t *testing
 	t.Run("empty", func(t *testing.T) {
 		e := fixenv.New(t)
 		listener := StreamListener(e)
-		listener.cfg.ReaderInfo = topicreadercommon.ReaderInfo{ReaderName: readerNamePointer("reader")}
+		listener.cfg.ReaderInfo = topicreadercommon.ReaderInfo{ReaderName: "reader"}
 		deltas := make(chan int, 2)
 		listener.tracer = &trace.Topic{
 			OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
@@ -168,7 +168,7 @@ func TestStreamListener_LocalBufferFinalizeWithoutOutstandingMessages(t *testing
 	t.Run("fully released", func(t *testing.T) {
 		e := fixenv.New(t)
 		listener := StreamListener(e)
-		listener.cfg.ReaderInfo = topicreadercommon.ReaderInfo{ReaderName: readerNamePointer("reader")}
+		listener.cfg.ReaderInfo = topicreadercommon.ReaderInfo{ReaderName: "reader"}
 		deltas := make(chan int, 2)
 		listener.tracer = &trace.Topic{
 			OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {

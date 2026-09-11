@@ -20,10 +20,8 @@ type ReaderMetricsSource struct {
 	closed bool
 
 	messageReceivedAt map[*PublicMessage]time.Time
-	receiptCounts     map[time.Time]int
 	receiptEntries    map[time.Time]*receiptTime
 	receiptTimes      receiptTimeHeap
-	oldestMessageAt   time.Time
 	partitions        map[*PartitionSession]readerMetricsPartition
 }
 
@@ -34,6 +32,7 @@ type readerMetricsPartition struct {
 
 type receiptTime struct {
 	at    time.Time
+	count int
 	index int
 }
 
@@ -74,7 +73,6 @@ func (h *receiptTimeHeap) Pop() any {
 func NewReaderMetricsSource() *ReaderMetricsSource {
 	return &ReaderMetricsSource{
 		messageReceivedAt: make(map[*PublicMessage]time.Time),
-		receiptCounts:     make(map[time.Time]int),
 		receiptEntries:    make(map[time.Time]*receiptTime),
 		partitions:        make(map[*PartitionSession]readerMetricsPartition),
 	}
@@ -89,11 +87,10 @@ func (s *ReaderMetricsSource) Snapshot() trace.TopicReaderMetricsSnapshot {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.advanceOldestLocked()
 
 	var oldestMessageAge time.Duration
-	if !s.oldestMessageAt.IsZero() {
-		oldestMessageAge = time.Since(s.oldestMessageAt)
+	if len(s.receiptTimes) > 0 {
+		oldestMessageAge = time.Since(s.receiptTimes[0].at)
 		oldestMessageAge = max(oldestMessageAge, 0)
 	}
 
@@ -137,14 +134,14 @@ func (s *ReaderMetricsSource) TrackBatch(batch *PublicBatch, receivedAt time.Tim
 			continue
 		}
 		s.messageReceivedAt[message] = receivedAt
-		if s.receiptCounts[receivedAt] == 0 {
-			entry := &receiptTime{at: receivedAt}
+		entry := s.receiptEntries[receivedAt]
+		if entry == nil {
+			entry = &receiptTime{at: receivedAt}
 			s.receiptEntries[receivedAt] = entry
 			heap.Push(&s.receiptTimes, entry)
 		}
-		s.receiptCounts[receivedAt]++
+		entry.count++
 	}
-	s.advanceOldestLocked()
 }
 
 // ReleaseBatch removes messages that are no longer retained by the SDK.
@@ -165,34 +162,13 @@ func (s *ReaderMetricsSource) ReleaseBatch(batch *PublicBatch) {
 			continue
 		}
 		delete(s.messageReceivedAt, message)
-		if count := s.receiptCounts[receivedAt]; count <= 1 {
-			delete(s.receiptCounts, receivedAt)
-			if entry := s.receiptEntries[receivedAt]; entry != nil {
-				delete(s.receiptEntries, receivedAt)
-				heap.Remove(&s.receiptTimes, entry.index)
-			}
-		} else {
-			s.receiptCounts[receivedAt] = count - 1
+		entry := s.receiptEntries[receivedAt]
+		entry.count--
+		if entry.count == 0 {
+			delete(s.receiptEntries, receivedAt)
+			heap.Remove(&s.receiptTimes, entry.index)
 		}
 	}
-	s.advanceOldestLocked()
-}
-
-func (s *ReaderMetricsSource) advanceOldestLocked() {
-	for len(s.receiptTimes) > 0 {
-		oldest := s.receiptTimes[0].at
-		if s.receiptCounts[oldest] > 0 {
-			s.oldestMessageAt = oldest
-
-			return
-		}
-		entry, ok := heap.Pop(&s.receiptTimes).(*receiptTime)
-		if !ok {
-			continue
-		}
-		delete(s.receiptEntries, entry.at)
-	}
-	s.oldestMessageAt = time.Time{}
 }
 
 // RegisterPartitionSession starts tracking one active partition session.
@@ -304,9 +280,7 @@ func (s *ReaderMetricsSource) Close() {
 	}
 	s.closed = true
 	s.messageReceivedAt = nil
-	s.receiptCounts = nil
 	s.receiptEntries = nil
 	s.receiptTimes = nil
-	s.oldestMessageAt = time.Time{}
 	s.partitions = nil
 }

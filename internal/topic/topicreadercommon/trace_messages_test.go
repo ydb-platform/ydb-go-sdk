@@ -22,7 +22,7 @@ func TestTraceMessagesDelivered(t *testing.T) {
 			Endpoint:   "configured:2135",
 			Database:   "/local",
 			Consumer:   "consumer",
-			ReaderName: readerNamePointer("reader"),
+			ReaderName: "reader",
 			Listener:   true,
 		},
 		"/local/topic",
@@ -35,7 +35,7 @@ func TestTraceMessagesDelivered(t *testing.T) {
 	require.Equal(t, "/local", actual.Database)
 	require.Equal(t, "/local/topic", actual.Topic)
 	require.Equal(t, "consumer", actual.Consumer)
-	require.Equal(t, readerNamePointer("reader"), actual.ReaderName)
+	require.Equal(t, "reader", actual.ReaderName)
 	require.True(t, actual.Listener)
 	require.Equal(t, 3, actual.MessagesCount)
 }

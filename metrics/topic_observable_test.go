@@ -286,7 +286,7 @@ func startTopicMetricsSource(
 		Endpoint:   labels["endpoint"],
 		Database:   labels["database"],
 		Consumer:   labels["consumer"],
-		ReaderName: readerNamePointer(labels["reader.name"]),
+		ReaderName: labels["reader.name"],
 		Source:     source,
 	}
 }
@@ -305,73 +305,33 @@ func observationFor(
 }
 
 type testTopicMetricsSource struct {
-	mu       sync.Mutex
 	snapshot trace.TopicReaderMetricsSnapshot
 }
 
 func (s *testTopicMetricsSource) Snapshot() trace.TopicReaderMetricsSnapshot {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	return s.snapshot
 }
 
 type observableConfig struct {
-	registry    *recordingRegistry
+	recordingConfig
+
 	observables *recordingObservableRegistry
-	system      string
-	details     trace.Details
 }
 
 func newObservableConfig(details trace.Details) observableConfig {
 	return observableConfig{
-		registry:    newRecordingRegistry(),
+		recordingConfig: recordingConfig{
+			registry: newRecordingRegistry(),
+			details:  details,
+		},
 		observables: newRecordingObservableRegistry(),
-		details:     details,
 	}
-}
-
-func (c observableConfig) Details() trace.Details {
-	return c.details
 }
 
 func (c observableConfig) WithSystem(system string) Config {
-	if c.system != "" {
-		system = c.system + "." + system
-	}
-	c.system = system
+	c.recordingConfig = c.recordingConfig.WithSystem(system).(recordingConfig)
 
 	return c
-}
-
-func (c observableConfig) path(name string) string {
-	if c.system == "" {
-		return name
-	}
-
-	return c.system + "." + name
-}
-
-func (c observableConfig) CounterVec(name string, labelNames ...string) CounterVec {
-	path := c.path(name)
-	c.registry.register(path, "counter", labelNames)
-
-	return recordingCounterVec{registry: c.registry, path: path}
-}
-
-func (c observableConfig) GaugeVec(name string, labelNames ...string) GaugeVec {
-	path := c.path(name)
-	c.registry.register(path, "gauge", labelNames)
-
-	return recordingGaugeVec{registry: c.registry, path: path}
-}
-
-func (observableConfig) TimerVec(string, ...string) TimerVec {
-	return noopTimerVec{}
-}
-
-func (observableConfig) HistogramVec(string, []float64, ...string) HistogramVec {
-	return noopHistogramVec{}
 }
 
 func (c observableConfig) ObservableGaugeVecWithDescriptor(

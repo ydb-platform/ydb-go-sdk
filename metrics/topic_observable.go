@@ -40,7 +40,6 @@ type topicObservableCollector struct {
 
 	metrics          []topicObservableMetric
 	registrations    []func() error
-	registered       bool
 	nextGeneration   uint64
 	activeGeneration uint64
 }
@@ -51,9 +50,7 @@ type topicObservableSource struct {
 	source trace.TopicReaderMetricsSource
 	labels map[string]string
 	age    bool
-	lag    bool
-	count  bool
-	active bool
+	stream bool
 }
 
 type topicObservableValue struct {
@@ -133,8 +130,8 @@ func newTopicObservableCollector(
 func (c *topicObservableCollector) start(
 	info trace.TopicReaderMetricsSourceStartInfo,
 ) func(trace.TopicReaderMetricsSourceDoneInfo) {
-	age, lag, count := c.enabledKinds(info.Listener)
-	if info.Source == nil || (!age && !lag && !count) {
+	age, stream := c.enabledKinds(info.Listener)
+	if info.Source == nil || (!age && !stream) {
 		return func(trace.TopicReaderMetricsSourceDoneInfo) {}
 	}
 
@@ -142,9 +139,7 @@ func (c *topicObservableCollector) start(
 		source: info.Source,
 		labels: streamLabels(info.Endpoint, info.Database, info.Consumer, info.ReaderName),
 		age:    age,
-		lag:    lag,
-		count:  count,
-		active: true,
+		stream: stream,
 	}
 
 	c.addSource(source)
@@ -159,18 +154,16 @@ func (c *topicObservableCollector) start(
 	}
 }
 
-func (c *topicObservableCollector) enabledKinds(listener bool) (age, lag, count bool) {
+func (c *topicObservableCollector) enabledKinds(listener bool) (age, stream bool) {
 	if listener {
 		age = c.details&trace.TopicListenerStreamEvents != 0
-		lag = c.details&trace.TopicListenerStreamEvents != 0
-		count = c.details&trace.TopicListenerStreamEvents != 0
+		stream = age
 	} else {
 		age = c.details&trace.TopicReaderMessageEvents != 0
-		lag = c.details&trace.TopicReaderStreamEvents != 0
-		count = c.details&trace.TopicReaderStreamEvents != 0
+		stream = c.details&trace.TopicReaderStreamEvents != 0
 	}
 
-	return age, lag, count
+	return age, stream
 }
 
 func (c *topicObservableCollector) remove(source *topicObservableSource) {
@@ -222,14 +215,13 @@ func (c *topicObservableCollector) reconcileAction() topicObservableReconcileAct
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.registered {
+	if c.activeGeneration != 0 {
 		if len(c.sources) != 0 {
 			return topicObservableReconcileAction{}
 		}
 
 		registrations := c.registrations
 		c.registrations = nil
-		c.registered = false
 		c.activeGeneration = 0
 
 		return topicObservableReconcileAction{
@@ -261,7 +253,6 @@ func (c *topicObservableCollector) commitRegistration(
 	}
 
 	c.registrations = registrations
-	c.registered = true
 	c.activeGeneration = generation
 
 	return true
@@ -371,9 +362,9 @@ func (s *topicObservableSource) snapshot(
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.active || (kind == topicObservableMessageAge && !s.age) ||
-		(kind == topicObservableCommitOffsetLag && !s.lag) ||
-		(kind == topicObservableSessionCount && !s.count) {
+	if s.source == nil || (kind == topicObservableMessageAge && !s.age) ||
+		(kind == topicObservableCommitOffsetLag && !s.stream) ||
+		(kind == topicObservableSessionCount && !s.stream) {
 		return trace.TopicReaderMetricsSnapshot{}, nil, false
 	}
 
@@ -383,7 +374,6 @@ func (s *topicObservableSource) snapshot(
 func (s *topicObservableSource) close() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.active = false
 	s.source = nil
 	s.labels = nil
 }

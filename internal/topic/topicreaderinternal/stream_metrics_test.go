@@ -24,7 +24,7 @@ func TestTopicStreamReader_CreditBalanceTracksSendReceiveAndClose(t *testing.T) 
 		Endpoint:   "node:2135",
 		Database:   "/db",
 		Consumer:   "consumer",
-		ReaderName: readerNamePointer("reader"),
+		ReaderName: "reader",
 	}
 
 	creditDeltas := make(chan int, 8)
@@ -54,6 +54,7 @@ func TestTopicStreamReader_CreditBalanceTracksSendReceiveAndClose(t *testing.T) 
 
 	require.NoError(t, e.reader.CloseWithError(e.ctx, errors.New("test close")))
 	require.Equal(t, -60, readerMetricDelta(t, creditDeltas))
+	e.reader.finalizeCreditBalance()
 
 	// A late callback cannot revive a finalized balance or emit another close delta.
 	e.reader.changeCreditBalance(5)
@@ -112,27 +113,33 @@ func TestTopicStreamReader_ReceivedBytesUsesProtocolSizeWhenBatchIsDropped(t *te
 
 func TestTopicStreamReader_LocalBufferTracksQueueAndDelivery(t *testing.T) {
 	e := newTopicReaderTestEnv(t)
-	e.reader.cfg.ReaderInfo.ReaderName = readerNamePointer("reader")
+	e.reader.cfg.ReaderInfo.ReaderName = "reader"
 
 	var (
-		mu          sync.Mutex
-		localDeltas []int
+		mu                    sync.Mutex
+		localDeltas           []int
+		queueEmptyAtReserve   bool
+		deliveredOrderCorrect bool
 	)
 	e.reader.cfg.Trace = &trace.Topic{
 		OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
-			mu.Lock()
-			defer mu.Unlock()
-			localDeltas = append(localDeltas, info.MessagesDelta)
+			queueEmpty := false
 			if info.MessagesDelta > 0 {
 				e.reader.batcher.m.WithLock(func() {
-					require.Empty(t, e.reader.batcher.messages)
+					queueEmpty = len(e.reader.batcher.messages) == 0
 				})
 			}
+			mu.Lock()
+			if info.MessagesDelta > 0 {
+				queueEmptyAtReserve = queueEmpty
+			}
+			localDeltas = append(localDeltas, info.MessagesDelta)
+			mu.Unlock()
 		},
 		OnReaderMessagesDelivered: func(trace.TopicReaderMessagesDeliveredInfo) {
 			mu.Lock()
-			defer mu.Unlock()
-			require.Equal(t, []int{1, -1}, localDeltas)
+			deliveredOrderCorrect = len(localDeltas) == 2 && localDeltas[0] == 1 && localDeltas[1] == -1
+			mu.Unlock()
 		},
 	}
 
@@ -155,32 +162,32 @@ func TestTopicStreamReader_LocalBufferTracksQueueAndDelivery(t *testing.T) {
 	require.NotNil(t, result.batch)
 
 	mu.Lock()
-	require.Equal(t, []int{1, -1}, localDeltas)
+	observedDeltas := append([]int(nil), localDeltas...)
+	observedQueueEmpty := queueEmptyAtReserve
+	observedDeliveredOrder := deliveredOrderCorrect
 	mu.Unlock()
+	require.Equal(t, []int{1, -1}, observedDeltas)
+	require.True(t, observedQueueEmpty)
+	require.True(t, observedDeliveredOrder)
 }
 
 func TestTopicStreamReader_LocalBufferRollbackAfterFinalization(t *testing.T) {
 	e := newTopicReaderTestEnv(t)
-	var (
-		mu          sync.Mutex
-		localDeltas []int
-	)
+	var localDeltas []int
+	var closeErr error
 	e.reader.cfg.Trace = &trace.Topic{
 		OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
-			mu.Lock()
 			localDeltas = append(localDeltas, info.MessagesDelta)
-			mu.Unlock()
 			if info.MessagesDelta > 0 {
-				require.NoError(t, e.reader.batcher.Close(errors.New("closed during reserve")))
+				closeErr = e.reader.batcher.Close(errors.New("closed during reserve"))
 				e.reader.finalizeLocalBuffer()
 			}
 		},
 	}
 
 	require.Error(t, e.reader.onReadResponse(readerMetricResponse(&e, 50)))
-	mu.Lock()
 	require.Equal(t, []int{1, -1}, localDeltas)
-	mu.Unlock()
+	require.NoError(t, closeErr)
 }
 
 func TestTopicReader_CommitMetricsRegisterBeforeSynchronousAckAndClose(t *testing.T) {
@@ -262,7 +269,7 @@ func TestTopicStreamReader_MetricBalancesArePerStreamForSameReaderName(t *testin
 			Endpoint:   "node:2135",
 			Database:   "/db",
 			Consumer:   "consumer",
-			ReaderName: readerNamePointer("same-reader"),
+			ReaderName: "same-reader",
 		}
 		reader.cfg.Trace = &trace.Topic{
 			OnReaderCreditBalanceChanged: func(info trace.TopicReaderCreditBalanceChangedInfo) {
@@ -368,7 +375,7 @@ func newReaderCommitMetricsTest(t *testing.T) *readerCommitMetricsTest {
 		Endpoint:   "node:2135",
 		Database:   "/db",
 		Consumer:   "consumer",
-		ReaderName: readerNamePointer("reader"),
+		ReaderName: "reader",
 	}
 	queued := make(chan int, 4)
 	acknowledged := make(chan int, 4)
@@ -498,8 +505,4 @@ func newMetricsReader(e *streamEnv) *Reader {
 	})
 
 	return reader
-}
-
-func readerNamePointer(name string) *string {
-	return &name
 }

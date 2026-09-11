@@ -260,7 +260,7 @@ type (
 		Endpoint   string
 		Database   string
 		Consumer   string
-		ReaderName *string
+		ReaderName string
 		Listener   bool
 		Source     TopicReaderMetricsSource
 	}
@@ -378,7 +378,7 @@ type (
 		Database      string
 		Topic         string
 		Consumer      string
-		ReaderName    *string
+		ReaderName    string
 		Listener      bool
 		MessagesCount int
 	}
@@ -390,7 +390,7 @@ type (
 		Database      string
 		Topic         string
 		Consumer      string
-		ReaderName    *string
+		ReaderName    string
 		Listener      bool
 		MessagesCount int
 	}
@@ -402,7 +402,7 @@ type (
 		Database      string
 		Topic         string
 		Consumer      string
-		ReaderName    *string
+		ReaderName    string
 		Listener      bool
 		MessagesDelta int
 	}
@@ -413,7 +413,7 @@ type (
 		Endpoint   string
 		Database   string
 		Consumer   string
-		ReaderName *string
+		ReaderName string
 		Listener   bool
 		Bytes      int
 	}
@@ -424,7 +424,7 @@ type (
 		Endpoint   string
 		Database   string
 		Consumer   string
-		ReaderName *string
+		ReaderName string
 		Listener   bool
 		BytesDelta int
 	}
@@ -435,7 +435,7 @@ type (
 		Endpoint      string
 		Database      string
 		Consumer      string
-		ReaderName    *string
+		ReaderName    string
 		Listener      bool
 		RetryDecision string
 		StatusCode    string
@@ -450,7 +450,7 @@ type (
 		Database           string
 		Topic              string
 		Consumer           string
-		ReaderName         *string
+		ReaderName         string
 		Listener           bool
 		PartitionID        int64
 		PartitionSessionID int64
@@ -464,7 +464,7 @@ type (
 		Database           string
 		Topic              string
 		Consumer           string
-		ReaderName         *string
+		ReaderName         string
 		Listener           bool
 		PartitionID        int64
 		PartitionSessionID int64

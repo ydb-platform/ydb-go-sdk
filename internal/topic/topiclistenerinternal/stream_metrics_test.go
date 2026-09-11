@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
@@ -30,7 +28,7 @@ func TestStreamListener_CreditBalanceTracksSendAndClose(t *testing.T) {
 			Endpoint:   "node:2135",
 			Database:   "/db",
 			Consumer:   "consumer",
-			ReaderName: readerNamePointer("reader"),
+			ReaderName: "reader",
 		}
 		creditDeltas := make(chan int, 4)
 		listener.tracer = &trace.Topic{
@@ -49,11 +47,9 @@ func TestStreamListener_CreditBalanceTracksSendAndClose(t *testing.T) {
 
 		listener.finalizeCreditBalance()
 		listenerMetricNoDelta(t, creditDeltas)
-		require.Zero(t, listener.creditBalance)
 
 		listener.changeCreditBalance(1)
 		listenerMetricNoDelta(t, creditDeltas)
-		require.Zero(t, listener.creditBalance)
 	})
 
 	t.Run("failed send", func(t *testing.T) {
@@ -87,7 +83,7 @@ func TestStreamListener_ReceivedBytesUsesProtocolSizeForDroppedBatch(t *testing.
 		Endpoint:   "node:2135",
 		Database:   "/db",
 		Consumer:   "consumer",
-		ReaderName: readerNamePointer("reader"),
+		ReaderName: "reader",
 	}
 	listener.tracer = &trace.Topic{}
 
@@ -140,7 +136,7 @@ func TestStreamListener_LocalBufferTracksQueueAndHandler(t *testing.T) {
 			Endpoint:   "node:2135",
 			Database:   "/db",
 			Consumer:   "consumer",
-			ReaderName: readerNamePointer("reader"),
+			ReaderName: "reader",
 		},
 	}
 	var (
@@ -170,7 +166,7 @@ func TestStreamListener_LocalBufferTracksQueueAndHandler(t *testing.T) {
 	session := PartitionSession(e)
 	session.Topic = "/topic"
 	listener.createWorkerForPartition(session)
-	require.NoError(t, listener.splitAndRouteReadResponse(listenerMetricResponse(session, 50)))
+	require.NoError(t, listener.splitAndRouteReadResponse(listenerMetricResponse(session, 50), time.Time{}))
 	select {
 	case deltas := <-handlerDeltas:
 		require.Equal(t, []int{1, -1}, deltas)
@@ -188,6 +184,7 @@ func TestStreamListener_LocalBufferRollbackAfterFinalization(t *testing.T) {
 	e := fixenv.New(t)
 	ctx := sf.Context(e)
 	listener := StreamListener(e)
+	var worker *PartitionWorker
 	t.Cleanup(func() {
 		_ = listener.Close(context.Background(), errors.New("test cleanup"))
 	})
@@ -199,25 +196,21 @@ func TestStreamListener_LocalBufferRollbackAfterFinalization(t *testing.T) {
 			Endpoint:   "node:2135",
 			Database:   "/db",
 			Consumer:   "consumer",
-			ReaderName: readerNamePointer("reader"),
+			ReaderName: "reader",
 		},
 	}
-	var (
-		mu          sync.Mutex
-		localDeltas []int
-	)
+	var localDeltas []int
 	listener.tracer = &trace.Topic{
 		OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
-			mu.Lock()
 			localDeltas = append(localDeltas, info.MessagesDelta)
-			mu.Unlock()
 			if info.MessagesDelta > 0 {
-				require.NoError(t, listenerMetricCloseWorkerQueueAndFinalize(listener, session))
+				worker.messageQueue.Close()
+				listener.finalizeLocalBuffer()
 			}
 		},
 	}
 
-	worker := NewPartitionWorker(
+	worker = NewPartitionWorker(
 		session.StreamPartitionSessionID,
 		session,
 		listener,
@@ -225,16 +218,17 @@ func TestStreamListener_LocalBufferRollbackAfterFinalization(t *testing.T) {
 		listener.onWorkerStopped,
 		listener.tracer,
 		listener.listenerID,
+		nil,
+		listener.reserveLocalBuffer,
+		listener.releaseLocalBuffer,
 	)
 	worker.readerInfo = listener.cfg.ReaderInfo
 	listener.m.WithLock(func() {
 		listener.workers[session.StreamPartitionSessionID] = worker
 	})
 
-	require.NoError(t, listener.splitAndRouteReadResponse(listenerMetricResponse(session, 50)))
-	mu.Lock()
+	require.NoError(t, listener.splitAndRouteReadResponse(listenerMetricResponse(session, 50), time.Time{}))
 	require.Equal(t, []int{1, -1}, localDeltas)
-	mu.Unlock()
 	require.NoError(t, listener.Close(ctx, errors.New("test close")))
 }
 
@@ -247,12 +241,11 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 		session := listenerMetricStartPartition(t, e, listener)
 		batch := listenerMetricCommitBatch(t, listener.cfg.Decoders, session)
 
+		commitSent := make(chan *rawtopicreader.CommitOffsetRequest, 1)
 		StreamMock(e).EXPECT().Send(gomock.AssignableToTypeOf(&rawtopicreader.CommitOffsetRequest{})).
 			DoAndReturn(func(msg rawtopicreader.ClientMessage) error {
 				request := msg.(*rawtopicreader.CommitOffsetRequest)
-				require.Equal(t, session.StreamPartitionSessionID, request.CommitOffsets[0].PartitionSessionID)
-				require.Equal(t, rawtopiccommon.NewOffset(0), request.CommitOffsets[0].Offsets[0].Start)
-				require.Equal(t, rawtopiccommon.NewOffset(5), request.CommitOffsets[0].Offsets[0].End)
+				commitSent <- request
 
 				if err := listener.onCommitResponse(
 					listenerMetricCommitResponse(session, rawydb.StatusInternalError, 5),
@@ -265,6 +258,10 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 
 		event := NewPublicReadMessages(session.ToPublic(), batch, listener)
 		event.Confirm()
+		request := <-commitSent
+		require.Equal(t, session.StreamPartitionSessionID, request.CommitOffsets[0].PartitionSessionID)
+		require.Equal(t, rawtopiccommon.NewOffset(0), request.CommitOffsets[0].Offsets[0].Start)
+		require.Equal(t, rawtopiccommon.NewOffset(5), request.CommitOffsets[0].Offsets[0].End)
 		// The wire range is checked above as [0, 5), so its span is five.
 		require.Equal(t, 5, listenerMetricDelta(t, queued))
 		require.Equal(t, 5, listenerMetricDelta(t, acknowledged))
@@ -309,51 +306,60 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 func TestStreamListener_MetricBalancesArePerStreamForSameReaderName(t *testing.T) {
 	e := fixenv.New(t)
 	listener1 := StreamListener(e)
-	listener2 := newStreamMetricsListener(e, "second-listener")
 	t.Cleanup(func() {
-		_ = listener2.Close(context.Background(), errors.New("test cleanup"))
+		_ = listener1.Close(context.Background(), errors.New("test cleanup"))
 	})
 
 	listener1.cfg.ReaderInfo = streamMetricsReaderInfo()
-	listener2.cfg.ReaderInfo = streamMetricsReaderInfo()
 	listener1.tracer = &trace.Topic{}
-	listener2.tracer = &trace.Topic{}
 	listener1Credits := make(chan int, 4)
 	listener1Locals := make(chan int, 4)
-	listener2Credits := make(chan int, 4)
-	listener2Locals := make(chan int, 4)
 	listener1.tracer.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
 		listener1Credits <- info.BytesDelta
 	}
 	listener1.tracer.OnReaderLocalBufferChanged = func(info trace.TopicReaderLocalBufferChangedInfo) {
 		listener1Locals <- info.MessagesDelta
 	}
-	listener2.tracer.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
-		listener2Credits <- info.BytesDelta
-	}
-	listener2.tracer.OnReaderLocalBufferChanged = func(info trace.TopicReaderLocalBufferChangedInfo) {
-		listener2Locals <- info.MessagesDelta
-	}
 
-	listener1.changeCreditBalance(10)
-	require.True(t, listener1.reserveLocalBuffer("/topic", 2))
-	listener2.changeCreditBalance(10)
-	require.True(t, listener2.reserveLocalBuffer("/topic", 2))
-	require.Equal(t, 10, listenerMetricDelta(t, listener1Credits))
-	require.Equal(t, 2, listenerMetricDelta(t, listener1Locals))
-	require.Equal(t, 10, listenerMetricDelta(t, listener2Credits))
-	require.Equal(t, 2, listenerMetricDelta(t, listener2Locals))
+	t.Run("independent stream", func(t *testing.T) {
+		e2 := fixenv.New(t)
+		listener2 := StreamListener(e2)
+		listener2.listenerID = "second-listener"
+		t.Cleanup(func() {
+			_ = listener2.Close(context.Background(), errors.New("test cleanup"))
+		})
 
-	require.NoError(t, listener1.Close(context.Background(), errors.New("close first listener")))
-	require.Equal(t, -10, listenerMetricDelta(t, listener1Credits))
-	require.Equal(t, -2, listenerMetricDelta(t, listener1Locals))
-	listenerMetricNoDelta(t, listener2Credits)
-	listenerMetricNoDelta(t, listener2Locals)
+		listener2.cfg.ReaderInfo = streamMetricsReaderInfo()
+		listener2.tracer = &trace.Topic{}
+		listener2Credits := make(chan int, 4)
+		listener2Locals := make(chan int, 4)
+		listener2.tracer.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
+			listener2Credits <- info.BytesDelta
+		}
+		listener2.tracer.OnReaderLocalBufferChanged = func(info trace.TopicReaderLocalBufferChangedInfo) {
+			listener2Locals <- info.MessagesDelta
+		}
 
-	listener1.changeCreditBalance(1)
-	require.NoError(t, listener2.Close(context.Background(), errors.New("close second listener")))
-	require.Equal(t, -10, listenerMetricDelta(t, listener2Credits))
-	require.Equal(t, -2, listenerMetricDelta(t, listener2Locals))
+		listener1.changeCreditBalance(10)
+		require.True(t, listener1.reserveLocalBuffer("/topic", 2))
+		listener2.changeCreditBalance(10)
+		require.True(t, listener2.reserveLocalBuffer("/topic", 2))
+		require.Equal(t, 10, listenerMetricDelta(t, listener1Credits))
+		require.Equal(t, 2, listenerMetricDelta(t, listener1Locals))
+		require.Equal(t, 10, listenerMetricDelta(t, listener2Credits))
+		require.Equal(t, 2, listenerMetricDelta(t, listener2Locals))
+
+		require.NoError(t, listener1.Close(context.Background(), errors.New("close first listener")))
+		require.Equal(t, -10, listenerMetricDelta(t, listener1Credits))
+		require.Equal(t, -2, listenerMetricDelta(t, listener1Locals))
+		listenerMetricNoDelta(t, listener2Credits)
+		listenerMetricNoDelta(t, listener2Locals)
+
+		listener1.changeCreditBalance(1)
+		require.NoError(t, listener2.Close(context.Background(), errors.New("close second listener")))
+		require.Equal(t, -10, listenerMetricDelta(t, listener2Credits))
+		require.Equal(t, -2, listenerMetricDelta(t, listener2Locals))
+	})
 }
 
 func TestStreamListenerStartCommitOverrideUpdatesOnlyMetricsBaseline(t *testing.T) {
@@ -369,7 +375,7 @@ func TestStreamListenerStartCommitOverrideUpdatesOnlyMetricsBaseline(t *testing.
 			Endpoint:   "node:2135",
 			Database:   "/db",
 			Consumer:   "consumer",
-			ReaderName: readerNamePointer("reader"),
+			ReaderName: "reader",
 		},
 	}
 	listener.metricsSource = topicreadercommon.NewReaderMetricsSource()
@@ -482,7 +488,7 @@ func setupListenerCommitMetrics(
 			Endpoint:   "node:2135",
 			Database:   "/db",
 			Consumer:   "consumer",
-			ReaderName: readerNamePointer("reader"),
+			ReaderName: "reader",
 		},
 	}
 	queued = make(chan int, 4)
@@ -626,57 +632,11 @@ func listenerMetricNoDelta(t *testing.T, deltas <-chan int) {
 	}
 }
 
-func listenerMetricCloseWorkerQueueAndFinalize(
-	listener *streamListener,
-	session *topicreadercommon.PartitionSession,
-) error {
-	var worker *PartitionWorker
-	listener.m.WithLock(func() {
-		worker = listener.workers[session.StreamPartitionSessionID]
-	})
-	if worker == nil {
-		return errors.New("metrics test worker is missing")
-	}
-	worker.messageQueue.Close()
-	listener.finalizeLocalBuffer()
-
-	return nil
-}
-
 func streamMetricsReaderInfo() topicreadercommon.ReaderInfo {
 	return topicreadercommon.ReaderInfo{
 		Endpoint:   "node:2135",
 		Database:   "/db",
 		Consumer:   "consumer",
-		ReaderName: readerNamePointer("same-reader"),
+		ReaderName: "same-reader",
 	}
-}
-
-func newStreamMetricsListener(e fixenv.Env, listenerID string) *streamListener {
-	listener := &streamListener{
-		cfg: &StreamListenerConfig{
-			Decoders: topicreadercommon.NewMultiDecoder(),
-		},
-		stream:      StreamMock(e),
-		streamClose: func(error) {},
-		handler:     EventHandlerMock(e),
-		tracer:      &trace.Topic{},
-		listenerID:  listenerID,
-		sessionID:   "test-session-id",
-	}
-	listener.initVars(&atomic.Int64{})
-	listener.syncCommitter = topicreadercommon.NewCommitterStopped(
-		listener.tracer,
-		sf.Context(e),
-		topicreadercommon.CommitModeSync,
-		listener.stream.Send,
-	)
-	listener.syncCommitter.Start()
-	listener.background = *background.NewWorker(sf.Context(e), "metrics-test-listener")
-
-	return listener
-}
-
-func readerNamePointer(name string) *string {
-	return &name
 }

@@ -26,27 +26,22 @@ func TestReaderInfoPropagatesDriverAttributes(t *testing.T) {
 		Endpoint: configuredEndpoint,
 		Database: configuredDatabase,
 		Consumer: "consumer",
-	}, client.readerInfo("consumer", nil))
+	}, client.readerInfo("consumer"))
 
 	require.Equal(t, topicreadercommon.ReaderInfo{
-		Endpoint:   configuredEndpoint,
-		Database:   configuredDatabase,
-		Consumer:   "consumer",
-		ReaderName: readerNamePointer("reader-name"),
-	}, client.readerInfo("consumer", readerNamePointer("reader-name")))
+		Endpoint: configuredEndpoint,
+		Database: configuredDatabase,
+		Consumer: "consumer",
+	}, client.readerInfo("consumer"))
 }
 
 func TestReaderInfoNormalizesConfiguredDatabase(t *testing.T) {
 	for _, database := range []string{"/local", "/local//", "/local/./", "/local/child/..", "local/"} {
 		t.Run(database, func(t *testing.T) {
 			client := &Client{cfg: newTopicConfig(internalTopic.WithDatabase(database))}
-			require.Equal(t, "/local", client.readerInfo("consumer", readerNamePointer("reader")).Database)
+			require.Equal(t, "/local", client.readerInfo("consumer").Database)
 			require.Equal(t, database, client.cfg.Database, "connection configuration must be preserved")
 		})
 	}
-	require.Empty(t, (&Client{}).readerInfo("", readerNamePointer("")).Database)
-}
-
-func readerNamePointer(name string) *string {
-	return &name
+	require.Empty(t, (&Client{}).readerInfo("").Database)
 }

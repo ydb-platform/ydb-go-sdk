@@ -136,9 +136,6 @@ func RegisterCommitAcknowledged(session *PartitionSession, exclusiveOffset rawto
 	if session == nil {
 		return 0
 	}
-	if session.metricsSource != nil {
-		session.metricsSource.AcknowledgeCommit(session, exclusiveOffset.ToInt64())
-	}
 	if session.commitMetrics == nil || session.commitMetrics.tracker == nil {
 		return 0
 	}

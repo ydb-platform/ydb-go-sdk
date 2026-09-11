@@ -287,7 +287,6 @@ func (r *readerReconnector) Commit(
 }
 
 func (r *readerReconnector) CloseWithError(ctx context.Context, reason error) error {
-	defer r.closeMetricsSource()
 	var closeErr error
 	r.closeOnce.Do(func() {
 		closeErr = r.background.Close(ctx, reason)
@@ -319,6 +318,7 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, reason error) er
 			}
 		})
 	})
+	r.closeMetricsSource()
 
 	return closeErr
 }
@@ -342,7 +342,6 @@ func (r *readerReconnector) initChannelsAndClock() {
 
 func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 	defer r.handlePanic()
-	defer r.closeMetricsSource()
 
 	var retriesStarted time.Time
 	lastTime := time.Time{}
@@ -404,14 +403,16 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 }
 
 func (r *readerReconnector) closeMetricsSource() {
+	var closeSource bool
 	r.metricsSourceCloseOnce.Do(func() {
+		closeSource = true
 		if r.metricsSource != nil {
 			r.metricsSource.Close()
 		}
-		if r.metricsSourceDone != nil {
-			r.metricsSourceDone()
-		}
 	})
+	if closeSource && r.metricsSourceDone != nil {
+		r.metricsSourceDone()
+	}
 }
 
 //nolint:funlen
@@ -419,13 +420,8 @@ func (r *readerReconnector) reconnect(
 	ctx context.Context,
 	reason error,
 	oldReader batchedStreamReader,
-	reportSessionError ...bool,
+	reportSessionError bool,
 ) (err error) {
-	reportRetry := true
-	if len(reportSessionError) > 0 {
-		reportRetry = reportSessionError[0]
-	}
-
 	defer func() {
 		logCtx := r.logContext
 		gtrace.TopicOnReaderReconnect(r.tracer, &logCtx, reason)(err)
@@ -457,7 +453,7 @@ func (r *readerReconnector) reconnect(
 	if oldReader != nil {
 		_ = oldReader.CloseWithError(ctx, xerrors.WithStackTrace(errReconnect))
 	}
-	if reportRetry && reason != nil {
+	if reportSessionError && reason != nil {
 		r.traceSessionRetry(ctx, reason)
 	}
 
@@ -696,7 +692,12 @@ func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, er
 
 func (r *readerReconnector) handlePanic() {
 	if p := recover(); p != nil {
-		_ = r.CloseWithError(context.Background(), xerrors.WithStackTrace(fmt.Errorf("handled panic: %v", p)))
+		reason := xerrors.WithStackTrace(fmt.Errorf("handled panic: %v", p))
+		go func() {
+			// The reconnection loop runs as a background worker. Close from a
+			// separate goroutine so shutdown can join the worker after it returns.
+			_ = r.CloseWithError(context.Background(), reason)
+		}()
 	}
 }
 

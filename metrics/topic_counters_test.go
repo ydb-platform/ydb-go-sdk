@@ -96,7 +96,7 @@ func TestTopicReaderMetricsHonorDetailsGroups(t *testing.T) {
 		require.Nil(t, tracer.OnReaderCommitAcknowledged)
 		require.Nil(t, tracer.OnReaderSessionError)
 
-		readerName := readerNamePointer("reader")
+		readerName := "reader"
 		tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
 			Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
 			ReaderName: readerName, MessagesCount: 3,
@@ -153,7 +153,7 @@ func TestTopicReaderMetricsHonorDetailsGroups(t *testing.T) {
 		require.NotNil(t, tracer.OnReaderCommitAcknowledged)
 		require.NotNil(t, tracer.OnReaderSessionError)
 
-		readerName := readerNamePointer("reader")
+		readerName := "reader"
 		tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
 			Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
 			ReaderName: readerName, MessagesCount: 9,
@@ -201,7 +201,7 @@ func TestTopicReaderCountersIgnoreNonPositiveDeltas(t *testing.T) {
 		recordingConfig: recordingConfig{registry: registry, details: trace.DetailsAll},
 		capture:         capture,
 	})
-	readerName := readerNamePointer("reader")
+	readerName := "reader"
 
 	tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
 		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
@@ -269,22 +269,22 @@ func TestTopicReaderCountersFallBackToIncForMessageAndSessionErrors(t *testing.T
 	})
 	fallbackTracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
 		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
-		ReaderName: readerNamePointer("reader"), MessagesCount: 3,
+		ReaderName: "reader", MessagesCount: 3,
 	})
 	fallbackTracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{
 		Endpoint: "node", Database: "/db", Consumer: "consumer",
-		ReaderName: readerNamePointer("reader"), Bytes: 1024,
+		ReaderName: "reader", Bytes: 1024,
 	})
 	fallbackTracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
 		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
-		ReaderName: readerNamePointer("reader"), MessagesCount: largeDelta,
+		ReaderName: "reader", MessagesCount: largeDelta,
 	})
 	fallbackTracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{
 		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
-		ReaderName: readerNamePointer("reader"), MessagesCount: largeDelta,
+		ReaderName: "reader", MessagesCount: largeDelta,
 	})
 	fallbackTracer.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"),
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader",
 		RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
 	})
 
@@ -322,14 +322,14 @@ func TestTopicReaderCountersUseInt64AddForLargeDeltas(t *testing.T) {
 	})
 
 	tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"), Bytes: largeDelta,
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", Bytes: largeDelta,
 	})
 	tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
 		Endpoint:      "node",
 		Database:      "/db",
 		Topic:         "/topic",
 		Consumer:      "consumer",
-		ReaderName:    readerNamePointer("reader"),
+		ReaderName:    "reader",
 		MessagesCount: largeDelta,
 	})
 	tracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{
@@ -337,7 +337,7 @@ func TestTopicReaderCountersUseInt64AddForLargeDeltas(t *testing.T) {
 		Database:      "/db",
 		Topic:         "/topic",
 		Consumer:      "consumer",
-		ReaderName:    readerNamePointer("reader"),
+		ReaderName:    "reader",
 		MessagesCount: largeDelta,
 	})
 
@@ -359,18 +359,18 @@ func TestTopicReaderGaugesApplyDeltasWithoutSet(t *testing.T) {
 
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
 		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
-		ReaderName: readerNamePointer("reader"), MessagesDelta: 5,
+		ReaderName: "reader", MessagesDelta: 5,
 	})
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
 		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
-		ReaderName: readerNamePointer("reader"), MessagesDelta: -2,
+		ReaderName: "reader", MessagesDelta: -2,
 	})
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{MessagesDelta: 0})
 	tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"), BytesDelta: 100,
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", BytesDelta: 100,
 	})
 	tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: readerNamePointer("reader"), BytesDelta: -40,
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", BytesDelta: -40,
 	})
 	tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{BytesDelta: 0})
 
@@ -389,11 +389,11 @@ func TestTopicMetricCallbacksProvideAllDeclaredLabels(t *testing.T) {
 	for _, test := range []struct {
 		name       string
 		consumer   string
-		readerName *string
+		readerName string
 	}{
 		{name: "without consumer or reader name"},
-		{name: "without consumer with reader name", readerName: readerNamePointer("generated-reader")},
-		{name: "with consumer and reader name", consumer: "consumer", readerName: readerNamePointer("reader")},
+		{name: "without consumer with reader name", readerName: "generated-reader"},
+		{name: "with consumer and reader name", consumer: "consumer", readerName: "reader"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			tracer := topic(strictTopicConfig{
@@ -726,8 +726,4 @@ func (g topicTrackingGauge) Set(value float64) {
 	}
 	g.capture.sets[g.path]++
 	g.registry.set(g.path, g.labels, value)
-}
-
-func readerNamePointer(name string) *string {
-	return &name
 }

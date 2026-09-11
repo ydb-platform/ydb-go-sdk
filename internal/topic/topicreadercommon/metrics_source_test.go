@@ -68,14 +68,13 @@ func TestReaderMetricsSourceRemovesReceiptMetadata(t *testing.T) {
 	source.mu.Lock()
 	require.Len(t, source.receiptTimes, 1)
 	require.Len(t, source.receiptEntries, 1)
-	require.Len(t, source.receiptCounts, 1)
+	require.Equal(t, 1, source.receiptTimes[0].count)
 	source.mu.Unlock()
 
 	source.ReleaseBatch(oldBatch)
 	source.mu.Lock()
 	require.Empty(t, source.receiptTimes)
 	require.Empty(t, source.receiptEntries)
-	require.Empty(t, source.receiptCounts)
 	source.mu.Unlock()
 }
 

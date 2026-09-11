@@ -19,37 +19,28 @@ import (
 )
 
 func TestStreamListenerSessionErrorReportsActualStopOnce(t *testing.T) {
-	events := make(chan trace.TopicReaderSessionErrorInfo, 4)
-	listener := newSessionErrorTestListener(events)
+	var events []trace.TopicReaderSessionErrorInfo
+	listener := newSessionErrorTestListener(&events)
 
 	listener.goClose(context.Background(), grpcStatus.Error(grpcCodes.Unavailable, "connection lost"))
 	listener.goClose(context.Background(), errors.New("second failure"))
 
-	select {
-	case event := <-events:
-		require.Equal(t, "endpoint", event.Endpoint)
-		require.Equal(t, "/database", event.Database)
-		require.Equal(t, "consumer", event.Consumer)
-		require.Equal(t, readerNamePointer("reader"), event.ReaderName)
-		require.Equal(t, "stop", event.RetryDecision)
-		require.Equal(t, "Unavailable", event.StatusCode)
-		require.Equal(t, "transport_error", event.ErrorType)
-	case <-time.After(time.Second):
-		t.Fatal("session error event was not emitted")
-	}
-
-	select {
-	case event := <-events:
-		t.Fatalf("unexpected duplicate session error event: %+v", event)
-	case <-time.After(20 * time.Millisecond):
-	}
+	require.Len(t, events, 1)
+	event := events[0]
+	require.Equal(t, "endpoint", event.Endpoint)
+	require.Equal(t, "/database", event.Database)
+	require.Equal(t, "consumer", event.Consumer)
+	require.Equal(t, "reader", event.ReaderName)
+	require.Equal(t, "stop", event.RetryDecision)
+	require.Equal(t, "Unavailable", event.StatusCode)
+	require.Equal(t, "transport_error", event.ErrorType)
 
 	_ = listener.background.Close(context.Background(), errors.New("test finished"))
 }
 
 func TestStreamListenerSessionErrorSkipsExpectedTermination(t *testing.T) {
-	events := make(chan trace.TopicReaderSessionErrorInfo, 4)
-	listener := newSessionErrorTestListener(events)
+	var events []trace.TopicReaderSessionErrorInfo
+	listener := newSessionErrorTestListener(&events)
 	cancelledCtx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -57,34 +48,26 @@ func TestStreamListenerSessionErrorSkipsExpectedTermination(t *testing.T) {
 	listener.traceSessionStop(cancelledCtx, context.Canceled)
 	listener.traceSessionStop(context.Background(), errPartitionQueueClosed)
 
-	select {
-	case event := <-events:
-		t.Fatalf("unexpected session error event: %+v", event)
-	case <-time.After(20 * time.Millisecond):
-	}
+	require.Empty(t, events)
 
 	_ = listener.background.Close(context.Background(), errors.New("test finished"))
 }
 
 func TestStreamListenerSessionErrorKeepsDeadlineFailures(t *testing.T) {
-	events := make(chan trace.TopicReaderSessionErrorInfo, 4)
-	listener := newSessionErrorTestListener(events)
+	var events []trace.TopicReaderSessionErrorInfo
+	listener := newSessionErrorTestListener(&events)
 
 	listener.traceSessionStop(context.Background(), grpcStatus.Error(grpcCodes.DeadlineExceeded, "connect timeout"))
 
-	select {
-	case event := <-events:
-		require.Equal(t, "DeadlineExceeded", event.StatusCode)
-		require.Equal(t, "transport_error", event.ErrorType)
-	case <-time.After(time.Second):
-		t.Fatal("deadline session error event was not emitted")
-	}
+	require.Len(t, events, 1)
+	require.Equal(t, "DeadlineExceeded", events[0].StatusCode)
+	require.Equal(t, "transport_error", events[0].ErrorType)
 
 	_ = listener.background.Close(context.Background(), errors.New("test finished"))
 }
 
 func TestTopicListenerReconnectorSessionErrorReportsInitialFailure(t *testing.T) {
-	events := make(chan trace.TopicReaderSessionErrorInfo, 4)
+	var events []trace.TopicReaderSessionErrorInfo
 	connectErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED))
 	cfg := NewStreamListenerConfig()
 	cfg.Consumer = "consumer"
@@ -93,11 +76,11 @@ func TestTopicListenerReconnectorSessionErrorReportsInitialFailure(t *testing.T)
 		Endpoint:   "endpoint",
 		Database:   "/database",
 		Consumer:   "consumer",
-		ReaderName: readerNamePointer("reader"),
+		ReaderName: "reader",
 	}
 	cfg.Tracer = &trace.Topic{
 		OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
-			reportSessionErrorEvent(events, info)
+			events = append(events, info)
 		},
 	}
 
@@ -111,19 +94,15 @@ func TestTopicListenerReconnectorSessionErrorReportsInitialFailure(t *testing.T)
 	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	require.ErrorIs(t, reconnector.WaitInit(waitCtx), connectErr)
-	select {
-	case event := <-events:
-		require.Equal(t, "stop", event.RetryDecision)
-		require.Equal(t, "UNAUTHORIZED", event.StatusCode)
-		require.Equal(t, "ydb_error", event.ErrorType)
-	case <-time.After(time.Second):
-		t.Fatal("listener initial session error event was not emitted")
-	}
+	require.Len(t, events, 1)
+	require.Equal(t, "stop", events[0].RetryDecision)
+	require.Equal(t, "UNAUTHORIZED", events[0].StatusCode)
+	require.Equal(t, "ydb_error", events[0].ErrorType)
 
 	require.NoError(t, reconnector.Close(context.Background(), errors.New("test finished")))
 }
 
-func newSessionErrorTestListener(events chan<- trace.TopicReaderSessionErrorInfo) *streamListener {
+func newSessionErrorTestListener(events *[]trace.TopicReaderSessionErrorInfo) *streamListener {
 	ctx := context.Background()
 	listener := &streamListener{
 		cfg: &StreamListenerConfig{
@@ -131,30 +110,20 @@ func newSessionErrorTestListener(events chan<- trace.TopicReaderSessionErrorInfo
 				Endpoint:   "endpoint",
 				Database:   "/database",
 				Consumer:   "consumer",
-				ReaderName: readerNamePointer("reader"),
+				ReaderName: "reader",
 			},
 		},
 		background: *background.NewWorker(ctx, "session-error-test"),
 		sessions:   &topicreadercommon.PartitionSessionStorage{},
 		tracer: &trace.Topic{
 			OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
-				reportSessionErrorEvent(events, info)
+				*events = append(*events, info)
 			},
 		},
 	}
 	listener.streamClose = func(error) {}
 
 	return listener
-}
-
-func reportSessionErrorEvent(
-	events chan<- trace.TopicReaderSessionErrorInfo,
-	info trace.TopicReaderSessionErrorInfo,
-) {
-	select {
-	case events <- info:
-	default:
-	}
 }
 
 type failingTopicClient struct {

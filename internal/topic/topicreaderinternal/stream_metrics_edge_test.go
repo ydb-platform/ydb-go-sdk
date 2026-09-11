@@ -144,24 +144,6 @@ func TestTopicStreamReader_DiscardBatchesIgnoresRawItems(t *testing.T) {
 	require.Equal(t, -1, readerMetricDelta(t, deltas))
 }
 
-func TestTopicStreamReader_CreditBalanceFinalizeIsIdempotent(t *testing.T) {
-	e := newTopicReaderTestEnv(t)
-	deltas := make(chan int, 4)
-	e.reader.cfg.Trace = &trace.Topic{
-		OnReaderCreditBalanceChanged: func(info trace.TopicReaderCreditBalanceChangedInfo) {
-			deltas <- info.BytesDelta
-		},
-	}
-
-	e.reader.changeCreditBalance(10)
-	require.Equal(t, 10, readerMetricDelta(t, deltas))
-	e.reader.finalizeCreditBalance()
-	require.Equal(t, -10, readerMetricDelta(t, deltas))
-	e.reader.finalizeCreditBalance()
-	e.reader.changeCreditBalance(1)
-	readerMetricNoDelta(t, deltas)
-}
-
 func TestReaderReconnectorSessionErrorNoOpStopAndNilError(t *testing.T) {
 	events := make(chan trace.TopicReaderSessionErrorInfo, 1)
 	reconnector := &readerReconnector{

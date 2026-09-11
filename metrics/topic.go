@@ -256,24 +256,19 @@ func topicGauge(readerConfig Config, legacySystem, legacyName, name, unit string
 	return readerConfig.WithSystem(legacySystem).GaugeVec(legacyName, labels...)
 }
 
-func messageLabels(endpoint, database, topic, consumer string, readerName *string) map[string]string {
+func messageLabels(endpoint, database, topic, consumer, readerName string) map[string]string {
 	labels := streamLabels(endpoint, database, consumer, readerName)
 	labels["topic"] = topic
 
 	return labels
 }
 
-func streamLabels(endpoint, database, consumer string, readerName *string) map[string]string {
-	readerNameValue := ""
-	if readerName != nil {
-		readerNameValue = *readerName
-	}
-
+func streamLabels(endpoint, database, consumer, readerName string) map[string]string {
 	return map[string]string{
 		"endpoint":    endpoint,
 		"database":    database,
 		"consumer":    consumer,
-		"reader.name": readerNameValue,
+		"reader.name": readerName,
 	}
 }
 

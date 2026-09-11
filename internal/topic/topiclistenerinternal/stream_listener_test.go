@@ -50,6 +50,9 @@ func TestStreamListener_MessagesReceivedTrace(t *testing.T) {
 		func(rawtopicreader.PartitionSessionID, error) {},
 		listener.tracer,
 		listener.listenerID,
+		nil,
+		nil,
+		nil,
 	)
 	listener.workers[session.StreamPartitionSessionID] = worker
 
@@ -73,7 +76,7 @@ func TestStreamListener_MessagesReceivedTrace(t *testing.T) {
 		}
 	}
 
-	require.NoError(t, listener.splitAndRouteReadResponse(readResponse(1)))
+	require.NoError(t, listener.splitAndRouteReadResponse(readResponse(1), time.Time{}))
 	require.Len(t, events, 1)
 	require.Equal(t, "configured:2135", events[0].Endpoint)
 	require.Equal(t, "/local", events[0].Database)
@@ -83,18 +86,18 @@ func TestStreamListener_MessagesReceivedTrace(t *testing.T) {
 
 	invalidResponse := readResponse(3)
 	invalidResponse.PartitionData[0].PartitionSessionID++
-	require.Error(t, listener.splitAndRouteReadResponse(invalidResponse))
+	require.Error(t, listener.splitAndRouteReadResponse(invalidResponse, time.Time{}))
 	require.Len(t, events, 1)
 
 	worker.messageQueue.Close()
-	require.NoError(t, listener.splitAndRouteReadResponse(readResponse(5)))
+	require.NoError(t, listener.splitAndRouteReadResponse(readResponse(5), time.Time{}))
 	require.Len(t, events, 1)
 
 	<-listener.freeBytes
 	listener.m.WithLock(func() {
 		delete(listener.workers, session.StreamPartitionSessionID)
 	})
-	require.NoError(t, listener.splitAndRouteReadResponse(readResponse(7)))
+	require.NoError(t, listener.splitAndRouteReadResponse(readResponse(7), time.Time{}))
 	require.Len(t, events, 1)
 }
 
@@ -175,7 +178,7 @@ func TestStreamListener_MessagesReceivedTraceOwnsBatchMetadata(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, time.Time{})
 	}()
 	select {
 	case err := <-routeDone:
@@ -225,7 +228,7 @@ func TestStreamListener_WorkerCreationAndRouting(t *testing.T) {
 			Start: 5,
 			End:   15,
 		},
-	})
+	}, time.Time{})
 	require.NoError(t, err)
 
 	// Should have created a worker
@@ -284,7 +287,7 @@ func TestStreamListener_RoutingToExistingWorker(t *testing.T) {
 			Start: 5,
 			End:   15,
 		},
-	})
+	}, time.Time{})
 	require.NoError(t, err)
 	require.Len(t, listener.workers, 1)
 
@@ -316,7 +319,7 @@ func TestStreamListener_RoutingToExistingWorker(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, time.Time{})
 	require.NoError(t, err)
 
 	// Should still have exactly one worker
@@ -373,7 +376,7 @@ func TestStreamListener_CloseWorkers(t *testing.T) {
 			Start: 5,
 			End:   15,
 		},
-	})
+	}, time.Time{})
 	require.NoError(t, err)
 	require.Len(t, listener.workers, 1)
 
@@ -477,7 +480,7 @@ func TestStreamListener_ReadResponseReturnsCreditWhenWorkerMissing(t *testing.T)
 				},
 			},
 		},
-	})
+	}, time.Time{})
 	require.NoError(t, err)
 
 	select {
@@ -564,7 +567,7 @@ func TestStreamListener_ReadResponseReturnsCreditAfterWorkerProcessing(t *testin
 			Start: 5,
 			End:   15,
 		},
-	}))
+	}, time.Time{}))
 
 	require.NoError(t, listener.routeMessage(ctx, &rawtopicreader.ReadResponse{
 		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
@@ -590,7 +593,7 @@ func TestStreamListener_ReadResponseReturnsCreditAfterWorkerProcessing(t *testin
 				},
 			},
 		},
-	}))
+	}, time.Time{}))
 
 	xtest.WaitChannelClosed(t, handlerDone)
 
@@ -641,7 +644,7 @@ func TestStreamListener_ReadResponseConversionError(t *testing.T) {
 		PartitionData: []rawtopicreader.PartitionData{
 			{PartitionSessionID: 100},
 		},
-	})
+	}, time.Time{})
 	require.Error(t, err)
 }
 
@@ -684,7 +687,7 @@ func TestStreamListener_RouteStopPartitionToExistingWorker(t *testing.T) {
 			Start: 5,
 			End:   15,
 		},
-	}))
+	}, time.Time{}))
 
 	require.NoError(t, listener.routeMessage(ctx, &rawtopicreader.StopPartitionSessionRequest{
 		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
@@ -693,7 +696,7 @@ func TestStreamListener_RouteStopPartitionToExistingWorker(t *testing.T) {
 		PartitionSessionID: 100,
 		Graceful:           true,
 		CommittedOffset:    rawtopiccommon.NewOffset(20),
-	}))
+	}, time.Time{}))
 
 	xtest.WaitChannelClosed(t, stopHandled)
 }

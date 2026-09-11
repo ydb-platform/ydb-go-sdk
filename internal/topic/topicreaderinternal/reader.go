@@ -89,9 +89,8 @@ func NewReader(
 	}
 
 	readerID := topicreadercommon.NextReaderID()
-	if cfg.ReaderInfo.ReaderName == nil || *cfg.ReaderInfo.ReaderName == "" {
-		name := fmt.Sprintf("reader-%d", readerID)
-		cfg.ReaderInfo.ReaderName = &name
+	if cfg.ReaderInfo.ReaderName == "" {
+		cfg.ReaderInfo.ReaderName = fmt.Sprintf("reader-%d", readerID)
 	}
 
 	metricsSource, metricsSourceDone := setupReaderMetricsSource(&cfg)
