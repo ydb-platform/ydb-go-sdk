@@ -135,7 +135,13 @@ func (l *GrpcStopper) intercept(method string, call func() error) error {
 	}()
 	select {
 	case <-stopChannel:
-		return l.stopError
+		// Preserve a completed result when both channels are ready.
+		select {
+		case err := <-resChan:
+			return err
+		default:
+			return l.stopError
+		}
 	case err := <-resChan:
 		return err
 	}

@@ -28,9 +28,19 @@ func TestStatusFromErr(t *testing.T) {
 			expected: StatusError,
 		},
 		{
-			name:     "TransportError returns StatusError",
+			name:     "TransportError UNAVAILABLE returns StatusError",
 			err:      xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "unavailable")),
 			expected: StatusError,
+		},
+		{
+			name:     "TransportError RESOURCE_EXHAUSTED returns StatusUnknown",
+			err:      xerrors.Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "")),
+			expected: StatusUnknown,
+		},
+		{
+			name:     "TransportError OUT_OF_RANGE returns StatusUnknown",
+			err:      xerrors.Transport(grpcStatus.Error(grpcCodes.OutOfRange, "")),
+			expected: StatusUnknown,
 		},
 		{
 			name:     "UnknownError returns StatusUnknown",

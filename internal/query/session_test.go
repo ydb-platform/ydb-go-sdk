@@ -48,15 +48,6 @@ func TestSessionBeginLazyTxDeadSession(t *testing.T) {
 	require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION))
 }
 
-func TestSessionResourceExhaustedKeepsAlive(t *testing.T) {
-	s := &Session{Core: &sessionCore{}}
-	s.SetStatus(StatusInUse)
-
-	s.onSessionError(xerrors.Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "retry operation")))
-
-	require.True(t, s.IsAlive())
-}
-
 func TestSessionOnErrorRespectsDeletionPolicy(t *testing.T) {
 	testErrors := []error{
 		errors.New("user error"),
