@@ -401,6 +401,11 @@ func (p *Pool[PT, T]) try(ctx context.Context,
 		}()
 	}
 
+	defer func() {
+		p.applyBatchStats(batchChanges)
+		*batchChanges = dynamicStats{}
+	}()
+
 	info, err := p.getItem(ctx, batchChanges)
 	if err != nil {
 		if isRetriable(err) {

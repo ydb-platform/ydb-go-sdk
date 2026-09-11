@@ -80,6 +80,28 @@ func TestPoolCreateItemPublishesInProgressStats(t *testing.T) {
 	require.NoError(t, item.Close(t.Context()))
 }
 
+func TestPoolTryPublishesReturnedItemStats(t *testing.T) {
+	var stats Stats
+	p := mustNewPool(t,
+		WithLimit[*testItem](1),
+		WithTrace(&Trace[*testItem, testItem]{
+			OnChange: func(s Stats) {
+				stats = s
+			},
+		}),
+	)
+	defer mustClose(t, p)
+
+	retryErr := grpcStatus.Error(grpcCodes.ResourceExhausted, "retry operation")
+	var batchChanges dynamicStats
+	err := p.try(t.Context(), func(context.Context, *testItem) error {
+		return retryErr
+	}, &batchChanges)
+	require.ErrorIs(t, err, retryErr)
+	assert.Equal(t, 1, stats.Idle, "Idle")
+	assert.Equal(t, 0, stats.InUse, "InUse")
+}
+
 type testItem struct {
 	v int32
 
