@@ -38,6 +38,7 @@ type Reader struct {
 	defaultBatchConfig ReadMessageBatchOptions
 	tracer             *trace.Topic
 	readerID           int64
+	readerInfo         topicreadercommon.ReaderInfo
 }
 
 func (r *Reader) TopicOnReaderStart(consumer string, err error) {
@@ -88,6 +89,11 @@ func NewReader(
 	}
 
 	readerID := topicreadercommon.NextReaderID()
+	if cfg.ReaderInfo.ReaderName == "" {
+		cfg.ReaderInfo.ReaderName = fmt.Sprintf("reader-%d", readerID)
+	}
+
+	metricsSource, metricsSourceDone := setupReaderMetricsSource(&cfg)
 
 	readerConnector := func(ctx context.Context) (batchedStreamReader, error) {
 		stream, err := connector(ctx, readerID, cfg.Trace)
@@ -105,6 +111,9 @@ func NewReader(
 		cfg.OperationTimeout(),
 		cfg.RetrySettings,
 		cfg.Trace,
+		cfg.ReaderInfo,
+		metricsSource,
+		metricsSourceDone,
 	)
 
 	res := Reader{
@@ -112,9 +121,30 @@ func NewReader(
 		defaultBatchConfig: cfg.DefaultBatchConfig,
 		tracer:             cfg.Trace,
 		readerID:           readerID,
+		readerInfo:         cfg.ReaderInfo,
 	}
 
 	return res, nil
+}
+
+func setupReaderMetricsSource(cfg *ReaderConfig) (*topicreadercommon.ReaderMetricsSource, func()) {
+	if cfg.Trace == nil || cfg.Trace.OnReaderMetricsSource == nil {
+		return nil, nil
+	}
+
+	metricsSource := topicreadercommon.NewReaderMetricsSource()
+	cfg.MetricsSource = metricsSource
+	metricsSourceDone := gtrace.TopicOnReaderMetricsSource(
+		cfg.Trace,
+		cfg.ReaderInfo.Endpoint,
+		cfg.ReaderInfo.Database,
+		cfg.ReaderInfo.Consumer,
+		cfg.ReaderInfo.ReaderName,
+		cfg.ReaderInfo.Listener,
+		metricsSource,
+	)
+
+	return metricsSource, metricsSourceDone
 }
 
 func (r *Reader) WaitInit(ctx context.Context) error {
@@ -148,7 +178,13 @@ func (r *Reader) PopBatchTx(
 ) (*topicreadercommon.PublicBatch, error) {
 	batchOptions := r.getBatchOptions(opts)
 
-	return r.reader.PopMessagesBatchTx(ctx, tx, batchOptions)
+	batch, err := r.reader.PopMessagesBatchTx(ctx, tx, batchOptions)
+	if err != nil {
+		return nil, err
+	}
+	r.traceMessagesDelivered(ctx, batch)
+
+	return batch, nil
 }
 
 // ReadMessage read exactly one message
@@ -185,9 +221,24 @@ func (r *Reader) ReadMessageBatch(
 		// if batch context is canceled - do not return it to client
 		// and read next batch
 		if batch.Context().Err() == nil {
+			r.traceMessagesDelivered(ctx, batch)
+
 			return batch, nil
 		}
 	}
+}
+
+func (r *Reader) traceMessagesDelivered(ctx context.Context, batch *topicreadercommon.PublicBatch) {
+	if batch == nil || len(batch.Messages) == 0 {
+		return
+	}
+	topicreadercommon.TraceMessagesDelivered(
+		ctx,
+		r.tracer,
+		r.readerInfo,
+		batch.Topic(),
+		len(batch.Messages),
+	)
 }
 
 func (r *Reader) getBatchOptions(opts []PublicReadBatchOption) ReadMessageBatchOptions {
@@ -274,6 +325,12 @@ func WithCredentials(cred credentials.Credentials) PublicReaderOption {
 	}
 }
 
+func WithReaderInfo(readerInfo topicreadercommon.ReaderInfo) PublicReaderOption {
+	return func(cfg *ReaderConfig) {
+		cfg.ReaderInfo = readerInfo
+	}
+}
+
 func WithTrace(tracer *trace.Topic) PublicReaderOption {
 	return func(cfg *ReaderConfig) {
 		cfg.Trace = gtrace.Compose(cfg.Trace, tracer)
@@ -286,7 +343,7 @@ func convertNewParamsToStreamConfig(
 	opts ...PublicReaderOption,
 ) (cfg ReaderConfig) {
 	cfg.topicStreamReaderConfig = newTopicStreamReaderConfig()
-	cfg.Consumer = consumer
+	cfg.ReaderInfo.Consumer = consumer
 
 	// make own copy, for prevent changing internal states if readSelectors will change outside
 	cfg.ReadSelectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))

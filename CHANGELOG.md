@@ -1,3 +1,12 @@
+* Added topic reader and listener metrics for message flow, session errors,
+  commit progress, local ownership, and read-ahead credit balance; bumped the
+  metrics observability chain to `ydb-sdk-metrics/0.3.0`; received bytes and
+  commit counters use exact `Add(int64)` batching, while message and
+  session-error counters retain `Inc()` compatibility; added optional
+  observable gauges for buffer age, commit lag, and active partition sessions.
+  See
+  [METRICS.md](METRICS.md).
+
 * Fixed session invalidation to follow the shared error policy for Query Service and Table API requests executed through Query Service, preserving sessions after gRPC `RESOURCE_EXHAUSTED` and `OUT_OF_RANGE`
 
 ## v3.151.2

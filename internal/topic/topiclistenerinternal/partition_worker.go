@@ -59,16 +59,20 @@ type WorkerStoppedCallback func(sessionID rawtopicreader.PartitionSessionID, rea
 
 // PartitionWorker processes messages for a single partition
 type PartitionWorker struct {
-	partitionSessionID rawtopicreader.PartitionSessionID
-	partitionSession   *topicreadercommon.PartitionSession
-	messageSender      MessageSender
-	readBufferReleaser ReadBufferReleaser
-	userHandler        EventHandler
-	onStopped          WorkerStoppedCallback
+	partitionSessionID   rawtopicreader.PartitionSessionID
+	partitionSession     *topicreadercommon.PartitionSession
+	messageSender        MessageSender
+	readBufferReleaser   ReadBufferReleaser
+	metricsSource        *topicreadercommon.ReaderMetricsSource
+	reserveLocalBufferFn func(topic string, messagesCount int) bool
+	releaseLocalBufferFn func(topic string, messagesCount int)
+	userHandler          EventHandler
+	onStopped            WorkerStoppedCallback
 
 	// Tracing and logging fields
 	tracer     *trace.Topic
 	listenerID string
+	readerInfo topicreadercommon.ReaderInfo
 
 	messageQueue *xsync.UnboundedChan[unifiedMessage]
 	bgWorker     *background.Worker
@@ -86,23 +90,31 @@ func NewPartitionWorker[T interface {
 	onStopped WorkerStoppedCallback,
 	tracer *trace.Topic,
 	listenerID string,
+	metricsSource *topicreadercommon.ReaderMetricsSource,
+	reserveLocalBuffer func(topic string, messagesCount int) bool,
+	releaseLocalBuffer func(topic string, messagesCount int),
 ) *PartitionWorker {
 	// Validate required parameters
 	if userHandler == nil {
 		panic("userHandler cannot be nil")
 	}
 
-	return &PartitionWorker{
-		partitionSessionID: sessionID,
-		partitionSession:   session,
-		messageSender:      messageSender,
-		readBufferReleaser: messageSender,
-		userHandler:        userHandler,
-		onStopped:          onStopped,
-		tracer:             tracer,
-		listenerID:         listenerID,
-		messageQueue:       xsync.NewUnboundedChan[unifiedMessage](),
+	worker := &PartitionWorker{
+		partitionSessionID:   sessionID,
+		partitionSession:     session,
+		messageSender:        messageSender,
+		readBufferReleaser:   messageSender,
+		metricsSource:        metricsSource,
+		reserveLocalBufferFn: reserveLocalBuffer,
+		releaseLocalBufferFn: releaseLocalBuffer,
+		userHandler:          userHandler,
+		onStopped:            onStopped,
+		tracer:               tracer,
+		listenerID:           listenerID,
+		messageQueue:         xsync.NewUnboundedChan[unifiedMessage](),
 	}
+
+	return worker
 }
 
 // Start begins processing messages for this partition
@@ -125,10 +137,34 @@ func (w *PartitionWorker) Start(ctx context.Context) {
 }
 
 // AddUnifiedMessage adds a unified message to the processing queue
-func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) {
-	if !w.messageQueue.SendWithMerge(msg, w.tryMergeMessages) {
+func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) bool {
+	var localBufferTopic string
+	var localBufferMessages int
+	if msg.BatchMessage != nil && msg.BatchMessage.Batch != nil {
+		localBufferTopic = w.partitionSession.Topic
+		if session := topicreadercommon.BatchGetPartitionSession(msg.BatchMessage.Batch); session != nil {
+			localBufferTopic = session.Topic
+		}
+		localBufferMessages = len(msg.BatchMessage.Batch.Messages)
+	}
+
+	reserved := false
+	if msg.BatchMessage != nil {
+		reserved = w.reserveLocalBuffer(localBufferTopic, localBufferMessages)
+	}
+
+	accepted := w.messageQueue.SendWithMerge(msg, w.tryMergeMessages)
+	if !accepted {
+		if reserved {
+			w.releaseLocalBuffer(localBufferTopic, localBufferMessages)
+		}
+		if msg.BatchMessage != nil {
+			w.releaseBatch(msg.BatchMessage.Batch)
+		}
 		w.freeBatchCredit(msg)
 	}
+
+	return accepted
 }
 
 // AddRawServerMessage sends a raw server message
@@ -140,8 +176,8 @@ func (w *PartitionWorker) AddRawServerMessage(msg rawtopicreader.ServerMessage) 
 func (w *PartitionWorker) AddMessagesBatch(
 	metadata rawtopiccommon.ServerMessageMetadata,
 	batch *topicreadercommon.PublicBatch,
-) {
-	w.AddUnifiedMessage(unifiedMessage{
+) bool {
+	return w.AddUnifiedMessage(unifiedMessage{
 		BatchMessage: &batchMessage{
 			ServerMessageMetadata: metadata,
 			Batch:                 batch,
@@ -155,6 +191,7 @@ func (w *PartitionWorker) Close(ctx context.Context, reason error) error {
 	if w.bgWorker != nil {
 		return w.bgWorker.Close(ctx, reason)
 	}
+	w.freeBufferedBatchCredits()
 
 	return nil
 }
@@ -285,6 +322,15 @@ func (w *PartitionWorker) callUserHandler(
 		"OnReadMessages",
 		messagesCount,
 	)
+	if msg.Batch != nil && messagesCount > 0 {
+		topicreadercommon.TraceMessagesDelivered(
+			ctx,
+			w.tracer,
+			w.readerInfo,
+			w.partitionSession.Topic,
+			messagesCount,
+		)
+	}
 
 	if err := w.userHandler.OnReadMessages(ctx, event); err != nil {
 		handlerErr := xerrors.WithStackTrace(err)
@@ -299,11 +345,19 @@ func (w *PartitionWorker) callUserHandler(
 }
 
 // processBatchMessage handles ready PublicBatch messages
+//
+//nolint:funlen
 func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMessage) error {
 	// Add tracing for batch processing
 	messagesCount := 0
 	if msg.Batch != nil {
 		messagesCount = len(msg.Batch.Messages)
+	}
+	batchTopic := w.partitionSession.Topic
+	if msg.Batch != nil {
+		if session := topicreadercommon.BatchGetPartitionSession(msg.Batch); session != nil {
+			batchTopic = session.Topic
+		}
 	}
 
 	traceDone := gtrace.TopicOnPartitionWorkerProcessMessage(
@@ -322,6 +376,24 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 	// Credit is tied to read/processing, not commit (protocol separates these; same as reader).
 	batchSize := batchReadBufferSize(msg.Batch)
 	defer w.readBufferReleaser.ReadBufferRelease(batchSize)
+	localBufferReleased := false
+	releaseLocalBuffer := func() {
+		if localBufferReleased {
+			return
+		}
+		localBufferReleased = true
+		w.releaseLocalBuffer(batchTopic, messagesCount)
+	}
+	batchReleased := false
+	releaseBatch := func() {
+		if batchReleased || msg.Batch == nil || w.metricsSource == nil {
+			return
+		}
+		batchReleased = true
+		w.metricsSource.ReleaseBatch(msg.Batch)
+	}
+	defer releaseLocalBuffer()
+	defer releaseBatch()
 
 	// Check for errors in the metadata
 	if err := w.validateBatchMetadata(msg); err != nil {
@@ -339,6 +411,9 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 		return err
 	}
 
+	releaseLocalBuffer()
+	releaseBatch()
+
 	// Call user handler with tracing
 	if err := w.callUserHandler(ctx, msg, commitHandler, messagesCount); err != nil {
 		traceDone(0, err)
@@ -355,8 +430,26 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 // partition queue. In-flight batch is freed by processBatchMessage defer, not here.
 func (w *PartitionWorker) freeBufferedBatchCredits() {
 	for _, msg := range w.messageQueue.DrainBuffered() {
+		if msg.BatchMessage != nil {
+			batch := msg.BatchMessage.Batch
+			if batch != nil {
+				topic := w.partitionSession.Topic
+				if session := topicreadercommon.BatchGetPartitionSession(batch); session != nil {
+					topic = session.Topic
+				}
+				w.releaseLocalBuffer(topic, len(batch.Messages))
+				w.releaseBatch(batch)
+			}
+		}
 		w.freeBatchCredit(msg)
 	}
+}
+
+func (w *PartitionWorker) releaseBatch(batch *topicreadercommon.PublicBatch) {
+	if batch == nil || w.metricsSource == nil {
+		return
+	}
+	w.metricsSource.ReleaseBatch(batch)
 }
 
 func (w *PartitionWorker) closeQueueAndFreeBufferedBatchCredits() {
@@ -369,6 +462,21 @@ func (w *PartitionWorker) freeBatchCredit(msg unifiedMessage) {
 	if msg.BatchMessage != nil {
 		w.readBufferReleaser.ReadBufferRelease(batchReadBufferSize(msg.BatchMessage.Batch))
 	}
+}
+
+func (w *PartitionWorker) reserveLocalBuffer(topic string, messagesCount int) bool {
+	if messagesCount == 0 || w.reserveLocalBufferFn == nil {
+		return false
+	}
+
+	return w.reserveLocalBufferFn(topic, messagesCount)
+}
+
+func (w *PartitionWorker) releaseLocalBuffer(topic string, messagesCount int) {
+	if messagesCount == 0 || w.releaseLocalBufferFn == nil {
+		return
+	}
+	w.releaseLocalBufferFn(topic, messagesCount)
 }
 
 // handleStartPartitionRequest processes StartPartitionSessionRequest
@@ -409,6 +517,9 @@ func (w *PartitionWorker) handleStartPartitionRequest(
 		resp.ReadOffset.HasValue = true
 	}
 	if userResp.CommitOffset != nil {
+		metricsCommittedOffset := max(w.partitionSession.CommittedOffset().ToInt64(), *userResp.CommitOffset)
+		w.partitionSession.SetInitialMetricsCommittedOffset(rawtopiccommon.NewOffset(metricsCommittedOffset))
+
 		resp.CommitOffset.Offset.FromInt64(*userResp.CommitOffset)
 		resp.CommitOffset.HasValue = true
 	}
@@ -447,6 +558,9 @@ func (w *PartitionWorker) handleStopPartitionRequest(
 			PartitionSessionID: w.partitionSession.StreamPartitionSessionID,
 		}
 		w.messageSender.SendRaw(resp)
+	}
+	if w.metricsSource != nil {
+		w.metricsSource.UnregisterPartitionSession(w.partitionSession)
 	}
 
 	return nil

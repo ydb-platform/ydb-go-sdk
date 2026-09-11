@@ -3,6 +3,7 @@ package topiclistenerinternal
 import (
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -10,13 +11,15 @@ import (
 )
 
 type StreamListenerConfig struct {
+	topicreadercommon.ReaderInfo
+
 	BufferSize             int
 	Decoders               *topicreadercommon.MultiDecoder
 	Selectors              []*topicreadercommon.PublicReadSelector
-	Consumer               string
 	ConnectWithoutConsumer bool
 	readerID               int64
 	Tracer                 *trace.Topic
+	metricsSource          *topicreadercommon.ReaderMetricsSource
 }
 
 func NewStreamListenerConfig() StreamListenerConfig {
@@ -24,9 +27,16 @@ func NewStreamListenerConfig() StreamListenerConfig {
 		BufferSize: topicreadercommon.DefaultBufferSize,
 		Decoders:   topicreadercommon.NewMultiDecoder(),
 		Selectors:  nil,
-		Consumer:   "",
 		readerID:   topicreadercommon.NextReaderID(),
 		Tracer:     &trace.Topic{},
+	}
+}
+
+// EnsureReaderName assigns the process-local default after all options have
+// been applied. An explicitly empty option is equivalent to leaving it unset.
+func (cfg *StreamListenerConfig) EnsureReaderName() {
+	if cfg.ReaderName == "" {
+		cfg.ReaderName = "reader-" + strconv.FormatInt(cfg.readerID, 10)
 	}
 }
 

@@ -282,9 +282,9 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 		<-stream1Ready
 
 		// skip bad (old) stream
-		reconnector.reconnectFromBadStream <- newReconnectRequest(NewMockbatchedStreamReader(mc), nil)
+		reconnector.reconnectFromBadStream <- newReconnectRequest(NewMockbatchedStreamReader(mc))
 
-		reconnector.reconnectFromBadStream <- newReconnectRequest(newStream1, nil)
+		reconnector.reconnectFromBadStream <- newReconnectRequest(newStream1)
 
 		<-stream2Ready
 
@@ -343,6 +343,64 @@ func TestTopicReaderReconnectorStart(t *testing.T) {
 
 	<-connectionRequested
 	_ = reconnector.CloseWithError(ctx, nil)
+}
+
+func TestTopicReaderReconnectorMetricsSourceDoneCanCloseReader(t *testing.T) {
+	var reconnector *readerReconnector
+	metricsDone := make(chan struct{})
+	reconnector = &readerReconnector{
+		background:    *background.NewWorker(context.Background(), "metrics-source-reentrant-close"),
+		metricsSource: topicreadercommon.NewReaderMetricsSource(),
+		metricsSourceDone: func() {
+			close(metricsDone)
+			_ = reconnector.CloseWithError(context.Background(), errors.New("reentrant close"))
+		},
+		tracer: &trace.Topic{},
+	}
+	reconnector.initChannelsAndClock()
+	reconnector.background.Start("reconnection-loop", reconnector.reconnectionLoop)
+
+	closeResult := make(chan error, 1)
+	go func() {
+		closeResult <- reconnector.CloseWithError(context.Background(), errors.New("explicit close"))
+	}()
+
+	select {
+	case err := <-closeResult:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("reader close did not complete after reentrant metrics callback")
+	}
+	select {
+	case <-metricsDone:
+	case <-time.After(time.Second):
+		t.Fatal("reader metrics source done callback was not called")
+	}
+}
+
+func TestTopicReaderReconnectorHandlePanicClosesMetricsSource(t *testing.T) {
+	metricsDone := make(chan struct{})
+	var reconnector *readerReconnector
+	reconnector = &readerReconnector{
+		background:    *background.NewWorker(context.Background(), "metrics-source-panic"),
+		metricsSource: topicreadercommon.NewReaderMetricsSource(),
+		metricsSourceDone: func() {
+			close(metricsDone)
+			_ = reconnector.CloseWithError(context.Background(), errors.New("reentrant close"))
+		},
+		tracer: &trace.Topic{},
+	}
+	reconnector.initChannelsAndClock()
+	reconnector.background.Start("panic-worker", func(context.Context) {
+		defer reconnector.handlePanic()
+		panic("test panic")
+	})
+
+	select {
+	case <-metricsDone:
+	case <-time.After(time.Second):
+		t.Fatal("metrics source was not closed after reconnection worker panic")
+	}
 }
 
 func TestTopicReaderReconnectorWaitInit(t *testing.T) {
@@ -494,7 +552,7 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 	fillChannel:
 		for {
 			select {
-			case reconnector.reconnectFromBadStream <- newReconnectRequest(nil, nil):
+			case reconnector.reconnectFromBadStream <- newReconnectRequest(nil):
 				// repeat
 			default:
 				break fillChannel
@@ -520,7 +578,7 @@ func TestTopicReaderReconnectorReconnectWithError(t *testing.T) {
 		tracer:    &trace.Topic{},
 	}
 	reconnector.initChannelsAndClock()
-	err := reconnector.reconnect(ctx, errors.New("test-reconnect"), nil)
+	err := reconnector.reconnect(ctx, errors.New("test-reconnect"), nil, true)
 	require.ErrorIs(t, err, testErr)
 	require.ErrorIs(t, reconnector.streamErr, testErr)
 }

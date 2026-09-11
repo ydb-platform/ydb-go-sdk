@@ -471,8 +471,9 @@ func buildPackage(
 				continue
 			}
 			t.Hooks = append(t.Hooks, Hook{
-				Name: name,
-				Func: f,
+				Name:     name,
+				Func:     f,
+				Optional: strings.Contains(field.Doc.Text(), "gtrace:optional"),
 			})
 		}
 	}
@@ -569,8 +570,9 @@ type Trace struct {
 func (*Trace) isFuncResult() bool { return true }
 
 type Hook struct {
-	Name string
-	Func *Func
+	Name     string
+	Func     *Func
+	Optional bool
 }
 
 type Param struct {

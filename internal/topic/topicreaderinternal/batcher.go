@@ -53,6 +53,49 @@ func (b *batcher) Close(err error) error {
 	return nil
 }
 
+// Drain removes all queued items and returns them to the owner.
+// Callers must release any resources associated with returned batches outside
+// the batcher mutex.
+func (b *batcher) Drain() []batcherMessageOrderItem {
+	messages := b.detachMessages()
+
+	var res []batcherMessageOrderItem
+	for _, items := range messages {
+		res = append(res, items...)
+	}
+
+	return res
+}
+
+func (b *batcher) detachMessages() batcherMessagesMap {
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	messages := b.messages
+	b.messages = make(batcherMessagesMap)
+	b.sessionsForFlush = nil
+
+	return messages
+}
+
+func (b *batcher) DrainPartitionSession(session *topicreadercommon.PartitionSession) []batcherMessageOrderItem {
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	items := b.messages[session]
+	delete(b.messages, session)
+
+	for i := range b.sessionsForFlush {
+		if b.sessionsForFlush[i] == session {
+			b.sessionsForFlush = append(b.sessionsForFlush[:i], b.sessionsForFlush[i+1:]...)
+
+			break
+		}
+	}
+
+	return items
+}
+
 func (b *batcher) PushBatches(batches ...*topicreadercommon.PublicBatch) error {
 	b.m.Lock()
 	defer b.m.Unlock()

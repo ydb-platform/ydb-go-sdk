@@ -11,6 +11,14 @@ import (
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type ListenerOption func(cfg *topiclistenerinternal.StreamListenerConfig)
 
+// WithListenerName sets the stable name used to identify this listener in metrics.
+// If omitted or empty, the SDK assigns a process-local name in the form reader-N.
+func WithListenerName(name string) ListenerOption {
+	return func(cfg *topiclistenerinternal.StreamListenerConfig) {
+		cfg.ReaderName = name
+	}
+}
+
 // WithListenerBufferSizeBytes sets size of the internal read-ahead buffer in bytes.
 // Flow control matches topic reader: one shared BufferSize limits in-flight data
 // across all partitions. Default value is the same as for topic reader: 1 MiB.

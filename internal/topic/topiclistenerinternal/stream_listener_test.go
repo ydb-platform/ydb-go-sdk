@@ -17,7 +17,179 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestStreamListener_MessagesReceivedTrace(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+	session := PartitionSession(e)
+	session.Topic = "/local/topic"
+	listener.cfg = &StreamListenerConfig{
+		Decoders: topicreadercommon.NewMultiDecoder(),
+		ReaderInfo: topicreadercommon.ReaderInfo{
+			Endpoint: "configured:2135",
+			Database: "/local",
+			Consumer: "consumer",
+		},
+	}
+
+	var events []trace.TopicReaderMessagesReceivedInfo
+	listener.tracer = &trace.Topic{
+		OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
+			events = append(events, info)
+		},
+	}
+	listener.stream = StreamMock(e)
+
+	worker := NewPartitionWorker(
+		session.StreamPartitionSessionID,
+		session,
+		listener,
+		EventHandlerMock(e),
+		func(rawtopicreader.PartitionSessionID, error) {},
+		listener.tracer,
+		listener.listenerID,
+		nil,
+		nil,
+		nil,
+	)
+	listener.workers[session.StreamPartitionSessionID] = worker
+
+	readResponse := func(firstOffset int64) *rawtopicreader.ReadResponse {
+		return &rawtopicreader.ReadResponse{
+			BytesSize: 2,
+			PartitionData: []rawtopicreader.PartitionData{
+				{
+					PartitionSessionID: session.StreamPartitionSessionID,
+					Batches: []rawtopicreader.Batch{
+						{
+							Codec: rawtopiccommon.CodecRaw,
+							MessageData: []rawtopicreader.MessageData{
+								{Offset: rawtopiccommon.Offset(firstOffset)},
+								{Offset: rawtopiccommon.Offset(firstOffset + 1)},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	require.NoError(t, listener.splitAndRouteReadResponse(readResponse(1), time.Time{}))
+	require.Len(t, events, 1)
+	require.Equal(t, "configured:2135", events[0].Endpoint)
+	require.Equal(t, "/local", events[0].Database)
+	require.Equal(t, "/local/topic", events[0].Topic)
+	require.Equal(t, "consumer", events[0].Consumer)
+	require.Equal(t, 2, events[0].MessagesCount)
+
+	invalidResponse := readResponse(3)
+	invalidResponse.PartitionData[0].PartitionSessionID++
+	require.Error(t, listener.splitAndRouteReadResponse(invalidResponse, time.Time{}))
+	require.Len(t, events, 1)
+
+	worker.messageQueue.Close()
+	require.NoError(t, listener.splitAndRouteReadResponse(readResponse(5), time.Time{}))
+	require.Len(t, events, 1)
+
+	<-listener.freeBytes
+	listener.m.WithLock(func() {
+		delete(listener.workers, session.StreamPartitionSessionID)
+	})
+	require.NoError(t, listener.splitAndRouteReadResponse(readResponse(7), time.Time{}))
+	require.Len(t, events, 1)
+}
+
+func TestStreamListener_MessagesReceivedTraceOwnsBatchMetadata(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	testCtx, cancel := context.WithTimeout(ctx, time.Second)
+	listener := StreamListener(e)
+	session := PartitionSession(e)
+	session.Topic = "/local/topic"
+	listener.cfg = &StreamListenerConfig{
+		Decoders: topicreadercommon.NewMultiDecoder(),
+		ReaderInfo: topicreadercommon.ReaderInfo{
+			Endpoint: "configured:2135",
+			Database: "/local",
+			Consumer: "consumer",
+		},
+	}
+
+	batchMutated := make(chan struct{})
+	traceInfoReceived := make(chan struct{})
+	var traceInfo trace.TopicReaderMessagesReceivedInfo
+	listener.tracer = &trace.Topic{
+		OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
+			// The listener must have copied the metadata before handing the batch
+			// to the worker. Waiting here makes the handoff and user mutation real
+			// without relying on scheduler timing.
+			select {
+			case <-batchMutated:
+			case <-testCtx.Done():
+				return
+			}
+			traceInfo = info
+			close(traceInfoReceived)
+		},
+	}
+
+	EventHandlerMock(e).EXPECT().OnReadMessages(
+		gomock.Any(),
+		gomock.Any(),
+	).DoAndReturn(func(_ context.Context, event *PublicReadMessages) error {
+		event.Batch.Messages = nil
+		close(batchMutated)
+		select {
+		case <-traceInfoReceived:
+		case <-testCtx.Done():
+			return testCtx.Err()
+		}
+
+		return nil
+	})
+
+	listener.createWorkerForPartition(session)
+	defer func() {
+		cancel()
+		_ = listener.Close(ctx, errors.New("test finished"))
+	}()
+
+	const messagesCount = 2
+	routeDone := make(chan error, 1)
+	go func() {
+		routeDone <- listener.splitAndRouteReadResponse(&rawtopicreader.ReadResponse{
+			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
+				Status: rawydb.StatusSuccess,
+			},
+			BytesSize: messagesCount,
+			PartitionData: []rawtopicreader.PartitionData{
+				{
+					PartitionSessionID: session.StreamPartitionSessionID,
+					Batches: []rawtopicreader.Batch{
+						{
+							Codec: rawtopiccommon.CodecRaw,
+							MessageData: []rawtopicreader.MessageData{
+								{Offset: 1, Data: []byte("a"), UncompressedSize: 1},
+								{Offset: 2, Data: []byte("b"), UncompressedSize: 1},
+							},
+						},
+					},
+				},
+			},
+		}, time.Time{})
+	}()
+	select {
+	case err := <-routeDone:
+		require.NoError(t, err)
+	case <-testCtx.Done():
+		t.Fatalf("timed out waiting for listener route: %v", testCtx.Err())
+	}
+
+	require.Equal(t, "/local/topic", traceInfo.Topic)
+	require.Equal(t, messagesCount, traceInfo.MessagesCount)
+}
 
 func TestStreamListener_WorkerCreationAndRouting(t *testing.T) {
 	e := fixenv.New(t)
@@ -56,7 +228,7 @@ func TestStreamListener_WorkerCreationAndRouting(t *testing.T) {
 			Start: 5,
 			End:   15,
 		},
-	})
+	}, time.Time{})
 	require.NoError(t, err)
 
 	// Should have created a worker
@@ -115,7 +287,7 @@ func TestStreamListener_RoutingToExistingWorker(t *testing.T) {
 			Start: 5,
 			End:   15,
 		},
-	})
+	}, time.Time{})
 	require.NoError(t, err)
 	require.Len(t, listener.workers, 1)
 
@@ -147,7 +319,7 @@ func TestStreamListener_RoutingToExistingWorker(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, time.Time{})
 	require.NoError(t, err)
 
 	// Should still have exactly one worker
@@ -204,7 +376,7 @@ func TestStreamListener_CloseWorkers(t *testing.T) {
 			Start: 5,
 			End:   15,
 		},
-	})
+	}, time.Time{})
 	require.NoError(t, err)
 	require.Len(t, listener.workers, 1)
 
@@ -308,7 +480,7 @@ func TestStreamListener_ReadResponseReturnsCreditWhenWorkerMissing(t *testing.T)
 				},
 			},
 		},
-	})
+	}, time.Time{})
 	require.NoError(t, err)
 
 	select {
@@ -395,7 +567,7 @@ func TestStreamListener_ReadResponseReturnsCreditAfterWorkerProcessing(t *testin
 			Start: 5,
 			End:   15,
 		},
-	}))
+	}, time.Time{}))
 
 	require.NoError(t, listener.routeMessage(ctx, &rawtopicreader.ReadResponse{
 		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
@@ -421,7 +593,7 @@ func TestStreamListener_ReadResponseReturnsCreditAfterWorkerProcessing(t *testin
 				},
 			},
 		},
-	}))
+	}, time.Time{}))
 
 	xtest.WaitChannelClosed(t, handlerDone)
 
@@ -472,7 +644,7 @@ func TestStreamListener_ReadResponseConversionError(t *testing.T) {
 		PartitionData: []rawtopicreader.PartitionData{
 			{PartitionSessionID: 100},
 		},
-	})
+	}, time.Time{})
 	require.Error(t, err)
 }
 
@@ -515,7 +687,7 @@ func TestStreamListener_RouteStopPartitionToExistingWorker(t *testing.T) {
 			Start: 5,
 			End:   15,
 		},
-	}))
+	}, time.Time{}))
 
 	require.NoError(t, listener.routeMessage(ctx, &rawtopicreader.StopPartitionSessionRequest{
 		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
@@ -524,7 +696,7 @@ func TestStreamListener_RouteStopPartitionToExistingWorker(t *testing.T) {
 		PartitionSessionID: 100,
 		Graceful:           true,
 		CommittedOffset:    rawtopiccommon.NewOffset(20),
-	}))
+	}, time.Time{}))
 
 	xtest.WaitChannelClosed(t, stopHandled)
 }
