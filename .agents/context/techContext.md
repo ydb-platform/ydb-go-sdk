@@ -59,6 +59,8 @@ Stress a single flaky integration test: add `-count=N -run 'TestName$'` to the `
 | `slo.yml` | push/PR + manual | SLO benchmarks (active in go-sdk) |
 | `publish.yml` | manual | version bump + release |
 
+The `SLO` label is added **manually by a developer**, only after all other review feedback and failing tests have been addressed. Agents must not add it automatically, even if `check-slo-label` fails. See [the SLO label rule](../rules/workflow.md#slo-label-developer-only).
+
 ## PR labels that skip CI gates
 
 `no lint`, `no tests`, `no integration tests`, `no changelog`, `no examples`, `broken changes`
