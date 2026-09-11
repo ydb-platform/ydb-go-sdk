@@ -402,7 +402,7 @@ func StatusFromErr(err error) Status {
 	}
 
 	switch {
-	case xerrors.IsTransportError(err):
+	case xerrors.IsTransportError(err) && xerrors.MustDeleteTableOrQuerySession(err):
 		return StatusError
 	case xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_BUSY):
 		return StatusError
