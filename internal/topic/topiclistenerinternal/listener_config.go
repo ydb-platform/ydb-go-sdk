@@ -4,12 +4,17 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jonboulle/clockwork"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type StreamListenerConfig struct {
+	RetrySettings          topic.RetrySettings
+	clock                  clockwork.Clock
 	BufferSize             int
 	Decoders               *topicreadercommon.MultiDecoder
 	Selectors              []*topicreadercommon.PublicReadSelector
@@ -21,12 +26,14 @@ type StreamListenerConfig struct {
 
 func NewStreamListenerConfig() StreamListenerConfig {
 	return StreamListenerConfig{
-		BufferSize: topicreadercommon.DefaultBufferSize,
-		Decoders:   topicreadercommon.NewMultiDecoder(),
-		Selectors:  nil,
-		Consumer:   "",
-		readerID:   topicreadercommon.NextReaderID(),
-		Tracer:     &trace.Topic{},
+		RetrySettings: topic.RetrySettings{StartTimeout: topic.DefaultStartTimeout},
+		clock:         clockwork.NewRealClock(),
+		BufferSize:    topicreadercommon.DefaultBufferSize,
+		Decoders:      topicreadercommon.NewMultiDecoder(),
+		Selectors:     nil,
+		Consumer:      "",
+		readerID:      topicreadercommon.NextReaderID(),
+		Tracer:        &trace.Topic{},
 	}
 }
 

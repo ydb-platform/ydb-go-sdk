@@ -999,6 +999,32 @@ func TestPartitionWorkerImpl_ContextCancellation(t *testing.T) {
 	require.Contains(t, (*errPtr).Error(), "graceful shutdown PartitionWorker")
 }
 
+// Requirement 3: queued messages must not reach the handler after session cancellation.
+func TestPartitionWorkerImpl_ContextCancellationWithQueuedBatch(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+
+	handler := NewMockEventHandler(gomock.NewController(t))
+	handler.EXPECT().OnReadMessages(gomock.Any(), gomock.Any()).Times(0)
+
+	worker := NewPartitionWorker(
+		123,
+		createTestPartitionSession(),
+		newMockMessageSender(),
+		handler,
+		func(rawtopicreader.PartitionSessionID, error) {},
+		&trace.Topic{},
+		"test-listener",
+	)
+	worker.AddMessagesBatch(
+		rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+		createTestBatch(),
+	)
+
+	cancel()
+	worker.receiveMessagesLoop(ctx)
+}
+
 func TestPartitionWorkerImpl_PanicRecovery(t *testing.T) {
 	ctx := xtest.Context(t)
 	ctrl := gomock.NewController(t)

@@ -8,6 +8,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 var (
@@ -81,20 +83,89 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 	return errors.Join(closeErrors...)
 }
 
-func (lr *TopicListenerReconnector) connect(connectionCtx context.Context) {
-	sl, connRes := newStreamListener(
-		connectionCtx,
-		lr.client,
-		lr.handler,
-		lr.streamConfig,
-		&lr.connectionIDCounter,
-	)
-	lr.m.Lock()
-	lr.streamListener = sl
-	lr.connectionResult = connRes
-	lr.m.Unlock()
+func (lr *TopicListenerReconnector) connect(ctx context.Context) {
+	sl, err := lr.connectStream(ctx)
+	if err != nil {
+		lr.stopWithError(ctx, err)
 
-	close(lr.connectionCompleted)
+		return
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-sl.background.StopDone():
+		}
+
+		reason := sl.background.CloseReason()
+		_ = sl.Close(ctx, reason)
+		sl, err = lr.reconnect(ctx, reason)
+		if err != nil {
+			lr.stopWithError(ctx, err)
+
+			return
+		}
+	}
+}
+
+func (lr *TopicListenerReconnector) stopWithError(ctx context.Context, reason error) {
+	ctx = context.WithoutCancel(ctx)
+	go func() {
+		_ = lr.background.Close(ctx, reason)
+	}()
+}
+
+func (lr *TopicListenerReconnector) reconnect(ctx context.Context, reason error) (*streamListener, error) {
+	clock := lr.streamConfig.clock
+	started := clock.Now()
+
+	for attempt := 0; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if transportErr := xerrors.TransportError(reason); transportErr != nil {
+			reason = transportErr
+		}
+		backoff, stopReason := topic.RetryDecision(reason, lr.streamConfig.RetrySettings, clock.Since(started))
+		if stopReason != nil {
+			return nil, stopReason
+		}
+
+		timer := clock.NewTimer(backoff.Delay(attempt))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+
+			return nil, ctx.Err()
+		case <-timer.Chan():
+			timer.Stop()
+		}
+
+		sl, err := lr.connectStream(ctx)
+		if err == nil {
+			return sl, nil
+		}
+		reason = err
+	}
+}
+
+func (lr *TopicListenerReconnector) connectStream(ctx context.Context) (*streamListener, error) {
+	sl, err := newStreamListener(ctx, lr.client, lr.handler, lr.streamConfig, &lr.connectionIDCounter)
+
+	lr.m.Lock()
+	defer lr.m.Unlock()
+
+	lr.streamListener = sl
+	select {
+	case <-lr.connectionCompleted:
+		// Initialization has already completed.
+	default:
+		lr.connectionResult = err
+		close(lr.connectionCompleted)
+	}
+
+	return sl, err
 }
 
 func (lr *TopicListenerReconnector) WaitInit(ctx context.Context) error {

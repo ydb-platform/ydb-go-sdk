@@ -34,6 +34,19 @@ func TestCommitterCommit(t *testing.T) {
 		err := c.Commit(ctx, CommitRange{})
 		require.ErrorIs(t, err, context.Canceled)
 	})
+
+	t.Run("ExpiredSession", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		committerCtx, cancelCommitter := context.WithCancel(ctx)
+		committer := NewCommitterStopped(&trace.Topic{}, committerCtx, CommitModeSync, nil)
+		session := newTestPartitionSession(ctx, 1)
+
+		cancelCommitter()
+		session.Close()
+
+		err := committer.Commit(ctx, CommitRange{PartitionSession: session})
+		require.ErrorIs(t, err, ErrPublicCommitSessionToExpiredSession)
+	})
 }
 
 func TestCommitterCommitDisabled(t *testing.T) {

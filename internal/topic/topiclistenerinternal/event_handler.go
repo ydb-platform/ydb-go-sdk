@@ -85,9 +85,10 @@ func (e *PublicReadMessages) Confirm() {
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (e *PublicReadMessages) ConfirmWithAck(ctx context.Context) error {
-	if e.committed.Swap(true) {
-		return nil
+	if e.Batch.Context().Err() != nil {
+		return topicreadercommon.ErrPublicCommitSessionToExpiredSession
 	}
+	e.committed.Store(true)
 
 	return e.commitHandler.getSyncCommitter().Commit(ctx, topicreadercommon.GetCommitRange(e.Batch))
 }

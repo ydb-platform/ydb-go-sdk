@@ -222,6 +222,12 @@ func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
 
 // processUnifiedMessage handles a single unified message by routing to appropriate processor
 func (w *PartitionWorker) processUnifiedMessage(ctx context.Context, msg unifiedMessage) error {
+	if err := ctx.Err(); err != nil {
+		w.freeBatchCredit(msg)
+
+		return err
+	}
+
 	switch {
 	case msg.RawServerMessage != nil:
 		return w.processRawServerMessage(ctx, *msg.RawServerMessage)

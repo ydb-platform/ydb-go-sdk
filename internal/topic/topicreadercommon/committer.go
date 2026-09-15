@@ -88,6 +88,9 @@ func (c *Committer) Commit(ctx context.Context, commitRange CommitRange) error {
 	if !c.mode.CommitsEnabled() {
 		return ErrCommitDisabled
 	}
+	if commitRange.PartitionSession != nil && commitRange.PartitionSession.Context().Err() != nil {
+		return ErrPublicCommitSessionToExpiredSession
+	}
 
 	if ctx.Err() != nil {
 		return ctx.Err()
