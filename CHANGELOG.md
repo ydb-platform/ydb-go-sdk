@@ -1,3 +1,5 @@
+* Fixed excessive waiter wakeups in the topic writer with `WithWriterWaitServerAck(true)`: an incoming ack now wakes only the `Write` calls whose messages were acknowledged instead of broadcasting to every concurrent waiter of the writer, reducing scheduler and lock pressure under high write concurrency
+
 ## v3.151.4
 * Fixed a data race when a streaming response contains a YDB operation error: trailers are read only after the underlying gRPC receive returns EOF or an error; stopping on a YDB operation error alone does not deliver trailer callbacks or server close hints
 

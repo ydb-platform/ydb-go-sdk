@@ -499,6 +499,91 @@ func TestQueue_Ack(t *testing.T) {
 	})
 }
 
+func TestQueue_AckNotifiesOnlyMatchingWaiter(t *testing.T) {
+	// An ack must wake only the waiters of the acked message, not every waiter of
+	// the writer (regression guard against the previous shared-broadcast wakeup).
+	q := newMessageQueue()
+	require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2)))
+
+	wOther := &ackWaiter{done: make(chan struct{})}
+	wTarget := &ackWaiter{done: make(chan struct{})}
+	q.m.WithLock(func() {
+		q.registerAckWaiterNeedLock(1, wOther)  // blocked on message order index 1
+		q.registerAckWaiterNeedLock(2, wTarget) // blocked on message order index 2
+	})
+
+	require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 2}}))
+
+	select {
+	case <-wTarget.done:
+		// expected: matching waiter notified
+	default:
+		t.Fatal("waiter of the acked message was not notified")
+	}
+
+	select {
+	case <-wOther.done:
+		t.Fatal("unrelated waiter was notified (thundering herd)")
+	default:
+		// expected: unrelated waiter untouched
+	}
+
+	q.m.WithRLock(func() {
+		_, stillWaiting := q.ackWaiters[1]
+		require.True(t, stillWaiting, "unrelated waiter must stay registered")
+		_, cleared := q.ackWaiters[2]
+		require.False(t, cleared, "acked index must be removed from waiters")
+	})
+}
+
+func TestQueue_WaitWokenOnOwnMessageAck(t *testing.T) {
+	q := newMessageQueue()
+	w1, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(1))
+	require.NoError(t, err)
+	w2, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(2))
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done1 := make(chan error, 1)
+	done2 := make(chan error, 1)
+	go func() { done1 <- q.Wait(ctx, w1) }()
+	go func() { done2 <- q.Wait(ctx, w2) }()
+
+	require.Eventually(t, func() bool {
+		var registered int
+		q.m.WithRLock(func() { registered = len(q.ackWaiters) })
+
+		return registered == 2
+	}, time.Second, time.Millisecond, "both waiters must subscribe")
+
+	// Ack only the second message: its waiter completes, the first keeps blocking.
+	require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 2}}))
+
+	select {
+	case err := <-done2:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("waiter of the acked message was not woken")
+	}
+
+	select {
+	case <-done1:
+		t.Fatal("waiter of the not-acked message returned early")
+	case <-time.After(50 * time.Millisecond):
+		// expected: still blocking
+	}
+
+	require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 1}}))
+	select {
+	case err := <-done1:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("waiter was not woken after its own message ack")
+	}
+}
+
 func waitGetMessageStarted(q *messageQueue) {
 	q.notifyNewMessages()
 	for len(q.hasNewMessages) != 0 {
