@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -274,6 +275,42 @@ func TestTopicListenerWaitStopReturnsHandlerError(t *testing.T) {
 
 	require.ErrorIs(t, listener.WaitStop(xtest.ContextWithCommonTimeout(scope.Ctx, t)), handlerErr)
 	require.NoError(t, listener.Close(scope.Ctx))
+}
+
+// WaitStop must not report shutdown while a partition callback is still running.
+func TestTopicListenerWaitStopWaitsAfterCloseDeadline(t *testing.T) {
+	scope := newScope(t)
+	require.NoError(t, scope.TopicWriter().Write(scope.Ctx, topicwriter.Message{Data: strings.NewReader("message")}))
+
+	readStarted := make(chan struct{})
+	readRelease := make(chan struct{})
+	readDone := make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(readRelease) }) }
+	defer release()
+
+	listener := scope.TopicListener(&TestTopicListener_Handler{
+		onReadMessages: func(context.Context, *topiclistener.ReadMessages) error {
+			close(readStarted)
+			<-readRelease
+			close(readDone)
+
+			return nil
+		},
+	})
+	xtest.WaitChannelClosed(t, readStarted)
+
+	closeCtx, cancelClose := context.WithTimeout(scope.Ctx, 50*time.Millisecond)
+	require.ErrorIs(t, listener.Close(closeCtx), context.DeadlineExceeded)
+	cancelClose()
+
+	waitCtx, cancelWait := context.WithTimeout(scope.Ctx, 50*time.Millisecond)
+	require.ErrorIs(t, listener.WaitStop(waitCtx), context.DeadlineExceeded)
+	cancelWait()
+
+	release()
+	xtest.WaitChannelClosed(t, readDone)
+	require.NoError(t, listener.WaitStop(xtest.ContextWithCommonTimeout(scope.Ctx, t)))
 }
 
 func TestTopicListenerCustomRetryPolicyRestartsPartition(t *testing.T) {

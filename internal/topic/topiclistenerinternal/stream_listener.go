@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -51,12 +50,27 @@ type streamListener struct {
 
 	freeBytes chan int
 
-	closing atomic.Bool
-	tracer  *trace.Topic
+	closing      atomic.Bool
+	tracer       *trace.Topic
+	shutdownDone empty.Chan
+	shutdownErr  error
 
 	m              xsync.Mutex
 	workers        map[rawtopicreader.PartitionSessionID]*PartitionWorker
+	workerStates   map[*PartitionWorker]*partitionWorkerState
 	messagesToSend []rawtopicreader.ClientMessage
+}
+
+type partitionWorkerState struct {
+	worker       *PartitionWorker
+	closeDone    empty.Chan
+	closeStarted bool
+	closeErr     error
+}
+
+type partitionWorkerCloseTask struct {
+	state    *partitionWorkerState
+	closeNow bool
 }
 
 func newStreamListener(
@@ -92,7 +106,7 @@ func newStreamListener(
 
 	if err := res.initStream(connectionCtx, client); err != nil {
 		initDone("", err)
-		res.goClose(connectionCtx, err)
+		_ = res.Close(xcontext.ValueOnly(connectionCtx), err)
 
 		return nil, err
 	}
@@ -116,73 +130,124 @@ func newStreamListener(
 }
 
 func (l *streamListener) Close(ctx context.Context, reason error) error {
-	if !l.closing.CompareAndSwap(false, true) {
-		return errTopicListenerClosed
+	done := l.beginClose(ctx, reason)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	select {
+	case <-done:
+		return l.shutdownErr
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (l *streamListener) goClose(ctx context.Context, reason error) {
+	l.beginClose(ctx, reason)
+}
+
+func (l *streamListener) beginClose(ctx context.Context, reason error) empty.Chan {
+	var done empty.Chan
+	l.m.WithLock(func() {
+		if l.shutdownDone == nil {
+			l.shutdownDone = make(empty.Chan)
+		}
+		done = l.shutdownDone
+	})
+
+	if l.closing.CompareAndSwap(false, true) {
+		go l.finishClose(xcontext.ValueOnly(ctx), reason, done)
 	}
 
+	return done
+}
+
+func (l *streamListener) finishClose(ctx context.Context, reason error, done empty.Chan) {
 	logCtx := ctx
-	closeDone := gtrace.TopicOnListenerClose(l.tracer, &logCtx, l.listenerID, l.sessionID, reason)
+	closeDone := func(int, error) {}
+	if l.tracer != nil {
+		closeDone = gtrace.TopicOnListenerClose(l.tracer, &logCtx, l.listenerID, l.sessionID, reason)
+	}
 
 	var resErrors []error
 
-	// Stop all partition workers first
-	// Copy workers to avoid holding mutex while closing them (to prevent deadlock)
-	var workers []*PartitionWorker
-	l.m.WithLock(func() {
-		workers = make([]*PartitionWorker, 0, len(l.workers))
-		for _, worker := range l.workers {
-			workers = append(workers, worker)
-		}
-	})
-
-	// Stop the read stream and background workers before closing partition workers,
-	// so receiveMessagesLoop does not route messages into shutting-down workers.
-	if l.stream != nil {
+	// Stop routing before taking ownership of the partition workers.
+	if l.streamClose != nil {
 		l.streamClose(reason)
 	}
-
-	if err := l.background.Close(ctx, reason); err != nil && !errors.Is(err, background.ErrAlreadyClosed) {
+	if err := l.background.Close(context.Background(), reason); err != nil &&
+		!errors.Is(err, background.ErrAlreadyClosed) {
 		resErrors = append(resErrors, err)
 	}
 
-	// Close workers without holding the mutex
-	for _, worker := range workers {
-		if err := worker.Close(ctx, reason); err != nil {
+	workerTasks := l.claimWorkersForClose()
+	for _, task := range workerTasks {
+		if task.closeNow {
+			l.finishWorkerClose(task.state, reason)
+		}
+		<-task.state.closeDone
+		if task.state.closeErr != nil {
+			resErrors = append(resErrors, task.state.closeErr)
+		}
+	}
+
+	if l.syncCommitter != nil {
+		if err := l.syncCommitter.Close(context.Background(), reason); err != nil &&
+			!errors.Is(err, background.ErrAlreadyClosed) {
 			resErrors = append(resErrors, err)
 		}
 	}
 
-	if err := l.syncCommitter.Close(ctx, reason); err != nil {
-		resErrors = append(resErrors, err)
+	if l.sessions != nil {
+		for _, session := range l.sessions.GetAll() {
+			session.Close()
+		}
 	}
 
-	for _, session := range l.sessions.GetAll() {
-		session.Close()
-		// For shutdown, we don't need to process stop partition requests through workers
-		// since all workers are already being closed above
-	}
-
-	finalErr := errors.Join(resErrors...)
-
-	closeDone(len(workers), finalErr)
-
-	return finalErr
+	l.shutdownErr = errors.Join(resErrors...)
+	closeDone(len(workerTasks), l.shutdownErr)
+	close(done)
 }
 
-func (l *streamListener) goClose(ctx context.Context, reason error) {
-	if l.closing.Load() || l.background.Context().Err() != nil {
-		return
+func (l *streamListener) claimWorkersForClose() []partitionWorkerCloseTask {
+	var tasks []partitionWorkerCloseTask
+	l.m.WithLock(func() {
+		tasks = make([]partitionWorkerCloseTask, 0, len(l.workerStates))
+		for _, state := range l.workerStates {
+			closeNow := !state.closeStarted
+			state.closeStarted = true
+			tasks = append(tasks, partitionWorkerCloseTask{state: state, closeNow: closeNow})
+		}
+	})
+
+	return tasks
+}
+
+func (l *streamListener) workerStateLocked(worker *PartitionWorker) *partitionWorkerState {
+	if state, ok := l.workerStates[worker]; ok {
+		return state
 	}
 
-	ctx, cancel := context.WithTimeout(xcontext.ValueOnly(ctx), time.Second)
+	state := &partitionWorkerState{worker: worker, closeDone: make(empty.Chan)}
+	l.workerStates[worker] = state
+
+	return state
+}
+
+func (l *streamListener) finishWorkerClose(state *partitionWorkerState, reason error) {
+	state.closeErr = state.worker.Close(context.Background(), reason)
+	l.m.WithLock(func() {
+		if l.workerStates[state.worker] == state {
+			delete(l.workerStates, state.worker)
+		}
+	})
+	close(state.closeDone)
+}
+
+func (l *streamListener) closeWorkerAfterStop(state *partitionWorkerState, reason error) {
 	go func() {
-		_ = l.background.Close(ctx, reason)
-		cancel()
+		l.finishWorkerClose(state, reason)
 	}()
-	// Close records the first reason and cancels the background context before
-	// stream cancellation can make another loop report context.Canceled.
-	<-l.background.Done()
-	l.streamClose(l.background.CloseReason())
 }
 
 func (l *streamListener) startBackground() {
@@ -198,6 +263,7 @@ func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	l.sessions = &topicreadercommon.PartitionSessionStorage{}
 	l.sessionIDCounter = sessionIDCounter
 	l.workers = make(map[rawtopicreader.PartitionSessionID]*PartitionWorker)
+	l.workerStates = make(map[*PartitionWorker]*partitionWorkerState)
 	if l.cfg == nil {
 		l.cfg = &StreamListenerConfig{}
 	}
@@ -616,11 +682,27 @@ func (l *streamListener) SendRaw(msg rawtopicreader.ClientMessage) {
 }
 
 // onWorkerStopped handles worker stopped notifications
-func (l *streamListener) onWorkerStopped(sessionID rawtopicreader.PartitionSessionID, reason error) {
-	// Remove worker from workers map
+func (l *streamListener) onWorkerStopped(
+	worker *PartitionWorker,
+	sessionID rawtopicreader.PartitionSessionID,
+	reason error,
+) {
+	var (
+		state       *partitionWorkerState
+		closeWorker bool
+	)
 	l.m.WithLock(func() {
-		delete(l.workers, sessionID)
+		if l.workers[sessionID] == worker {
+			delete(l.workers, sessionID)
+		}
+		state = l.workerStateLocked(worker)
+		closeWorker = !state.closeStarted
+		state.closeStarted = true
 	})
+	if closeWorker {
+		// This callback runs in the worker goroutine, so its join must be asynchronous.
+		l.closeWorkerAfterStop(state, reason)
+	}
 
 	// Remove corresponding session
 	for _, session := range l.sessions.GetAll() {
@@ -644,12 +726,15 @@ func (l *streamListener) onWorkerStopped(sessionID rawtopicreader.PartitionSessi
 
 // createWorkerForPartition creates a new PartitionWorker for the given session
 func (l *streamListener) createWorkerForPartition(session *topicreadercommon.PartitionSession) *PartitionWorker {
-	worker := NewPartitionWorker(
+	var worker *PartitionWorker
+	worker = NewPartitionWorker(
 		session.StreamPartitionSessionID,
 		session,
 		l,
 		l.handler,
-		l.onWorkerStopped,
+		func(sessionID rawtopicreader.PartitionSessionID, reason error) {
+			l.onWorkerStopped(worker, sessionID, reason)
+		},
 		l.tracer,
 		l.listenerID,
 	)
@@ -657,6 +742,7 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 	// Store worker in map
 	l.m.WithLock(func() {
 		l.workers[session.StreamPartitionSessionID] = worker
+		l.workerStateLocked(worker)
 	})
 
 	// Start worker

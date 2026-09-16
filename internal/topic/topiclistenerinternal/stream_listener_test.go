@@ -10,13 +10,17 @@ import (
 	"github.com/rekby/fixenv"
 	"github.com/rekby/fixenv/sf"
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestStreamListener_WorkerCreationAndRouting(t *testing.T) {
@@ -217,6 +221,118 @@ func TestStreamListener_CloseWorkers(t *testing.T) {
 
 	// Workers should be cleared
 	require.Empty(t, listener.workers)
+}
+
+func TestStreamListenerCloseWaitsForRemovedWorker(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+	worker := listener.createWorkerForPartition(PartitionSession(e))
+
+	removed := make(chan struct{})
+	release := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+	}()
+	originalOnStopped := worker.onStopped
+	worker.onStopped = func(id rawtopicreader.PartitionSessionID, _ error) {
+		originalOnStopped(id, errPartitionQueueClosed)
+		close(removed)
+		<-release
+	}
+	worker.messageQueue.Close()
+	xtest.WaitChannelClosed(t, removed)
+
+	closeCtx, cancelClose := context.WithTimeout(sf.Context(e), 20*time.Millisecond)
+	require.ErrorIs(t, listener.Close(closeCtx, ErrUserCloseTopic), context.DeadlineExceeded)
+	cancelClose()
+
+	close(release)
+	released = true
+	require.NoError(t, listener.Close(xtest.ContextWithCommonTimeout(sf.Context(e), t), ErrUserCloseTopic))
+}
+
+func TestStreamListenerStoppedWorkerKeepsReplacement(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+	session := PartitionSession(e)
+	first := listener.createWorkerForPartition(session)
+	replacement := listener.createWorkerForPartition(session)
+	first.messageQueue.Close()
+	xtest.WaitChannelClosed(t, first.bgWorker.StopDone())
+
+	var current *PartitionWorker
+	listener.m.WithLock(func() {
+		current = listener.workers[session.StreamPartitionSessionID]
+	})
+	require.Same(t, replacement, current)
+	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
+}
+
+func TestNewStreamListenerWaitsForFailedInitCleanup(t *testing.T) {
+	ctx := xtest.Context(t)
+	initErr := status.Error(codes.Unavailable, "init response failed")
+	client := &failedInitTopicClient{stream: &failedInitGRPCStream{err: initErr}}
+	cfg := NewStreamListenerConfig()
+	cfg.Consumer = "test-consumer"
+	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "test-topic"}}
+	closeStarted := make(chan struct{})
+	closeRelease := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(closeRelease)
+		}
+	}()
+	cfg.Tracer.OnListenerClose = func(trace.TopicListenerCloseStartInfo) func(trace.TopicListenerCloseDoneInfo) {
+		close(closeStarted)
+		<-closeRelease
+
+		return nil
+	}
+	result := make(chan error, 1)
+	go func() {
+		_, err := newStreamListener(ctx, client, NewMockEventHandler(gomock.NewController(t)), &cfg, &atomic.Int64{})
+		result <- err
+	}()
+
+	select {
+	case err := <-result:
+		t.Fatalf("initialization returned before cleanup began: %v", err)
+	case <-closeStarted:
+	case <-ctx.Done():
+		t.Fatal("initialization cleanup did not begin")
+	}
+	select {
+	case err := <-result:
+		t.Fatalf("initialization returned before cleanup completed: %v", err)
+	default:
+	}
+
+	close(closeRelease)
+	released = true
+	require.ErrorIs(t, xtest.Receive(t, result, "the initialization error"), initErr)
+	require.ErrorIs(t, context.Cause(client.stream.ctx), initErr)
+}
+
+func TestNewStreamListenerCancellationDuringInitDoesNotHang(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+	client := &blockingInitTopicClient{started: make(chan struct{})}
+	cfg := NewStreamListenerConfig()
+	cfg.Consumer = "test-consumer"
+	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "test-topic"}}
+	result := make(chan error, 1)
+	go func() {
+		_, err := newStreamListener(ctx, client, NewMockEventHandler(gomock.NewController(t)), &cfg, &atomic.Int64{})
+		result <- err
+	}()
+	xtest.WaitChannelClosed(t, client.started)
+	cancel()
+	require.ErrorIs(t, xtest.Receive(t, result, "the canceled initialization"), context.Canceled)
 }
 
 func TestStreamListener_SendMessagesLoopIssuesReadRequestOnFreeBytes(t *testing.T) {
@@ -606,4 +722,46 @@ func TestStreamListenerConcurrentGoCloseKeepsStreamCause(t *testing.T) {
 
 func testTime(num int) time.Time {
 	return time.Date(2000, 1, 1, 0, 0, num, 0, time.UTC)
+}
+
+type failedInitTopicClient struct {
+	stream *failedInitGRPCStream
+}
+
+func (c *failedInitTopicClient) StreamRead(
+	ctx context.Context, _ int64, tracer *trace.Topic,
+) (rawtopicreader.StreamReader, error) {
+	c.stream.ctx = ctx
+
+	return rawtopicreader.StreamReader{Stream: c.stream, Tracer: tracer}, nil
+}
+
+type failedInitGRPCStream struct {
+	ctx context.Context //nolint:containedctx
+	err error
+}
+
+func (*failedInitGRPCStream) Send(*Ydb_Topic.StreamReadMessage_FromClient) error {
+	return nil
+}
+
+func (s *failedInitGRPCStream) Recv() (*Ydb_Topic.StreamReadMessage_FromServer, error) {
+	return nil, s.err
+}
+
+func (*failedInitGRPCStream) CloseSend() error {
+	return nil
+}
+
+type blockingInitTopicClient struct {
+	started chan struct{}
+}
+
+func (c *blockingInitTopicClient) StreamRead(
+	ctx context.Context, _ int64, _ *trace.Topic,
+) (rawtopicreader.StreamReader, error) {
+	close(c.started)
+	<-ctx.Done()
+
+	return rawtopicreader.StreamReader{}, ctx.Err()
 }

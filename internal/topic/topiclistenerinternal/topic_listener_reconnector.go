@@ -26,11 +26,13 @@ type TopicListenerReconnector struct {
 
 	connectionResult    error
 	connectionCompleted empty.Chan
+	stopped             empty.Chan
 	connectionIDCounter atomic.Int64
 	closing             atomic.Bool
 
 	m              sync.Mutex
 	streamListener *streamListener
+	streamCloseErr error
 }
 
 func NewTopicListenerReconnector(
@@ -43,6 +45,7 @@ func NewTopicListenerReconnector(
 		client:              client,
 		handler:             handler,
 		connectionCompleted: make(empty.Chan),
+		stopped:             make(empty.Chan),
 	}
 
 	res.background.Start("connection", res.connect)
@@ -72,20 +75,18 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 	}
 
 	lr.m.Lock()
-	sl := lr.streamListener
+	streamCloseErr := lr.streamCloseErr
 	lr.m.Unlock()
-
-	if sl != nil {
-		err = sl.Close(ctx, reason)
-		if !errors.Is(err, context.Canceled) && !errors.Is(err, errTopicListenerClosed) {
-			closeErrors = append(closeErrors, err)
-		}
+	if streamCloseErr != nil && !errors.Is(streamCloseErr, context.Canceled) {
+		closeErrors = append(closeErrors, streamCloseErr)
 	}
 
 	return errors.Join(closeErrors...)
 }
 
 func (lr *TopicListenerReconnector) connect(ctx context.Context) {
+	defer close(lr.stopped)
+
 	sl, err := lr.connectStream(ctx)
 	if err != nil {
 		sl, err = lr.reconnect(ctx, err)
@@ -100,12 +101,17 @@ func (lr *TopicListenerReconnector) connect(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			lr.closeStream(sl, lr.background.CloseReason(), true)
+
 			return
 		case <-sl.background.StopDone():
 		}
 
 		reason := sl.background.CloseReason()
-		_ = sl.Close(ctx, reason)
+		lr.closeStream(sl, reason, ctx.Err() != nil)
+		if ctx.Err() != nil {
+			return
+		}
 		sl, err = lr.reconnect(ctx, reason)
 		if err != nil {
 			lr.stopWithError(ctx, err)
@@ -115,11 +121,24 @@ func (lr *TopicListenerReconnector) connect(ctx context.Context) {
 	}
 }
 
+func (lr *TopicListenerReconnector) closeStream(sl *streamListener, reason error, userClose bool) {
+	closeErr := sl.Close(context.Background(), reason)
+	lr.m.Lock()
+	defer lr.m.Unlock()
+	if lr.streamListener == sl {
+		lr.streamListener = nil
+	}
+	if userClose {
+		lr.streamCloseErr = closeErr
+	}
+}
+
 func (lr *TopicListenerReconnector) stopWithError(ctx context.Context, reason error) {
 	ctx = context.WithoutCancel(ctx)
 	go func() {
 		_ = lr.background.Close(ctx, reason)
 	}()
+	<-lr.background.Done()
 }
 
 func (lr *TopicListenerReconnector) reconnect(ctx context.Context, reason error) (*streamListener, error) {
@@ -199,7 +218,7 @@ func (lr *TopicListenerReconnector) WaitStop(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-lr.background.StopDone():
+	case <-lr.stopped:
 		err := lr.background.CloseReason()
 		if errors.Is(err, ErrUserCloseTopic) {
 			return nil
