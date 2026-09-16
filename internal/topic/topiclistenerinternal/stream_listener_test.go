@@ -555,6 +555,55 @@ func TestStreamListener_ReadBufferReleaseSkipsZeroSize(t *testing.T) {
 	})
 }
 
+func TestStreamListenerGoClosePreservesFirstReason(t *testing.T) {
+	ctx := xtest.Context(t)
+	var closeReasons []error
+	streamCtx, streamClose := context.WithCancelCause(ctx)
+	listener := &streamListener{
+		streamClose: func(reason error) {
+			closeReasons = append(closeReasons, reason)
+			streamClose(reason)
+		},
+	}
+	_ = listener.background.Context()
+	firstErr := errors.New("message handler failed")
+
+	listener.goClose(ctx, firstErr)
+	listener.goClose(ctx, context.Canceled)
+	xtest.WaitChannelClosed(t, listener.background.StopDone())
+
+	require.Equal(t, []error{firstErr}, closeReasons)
+	require.ErrorIs(t, context.Cause(streamCtx), firstErr)
+	require.ErrorIs(t, listener.background.CloseReason(), firstErr)
+}
+
+func TestStreamListenerConcurrentGoCloseKeepsStreamCause(t *testing.T) {
+	ctx := xtest.Context(t)
+	streamCtx, streamClose := context.WithCancelCause(ctx)
+	listener := &streamListener{streamClose: streamClose}
+	_ = listener.background.Context()
+	firstErr := errors.New("first failure")
+	secondErr := errors.New("second failure")
+	start := make(chan struct{})
+	finished := make(chan struct{}, 2)
+
+	for _, reason := range []error{firstErr, secondErr} {
+		go func() {
+			<-start
+			listener.goClose(ctx, reason)
+			finished <- struct{}{}
+		}()
+	}
+	close(start)
+	<-finished
+	<-finished
+	xtest.WaitChannelClosed(t, listener.background.StopDone())
+
+	cause := context.Cause(streamCtx)
+	require.True(t, errors.Is(cause, firstErr) || errors.Is(cause, secondErr))
+	require.ErrorIs(t, listener.background.CloseReason(), cause)
+}
+
 func testTime(num int) time.Time {
 	return time.Date(2000, 1, 1, 0, 0, num, 0, time.UTC)
 }

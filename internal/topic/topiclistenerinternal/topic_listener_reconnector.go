@@ -67,7 +67,9 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 	}
 	var closeErrors []error
 	err := lr.background.Close(ctx, reason)
-	closeErrors = append(closeErrors, err)
+	if !errors.Is(err, background.ErrAlreadyClosed) {
+		closeErrors = append(closeErrors, err)
+	}
 
 	lr.m.Lock()
 	sl := lr.streamListener
@@ -75,7 +77,7 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 
 	if sl != nil {
 		err = sl.Close(ctx, reason)
-		if !errors.Is(err, context.Canceled) {
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, errTopicListenerClosed) {
 			closeErrors = append(closeErrors, err)
 		}
 	}
@@ -85,6 +87,10 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 
 func (lr *TopicListenerReconnector) connect(ctx context.Context) {
 	sl, err := lr.connectStream(ctx)
+	if err != nil {
+		sl, err = lr.reconnect(ctx, err)
+	}
+	lr.completeConnection(err)
 	if err != nil {
 		lr.stopWithError(ctx, err)
 
@@ -124,11 +130,16 @@ func (lr *TopicListenerReconnector) reconnect(ctx context.Context, reason error)
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
+		retryReason := reason
 		if transportErr := xerrors.TransportError(reason); transportErr != nil {
-			reason = transportErr
+			retryReason = transportErr
 		}
-		backoff, stopReason := topic.RetryDecision(reason, lr.streamConfig.RetrySettings, clock.Since(started))
+		backoff, stopReason := topic.RetryDecision(retryReason, lr.streamConfig.RetrySettings, clock.Since(started))
 		if stopReason != nil {
+			if !errors.Is(stopReason, reason) {
+				stopReason = errors.Join(stopReason, reason)
+			}
+
 			return nil, stopReason
 		}
 
@@ -157,15 +168,16 @@ func (lr *TopicListenerReconnector) connectStream(ctx context.Context) (*streamL
 	defer lr.m.Unlock()
 
 	lr.streamListener = sl
-	select {
-	case <-lr.connectionCompleted:
-		// Initialization has already completed.
-	default:
-		lr.connectionResult = err
-		close(lr.connectionCompleted)
-	}
 
 	return sl, err
+}
+
+func (lr *TopicListenerReconnector) completeConnection(err error) {
+	lr.m.Lock()
+	defer lr.m.Unlock()
+
+	lr.connectionResult = err
+	close(lr.connectionCompleted)
 }
 
 func (lr *TopicListenerReconnector) WaitInit(ctx context.Context) error {

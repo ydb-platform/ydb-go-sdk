@@ -1,4 +1,4 @@
-* Fixed topic listener recovery and message confirmation after stream failures
+* Fixed topic listener recovery, error reporting, closing, and message confirmation after stream failures
 
 ## v3.151.3
 * Fixed query session pool metrics during checkout, session creation and warm-up, retries, and waiting for a session

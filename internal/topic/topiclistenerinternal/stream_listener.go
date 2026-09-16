@@ -141,7 +141,7 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 		l.streamClose(reason)
 	}
 
-	if err := l.background.Close(ctx, reason); err != nil {
+	if err := l.background.Close(ctx, reason); err != nil && !errors.Is(err, background.ErrAlreadyClosed) {
 		resErrors = append(resErrors, err)
 	}
 
@@ -170,12 +170,19 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 }
 
 func (l *streamListener) goClose(ctx context.Context, reason error) {
+	if l.closing.Load() || l.background.Context().Err() != nil {
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(xcontext.ValueOnly(ctx), time.Second)
-	l.streamClose(reason)
 	go func() {
 		_ = l.background.Close(ctx, reason)
 		cancel()
 	}()
+	// Close records the first reason and cancels the background context before
+	// stream cancellation can make another loop report context.Canceled.
+	<-l.background.Done()
+	l.streamClose(l.background.CloseReason())
 }
 
 func (l *streamListener) startBackground() {

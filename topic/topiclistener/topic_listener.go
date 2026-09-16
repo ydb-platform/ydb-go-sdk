@@ -39,6 +39,7 @@ func (cr *TopicListener) ReadSessionID() string {
 	return cr.listenerReconnector.ReadSessionID()
 }
 
+// WaitInit waits for the first successful connection or a terminal retry error.
 func (cr *TopicListener) WaitInit(ctx context.Context) error {
 	return cr.listenerReconnector.WaitInit(ctx)
 }

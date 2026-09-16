@@ -58,6 +58,37 @@ func TestTopicListener(t *testing.T) {
 	require.Equal(t, "asd", content)
 }
 
+// A retriable initial stream failure must not complete WaitInit before recovery.
+func TestTopicListenerRetriesInitialConnection(t *testing.T) {
+	scope := newScope(t)
+	streamErr := status.Error(codes.Canceled, "initial stream interrupted")
+	stopper := NewGrpcStopper(streamErr)
+	scope.Driver(ydb.With(config.WithGrpcOptions(
+		grpc.WithStreamInterceptor(stopper.StreamClientInterceptor),
+	)))
+	_ = scope.TopicPath()
+
+	checkedErrors := make(chan error, 1)
+	stopper.Stop()
+	defer stopper.Start()
+	listener := scope.TopicListener(&TestTopicListener_Handler{},
+		topicoptions.WithListenerCheckRetryErrorFunction(
+			func(args topicoptions.CheckErrorRetryArgs) topicoptions.CheckErrorRetryResult {
+				select {
+				case checkedErrors <- args.Error:
+				default:
+				}
+
+				return topicoptions.CheckErrorRetryDecisionDefault
+			},
+		))
+
+	require.ErrorIs(t, xtest.Receive(t, checkedErrors, "the initial retry decision"), streamErr)
+	stopper.Start()
+	require.NoError(t, listener.WaitInit(xtest.ContextWithCommonTimeout(scope.Ctx, t)))
+	require.NotEmpty(t, listener.ReadSessionID())
+}
+
 // Reconnect starts a new session for the same partition.
 func TestTopicListenerStartsPartitionAfterStreamCancellation(t *testing.T) {
 	scope := newScope(t)
@@ -242,6 +273,7 @@ func TestTopicListenerWaitStopReturnsHandlerError(t *testing.T) {
 	})
 
 	require.ErrorIs(t, listener.WaitStop(xtest.ContextWithCommonTimeout(scope.Ctx, t)), handlerErr)
+	require.NoError(t, listener.Close(scope.Ctx))
 }
 
 func TestTopicListenerCustomRetryPolicyRestartsPartition(t *testing.T) {

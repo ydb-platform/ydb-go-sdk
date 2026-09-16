@@ -88,9 +88,17 @@ func (e *PublicReadMessages) ConfirmWithAck(ctx context.Context) error {
 	if e.Batch.Context().Err() != nil {
 		return topicreadercommon.ErrPublicCommitSessionToExpiredSession
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	e.committed.Store(true)
 
-	return e.commitHandler.getSyncCommitter().Commit(ctx, topicreadercommon.GetCommitRange(e.Batch))
+	commitRange := topicreadercommon.GetCommitRange(e.Batch)
+	if commitRange.PartitionSession.CommittedOffset() >= commitRange.CommitOffsetEnd {
+		return nil
+	}
+
+	return e.commitHandler.getSyncCommitter().Commit(ctx, commitRange)
 }
 
 // PublicEventStartPartitionSession
