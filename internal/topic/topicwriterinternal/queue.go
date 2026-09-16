@@ -33,9 +33,8 @@ type messageQueue struct {
 	OnAckReceived func(count int)
 	AckCallback   func(seqNo int64)
 
-	hasNewMessages    empty.Chan
-	closedErr         error
-	acksReceivedEvent xsync.EventBroadcast
+	hasNewMessages empty.Chan
+	closedErr      error
 
 	m                         xsync.RWMutex
 	stopReceiveMessagesReason error
@@ -47,12 +46,27 @@ type messageQueue struct {
 
 	messagesByOrder map[int]messageWithDataContent
 	seqNoToOrderID  map[int64]int
+
+	// ackWaiters indexes waiters by the message order index they are currently
+	// blocked on, so an incoming ack wakes only the waiters of the acked message
+	// instead of every waiter of the writer (see ackWaiter).
+	ackWaiters map[int]map[*ackWaiter]struct{}
+}
+
+// ackWaiter is a personal notification handle for a single Wait call blocked on
+// a specific message order index. It replaces the previous shared broadcast
+// (xsync.EventBroadcast): an incoming ack closes done only for the waiters of the
+// acked message, avoiding a thundering herd where every concurrent Write wakes on
+// each ack packet regardless of which messages were actually acknowledged.
+type ackWaiter struct {
+	done chan struct{}
 }
 
 func newMessageQueue() messageQueue {
 	return messageQueue{
 		messagesByOrder: make(map[int]messageWithDataContent),
 		seqNoToOrderID:  make(map[int64]int),
+		ackWaiters:      make(map[int]map[*ackWaiter]struct{}),
 		hasNewMessages:  make(empty.Chan, 1),
 		closedChan:      make(empty.Chan),
 		lastSeqNo:       -1,
@@ -162,9 +176,12 @@ func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
 	}
 
 	for i := range acks {
-		if err := q.ackReceivedNeedLock(acks[i].SeqNo); err != nil {
+		orderID, err := q.ackReceivedNeedLock(acks[i].SeqNo)
+		if err != nil {
 			return err
 		}
+
+		q.notifyAckWaitersNeedLock(orderID)
 
 		if q.AckCallback != nil {
 			q.AckCallback(acks[i].SeqNo)
@@ -172,21 +189,57 @@ func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
 		ackReceivedCounter++
 	}
 
-	q.acksReceivedEvent.Broadcast()
-
 	return nil
 }
 
-func (q *messageQueue) ackReceivedNeedLock(seqNo int64) error {
+func (q *messageQueue) ackReceivedNeedLock(seqNo int64) (orderID int, _ error) {
 	orderID, ok := q.seqNoToOrderID[seqNo]
 	if !ok {
-		return xerrors.WithStackTrace(errAckUnexpectedMessage)
+		return 0, xerrors.WithStackTrace(errAckUnexpectedMessage)
 	}
 
 	delete(q.seqNoToOrderID, seqNo)
 	delete(q.messagesByOrder, orderID)
 
-	return nil
+	return orderID, nil
+}
+
+// registerAckWaiterNeedLock subscribes w to acks of the given message order index.
+func (q *messageQueue) registerAckWaiterNeedLock(index int, w *ackWaiter) {
+	set := q.ackWaiters[index]
+	if set == nil {
+		set = make(map[*ackWaiter]struct{}, 1)
+		q.ackWaiters[index] = set
+	}
+	set[w] = struct{}{}
+}
+
+// notifyAckWaitersNeedLock wakes and removes all waiters blocked on the given index.
+func (q *messageQueue) notifyAckWaitersNeedLock(index int) {
+	set, ok := q.ackWaiters[index]
+	if !ok {
+		return
+	}
+	for w := range set {
+		close(w.done)
+	}
+	delete(q.ackWaiters, index)
+}
+
+// unregisterAckWaiter removes w from the index subscription (used on ctx cancel or
+// queue close, when the waiter leaves before its message is acked).
+func (q *messageQueue) unregisterAckWaiter(index int, w *ackWaiter) {
+	q.m.Lock()
+	defer q.m.Unlock()
+
+	set, ok := q.ackWaiters[index]
+	if !ok {
+		return
+	}
+	delete(set, w)
+	if len(set) == 0 {
+		delete(q.ackWaiters, index)
+	}
 }
 
 func (q *messageQueue) StopAddNewMessages(reason error) {
@@ -314,13 +367,21 @@ func (q *messageQueue) Wait(ctx context.Context, waiter MessageQueueAckWaiter) e
 
 	ctxDone := ctx.Done()
 	for {
-		ackReceived := q.acksReceivedEvent.Waiter()
+		var (
+			w          *ackWaiter
+			blockIndex int
+			hasWaited  bool
+		)
 
-		hasWaited := false
-		q.m.WithRLock(func() {
+		// Find the first not-yet-acked message index and subscribe a personal
+		// waiter to it atomically under the lock, so a concurrent ack cannot slip
+		// between the check and the subscription (which would lose the wakeup).
+		q.m.WithLock(func() {
 			for len(waiter.sequenseNumbers) > 0 {
-				checkMessageIndex := waiter.sequenseNumbers[0]
-				if _, ok := q.messagesByOrder[checkMessageIndex]; ok {
+				blockIndex = waiter.sequenseNumbers[0]
+				if _, ok := q.messagesByOrder[blockIndex]; ok {
+					w = &ackWaiter{done: make(chan struct{})}
+					q.registerAckWaiterNeedLock(blockIndex, w)
 					hasWaited = true
 
 					return
@@ -335,11 +396,16 @@ func (q *messageQueue) Wait(ctx context.Context, waiter MessageQueueAckWaiter) e
 
 		select {
 		case <-ctxDone:
+			q.unregisterAckWaiter(blockIndex, w)
+
 			return ctx.Err()
 		case <-q.closedChan:
+			q.unregisterAckWaiter(blockIndex, w)
+
 			return q.closedErr
-		case <-ackReceived.Done():
-			// pass next iteration
+		case <-w.done:
+			// blockIndex acked (waiter already removed by notifyAckWaitersNeedLock);
+			// re-check the remaining indexes on the next iteration.
 		}
 	}
 }

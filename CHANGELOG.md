@@ -1,3 +1,5 @@
+* Fixed excessive waiter wakeups in the topic writer with `WithWriterWaitServerAck(true)`: an incoming ack now wakes only the `Write` calls whose messages were acknowledged instead of broadcasting to every concurrent waiter of the writer, reducing scheduler and lock pressure under high write concurrency
+
 ## v3.151.3
 * Fixed query session pool metrics during checkout, session creation and warm-up, retries, and waiting for a session
 * Fixed session invalidation to follow the shared error policy for Query Service and Table API requests executed through Query Service, preserving sessions after gRPC `RESOURCE_EXHAUSTED` and `OUT_OF_RANGE`
