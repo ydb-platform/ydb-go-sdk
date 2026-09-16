@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	grpcStatus "google.golang.org/grpc/status"
@@ -757,7 +759,10 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 
 			return nil
 		})
-		mockStream.EXPECT().Trailer().Return(metadata.MD{})
+		// Trailer() must NOT be called here: the underlying RecvMsg returned nil,
+		// so the gRPC stream is not finished and reading trailers would race with
+		// the transport goroutine. No Trailer() expectation is set, so gomock
+		// fails the test if RecvMsg reads trailers on the operation-error path.
 
 		config := &mockConfig{
 			dialTimeout: 5 * time.Second,
@@ -806,6 +811,44 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 
 		err := s.RecvMsg(msg)
 		require.NoError(t, err)
+	})
+
+	t.Run("OperationErrorDoesNotRaceOnTrailer", func(t *testing.T) {
+		// Regression test: on a non-success YDB operation status the underlying
+		// gRPC RecvMsg returns nil, so the stream is not finished. Reading
+		// Trailer() there used to race with the gRPC transport goroutine that
+		// finalizes the trailer metadata. Meaningful only under `go test -race`.
+		fake := &fakeTrailerStream{
+			recv: func(m any) error {
+				resp := m.(*Ydb_Query.ExecuteQueryResponsePart)
+				resp.Status = Ydb.StatusIds_UNAVAILABLE
+
+				return nil // underlying gRPC RecvMsg succeeds
+			},
+		}
+
+		config := &mockConfig{
+			dialTimeout: 5 * time.Second,
+		}
+		e := endpoint.New("test-endpoint:2135", endpoint.WithID(123))
+		parentConn := newConn(e, config)
+
+		s := &grpcClientStream{
+			parentConn: parentConn,
+			stream:     fake,
+			requestCtx: t.Context(),
+			wrapping:   true,
+			sentMark:   &modificationMark{},
+		}
+
+		msg := &Ydb_Query.ExecuteQueryResponsePart{}
+		err := s.RecvMsg(msg)
+		<-fake.transportDone // join the simulated transport goroutine
+
+		require.Error(t, err)
+		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
+		require.Zero(t, fake.trailerCalls.Load(),
+			"Trailer() must not be read on the operation-error path")
 	})
 }
 
@@ -863,4 +906,36 @@ func TestGrpcClientStream_Finish(t *testing.T) {
 		s.finish(testErr)
 		// Should not panic
 	})
+}
+
+// fakeTrailerStream is a grpc.ClientStream whose RecvMsg spawns a goroutine that
+// concurrently mutates the trailer metadata, mimicking the gRPC transport
+// finalizing a stream. Reading Trailer() before that goroutine completes trips
+// the race detector, which is what the trailer data-race regression test relies
+// on.
+type fakeTrailerStream struct {
+	grpc.ClientStream
+
+	recv          func(m any) error
+	trailer       metadata.MD
+	trailerCalls  atomic.Int32
+	transportDone chan struct{}
+}
+
+func (f *fakeTrailerStream) RecvMsg(m any) error {
+	f.transportDone = make(chan struct{})
+	go func() {
+		defer close(f.transportDone)
+		for range 1000 {
+			f.trailer = metadata.MD{"x-ydb-server-hints": []string{"session-close"}}
+		}
+	}()
+
+	return f.recv(m)
+}
+
+func (f *fakeTrailerStream) Trailer() metadata.MD {
+	f.trailerCalls.Add(1)
+
+	return f.trailer
 }

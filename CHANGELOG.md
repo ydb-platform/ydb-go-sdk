@@ -1,3 +1,5 @@
+* Fixed data race in `internal/conn.(*grpcClientStream).RecvMsg`: gRPC trailers are no longer read when a non-success YDB operation status is converted into an error, since the underlying gRPC stream is not finished at that point and reading `Trailer()` raced with the transport goroutine
+
 ## v3.151.3
 * Fixed query session pool metrics during checkout, session creation and warm-up, retries, and waiting for a session
 * Fixed session invalidation to follow the shared error policy for Query Service and Table API requests executed through Query Service, preserving sessions after gRPC `RESOURCE_EXHAUSTED` and `OUT_OF_RANGE`
