@@ -215,41 +215,15 @@ func TestCommitterCommitDisabled(t *testing.T) {
 	require.ErrorIs(t, err, ErrCommitDisabled)
 }
 
-func TestCommitterWaitAckDoesNotQueueAnotherCommit(t *testing.T) {
-	ctx := xtest.Context(t)
-	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync, nil)
-	defer func() { _ = committer.Close(ctx, nil) }()
-	session := newTestPartitionSession(ctx, 1)
-	commitRange := CommitRange{
-		PartitionSession:  session,
-		CommitOffsetStart: 1,
-		CommitOffsetEnd:   2,
-	}
-	result := make(chan error, 1)
-	go func() {
-		result <- committer.WaitAck(ctx, commitRange)
-	}()
-	require.Eventually(t, func() bool {
-		var waiting bool
-		committer.m.WithLock(func() {
-			waiting = len(committer.waiters) == 1 && committer.commits.Len() == 0
-		})
-
-		return waiting
-	}, time.Second, time.Millisecond)
-	session.SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
-	committer.OnCommitNotify(session, commitRange.CommitOffsetEnd)
-	require.NoError(t, <-result)
-}
-
-func TestCommitterWaitAckRejectsMissingSession(t *testing.T) {
+func TestCommitRequestWaitRejectsMissingSession(t *testing.T) {
 	ctx := xtest.Context(t)
 	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync, nil)
 
-	require.ErrorIs(t, committer.WaitAck(ctx, CommitRange{}), ErrPublicCommitSessionToExpiredSession)
+	require.ErrorIs(t, committer.NewCommitRequest(CommitRange{}).Wait(ctx),
+		ErrPublicCommitSessionToExpiredSession)
 }
 
-func TestCommitterWaitAckRejectsNonSyncModeWithoutLeakingWaiter(t *testing.T) {
+func TestCommitRequestWaitRejectsNonSyncModeWithoutQueuing(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		mode PublicCommitMode
@@ -267,9 +241,11 @@ func TestCommitterWaitAckRejectsNonSyncModeWithoutLeakingWaiter(t *testing.T) {
 				CommitOffsetEnd:   2,
 			}
 
-			require.ErrorIs(t, committer.WaitAck(ctx, commitRange), ErrWaitAckRequiresSyncMode)
+			require.ErrorIs(t, committer.NewCommitRequest(commitRange).Wait(ctx), ErrWaitAckRequiresSyncMode)
 			committer.m.WithLock(func() {
 				require.Empty(t, committer.waiters)
+				require.Empty(t, committer.requests)
+				require.Zero(t, committer.commits.Len())
 			})
 		})
 	}

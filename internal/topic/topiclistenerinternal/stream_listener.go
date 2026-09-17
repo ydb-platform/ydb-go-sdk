@@ -57,20 +57,8 @@ type streamListener struct {
 
 	m              xsync.Mutex
 	workers        map[rawtopicreader.PartitionSessionID]*PartitionWorker
-	workerStates   map[*PartitionWorker]*partitionWorkerState
+	workerCloseWG  sync.WaitGroup
 	messagesToSend []rawtopicreader.ClientMessage
-}
-
-type partitionWorkerState struct {
-	worker       *PartitionWorker
-	closeDone    empty.Chan
-	closeStarted bool
-	closeErr     error
-}
-
-type partitionWorkerCloseTask struct {
-	state    *partitionWorkerState
-	closeNow bool
 }
 
 func newStreamListener(
@@ -171,7 +159,11 @@ func (l *streamListener) finishClose(ctx context.Context, reason error, done emp
 
 	var resErrors []error
 
-	// Stop routing before taking ownership of the partition workers.
+	// Count active workers before stopping the stream; callbacks remove them.
+	var workersClosed int
+	l.m.WithLock(func() {
+		workersClosed = len(l.workers)
+	})
 	if l.streamClose != nil {
 		l.streamClose(reason)
 	}
@@ -180,16 +172,9 @@ func (l *streamListener) finishClose(ctx context.Context, reason error, done emp
 		resErrors = append(resErrors, err)
 	}
 
-	workerTasks := l.claimWorkersForClose()
-	for _, task := range workerTasks {
-		if task.closeNow {
-			l.finishWorkerClose(task.state, reason)
-		}
-		<-task.state.closeDone
-		if task.state.closeErr != nil {
-			resErrors = append(resErrors, task.state.closeErr)
-		}
-	}
+	// Canceling the listener also stops each partition worker. Its callback
+	// closes the worker asynchronously, because it may run in the worker itself.
+	l.workerCloseWG.Wait()
 
 	if l.syncCommitter != nil {
 		if err := l.syncCommitter.Close(context.Background(), reason); err != nil &&
@@ -204,50 +189,9 @@ func (l *streamListener) finishClose(ctx context.Context, reason error, done emp
 		}
 	}
 
-	l.shutdownErr = errors.Join(resErrors...)
-	closeDone(len(workerTasks), l.shutdownErr)
+	l.shutdownErr = errors.Join(l.shutdownErr, errors.Join(resErrors...))
+	closeDone(workersClosed, l.shutdownErr)
 	close(done)
-}
-
-func (l *streamListener) claimWorkersForClose() []partitionWorkerCloseTask {
-	var tasks []partitionWorkerCloseTask
-	l.m.WithLock(func() {
-		tasks = make([]partitionWorkerCloseTask, 0, len(l.workerStates))
-		for _, state := range l.workerStates {
-			closeNow := !state.closeStarted
-			state.closeStarted = true
-			tasks = append(tasks, partitionWorkerCloseTask{state: state, closeNow: closeNow})
-		}
-	})
-
-	return tasks
-}
-
-func (l *streamListener) workerStateLocked(worker *PartitionWorker) *partitionWorkerState {
-	if state, ok := l.workerStates[worker]; ok {
-		return state
-	}
-
-	state := &partitionWorkerState{worker: worker, closeDone: make(empty.Chan)}
-	l.workerStates[worker] = state
-
-	return state
-}
-
-func (l *streamListener) finishWorkerClose(state *partitionWorkerState, reason error) {
-	state.closeErr = state.worker.Close(context.Background(), reason)
-	l.m.WithLock(func() {
-		if l.workerStates[state.worker] == state {
-			delete(l.workerStates, state.worker)
-		}
-	})
-	close(state.closeDone)
-}
-
-func (l *streamListener) closeWorkerAfterStop(state *partitionWorkerState, reason error) {
-	go func() {
-		l.finishWorkerClose(state, reason)
-	}()
 }
 
 func (l *streamListener) startBackground() {
@@ -263,7 +207,6 @@ func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	l.sessions = &topicreadercommon.PartitionSessionStorage{}
 	l.sessionIDCounter = sessionIDCounter
 	l.workers = make(map[rawtopicreader.PartitionSessionID]*PartitionWorker)
-	l.workerStates = make(map[*PartitionWorker]*partitionWorkerState)
 	if l.cfg == nil {
 		l.cfg = &StreamListenerConfig{}
 	}
@@ -504,6 +447,11 @@ func (l *streamListener) handleStartPartition(
 
 	// Create worker for this partition
 	worker := l.createWorkerForPartition(session)
+	if worker == nil {
+		_, _ = l.sessions.Remove(session.StreamPartitionSessionID)
+
+		return nil
+	}
 
 	// Send StartPartition message to the worker
 	worker.AddRawServerMessage(m)
@@ -674,17 +622,10 @@ func (l *streamListener) onWorkerStopped(
 	sessionID rawtopicreader.PartitionSessionID,
 	reason error,
 ) {
-	var (
-		state       *partitionWorkerState
-		closeWorker bool
-	)
 	l.m.WithLock(func() {
 		if l.workers[sessionID] == worker {
 			delete(l.workers, sessionID)
 		}
-		state = l.workerStateLocked(worker)
-		closeWorker = !state.closeStarted
-		state.closeStarted = true
 	})
 	// If reason from worker, propagate to streamListener shutdown
 	// But avoid cascading shutdowns for normal lifecycle events like queue closure during shutdown
@@ -704,16 +645,13 @@ func (l *streamListener) onWorkerStopped(
 			break
 		}
 	}
-
-	if closeWorker {
-		// This callback may run in the worker goroutine, so its join must be asynchronous.
-		l.closeWorkerAfterStop(state, reason)
-	}
 }
 
 // createWorkerForPartition creates a new PartitionWorker for the given session
 func (l *streamListener) createWorkerForPartition(session *topicreadercommon.PartitionSession) *PartitionWorker {
 	var worker *PartitionWorker
+	var closeOnce sync.Once
+	started := false
 	worker = NewPartitionWorker(
 		session.StreamPartitionSessionID,
 		session,
@@ -721,17 +659,35 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 		l.handler,
 		func(sessionID rawtopicreader.PartitionSessionID, reason error) {
 			l.onWorkerStopped(worker, sessionID, reason)
+			closeOnce.Do(func() {
+				// The callback can run in the worker goroutine, so join it elsewhere.
+				go func() {
+					if err := worker.Close(context.Background(), reason); err != nil {
+						l.m.WithLock(func() {
+							l.shutdownErr = errors.Join(l.shutdownErr, err)
+						})
+					}
+					l.workerCloseWG.Done()
+				}()
+			})
 		},
 		l.tracer,
 		l.listenerID,
 	)
 
-	// Register and start under the same lock so shutdown cannot close an unstarted worker.
+	// Register and start under the same lock so shutdown cannot wait for an unstarted worker.
 	l.m.WithLock(func() {
+		if l.closing.Load() {
+			return
+		}
 		l.workers[session.StreamPartitionSessionID] = worker
-		l.workerStateLocked(worker)
+		l.workerCloseWG.Add(1)
 		worker.Start(l.background.Context())
+		started = true
 	})
+	if !started {
+		return nil
+	}
 
 	return worker
 }
