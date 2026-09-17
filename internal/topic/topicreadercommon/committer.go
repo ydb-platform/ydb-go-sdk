@@ -20,6 +20,7 @@ import (
 
 var (
 	ErrCommitDisabled             = xerrors.Wrap(errors.New("ydb: commits disabled"))
+	ErrWaitAckRequiresSyncMode    = xerrors.Wrap(errors.New("ydb: waiting for commit ack requires sync commit mode"))
 	ErrWrongCommitOrderInSyncMode = xerrors.Wrap(errors.New("ydb: wrong commit order in sync mode. It means you skipped committing some messages. Out-of-order commits are OK for async mode - you can commit the messages later. But im sync mode, it means deadlock: the code waits for a commit ack from the server, but the server waits for the commits of the skipped message. In sync mode, ensure that you commit messages/batches in the same order as you read them")) //nolint:lll
 )
 
@@ -106,9 +107,12 @@ func (c *Committer) Commit(ctx context.Context, commitRange CommitRange) error {
 	return c.waitCommitAck(ctx, waiter)
 }
 
-// WaitAck waits for an already sent commit without sending it again.
+// WaitAck waits for an already sent commit in sync mode without sending it again.
 func (c *Committer) WaitAck(ctx context.Context, commitRange CommitRange) error {
-	if commitRange.PartitionSession.Context().Err() != nil {
+	if c.mode != CommitModeSync {
+		return ErrWaitAckRequiresSyncMode
+	}
+	if commitRange.PartitionSession == nil || commitRange.PartitionSession.Context().Err() != nil {
 		return ErrPublicCommitSessionToExpiredSession
 	}
 	if err := ctx.Err(); err != nil {

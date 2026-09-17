@@ -58,6 +58,7 @@ func WithListenerCheckRetryErrorFunction(callback CheckErrorRetryFunction) Liste
 
 // WithListenerStartTimeout limits the duration of a listener connection retry period.
 // The default allows retries without a time limit.
+// Set timeout to 0 to stop after the first failed connection attempt.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithListenerStartTimeout(timeout time.Duration) ListenerOption {

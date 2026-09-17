@@ -242,6 +242,39 @@ func TestCommitterWaitAckDoesNotQueueAnotherCommit(t *testing.T) {
 	require.NoError(t, <-result)
 }
 
+func TestCommitterWaitAckRejectsMissingSession(t *testing.T) {
+	ctx := xtest.Context(t)
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync, nil)
+
+	require.ErrorIs(t, committer.WaitAck(ctx, CommitRange{}), ErrPublicCommitSessionToExpiredSession)
+}
+
+func TestCommitterWaitAckRejectsNonSyncModeWithoutLeakingWaiter(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		mode PublicCommitMode
+	}{
+		{name: "async", mode: CommitModeAsync},
+		{name: "none", mode: CommitModeNone},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := xtest.Context(t)
+			committer := NewCommitterStopped(&trace.Topic{}, ctx, tc.mode, nil)
+			session := newTestPartitionSession(ctx, 1)
+			commitRange := CommitRange{
+				PartitionSession:  session,
+				CommitOffsetStart: 1,
+				CommitOffsetEnd:   2,
+			}
+
+			require.ErrorIs(t, committer.WaitAck(ctx, commitRange), ErrWaitAckRequiresSyncMode)
+			committer.m.WithLock(func() {
+				require.Empty(t, committer.waiters)
+			})
+		})
+	}
+}
+
 func TestCommitterCommitAsync(t *testing.T) {
 	t.Run("ExpiredSessionStillQueuesCommit", func(t *testing.T) {
 		ctx := xtest.Context(t)
