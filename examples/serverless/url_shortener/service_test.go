@@ -9,24 +9,15 @@ import (
 )
 
 func TestHashDistinguishesKnownFNV32Collision(t *testing.T) {
-	first, err := hash("url-332789")
-	if err != nil {
-		t.Fatalf("hash first URL: %v", err)
-	}
-	second, err := hash("url-529192")
-	if err != nil {
-		t.Fatalf("hash second URL: %v", err)
-	}
+	first := hash("url-332789")
+	second := hash("url-529192")
 	if first == second {
 		t.Fatalf("different URLs produced the same short hash %q", first)
 	}
 }
 
 func TestShortLinkValidationRequiresWholeStrongHash(t *testing.T) {
-	valid, err := hash("https://example.com")
-	if err != nil {
-		t.Fatalf("hash URL: %v", err)
-	}
+	valid := hash("https://example.com")
 
 	tests := []struct {
 		name string
@@ -84,7 +75,7 @@ func TestServerlessReusesServiceWithoutClosingItPerRequest(t *testing.T) {
 
 	for range 2 {
 		response := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodGet, "/", nil)
+		request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		Serverless(response, request)
 		if response.Code != http.StatusNoContent {
 			t.Fatalf("response status = %d, want %d", response.Code, http.StatusNoContent)

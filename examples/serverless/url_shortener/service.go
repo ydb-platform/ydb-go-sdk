@@ -37,10 +37,10 @@ var (
 	long  = regexp.MustCompile(`https?://(?:[-\w.]|%[\da-fA-F]{2})+`)
 )
 
-func hash(s string) (string, error) {
+func hash(s string) string {
 	sum := sha256.Sum256([]byte(s))
 
-	return hex.EncodeToString(sum[:16]), nil
+	return hex.EncodeToString(sum[:16])
 }
 
 func isShortCorrect(link string) bool {
@@ -218,10 +218,7 @@ func (s *service) createTable(ctx context.Context) (err error) {
 }
 
 func (s *service) insertShort(ctx context.Context, url string) (h string, err error) {
-	h, err = hash(url)
-	if err != nil {
-		return "", err
-	}
+	h = hash(url)
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -294,7 +291,6 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 				),
 				options.WithCollectStatsModeBasic(),
 			)
-
 			if err != nil {
 				return err
 			}
@@ -304,8 +300,8 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 
 			var src string
 			found := false
-			for res.NextResultSet(ctx) {
-				for res.NextRow() {
+			for res.NextResultSet(ctx) && !found {
+				for res.NextRow() && !found {
 					if err = res.ScanNamed(
 						named.OptionalWithDefault("src", &src),
 					); err != nil {
@@ -313,10 +309,6 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 					}
 					url = src
 					found = true
-					break
-				}
-				if found {
-					break
 				}
 			}
 			if err = res.Err(); err != nil {

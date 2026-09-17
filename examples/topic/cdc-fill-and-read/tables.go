@@ -108,6 +108,7 @@ VALUES
 			table.ValueParam("$id", types.Uint64Value(id)),
 			table.ValueParam("$value", types.UTF8Value(val)),
 		)
+
 		return c.DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 			res, err := tx.Execute(ctx, query, params, options.WithCommit())
 			if err != nil {
@@ -135,6 +136,7 @@ WHERE id=$id
 		params := table.NewQueryParameters(
 			table.ValueParam("$id", types.Uint64Value(id)),
 		)
+
 		return c.DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 			res, err := tx.Execute(ctx, query, params, options.WithCommit())
 			if err != nil {

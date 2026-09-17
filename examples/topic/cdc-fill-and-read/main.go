@@ -57,11 +57,9 @@ func main() {
 	var wg sync.WaitGroup
 	errCh := make(chan error, 3)
 	run := func(operation func() error) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			errCh <- operation()
-		}()
+		})
 	}
 	run(func() error {
 		return fillTable(ctx, db.Table(), prefix, tableName)

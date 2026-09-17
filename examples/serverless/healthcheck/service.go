@@ -232,5 +232,6 @@ func Serverless(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error on create service: %w", err)
 	}
+
 	return s.check(ctx, strings.Split(os.Getenv("URLS"), ","))
 }
