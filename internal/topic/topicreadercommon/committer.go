@@ -49,9 +49,10 @@ type Committer struct {
 	backgroundWorker background.Worker
 	tracer           *trace.Topic
 
-	m       xsync.Mutex
-	waiters []commitWaiter
-	commits CommitRanges
+	m        xsync.Mutex
+	waiters  []commitWaiter
+	commits  CommitRanges
+	requests []*commitRequest
 }
 
 func NewCommitterStopped(
@@ -153,6 +154,42 @@ func (c *Committer) pushCommit(commitRange CommitRange) (commitWaiter, error) {
 	return waiter, resErr
 }
 
+func (c *Committer) pushRequest(request *commitRequest) {
+	commitRange := request.commitRange
+	if !c.mode.CommitsEnabled() {
+		request.finishSend(ErrCommitDisabled)
+
+		return
+	}
+	if c.mode == CommitModeSync && commitRange.PartitionSession != nil &&
+		commitRange.PartitionSession.Context().Err() != nil {
+		request.finishSend(ErrPublicCommitSessionToExpiredSession)
+
+		return
+	}
+
+	var resErr error
+	c.m.WithLock(func() {
+		if c.backgroundWorker.Context().Err() != nil {
+			resErr = ErrPublicCommitSessionToExpiredSession
+
+			return
+		}
+
+		c.commits.Append(&commitRange)
+		c.requests = append(c.requests, request)
+	})
+	if resErr != nil {
+		request.finishSend(resErr)
+
+		return
+	}
+	select {
+	case c.commitLoopSignal <- struct{}{}:
+	default:
+	}
+}
+
 func (c *Committer) pushCommitsLoop(ctx context.Context) {
 	for {
 		c.waitSendTrigger(ctx)
@@ -186,10 +223,13 @@ func (c *Committer) pushCommitsLoop(ctx context.Context) {
 // This method is thread-safe and can be called concurrently with other operations.
 func (c *Committer) Flush() error {
 	var commits CommitRanges
+	var requests []*commitRequest
 
 	c.m.WithLock(func() {
 		commits = c.commits
 		c.commits = NewCommitRangesWithCapacity(commits.Len() * 2) //nolint:mnd
+		requests = c.requests
+		c.requests = nil
 	})
 
 	if commits.Len() == 0 {
@@ -206,6 +246,9 @@ func (c *Committer) Flush() error {
 	)
 	err := c.send(commits.ToRawMessage())
 	onDone(err)
+	for _, request := range requests {
+		request.finishSend(err)
+	}
 
 	return err
 }

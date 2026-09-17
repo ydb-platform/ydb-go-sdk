@@ -2,7 +2,6 @@ package topiclistenerinternal
 
 import (
 	"context"
-	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
@@ -10,16 +9,15 @@ import (
 
 //go:generate mockgen -source event_handler.go -destination event_handler_mock_test.go --typed -package topiclistenerinternal -write_package_comment=false
 
-// CommitHandler interface for PublicReadMessages commit operations
-type CommitHandler interface {
-	sendCommit(b *topicreadercommon.PublicBatch) error
-	getSyncCommitter() SyncCommitter
+// commitRequest is the listener's view of a single commit shared by its callers.
+type commitRequest interface {
+	Confirm()
+	Wait(ctx context.Context) error
 }
 
-// SyncCommitter interface for ConfirmWithAck support
-type SyncCommitter interface {
-	Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error
-	WaitAck(ctx context.Context, commitRange topicreadercommon.CommitRange) error
+// CommitHandler interface for PublicReadMessages commit operations
+type CommitHandler interface {
+	newCommitRequest(b *topicreadercommon.PublicBatch) commitRequest
 }
 
 type EventHandler interface {
@@ -54,10 +52,7 @@ type EventHandler interface {
 type PublicReadMessages struct {
 	PartitionSession topicreadercommon.PublicPartitionSession
 	Batch            *topicreadercommon.PublicBatch
-	commitHandler    CommitHandler
-	committed        atomic.Bool
-	confirmDone      empty.Chan
-	confirmErr       error
+	commitRequest    commitRequest
 }
 
 func NewPublicReadMessages(
@@ -68,8 +63,7 @@ func NewPublicReadMessages(
 	return &PublicReadMessages{
 		PartitionSession: session,
 		Batch:            batch,
-		commitHandler:    commitHandler,
-		confirmDone:      make(empty.Chan),
+		commitRequest:    commitHandler.newCommitRequest(batch),
 	}
 }
 
@@ -78,12 +72,7 @@ func NewPublicReadMessages(
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (e *PublicReadMessages) Confirm() {
-	if e.committed.Swap(true) {
-		return
-	}
-
-	e.confirmErr = e.commitHandler.sendCommit(e.Batch)
-	close(e.confirmDone)
+	e.commitRequest.Confirm()
 }
 
 // ConfirmWithAck commit the batch and wait ack from the server. The method will be blocked until
@@ -97,31 +86,8 @@ func (e *PublicReadMessages) ConfirmWithAck(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	commitRange := topicreadercommon.GetCommitRange(e.Batch)
-	if commitRange.PartitionSession.CommittedOffset() >= commitRange.CommitOffsetEnd {
-		return nil
-	}
-	if e.committed.CompareAndSwap(false, true) {
-		e.confirmErr = e.commitHandler.getSyncCommitter().Commit(ctx, commitRange)
-		close(e.confirmDone)
 
-		return e.confirmErr
-	}
-	select {
-	case <-e.confirmDone:
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-e.Batch.Context().Done():
-		return topicreadercommon.ErrPublicCommitSessionToExpiredSession
-	}
-	if commitRange.PartitionSession.CommittedOffset() >= commitRange.CommitOffsetEnd {
-		return nil
-	}
-	if e.confirmErr == nil {
-		return e.commitHandler.getSyncCommitter().WaitAck(ctx, commitRange)
-	}
-
-	return e.commitHandler.getSyncCommitter().Commit(ctx, commitRange)
+	return e.commitRequest.Wait(ctx)
 }
 
 // PublicEventStartPartitionSession

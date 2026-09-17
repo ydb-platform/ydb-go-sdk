@@ -14,6 +14,103 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
+// MockcommitRequest is a mock of commitRequest interface.
+type MockcommitRequest struct {
+	ctrl     *gomock.Controller
+	recorder *MockcommitRequestMockRecorder
+}
+
+// MockcommitRequestMockRecorder is the mock recorder for MockcommitRequest.
+type MockcommitRequestMockRecorder struct {
+	mock *MockcommitRequest
+}
+
+// NewMockcommitRequest creates a new mock instance.
+func NewMockcommitRequest(ctrl *gomock.Controller) *MockcommitRequest {
+	mock := &MockcommitRequest{ctrl: ctrl}
+	mock.recorder = &MockcommitRequestMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockcommitRequest) EXPECT() *MockcommitRequestMockRecorder {
+	return m.recorder
+}
+
+// Confirm mocks base method.
+func (m *MockcommitRequest) Confirm() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Confirm")
+}
+
+// Confirm indicates an expected call of Confirm.
+func (mr *MockcommitRequestMockRecorder) Confirm() *MockcommitRequestConfirmCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Confirm", reflect.TypeOf((*MockcommitRequest)(nil).Confirm))
+	return &MockcommitRequestConfirmCall{Call: call}
+}
+
+// MockcommitRequestConfirmCall wrap *gomock.Call
+type MockcommitRequestConfirmCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockcommitRequestConfirmCall) Return() *MockcommitRequestConfirmCall {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockcommitRequestConfirmCall) Do(f func()) *MockcommitRequestConfirmCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockcommitRequestConfirmCall) DoAndReturn(f func()) *MockcommitRequestConfirmCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// Wait mocks base method.
+func (m *MockcommitRequest) Wait(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Wait", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Wait indicates an expected call of Wait.
+func (mr *MockcommitRequestMockRecorder) Wait(ctx any) *MockcommitRequestWaitCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Wait", reflect.TypeOf((*MockcommitRequest)(nil).Wait), ctx)
+	return &MockcommitRequestWaitCall{Call: call}
+}
+
+// MockcommitRequestWaitCall wrap *gomock.Call
+type MockcommitRequestWaitCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockcommitRequestWaitCall) Return(arg0 error) *MockcommitRequestWaitCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockcommitRequestWaitCall) Do(f func(context.Context) error) *MockcommitRequestWaitCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockcommitRequestWaitCall) DoAndReturn(f func(context.Context) error) *MockcommitRequestWaitCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // MockCommitHandler is a mock of CommitHandler interface.
 type MockCommitHandler struct {
 	ctrl     *gomock.Controller
@@ -37,177 +134,40 @@ func (m *MockCommitHandler) EXPECT() *MockCommitHandlerMockRecorder {
 	return m.recorder
 }
 
-// getSyncCommitter mocks base method.
-func (m *MockCommitHandler) getSyncCommitter() SyncCommitter {
+// newCommitRequest mocks base method.
+func (m *MockCommitHandler) newCommitRequest(b *topicreadercommon.PublicBatch) commitRequest {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "getSyncCommitter")
-	ret0, _ := ret[0].(SyncCommitter)
+	ret := m.ctrl.Call(m, "newCommitRequest", b)
+	ret0, _ := ret[0].(commitRequest)
 	return ret0
 }
 
-// getSyncCommitter indicates an expected call of getSyncCommitter.
-func (mr *MockCommitHandlerMockRecorder) getSyncCommitter() *MockCommitHandlergetSyncCommitterCall {
+// newCommitRequest indicates an expected call of newCommitRequest.
+func (mr *MockCommitHandlerMockRecorder) newCommitRequest(b any) *MockCommitHandlernewCommitRequestCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getSyncCommitter", reflect.TypeOf((*MockCommitHandler)(nil).getSyncCommitter))
-	return &MockCommitHandlergetSyncCommitterCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "newCommitRequest", reflect.TypeOf((*MockCommitHandler)(nil).newCommitRequest), b)
+	return &MockCommitHandlernewCommitRequestCall{Call: call}
 }
 
-// MockCommitHandlergetSyncCommitterCall wrap *gomock.Call
-type MockCommitHandlergetSyncCommitterCall struct {
+// MockCommitHandlernewCommitRequestCall wrap *gomock.Call
+type MockCommitHandlernewCommitRequestCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockCommitHandlergetSyncCommitterCall) Return(arg0 SyncCommitter) *MockCommitHandlergetSyncCommitterCall {
+func (c *MockCommitHandlernewCommitRequestCall) Return(arg0 commitRequest) *MockCommitHandlernewCommitRequestCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockCommitHandlergetSyncCommitterCall) Do(f func() SyncCommitter) *MockCommitHandlergetSyncCommitterCall {
+func (c *MockCommitHandlernewCommitRequestCall) Do(f func(*topicreadercommon.PublicBatch) commitRequest) *MockCommitHandlernewCommitRequestCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockCommitHandlergetSyncCommitterCall) DoAndReturn(f func() SyncCommitter) *MockCommitHandlergetSyncCommitterCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// sendCommit mocks base method.
-func (m *MockCommitHandler) sendCommit(b *topicreadercommon.PublicBatch) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "sendCommit", b)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// sendCommit indicates an expected call of sendCommit.
-func (mr *MockCommitHandlerMockRecorder) sendCommit(b any) *MockCommitHandlersendCommitCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "sendCommit", reflect.TypeOf((*MockCommitHandler)(nil).sendCommit), b)
-	return &MockCommitHandlersendCommitCall{Call: call}
-}
-
-// MockCommitHandlersendCommitCall wrap *gomock.Call
-type MockCommitHandlersendCommitCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockCommitHandlersendCommitCall) Return(arg0 error) *MockCommitHandlersendCommitCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockCommitHandlersendCommitCall) Do(f func(*topicreadercommon.PublicBatch) error) *MockCommitHandlersendCommitCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockCommitHandlersendCommitCall) DoAndReturn(f func(*topicreadercommon.PublicBatch) error) *MockCommitHandlersendCommitCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// MockSyncCommitter is a mock of SyncCommitter interface.
-type MockSyncCommitter struct {
-	ctrl     *gomock.Controller
-	recorder *MockSyncCommitterMockRecorder
-}
-
-// MockSyncCommitterMockRecorder is the mock recorder for MockSyncCommitter.
-type MockSyncCommitterMockRecorder struct {
-	mock *MockSyncCommitter
-}
-
-// NewMockSyncCommitter creates a new mock instance.
-func NewMockSyncCommitter(ctrl *gomock.Controller) *MockSyncCommitter {
-	mock := &MockSyncCommitter{ctrl: ctrl}
-	mock.recorder = &MockSyncCommitterMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockSyncCommitter) EXPECT() *MockSyncCommitterMockRecorder {
-	return m.recorder
-}
-
-// Commit mocks base method.
-func (m *MockSyncCommitter) Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Commit", ctx, commitRange)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Commit indicates an expected call of Commit.
-func (mr *MockSyncCommitterMockRecorder) Commit(ctx, commitRange any) *MockSyncCommitterCommitCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockSyncCommitter)(nil).Commit), ctx, commitRange)
-	return &MockSyncCommitterCommitCall{Call: call}
-}
-
-// MockSyncCommitterCommitCall wrap *gomock.Call
-type MockSyncCommitterCommitCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockSyncCommitterCommitCall) Return(arg0 error) *MockSyncCommitterCommitCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockSyncCommitterCommitCall) Do(f func(context.Context, topicreadercommon.CommitRange) error) *MockSyncCommitterCommitCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockSyncCommitterCommitCall) DoAndReturn(f func(context.Context, topicreadercommon.CommitRange) error) *MockSyncCommitterCommitCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// WaitAck mocks base method.
-func (m *MockSyncCommitter) WaitAck(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitAck", ctx, commitRange)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// WaitAck indicates an expected call of WaitAck.
-func (mr *MockSyncCommitterMockRecorder) WaitAck(ctx, commitRange any) *MockSyncCommitterWaitAckCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitAck", reflect.TypeOf((*MockSyncCommitter)(nil).WaitAck), ctx, commitRange)
-	return &MockSyncCommitterWaitAckCall{Call: call}
-}
-
-// MockSyncCommitterWaitAckCall wrap *gomock.Call
-type MockSyncCommitterWaitAckCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockSyncCommitterWaitAckCall) Return(arg0 error) *MockSyncCommitterWaitAckCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockSyncCommitterWaitAckCall) Do(f func(context.Context, topicreadercommon.CommitRange) error) *MockSyncCommitterWaitAckCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockSyncCommitterWaitAckCall) DoAndReturn(f func(context.Context, topicreadercommon.CommitRange) error) *MockSyncCommitterWaitAckCall {
+func (c *MockCommitHandlernewCommitRequestCall) DoAndReturn(f func(*topicreadercommon.PublicBatch) commitRequest) *MockCommitHandlernewCommitRequestCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

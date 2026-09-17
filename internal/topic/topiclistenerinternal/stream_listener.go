@@ -575,21 +575,8 @@ func (l *streamListener) onCommitResponse(msg *rawtopicreader.CommitOffsetRespon
 	return nil
 }
 
-func (l *streamListener) sendCommit(b *topicreadercommon.PublicBatch) error {
-	commitRanges := topicreadercommon.CommitRanges{
-		Ranges: []topicreadercommon.CommitRange{topicreadercommon.GetCommitRange(b)},
-	}
-
-	if err := l.stream.Send(commitRanges.ToRawMessage()); err != nil {
-		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to send commit message: %w", err)))
-	}
-
-	return nil
-}
-
-// getSyncCommitter returns the syncCommitter for CommitHandler interface compatibility
-func (l *streamListener) getSyncCommitter() SyncCommitter {
-	return l.syncCommitter
+func (l *streamListener) newCommitRequest(b *topicreadercommon.PublicBatch) commitRequest {
+	return l.syncCommitter.NewCommitRequest(topicreadercommon.GetCommitRange(b))
 }
 
 // collectPendingFreeBytes drains all byte credits already queued in freeBytes after

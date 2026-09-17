@@ -114,16 +114,8 @@ func (m *mockMessageSender) GetFreedBuffer() []int {
 	return result
 }
 
-// Implement CommitHandler interface for tests
-func (m *mockMessageSender) sendCommit(b *topicreadercommon.PublicBatch) error {
-	// For tests, just record the commit as a message
-	m.SendRaw(&rawtopicreader.ReadRequest{BytesSize: -1}) // Use negative size to indicate commit
-
-	return nil
-}
-
-func (m *mockMessageSender) getSyncCommitter() SyncCommitter {
-	return &mockSyncCommitter{}
+func (m *mockMessageSender) newCommitRequest(*topicreadercommon.PublicBatch) commitRequest {
+	return &mockCommitRequest{sender: m}
 }
 
 func (m *mockMessageSender) GetMessages() []rawtopicreader.ClientMessage {
@@ -143,14 +135,20 @@ func (m *mockMessageSender) GetMessageCount() int {
 	return len(m.messages)
 }
 
-// mockSyncCommitter provides a mock implementation of SyncCommitter for tests
-type mockSyncCommitter struct{}
-
-func (m *mockSyncCommitter) Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
-	return nil
+type mockCommitRequest struct {
+	sender *mockMessageSender
+	once   sync.Once
 }
 
-func (m *mockSyncCommitter) WaitAck(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
+func (r *mockCommitRequest) Confirm() {
+	r.once.Do(func() {
+		r.sender.SendRaw(&rawtopicreader.ReadRequest{BytesSize: -1})
+	})
+}
+
+func (r *mockCommitRequest) Wait(context.Context) error {
+	r.Confirm()
+
 	return nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -20,7 +21,9 @@ func TestPublicReadMessagesConfirmWithAckAfterFailedConfirm(t *testing.T) {
 	session := topicreadercommon.BatchGetPartitionSession(batch)
 
 	commitHandler := NewMockCommitHandler(gomock.NewController(t))
-	commitHandler.EXPECT().sendCommit(batch).Return(context.Canceled)
+	commitHandler.EXPECT().newCommitRequest(batch).Return(&testCommitRequest{
+		onSent: func(context.Context) error { return context.Canceled },
+	})
 	event := NewPublicReadMessages(session.ToPublic(), batch, commitHandler)
 
 	session.Close()
@@ -33,26 +36,81 @@ func TestPublicReadMessagesConfirmWithAckAfterFailedConfirm(t *testing.T) {
 	)
 }
 
-func TestPublicReadMessagesConfirmWithAckRetriesFailedConfirm(t *testing.T) {
+func TestPublicReadMessagesConfirmWithAckReturnsFailedConfirm(t *testing.T) {
 	batch := createTestBatchWithBufferBytes(t, 1)
 	session := topicreadercommon.BatchGetPartitionSession(batch)
 	commitRange := topicreadercommon.GetCommitRange(batch)
 	commitHandler := NewMockCommitHandler(gomock.NewController(t))
-	syncCommitter := NewMockSyncCommitter(gomock.NewController(t))
-	commitHandler.EXPECT().sendCommit(batch).Return(errors.New("send failed"))
-	commitHandler.EXPECT().getSyncCommitter().Return(syncCommitter)
-	syncCommitter.EXPECT().Commit(gomock.Any(), commitRange).DoAndReturn(
-		func(context.Context, topicreadercommon.CommitRange) error {
-			session.SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
+	sendErr := errors.New("send failed")
+	waits := 0
+	request := &testCommitRequest{
+		onSent: func(context.Context) error { return sendErr },
+		onWait: func(ctx context.Context) error {
+			waits++
 
-			return nil
+			return sendErr
 		},
-	)
+	}
+	commitHandler.EXPECT().newCommitRequest(batch).Return(request)
 	event := NewPublicReadMessages(session.ToPublic(), batch, commitHandler)
 	event.Confirm()
+	event.Confirm()
 
-	require.NoError(t, event.ConfirmWithAck(context.Background()))
-	require.Equal(t, commitRange.CommitOffsetEnd, session.CommittedOffset())
+	require.ErrorIs(t, event.ConfirmWithAck(context.Background()), sendErr)
+	require.ErrorIs(t, event.ConfirmWithAck(context.Background()), sendErr)
+	require.EqualValues(t, 1, request.starts.Load())
+	require.Equal(t, 2, waits)
+	require.Less(t, session.CommittedOffset(), commitRange.CommitOffsetEnd)
+}
+
+func TestPublicReadMessagesConfirmWithAckWaitsForConcurrentConfirmError(t *testing.T) {
+	ctx := xtest.Context(t)
+	batch := createTestBatchWithBufferBytes(t, 1)
+	session := topicreadercommon.BatchGetPartitionSession(batch)
+	sendErr := errors.New("send failed")
+	started, release := make(chan struct{}), make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+	}()
+	commitHandler := NewMockCommitHandler(gomock.NewController(t))
+	request := &testCommitRequest{
+		onSent: func(context.Context) error {
+			close(started)
+			<-release
+
+			return sendErr
+		},
+		onWait: func(ctx context.Context) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-release:
+				return sendErr
+			}
+		},
+	}
+	commitHandler.EXPECT().newCommitRequest(batch).Return(request)
+	event := NewPublicReadMessages(session.ToPublic(), batch, commitHandler)
+	confirmDone := make(chan struct{})
+	go func() {
+		event.Confirm()
+		close(confirmDone)
+	}()
+	<-started
+	result := make(chan error, 1)
+	go func() { result <- event.ConfirmWithAck(ctx) }()
+	select {
+	case err := <-result:
+		t.Fatalf("ConfirmWithAck returned before Confirm finished: %v", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(release)
+	released = true
+	<-confirmDone
+	require.ErrorIs(t, <-result, sendErr)
 }
 
 func TestPublicReadMessagesConfirmWithAckAfterConfirm(t *testing.T) {
@@ -60,17 +118,50 @@ func TestPublicReadMessagesConfirmWithAckAfterConfirm(t *testing.T) {
 	session := topicreadercommon.BatchGetPartitionSession(batch)
 
 	commitErr := errors.New("commit failed")
-	syncCommitter := NewMockSyncCommitter(gomock.NewController(t))
-	syncCommitter.EXPECT().WaitAck(gomock.Any(), gomock.Any()).Times(2).Return(commitErr)
+	waits := 0
+	request := &testCommitRequest{onWait: func(context.Context) error {
+		waits++
+
+		return commitErr
+	}}
 	commitHandler := NewMockCommitHandler(gomock.NewController(t))
-	commitHandler.EXPECT().sendCommit(batch).Return(nil)
-	commitHandler.EXPECT().getSyncCommitter().AnyTimes().Return(syncCommitter)
+	commitHandler.EXPECT().newCommitRequest(batch).Return(request)
 	event := NewPublicReadMessages(session.ToPublic(), batch, commitHandler)
 
 	event.Confirm()
 
 	require.ErrorIs(t, event.ConfirmWithAck(context.Background()), commitErr)
 	require.ErrorIs(t, event.ConfirmWithAck(context.Background()), commitErr)
+	require.Equal(t, 2, waits)
+	require.EqualValues(t, 1, request.starts.Load())
+}
+
+func TestPublicReadMessagesConfirmWithAckWaitAckCancellationDoesNotPoisonEvent(t *testing.T) {
+	batch := createTestBatchWithBufferBytes(t, 1)
+	session := topicreadercommon.BatchGetPartitionSession(batch)
+	commitHandler := NewMockCommitHandler(gomock.NewController(t))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	waits := 0
+	request := &testCommitRequest{onWait: func(context.Context) error {
+		waits++
+		if waits == 1 {
+			cancel()
+
+			return ctx.Err()
+		}
+		session.SetCommittedOffsetForward(topicreadercommon.GetCommitRange(batch).CommitOffsetEnd)
+
+		return nil
+	}}
+	commitHandler.EXPECT().newCommitRequest(batch).Return(request)
+	event := NewPublicReadMessages(session.ToPublic(), batch, commitHandler)
+	event.Confirm()
+
+	require.ErrorIs(t, event.ConfirmWithAck(ctx), context.Canceled)
+	require.NoError(t, event.ConfirmWithAck(context.Background()))
+	require.Equal(t, topicreadercommon.GetCommitRange(batch).CommitOffsetEnd, session.CommittedOffset())
+	require.EqualValues(t, 1, request.starts.Load())
 }
 
 func TestPublicReadMessagesConfirmWithAckSkipsAcknowledgedBatch(t *testing.T) {
@@ -79,22 +170,15 @@ func TestPublicReadMessagesConfirmWithAckSkipsAcknowledgedBatch(t *testing.T) {
 			batch := createTestBatchWithBufferBytes(t, 1)
 			session := topicreadercommon.BatchGetPartitionSession(batch)
 			commitHandler := NewMockCommitHandler(gomock.NewController(t))
-			syncCommitter := NewMockSyncCommitter(gomock.NewController(t))
 			commitRange := topicreadercommon.GetCommitRange(batch)
-			commitHandler.EXPECT().getSyncCommitter().Return(syncCommitter)
-			acknowledge := func(context.Context, topicreadercommon.CommitRange) error {
+			request := &testCommitRequest{onWait: func(context.Context) error {
 				session.SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
 
 				return nil
-			}
-			if confirmFirst {
-				syncCommitter.EXPECT().WaitAck(gomock.Any(), commitRange).DoAndReturn(acknowledge)
-			} else {
-				syncCommitter.EXPECT().Commit(gomock.Any(), commitRange).DoAndReturn(acknowledge)
-			}
+			}}
+			commitHandler.EXPECT().newCommitRequest(batch).Return(request)
 			event := NewPublicReadMessages(session.ToPublic(), batch, commitHandler)
 			if confirmFirst {
-				commitHandler.EXPECT().sendCommit(batch).Return(nil)
 				event.Confirm()
 			}
 
@@ -106,6 +190,7 @@ func TestPublicReadMessagesConfirmWithAckSkipsAcknowledgedBatch(t *testing.T) {
 			session.Close()
 			require.ErrorIs(t, event.ConfirmWithAck(context.Background()),
 				topicreadercommon.ErrPublicCommitSessionToExpiredSession)
+			require.EqualValues(t, 1, request.starts.Load())
 		})
 	}
 }
@@ -114,7 +199,8 @@ func TestPublicReadMessagesConfirmWithAckAfterAcknowledgedConfirm(t *testing.T) 
 	batch := createTestBatchWithBufferBytes(t, 1)
 	session := topicreadercommon.BatchGetPartitionSession(batch)
 	commitHandler := NewMockCommitHandler(gomock.NewController(t))
-	commitHandler.EXPECT().sendCommit(batch).Return(nil)
+	request := &testCommitRequest{}
+	commitHandler.EXPECT().newCommitRequest(batch).Return(request)
 	event := NewPublicReadMessages(session.ToPublic(), batch, commitHandler)
 	event.Confirm()
 	session.SetCommittedOffsetForward(topicreadercommon.GetCommitRange(batch).CommitOffsetEnd)
@@ -125,10 +211,17 @@ func TestPublicReadMessagesConfirmWithAckAfterAcknowledgedConfirm(t *testing.T) 
 func TestPublicReadMessagesConfirmWithAckWaitsWithoutResendingAfterConfirm(t *testing.T) {
 	batch := createTestBatchWithBufferBytes(t, 1)
 	session := topicreadercommon.BatchGetPartitionSession(batch)
-	committer := &ackOnlySyncCommitter{ack: make(chan struct{})}
+	ack := make(chan struct{})
+	request := &testCommitRequest{onWait: func(ctx context.Context) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ack:
+			return nil
+		}
+	}}
 	commitHandler := NewMockCommitHandler(gomock.NewController(t))
-	commitHandler.EXPECT().sendCommit(batch).Return(nil)
-	commitHandler.EXPECT().getSyncCommitter().Return(committer)
+	commitHandler.EXPECT().newCommitRequest(batch).Return(request)
 	event := NewPublicReadMessages(session.ToPublic(), batch, commitHandler)
 	event.Confirm()
 
@@ -141,9 +234,9 @@ func TestPublicReadMessagesConfirmWithAckWaitsWithoutResendingAfterConfirm(t *te
 		t.Fatalf("ConfirmWithAck returned before the commit ACK: %v", err)
 	case <-time.After(20 * time.Millisecond):
 	}
-	require.Zero(t, committer.commits.Load(), "ConfirmWithAck must not resend Confirm's commit")
+	require.EqualValues(t, 1, request.starts.Load(), "ConfirmWithAck must not resend Confirm's commit")
 	session.SetCommittedOffsetForward(topicreadercommon.GetCommitRange(batch).CommitOffsetEnd)
-	close(committer.ack)
+	close(ack)
 	require.NoError(t, <-result)
 }
 
@@ -151,72 +244,193 @@ func TestPublicReadMessagesConfirmWithAckConcurrentCallsSendOneCommit(t *testing
 	ctx := xtest.Context(t)
 	batch := createTestBatchWithBufferBytes(t, 1)
 	session := topicreadercommon.BatchGetPartitionSession(batch)
-	committer := &blockingSyncCommitter{started: make(chan struct{}), release: make(chan struct{})}
+	started, release := make(chan struct{}), make(chan struct{})
 	released := false
 	defer func() {
 		if !released {
-			close(committer.release)
+			close(release)
 		}
 	}()
+	request := &testCommitRequest{
+		onStart: func() { close(started) },
+		onWait: func(ctx context.Context) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-release:
+				return nil
+			}
+		},
+	}
 	commitHandler := NewMockCommitHandler(gomock.NewController(t))
-	commitHandler.EXPECT().getSyncCommitter().Return(committer)
+	commitHandler.EXPECT().newCommitRequest(batch).Return(request)
 	event := NewPublicReadMessages(session.ToPublic(), batch, commitHandler)
 	first, second := make(chan error, 1), make(chan error, 1)
 	go func() { first <- event.ConfirmWithAck(ctx) }()
-	<-committer.started
+	<-started
 	go func() { second <- event.ConfirmWithAck(ctx) }()
 	select {
 	case err := <-second:
 		t.Fatalf("second confirmation returned before the first commit completed: %v", err)
 	case <-time.After(20 * time.Millisecond):
 	}
-	require.EqualValues(t, 1, committer.commits.Load())
+	require.EqualValues(t, 1, request.starts.Load())
 	session.SetCommittedOffsetForward(topicreadercommon.GetCommitRange(batch).CommitOffsetEnd)
-	close(committer.release)
+	close(release)
 	released = true
 	require.NoError(t, <-first)
 	require.NoError(t, <-second)
-	require.EqualValues(t, 1, committer.commits.Load())
+	require.EqualValues(t, 1, request.starts.Load())
 }
 
-type ackOnlySyncCommitter struct {
-	commits atomic.Int32
-	ack     chan struct{}
+func TestPublicReadMessagesConfirmWithAckConcurrentCallsReturnFirstError(t *testing.T) {
+	ctx := xtest.Context(t)
+	batch := createTestBatchWithBufferBytes(t, 1)
+	session := topicreadercommon.BatchGetPartitionSession(batch)
+	commitErr := errors.New("commit failed")
+	started, release := make(chan struct{}), make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+	}()
+	request := &testCommitRequest{
+		onStart: func() { close(started) },
+		onWait: func(ctx context.Context) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-release:
+				return commitErr
+			}
+		},
+	}
+	commitHandler := NewMockCommitHandler(gomock.NewController(t))
+	commitHandler.EXPECT().newCommitRequest(batch).Return(request)
+	event := NewPublicReadMessages(session.ToPublic(), batch, commitHandler)
+	first, second := make(chan error, 1), make(chan error, 1)
+	go func() { first <- event.ConfirmWithAck(ctx) }()
+	<-started
+	go func() { second <- event.ConfirmWithAck(ctx) }()
+	close(release)
+	released = true
+
+	require.ErrorIs(t, <-first, commitErr)
+	require.ErrorIs(t, <-second, commitErr)
+	require.EqualValues(t, 1, request.starts.Load())
 }
 
-func (c *ackOnlySyncCommitter) Commit(context.Context, topicreadercommon.CommitRange) error {
-	c.commits.Add(1)
+func TestPublicReadMessagesConfirmWithAckCallerCancellationDoesNotPoisonEvent(t *testing.T) {
+	batch := createTestBatchWithBufferBytes(t, 1)
+	session := topicreadercommon.BatchGetPartitionSession(batch)
+	commitRange := topicreadercommon.GetCommitRange(batch)
+	commitHandler := NewMockCommitHandler(gomock.NewController(t))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	waits := 0
+	request := &testCommitRequest{onWait: func(context.Context) error {
+		waits++
+		if waits == 1 {
+			cancel()
+
+			return ctx.Err()
+		}
+		session.SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
+
+		return nil
+	}}
+	commitHandler.EXPECT().newCommitRequest(batch).Return(request)
+	event := NewPublicReadMessages(session.ToPublic(), batch, commitHandler)
+
+	require.ErrorIs(t, event.ConfirmWithAck(ctx), context.Canceled)
+	require.NoError(t, event.ConfirmWithAck(context.Background()))
+	require.Equal(t, commitRange.CommitOffsetEnd, session.CommittedOffset())
+	require.EqualValues(t, 1, request.starts.Load())
+}
+
+func TestPublicReadMessagesConfirmDoesNotWaitForConcurrentAck(t *testing.T) {
+	ctx := xtest.Context(t)
+	batch := createTestBatchWithBufferBytes(t, 1)
+	session := topicreadercommon.BatchGetPartitionSession(batch)
+	started, release := make(chan struct{}), make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+	}()
+	request := &testCommitRequest{
+		onStart: func() { close(started) },
+		onWait: func(ctx context.Context) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-release:
+				return nil
+			}
+		},
+	}
+	commitHandler := NewMockCommitHandler(gomock.NewController(t))
+	commitHandler.EXPECT().newCommitRequest(batch).Return(request)
+	event := NewPublicReadMessages(session.ToPublic(), batch, commitHandler)
+	first := make(chan error, 1)
+	go func() { first <- event.ConfirmWithAck(ctx) }()
+	<-started
+
+	confirmDone := make(chan struct{})
+	go func() {
+		event.Confirm()
+		close(confirmDone)
+	}()
+	xtest.Receive(t, confirmDone, "Confirm during an in-flight ConfirmWithAck")
+	require.EqualValues(t, 1, request.starts.Load())
+
+	session.SetCommittedOffsetForward(topicreadercommon.GetCommitRange(batch).CommitOffsetEnd)
+	close(release)
+	released = true
+	require.NoError(t, <-first)
+}
+
+type testCommitRequest struct {
+	startOnce sync.Once
+	starts    atomic.Int32
+	onStart   func()
+	onSent    func(context.Context) error
+	onWait    func(context.Context) error
+}
+
+func (r *testCommitRequest) start() (started bool) {
+	r.startOnce.Do(func() {
+		started = true
+		r.starts.Add(1)
+		if r.onStart != nil {
+			r.onStart()
+		}
+	})
+
+	return started
+}
+
+func (r *testCommitRequest) Confirm() {
+	if r.start() {
+		_ = r.waitSent(context.Background())
+	}
+}
+
+func (r *testCommitRequest) waitSent(ctx context.Context) error {
+	if r.onSent != nil {
+		return r.onSent(ctx)
+	}
 
 	return nil
 }
 
-func (c *ackOnlySyncCommitter) WaitAck(ctx context.Context, _ topicreadercommon.CommitRange) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-c.ack:
-		return nil
+func (r *testCommitRequest) Wait(ctx context.Context) error {
+	r.start()
+	if r.onWait != nil {
+		return r.onWait(ctx)
 	}
-}
 
-type blockingSyncCommitter struct {
-	commits atomic.Int32
-	started chan struct{}
-	release chan struct{}
-}
-
-func (c *blockingSyncCommitter) Commit(ctx context.Context, _ topicreadercommon.CommitRange) error {
-	if c.commits.Add(1) == 1 {
-		close(c.started)
-	}
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-c.release:
-		return nil
-	}
-}
-
-func (c *blockingSyncCommitter) WaitAck(context.Context, topicreadercommon.CommitRange) error {
-	return nil
+	return r.waitSent(ctx)
 }
