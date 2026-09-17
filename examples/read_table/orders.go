@@ -88,7 +88,7 @@ type templateConfig struct {
 func fillTable(ctx context.Context, c table.Client, prefix string) (err error) {
 	return c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(
+			_, res, err := s.Execute(
 				ctx,
 				table.TxControl(
 					table.BeginTx(
@@ -118,8 +118,11 @@ func fillTable(ctx context.Context, c table.Client, prefix string) (err error) {
 					),
 				),
 			)
+			if err != nil {
+				return err
+			}
 
-			return err
+			return res.Close()
 		},
 		table.WithIdempotent(),
 	)

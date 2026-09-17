@@ -76,6 +76,11 @@ func runPeriodically(ctx context.Context, every time.Duration, operation func() 
 	defer ticker.Stop()
 
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		if err := operation(); err != nil {
 			return err
 		}

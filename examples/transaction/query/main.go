@@ -109,7 +109,23 @@ func txWithRetries(ctx context.Context, db *ydb.Driver) (words []string, _ error
 		if err != nil {
 			return err
 		}
-		for row := range rows.Rows(ctx) {
+		closeRows := func() error {
+			if rows == nil {
+				return nil
+			}
+			err := rows.Close(ctx)
+			rows = nil
+
+			return err
+		}
+		defer func() {
+			_ = closeRows()
+		}()
+
+		for row, err := range rows.Rows(ctx) {
+			if err != nil {
+				return err
+			}
 			var (
 				word string
 				ord  int
@@ -119,6 +135,9 @@ func txWithRetries(ctx context.Context, db *ydb.Driver) (words []string, _ error
 				return err
 			}
 			attemptWords = append(attemptWords, word)
+		}
+		if err = closeRows(); err != nil {
+			return err
 		}
 		words = attemptWords
 

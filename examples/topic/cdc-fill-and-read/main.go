@@ -54,8 +54,9 @@ func main() {
 
 	prepareTableWithCDC(ctx, db, prefix, tableName, topicPath, consumerName)
 
+	const workerCount = 3
 	var wg sync.WaitGroup
-	errCh := make(chan error, 3)
+	errCh := make(chan error, workerCount)
 	run := func(operation func() error) {
 		wg.Go(func() {
 			errCh <- operation()
@@ -81,6 +82,13 @@ func main() {
 	err = <-errCh
 	cancel()
 	wg.Wait()
+	for range workerCount - 1 {
+		workerErr := <-errCh
+		if (err == nil || errors.Is(err, context.Canceled)) &&
+			workerErr != nil && !errors.Is(workerErr, context.Canceled) {
+			err = workerErr
+		}
+	}
 	if err != nil && !errors.Is(err, context.Canceled) {
 		panic(err)
 	}

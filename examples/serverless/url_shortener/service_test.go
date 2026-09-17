@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func TestHashDistinguishesKnownFNV32Collision(t *testing.T) {
+func TestHashDistinguishesURLsThatCollidedUnderFNV32(t *testing.T) {
 	first := hash("url-332789")
 	second := hash("url-529192")
 	if first == second {
@@ -16,7 +16,7 @@ func TestHashDistinguishesKnownFNV32Collision(t *testing.T) {
 	}
 }
 
-func TestShortLinkValidationRequiresWholeStrongHash(t *testing.T) {
+func TestShortLinkValidationAcceptsLegacyAndStrongHashes(t *testing.T) {
 	valid := hash("https://example.com")
 
 	tests := []struct {
@@ -24,8 +24,10 @@ func TestShortLinkValidationRequiresWholeStrongHash(t *testing.T) {
 		link string
 		want bool
 	}{
-		{name: "valid", link: valid, want: true},
-		{name: "truncated", link: valid[:8], want: false},
+		{name: "strong", link: valid, want: true},
+		{name: "legacy", link: valid[:8], want: true},
+		{name: "too short", link: valid[:7], want: false},
+		{name: "partial strong", link: valid[:9], want: false},
 		{name: "suffix", link: valid + "x", want: false},
 	}
 	for _, tt := range tests {

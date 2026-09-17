@@ -216,6 +216,8 @@ func fillTablesWithData(ctx context.Context, db *sql.DB) (err error) {
 	return nil
 }
 
+// The drop-and-create callbacks are intentionally not marked idempotent: replaying one after an ambiguous
+// CREATE result could drop a table that the first attempt created successfully.
 func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 	err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
 		err = dropTableIfExists(ctx, cc, "series")

@@ -32,8 +32,10 @@ import (
 //go:embed static/index.html
 var static embed.FS
 
+const shortHashPattern = `[a-fA-F0-9]{8}(?:[a-fA-F0-9]{24})?`
+
 var (
-	short = regexp.MustCompile(`^[a-fA-F0-9]{32}$`)
+	short = regexp.MustCompile(`^` + shortHashPattern + `$`)
 	long  = regexp.MustCompile(`https?://(?:[-\w.]|%[\da-fA-F]{2})+`)
 )
 
@@ -173,7 +175,7 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (*service, 
 		))
 		s.router.HandleFunc("/", s.handleIndex).Methods(http.MethodGet)
 		s.router.HandleFunc("/shorten", s.handleShorten).Methods(http.MethodPost)
-		s.router.HandleFunc("/{short:[0-9a-fA-F]{32}}", s.handleLonger).Methods(http.MethodGet)
+		s.router.HandleFunc("/{short:"+shortHashPattern+"}", s.handleLonger).Methods(http.MethodGet)
 
 		err = s.createTable(ctx)
 		if err != nil {
@@ -243,15 +245,18 @@ func (s *service) insertShort(ctx context.Context, url string) (h string, err er
 	)
 	err = s.db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(ctx, writeTx, query,
+			_, res, err := s.Execute(ctx, writeTx, query,
 				table.NewQueryParameters(
 					table.ValueParam("$hash", types.TextValue(h)),
 					table.ValueParam("$src", types.TextValue(url)),
 				),
 				options.WithCollectStatsModeBasic(),
 			)
+			if err != nil {
+				return err
+			}
 
-			return
+			return res.Close()
 		},
 		table.WithIdempotent(),
 	)
