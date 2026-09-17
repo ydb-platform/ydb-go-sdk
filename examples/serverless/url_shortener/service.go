@@ -3,16 +3,15 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"embed"
 	"encoding/hex"
 	"fmt"
-	"hash/fnv"
 	"io"
 	"net/http"
 	"os"
 	"path"
 	"regexp"
-	"strings"
 	"sync"
 	"text/template"
 	"time"
@@ -25,7 +24,6 @@ import (
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
@@ -35,17 +33,14 @@ import (
 var static embed.FS
 
 var (
-	short = regexp.MustCompile(`[a-zA-Z0-9]{8}`)
+	short = regexp.MustCompile(`^[a-fA-F0-9]{32}$`)
 	long  = regexp.MustCompile(`https?://(?:[-\w.]|%[\da-fA-F]{2})+`)
 )
 
 func hash(s string) (string, error) {
-	hasher := fnv.New32a()
-	if _, err := hasher.Write([]byte(s)); err != nil {
-		return "", err
-	}
+	sum := sha256.Sum256([]byte(s))
 
-	return hex.EncodeToString(hasher.Sum(nil)), nil
+	return hex.EncodeToString(sum[:16]), nil
 }
 
 func isShortCorrect(link string) bool {
@@ -79,10 +74,32 @@ type service struct {
 	callsErrors  *prometheus.GaugeVec
 }
 
-var once sync.Once
+type serviceCache struct {
+	mu      sync.Mutex
+	service *service
+}
 
-func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service, err error) {
-	once.Do(func() {
+func (c *serviceCache) get(initService func() (*service, error)) (*service, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.service != nil {
+		return c.service, nil
+	}
+
+	s, err := initService()
+	if err != nil {
+		return nil, err
+	}
+	c.service = s
+
+	return s, nil
+}
+
+var services serviceCache
+
+func getService(ctx context.Context, dsn string, opts ...ydb.Option) (*service, error) {
+	return services.get(func() (*service, error) {
 		var (
 			registry = prometheus.NewRegistry()
 			calls    = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -136,7 +153,7 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 			),
 		)
 
-		s = &service{
+		s := &service{
 			registry: registry,
 			router:   mux.NewRouter(),
 
@@ -145,11 +162,10 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 			callsErrors:  callsErrors,
 		}
 
+		var err error
 		s.db, err = ydb.Open(ctx, dsn, opts...)
 		if err != nil {
-			err = fmt.Errorf("connect error: %w", err)
-
-			return
+			return nil, fmt.Errorf("connect error: %w", err)
 		}
 
 		s.router.Handle("/metrics", promhttp.InstrumentMetricHandler(
@@ -157,23 +173,17 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 		))
 		s.router.HandleFunc("/", s.handleIndex).Methods(http.MethodGet)
 		s.router.HandleFunc("/shorten", s.handleShorten).Methods(http.MethodPost)
-		s.router.HandleFunc("/{[0-9a-fA-F]{8}}", s.handleLonger).Methods(http.MethodGet)
+		s.router.HandleFunc("/{short:[0-9a-fA-F]{32}}", s.handleLonger).Methods(http.MethodGet)
 
 		err = s.createTable(ctx)
 		if err != nil {
 			_ = s.db.Close(ctx)
-			err = fmt.Errorf("error on create table: %w", err)
 
-			return
+			return nil, fmt.Errorf("error on create table: %w", err)
 		}
+
+		return s, nil
 	})
-	if err != nil {
-		once = sync.Once{}
-
-		return nil, err
-	}
-
-	return s, nil
 }
 
 func (s *service) Close(ctx context.Context) {
@@ -185,7 +195,7 @@ func (s *service) createTable(ctx context.Context) (err error) {
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 
-			CREATE TABLE urls (
+				CREATE TABLE IF NOT EXISTS urls (
 				src Text,
 				hash Text,
 
@@ -203,6 +213,7 @@ func (s *service) createTable(ctx context.Context) (err error) {
 
 			return err
 		},
+		table.WithIdempotent(),
 	)
 }
 
@@ -245,6 +256,7 @@ func (s *service) insertShort(ctx context.Context, url string) (h string, err er
 
 			return
 		},
+		table.WithIdempotent(),
 	)
 
 	return h, err
@@ -274,37 +286,55 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 		),
 		table.CommitTx(),
 	)
-	var res result.Result
 	err = s.db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
-			_, res, err = s.Execute(ctx, readTx, query,
+			_, res, err := s.Execute(ctx, readTx, query,
 				table.NewQueryParameters(
 					table.ValueParam("$hash", types.TextValue(hash)),
 				),
 				options.WithCollectStatsModeBasic(),
 			)
 
-			return err
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = res.Close()
+			}()
+
+			var src string
+			found := false
+			for res.NextResultSet(ctx) {
+				for res.NextRow() {
+					if err = res.ScanNamed(
+						named.OptionalWithDefault("src", &src),
+					); err != nil {
+						return err
+					}
+					url = src
+					found = true
+					break
+				}
+				if found {
+					break
+				}
+			}
+			if err = res.Err(); err != nil {
+				return err
+			}
+			if found {
+				return nil
+			}
+
+			return fmt.Errorf("hash '%s' is not found", hash)
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		return "", err
 	}
-	defer func() {
-		_ = res.Close()
-	}()
-	var src string
-	for res.NextResultSet(ctx) {
-		for res.NextRow() {
-			err = res.ScanNamed(
-				named.OptionalWithDefault("src", &src),
-			)
 
-			return src, err
-		}
-	}
-
-	return "", fmt.Errorf("hash '%s' is not found", hash)
+	return url, nil
 }
 
 func writeResponse(w http.ResponseWriter, statusCode int, body string) {
@@ -424,14 +454,14 @@ func (s *service) handleLonger(w http.ResponseWriter, r *http.Request) {
 			"success": successToString(err == nil),
 		}).Add(1)
 	}()
-	path := strings.Split(r.URL.Path, "/")
-	if !isShortCorrect(path[len(path)-1]) {
-		err = fmt.Errorf("'%s' is not a valid short path", path[len(path)-1])
+	shortLink := mux.Vars(r)["short"]
+	if !isShortCorrect(shortLink) {
+		err = fmt.Errorf("'%s' is not a valid short path", shortLink)
 		writeResponse(w, http.StatusBadRequest, err.Error())
 
 		return
 	}
-	url, err = s.selectLong(r.Context(), path[len(path)-1])
+	url, err = s.selectLong(r.Context(), shortLink)
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, err.Error())
 
@@ -452,6 +482,5 @@ func Serverless(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	defer s.Close(r.Context())
 	s.router.ServeHTTP(w, r)
 }

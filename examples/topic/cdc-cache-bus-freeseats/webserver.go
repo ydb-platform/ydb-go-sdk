@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
@@ -105,11 +106,14 @@ func (s *server) getContentFromDB(ctx context.Context, id string) (int64, error)
 	s.dbCounter.Add(1)
 	var freeSeats int64
 	err := s.db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-		var err error
-		freeSeats, err = s.getFreeSeatsTx(ctx, tx, id)
+		attemptFreeSeats, err := s.getFreeSeatsTx(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		freeSeats = attemptFreeSeats
 
-		return err
-	})
+		return nil
+	}, table.WithIdempotent())
 
 	return freeSeats, err
 }
@@ -124,6 +128,9 @@ SELECT freeSeats FROM bus WHERE id=$id;
 	if err != nil {
 		return 0, err
 	}
+	defer func() {
+		_ = res.Close()
+	}()
 
 	err = res.NextResultSetErr(ctx, "freeSeats")
 	if err != nil {
@@ -147,28 +154,35 @@ SELECT freeSeats FROM bus WHERE id=$id;
 func (s *server) sellTicket(ctx context.Context, id string) (int64, error) {
 	var freeSeats int64
 	err := s.db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-		var err error
-		freeSeats, err = s.getFreeSeatsTx(ctx, tx, id)
+		attemptFreeSeats, err := s.getFreeSeatsTx(ctx, tx, id)
 		if err != nil {
 			return err
 		}
-		if freeSeats < 0 {
+		if !hasAvailableSeats(attemptFreeSeats) {
 			return fmt.Errorf("failed to sell ticket: %w", errNotEnthoughtFreeSeats)
 		}
 
-		_, err = tx.Execute(ctx, `
+		res, err := tx.Execute(ctx, `
 DECLARE $id AS Text;
 
 UPDATE bus SET freeSeats = freeSeats - 1 WHERE id=$id;
 `, table.NewQueryParameters(table.ValueParam("$id", types.UTF8Value(id))))
+		if err != nil {
+			return err
+		}
+		if err = res.Close(); err != nil {
+			return err
+		}
+		freeSeats = attemptFreeSeats - 1
 
-		return err
+		return nil
 	})
-	if err == nil {
-		freeSeats--
-	}
 
 	return freeSeats, err
+}
+
+func hasAvailableSeats(freeSeats int64) bool {
+	return freeSeats > 0
 }
 
 func (s *server) IndexPageHandler(writer http.ResponseWriter, request *http.Request) {
@@ -176,26 +190,35 @@ func (s *server) IndexPageHandler(writer http.ResponseWriter, request *http.Requ
 
 	var busIDs []string
 
-	err := s.db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-		res, err := tx.Execute(ctx, "SELECT id FROM bus ORDER BY id", nil)
+	err := s.db.Query().Do(ctx, func(ctx context.Context, session query.Session) error {
+		res, err := session.Query(ctx, "SELECT id FROM bus ORDER BY id")
 		if err != nil {
 			return err
 		}
+		defer func() {
+			_ = res.Close(ctx)
+		}()
 
-		res.NextResultSet(ctx, "id")
-
-		for res.HasNextRow() {
-			res.NextRow()
-			var id string
-			err = res.ScanWithDefaults(&id)
+		var attemptBusIDs []string
+		for resultSet, err := range res.ResultSets(ctx) {
 			if err != nil {
 				return err
 			}
-			busIDs = append(busIDs, id)
+			for row, err := range resultSet.Rows(ctx) {
+				if err != nil {
+					return err
+				}
+				var id string
+				if err = row.Scan(&id); err != nil {
+					return err
+				}
+				attemptBusIDs = append(attemptBusIDs, id)
+			}
 		}
+		busIDs = attemptBusIDs
 
 		return nil
-	})
+	}, query.WithIdempotent())
 	if err != nil {
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 

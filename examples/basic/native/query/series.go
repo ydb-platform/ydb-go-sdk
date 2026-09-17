@@ -15,8 +15,10 @@ import (
 )
 
 func read(ctx context.Context, c query.Client, prefix string) error {
-	return c.Do(ctx,
+	var messages []string
+	err := c.Do(ctx,
 		func(ctx context.Context, s query.Session) (err error) {
+			var attemptMessages []string
 			result, err := s.Query(ctx, fmt.Sprintf(`
 					SELECT
 						series_id,
@@ -54,14 +56,23 @@ func read(ctx context.Context, c query.Client, prefix string) error {
 						return err
 					}
 
-					log.Printf("id: %v, title: %v, release: %v",
-						row.SeriesID, row.Title, row.ReleaseDate)
+					attemptMessages = append(attemptMessages, fmt.Sprintf(
+						"id: %v, title: %v, release: %v",
+						row.SeriesID, row.Title, row.ReleaseDate,
+					))
 				}
 			}
+			messages = attemptMessages
 
 			return nil
 		},
+		query.WithIdempotent(),
 	)
+	for _, message := range messages {
+		log.Print(message)
+	}
+
+	return err
 }
 
 func fillTablesWithData(ctx context.Context, c query.Client, prefix string) error {

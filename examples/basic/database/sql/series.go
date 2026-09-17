@@ -244,7 +244,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 		}
 
 		return nil
-	}, retry.WithIdempotent(true))
+	})
 	if err != nil {
 		return fmt.Errorf("create table failed: %w", err)
 	}
@@ -277,7 +277,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 		}
 
 		return nil
-	}, retry.WithIdempotent(true))
+	})
 	if err != nil {
 		return fmt.Errorf("create table failed: %w", err)
 	}
@@ -312,7 +312,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 		}
 
 		return nil
-	}, retry.WithIdempotent(true))
+	})
 	if err != nil {
 		return fmt.Errorf("create table failed: %w", err)
 	}

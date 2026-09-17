@@ -15,7 +15,6 @@ import (
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
@@ -25,11 +24,33 @@ type service struct {
 	client *http.Client
 }
 
-var once sync.Once
+type serviceCache struct {
+	mu      sync.Mutex
+	service *service
+}
 
-func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service, err error) {
-	once.Do(func() {
-		s = &service{
+func (c *serviceCache) get(initService func() (*service, error)) (*service, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.service != nil {
+		return c.service, nil
+	}
+
+	s, err := initService()
+	if err != nil {
+		return nil, err
+	}
+	c.service = s
+
+	return s, nil
+}
+
+var services serviceCache
+
+func getService(ctx context.Context, dsn string, opts ...ydb.Option) (*service, error) {
+	return services.get(func() (*service, error) {
+		s := &service{
 			client: &http.Client{
 				Transport: &http.Transport{
 					TLSClientConfig: &tls.Config{
@@ -39,25 +60,20 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 				Timeout: time.Second * 10,
 			},
 		}
+		var err error
 		s.db, err = ydb.Open(ctx, dsn, opts...)
 		if err != nil {
-			err = fmt.Errorf("connect error: %w", err)
-
-			return
+			return nil, fmt.Errorf("connect error: %w", err)
 		}
 		err = s.createTableIfNotExists(ctx)
 		if err != nil {
 			_ = s.db.Close(ctx)
-			err = fmt.Errorf("error on create table: %w", err)
+
+			return nil, fmt.Errorf("error on create table: %w", err)
 		}
+
+		return s, nil
 	})
-	if err != nil {
-		once = sync.Once{}
-
-		return nil, err
-	}
-
-	return s, nil
 }
 
 func (s *service) Close(ctx context.Context) {
@@ -65,17 +81,10 @@ func (s *service) Close(ctx context.Context) {
 }
 
 func (s *service) createTableIfNotExists(ctx context.Context) error {
-	exists, err := sugar.IsTableExists(ctx, s.db.Scheme(), path.Join(s.db.Name(), prefix, "healthchecks"))
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
 	query := fmt.Sprintf(`
-		PRAGMA TablePathPrefix("%s");
+			PRAGMA TablePathPrefix("%s");
 
-		CREATE TABLE healthchecks (
+			CREATE TABLE IF NOT EXISTS healthchecks (
 			url         Text,
 			code        Int32,
 			ts          DateTime,
@@ -90,6 +99,7 @@ func (s *service) createTableIfNotExists(ctx context.Context) error {
 		func(ctx context.Context, s table.Session) error {
 			return s.ExecuteSchemeQuery(ctx, query)
 		},
+		table.WithIdempotent(),
 	)
 }
 
@@ -122,31 +132,39 @@ type row struct {
 	err  error
 }
 
+func expandURLs(groups []string) []string {
+	var urls []string
+	for _, group := range groups {
+		urls = append(urls, strings.Fields(group)...)
+	}
+
+	return urls
+}
+
 func (s *service) check(ctx context.Context, urls []string) error {
-	if len(urls) == 0 {
+	targets := expandURLs(urls)
+	if len(targets) == 0 {
 		return nil
 	}
 	wg := &sync.WaitGroup{}
-	rows := make([]row, len(urls))
-	for idx := range urls {
-		for u := range strings.SplitSeq(urls[idx], " ") {
-			wg.Add(1)
-			go func(idx int, u string) {
-				defer wg.Done()
-				out := " > '" + u + "' => "
-				code, err := s.ping(ctx, u)
-				if err != nil {
-					fmt.Println(out + err.Error())
-				} else {
-					fmt.Println(out + strconv.Itoa(int(code)))
-				}
-				rows[idx] = row{
-					url:  urls[idx],
-					code: code,
-					err:  err,
-				}
-			}(idx, u)
-		}
+	rows := make([]row, len(targets))
+	for idx, u := range targets {
+		wg.Add(1)
+		go func(idx int, u string) {
+			defer wg.Done()
+			out := " > '" + u + "' => "
+			code, err := s.ping(ctx, u)
+			if err != nil {
+				fmt.Println(out + err.Error())
+			} else {
+				fmt.Println(out + strconv.Itoa(int(code)))
+			}
+			rows[idx] = row{
+				url:  u,
+				code: code,
+				err:  err,
+			}
+		}(idx, u)
 	}
 	wg.Wait()
 
@@ -194,6 +212,7 @@ func (s *service) upsertRows(ctx context.Context, rows []row) (err error) {
 
 			return err
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		return fmt.Errorf("error on upsert rows: %w", err)
@@ -213,7 +232,5 @@ func Serverless(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error on create service: %w", err)
 	}
-	defer s.Close(ctx)
-
 	return s.check(ctx, strings.Split(os.Getenv("URLS"), ","))
 }

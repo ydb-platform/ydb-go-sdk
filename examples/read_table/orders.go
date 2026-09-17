@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log"
 	"text/template"
 	"time"
@@ -120,6 +121,7 @@ func fillTable(ctx context.Context, c table.Client, prefix string) (err error) {
 
 			return err
 		},
+		table.WithIdempotent(),
 	)
 }
 
@@ -138,6 +140,7 @@ func order(customerID, orderID uint64, description, date string) types.Value {
 }
 
 func readTable(ctx context.Context, c table.Client, path string, opts ...options.ReadTableOption) (err error) {
+	var messages []string
 	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			res, err := s.StreamReadTable(ctx, path, opts...)
@@ -148,6 +151,7 @@ func readTable(ctx context.Context, c table.Client, path string, opts ...options
 				_ = res.Close()
 			}()
 			r := row{}
+			var attemptMessages []string
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
 					if res.CurrentResultSet().ColumnCount() == 4 {
@@ -160,9 +164,10 @@ func readTable(ctx context.Context, c table.Client, path string, opts ...options
 						if err != nil {
 							return err
 						}
-						log.Printf("#  Order, CustomerId: %d, OrderId: %d, Description: %s, Order date: %s",
+						attemptMessages = append(attemptMessages, fmt.Sprintf(
+							"#  Order, CustomerId: %d, OrderId: %d, Description: %s, Order date: %s",
 							r.id, r.orderID, r.description, r.date.Format("2006-01-02"),
-						)
+						))
 					} else {
 						err = res.ScanNamed(
 							named.OptionalWithDefault("customer_id", &r.id),
@@ -172,14 +177,25 @@ func readTable(ctx context.Context, c table.Client, path string, opts ...options
 						if err != nil {
 							return err
 						}
-						log.Printf("#  Order, CustomerId: %d, OrderId: %d, Order date: %s", r.id, r.orderID, r.date.Format("2006-01-02"))
+						attemptMessages = append(attemptMessages, fmt.Sprintf(
+							"#  Order, CustomerId: %d, OrderId: %d, Order date: %s",
+							r.id, r.orderID, r.date.Format("2006-01-02"),
+						))
 					}
 				}
 			}
+			if err = res.Err(); err != nil {
+				return err
+			}
+			messages = attemptMessages
 
-			return res.Err()
+			return nil
 		},
+		table.WithIdempotent(),
 	)
+	for _, message := range messages {
+		log.Print(message)
+	}
 
 	return err
 }

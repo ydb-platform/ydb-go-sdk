@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"path"
+	"sync"
 	"time"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
@@ -29,6 +31,7 @@ func main() {
 	if useEnvCredentials {
 		opts = append(opts, environ.WithEnvironCredentials())
 	}
+	opts = append(opts, ydb.WithLazyTx(true))
 
 	db, err := ydb.Open(
 		ctx,
@@ -38,7 +41,11 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("connect error: %w", err))
 	}
-	defer func() { _ = db.Close(ctx) }()
+	defer func() {
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+		_ = db.Close(closeCtx)
+	}()
 
 	prefix := path.Join(db.Name())
 	tableName := "cdc"
@@ -47,13 +54,38 @@ func main() {
 
 	prepareTableWithCDC(ctx, db, prefix, tableName, topicPath, consumerName)
 
-	go fillTable(ctx, db.Table(), prefix, tableName)
-	go func() {
-		time.Sleep(interval / 2)
-		removeFromTable(ctx, db.Table(), prefix, tableName)
-	}()
+	var wg sync.WaitGroup
+	errCh := make(chan error, 3)
+	run := func(operation func() error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errCh <- operation()
+		}()
+	}
+	run(func() error {
+		return fillTable(ctx, db.Table(), prefix, tableName)
+	})
+	run(func() error {
+		timer := time.NewTimer(interval / 2)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			return removeFromTable(ctx, db.Table(), prefix, tableName)
+		}
+	})
+	run(func() error {
+		return cdcRead(ctx, db, consumerName, topicPath)
+	})
 
-	cdcRead(ctx, db, consumerName, topicPath)
+	err = <-errCh
+	cancel()
+	wg.Wait()
+	if err != nil && !errors.Is(err, context.Canceled) {
+		panic(err)
+	}
 }
 
 func readFlags() {

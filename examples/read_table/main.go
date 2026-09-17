@@ -210,31 +210,36 @@ func main() {
 	log.Println("Parallel read all rows from shards")
 	var description options.Description
 	err = db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
-		description, err = s.DescribeTable(ctx, tableName)
+		attemptDescription, err := s.DescribeTable(ctx, tableName)
 		if err != nil {
 			return err
 		}
+		description = attemptDescription
 
 		return nil
-	})
+	}, table.WithIdempotent())
 	if err != nil {
 		panic(fmt.Errorf("describe table error: %w", err))
 	}
 	var wg sync.WaitGroup
+	errCh := make(chan error, len(description.KeyRanges))
 	wg.Add(len(description.KeyRanges))
 	for _, shard := range description.KeyRanges {
-		go func(options.KeyRange) {
+		go func(shard options.KeyRange) {
 			defer wg.Done()
-			err = readTable(
+			if err := readTable(
 				ctx,
 				db.Table(),
 				path.Join(prefix, tableName),
 				options.ReadKeyRange(shard),
-			)
-			if err != nil {
-				panic(fmt.Errorf("shard %q read error: %w", shard.String(), err))
+			); err != nil {
+				errCh <- fmt.Errorf("shard %q read error: %w", shard.String(), err)
 			}
 		}(shard)
 	}
 	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		panic(err)
+	}
 }
