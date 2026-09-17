@@ -56,7 +56,51 @@ func TestCommitterCommitDisabled(t *testing.T) {
 	require.ErrorIs(t, err, ErrCommitDisabled)
 }
 
+func TestCommitterWaitAckDoesNotQueueAnotherCommit(t *testing.T) {
+	ctx := xtest.Context(t)
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync, nil)
+	defer func() { _ = committer.Close(ctx, nil) }()
+	session := newTestPartitionSession(ctx, 1)
+	commitRange := CommitRange{
+		PartitionSession:  session,
+		CommitOffsetStart: 1,
+		CommitOffsetEnd:   2,
+	}
+	result := make(chan error, 1)
+	go func() {
+		result <- committer.WaitAck(ctx, commitRange)
+	}()
+	require.Eventually(t, func() bool {
+		var waiting bool
+		committer.m.WithLock(func() {
+			waiting = len(committer.waiters) == 1 && committer.commits.Len() == 0
+		})
+
+		return waiting
+	}, time.Second, time.Millisecond)
+	session.SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
+	committer.OnCommitNotify(session, commitRange.CommitOffsetEnd)
+	require.NoError(t, <-result)
+}
+
 func TestCommitterCommitAsync(t *testing.T) {
+	t.Run("ExpiredSessionStillQueuesCommit", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		session := newTestPartitionSession(ctx, 1)
+		committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeAsync, nil)
+		session.Close()
+
+		err := committer.Commit(ctx, CommitRange{
+			PartitionSession:  session,
+			CommitOffsetStart: 1,
+			CommitOffsetEnd:   2,
+		})
+		require.NoError(t, err)
+		committer.m.WithLock(func() {
+			require.Equal(t, 1, committer.commits.Len())
+		})
+	})
+
 	t.Run("SendCommit", func(t *testing.T) {
 		ctx := xtest.Context(t)
 		session := newTestPartitionSession(context.Background(), 1)

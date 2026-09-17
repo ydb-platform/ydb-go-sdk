@@ -150,6 +150,10 @@ func (m *mockSyncCommitter) Commit(ctx context.Context, commitRange topicreaderc
 	return nil
 }
 
+func (m *mockSyncCommitter) WaitAck(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
+	return nil
+}
+
 func createTestPartitionSession() *topicreadercommon.PartitionSession {
 	ctx := context.Background()
 
@@ -240,6 +244,38 @@ func createTestBatchWithBufferBytes(t *testing.T, size int) *topicreadercommon.P
 // =============================================================================
 // INTERFACE TESTS - Test external behavior through public API only
 // =============================================================================
+
+func TestPartitionWorkerBatchMergeFailureDoesNotDeadlock(t *testing.T) {
+	session := createTestPartitionSession()
+	first, err := topicreadercommon.NewBatch(session, nil)
+	require.NoError(t, err)
+	second, err := topicreadercommon.NewBatch(session, nil)
+	require.NoError(t, err)
+	topicreadercommon.BatchSetCommitRangeForTest(first, topicreadercommon.CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+	topicreadercommon.BatchSetCommitRangeForTest(second, topicreadercommon.CommitRange{
+		PartitionSession: session, CommitOffsetStart: 4, CommitOffsetEnd: 5,
+	})
+	stopped := make(chan error, 1)
+	worker := NewPartitionWorker(456, session, newMockMessageSender(),
+		NewMockEventHandler(gomock.NewController(t)),
+		func(_ rawtopicreader.PartitionSessionID, reason error) { stopped <- reason },
+		&trace.Topic{}, "test-listener")
+	metadata := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
+	worker.AddMessagesBatch(metadata, first)
+	done := make(chan struct{})
+	go func() {
+		worker.AddMessagesBatch(metadata, second)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("adding a batch deadlocked while reporting a merge error")
+	}
+	require.ErrorContains(t, xtest.Receive(t, stopped, "the batch merge failure"), "bad offset interval for merge")
+}
 
 func TestPartitionWorkerInterface_StartPartitionSessionFlow(t *testing.T) {
 	ctx := xtest.Context(t)
@@ -649,8 +685,8 @@ func TestPartitionWorkerInterface_CloseFreesQueuedBatchCredits(t *testing.T) {
 	worker.Start(ctx)
 
 	metadata1 := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
-	// Different metadata prevents tryMergeMessages from joining two batches into one
-	// queue item (would look like a single FreeBuffer call in the assertion).
+	// Different metadata keeps the batches as separate queue items,
+	// producing two buffer-release calls.
 	metadata2 := rawtopiccommon.ServerMessageMetadata{
 		Status: rawydb.StatusSuccess,
 		Issues: rawydb.Issues{{Message: "different metadata to prevent queue merge"}},

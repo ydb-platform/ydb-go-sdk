@@ -9,6 +9,8 @@ import (
 
 // EventHandler methods will be called sequentially by partition,
 // but can be called in parallel for different partitions.
+// Callbacks must return when their context is canceled; reconnect and WaitStop
+// wait for active callbacks to finish.
 // You should include topiclistener.BaseHandler into your struct for the interface implementation
 // It allows to extend the interface in the future without broke compatibility.
 //

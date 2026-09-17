@@ -254,6 +254,47 @@ func TestStreamListenerCloseWaitsForRemovedWorker(t *testing.T) {
 	require.NoError(t, listener.Close(xtest.ContextWithCommonTimeout(sf.Context(e), t), ErrUserCloseTopic))
 }
 
+func TestStreamListenerCloseWaitsForStartingWorker(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+	startEntered := make(chan struct{})
+	allowStart := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(allowStart)
+		}
+	}()
+	listener.tracer.OnPartitionWorkerStart = func(trace.TopicPartitionWorkerStartInfo) {
+		close(startEntered)
+		<-allowStart
+	}
+
+	created := make(chan *PartitionWorker, 1)
+	session := PartitionSession(e)
+	go func() {
+		created <- listener.createWorkerForPartition(session)
+	}()
+	xtest.WaitChannelClosed(t, startEntered)
+
+	closeResult := make(chan error, 1)
+	closeCtx := xtest.ContextWithCommonTimeout(sf.Context(e), t)
+	go func() {
+		closeResult <- listener.Close(closeCtx, ErrUserCloseTopic)
+	}()
+
+	select {
+	case err := <-closeResult:
+		t.Fatalf("Close returned before worker startup completed: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(allowStart)
+	released = true
+	require.NotNil(t, <-created)
+	require.NoError(t, <-closeResult)
+}
+
 func TestStreamListenerStoppedWorkerKeepsReplacement(t *testing.T) {
 	e := fixenv.New(t)
 	ctx := sf.Context(e)
@@ -270,6 +311,50 @@ func TestStreamListenerStoppedWorkerKeepsReplacement(t *testing.T) {
 	})
 	require.Same(t, replacement, current)
 	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
+}
+
+func TestStreamListenerMergeFailureClosesWorkerWithoutSecondClose(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+	session := PartitionSession(e)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+	}()
+	EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(context.Context, *PublicEventStartPartitionSession) error {
+			close(entered)
+			<-release
+
+			return nil
+		},
+	)
+	worker := listener.createWorkerForPartition(session)
+	worker.AddRawServerMessage(&rawtopicreader.StartPartitionSessionRequest{})
+	xtest.WaitChannelClosed(t, entered)
+	first, err := topicreadercommon.NewBatch(session, nil)
+	require.NoError(t, err)
+	second, err := topicreadercommon.NewBatch(session, nil)
+	require.NoError(t, err)
+	topicreadercommon.BatchSetCommitRangeForTest(first, topicreadercommon.CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+	topicreadercommon.BatchSetCommitRangeForTest(second, topicreadercommon.CommitRange{
+		PartitionSession: session, CommitOffsetStart: 4, CommitOffsetEnd: 5,
+	})
+	metadata := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
+	worker.AddMessagesBatch(metadata, first)
+	worker.AddMessagesBatch(metadata, second)
+	require.Eventually(t, listener.closing.Load, time.Second, time.Millisecond)
+	close(release)
+	released = true
+	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
+	require.ErrorContains(t, listener.background.CloseReason(), "bad offset interval for merge")
 }
 
 func TestNewStreamListenerWaitsForFailedInitCleanup(t *testing.T) {

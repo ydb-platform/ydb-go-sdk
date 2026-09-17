@@ -699,9 +699,14 @@ func (l *streamListener) onWorkerStopped(
 		closeWorker = !state.closeStarted
 		state.closeStarted = true
 	})
-	if closeWorker {
-		// This callback runs in the worker goroutine, so its join must be asynchronous.
-		l.closeWorkerAfterStop(state, reason)
+	// If reason from worker, propagate to streamListener shutdown
+	// But avoid cascading shutdowns for normal lifecycle events like queue closure during shutdown
+	if reason != nil && !l.closing.Load() {
+		// Only propagate reason if we're not already closing
+		// and if it's not a normal queue closure reason (which can happen during shutdown)
+		if !xerrors.Is(reason, errPartitionQueueClosed) {
+			l.goClose(l.background.Context(), reason)
+		}
 	}
 
 	// Remove corresponding session
@@ -713,14 +718,9 @@ func (l *streamListener) onWorkerStopped(
 		}
 	}
 
-	// If reason from worker, propagate to streamListener shutdown
-	// But avoid cascading shutdowns for normal lifecycle events like queue closure during shutdown
-	if reason != nil && !l.closing.Load() {
-		// Only propagate reason if we're not already closing
-		// and if it's not a normal queue closure reason (which can happen during shutdown)
-		if !xerrors.Is(reason, errPartitionQueueClosed) {
-			l.goClose(l.background.Context(), reason)
-		}
+	if closeWorker {
+		// This callback may run in the worker goroutine, so its join must be asynchronous.
+		l.closeWorkerAfterStop(state, reason)
 	}
 }
 
@@ -739,14 +739,12 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 		l.listenerID,
 	)
 
-	// Store worker in map
+	// Register and start under the same lock so shutdown cannot close an unstarted worker.
 	l.m.WithLock(func() {
 		l.workers[session.StreamPartitionSessionID] = worker
 		l.workerStateLocked(worker)
+		worker.Start(l.background.Context())
 	})
-
-	// Start worker
-	worker.Start(l.background.Context())
 
 	return worker
 }

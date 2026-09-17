@@ -196,6 +196,36 @@ func TestTopicListenerReconnectorWaitStopWaitsAfterCloseDeadline(t *testing.T) {
 	require.NoError(t, listener.WaitStop(xtest.ContextWithCommonTimeout(ctx, t)))
 }
 
+func TestTopicListenerReconnectorKeepsTerminalErrorWhenCloseWins(t *testing.T) {
+	ctx := xtest.Context(t)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	listener := &TopicListenerReconnector{stopped: make(chan struct{})}
+	listener.background.Start("blocked connection", func(context.Context) {
+		defer close(listener.stopped)
+		close(started)
+		<-release
+	})
+	<-started
+
+	closeResult := make(chan error, 1)
+	go func() {
+		closeResult <- listener.Close(ctx, ErrUserCloseTopic)
+	}()
+	<-listener.background.Done()
+
+	terminalErr := errors.New("terminal reconnect error")
+	stopResult := make(chan struct{})
+	go func() {
+		listener.stopWithError(context.Background(), terminalErr)
+		close(stopResult)
+	}()
+	close(release)
+	require.NoError(t, <-closeResult)
+	<-stopResult
+	require.ErrorIs(t, listener.WaitStop(ctx), terminalErr)
+}
+
 func TestTopicListenerReconnectorWaitStopWaitsForReadHandler(t *testing.T) {
 	ctx := xtest.Context(t)
 	cfg := NewStreamListenerConfig()

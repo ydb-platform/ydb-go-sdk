@@ -19,6 +19,7 @@ type CommitHandler interface {
 // SyncCommitter interface for ConfirmWithAck support
 type SyncCommitter interface {
 	Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error
+	WaitAck(ctx context.Context, commitRange topicreadercommon.CommitRange) error
 }
 
 type EventHandler interface {
@@ -30,7 +31,8 @@ type EventHandler interface {
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	OnStartPartitionSessionRequest(ctx context.Context, event *PublicEventStartPartitionSession) error
 
-	// OnReadMessages called with batch of messages. Max count of messages limited by internal buffer size
+	// OnReadMessages called with batch of messages. Max count of messages limited by internal buffer size.
+	// The callback must return when ctx is canceled: shutdown and reconnect wait for it to finish.
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	OnReadMessages(ctx context.Context, event *PublicReadMessages) error
@@ -54,6 +56,8 @@ type PublicReadMessages struct {
 	Batch            *topicreadercommon.PublicBatch
 	commitHandler    CommitHandler
 	committed        atomic.Bool
+	confirmDone      empty.Chan
+	confirmErr       error
 }
 
 func NewPublicReadMessages(
@@ -65,6 +69,7 @@ func NewPublicReadMessages(
 		PartitionSession: session,
 		Batch:            batch,
 		commitHandler:    commitHandler,
+		confirmDone:      make(empty.Chan),
 	}
 }
 
@@ -77,7 +82,8 @@ func (e *PublicReadMessages) Confirm() {
 		return
 	}
 
-	_ = e.commitHandler.sendCommit(e.Batch)
+	e.confirmErr = e.commitHandler.sendCommit(e.Batch)
+	close(e.confirmDone)
 }
 
 // ConfirmWithAck commit the batch and wait ack from the server. The method will be blocked until
@@ -91,11 +97,28 @@ func (e *PublicReadMessages) ConfirmWithAck(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	e.committed.Store(true)
-
 	commitRange := topicreadercommon.GetCommitRange(e.Batch)
 	if commitRange.PartitionSession.CommittedOffset() >= commitRange.CommitOffsetEnd {
 		return nil
+	}
+	if e.committed.CompareAndSwap(false, true) {
+		e.confirmErr = e.commitHandler.getSyncCommitter().Commit(ctx, commitRange)
+		close(e.confirmDone)
+
+		return e.confirmErr
+	}
+	select {
+	case <-e.confirmDone:
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-e.Batch.Context().Done():
+		return topicreadercommon.ErrPublicCommitSessionToExpiredSession
+	}
+	if commitRange.PartitionSession.CommittedOffset() >= commitRange.CommitOffsetEnd {
+		return nil
+	}
+	if e.confirmErr == nil {
+		return e.commitHandler.getSyncCommitter().WaitAck(ctx, commitRange)
 	}
 
 	return e.commitHandler.getSyncCommitter().Commit(ctx, commitRange)

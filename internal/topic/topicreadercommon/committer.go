@@ -88,7 +88,8 @@ func (c *Committer) Commit(ctx context.Context, commitRange CommitRange) error {
 	if !c.mode.CommitsEnabled() {
 		return ErrCommitDisabled
 	}
-	if commitRange.PartitionSession != nil && commitRange.PartitionSession.Context().Err() != nil {
+	if c.mode == CommitModeSync && commitRange.PartitionSession != nil &&
+		commitRange.PartitionSession.Context().Err() != nil {
 		return ErrPublicCommitSessionToExpiredSession
 	}
 
@@ -99,6 +100,30 @@ func (c *Committer) Commit(ctx context.Context, commitRange CommitRange) error {
 	waiter, err := c.pushCommit(commitRange)
 	if err != nil {
 		return err
+	}
+
+	return c.waitCommitAck(ctx, waiter)
+}
+
+// WaitAck waits for an already sent commit without sending it again.
+func (c *Committer) WaitAck(ctx context.Context, commitRange CommitRange) error {
+	if commitRange.PartitionSession.Context().Err() != nil {
+		return ErrPublicCommitSessionToExpiredSession
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	waiter := newCommitWaiter(commitRange.PartitionSession, commitRange.CommitOffsetEnd)
+	var acknowledged bool
+	c.m.WithLock(func() {
+		acknowledged = commitRange.PartitionSession.CommittedOffset() >= commitRange.CommitOffsetEnd
+		if !acknowledged {
+			c.addWaiterNeedLock(waiter)
+		}
+	})
+	if acknowledged {
+		return nil
 	}
 
 	return c.waitCommitAck(ctx, waiter)
