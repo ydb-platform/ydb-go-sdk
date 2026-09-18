@@ -12,7 +12,6 @@ import (
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
@@ -95,12 +94,7 @@ func main() {
 }
 
 func list(ctx context.Context, db *ydb.Driver, t *template.Template, p string) {
-	var dir scheme.Directory
-	err := retry.Retry(ctx, func(ctx context.Context) (err error) {
-		dir, err = db.Scheme().ListDirectory(ctx, p)
-
-		return err
-	}, retry.WithIdempotent(true))
+	dir, err := db.Scheme().ListDirectory(ctx, p)
 	if err != nil {
 		fmt.Printf("list directory '%s' failed: %v\n", p, err)
 

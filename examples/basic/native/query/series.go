@@ -18,6 +18,7 @@ func read(ctx context.Context, c query.Client, prefix string) error {
 	var messages []string
 	err := c.Do(ctx,
 		func(ctx context.Context, s query.Session) (err error) {
+			// Publish output only after a successful attempt, so retrying this callback has no visible side effects.
 			var attemptMessages []string
 			result, err := s.Query(ctx, fmt.Sprintf(`
 					SELECT

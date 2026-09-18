@@ -10,7 +10,7 @@ import (
 func TestRunPeriodicallyStopsAfterCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	calls := 0
-	err := runPeriodically(ctx, time.Hour, func() error {
+	err := runPeriodically(ctx, time.Hour, func(context.Context) error {
 		calls++
 		cancel()
 
@@ -28,7 +28,7 @@ func TestRunPeriodicallyDoesNotRunAfterCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	calls := 0
-	err := runPeriodically(ctx, time.Hour, func() error {
+	err := runPeriodically(ctx, time.Hour, func(context.Context) error {
 		calls++
 
 		return nil
@@ -43,7 +43,7 @@ func TestRunPeriodicallyDoesNotRunAfterCancellation(t *testing.T) {
 
 func TestRunPeriodicallyReturnsOperationError(t *testing.T) {
 	want := errors.New("write failed")
-	err := runPeriodically(context.Background(), time.Hour, func() error {
+	err := runPeriodically(context.Background(), time.Hour, func(context.Context) error {
 		return want
 	})
 	if !errors.Is(err, want) {

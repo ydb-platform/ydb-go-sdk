@@ -51,15 +51,15 @@ WITH (
 	return nil
 }
 
-func runPeriodically(ctx context.Context, every time.Duration, operation func() error) error {
+func runPeriodically(ctx context.Context, every time.Duration, operation func(context.Context) error) error {
 	ticker := time.NewTicker(every)
 	defer ticker.Stop()
 
 	for {
-		if ctx.Err() != nil {
-		    return ctx.Err()
+		if err := ctx.Err(); err != nil {
+			return err
 		}
-		if err := operation(); err != nil {
+		if err := operation(ctx); err != nil {
 			return err
 		}
 		select {
@@ -81,7 +81,7 @@ VALUES
 	($id, $value)
 `, prefix, tableName)
 
-	return runPeriodically(ctx, interval, func() error {
+	return runPeriodically(ctx, interval, func(ctx context.Context) error {
 		id := uint64(rand.Intn(maxID))              //nolint:gosec
 		val := "val-" + strconv.Itoa(rand.Intn(10)) //nolint:gosec
 
@@ -103,7 +103,7 @@ DELETE FROM
 WHERE id=$id
 `, prefix, tableName)
 
-	return runPeriodically(ctx, interval, func() error {
+	return runPeriodically(ctx, interval, func(ctx context.Context) error {
 		id := uint64(rand.Intn(maxID)) //nolint:gosec
 
 		return c.DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {

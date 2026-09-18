@@ -223,7 +223,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 			_, _ = fmt.Fprintf(os.Stdout, "warn: drop series table failed: %v\n", err)
 		}
 		_, err = cc.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), `
-			CREATE TABLE IF NOT EXISTS series (
+			CREATE TABLE series (
 				series_id Bytes,
 				title Text,
 				series_info Text,
@@ -254,7 +254,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 			_, _ = fmt.Fprintf(os.Stdout, "warn: drop seasons table failed: %v\n", err)
 		}
 		_, err = cc.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), `
-			CREATE TABLE IF NOT EXISTS seasons (
+			CREATE TABLE seasons (
 				series_id Bytes,
 				season_id Bytes,
 				title Text,
@@ -288,7 +288,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 		}
 		_, err = cc.ExecContext(
 			ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), `
-			CREATE TABLE IF NOT EXISTS episodes (
+			CREATE TABLE episodes (
 				series_id Bytes,
 				season_id Bytes,
 				episode_id Bytes,
