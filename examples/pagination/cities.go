@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
-	"github.com/ydb-platform/ydb-go-sdk/v3/types"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 func selectPaging(
 	ctx context.Context,
-	c table.Client,
+	c query.Client,
 	prefix string,
 	limit int,
 	lastNum *uint,
@@ -21,7 +19,7 @@ func selectPaging(
 	empty bool,
 	err error,
 ) {
-	query := fmt.Sprintf(`
+	sql := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
 		$part1 = (
@@ -46,50 +44,70 @@ func selectPaging(
 		ORDER BY city, number LIMIT $limit;
 		`, prefix)
 
-	readTx := table.TxControl(table.BeginTx(table.WithOnlineReadOnly()), table.CommitTx())
-
+	var messages []string
 	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, res, err := s.Execute(ctx, readTx, query,
-				table.NewQueryParameters(
-					table.ValueParam("$limit", types.Uint64Value(uint64(limit))),
-					table.ValueParam("$lastCity", types.TextValue(*lastCity)),
-					table.ValueParam("$lastNumber", types.Uint32Value(uint32(*lastNum))),
-				),
-			)
+		func(ctx context.Context, s query.Session) (err error) {
+			res, err := s.Query(ctx, sql, query.WithParameters(ydb.ParamsBuilder().
+				Param("$limit").Uint64(uint64(limit)).
+				Param("$lastCity").Text(*lastCity).
+				Param("$lastNumber").Uint32(uint32(*lastNum)).
+				Build()))
 			if err != nil {
 				return err
 			}
 			defer func() {
-				_ = res.Close()
+				_ = res.Close(ctx)
 			}()
-			if !res.NextResultSet(ctx) || !res.HasNextRow() {
-				empty = true
-
-				return res.Err()
-			}
-			var addr string
-			for res.NextRow() {
-				err = res.ScanNamed(
-					named.Optional("city", &lastCity),
-					named.Optional("number", &lastNum),
-					named.OptionalWithDefault("address", &addr),
-				)
+			attemptEmpty := true
+			attemptLastNum := *lastNum
+			attemptLastCity := *lastCity
+			var attemptMessages []string
+			for resultSet, err := range res.ResultSets(ctx) {
 				if err != nil {
 					return err
 				}
-				fmt.Printf("\t%v, School #%v, Address: %v\n", *lastCity, *lastNum, addr)
+				for row, err := range resultSet.Rows(ctx) {
+					if err != nil {
+						return err
+					}
+					var (
+						city    string
+						number  uint32
+						address string
+					)
+					if err = row.ScanNamed(
+						query.Named("city", &city),
+						query.Named("number", &number),
+						query.Named("address", &address),
+					); err != nil {
+						return err
+					}
+					attemptEmpty = false
+					attemptLastCity = city
+					attemptLastNum = uint(number)
+					attemptMessages = append(attemptMessages, fmt.Sprintf(
+						"\t%v, School #%v, Address: %v\n", city, number, address,
+					))
+				}
 			}
+			empty = attemptEmpty
+			*lastCity = attemptLastCity
+			*lastNum = attemptLastNum
+			messages = attemptMessages
 
-			return res.Err()
+			return nil
 		},
+		query.WithIdempotent(),
 	)
+	for _, message := range messages {
+		fmt.Print(message)
+	}
 
 	return empty, err
 }
 
-func fillTableWithData(ctx context.Context, c table.Client, prefix string) (err error) {
-	query := fmt.Sprintf(`
+func fillTableWithData(ctx context.Context, c query.Client, prefix string) error {
+	sql := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
 		REPLACE INTO schools
@@ -99,34 +117,17 @@ func fillTableWithData(ctx context.Context, c table.Client, prefix string) (err 
 			address
 		FROM AS_TABLE($schoolsData);`, prefix)
 
-	writeTx := table.TxControl(table.BeginTx(table.WithSerializableReadWrite()), table.CommitTx())
-
-	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(ctx, writeTx, query, table.NewQueryParameters(
-				table.ValueParam("$schoolsData", getSchoolData()),
-			))
-
-			return err
-		})
-
-	return err
+	return c.Exec(ctx, sql, query.WithParameters(ydb.ParamsBuilder().
+		Param("$schoolsData").Any(getSchoolData()).
+		Build()), query.WithIdempotent())
 }
 
-func createTable(ctx context.Context, c table.Client, path string) (err error) {
-	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) error {
-			return s.CreateTable(ctx, path,
-				options.WithColumn("city", types.Optional(types.TypeUTF8)),
-				options.WithColumn("number", types.Optional(types.TypeUint32)),
-				options.WithColumn("address", types.Optional(types.TypeUTF8)),
-				options.WithPrimaryKeyColumn("city", "number"),
-			)
-		},
-	)
-	if err != nil {
-		return err
-	}
-
-	return nil
+func createTable(ctx context.Context, c query.Client, tablePath string) error {
+	return c.Exec(ctx, fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
+			city Text,
+			number Uint32,
+			address Text,
+			PRIMARY KEY (city, number)
+		)`, "`"+tablePath+"`"), query.WithIdempotent())
 }

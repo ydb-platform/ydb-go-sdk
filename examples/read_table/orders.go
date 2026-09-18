@@ -9,6 +9,7 @@ import (
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
@@ -22,33 +23,19 @@ type row struct {
 	description string
 }
 
-func dropTableIfExists(ctx context.Context, c table.Client, path string) (err error) {
-	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) error {
-			return s.DropTable(ctx, path)
-		},
-		table.WithIdempotent(),
-	)
-	if !ydb.IsOperationErrorSchemeError(err) {
-		return err
-	}
-
-	return nil
+func dropTableIfExists(ctx context.Context, c query.Client, tablePath string) error {
+	return c.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS `%s`", tablePath), query.WithIdempotent())
 }
 
-func createTable(ctx context.Context, c table.Client, path string) (err error) {
-	return c.Do(ctx,
-		func(ctx context.Context, s table.Session) error {
-			return s.CreateTable(ctx, path,
-				options.WithColumn("customer_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("order_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("order_date", types.Optional(types.TypeDate)),
-				options.WithColumn("description", types.Optional(types.TypeUTF8)),
-				options.WithPrimaryKeyColumn("customer_id", "order_id"),
-			)
-		},
-		table.WithIdempotent(),
-	)
+func createTable(ctx context.Context, c query.Client, tablePath string) error {
+	return c.Exec(ctx, fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
+			customer_id Uint64,
+			order_id Uint64,
+			order_date Date,
+			description Text,
+			PRIMARY KEY (customer_id, order_id)
+		)`, "`"+tablePath+"`"), query.WithIdempotent())
 }
 
 var (
@@ -79,47 +66,23 @@ type templateConfig struct {
 	TablePathPrefix string
 }
 
-func fillTable(ctx context.Context, c table.Client, prefix string) (err error) {
-	return c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, res, err := s.Execute(
-				ctx,
-				table.TxControl(
-					table.BeginTx(
-						table.WithSerializableReadWrite(),
-					),
-					table.CommitTx(),
-				),
-				render(fillQuery, templateConfig{
-					TablePathPrefix: prefix,
-				}),
-				table.NewQueryParameters(
-					table.ValueParam(
-						"$ordersData",
-						types.ListValue(
-							order(1, 1, "Order 1", "2006-02-03"),
-							order(1, 2, "Order 2", "2007-08-24"),
-							order(1, 3, "Order 3", "2008-11-21"),
-							order(1, 4, "Order 4", "2010-06-25"),
-							order(2, 1, "Order 1", "2014-04-06"),
-							order(2, 2, "Order 2", "2015-04-12"),
-							order(2, 3, "Order 3", "2016-04-24"),
-							order(2, 4, "Order 4", "2017-04-23"),
-							order(2, 5, "Order 5", "2018-03-25"),
-							order(3, 1, "Order 1", "2019-04-23"),
-							order(3, 2, "Order 3", "2020-03-25"),
-						),
-					),
-				),
-			)
-			if err != nil {
-				return err
-			}
-
-			return res.Close()
-		},
-		table.WithIdempotent(),
-	)
+func fillTable(ctx context.Context, c query.Client, prefix string) error {
+	return c.Exec(ctx, render(fillQuery, templateConfig{
+		TablePathPrefix: prefix,
+	}), query.WithParameters(ydb.ParamsBuilder().
+		Param("$ordersData").Any(types.ListValue(
+		order(1, 1, "Order 1", "2006-02-03"),
+		order(1, 2, "Order 2", "2007-08-24"),
+		order(1, 3, "Order 3", "2008-11-21"),
+		order(1, 4, "Order 4", "2010-06-25"),
+		order(2, 1, "Order 1", "2014-04-06"),
+		order(2, 2, "Order 2", "2015-04-12"),
+		order(2, 3, "Order 3", "2016-04-24"),
+		order(2, 4, "Order 4", "2017-04-23"),
+		order(2, 5, "Order 5", "2018-03-25"),
+		order(3, 1, "Order 1", "2019-04-23"),
+		order(3, 2, "Order 3", "2020-03-25"),
+	)).Build()), query.WithIdempotent())
 }
 
 func order(customerID, orderID uint64, description, date string) types.Value {

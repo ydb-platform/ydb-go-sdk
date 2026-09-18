@@ -14,8 +14,8 @@ import (
 	"time"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
@@ -81,7 +81,7 @@ func (s *service) Close(ctx context.Context) {
 }
 
 func (s *service) createTableIfNotExists(ctx context.Context) error {
-	query := fmt.Sprintf(`
+	sql := fmt.Sprintf(`
 			PRAGMA TablePathPrefix("%s");
 
 			CREATE TABLE IF NOT EXISTS healthchecks (
@@ -95,12 +95,7 @@ func (s *service) createTableIfNotExists(ctx context.Context) error {
 		);`, path.Join(s.db.Name(), prefix),
 	)
 
-	return s.db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) error {
-			return s.ExecuteSchemeQuery(ctx, query)
-		},
-		table.WithIdempotent(),
-	)
+	return s.db.Query().Exec(ctx, sql, query.WithIdempotent())
 }
 
 func (s *service) ping(ctx context.Context, path string) (code int32, err error) {
@@ -187,28 +182,16 @@ func (s *service) upsertRows(ctx context.Context, rows []row) (err error) {
 			}(rows[i].err))),
 		)
 	}
-	err = s.db.Table().Do(ctx,
-		func(ctx context.Context, session table.Session) (err error) {
-			_, res, err := session.Execute(ctx,
-				table.SerializableReadWriteTxControl(table.CommitTx()),
-				fmt.Sprintf(`
+	err = s.db.Query().Exec(ctx,
+		fmt.Sprintf(`
 					PRAGMA TablePathPrefix("%s");
 
 					UPSERT INTO healthchecks ( url, code, ts, error )
 					SELECT url, code, ts, error FROM AS_TABLE($rows);`,
-					path.Join(s.db.Name(), prefix),
-				),
-				table.NewQueryParameters(
-					table.ValueParam("$rows", types.ListValue(values...)),
-				),
-			)
-			if err != nil {
-				return err
-			}
-
-			return res.Close()
-		},
-		table.WithIdempotent(),
+			path.Join(s.db.Name(), prefix),
+		),
+		query.WithParameters(ydb.ParamsBuilder().Param("$rows").Any(types.ListValue(values...)).Build()),
+		query.WithIdempotent(),
 	)
 	if err != nil {
 		return fmt.Errorf("error on upsert rows: %w", err)

@@ -11,7 +11,6 @@ import (
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
@@ -74,7 +73,7 @@ func main() {
 	log.Println("Drop table (if exists)...")
 	err = dropTableIfExists(
 		ctx,
-		db.Table(),
+		db.Query(),
 		path.Join(prefix, tableName),
 	)
 	if err != nil {
@@ -85,7 +84,7 @@ func main() {
 	log.Println("Create table...")
 	err = createTable(
 		ctx,
-		db.Table(),
+		db.Query(),
 		path.Join(prefix, tableName),
 	)
 	if err != nil {
@@ -96,7 +95,7 @@ func main() {
 	log.Println("Fill table...")
 	err = fillTable(
 		ctx,
-		db.Table(),
+		db.Query(),
 		prefix,
 	)
 	if err != nil {
@@ -208,16 +207,7 @@ func main() {
 	}
 
 	log.Println("Parallel read all rows from shards")
-	var description options.Description
-	err = db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
-		attemptDescription, err := s.DescribeTable(ctx, tableName)
-		if err != nil {
-			return err
-		}
-		description = attemptDescription
-
-		return nil
-	}, table.WithIdempotent())
+	description, err := db.Table().DescribeTable(ctx, path.Join(prefix, tableName), options.WithShardKeyBounds())
 	if err != nil {
 		panic(fmt.Errorf("describe table error: %w", err))
 	}

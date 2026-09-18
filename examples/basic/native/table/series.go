@@ -367,20 +367,16 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 }
 
 func describeTable(ctx context.Context, c table.Client, path string) error {
-	return c.Do(ctx,
-		func(ctx context.Context, s table.Session) error {
-			desc, err := s.DescribeTable(ctx, path)
-			if err != nil {
-				return err
-			}
-			log.Printf("> describe table: %s", path)
-			for i := range desc.Columns {
-				log.Printf("column, name: %s, %s", desc.Columns[i].Type, desc.Columns[i].Name)
-			}
+	desc, err := c.DescribeTable(ctx, path)
+	if err != nil {
+		return err
+	}
+	log.Printf("> describe table: %s", path)
+	for i := range desc.Columns {
+		log.Printf("column, name: %s, %s", desc.Columns[i].Type, desc.Columns[i].Name)
+	}
 
-			return nil
-		},
-	)
+	return nil
 }
 
 func render(t *template.Template, data any) string {

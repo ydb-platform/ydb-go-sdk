@@ -63,7 +63,7 @@ func main() {
 		})
 	}
 	run(func() error {
-		return fillTable(ctx, db.Table(), prefix, tableName)
+		return fillTable(ctx, db.Query(), prefix, tableName)
 	})
 	run(func() error {
 		timer := time.NewTimer(interval / 2)
@@ -72,7 +72,7 @@ func main() {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-timer.C:
-			return removeFromTable(ctx, db.Table(), prefix, tableName)
+			return removeFromTable(ctx, db.Query(), prefix, tableName)
 		}
 	})
 	run(func() error {
@@ -120,7 +120,7 @@ func prepareTableWithCDC(ctx context.Context, db *ydb.Driver, prefix, tableName,
 	log.Println("Drop table (if exists)...")
 	err := dropTableIfExists(
 		ctx,
-		db.Table(),
+		db.Query(),
 		path.Join(prefix, tableName),
 	)
 	if err != nil {
@@ -131,7 +131,7 @@ func prepareTableWithCDC(ctx context.Context, db *ydb.Driver, prefix, tableName,
 	log.Println("Create table...")
 	err = createTable(
 		ctx,
-		db.Table(),
+		db.Query(),
 		prefix, tableName,
 	)
 	if err != nil {

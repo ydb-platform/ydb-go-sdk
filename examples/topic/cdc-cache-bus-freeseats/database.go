@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
@@ -27,21 +26,18 @@ func createTableAndCDC(ctx context.Context, db *ydb.Driver, consumersCount int) 
 }
 
 func createTables(ctx context.Context, db *ydb.Driver) error {
-	err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
-		err := s.DropTable(ctx, path.Join(db.Name(), "bus"))
-		if ydb.IsOperationErrorSchemeError(err) {
-			err = nil
-		}
-
-		return err
-	})
+	err := db.Query().Exec(ctx, "DROP TABLE IF EXISTS bus", query.WithIdempotent())
 	if err != nil {
 		return fmt.Errorf("failed to drop table: %w", err)
 	}
 
-	_, err = db.Scripting().Execute(ctx, `
-CREATE TABLE bus (id Text, freeSeats Int64, PRIMARY KEY(id));
-
+	err = db.Query().Exec(ctx, `
+CREATE TABLE IF NOT EXISTS bus (id Text, freeSeats Int64, PRIMARY KEY(id));
+`, query.WithIdempotent())
+	if err != nil {
+		return fmt.Errorf("failed to create table: %w", err)
+	}
+	err = db.Query().Exec(ctx, `
 ALTER TABLE 
 	bus
 ADD CHANGEFEED
@@ -50,13 +46,13 @@ WITH (
 	FORMAT = 'JSON',
 	MODE = 'UPDATES'
 )
-`, nil)
+`)
 	if err != nil {
 		return fmt.Errorf("failed to create table: %w", err)
 	}
-	_, err = db.Scripting().Execute(ctx, `
+	err = db.Query().Exec(ctx, `
 UPSERT INTO bus (id, freeSeats) VALUES ("bus1", 40), ("bus2", 60);
-`, nil)
+`, query.WithIdempotent())
 	if err != nil {
 		return fmt.Errorf("failed insert rows: %w", err)
 	}

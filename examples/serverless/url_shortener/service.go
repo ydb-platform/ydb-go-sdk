@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,11 +23,8 @@ import (
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydbMetrics "github.com/ydb-platform/ydb-go-sdk-prometheus/v2"
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
 //go:embed static/index.html
@@ -192,8 +190,8 @@ func (s *service) Close(ctx context.Context) {
 	_ = s.db.Close(ctx)
 }
 
-func (s *service) createTable(ctx context.Context) (err error) {
-	query := render(
+func (s *service) createTable(ctx context.Context) error {
+	sql := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 
@@ -209,19 +207,12 @@ func (s *service) createTable(ctx context.Context) (err error) {
 		},
 	)
 
-	return s.db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) error {
-			err := s.ExecuteSchemeQuery(ctx, query)
-
-			return err
-		},
-		table.WithIdempotent(),
-	)
+	return s.db.Query().Exec(ctx, sql, query.WithIdempotent())
 }
 
 func (s *service) insertShort(ctx context.Context, url string) (h string, err error) {
 	h = hash(url)
-	query := render(
+	sql := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 
@@ -234,35 +225,19 @@ func (s *service) insertShort(ctx context.Context, url string) (h string, err er
 			TablePathPrefix: path.Join(s.db.Name(), prefix),
 		},
 	)
-	writeTx := table.TxControl(
-		table.BeginTx(
-			table.WithSerializableReadWrite(),
-		),
-		table.CommitTx(),
-	)
-	err = s.db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, res, err := s.Execute(ctx, writeTx, query,
-				table.NewQueryParameters(
-					table.ValueParam("$hash", types.TextValue(h)),
-					table.ValueParam("$src", types.TextValue(url)),
-				),
-				options.WithCollectStatsModeBasic(),
-			)
-			if err != nil {
-				return err
-			}
-
-			return res.Close()
-		},
-		table.WithIdempotent(),
+	err = s.db.Query().Exec(ctx, sql,
+		query.WithParameters(ydb.ParamsBuilder().
+			Param("$hash").Text(h).
+			Param("$src").Text(url).
+			Build()),
+		query.WithIdempotent(),
 	)
 
 	return h, err
 }
 
 func (s *service) selectLong(ctx context.Context, hash string) (url string, err error) {
-	query := render(
+	sql := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 
@@ -277,51 +252,24 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 			TablePathPrefix: path.Join(s.db.Name(), prefix),
 		},
 	)
-	readTx := table.TxControl(
-		table.BeginTx(
-			table.WithSnapshotReadOnly(),
-		),
-		table.CommitTx(),
-	)
-	err = s.db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, res, err := s.Execute(ctx, readTx, query,
-				table.NewQueryParameters(
-					table.ValueParam("$hash", types.TextValue(hash)),
-				),
-				options.WithCollectStatsModeBasic(),
-			)
-			if err != nil {
-				return err
-			}
-			defer func() {
-				_ = res.Close()
-			}()
-
-			var src string
-			found := false
-			for res.NextResultSet(ctx) && !found {
-				for res.NextRow() && !found {
-					if err = res.ScanNamed(
-						named.OptionalWithDefault("src", &src),
-					); err != nil {
-						return err
-					}
-					url = src
-					found = true
-				}
-			}
-			if err = res.Err(); err != nil {
-				return err
-			}
-			if found {
-				return nil
-			}
-
+	err = s.db.Query().Do(ctx, func(ctx context.Context, session query.Session) error {
+		row, err := session.QueryRow(ctx, sql, query.WithParameters(ydb.ParamsBuilder().
+			Param("$hash").Text(hash).
+			Build()))
+		if errors.Is(err, query.ErrNoRows) {
 			return fmt.Errorf("hash '%s' is not found", hash)
-		},
-		table.WithIdempotent(),
-	)
+		}
+		if err != nil {
+			return err
+		}
+		var attemptURL string
+		if err = row.Scan(&attemptURL); err != nil {
+			return err
+		}
+		url = attemptURL
+
+		return nil
+	}, query.WithIdempotent())
 	if err != nil {
 		return "", err
 	}
