@@ -135,7 +135,7 @@ func (lr *TopicListenerReconnector) closeStream(sl *streamListener, reason error
 	if lr.streamListener == sl {
 		lr.streamListener = nil
 	}
-	if closeErr != nil && !errors.Is(closeErr, context.Canceled) {
+	if closeErr != nil {
 		lr.streamCloseErr = errors.Join(lr.streamCloseErr, closeErr)
 	}
 }

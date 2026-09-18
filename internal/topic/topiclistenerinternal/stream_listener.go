@@ -105,7 +105,14 @@ func newStreamListener(
 		res.tracer,
 		res.background.Context(),
 		topicreadercommon.CommitModeSync,
-		res.stream.Send,
+		func(message rawtopicreader.ClientMessage) error {
+			err := res.stream.Send(message)
+			if err != nil {
+				res.goClose(res.background.Context(), err)
+			}
+
+			return err
+		},
 	)
 
 	res.startBackground()
@@ -152,10 +159,7 @@ func (l *streamListener) beginClose(ctx context.Context, reason error) empty.Cha
 
 func (l *streamListener) finishClose(ctx context.Context, reason error, done empty.Chan) {
 	logCtx := ctx
-	closeDone := func(int, error) {}
-	if l.tracer != nil {
-		closeDone = gtrace.TopicOnListenerClose(l.tracer, &logCtx, l.listenerID, l.sessionID, reason)
-	}
+	closeDone := gtrace.TopicOnListenerClose(l.tracer, &logCtx, l.listenerID, l.sessionID, reason)
 
 	var resErrors []error
 

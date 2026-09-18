@@ -49,6 +49,8 @@ func (cr *TopicListener) WaitStop(ctx context.Context) error {
 	return cr.listenerReconnector.WaitStop(ctx)
 }
 
+// Close waits for listener shutdown while ctx is active. If ctx expires,
+// shutdown continues; call WaitStop with a new context to wait for completion.
 func (cr *TopicListener) Close(ctx context.Context) error {
 	return cr.listenerReconnector.Close(ctx, xerrors.WithStackTrace(topiclistenerinternal.ErrUserCloseTopic))
 }

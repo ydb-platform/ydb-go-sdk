@@ -49,16 +49,25 @@ func (r *commitRequest) Confirm() {
 // Canceling ctx stops only this wait: another caller can keep waiting without
 // sending the commit again. An already committed range is not sent again.
 // Waiting for an ACK requires sync commit mode.
+//
+//nolint:funlen // Keep the send and ACK phases together to preserve their error order.
 func (r *commitRequest) Wait(ctx context.Context) error {
 	if r.committer.mode != CommitModeSync {
 		return ErrWaitAckRequiresSyncMode
 	}
 	session := r.commitRange.PartitionSession
-	if session == nil || session.Context().Err() != nil {
+	if session == nil {
 		return ErrPublicCommitSessionToExpiredSession
 	}
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	select {
+	case <-r.sendDone:
+		if r.sendErr != nil {
+			return r.sendErr
+		}
+	default:
 	}
 	if session.CommittedOffset() >= r.commitRange.CommitOffsetEnd {
 		skipped := false
@@ -69,6 +78,9 @@ func (r *commitRequest) Wait(ctx context.Context) error {
 		if skipped {
 			return nil
 		}
+	}
+	if session.Context().Err() != nil {
+		return ErrPublicCommitSessionToExpiredSession
 	}
 	r.start()
 	select {
@@ -105,9 +117,6 @@ func (r *commitRequest) Wait(ctx context.Context) error {
 }
 
 func (r *commitRequest) finishSend(err error) {
-	if err != nil && r.committer.backgroundWorker.Context().Err() != nil {
-		err = ErrPublicCommitSessionToExpiredSession
-	}
 	r.sendErr = err
 	close(r.sendDone)
 }

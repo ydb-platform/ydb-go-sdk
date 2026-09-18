@@ -80,13 +80,6 @@ func (e *PublicReadMessages) Confirm() {
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (e *PublicReadMessages) ConfirmWithAck(ctx context.Context) error {
-	if e.Batch.Context().Err() != nil {
-		return topicreadercommon.ErrPublicCommitSessionToExpiredSession
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
 	return e.commitRequest.Wait(ctx)
 }
 

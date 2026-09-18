@@ -187,6 +187,15 @@ func (c *Committer) pushCommitsLoop(ctx context.Context) {
 
 		if err := c.Flush(); err != nil {
 			_ = c.backgroundWorker.Close(ctx, err)
+			var requests []*commitRequest
+			c.m.WithLock(func() {
+				requests = c.requests
+				c.requests = nil
+				c.commits = CommitRanges{}
+			})
+			for _, request := range requests {
+				request.finishSend(err)
+			}
 
 			return
 		}

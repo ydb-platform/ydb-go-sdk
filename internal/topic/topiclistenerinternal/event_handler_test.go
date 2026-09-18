@@ -23,6 +23,9 @@ func TestPublicReadMessagesConfirmWithAckAfterFailedConfirm(t *testing.T) {
 	commitHandler := NewMockCommitHandler(gomock.NewController(t))
 	commitHandler.EXPECT().newCommitRequest(batch).Return(&testCommitRequest{
 		onSent: func(context.Context) error { return context.Canceled },
+		onWait: func(context.Context) error {
+			return topicreadercommon.ErrPublicCommitSessionToExpiredSession
+		},
 	})
 	event := NewPublicReadMessages(session.ToPublic(), batch, commitHandler)
 
@@ -171,7 +174,10 @@ func TestPublicReadMessagesConfirmWithAckSkipsAcknowledgedBatch(t *testing.T) {
 			session := topicreadercommon.BatchGetPartitionSession(batch)
 			commitHandler := NewMockCommitHandler(gomock.NewController(t))
 			commitRange := topicreadercommon.GetCommitRange(batch)
-			request := &testCommitRequest{onWait: func(context.Context) error {
+			request := &testCommitRequest{onWait: func(ctx context.Context) error {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
 				session.SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
 
 				return nil
@@ -188,8 +194,7 @@ func TestPublicReadMessagesConfirmWithAckSkipsAcknowledgedBatch(t *testing.T) {
 			cancel()
 			require.ErrorIs(t, event.ConfirmWithAck(ctx), context.Canceled)
 			session.Close()
-			require.ErrorIs(t, event.ConfirmWithAck(context.Background()),
-				topicreadercommon.ErrPublicCommitSessionToExpiredSession)
+			require.NoError(t, event.ConfirmWithAck(context.Background()))
 			require.EqualValues(t, 1, request.starts.Load())
 		})
 	}

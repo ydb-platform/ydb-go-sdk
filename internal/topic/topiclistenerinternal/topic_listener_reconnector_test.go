@@ -10,6 +10,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -71,6 +72,34 @@ func TestTopicListenerReconnectorStopsOnStreamError(t *testing.T) {
 
 	require.ErrorIs(t, listener.WaitStop(xtest.ContextWithCommonTimeout(ctx, t)), streamErr)
 	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
+}
+
+func TestTopicListenerReconnectorRetriesFailedCommitSend(t *testing.T) {
+	ctx := xtest.Context(t)
+	cfg := NewStreamListenerConfig()
+	client := &failCommitStreamTopicClient{sendError: status.Error(codes.Unavailable, "commit send failed")}
+	listener, err := NewTopicListenerReconnector(
+		client, &cfg, NewMockEventHandler(gomock.NewController(t)),
+	)
+	require.NoError(t, err)
+	defer func() { _ = listener.Close(ctx, ErrUserCloseTopic) }()
+	require.NoError(t, listener.WaitInit(ctx))
+
+	listener.m.Lock()
+	first := listener.streamListener
+	listener.m.Unlock()
+	session := topicreadercommon.NewPartitionSession(ctx, "test-topic", 0, 0, first.sessionID, 1, 1, 0)
+	request := first.syncCommitter.NewCommitRequest(topicreadercommon.CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+	request.Confirm()
+	require.Eventually(t, func() bool {
+		listener.m.Lock()
+		defer listener.m.Unlock()
+
+		return client.attempts.Load() >= 2 && listener.streamListener != nil &&
+			listener.streamListener != first
+	}, 2*time.Second, time.Millisecond)
 }
 
 func TestTopicListenerReconnectorWaitsForBackoff(t *testing.T) {
@@ -414,6 +443,22 @@ func TestTopicListenerReconnectorPreservesStreamErrorContext(t *testing.T) {
 	require.ErrorContains(t, err, "read stream failed")
 }
 
+func TestTopicListenerReconnectorPreservesCompositeCloseError(t *testing.T) {
+	streamErr := errors.New("worker failed during close")
+	done := make(chan struct{})
+	close(done)
+	stream := &streamListener{
+		shutdownDone: done,
+		shutdownErr:  errors.Join(context.Canceled, streamErr),
+	}
+	stream.closing.Store(true)
+	listener := &TopicListenerReconnector{streamListener: stream}
+
+	listener.closeStream(stream, nil)
+
+	require.ErrorIs(t, listener.streamCloseErr, streamErr)
+}
+
 func TestTopicListenerReconnectorRetriesInitialConnection(t *testing.T) {
 	for _, code := range []codes.Code{codes.Canceled, codes.Unavailable} {
 		t.Run(code.String(), func(t *testing.T) {
@@ -474,6 +519,41 @@ type freshStreamTopicClient struct {
 
 type countingStreamTopicClient struct {
 	attempts atomic.Int32
+}
+
+type failCommitStreamTopicClient struct {
+	sendError error
+	attempts  atomic.Int32
+}
+
+func (c *failCommitStreamTopicClient) StreamRead(
+	ctx context.Context, id int64, tracer *trace.Topic,
+) (rawtopicreader.StreamReader, error) {
+	if c.attempts.Add(1) != 1 {
+		return freshStreamTopicClient{}.StreamRead(ctx, id, tracer)
+	}
+
+	return rawtopicreader.StreamReader{
+		Stream: &failCommitGRPCStream{
+			testInitGrpcStream: &testInitGrpcStream{sessionID: "test-session", recvContext: ctx},
+			sendError:          c.sendError,
+		},
+		Tracer: tracer,
+	}, nil
+}
+
+type failCommitGRPCStream struct {
+	*testInitGrpcStream
+
+	sendError error
+}
+
+func (s *failCommitGRPCStream) Send(message *Ydb_Topic.StreamReadMessage_FromClient) error {
+	if message.GetCommitOffsetRequest() != nil {
+		return s.sendError
+	}
+
+	return s.testInitGrpcStream.Send(message)
 }
 
 func (c *countingStreamTopicClient) StreamRead(

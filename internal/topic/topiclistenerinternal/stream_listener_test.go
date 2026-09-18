@@ -765,6 +765,7 @@ func TestStreamListenerGoClosePreservesFirstReason(t *testing.T) {
 			closeReasons = append(closeReasons, reason)
 			streamClose(reason)
 		},
+		tracer: &trace.Topic{},
 	}
 	_ = listener.background.Context()
 	firstErr := errors.New("message handler failed")
@@ -781,7 +782,7 @@ func TestStreamListenerGoClosePreservesFirstReason(t *testing.T) {
 func TestStreamListenerConcurrentGoCloseKeepsStreamCause(t *testing.T) {
 	ctx := xtest.Context(t)
 	streamCtx, streamClose := context.WithCancelCause(ctx)
-	listener := &streamListener{streamClose: streamClose}
+	listener := &streamListener{streamClose: streamClose, tracer: &trace.Topic{}}
 	_ = listener.background.Context()
 	firstErr := errors.New("first failure")
 	secondErr := errors.New("second failure")
