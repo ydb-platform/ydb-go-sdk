@@ -216,8 +216,6 @@ func fillTablesWithData(ctx context.Context, db *sql.DB) (err error) {
 	return nil
 }
 
-// The drop-and-create callbacks are intentionally not marked idempotent: replaying one after an ambiguous
-// CREATE result could drop a table that the first attempt created successfully.
 func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 	err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
 		err = dropTableIfExists(ctx, cc, "series")
@@ -225,7 +223,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 			_, _ = fmt.Fprintf(os.Stdout, "warn: drop series table failed: %v\n", err)
 		}
 		_, err = cc.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), `
-			CREATE TABLE series (
+			CREATE TABLE IF NOT EXISTS series (
 				series_id Bytes,
 				title Text,
 				series_info Text,
@@ -246,7 +244,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 		}
 
 		return nil
-	})
+	}, retry.WithIdempotent(true))
 	if err != nil {
 		return fmt.Errorf("create table failed: %w", err)
 	}
@@ -256,7 +254,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 			_, _ = fmt.Fprintf(os.Stdout, "warn: drop seasons table failed: %v\n", err)
 		}
 		_, err = cc.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), `
-			CREATE TABLE seasons (
+			CREATE TABLE IF NOT EXISTS seasons (
 				series_id Bytes,
 				season_id Bytes,
 				title Text,
@@ -279,7 +277,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 		}
 
 		return nil
-	})
+	}, retry.WithIdempotent(true))
 	if err != nil {
 		return fmt.Errorf("create table failed: %w", err)
 	}
@@ -290,7 +288,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 		}
 		_, err = cc.ExecContext(
 			ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), `
-			CREATE TABLE episodes (
+			CREATE TABLE IF NOT EXISTS episodes (
 				series_id Bytes,
 				season_id Bytes,
 				episode_id Bytes,
@@ -314,7 +312,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 		}
 
 		return nil
-	})
+	}, retry.WithIdempotent(true))
 	if err != nil {
 		return fmt.Errorf("create table failed: %w", err)
 	}
