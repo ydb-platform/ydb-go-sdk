@@ -47,6 +47,18 @@ func TestCommitterCommit(t *testing.T) {
 		err := committer.Commit(ctx, CommitRange{PartitionSession: session})
 		require.ErrorIs(t, err, ErrPublicCommitSessionToExpiredSession)
 	})
+
+	t.Run("CanceledCallerAndExpiredSession", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync, nil)
+		session := newTestPartitionSession(ctx, 1)
+		session.Close()
+		callCtx, cancel := context.WithCancel(ctx)
+		cancel()
+
+		err := committer.Commit(callCtx, CommitRange{PartitionSession: session})
+		require.ErrorIs(t, err, context.Canceled)
+	})
 }
 
 func TestCommitRequestKeepsSendError(t *testing.T) {
@@ -105,6 +117,25 @@ func TestCommitRequestAcknowledgedBeforeSessionCloseSucceeds(t *testing.T) {
 	})
 	session.SetCommittedOffsetForward(2)
 	session.Close()
+
+	require.NoError(t, request.Wait(ctx))
+}
+
+func TestCommitRequestWaitAcknowledgedDuringSendBeforeSessionClose(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			session.SetCommittedOffsetForward(2)
+			session.Close()
+
+			return nil
+		})
+	committer.Start()
+	defer func() { _ = committer.Close(ctx, nil) }()
+	request := committer.NewCommitRequest(CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
 
 	require.NoError(t, request.Wait(ctx))
 }
@@ -242,7 +273,7 @@ func TestCommitRequestConcurrentWaitsShareSend(t *testing.T) {
 	require.Equal(t, 1, sends)
 }
 
-func TestCommitRequestClosedCommitterReturnsExpiredSession(t *testing.T) {
+func TestCommitRequestClosedCommitterReturnsCancellation(t *testing.T) {
 	ctx := xtest.Context(t)
 	committerCtx, cancelCommitter := context.WithCancel(ctx)
 	committer := NewCommitterStopped(&trace.Topic{}, committerCtx, CommitModeSync,
@@ -261,7 +292,7 @@ func TestCommitRequestClosedCommitterReturnsExpiredSession(t *testing.T) {
 
 	request.Confirm()
 	require.NoError(t, session.Context().Err(), "partition session may still be open during shutdown")
-	require.ErrorIs(t, request.Wait(ctx), ErrPublicCommitSessionToExpiredSession)
+	require.ErrorIs(t, request.Wait(ctx), context.Canceled)
 }
 
 func TestCommitRequestCloseDuringSendReturnsSendError(t *testing.T) {

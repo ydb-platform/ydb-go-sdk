@@ -90,13 +90,12 @@ func (c *Committer) Commit(ctx context.Context, commitRange CommitRange) error {
 	if !c.mode.CommitsEnabled() {
 		return ErrCommitDisabled
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if c.mode == CommitModeSync && commitRange.PartitionSession != nil &&
 		commitRange.PartitionSession.Context().Err() != nil {
 		return ErrPublicCommitSessionToExpiredSession
-	}
-
-	if ctx.Err() != nil {
-		return ctx.Err()
 	}
 
 	waiter, err := c.pushCommit(commitRange)
@@ -147,8 +146,8 @@ func (c *Committer) pushRequest(request *commitRequest) {
 
 	var resErr error
 	c.m.WithLock(func() {
-		if c.backgroundWorker.Context().Err() != nil {
-			resErr = ErrPublicCommitSessionToExpiredSession
+		if err := c.backgroundWorker.Context().Err(); err != nil {
+			resErr = err
 
 			return
 		}

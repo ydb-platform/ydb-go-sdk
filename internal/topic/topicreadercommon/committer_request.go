@@ -91,12 +91,23 @@ func (r *commitRequest) Wait(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-session.Context().Done():
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		select {
+		case <-r.sendDone:
+			if r.sendErr != nil {
+				return r.sendErr
+			}
+		default:
+		}
+		if session.CommittedOffset() >= r.commitRange.CommitOffsetEnd {
+			return nil
+		}
+
 		return ErrPublicCommitSessionToExpiredSession
 	}
 
-	if session.Context().Err() != nil {
-		return ErrPublicCommitSessionToExpiredSession
-	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
