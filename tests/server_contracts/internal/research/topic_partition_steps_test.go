@@ -12,8 +12,6 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
-
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 func initializeTopicPartitionSteps(sc *godog.ScenarioContext) {
@@ -31,12 +29,13 @@ func stepAlterTopic(ctx context.Context, parameters string) error {
 	}
 	method := Ydb_Topic_V1.TopicService_AlterTopic_FullMethodName
 	research.observeProto("→", method, request)
-	response, err := Ydb_Topic_V1.NewTopicServiceClient(ydb.GRPCConn(research.world.driver)).AlterTopic(ctx, request)
+	response, err := Ydb_Topic_V1.NewTopicServiceClient(research.world.conn).AlterTopic(ctx, request)
 	if err != nil {
 		research.observe(fmt.Sprintf("gRPC client ← server %s: %v.", method, err))
 
 		return ctx.Err()
 	}
+	research.lastAlterResponse = response
 	research.observeProto("←", method, response)
 
 	return nil

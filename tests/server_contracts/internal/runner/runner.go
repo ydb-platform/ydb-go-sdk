@@ -13,6 +13,11 @@ import (
 	"strings"
 )
 
+const (
+	resultPass = "PASS"
+	resultFail = "FAIL"
+)
+
 const modulePath = "github.com/ydb-platform/ydb-go-sdk/v3/tests/server_contracts"
 
 var versionPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
@@ -84,13 +89,17 @@ func executeOnce(
 	out, errOut io.Writer,
 	executeTest executeTestFunc,
 ) int {
+	success, failure := "RECORDED", "ERROR"
+	if strings.Contains("/"+test.path, "/contracts/") {
+		success, failure = resultPass, resultFail
+	}
 	if err := executeTest(ctx, root, version, test, out, errOut); err != nil {
-		fmt.Fprintln(errOut, "\nResult: ERROR")
+		fmt.Fprintf(errOut, "\nResult: %s\n", failure)
 		fmt.Fprintln(errOut, "Error:", err)
 
 		return 1
 	}
-	fmt.Fprintln(out, "\nResult: RECORDED")
+	fmt.Fprintf(out, "\nResult: %s\n", success)
 
 	return 0
 }

@@ -49,11 +49,11 @@ func TestEveryFeatureUsesRequestScopedTransactions(t *testing.T) {
 	requests, batches := 0, 0
 	for _, feature := range features {
 		for _, scenario := range feature.Pickles {
-			transactions := make(map[string]*leasedQueryTransaction)
+			transactions := make(map[string]*queryTransaction)
 			for _, step := range scenario.Steps {
 				if match := beginPattern.FindStringSubmatch(step.Text); match != nil {
-					transactions[match[1]] = &leasedQueryTransaction{
-						transaction: queryTransactionIDStub{id: match[1]}, sessionID: "session-" + match[1],
+					transactions[match[1]] = &queryTransaction{
+						id: match[1], sessionID: "session-" + match[1],
 					}
 				}
 				if !strings.HasPrefix(step.Text, "TopicService.StreamWrite") || !strings.Contains(step.Text, ": WriteRequest") {

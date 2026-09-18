@@ -133,7 +133,7 @@ func (r *streamWriteSession) runStreamReceiver() {
 		r.observeStreamWriteResponse(r.label(), message)
 		if message.GetWriteResponse() != nil && r.takeHideNextWriteResponse() {
 			r.observe(fmt.Sprintf(
-				"Research control flow withholds Ydb.Topic.StreamWriteMessage.WriteResponse from StreamWrite %s "+
+				"Test client withholds Ydb.Topic.StreamWriteMessage.WriteResponse from StreamWrite %s "+
 					"and cancels the stream after recording it.", r.label()))
 			r.streamCancel()
 			r.queueReceived(streamWriteReceive{err: context.Canceled})

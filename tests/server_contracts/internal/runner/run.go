@@ -215,7 +215,7 @@ func cleanGoTestLine(line string) (string, bool) {
 		return "", false
 	case strings.HasPrefix(trimmed, "--- SKIP"):
 		return "", false
-	case trimmed == "PASS" || trimmed == "FAIL":
+	case trimmed == resultPass || trimmed == resultFail:
 		return "", false
 	case strings.HasPrefix(trimmed, "ok  \t") || strings.HasPrefix(trimmed, "FAIL\t"):
 		return "", false

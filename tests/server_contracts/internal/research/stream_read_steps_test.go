@@ -13,15 +13,13 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
-
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 const streamReadResponseIdleTimeout = 2 * time.Second
 
 func initializeStreamReadSteps(sc *godog.ScenarioContext) {
 	sc.Step(
-		`^TopicService\.StreamRead: InitRequest\{consumer: ([^,}]+), partition_ids: \[([0-9, ]+)\]\}$`,
+		`^TopicService\.StreamRead: InitRequest\{consumer: ([^,}]+)(?:, partition_ids: \[([0-9, ]+)\])?\}$`,
 		stepOpenStreamRead,
 	)
 	sc.Step(
@@ -35,9 +33,13 @@ func initializeStreamReadSteps(sc *godog.ScenarioContext) {
 }
 
 func stepOpenStreamRead(ctx context.Context, consumer, partitions string) error {
-	partitionIDs, err := parseReadPartitionIDs(partitions)
-	if err != nil {
-		return err
+	var partitionIDs []int64
+	if partitions != "" {
+		var err error
+		partitionIDs, err = parseReadPartitionIDs(partitions)
+		if err != nil {
+			return err
+		}
 	}
 	research, err := researchFromContext(ctx)
 	if err != nil {
@@ -48,7 +50,7 @@ func stepOpenStreamRead(ctx context.Context, consumer, partitions string) error 
 	}
 
 	streamCtx, cancel := context.WithCancel(ctx)
-	stream, err := Ydb_Topic_V1.NewTopicServiceClient(ydb.GRPCConn(research.world.driver)).StreamRead(streamCtx)
+	stream, err := Ydb_Topic_V1.NewTopicServiceClient(research.world.conn).StreamRead(streamCtx)
 	if err != nil {
 		cancel()
 
@@ -79,7 +81,7 @@ func stepOpenStreamRead(ctx context.Context, consumer, partitions string) error 
 	initObserved := false
 	windowCtx, windowCancel := context.WithTimeout(ctx, streamReadResponseIdleTimeout)
 	defer windowCancel()
-	for !initObserved || len(research.readPartitionSessions) < len(partitionIDs) {
+	for !initObserved || len(research.readPartitionSessions) < max(1, len(partitionIDs)) {
 		response, recvErr := research.receiveRead(windowCtx)
 		if recvErr != nil {
 			return ctx.Err()
@@ -187,6 +189,11 @@ func stepReadTopicMessages(ctx context.Context, bytesSizeText string) error {
 		}
 		if response.GetStatus() != Ydb.StatusIds_SUCCESS {
 			return nil
+		}
+		if start := response.GetStartPartitionSessionRequest(); start != nil {
+			if err := research.startReadPartition(start.GetPartitionSession().GetPartitionSessionId()); err != nil {
+				return err
+			}
 		}
 	}
 }

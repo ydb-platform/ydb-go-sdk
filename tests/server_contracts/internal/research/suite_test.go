@@ -61,7 +61,7 @@ func TestEveryResearchScenarioDocumentsCurrentObservation(t *testing.T) {
 		if walkErr != nil {
 			return walkErr
 		}
-		if entry.IsDir() || !strings.HasSuffix(path, ".feature") {
+		if entry.IsDir() || !strings.HasSuffix(path, ".feature") || !strings.Contains("/"+path, "/research/") {
 			return nil
 		}
 		contents, err := fs.ReadFile(featureFiles, path)

@@ -12,12 +12,12 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"google.golang.org/grpc"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/tests/server_contracts/internal/grpcclient"
 )
 
 const (
@@ -32,7 +32,7 @@ type worldContextKey struct{}
 type researchWorld struct {
 	cancel context.CancelFunc
 
-	driver   *ydb.Driver
+	conn     *grpcclient.Conn
 	observer *grpcObserver
 	research *streamWriteResearch
 
@@ -48,7 +48,7 @@ func initializeScenario() func(*godog.ScenarioContext) {
 		sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
 			scenarioCtx, cancel := context.WithTimeout(ctx, scenarioTimeout)
 			world := &researchWorld{cancel: cancel}
-			godog.Logf(scenarioCtx, "Research scenario:")
+			godog.Logf(scenarioCtx, "Server scenario:")
 			for line := range strings.SplitSeq(formatResearchScenario(scenario), "\n") {
 				godog.Logf(scenarioCtx, "%s", line)
 			}
@@ -75,6 +75,9 @@ func initializeScenario() func(*godog.ScenarioContext) {
 		initializeStreamWriteSteps(sc)
 		initializeStreamReadSteps(sc)
 		initializeTopicPartitionSteps(sc)
+		initializeSplitObservationSteps(sc)
+		initializeContractSteps(sc)
+		initializeSplitContractSteps(sc)
 	}
 }
 
@@ -148,44 +151,47 @@ func worldFromContext(ctx context.Context) (*researchWorld, error) {
 }
 
 func (w *researchWorld) CreateTopic(ctx context.Context, partitionCount int64, paused bool, consumer string) error {
-	if w.driver != nil {
+	if w.conn != nil {
 		return errors.New("topic fixture is already initialized")
 	}
 
 	w.observer = newGRPCObserver()
-	driver, err := openDriver(
-		ctx,
-		connectionString(),
-		ydb.With(config.WithNoAutoRetry()),
-		ydb.With(config.WithGrpcOptions(
-			grpc.WithChainUnaryInterceptor(w.observer.UnaryClientInterceptor()),
-			grpc.WithChainStreamInterceptor(w.observer.StreamClientInterceptor()),
-		)),
+	conn, err := grpcclient.Open(connectionString(),
+		grpc.WithChainUnaryInterceptor(w.observer.UnaryClientInterceptor()),
+		grpc.WithChainStreamInterceptor(w.observer.StreamClientInterceptor()),
 	)
 	if err != nil {
-		return fmt.Errorf("open YDB driver: %w", err)
+		return err
 	}
-	w.driver = driver
+	w.conn = conn
+
 	w.consumer = consumer
 
 	name := fmt.Sprintf("topic-research-%d-%d-%d", os.Getpid(), time.Now().UnixNano(), scenarioCounter.Add(1))
-	w.topicPath = path.Join(driver.Name(), name)
-	createOptions := []topicoptions.CreateOption{
-		topicoptions.CreateWithMinActivePartitions(partitionCount),
-		topicoptions.CreateWithMaxActivePartitions(partitionCount),
+	w.topicPath = path.Join(conn.Database, name)
+	request := &Ydb_Topic.CreateTopicRequest{
+		Path:            w.topicPath,
+		OperationParams: &Ydb_Operations.OperationParams{OperationMode: Ydb_Operations.OperationParams_SYNC},
+		PartitioningSettings: &Ydb_Topic.PartitioningSettings{
+			MinActivePartitions: partitionCount, MaxActivePartitions: partitionCount,
+		},
 	}
 	if paused {
-		settings := topictypes.AutoPartitioningSettings{
-			AutoPartitioningStrategy: topictypes.AutoPartitioningStrategyPaused,
+		request.PartitioningSettings.AutoPartitioningSettings = &Ydb_Topic.AutoPartitioningSettings{
+			Strategy: Ydb_Topic.AutoPartitioningStrategy_AUTO_PARTITIONING_STRATEGY_PAUSED,
 		}
-		createOptions = append(createOptions, topicoptions.CreateWithAutoPartitioningSettings(settings))
 	}
 	if consumer != "" {
-		createOptions = append(createOptions, topicoptions.CreateWithConsumer(topictypes.Consumer{Name: consumer}))
+		request.Consumers = []*Ydb_Topic.Consumer{{Name: consumer}}
 	}
-	if err := driver.Topic().Create(ctx, w.topicPath, createOptions...); err != nil {
+	response, err := Ydb_Topic_V1.NewTopicServiceClient(conn).CreateTopic(ctx, request)
+	if err != nil {
 		return fmt.Errorf("create topic %q: %w", w.topicPath, err)
 	}
+	if err := grpcclient.DecodeOperation("CreateTopic", response.GetOperation(), nil); err != nil {
+		return err
+	}
+
 	w.created = true
 
 	return nil
@@ -203,13 +209,22 @@ func (w *researchWorld) Close() error {
 	if w.research != nil {
 		cleanupErr = errors.Join(cleanupErr, w.research.Close(cleanupCtx))
 	}
-	if w.driver != nil && w.created {
-		if err := w.driver.Topic().Drop(cleanupCtx, w.topicPath); err != nil {
+	if w.conn != nil && w.created {
+		response, err := Ydb_Topic_V1.NewTopicServiceClient(w.conn).DropTopic(cleanupCtx, &Ydb_Topic.DropTopicRequest{
+			Path:            w.topicPath,
+			OperationParams: &Ydb_Operations.OperationParams{OperationMode: Ydb_Operations.OperationParams_SYNC},
+		})
+		if err == nil {
+			err = grpcclient.DecodeOperation("DropTopic", response.GetOperation(), nil)
+		}
+		if err != nil {
 			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("drop topic %q: %w", w.topicPath, err))
 		}
+		w.created = false
 	}
-	if w.driver != nil {
-		cleanupErr = errors.Join(cleanupErr, w.driver.Close(cleanupCtx))
+	if w.conn != nil {
+		cleanupErr = errors.Join(cleanupErr, w.conn.Close())
+		w.conn = nil
 	}
 
 	return cleanupErr
@@ -235,17 +250,18 @@ func connectionString() string {
 	return defaultConnectionString
 }
 
-func openDriver(ctx context.Context, dsn string, extraOptions ...ydb.Option) (*ydb.Driver, error) {
-	options := make([]ydb.Option, 0, 2+len(extraOptions))
-	if token := os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"); token != "" {
-		options = append(options, ydb.WithAccessTokenCredentials(token))
-	} else {
-		options = append(options, ydb.WithAnonymousCredentials())
+func (w *researchWorld) DescribeTopic(ctx context.Context, includeStats bool) (*Ydb_Topic.DescribeTopicResult, error) {
+	response, err := Ydb_Topic_V1.NewTopicServiceClient(w.conn).DescribeTopic(ctx, &Ydb_Topic.DescribeTopicRequest{
+		Path: w.topicPath, IncludeStats: includeStats,
+		OperationParams: &Ydb_Operations.OperationParams{OperationMode: Ydb_Operations.OperationParams_SYNC},
+	})
+	if err != nil {
+		return nil, err
 	}
-	if certificates := os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE"); certificates != "" {
-		options = append(options, ydb.WithCertificatesFromFile(certificates))
+	result := &Ydb_Topic.DescribeTopicResult{}
+	if err := grpcclient.DecodeOperation("DescribeTopic", response.GetOperation(), result); err != nil {
+		return nil, err
 	}
-	options = append(options, extraOptions...)
 
-	return ydb.Open(ctx, dsn, options...)
+	return result, nil
 }

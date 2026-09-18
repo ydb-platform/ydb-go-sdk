@@ -13,11 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 type streamWriteResearch struct {
@@ -31,31 +26,19 @@ type streamWriteResearch struct {
 	readDone              chan struct{}
 	readPartitionSessions []int64
 	pipelineWrites        bool
+	splitObservation      *splitObservation
+	lastAlterResponse     *Ydb_Topic.AlterTopicResponse
 
-	transactions       []*leasedQueryTransaction
-	namedTransactions  map[string]*leasedQueryTransaction
+	transactions       []*queryTransaction
+	namedTransactions  map[string]*queryTransaction
 	transactionAliases map[string]string
 	sessionAliases     map[string]string
 
-	mu         sync.Mutex
-	timeline   []string
-	transcript []string
-	liveLogf   func(string, ...any)
-}
-
-type leasedQueryTransaction struct {
-	transaction query.Transaction
-	sessionID   string
-	release     chan struct{}
-	done        chan struct{}
-	doErr       error
-	releaseOnce sync.Once
-	finished    bool
-}
-
-type leasedQueryTransactionResult struct {
-	transaction *leasedQueryTransaction
-	err         error
+	mu             sync.Mutex
+	timeline       []string
+	transcript     []string
+	protocolEvents []protocolEvent
+	liveLogf       func(string, ...any)
 }
 
 type streamWriteSend struct {
@@ -95,13 +78,13 @@ func stepNamedQueryTransactionOpen(ctx context.Context, name string) error {
 		return err
 	}
 	if research.namedTransactions == nil {
-		research.namedTransactions = make(map[string]*leasedQueryTransaction)
+		research.namedTransactions = make(map[string]*queryTransaction)
 	}
 	if _, exists := research.namedTransactions[name]; exists {
 		return fmt.Errorf("Query transaction %q is already open", name)
 	}
 
-	transaction, err := leaseQueryTransaction(ctx, research.world.driver)
+	transaction, err := beginQueryTransaction(ctx, research.world.conn)
 	if err != nil {
 		return fmt.Errorf("begin Query transaction %q: %w", name, err)
 	}
@@ -120,7 +103,8 @@ func stepNamedQueryTransactionCommit(ctx context.Context, name string) error {
 	if err := research.drainPendingWrites(ctx); err != nil {
 		return err
 	}
-	_ = transaction.transaction.CommitTx(ctx)
+	transaction.completionErr = transaction.Commit(ctx)
+	transaction.completionOperation = "Commit"
 	transaction.finished = true
 
 	return releaseQueryTransaction(ctx, name, transaction)
@@ -131,7 +115,8 @@ func stepNamedQueryTransactionRollback(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
-	_ = transaction.transaction.Rollback(ctx)
+	transaction.completionErr = transaction.Rollback(ctx)
+	transaction.completionOperation = "Rollback"
 	transaction.finished = true
 
 	return releaseQueryTransaction(ctx, name, transaction)
@@ -152,20 +137,21 @@ func stepNamedQueryTransactionsCommitConcurrently(ctx context.Context, firstName
 
 	type commitResult struct {
 		name        string
-		transaction *leasedQueryTransaction
+		transaction *queryTransaction
 	}
 	start := make(chan struct{})
 	results := make(chan commitResult, 2)
 	for _, item := range []struct {
 		name        string
-		transaction *leasedQueryTransaction
+		transaction *queryTransaction
 	}{
 		{name: firstName, transaction: first},
 		{name: secondName, transaction: second},
 	} {
 		go func() {
 			<-start
-			_ = item.transaction.transaction.CommitTx(ctx)
+			item.transaction.completionErr = item.transaction.Commit(ctx)
+			item.transaction.completionOperation = "Commit"
 			item.transaction.finished = true
 			results <- commitResult{name: item.name, transaction: item.transaction}
 		}()
@@ -184,7 +170,7 @@ func stepNamedQueryTransactionsCommitConcurrently(ctx context.Context, firstName
 func namedQueryTransactionFromContext(
 	ctx context.Context,
 	name string,
-) (*streamWriteResearch, *leasedQueryTransaction, error) {
+) (*streamWriteResearch, *queryTransaction, error) {
 	research, err := researchFromContext(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -197,9 +183,8 @@ func namedQueryTransactionFromContext(
 	return research, transaction, nil
 }
 
-func releaseQueryTransaction(ctx context.Context, name string, transaction *leasedQueryTransaction) error {
-	transaction.Release()
-	if err := transaction.Wait(ctx); err != nil {
+func releaseQueryTransaction(ctx context.Context, name string, transaction *queryTransaction) error {
+	if err := transaction.Close(ctx); err != nil {
 		return fmt.Errorf("release Query session for transaction %q: %w", name, err)
 	}
 
@@ -212,7 +197,7 @@ func openStreamWrite(
 	initRequest *Ydb_Topic.StreamWriteMessage_InitRequest,
 ) error {
 	streamCtx, streamCancel := context.WithCancel(ctx)
-	stream, err := Ydb_Topic_V1.NewTopicServiceClient(ydb.GRPCConn(session.world.driver)).StreamWrite(streamCtx)
+	stream, err := Ydb_Topic_V1.NewTopicServiceClient(session.world.conn).StreamWrite(streamCtx)
 	if err != nil {
 		streamCancel()
 
@@ -244,101 +229,45 @@ func stepInspectTopicPartition(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	description, err := research.world.driver.Topic().Describe(
-		ctx,
-		research.world.topicPath,
-		topicoptions.IncludePartitionStats(),
-	)
+	description, err := research.world.DescribeTopic(ctx, true)
 	if err != nil {
 		return fmt.Errorf("describe Topic after writes: %w", err)
 	}
-	research.observe(formatTopicPartitionStats(research.world.topicPath, description.Partitions))
-	settings := description.PartitionSettings
+	research.observe(formatTopicPartitionStats(research.world.topicPath, description.GetPartitions()))
+	settings := description.GetPartitioningSettings()
 	research.observe(fmt.Sprintf(
 		"Decoded Ydb.Topic.DescribeTopicResult: partitioning_settings={min_active_partitions=%d, "+
 			"max_active_partitions=%d, auto_partitioning_settings={strategy=%s}}.",
-		settings.MinActivePartitions, settings.MaxActivePartitions,
-		Ydb_Topic.AutoPartitioningStrategy(settings.AutoPartitioningSettings.AutoPartitioningStrategy),
+		settings.GetMinActivePartitions(), settings.GetMaxActivePartitions(),
+		settings.GetAutoPartitioningSettings().GetStrategy(),
 	))
 
 	return nil
 }
 
-func formatTopicPartitionStats(topicPath string, partitions []topictypes.PartitionInfo) string {
+func formatTopicPartitionStats(topicPath string, partitions []*Ydb_Topic.DescribeTopicResult_PartitionInfo) string {
 	details := make([]string, 0, len(partitions))
 	for _, partition := range partitions {
 		var bounds string
-		if len(partition.FromBound) > 0 {
-			bounds += fmt.Sprintf(", from_bound=0x%x", partition.FromBound)
+		if len(partition.GetKeyRange().GetFromBound()) > 0 {
+			bounds += fmt.Sprintf(", from_bound=0x%x", partition.GetKeyRange().GetFromBound())
 		}
-		if len(partition.ToBound) > 0 {
-			bounds += fmt.Sprintf(", to_bound=0x%x", partition.ToBound)
+		if len(partition.GetKeyRange().GetToBound()) > 0 {
+			bounds += fmt.Sprintf(", to_bound=0x%x", partition.GetKeyRange().GetToBound())
 		}
 		details = append(details, fmt.Sprintf(
 			"{partition_id=%d, active=%t, parent_partition_ids=%v, child_partition_ids=%v, partition_stats={end_offset=%d}%s}",
-			partition.PartitionID,
-			partition.Active,
-			partition.ParentPartitionIDs,
-			partition.ChildPartitionIDs,
-			partition.PartitionStats.PartitionsOffset.End,
+			partition.GetPartitionId(),
+			partition.GetActive(),
+			partition.GetParentPartitionIds(),
+			partition.GetChildPartitionIds(),
+			partition.GetPartitionStats().GetPartitionOffsets().GetEnd(),
 			bounds,
 		))
 	}
 
 	return fmt.Sprintf("Decoded Ydb.Topic.DescribeTopicResult: path=%q, partitions=[%s].",
 		topicPath, strings.Join(details, "; "))
-}
-
-func leaseQueryTransaction(ctx context.Context, driver *ydb.Driver) (*leasedQueryTransaction, error) {
-	transaction := &leasedQueryTransaction{
-		release: make(chan struct{}),
-		done:    make(chan struct{}),
-	}
-	ready := make(chan leasedQueryTransactionResult, 1)
-
-	go func() {
-		callbackStarted := false
-		err := driver.Query().Do(ctx, func(attemptCtx context.Context, session query.Session) error {
-			callbackStarted = true
-			tx, err := session.Begin(attemptCtx, query.TxSettings(query.WithSerializableReadWrite()))
-			if err != nil {
-				ready <- leasedQueryTransactionResult{err: err}
-
-				return err
-			}
-			sessionAware, ok := tx.(interface{ SessionID() string })
-			if !ok {
-				ready <- leasedQueryTransactionResult{err: fmt.Errorf(
-					"Query transaction %T does not expose its session ID",
-					tx,
-				)}
-
-				return nil
-			}
-			transaction.transaction = tx
-			transaction.sessionID = sessionAware.SessionID()
-			ready <- leasedQueryTransactionResult{transaction: transaction}
-
-			select {
-			case <-transaction.release:
-			case <-attemptCtx.Done():
-			}
-
-			return nil
-		}, query.WithIdempotent(false))
-		if !callbackStarted {
-			ready <- leasedQueryTransactionResult{err: err}
-		}
-		transaction.doErr = err
-		close(transaction.done)
-	}()
-
-	select {
-	case result := <-ready:
-		return result.transaction, result.err
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
 }
 
 func transactionalWriteRequest(
@@ -546,7 +475,7 @@ func (r *streamWriteResearch) observeGRPCEvent(event observedGRPCEvent) {
 
 func (r *streamWriteResearch) registerTransactionAlias(
 	alias string,
-	transaction *leasedQueryTransaction,
+	transaction *queryTransaction,
 ) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -557,7 +486,7 @@ func (r *streamWriteResearch) registerTransactionAlias(
 	if r.sessionAliases == nil {
 		r.sessionAliases = make(map[string]string)
 	}
-	txID := transaction.transaction.ID()
+	txID := transaction.id
 	r.transactionAliases[txID] = alias
 	sessionAlias := r.sessionAliases[transaction.sessionID]
 	if sessionAlias == "" {
@@ -603,6 +532,7 @@ func (r *streamWriteResearch) appendProtocolEventLocked(
 	description string,
 	message proto.Message,
 ) {
+	r.protocolEvents = append(r.protocolEvents, protocolEvent{direction: direction, message: proto.Clone(message)})
 	encoded, err := (protojson.MarshalOptions{UseProtoNames: true}).Marshal(message)
 	if err != nil {
 		r.transcript = append(r.transcript, fmt.Sprintf(
@@ -681,27 +611,11 @@ func (r *streamWriteResearch) Close(ctx context.Context) error {
 	}
 	for _, transaction := range r.transactions {
 		if !transaction.finished {
-			cleanupErr = errors.Join(cleanupErr, transaction.transaction.Rollback(ctx))
+			cleanupErr = errors.Join(cleanupErr, transaction.Rollback(ctx))
 			transaction.finished = true
 		}
-		transaction.Release()
-		cleanupErr = errors.Join(cleanupErr, transaction.Wait(ctx))
+		cleanupErr = errors.Join(cleanupErr, transaction.Close(ctx))
 	}
 
 	return cleanupErr
-}
-
-func (t *leasedQueryTransaction) Release() {
-	t.releaseOnce.Do(func() {
-		close(t.release)
-	})
-}
-
-func (t *leasedQueryTransaction) Wait(ctx context.Context) error {
-	select {
-	case <-t.done:
-		return t.doErr
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }

@@ -19,9 +19,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 func TestInitRequestParametersPreservePartitioning(t *testing.T) {
@@ -125,8 +122,8 @@ func TestStreamErrorDoesNotInventPartitionID(t *testing.T) {
 func TestWriteRequestStepSendsWholeTableOnce(t *testing.T) {
 	for _, name := range []string{"", "A"} {
 		t.Run("stream="+name, func(t *testing.T) {
-			research := &streamWriteResearch{namedTransactions: map[string]*leasedQueryTransaction{
-				"Transaction A": {transaction: queryTransactionIDStub{id: "real-tx"}, sessionID: "real-session"},
+			research := &streamWriteResearch{namedTransactions: map[string]*queryTransaction{
+				"Transaction A": {id: "real-tx", sessionID: "real-session"},
 			}}
 			_, wire := startControlledSession(t, research, name)
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -288,9 +285,9 @@ func TestTopicFixtureStepParameters(t *testing.T) {
 }
 
 func TestFormatTopicPartitionStats(t *testing.T) {
-	partitions := []topictypes.PartitionInfo{
-		{PartitionID: 5, PartitionStats: topictypes.PartitionStats{PartitionsOffset: topictypes.OffsetRange{End: 3}}},
-		{PartitionID: 1, PartitionStats: topictypes.PartitionStats{PartitionsOffset: topictypes.OffsetRange{End: 2}}},
+	partitions := []*Ydb_Topic.DescribeTopicResult_PartitionInfo{
+		{PartitionId: 5, PartitionStats: &Ydb_Topic.PartitionStats{PartitionOffsets: &Ydb_Topic.OffsetsRange{End: 3}}},
+		{PartitionId: 1, PartitionStats: &Ydb_Topic.PartitionStats{PartitionOffsets: &Ydb_Topic.OffsetsRange{End: 2}}},
 	}
 	want := `Decoded Ydb.Topic.DescribeTopicResult: path="/local/topic", partitions=[` +
 		`{partition_id=5, active=false, parent_partition_ids=[], child_partition_ids=[], partition_stats={end_offset=3}}; ` +
@@ -675,14 +672,6 @@ func TestAlterTopicParameters(t *testing.T) {
 		}
 	}
 }
-
-type queryTransactionIDStub struct {
-	query.Transaction
-
-	id string
-}
-
-func (tx queryTransactionIDStub) ID() string { return tx.id }
 
 func messageTableForTest(rows ...[]string) *godog.Table {
 	table := &godog.Table{}

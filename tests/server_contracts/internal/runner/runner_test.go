@@ -88,17 +88,25 @@ func TestInteractiveMenuReturnsToPreviousLevelAfterEachRun(t *testing.T) {
 	}
 }
 
-func TestExecuteOnceUsesResearchResultVocabulary(t *testing.T) {
+func TestExecuteOnceUsesFeatureResultVocabulary(t *testing.T) {
 	tests := []struct {
+		path       string
 		executeErr error
 		wantCode   int
 		want       string
 	}{
-		{want: "Result: RECORDED\n"},
+		{path: "topic/research/sample.feature", want: "Result: RECORDED\n"},
 		{
 			executeErr: errors.New("observer unavailable"),
 			wantCode:   1,
 			want:       "Result: ERROR\nError: observer unavailable\n",
+		},
+		{path: "topic/contracts/sample.feature", want: "Result: PASS\n"},
+		{
+			path:       "topic/contracts/sample.feature",
+			executeErr: errors.New("ACK mismatch"),
+			wantCode:   1,
+			want:       "Result: FAIL\nError: ACK mismatch\n",
 		},
 	}
 	for i, test := range tests {
@@ -118,7 +126,7 @@ func TestExecuteOnceUsesResearchResultVocabulary(t *testing.T) {
 				context.Background(),
 				"module-root",
 				"trunk",
-				featureTest{},
+				featureTest{path: test.path},
 				&output,
 				&output,
 				executeTest,

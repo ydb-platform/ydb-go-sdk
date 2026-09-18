@@ -11,12 +11,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/draft/Ydb_Maintenance_V1"
 	"github.com/ydb-platform/ydb-go-genproto/draft/protos/Ydb_Maintenance"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/tests/server_contracts/internal/grpcclient"
 )
 
 type ydbRuntimeIdentity struct {
@@ -48,17 +50,13 @@ func maintenanceAPIServerVersions(ctx context.Context, connectionString string) 
 	versionCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
-	driver, err := ydb.Open(versionCtx, connectionString, ydb.WithAnonymousCredentials())
+	conn, err := grpcclient.Open(connectionString)
 	if err != nil {
-		return nil, fmt.Errorf("open YDB driver: %w", err)
+		return nil, err
 	}
-	defer func() {
-		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer closeCancel()
-		_ = driver.Close(closeCtx)
-	}()
+	defer conn.Close()
 
-	response, err := Ydb_Maintenance_V1.NewMaintenanceServiceClient(ydb.GRPCConn(driver)).ListClusterNodes(
+	response, err := Ydb_Maintenance_V1.NewMaintenanceServiceClient(conn).ListClusterNodes(
 		versionCtx,
 		&Ydb_Maintenance.ListClusterNodesRequest{
 			OperationParams: &Ydb_Operations.OperationParams{
@@ -208,14 +206,19 @@ func waitForYDB(ctx context.Context, connectionString string) error {
 	var lastErr error
 	for {
 		attemptCtx, attemptCancel := context.WithTimeout(readyCtx, 5*time.Second)
-		driver, err := ydb.Open(attemptCtx, connectionString, ydb.WithAnonymousCredentials())
+		conn, err := grpcclient.Open(connectionString)
 		if err == nil {
-			_, err = driver.Scheme().ListDirectory(attemptCtx, "/local")
-			closeErr := driver.Close(attemptCtx)
-			if err == nil {
-				err = closeErr
+			response, callErr := Ydb_Scheme_V1.NewSchemeServiceClient(conn).ListDirectory(
+				attemptCtx, &Ydb_Scheme.ListDirectoryRequest{
+					Path:            conn.Database,
+					OperationParams: &Ydb_Operations.OperationParams{OperationMode: Ydb_Operations.OperationParams_SYNC},
+				})
+			if callErr == nil {
+				callErr = grpcclient.DecodeOperation("ListDirectory", response.GetOperation(), nil)
 			}
+			err = errors.Join(callErr, conn.Close())
 		}
+
 		attemptCancel()
 		if err == nil {
 			return nil

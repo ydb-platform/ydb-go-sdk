@@ -1,7 +1,9 @@
-# YDB server research tests
+# YDB server research and contract tests
 
 This nested Go module contains executable experiments for YDB server behavior observable through public gRPC protocols.
-Research is grouped by service; the current suite covers [Topics](features/topic/research/).
+Scenarios are grouped by service; Topics has [research experiments](features/topic/research/) and
+[transactional StreamWrite contracts](features/topic/contracts/README.md). Contracts assert explicit expectations and fail
+on mismatches; their runner result is `PASS` / `FAIL`. Research keeps its observation-only behavior described below.
 
 Research scenarios live in a `research/` subdirectory. They record behavior without asserting an expected server response. A run ends
 with `RECORDED` when the experiment and its observation machinery worked, or `ERROR` when the experiment itself could not be
@@ -29,6 +31,18 @@ The experiment covers partition-ID-only, producer-plus-partition-ID, and produce
 Nonempty partition bounds are printed in hexadecimal.
 It isolates enabling the setting; a later automatic split is outside its scope.
 
+Two [split session/discovery research scenarios](features/topic/research/split_session_and_discovery.feature) and
+[two separate contract scenarios](features/topic/contracts/split_session_and_discovery.feature) cover OVERLOADED on the
+old writer and delayed child visibility in DescribeTopic. Raw write probes and timestamped descriptions capture a window
+in which the writer is already rejected while metadata still describes only the parent. The contract allows that delay
+and requires the children to appear in a later fresh description; exact timings are recorded only as research evidence.
+
+Three [partition limit reduction scenarios](features/topic/research/decrease_max_active_partitions.feature) were recorded
+on `main.db11cbd` (`trunk`, 2026-09-14). Lowering max below min returns `BAD_REQUEST`. With `PAUSED`, lowering min and then max
+to 1 succeeds, but both children of an earlier split stay active throughout a 10-second idle observation and both existing
+streams still accept writes. A separate request accepts `SCALE_UP_AND_DOWN` and min=max=1 without an immediate merge;
+that scenario records configuration acceptance and does not wait for load-based scaling.
+
 ## Layout
 
 ```text
@@ -36,6 +50,7 @@ server_contracts/
   features/
     topic/
       research/       # Executable .feature scenarios and observations
+      contracts/      # Executable .feature expectations and coverage matrix
   internal/
     research/         # Shared scenario runner, protocol steps, and unit checks
     runner/           # Shared CLI, discovery, Docker lifecycle, and output
@@ -61,7 +76,8 @@ runs **all scenarios in that file**. Every menu has a `0` choice to return one l
 After a run, including an unsuccessful one, the runner returns to the same folder with the selected YDB version unchanged.
 
 The CLI is organized into menu/catalog code, Compose lifecycle management, server version discovery, and test output streaming.
-The nested module uses the SDK checkout via a local `replace`; it does not change the SDK's public API or dependencies.
+The nested module depends only on generated YDB protobuf clients and gRPC, with no SDK dependency or local `replace`.
+Fixture creation, descriptions, cleanup, Query sessions, and runner readiness/version checks all use direct RPCs.
 
 For every run the utility:
 
@@ -90,7 +106,7 @@ structure below that root, including arbitrary nesting. Only folders containing 
 
 For example, adding `features/topic/research/ordering/new_case.feature` adds the `ordering/` submenu and a runnable feature.
 Adding `features/query/research/new_case.feature` adds a top-level `query/` submenu. Restart the utility to reload the catalog.
-Only research scenarios are included. Tags are optional metadata and do not determine where a scenario appears or whether it runs.
+Both research and contract scenarios are included. Tags are optional metadata and do not determine where a scenario appears or whether it runs.
 
 A new feature can use the existing Go steps without code changes, regardless of its directory. New protocol actions are added
 to the shared steps in `internal/research`; no separate service-specific Go package or entry point is needed.
@@ -126,24 +142,33 @@ transaction IDs remain visible alongside stable aliases such as `Transaction A`.
 
 `StreamWrite` uses separate send and receive goroutines. The shared event recorder numbers Query and Topic events in the order in
 which those goroutines and gRPC interceptors observe them. Raw `StreamRead` is used only in ordering experiments because topic
-metadata exposes offsets but not message payload order. Creating fixtures and obtaining Query transactions uses the Go SDK, but
-the subject of every experiment is the server protocol: no SDK behavior is asserted or characterized.
+metadata exposes offsets but not message payload order. Fixtures and Query transactions also use generated gRPC clients
+directly. Each transaction owns a Query session, keeps its AttachSession stream open, and deletes the session on completion.
+There is no SDK driver, session pool,
+metadata cache, or automatic replay; server statuses and issue trees are preserved without SDK classification.
 
 Each read stream has one receiver for its whole lifetime, including across idle observation windows. Cleanup cancels and joins
 the receiver. Topic names are unique per run, and cleanup only drops topics successfully created by that scenario.
 Live event order is client-observed order, not a claim about the server's internal scheduling.
 
-## Adding a scenario
+## Adding a research scenario
 
 The fixture step `* an empty topic` creates one partition by default. Use `* an empty topic with 2 partitions` to set both
 minimum and maximum active partition counts. It can also include `with consumer "reader" for observation` when reading payloads
-is needed. `with paused auto partitioning` enables manual splitting via `AlterTopic` without load-triggered scaling.
+is needed. `with paused auto partitioning` disables load-triggered scaling and lets the experiment request a manual
+split via `AlterTopic` on server versions that support it.
 `DescribeTopic` prints all partition offsets, active flags, and parent/child IDs, including before a write session is opened.
 
 `TopicService.AlterTopic: AlterTopicRequest{...}` accepts protobuf text-format fields. The topic path is always the scenario's
 fixture and the operation mode is synchronous. For example, `alter_partitioning_settings: {set_min_active_partitions: 2,
-set_max_active_partitions: 2}` splits a fresh one-partition topic created with paused auto partitioning on the tested version.
+set_max_active_partitions: 2}` splits a fresh one-partition topic created with paused auto partitioning on `main.db11cbd`.
 Splitting is verified from the observed parent/child topology, not inferred from the partition count alone.
+
+The combined `AlterTopic ... while probing StreamWrite ... and sampling DescribeTopic every 1ms` step probes during Alter,
+then takes one final write probe if the writer has not rejected writes and Alter succeeded, followed by a fresh description.
+It finishes even when no writer rejection or split was observed. On `26.1.1.22.1b59297`, the same Alter returned SUCCESS,
+while partition 0 remained active and accepted the probes. Research records that outcome; split contracts require rejection
+and the expected parent/child topology separately.
 
 `StreamRead` accepts multiple explicit `partition_ids`, such as `[0, 1]`; the start step answers each observed partition session.
 The trace preserves partition-session IDs so payloads and offsets can be attributed to the correct partition.
@@ -167,7 +192,7 @@ compact protobuf-like object and omit fields that are not set:
 ```
 
 Leaving the `partitioning` oneof unset differs from explicitly setting `partition_id=0`, even though `GetPartitionId()` returns
-zero in both cases. Scenarios concerned with ordering therefore set `partition_id` explicitly.
+zero in both cases. General contracts omit it; scenarios that exercise specific partition routes set it explicitly.
 
 To keep multiple StreamWrite sessions open, give each one a client-side alias:
 
@@ -187,7 +212,7 @@ real server session IDs. An alias can be reused after its explicit `CloseSend`, 
 
 Steps without an alias still address a separate default stream, not the most recently opened named stream. Cleanup closes
 every stream, including streams not explicitly closed by the scenario. Withholding a response can also target a named stream:
-`* research runner: withhold the next TopicService.StreamWrite "A" WriteResponse`.
+`* client: withhold the next TopicService.StreamWrite "A" WriteResponse`.
 
 Each `WriteRequest` step sends exactly one gRPC message. All table rows become its `messages` list, in table order:
 
@@ -210,10 +235,13 @@ Send and receive still run in separate goroutines; the step implicitly observes 
 separate single-row steps when the experiment requires separate WriteRequests. Add a Go step only when an experiment
 introduces a protocol action that the shared vocabulary cannot express.
 
-`* research runner: pipeline TopicService.StreamWrite requests` stops waiting for ACKs between write steps. The single sender
-per stream still serializes gRPC Send calls while the receiver records responses concurrently. Commit implicitly observes
+`* client: send TopicService.StreamWrite requests without waiting for ACKs` stops waiting for ACKs between write steps.
+The single sender per stream still serializes gRPC Send calls while the receiver records responses concurrently. Commit implicitly observes
 pending responses; it does not assert that a response succeeded. This lets multiple transactions have requests in flight
 through one stream without introducing concurrent Send calls on that stream.
+
+The older `research runner: pipeline ...` and `research runner: withhold ...` spellings remain aliases for existing research
+features. Contracts use the neutral `client:` steps; the transport behavior is shared.
 
 Recovery scenarios explicitly replay the entire logical transaction after rollback or an observed commit rejection. The ACK
 fault control records a real server WriteResponse, withholds it from the scenario, and cancels the stream. It does not simulate

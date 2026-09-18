@@ -19,6 +19,7 @@ const streamWriteRequestStepPattern = streamWriteStepPrefix + `WriteRequest(?:\{
 
 func initializeStreamWriteSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^research runner: pipeline TopicService\.StreamWrite requests$`, stepPipelineWrites)
+	sc.Step(`^client: send TopicService\.StreamWrite requests without waiting for ACKs$`, stepPipelineWrites)
 	sc.Step(
 		streamWriteStepPrefix+`InitRequest\{([^}]*)\}$`,
 		stepOpenStreamWrite,
@@ -29,6 +30,10 @@ func initializeStreamWriteSteps(sc *godog.ScenarioContext) {
 	)
 	sc.Step(
 		`^research runner: withhold the next TopicService\.StreamWrite(?: "([^"]+)")? WriteResponse$`,
+		stepHideNextWriteResponseFromScenario,
+	)
+	sc.Step(
+		`^client: withhold the next TopicService\.StreamWrite(?: "([^"]+)")? WriteResponse$`,
 		stepHideNextWriteResponseFromScenario,
 	)
 	sc.Step(
@@ -188,7 +193,7 @@ func (r *streamWriteResearch) drainPendingWrites(ctx context.Context) error {
 func buildWriteRequest(
 	parameters string,
 	table *godog.Table,
-	transactions map[string]*leasedQueryTransaction,
+	transactions map[string]*queryTransaction,
 ) (*Ydb_Topic.StreamWriteMessage_FromClient, error) {
 	request := &Ydb_Topic.StreamWriteMessage_WriteRequest{Codec: int32(Ydb_Topic.Codec_CODEC_RAW)}
 	if parameters = strings.TrimSpace(parameters); parameters != "" {
@@ -202,7 +207,7 @@ func buildWriteRequest(
 			return nil, fmt.Errorf("WriteRequest refers to unopened Query transaction %q", name)
 		}
 		request.Tx = &Ydb_Topic.TransactionIdentity{
-			Id: transaction.transaction.ID(), Session: transaction.sessionID,
+			Id: transaction.id, Session: transaction.sessionID,
 		}
 	}
 	var err error
@@ -270,7 +275,7 @@ func stepHideNextWriteResponseFromScenario(ctx context.Context, name string) err
 	}
 	research.setHideNextWriteResponse()
 	research.observe(fmt.Sprintf(
-		"Research client will observe the next WriteResponse on StreamWrite %s "+
+		"Test client will observe the next WriteResponse on StreamWrite %s "+
 			"but will not deliver it to the scenario.", research.label()))
 
 	return nil
@@ -348,7 +353,7 @@ func stepCloseStreamWriteSessionBeforeAwaitingResponses(ctx context.Context, nam
 	case <-timer.C:
 		research.observe(fmt.Sprintf(
 			"/Ydb.Topic.V1.TopicService/StreamWrite %s produced no withheld "+
-				"Ydb.Topic.StreamWriteMessage.WriteResponse within %s; the research client now cancels the stream.",
+				"Ydb.Topic.StreamWriteMessage.WriteResponse within %s; the test client now cancels the stream.",
 			research.label(),
 			streamResponseIdleTimeout,
 		))
