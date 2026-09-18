@@ -21,7 +21,7 @@ var (
 	logLevel         string
 )
 
-func init() { //nolint:gochecknoinits
+func parseFlags() {
 	required := []string{"ydb"}
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	flagSet.Usage = func() {
@@ -73,6 +73,8 @@ func init() { //nolint:gochecknoinits
 }
 
 func main() {
+	parseFlags()
+
 	var (
 		ctx    context.Context
 		cancel context.CancelFunc
