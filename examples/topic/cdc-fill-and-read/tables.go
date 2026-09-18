@@ -96,9 +96,6 @@ func fillTable(ctx context.Context, c table.Client, prefix, tableName string) er
 	query := fmt.Sprintf(`
 PRAGMA TablePathPrefix("%v");
 
-DECLARE $id AS Uint64;
-DECLARE $value AS Text;
-
 UPSERT INTO
 	%v
 	(id, value)
@@ -128,8 +125,6 @@ VALUES
 func removeFromTable(ctx context.Context, c table.Client, prefix, tableName string) error {
 	query := fmt.Sprintf(`
 PRAGMA TablePathPrefix("%v");
-
-DECLARE $id AS Uint64;
 
 DELETE FROM
 	%v

@@ -193,13 +193,6 @@ func (s *service) upsertRows(ctx context.Context, rows []row) (err error) {
 				table.SerializableReadWriteTxControl(table.CommitTx()),
 				fmt.Sprintf(`
 					PRAGMA TablePathPrefix("%s");
-			
-					DECLARE $rows AS List<Struct<
-						url: Text,
-						code: Int32,
-						ts: DateTime,
-						error: Text
-					>>;
 
 					UPSERT INTO healthchecks ( url, code, ts, error )
 					SELECT url, code, ts, error FROM AS_TABLE($rows);`,

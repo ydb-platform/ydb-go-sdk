@@ -25,12 +25,6 @@ func deleteExpiredDocuments(ctx context.Context, c table.Client, prefix string, 
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
-		DECLARE $keys AS List<Struct<
-            doc_id: Uint64
-        >>;
-
-        DECLARE $timestamp AS Uint64;
-
         $expired = (
             SELECT d.doc_id AS doc_id
             FROM AS_TABLE($keys) AS k
@@ -163,8 +157,6 @@ func readDocument(ctx context.Context, c table.Client, prefix, url string) error
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
-		DECLARE $url AS Text;
-
         $doc_id = Digest::CityHash($url);
 
         SELECT doc_id, url, html, ts
@@ -221,10 +213,6 @@ func addDocument(ctx context.Context, c table.Client, prefix, url, html string, 
 
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
-
-		DECLARE $url AS Text;
-        DECLARE $html AS Text;
-        DECLARE $timestamp AS Uint64;
 
         $doc_id = Digest::CityHash($url);
 

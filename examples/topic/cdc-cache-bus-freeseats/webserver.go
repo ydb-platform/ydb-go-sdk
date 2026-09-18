@@ -121,7 +121,6 @@ func (s *server) getContentFromDB(ctx context.Context, id string) (int64, error)
 func (s *server) getFreeSeatsTx(ctx context.Context, tx table.TransactionActor, id string) (int64, error) {
 	var freeSeats int64
 	res, err := tx.Execute(ctx, `
-DECLARE $id AS Text;
 		SELECT freeSeats FROM bus WHERE id=$id;
 `, table.NewQueryParameters(table.ValueParam("$id", types.UTF8Value(id))))
 	if err != nil {
@@ -162,8 +161,6 @@ func (s *server) sellTicket(ctx context.Context, id string) (int64, error) {
 		}
 
 		res, err := tx.Execute(ctx, `
-DECLARE $id AS Text;
-
 UPDATE bus SET freeSeats = freeSeats - 1 WHERE id=$id;
 `, table.NewQueryParameters(table.ValueParam("$id", types.UTF8Value(id))))
 		if err != nil {

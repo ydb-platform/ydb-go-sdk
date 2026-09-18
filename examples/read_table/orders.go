@@ -55,12 +55,6 @@ var (
 	fillQuery = template.Must(template.New("fill orders").Parse(`
 PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 
-DECLARE $ordersData AS List<Struct<
-	customer_id: Uint64,
-	order_id: Uint64,
-	order_date: Date,
-	description: Text>>;
-
 REPLACE INTO orders
 SELECT
 	customer_id,

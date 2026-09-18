@@ -24,10 +24,6 @@ func selectPaging(
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
-		DECLARE $limit AS Uint64;
-		DECLARE $lastCity AS Text;
-		DECLARE $lastNumber AS Uint32;
-		
 		$part1 = (
 			SELECT * FROM schools
 			WHERE city = $lastCity AND number > $lastNumber
@@ -95,11 +91,6 @@ func selectPaging(
 func fillTableWithData(ctx context.Context, c table.Client, prefix string) (err error) {
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
-
-		DECLARE $schoolsData AS List<Struct<
-			city: Text,
-			number: Uint32,
-			address: Text>>;
 
 		REPLACE INTO schools
 		SELECT

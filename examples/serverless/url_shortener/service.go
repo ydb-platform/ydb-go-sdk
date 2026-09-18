@@ -225,9 +225,6 @@ func (s *service) insertShort(ctx context.Context, url string) (h string, err er
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 
-			DECLARE $hash as Text;
-			DECLARE $src as Text;
-
 			REPLACE INTO
 				urls (hash, src)
 			VALUES
@@ -268,8 +265,6 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-
-			DECLARE $hash as Text;
 
 			SELECT
 				src

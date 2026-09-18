@@ -25,10 +25,6 @@ func readExpiredBatchTransaction(ctx context.Context, c table.Client, prefix str
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
-		DECLARE $timestamp AS Uint64;
-        DECLARE $prev_timestamp AS Uint64;
-        DECLARE $prev_doc_id AS Uint64;
-
         $data = (
             SELECT *
             FROM expiration_queue_%v
@@ -81,9 +77,6 @@ func deleteDocumentWithTimestamp(ctx context.Context,
 ) error {
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
-
-		DECLARE $doc_id AS Uint64;
-        DECLARE $timestamp AS Uint64;
 
         DELETE FROM documents
         WHERE doc_id = $doc_id AND ts = $timestamp;
@@ -158,8 +151,6 @@ func readDocument(ctx context.Context, c table.Client, prefix, url string) error
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
-        DECLARE $url AS Text;
-
         $doc_id = Digest::CityHash($url);
 
         SELECT doc_id, url, html, ts
@@ -216,10 +207,6 @@ func addDocument(ctx context.Context, c table.Client, prefix, url, html string, 
 	queue := rand.Intn(expirationQueueCount) //nolint:gosec
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
-
-		DECLARE $url AS Text;
-        DECLARE $html AS Text;
-        DECLARE $timestamp AS Uint64;
 
         $doc_id = Digest::CityHash($url);
 

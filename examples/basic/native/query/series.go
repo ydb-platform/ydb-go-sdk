@@ -79,13 +79,6 @@ func fillTablesWithData(ctx context.Context, c query.Client, prefix string) erro
 	series, seasons, episodes := getData()
 
 	err := c.Exec(ctx, fmt.Sprintf(`
-		DECLARE $seriesData AS List<Struct<
-			series_id: Bytes,
-			title: Text,
-			series_info: Text,
-			release_date: Date,
-			comment: Optional<Text>>>;
-		
 		REPLACE INTO %s
 		SELECT
 			series_id,
@@ -106,13 +99,6 @@ func fillTablesWithData(ctx context.Context, c query.Client, prefix string) erro
 	}
 
 	err = c.Exec(ctx, fmt.Sprintf(`
-		DECLARE $seasonsData AS List<Struct<
-			series_id: Bytes,
-			season_id: Bytes,
-			title: Text,
-			first_aired: Date,
-			last_aired: Date>>;
-
 		REPLACE INTO %s
 		SELECT
 			series_id,
@@ -133,13 +119,6 @@ func fillTablesWithData(ctx context.Context, c query.Client, prefix string) erro
 	}
 
 	err = c.Exec(ctx, fmt.Sprintf(`
-		DECLARE $episodesData AS List<Struct<
-			series_id: Bytes,
-			season_id: Bytes,
-			episode_id: Bytes,
-			title: Text,
-			air_date: Date>>;
-
 		REPLACE INTO %s
 		SELECT
 			series_id,
