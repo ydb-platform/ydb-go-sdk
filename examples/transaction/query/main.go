@@ -81,7 +81,6 @@ func txWithRetries(ctx context.Context, db *ydb.Driver) (words []string, _ error
 				DECLARE $word1 AS Text;
 				DECLARE $word2 AS Text;
 				DECLARE $word3 AS Text;
-
 				SELECT w, ord FROM (
 					SELECT $word1 AS w, 1 AS ord 
 					UNION 

@@ -122,8 +122,7 @@ func (s *server) getFreeSeatsTx(ctx context.Context, tx table.TransactionActor, 
 	var freeSeats int64
 	res, err := tx.Execute(ctx, `
 DECLARE $id AS Text;
-
-SELECT freeSeats FROM bus WHERE id=$id;
+		SELECT freeSeats FROM bus WHERE id=$id;
 `, table.NewQueryParameters(table.ValueParam("$id", types.UTF8Value(id))))
 	if err != nil {
 		return 0, err
