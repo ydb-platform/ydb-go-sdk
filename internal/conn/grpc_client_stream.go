@@ -133,7 +133,11 @@ func (s *grpcClientStream) finish(err error) {
 	// grpc-go v1.78.0 applies TrailerCallOption.after before invoking OnFinish
 	// callbacks from clientStream.finish. Publish the now-immutable trailer;
 	// real-gRPC tests cover this ordering when the dependency is upgraded.
-	s.finishedTrailer.Store(&s.trailer)
+	trailer := s.trailer
+	if trailer != nil {
+		trailer = trailer.Copy()
+	}
+	s.finishedTrailer.Store(&trailer)
 	meta.CallTrailerCallback(s.requestCtx, s.Trailer())
 	gtrace.DriverOnConnStreamFinish(s.parentConn.config.Trace(), s.requestCtx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).finish"), err,
