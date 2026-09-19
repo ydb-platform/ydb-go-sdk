@@ -1,5 +1,4 @@
-* Fixed a data race while processing trailers for streaming RPCs by delivering trailer callbacks from `grpc.OnFinish`; non-success YDB statuses locally cancel the stream, so server trailers that have not arrived by then are unavailable
-* Fixed Query Service response prefetch occasionally replacing a terminal stream error with `io.EOF` when stream cancellation raced with error delivery
+* Fixed a data race while processing streaming RPC trailers: callbacks now receive finalized metadata when the RPC finishes; a YDB operation error alone does not finish the RPC, so callers must still close results or cancel their context
 
 ## v3.151.3
 * Fixed query session pool metrics during checkout, session creation and warm-up, retries, and waiting for a session

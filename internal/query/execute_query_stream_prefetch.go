@@ -20,8 +20,7 @@ type executeQueryPartRecv struct {
 type asyncPrefetchExecuteQueryStream struct {
 	Ydb_Query_V1.QueryService_ExecuteQueryClient
 
-	ch       chan executeQueryPartRecv
-	terminal chan executeQueryPartRecv
+	ch chan executeQueryPartRecv
 }
 
 func wrapExecuteQueryStreamWithAsyncPrefetch(
@@ -34,7 +33,6 @@ func wrapExecuteQueryStreamWithAsyncPrefetch(
 	s := &asyncPrefetchExecuteQueryStream{
 		QueryService_ExecuteQueryClient: stream,
 		ch:                              make(chan executeQueryPartRecv, prefetch),
-		terminal:                        make(chan executeQueryPartRecv, 1),
 	}
 
 	go s.pump()
@@ -44,23 +42,18 @@ func wrapExecuteQueryStreamWithAsyncPrefetch(
 
 func (p *asyncPrefetchExecuteQueryStream) pump() {
 	defer close(p.ch)
-	defer close(p.terminal)
 	ctx := p.QueryService_ExecuteQueryClient.Context()
 	for {
 		part, err := p.QueryService_ExecuteQueryClient.Recv()
 		item := executeQueryPartRecv{part: part, err: err}
-		if err != nil {
-			// Preserve the terminal receive result even when Recv cancels the
-			// stream context itself. The consumer must observe the operation or
-			// transport error instead of an indistinguishable io.EOF.
-			p.terminal <- item
-
-			return
-		}
 
 		select {
 		case p.ch <- item:
 		case <-ctx.Done():
+			return
+		}
+
+		if err != nil {
 			return
 		}
 	}
@@ -68,15 +61,11 @@ func (p *asyncPrefetchExecuteQueryStream) pump() {
 
 func (p *asyncPrefetchExecuteQueryStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 	item, ok := <-p.ch
-	if ok {
-		return item.part, item.err
-	}
-	item, ok = <-p.terminal
-	if ok {
-		return item.part, item.err
+	if !ok {
+		return nil, io.EOF
 	}
 
-	return nil, io.EOF
+	return item.part, item.err
 }
 
 func (p *asyncPrefetchExecuteQueryStream) RecvMsg(m any) error {

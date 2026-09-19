@@ -3,7 +3,7 @@ package conn
 import (
 	"context"
 	"io"
-	"sync"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
@@ -21,8 +21,7 @@ type grpcClientStream struct {
 	parentConn      *conn
 	stream          grpc.ClientStream
 	trailer         metadata.MD
-	trailerMu       sync.RWMutex
-	finishedTrailer metadata.MD
+	finishedTrailer atomic.Pointer[metadata.MD]
 	requestCtx      context.Context //nolint:containedctx
 	grpcCancel      context.CancelFunc
 	wrapping        bool
@@ -37,14 +36,11 @@ func (s *grpcClientStream) Header() (metadata.MD, error) {
 // Trailer returns a snapshot of the server trailers captured after the
 // underlying gRPC stream finishes. It returns nil while the stream is active.
 func (s *grpcClientStream) Trailer() metadata.MD {
-	s.trailerMu.RLock()
-	defer s.trailerMu.RUnlock()
-
-	if s.finishedTrailer == nil {
-		return nil
+	if trailer := s.finishedTrailer.Load(); trailer != nil && *trailer != nil {
+		return (*trailer).Copy()
 	}
 
-	return s.finishedTrailer.Copy()
+	return nil
 }
 
 func (s *grpcClientStream) Context() context.Context {
@@ -134,26 +130,15 @@ func (s *grpcClientStream) SendMsg(m any) (err error) {
 }
 
 func (s *grpcClientStream) finish(err error) {
-	meta.CallTrailerCallback(s.requestCtx, s.captureTrailer())
+	// grpc-go v1.78.0 applies TrailerCallOption.after before invoking OnFinish
+	// callbacks from clientStream.finish. Publish the now-immutable trailer;
+	// real-gRPC tests cover this ordering when the dependency is upgraded.
+	s.finishedTrailer.Store(&s.trailer)
+	meta.CallTrailerCallback(s.requestCtx, s.Trailer())
 	gtrace.DriverOnConnStreamFinish(s.parentConn.config.Trace(), s.requestCtx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).finish"), err,
 	)
 	s.grpcCancel()
-}
-
-func (s *grpcClientStream) captureTrailer() metadata.MD {
-	s.trailerMu.Lock()
-	defer s.trailerMu.Unlock()
-
-	if s.trailer == nil {
-		s.finishedTrailer = nil
-
-		return nil
-	}
-
-	s.finishedTrailer = s.trailer.Copy()
-
-	return s.finishedTrailer.Copy()
 }
 
 func (s *grpcClientStream) RecvMsg(m any) (err error) {
@@ -203,18 +188,12 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 	if s.wrapping {
 		if operation, ok := m.(operation.Status); ok {
 			if status := operation.GetStatus(); status != Ydb.StatusIds_SUCCESS {
-				err = xerrors.WithStackTrace(xerrors.Operation(
+				return xerrors.WithStackTrace(xerrors.Operation(
 					xerrors.FromOperation(operation),
 					xerrors.WithAddress(s.parentConn.Address()),
 					xerrors.WithNodeID(s.parentConn.NodeID()),
 					xerrors.WithTraceID(s.traceID),
 				))
-				// A non-success operation status is terminal for a wrapped stream.
-				// Cancel it to release its resources and drive grpc.OnFinish. Server
-				// trailers that have not arrived yet are unavailable after cancellation.
-				s.grpcCancel()
-
-				return err
 			}
 		}
 	}

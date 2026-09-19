@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,9 +17,11 @@ import (
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
-	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
+	grpc_testing "google.golang.org/grpc/interop/grpc_testing"
 	"google.golang.org/grpc/metadata"
 	grpcStatus "google.golang.org/grpc/status"
+	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -92,10 +95,10 @@ func TestGrpcClientStream_Trailer(t *testing.T) {
 		parentConn := newConn(e, config)
 
 		s := &grpcClientStream{
-			parentConn:      parentConn,
-			stream:          mockStream,
-			finishedTrailer: expectedMD,
+			parentConn: parentConn,
+			stream:     mockStream,
 		}
+		s.finishedTrailer.Store(&expectedMD)
 
 		md := s.Trailer()
 		require.Equal(t, expectedMD, md)
@@ -784,7 +787,8 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		err := s.RecvMsg(msg)
 		require.Error(t, err)
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
-		require.True(t, canceled)
+		require.False(t, canceled, "operation errors must not change the stream lifecycle")
+		require.Nil(t, s.Trailer(), "operation errors do not finalize transport trailers")
 	})
 
 	t.Run("OperationErrorWithoutWrapping", func(t *testing.T) {
@@ -915,7 +919,7 @@ func TestGrpcClientStream_Finish(t *testing.T) {
 
 		testErr := fmt.Errorf("test error")
 		s.finish(testErr)
-		// Should not panic
+		require.Nil(t, s.Trailer())
 	})
 
 	t.Run("CallsTrailerCallback", func(t *testing.T) {
@@ -946,220 +950,71 @@ func TestGrpcClientStream_Finish(t *testing.T) {
 	})
 }
 
-func TestConn_NewStreamCallsTrailerCallbackOnRecvEnd(t *testing.T) {
-	tests := []struct {
-		name    string
-		recvErr error
-	}{
-		{
-			name:    "EOF",
-			recvErr: io.EOF,
-		},
-		{
-			name:    "TransportError",
-			recvErr: grpcStatus.Error(grpcCodes.Unavailable, "unavailable"),
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+func TestConn_NewStreamRealGRPCTrailers(t *testing.T) {
+	for _, code := range []grpcCodes.Code{grpcCodes.OK, grpcCodes.Unavailable} {
+		t.Run(code.String(), func(t *testing.T) {
 			trailer := metadata.Pairs("x-ydb-server-hints", "session-close")
-			var callerTrailer metadata.MD
-			rawStream := &finishCaptureStream{
-				recv: func(any) error {
-					return test.recvErr
-				},
-				trailer:    trailer,
-				finishDone: make(chan struct{}),
-			}
-			rawConn := &finishCaptureConn{
-				stream: rawStream,
-			}
+			listener := bufconn.Listen(1 << 20)
+			t.Cleanup(func() { _ = listener.Close() })
+			server := grpc.NewServer()
+			grpc_testing.RegisterTestServiceServer(server, &trailerTestService{
+				trailer: trailer,
+				err:     grpcStatus.Error(code, "stream finished"),
+			})
+			t.Cleanup(server.Stop)
+			go func() { _ = server.Serve(listener) }()
 
-			config := &mockConfig{
-				dialTimeout: 5 * time.Second,
-				driverTrace: &trace.Driver{},
-			}
-			e := endpoint.New("test-endpoint:2135")
-			parentConn := newConn(e, config)
+			rawConn, err := grpc.NewClient("passthrough:///trailer-test",
+				grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+					return listener.DialContext(ctx)
+				}),
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+			)
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = rawConn.Close() })
+			parentConn := newConn(endpoint.New("trailer-test"), &mockConfig{dialTimeout: 5 * time.Second})
 			parentConn.grpcConn = rawConn
 
-			var callbackTrailer metadata.MD
-			ctx := meta.WithTrailerCallback(t.Context(), func(md metadata.MD) {
-				callbackTrailer = md
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			trailers := make(chan metadata.MD, 1)
+			var callbacks atomic.Int32
+			ctx = meta.WithTrailerCallback(ctx, func(md metadata.MD) {
+				callbacks.Add(1)
+				trailers <- md
 			})
-
-			stream, err := parentConn.NewStream(ctx, &grpc.StreamDesc{ServerStreams: true},
-				"/test.Service/Stream", grpc.Trailer(&callerTrailer))
+			var callerTrailer metadata.MD
+			sentinel := grpc.MaxCallRecvMsgSize(42)
+			opts := []grpc.CallOption{grpc.Trailer(&callerTrailer), sentinel, sentinel}
+			client := grpc_testing.NewTestServiceClient(parentConn)
+			stream, err := client.StreamingOutputCall(ctx, &grpc_testing.StreamingOutputCallRequest{}, opts[:1]...)
 			require.NoError(t, err)
-			require.Len(t, rawStream.trailerAddrs, 2)
-			require.NotNil(t, rawStream.onFinish)
-
-			err = stream.RecvMsg(&Ydb_Query.ExecuteQueryResponsePart{})
-			require.Error(t, err)
-			if errors.Is(test.recvErr, io.EOF) {
+			require.Equal(t, []grpc.CallOption{sentinel, sentinel}, opts[1:])
+			_, err = stream.Recv()
+			require.NoError(t, err)
+			_, err = stream.Recv()
+			if code == grpcCodes.OK {
 				require.ErrorIs(t, err, io.EOF)
 			} else {
-				require.True(t, xerrors.IsTransportError(err))
+				require.True(t, xerrors.IsTransportError(err, code))
 			}
-			require.Equal(t, trailer, callbackTrailer)
+			select {
+			case md := <-trailers:
+				require.Equal(t, trailer, md)
+				md.Set("x-ydb-server-hints", "changed")
+			case <-ctx.Done():
+				t.Fatal("trailer callback did not run")
+			}
+			require.EqualValues(t, 1, callbacks.Load())
 			require.Equal(t, trailer, callerTrailer)
+			require.Equal(t, trailer, stream.Trailer())
+
+			// Invoke must also leave the caller's spare option capacity untouched.
+			_, err = client.EmptyCall(ctx, &grpc_testing.Empty{}, opts[:1]...)
+			require.True(t, xerrors.IsTransportError(err, grpcCodes.Unimplemented))
+			require.Equal(t, []grpc.CallOption{sentinel, sentinel}, opts[1:])
 		})
 	}
-}
-
-func TestConn_InvokeDoesNotMutateCallerOptions(t *testing.T) {
-	rawConn := &finishCaptureConn{}
-	config := &mockConfig{
-		dialTimeout: 5 * time.Second,
-		driverTrace: &trace.Driver{},
-	}
-	e := endpoint.New("test-endpoint:2135")
-	parentConn := newConn(e, config)
-	parentConn.grpcConn = rawConn
-
-	options := make([]grpc.CallOption, 2)
-	options[0] = grpc.WaitForReady(true)
-	sentinel := grpc.MaxCallRecvMsgSize(42)
-	options[1] = sentinel
-
-	err := parentConn.Invoke(t.Context(), "/test.Service/Unary", struct{}{}, &struct{}{}, options[:1]...)
-	require.NoError(t, err)
-	require.Equal(t, sentinel, options[1], "Invoke must not overwrite spare capacity in the caller's option slice")
-	require.Len(t, rawConn.invokeOpts, 2)
-}
-
-func TestConn_NewStreamCallsTrailerCallbackOnCallerCancelWithAvailableTrailer(t *testing.T) {
-	trailer := metadata.Pairs("x-ydb-server-hints", "session-close")
-	rawStream := &finishCaptureStream{
-		trailer:                trailer,
-		publishTrailerOnCancel: true,
-		finishDone:             make(chan struct{}),
-	}
-	rawConn := &finishCaptureConn{
-		stream: rawStream,
-	}
-
-	config := &mockConfig{
-		dialTimeout: 5 * time.Second,
-		driverTrace: &trace.Driver{},
-	}
-	e := endpoint.New("test-endpoint:2135")
-	parentConn := newConn(e, config)
-	parentConn.grpcConn = rawConn
-
-	var callbackTrailer metadata.MD
-	var callbackCalls atomic.Int32
-	ctx, cancel := context.WithCancel(meta.WithTrailerCallback(t.Context(), func(md metadata.MD) {
-		callbackTrailer = md
-		callbackCalls.Add(1)
-	}))
-	stream, err := parentConn.NewStream(ctx, &grpc.StreamDesc{ServerStreams: true}, "/test.Service/Stream")
-	require.NoError(t, err)
-
-	cancel()
-	select {
-	case <-rawStream.finishDone:
-	case <-time.After(time.Second):
-		t.Fatal("gRPC stream did not finish after caller cancellation")
-	}
-
-	require.Equal(t, trailer, callbackTrailer)
-	require.EqualValues(t, 1, callbackCalls.Load())
-	require.Equal(t, trailer, stream.Trailer())
-}
-
-func TestConn_NewStreamSendMsgErrorDoesNotCallEmptyTrailerCallback(t *testing.T) {
-	rawStream := &finishCaptureStream{
-		send: func(any) error {
-			return grpcStatus.Error(grpcCodes.Unavailable, "unavailable")
-		},
-		finishDone: make(chan struct{}),
-	}
-	rawConn := &finishCaptureConn{
-		stream: rawStream,
-	}
-
-	config := &mockConfig{
-		dialTimeout: 5 * time.Second,
-		driverTrace: &trace.Driver{},
-	}
-	e := endpoint.New("test-endpoint:2135")
-	parentConn := newConn(e, config)
-	parentConn.grpcConn = rawConn
-
-	var callbackCalls atomic.Int32
-	ctx := meta.WithTrailerCallback(t.Context(), func(metadata.MD) {
-		callbackCalls.Add(1)
-	})
-	stream, err := parentConn.NewStream(ctx, &grpc.StreamDesc{ClientStreams: true}, "/test.Service/Stream")
-	require.NoError(t, err)
-
-	err = stream.SendMsg(struct{}{})
-	require.Error(t, err)
-	select {
-	case <-rawStream.finishDone:
-	case <-time.After(time.Second):
-		t.Fatal("gRPC stream did not finish after SendMsg error")
-	}
-
-	require.Zero(t, callbackCalls.Load())
-	require.Nil(t, stream.Trailer())
-}
-
-func TestConn_NewStreamCancelsOnOperationError(t *testing.T) {
-	trailer := metadata.Pairs("x-ydb-server-hints", "session-close")
-	rawStream := &finishCaptureStream{
-		recv: func(m any) error {
-			response := m.(*Ydb_Query.ExecuteQueryResponsePart)
-			response.Status = Ydb.StatusIds_UNAVAILABLE
-
-			return nil
-		},
-		trailer:       trailer,
-		finishStarted: make(chan struct{}),
-		finishRelease: make(chan struct{}),
-		finishDone:    make(chan struct{}),
-	}
-	rawConn := &finishCaptureConn{
-		stream: rawStream,
-	}
-
-	config := &mockConfig{
-		dialTimeout: 5 * time.Second,
-		driverTrace: &trace.Driver{},
-	}
-	e := endpoint.New("test-endpoint:2135")
-	parentConn := newConn(e, config)
-	parentConn.grpcConn = rawConn
-
-	var callbackTrailer metadata.MD
-	ctx := meta.WithTrailerCallback(t.Context(), func(md metadata.MD) {
-		callbackTrailer = md
-	})
-
-	stream, err := parentConn.NewStream(ctx, &grpc.StreamDesc{ServerStreams: true}, "/test.Service/Stream")
-	require.NoError(t, err)
-
-	err = stream.RecvMsg(&Ydb_Query.ExecuteQueryResponsePart{})
-	require.Error(t, err)
-	require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
-	select {
-	case <-rawStream.finishStarted:
-	case <-time.After(time.Second):
-		t.Fatal("gRPC stream finish did not start")
-	}
-	require.Nil(t, stream.Trailer(), "Trailer must not read transport state while OnFinish is pending")
-	close(rawStream.finishRelease)
-	require.Eventually(t, func() bool {
-		select {
-		case <-rawStream.finishDone:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, time.Millisecond)
-	require.Nil(t, callbackTrailer)
 }
 
 // fakeTrailerStream is a grpc.ClientStream whose transport goroutine mutates
@@ -1209,97 +1064,21 @@ func (f *fakeTrailerStream) Trailer() metadata.MD {
 	return f.trailer
 }
 
-type finishCaptureConn struct {
-	stream     *finishCaptureStream
-	invokeOpts []grpc.CallOption
+type trailerTestService struct {
+	grpc_testing.UnimplementedTestServiceServer
+
+	trailer metadata.MD
+	err     error
 }
 
-func (f *finishCaptureConn) Invoke(_ context.Context, _ string, _ any, _ any, opts ...grpc.CallOption) error {
-	f.invokeOpts = append([]grpc.CallOption(nil), opts...)
-
-	return nil
-}
-
-func (f *finishCaptureConn) NewStream(
-	ctx context.Context,
-	_ *grpc.StreamDesc,
-	_ string,
-	opts ...grpc.CallOption,
-) (grpc.ClientStream, error) {
-	for _, opt := range opts {
-		switch opt := opt.(type) {
-		case grpc.TrailerCallOption:
-			f.stream.trailerAddrs = append(f.stream.trailerAddrs, opt.TrailerAddr)
-		case grpc.OnFinishCallOption:
-			f.stream.onFinish = opt.OnFinish
-		}
-	}
-	go func() {
-		<-ctx.Done()
-		f.stream.finish(ctx.Err())
-	}()
-
-	return f.stream, nil
-}
-
-func (f *finishCaptureConn) Close() error {
-	return nil
-}
-
-func (f *finishCaptureConn) GetState() connectivity.State {
-	return connectivity.Ready
-}
-
-type finishCaptureStream struct {
-	grpc.ClientStream
-
-	recv                   func(m any) error
-	send                   func(m any) error
-	trailer                metadata.MD
-	trailerAddrs           []*metadata.MD
-	onFinish               func(error)
-	finishOnce             sync.Once
-	publishTrailerOnCancel bool
-	finishStarted          chan struct{}
-	finishRelease          chan struct{}
-	finishDone             chan struct{}
-}
-
-func (f *finishCaptureStream) RecvMsg(m any) error {
-	err := f.recv(m)
-	if err != nil {
-		f.finish(err)
+func (s *trailerTestService) StreamingOutputCall(
+	_ *grpc_testing.StreamingOutputCallRequest,
+	stream grpc.ServerStreamingServer[grpc_testing.StreamingOutputCallResponse],
+) error {
+	stream.SetTrailer(s.trailer)
+	if err := stream.Send(&grpc_testing.StreamingOutputCallResponse{}); err != nil {
+		return err
 	}
 
-	return err
-}
-
-func (f *finishCaptureStream) SendMsg(m any) error {
-	err := f.send(m)
-	if err != nil {
-		f.finish(err)
-	}
-
-	return err
-}
-
-func (f *finishCaptureStream) finish(err error) {
-	f.finishOnce.Do(func() {
-		if f.finishStarted != nil {
-			close(f.finishStarted)
-		}
-		if f.finishRelease != nil {
-			<-f.finishRelease
-		}
-		if !errors.Is(err, context.Canceled) || f.publishTrailerOnCancel {
-			for _, trailerAddr := range f.trailerAddrs {
-				*trailerAddr = f.trailer
-			}
-		}
-		if errors.Is(err, io.EOF) {
-			err = nil
-		}
-		f.onFinish(err)
-		close(f.finishDone)
-	})
+	return s.err
 }
