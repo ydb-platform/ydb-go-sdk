@@ -15,8 +15,11 @@ import (
 )
 
 func read(ctx context.Context, c query.Client, prefix string) error {
-	return c.Do(ctx,
+	var messages []string
+	err := c.Do(ctx,
 		func(ctx context.Context, s query.Session) (err error) {
+			// Publish output only after a successful attempt, so retrying this callback has no visible side effects.
+			var attemptMessages []string
 			result, err := s.Query(ctx, fmt.Sprintf(`
 					SELECT
 						series_id,
@@ -54,27 +57,29 @@ func read(ctx context.Context, c query.Client, prefix string) error {
 						return err
 					}
 
-					log.Printf("id: %v, title: %v, release: %v",
-						row.SeriesID, row.Title, row.ReleaseDate)
+					attemptMessages = append(attemptMessages, fmt.Sprintf(
+						"id: %v, title: %v, release: %v",
+						row.SeriesID, row.Title, row.ReleaseDate,
+					))
 				}
 			}
+			messages = attemptMessages
 
 			return nil
 		},
+		query.WithIdempotent(),
 	)
+	for _, message := range messages {
+		log.Print(message)
+	}
+
+	return err
 }
 
 func fillTablesWithData(ctx context.Context, c query.Client, prefix string) error {
 	series, seasons, episodes := getData()
 
 	err := c.Exec(ctx, fmt.Sprintf(`
-		DECLARE $seriesData AS List<Struct<
-			series_id: Bytes,
-			title: Text,
-			series_info: Text,
-			release_date: Date,
-			comment: Optional<Text>>>;
-		
 		REPLACE INTO %s
 		SELECT
 			series_id,
@@ -95,13 +100,6 @@ func fillTablesWithData(ctx context.Context, c query.Client, prefix string) erro
 	}
 
 	err = c.Exec(ctx, fmt.Sprintf(`
-		DECLARE $seasonsData AS List<Struct<
-			series_id: Bytes,
-			season_id: Bytes,
-			title: Text,
-			first_aired: Date,
-			last_aired: Date>>;
-
 		REPLACE INTO %s
 		SELECT
 			series_id,
@@ -122,13 +120,6 @@ func fillTablesWithData(ctx context.Context, c query.Client, prefix string) erro
 	}
 
 	err = c.Exec(ctx, fmt.Sprintf(`
-		DECLARE $episodesData AS List<Struct<
-			series_id: Bytes,
-			season_id: Bytes,
-			episode_id: Bytes,
-			title: Text,
-			air_date: Date>>;
-
 		REPLACE INTO %s
 		SELECT
 			series_id,
