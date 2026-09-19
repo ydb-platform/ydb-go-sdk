@@ -43,8 +43,6 @@ func (r *commitRequest) Confirm() {
 // Wait starts the commit if needed, then waits for the send result and ACK.
 // Canceling ctx stops only this wait: another caller can keep waiting without
 // sending the commit again. An already committed range is not sent again.
-//
-//nolint:funlen // Keep the send and ACK phases together to preserve their error order.
 func (r *commitRequest) Wait(ctx context.Context) error {
 	if !r.committer.mode.CommitsEnabled() {
 		return xerrors.WithStackTrace(ErrCommitDisabled)
@@ -77,11 +75,17 @@ func (r *commitRequest) Wait(ctx context.Context) error {
 		return xerrors.WithStackTrace(ErrPublicCommitSessionToExpiredSession)
 	}
 	r.start()
+	if err := r.waitSend(ctx, session); err != nil {
+		return err
+	}
+
+	return r.waitAck(ctx, session)
+}
+
+func (r *commitRequest) waitSend(ctx context.Context, session *PartitionSession) error {
 	select {
 	case <-r.sendDone:
-		if r.sendErr != nil {
-			return r.sendErr
-		}
+		return r.sendErr
 	case <-ctx.Done():
 		return xerrors.WithStackTrace(ctx.Err())
 	case <-session.Context().Done():
@@ -101,7 +105,9 @@ func (r *commitRequest) Wait(ctx context.Context) error {
 
 		return xerrors.WithStackTrace(ErrPublicCommitSessionToExpiredSession)
 	}
+}
 
+func (r *commitRequest) waitAck(ctx context.Context, session *PartitionSession) error {
 	if err := ctx.Err(); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
