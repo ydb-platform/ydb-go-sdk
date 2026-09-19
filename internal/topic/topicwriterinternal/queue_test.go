@@ -25,7 +25,7 @@ func TestMessageQueue_AddMessages(t *testing.T) {
 
 		require.Equal(t, 3, q.lastWrittenIndex)
 
-		expected := map[int]queuedMessage{
+		expected := map[int]*queuedMessage{
 			1: {messageWithDataContent: newTestMessageWithDataContent(1)},
 			2: {messageWithDataContent: newTestMessageWithDataContent(3)},
 			3: {messageWithDataContent: newTestMessageWithDataContent(5)},
@@ -47,9 +47,9 @@ func TestMessageQueue_AddMessages(t *testing.T) {
 		q.lastWrittenIndex = maxInt - 1
 		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 3, 5)))
 		require.Len(t, q.messagesByOrder, 3)
-		q.messagesByOrder[maxInt] = queuedMessage{messageWithDataContent: newTestMessageWithDataContent(1)}
-		q.messagesByOrder[minInt] = queuedMessage{messageWithDataContent: newTestMessageWithDataContent(3)}
-		q.messagesByOrder[minInt+1] = queuedMessage{messageWithDataContent: newTestMessageWithDataContent(5)}
+		q.messagesByOrder[maxInt] = &queuedMessage{messageWithDataContent: newTestMessageWithDataContent(1)}
+		q.messagesByOrder[minInt] = &queuedMessage{messageWithDataContent: newTestMessageWithDataContent(3)}
+		q.messagesByOrder[minInt+1] = &queuedMessage{messageWithDataContent: newTestMessageWithDataContent(5)}
 		require.Equal(t, minInt+1, q.lastWrittenIndex)
 	})
 	t.Run("BadOrder", func(t *testing.T) {
@@ -402,7 +402,7 @@ func TestSortIndexes(t *testing.T) {
 func TestQueuePanicOnOverflow(t *testing.T) {
 	require.Panics(t, func() {
 		q := newMessageQueue()
-		q.messagesByOrder[123] = queuedMessage{}
+		q.messagesByOrder[123] = &queuedMessage{}
 		q.lastWrittenIndex = maxInt
 		q.addMessageNeedLock(messageWithDataContent{})
 	})
@@ -438,7 +438,7 @@ func TestQueue_Ack(t *testing.T) {
 				SeqNo: 2,
 			},
 		}))
-		expectedMap := map[int]queuedMessage{
+		expectedMap := map[int]*queuedMessage{
 			1: {messageWithDataContent: newTestMessageWithDataContent(1)},
 			3: {messageWithDataContent: newTestMessageWithDataContent(5)},
 		}
@@ -455,7 +455,7 @@ func TestQueue_Ack(t *testing.T) {
 			},
 		}))
 
-		expectedMap := map[int]queuedMessage{
+		expectedMap := map[int]*queuedMessage{
 			1: {messageWithDataContent: newTestMessageWithDataContent(1)},
 		}
 
@@ -711,6 +711,8 @@ func TestQueue_WaitLastWrittenSharesAck(t *testing.T) {
 	require.NoError(t, q.WaitLastWritten(t.Context()))
 }
 
+const queueWaitTestTimeout = 5 * time.Second
+
 // Done is called by Wait after obtaining the message's ack channel.
 type queueWaitContext struct {
 	context.Context //nolint:containedctx // Decorate Done to synchronize the test with Wait.
@@ -731,7 +733,7 @@ func requireQueueWaitStarted(t *testing.T, ctx *queueWaitContext) {
 	t.Helper()
 	select {
 	case <-ctx.waiting:
-	case <-time.After(time.Second):
+	case <-time.After(queueWaitTestTimeout):
 		t.Fatal("Wait did not reach the ack notification select")
 	}
 }
@@ -740,10 +742,14 @@ func waitForMessageAckChannel(t *testing.T, q *messageQueue, index int) empty.Ch
 	t.Helper()
 	var acked empty.Chan
 	require.Eventually(t, func() bool {
-		q.m.WithRLock(func() { acked = q.messagesByOrder[index].acked })
+		q.m.WithRLock(func() {
+			if msg, ok := q.messagesByOrder[index]; ok {
+				acked = msg.acked
+			}
+		})
 
 		return acked != nil
-	}, time.Second, time.Millisecond, "Wait did not create the message ack channel")
+	}, queueWaitTestTimeout, time.Millisecond, "Wait did not create the message ack channel")
 
 	return acked
 }
@@ -762,7 +768,7 @@ func waitQueueResult(t *testing.T, done <-chan error) error {
 	select {
 	case err := <-done:
 		return err
-	case <-time.After(time.Second):
+	case <-time.After(queueWaitTestTimeout):
 		t.Fatal("timed out waiting for queue operation")
 
 		return nil

@@ -44,7 +44,7 @@ type messageQueue struct {
 	lastSentIndex             int
 	lastSeqNo                 int64
 
-	messagesByOrder map[int]queuedMessage
+	messagesByOrder map[int]*queuedMessage
 	seqNoToOrderID  map[int64]int
 }
 
@@ -57,7 +57,7 @@ type queuedMessage struct {
 
 func newMessageQueue() messageQueue {
 	return messageQueue{
-		messagesByOrder: make(map[int]queuedMessage),
+		messagesByOrder: make(map[int]*queuedMessage),
 		seqNoToOrderID:  make(map[int64]int),
 		hasNewMessages:  make(empty.Chan, 1),
 		closedChan:      make(empty.Chan),
@@ -146,7 +146,7 @@ func (q *messageQueue) addMessageNeedLock(
 		panic(fmt.Errorf("ydb: bad internal state os message queue - already exists with index: %v", messageIndex))
 	}
 
-	q.messagesByOrder[messageIndex] = queuedMessage{messageWithDataContent: mess}
+	q.messagesByOrder[messageIndex] = &queuedMessage{messageWithDataContent: mess}
 	q.seqNoToOrderID[mess.SeqNo] = messageIndex
 	q.lastSeqNo = mess.SeqNo
 
@@ -327,7 +327,6 @@ func (q *messageQueue) Wait(ctx context.Context, waiter MessageQueueAckWaiter) e
 				if msg, ok := q.messagesByOrder[index]; ok {
 					if msg.acked == nil {
 						msg.acked = make(empty.Chan)
-						q.messagesByOrder[index] = msg
 					}
 					acked = msg.acked
 

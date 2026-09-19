@@ -112,7 +112,7 @@ func TestWriterImpl_Write(t *testing.T) {
 		err := w.Write(ctx, newTestMessages(1, 3, 5))
 		require.NoError(t, err)
 
-		expectedMap := map[int]queuedMessage{
+		expectedMap := map[int]*queuedMessage{
 			1: {messageWithDataContent: newTestMessageWithDataContent(1)},
 			2: {messageWithDataContent: newTestMessageWithDataContent(3)},
 			3: {messageWithDataContent: newTestMessageWithDataContent(5)},
