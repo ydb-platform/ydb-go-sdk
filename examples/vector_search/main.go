@@ -159,6 +159,7 @@ func searchItemsAsBytes(
 
 	var hits []searchHit
 	err := c.Do(ctx, func(ctx context.Context, s query.Session) error {
+		attemptHits := make([]searchHit, 0, limit)
 		stream, err := s.Query(ctx, sql, query.WithParameters(
 			ydb.ParamsBuilder().
 				Param("$embedding").
@@ -186,9 +187,10 @@ func searchItemsAsBytes(
 				); err != nil {
 					return err
 				}
-				hits = append(hits, hit)
+				attemptHits = append(attemptHits, hit)
 			}
 		}
+		hits = attemptHits
 
 		return nil
 	}, query.WithIdempotent())
