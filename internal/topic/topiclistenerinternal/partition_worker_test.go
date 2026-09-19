@@ -243,7 +243,7 @@ func createTestBatchWithBufferBytes(t *testing.T, size int) *topicreadercommon.P
 // INTERFACE TESTS - Test external behavior through public API only
 // =============================================================================
 
-func TestPartitionWorkerBatchMergeFailureDoesNotDeadlock(t *testing.T) {
+func TestPartitionWorkerBatchMergeFailureKeepsBatchesSeparate(t *testing.T) {
 	session := createTestPartitionSession()
 	first, err := topicreadercommon.NewBatch(session, nil)
 	require.NoError(t, err)
@@ -262,17 +262,21 @@ func TestPartitionWorkerBatchMergeFailureDoesNotDeadlock(t *testing.T) {
 		&trace.Topic{}, "test-listener")
 	metadata := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
 	worker.AddMessagesBatch(metadata, first)
-	done := make(chan struct{})
-	go func() {
-		worker.AddMessagesBatch(metadata, second)
-		close(done)
-	}()
+	worker.AddMessagesBatch(metadata, second)
+
 	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("adding a batch deadlocked while reporting a merge error")
+	case err := <-stopped:
+		t.Fatalf("a failed optimization stopped the worker: %v", err)
+	default:
 	}
-	require.ErrorContains(t, xtest.Receive(t, stopped, "the batch merge failure"), "bad offset interval for merge")
+	firstMessage, ok, err := worker.messageQueue.Receive(xtest.Context(t))
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Same(t, first, firstMessage.BatchMessage.Batch)
+	secondMessage, ok, err := worker.messageQueue.Receive(xtest.Context(t))
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Same(t, second, secondMessage.BatchMessage.Batch)
 }
 
 func TestPartitionWorkerInterface_StartPartitionSessionFlow(t *testing.T) {

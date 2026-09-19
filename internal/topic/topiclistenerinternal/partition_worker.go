@@ -126,7 +126,6 @@ func (w *PartitionWorker) Start(ctx context.Context) {
 
 // AddUnifiedMessage adds a unified message to the processing queue
 func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) {
-	var mergeErr error
 	// Merge adjacent batches from the same server message without reordering control messages.
 	accepted := w.messageQueue.SendWithMerge(msg, func(last, next unifiedMessage) (unifiedMessage, bool) {
 		if last.BatchMessage == nil || next.BatchMessage == nil ||
@@ -136,8 +135,6 @@ func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) {
 
 		merged, err := topicreadercommon.BatchAppend(last.BatchMessage.Batch, next.BatchMessage.Batch)
 		if err != nil {
-			mergeErr = err
-
 			return next, false
 		}
 
@@ -146,10 +143,6 @@ func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) {
 			Batch:                 merged,
 		}}, true
 	})
-	if mergeErr != nil {
-		// The listener owns worker shutdown; report the merge failure after the queue lock is released.
-		w.onStopped(w.partitionSessionID, mergeErr)
-	}
 	if !accepted {
 		w.freeBatchCredit(msg)
 	}

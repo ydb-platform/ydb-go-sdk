@@ -127,14 +127,21 @@ func newStreamListener(
 
 func (l *streamListener) Close(ctx context.Context, reason error) error {
 	done := l.beginClose(ctx, reason)
-	if err := ctx.Err(); err != nil {
-		return err
+	select {
+	case <-done:
+		return l.shutdownErr
+	default:
 	}
 	select {
 	case <-done:
 		return l.shutdownErr
 	case <-ctx.Done():
-		return ctx.Err()
+		select {
+		case <-done:
+			return l.shutdownErr
+		default:
+			return ctx.Err()
+		}
 	}
 }
 
@@ -195,8 +202,12 @@ func (l *streamListener) finishClose(ctx context.Context, reason error, done emp
 		}
 	}
 
-	l.shutdownErr = errors.Join(l.shutdownErr, errors.Join(resErrors...))
-	closeDone(workersClosed, l.shutdownErr)
+	var shutdownErr error
+	l.m.WithLock(func() {
+		l.shutdownErr = errors.Join(l.shutdownErr, errors.Join(resErrors...))
+		shutdownErr = l.shutdownErr
+	})
+	closeDone(workersClosed, shutdownErr)
 	close(done)
 }
 

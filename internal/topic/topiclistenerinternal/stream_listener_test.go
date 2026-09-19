@@ -320,7 +320,7 @@ func TestStreamListenerStoppedWorkerKeepsReplacement(t *testing.T) {
 	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
 }
 
-func TestStreamListenerMergeFailureClosesWorkerWithoutSecondClose(t *testing.T) {
+func TestStreamListenerMergeFailureKeepsBatchesSeparate(t *testing.T) {
 	e := fixenv.New(t)
 	ctx := sf.Context(e)
 	listener := StreamListener(e)
@@ -334,9 +334,18 @@ func TestStreamListenerMergeFailureClosesWorkerWithoutSecondClose(t *testing.T) 
 		}
 	}()
 	EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(context.Context, *PublicEventStartPartitionSession) error {
+		func(_ context.Context, event *PublicEventStartPartitionSession) error {
 			close(entered)
 			<-release
+			event.Confirm()
+
+			return nil
+		},
+	)
+	processed := make(chan struct{}, 2)
+	EventHandlerMock(e).EXPECT().OnReadMessages(gomock.Any(), gomock.Any()).Times(2).DoAndReturn(
+		func(context.Context, *PublicReadMessages) error {
+			processed <- struct{}{}
 
 			return nil
 		},
@@ -357,11 +366,24 @@ func TestStreamListenerMergeFailureClosesWorkerWithoutSecondClose(t *testing.T) 
 	metadata := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
 	worker.AddMessagesBatch(metadata, first)
 	worker.AddMessagesBatch(metadata, second)
-	require.Eventually(t, listener.closing.Load, time.Second, time.Millisecond)
+	require.False(t, listener.closing.Load(), "a failed optimization must not stop the listener")
 	close(release)
 	released = true
+	_ = xtest.Receive(t, processed, "the first batch")
+	_ = xtest.Receive(t, processed, "the second batch")
 	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
-	require.ErrorContains(t, listener.background.CloseReason(), "bad offset interval for merge")
+}
+
+func TestStreamListenerClosePrefersCompletedShutdown(t *testing.T) {
+	shutdownErr := errors.New("shutdown failed")
+	done := make(chan struct{})
+	close(done)
+	listener := &streamListener{shutdownDone: done, shutdownErr: shutdownErr}
+	listener.closing.Store(true)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	require.ErrorIs(t, listener.Close(ctx, ErrUserCloseTopic), shutdownErr)
 }
 
 func TestNewStreamListenerWaitsForFailedInitCleanup(t *testing.T) {

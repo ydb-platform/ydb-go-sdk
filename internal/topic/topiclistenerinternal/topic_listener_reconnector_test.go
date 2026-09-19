@@ -10,6 +10,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
@@ -558,6 +559,27 @@ func TestTopicListenerReconnectorRetriesInitialConnection(t *testing.T) {
 	}
 }
 
+func TestTopicListenerReconnectorRetriesTransientInitialStatus(t *testing.T) {
+	ctx := xtest.Context(t)
+	clock := clockwork.NewFakeClock()
+	timers := make(chan time.Duration, 1)
+	cfg := NewStreamListenerConfig()
+	cfg.clock = &recordingListenerClock{Clock: clock, timers: timers}
+	client := &failFirstInitStatusTopicClient{status: Ydb.StatusIds_OVERLOADED}
+	listener, err := NewTopicListenerReconnector(
+		client, &cfg, NewMockEventHandler(gomock.NewController(t)),
+	)
+	require.NoError(t, err)
+	defer func() { _ = listener.Close(ctx, ErrUserCloseTopic) }()
+
+	delay := xtest.Receive(t, timers, "the initial status retry backoff timer")
+	clock.Advance(delay)
+
+	require.NoError(t, listener.WaitInit(xtest.ContextWithCommonTimeout(ctx, t)))
+	require.EqualValues(t, 2, client.attempts.Load())
+	require.NotEmpty(t, listener.ReadSessionID())
+}
+
 func TestTopicListenerReconnectorCloseDuringInitialBackoff(t *testing.T) {
 	ctx := xtest.Context(t)
 	timers := make(chan time.Duration, 1)
@@ -657,6 +679,40 @@ func (c freshStreamTopicClient) StreamRead(
 type failFirstStreamTopicClient struct {
 	openError error
 	attempts  atomic.Int32
+}
+
+type failFirstInitStatusTopicClient struct {
+	status   Ydb.StatusIds_StatusCode
+	attempts atomic.Int32
+}
+
+func (c *failFirstInitStatusTopicClient) StreamRead(
+	ctx context.Context, id int64, tracer *trace.Topic,
+) (rawtopicreader.StreamReader, error) {
+	if c.attempts.Add(1) == 1 {
+		return rawtopicreader.StreamReader{
+			Stream: &initStatusGRPCStream{status: c.status},
+			Tracer: tracer,
+		}, nil
+	}
+
+	return freshStreamTopicClient{}.StreamRead(ctx, id, tracer)
+}
+
+type initStatusGRPCStream struct {
+	status Ydb.StatusIds_StatusCode
+}
+
+func (*initStatusGRPCStream) Send(*Ydb_Topic.StreamReadMessage_FromClient) error {
+	return nil
+}
+
+func (s *initStatusGRPCStream) Recv() (*Ydb_Topic.StreamReadMessage_FromServer, error) {
+	return &Ydb_Topic.StreamReadMessage_FromServer{Status: s.status}, nil
+}
+
+func (*initStatusGRPCStream) CloseSend() error {
+	return nil
 }
 
 func (c *failFirstStreamTopicClient) StreamRead(
