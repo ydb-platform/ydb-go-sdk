@@ -37,7 +37,9 @@ func WithAllowFeatures(ctx context.Context, features ...string) context.Context 
 	return meta.WithAllowFeatures(ctx, features...)
 }
 
-// WithTrailerCallback attaches callback to context for listening incoming metadata
+// WithTrailerCallback attaches callback to context for listening to non-empty
+// trailer metadata available when an RPC finishes. If a stream is canceled
+// before server trailers arrive, the callback is not invoked for those trailers.
 func WithTrailerCallback(
 	ctx context.Context,
 	callback func(md metadata.MD),

@@ -420,6 +420,8 @@ func (c *conn) Invoke(
 		return xerrors.WithStackTrace(err)
 	}
 
+	invokeOpts := append([]grpc.CallOption(nil), opts...)
+	invokeOpts = append(invokeOpts, grpc.Trailer(&md))
 	opID, issues, err = invoke(
 		ctx,
 		method,
@@ -428,7 +430,7 @@ func (c *conn) Invoke(
 		cc,
 		c.Address(),
 		c.NodeID(),
-		append(opts, grpc.Trailer(&md))...,
+		invokeOpts...,
 	)
 
 	return err

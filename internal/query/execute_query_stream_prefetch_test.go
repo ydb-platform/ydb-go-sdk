@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 // testExecuteQueryStream is a minimal [Ydb_Query_V1.QueryService_ExecuteQueryClient] for tests.
@@ -127,6 +128,27 @@ func TestWrapExecuteQueryStreamWithPrefetchPropagatesError(t *testing.T) {
 
 	_, err = wrapped.Recv()
 	require.ErrorIs(t, err, testErr)
+}
+
+func TestWrapExecuteQueryStreamWithPrefetchPreservesErrorWhenStreamContextIsCanceled(t *testing.T) {
+	testErr := errors.New("stream operation error")
+
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		ctx, cancel := context.WithCancel(t.Context())
+		inner := &testExecuteQueryStream{
+			ctx: ctx,
+			recv: func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+				cancel()
+
+				return nil, testErr
+			},
+		}
+
+		wrapped := wrapExecuteQueryStreamWithAsyncPrefetch(inner, 1)
+
+		_, err := wrapped.Recv()
+		require.ErrorIs(t, err, testErr)
+	})
 }
 
 func TestWrapExecuteQueryStreamWithPrefetchZeroPassthrough(t *testing.T) {
