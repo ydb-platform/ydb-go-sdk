@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -758,18 +759,23 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 		}
 		e := endpoint.New("test-endpoint:2135", endpoint.WithID(123))
 		parentConn := newConn(e, config)
+		canceled := false
 
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
 			requestCtx: t.Context(),
-			wrapping:   true,
-			sentMark:   &modificationMark{},
+			grpcCancel: func() {
+				canceled = true
+			},
+			wrapping: true,
+			sentMark: &modificationMark{},
 		}
 
 		err := s.RecvMsg(msg)
 		require.Error(t, err)
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
+		require.True(t, canceled)
 	})
 
 	t.Run("OperationErrorWithoutWrapping", func(t *testing.T) {
@@ -832,6 +838,7 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 				parentConn: parentConn,
 				stream:     fake,
 				requestCtx: t.Context(),
+				grpcCancel: func() {},
 				wrapping:   true,
 				sentMark:   &modificationMark{},
 			}
@@ -930,9 +937,77 @@ func TestGrpcClientStream_Finish(t *testing.T) {
 	})
 }
 
-func TestConn_NewStreamCallsTrailerCallbackOnFinish(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	rawStream := mock.NewMockClientStream(ctrl)
+func TestConn_NewStreamCallsTrailerCallbackOnRecvEnd(t *testing.T) {
+	tests := []struct {
+		name    string
+		recvErr error
+	}{
+		{
+			name:    "EOF",
+			recvErr: io.EOF,
+		},
+		{
+			name:    "TransportError",
+			recvErr: grpcStatus.Error(grpcCodes.Unavailable, "unavailable"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			trailer := metadata.Pairs("x-ydb-server-hints", "session-close")
+			rawStream := &finishCaptureStream{
+				recv: func(any) error {
+					return test.recvErr
+				},
+				trailer:    trailer,
+				finishDone: make(chan struct{}),
+			}
+			rawConn := &finishCaptureConn{
+				stream: rawStream,
+			}
+
+			config := &mockConfig{
+				dialTimeout: 5 * time.Second,
+				driverTrace: &trace.Driver{},
+			}
+			e := endpoint.New("test-endpoint:2135")
+			parentConn := newConn(e, config)
+			parentConn.grpcConn = rawConn
+
+			var callbackTrailer metadata.MD
+			ctx := meta.WithTrailerCallback(t.Context(), func(md metadata.MD) {
+				callbackTrailer = md
+			})
+
+			stream, err := parentConn.NewStream(ctx, &grpc.StreamDesc{ServerStreams: true}, "/test.Service/Stream")
+			require.NoError(t, err)
+			require.NotNil(t, rawStream.trailerAddr)
+			require.NotNil(t, rawStream.onFinish)
+
+			err = stream.RecvMsg(&Ydb_Query.ExecuteQueryResponsePart{})
+			require.Error(t, err)
+			if errors.Is(test.recvErr, io.EOF) {
+				require.ErrorIs(t, err, io.EOF)
+			} else {
+				require.True(t, xerrors.IsTransportError(err))
+			}
+			require.Equal(t, trailer, callbackTrailer)
+		})
+	}
+}
+
+func TestConn_NewStreamCancelsOnOperationError(t *testing.T) {
+	trailer := metadata.Pairs("x-ydb-server-hints", "session-close")
+	rawStream := &finishCaptureStream{
+		recv: func(m any) error {
+			response := m.(*Ydb_Query.ExecuteQueryResponsePart)
+			response.Status = Ydb.StatusIds_UNAVAILABLE
+
+			return nil
+		},
+		trailer:    trailer,
+		finishDone: make(chan struct{}),
+	}
 	rawConn := &finishCaptureConn{
 		stream: rawStream,
 	}
@@ -952,14 +1027,18 @@ func TestConn_NewStreamCallsTrailerCallbackOnFinish(t *testing.T) {
 
 	stream, err := parentConn.NewStream(ctx, &grpc.StreamDesc{ServerStreams: true}, "/test.Service/Stream")
 	require.NoError(t, err)
-	require.NotNil(t, stream)
-	require.NotNil(t, rawConn.trailerAddr)
-	require.NotNil(t, rawConn.onFinish)
 
-	trailer := metadata.Pairs("x-ydb-server-hints", "session-close")
-	*rawConn.trailerAddr = trailer
-	rawConn.onFinish(nil)
-
+	err = stream.RecvMsg(&Ydb_Query.ExecuteQueryResponsePart{})
+	require.Error(t, err)
+	require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
+	require.Eventually(t, func() bool {
+		select {
+		case <-rawStream.finishDone:
+			return true
+		default:
+			return false
+		}
+	}, time.Second, time.Millisecond)
 	require.Equal(t, trailer, callbackTrailer)
 }
 
@@ -972,6 +1051,7 @@ type fakeTrailerStream struct {
 	recv               func(m any) error
 	trailer            metadata.MD
 	trailerCalls       atomic.Int32
+	trailerReadOnce    sync.Once
 	trailerReadStarted chan struct{}
 	writerSelected     chan struct{}
 	transportStop      chan struct{}
@@ -1001,16 +1081,16 @@ func (f *fakeTrailerStream) RecvMsg(m any) error {
 
 func (f *fakeTrailerStream) Trailer() metadata.MD {
 	f.trailerCalls.Add(1)
-	close(f.trailerReadStarted)
+	f.trailerReadOnce.Do(func() {
+		close(f.trailerReadStarted)
+	})
 	<-f.writerSelected
 
 	return f.trailer
 }
 
 type finishCaptureConn struct {
-	stream      grpc.ClientStream
-	trailerAddr *metadata.MD
-	onFinish    func(error)
+	stream *finishCaptureStream
 }
 
 func (f *finishCaptureConn) Invoke(context.Context, string, any, any, ...grpc.CallOption) error {
@@ -1018,7 +1098,7 @@ func (f *finishCaptureConn) Invoke(context.Context, string, any, any, ...grpc.Ca
 }
 
 func (f *finishCaptureConn) NewStream(
-	_ context.Context,
+	ctx context.Context,
 	_ *grpc.StreamDesc,
 	_ string,
 	opts ...grpc.CallOption,
@@ -1026,11 +1106,15 @@ func (f *finishCaptureConn) NewStream(
 	for _, opt := range opts {
 		switch opt := opt.(type) {
 		case grpc.TrailerCallOption:
-			f.trailerAddr = opt.TrailerAddr
+			f.stream.trailerAddr = opt.TrailerAddr
 		case grpc.OnFinishCallOption:
-			f.onFinish = opt.OnFinish
+			f.stream.onFinish = opt.OnFinish
 		}
 	}
+	go func() {
+		<-ctx.Done()
+		f.stream.finish(ctx.Err())
+	}()
 
 	return f.stream, nil
 }
@@ -1041,4 +1125,35 @@ func (f *finishCaptureConn) Close() error {
 
 func (f *finishCaptureConn) GetState() connectivity.State {
 	return connectivity.Ready
+}
+
+type finishCaptureStream struct {
+	grpc.ClientStream
+
+	recv        func(m any) error
+	trailer     metadata.MD
+	trailerAddr *metadata.MD
+	onFinish    func(error)
+	finishOnce  sync.Once
+	finishDone  chan struct{}
+}
+
+func (f *finishCaptureStream) RecvMsg(m any) error {
+	err := f.recv(m)
+	if err != nil {
+		f.finish(err)
+	}
+
+	return err
+}
+
+func (f *finishCaptureStream) finish(err error) {
+	f.finishOnce.Do(func() {
+		*f.trailerAddr = f.trailer
+		if errors.Is(err, io.EOF) {
+			err = nil
+		}
+		f.onFinish(err)
+		close(f.finishDone)
+	})
 }

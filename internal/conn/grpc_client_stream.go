@@ -176,11 +176,14 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 	if s.wrapping {
 		if operation, ok := m.(operation.Status); ok {
 			if status := operation.GetStatus(); status != Ydb.StatusIds_SUCCESS {
-				return xerrors.WithStackTrace(xerrors.Operation(
+				err = xerrors.WithStackTrace(xerrors.Operation(
 					xerrors.FromOperation(operation),
 					xerrors.WithAddress(s.parentConn.Address()),
 					xerrors.WithNodeID(s.parentConn.NodeID()),
 				))
+				s.grpcCancel()
+
+				return err
 			}
 		}
 	}
