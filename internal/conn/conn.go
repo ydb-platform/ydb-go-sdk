@@ -420,6 +420,8 @@ func (c *conn) Invoke(
 		return xerrors.WithStackTrace(err)
 	}
 
+	invokeOpts := append([]grpc.CallOption(nil), opts...)
+	invokeOpts = append(invokeOpts, grpc.Trailer(&md))
 	opID, issues, err = invoke(
 		ctx,
 		method,
@@ -428,7 +430,7 @@ func (c *conn) Invoke(
 		cc,
 		c.Address(),
 		c.NodeID(),
-		append(opts, grpc.Trailer(&md))...,
+		invokeOpts...,
 	)
 
 	return err
@@ -485,7 +487,12 @@ func (c *conn) NewStream(
 		sentMark:   sentMark,
 	}
 
-	s.stream, err = cc.NewStream(grpcCtx, desc, method, append(opts, grpc.OnFinish(s.finish))...)
+	streamOpts := append([]grpc.CallOption(nil), opts...)
+	streamOpts = append(streamOpts,
+		grpc.Trailer(&s.trailer),
+		grpc.OnFinish(s.finish),
+	)
+	s.stream, err = cc.NewStream(grpcCtx, desc, method, streamOpts...)
 	if err != nil {
 		if xerrors.IsContextError(err) {
 			return nil, xerrors.WithStackTrace(err)
