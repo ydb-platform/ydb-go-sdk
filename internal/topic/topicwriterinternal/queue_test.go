@@ -543,20 +543,12 @@ func TestQueue_WaitWokenOnOwnMessageAck(t *testing.T) {
 	w2, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(2))
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	done1 := make(chan error, 1)
 	done2 := make(chan error, 1)
-	go func() { done1 <- q.Wait(ctx, w1) }()
-	go func() { done2 <- q.Wait(ctx, w2) }()
+	go func() { done1 <- q.Wait(t.Context(), w1) }()
+	go func() { done2 <- q.Wait(t.Context(), w2) }()
 
-	require.Eventually(t, func() bool {
-		var registered int
-		q.m.WithRLock(func() { registered = len(q.ackWaiters) })
-
-		return registered == 2
-	}, time.Second, time.Millisecond, "both waiters must subscribe")
+	requireAckWaiterCount(t, &q, 2)
 
 	// Ack only the second message: its waiter completes, the first keeps blocking.
 	require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 2}}))
@@ -581,6 +573,136 @@ func TestQueue_WaitWokenOnOwnMessageAck(t *testing.T) {
 		require.NoError(t, err)
 	case <-time.After(time.Second):
 		t.Fatal("waiter was not woken after its own message ack")
+	}
+}
+
+func TestQueue_WaitCleansUpAckWaiter(t *testing.T) {
+	t.Run("ContextCanceled", func(t *testing.T) {
+		q := newMessageQueue()
+		waiter, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(1))
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+		go func() { done <- q.Wait(ctx, waiter) }()
+
+		requireAckWaiterCount(t, &q, 1)
+		cancel()
+
+		require.ErrorIs(t, waitQueueResult(t, done), context.Canceled)
+		requireAckWaiterCount(t, &q, 0)
+	})
+
+	t.Run("QueueClosed", func(t *testing.T) {
+		q := newMessageQueue()
+		waiter, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(1))
+		require.NoError(t, err)
+
+		done := make(chan error, 1)
+		go func() { done <- q.Wait(t.Context(), waiter) }()
+
+		requireAckWaiterCount(t, &q, 1)
+		closeErr := errors.New("queue closed")
+		require.NoError(t, q.Close(closeErr))
+
+		require.ErrorIs(t, waitQueueResult(t, done), closeErr)
+		requireAckWaiterCount(t, &q, 0)
+	})
+}
+
+func TestQueue_WaitCleanupRaceWithAck(t *testing.T) {
+	t.Run("ContextCanceled", func(t *testing.T) {
+		for range 20 {
+			q := newMessageQueue()
+			waiter, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(1))
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(t.Context())
+			waitDone := make(chan error, 1)
+			go func() { waitDone <- q.Wait(ctx, waiter) }()
+			requireAckWaiterCount(t, &q, 1)
+
+			start := make(chan struct{})
+			cancelDone := make(chan struct{})
+			ackDone := make(chan error, 1)
+			go func() {
+				<-start
+				cancel()
+				close(cancelDone)
+			}()
+			go func() {
+				<-start
+				ackDone <- q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 1}})
+			}()
+
+			close(start)
+			<-cancelDone
+			require.NoError(t, waitQueueResult(t, ackDone))
+			waitErr := waitQueueResult(t, waitDone)
+			if waitErr != nil {
+				require.ErrorIs(t, waitErr, context.Canceled)
+			}
+			requireAckWaiterCount(t, &q, 0)
+		}
+	})
+
+	t.Run("QueueClosed", func(t *testing.T) {
+		for range 20 {
+			q := newMessageQueue()
+			waiter, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(1))
+			require.NoError(t, err)
+
+			waitDone := make(chan error, 1)
+			go func() { waitDone <- q.Wait(t.Context(), waiter) }()
+			requireAckWaiterCount(t, &q, 1)
+
+			closeErr := errors.New("queue closed")
+			start := make(chan struct{})
+			closeDone := make(chan error, 1)
+			ackDone := make(chan error, 1)
+			go func() {
+				<-start
+				closeDone <- q.Close(closeErr)
+			}()
+			go func() {
+				<-start
+				ackDone <- q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 1}})
+			}()
+
+			close(start)
+			require.NoError(t, waitQueueResult(t, closeDone))
+			ackErr := waitQueueResult(t, ackDone)
+			if ackErr != nil {
+				require.ErrorIs(t, ackErr, errAckOnClosedMessageQueue)
+			}
+			waitErr := waitQueueResult(t, waitDone)
+			if waitErr != nil {
+				require.ErrorIs(t, waitErr, closeErr)
+			}
+			requireAckWaiterCount(t, &q, 0)
+		}
+	})
+}
+
+func requireAckWaiterCount(t *testing.T, q *messageQueue, expected int) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		var registered int
+		q.m.WithRLock(func() { registered = len(q.ackWaiters) })
+
+		return registered == expected
+	}, time.Second, time.Millisecond, "unexpected ack waiter count")
+}
+
+func waitQueueResult(t *testing.T, done <-chan error) error {
+	t.Helper()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for queue operation")
+
+		return nil
 	}
 }
 

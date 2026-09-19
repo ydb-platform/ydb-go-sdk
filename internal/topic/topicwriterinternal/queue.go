@@ -214,6 +214,30 @@ func (q *messageQueue) registerAckWaiterNeedLock(index int, w *ackWaiter) {
 	set[w] = struct{}{}
 }
 
+// registerAckWaiter subscribes to index if its message is still pending. The
+// read-lock check keeps the already-acked path shared; registration then
+// double-checks under the write lock so an ack cannot be missed between them.
+func (q *messageQueue) registerAckWaiter(index int) (w *ackWaiter) {
+	var exists bool
+	q.m.WithRLock(func() {
+		_, exists = q.messagesByOrder[index]
+	})
+	if !exists {
+		return nil
+	}
+
+	q.m.WithLock(func() {
+		if _, ok := q.messagesByOrder[index]; !ok {
+			return
+		}
+
+		w = &ackWaiter{done: make(chan struct{})}
+		q.registerAckWaiterNeedLock(index, w)
+	})
+
+	return w
+}
+
 // notifyAckWaitersNeedLock wakes and removes all waiters blocked on the given index.
 func (q *messageQueue) notifyAckWaitersNeedLock(index int) {
 	set, ok := q.ackWaiters[index]
@@ -366,32 +390,13 @@ func (q *messageQueue) Wait(ctx context.Context, waiter MessageQueueAckWaiter) e
 	}
 
 	ctxDone := ctx.Done()
-	for {
-		var (
-			w          *ackWaiter
-			blockIndex int
-			hasWaited  bool
-		)
+	for len(waiter.sequenseNumbers) > 0 {
+		blockIndex := waiter.sequenseNumbers[0]
+		w := q.registerAckWaiter(blockIndex)
+		if w == nil {
+			waiter.sequenseNumbers = waiter.sequenseNumbers[1:]
 
-		// Find the first not-yet-acked message index and subscribe a personal
-		// waiter to it atomically under the lock, so a concurrent ack cannot slip
-		// between the check and the subscription (which would lose the wakeup).
-		q.m.WithLock(func() {
-			for len(waiter.sequenseNumbers) > 0 {
-				blockIndex = waiter.sequenseNumbers[0]
-				if _, ok := q.messagesByOrder[blockIndex]; ok {
-					w = &ackWaiter{done: make(chan struct{})}
-					q.registerAckWaiterNeedLock(blockIndex, w)
-					hasWaited = true
-
-					return
-				}
-				waiter.sequenseNumbers = waiter.sequenseNumbers[1:]
-			}
-		})
-
-		if !hasWaited {
-			return nil
+			continue
 		}
 
 		select {
@@ -404,10 +409,13 @@ func (q *messageQueue) Wait(ctx context.Context, waiter MessageQueueAckWaiter) e
 
 			return q.closedErr
 		case <-w.done:
-			// blockIndex acked (waiter already removed by notifyAckWaitersNeedLock);
-			// re-check the remaining indexes on the next iteration.
+			// blockIndex was acked and the waiter was removed by
+			// notifyAckWaitersNeedLock.
+			waiter.sequenseNumbers = waiter.sequenseNumbers[1:]
 		}
 	}
+
+	return nil
 }
 
 // WaitLastWritten waits for last written message gets ack.
