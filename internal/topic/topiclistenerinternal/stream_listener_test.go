@@ -227,6 +227,12 @@ func TestStreamListenerCloseWaitsForRemovedWorker(t *testing.T) {
 	e := fixenv.New(t)
 	listener := StreamListener(e)
 	worker := listener.createWorkerForPartition(PartitionSession(e))
+	closedWorkers := make(chan int, 1)
+	listener.tracer.OnListenerClose = func(trace.TopicListenerCloseStartInfo) func(trace.TopicListenerCloseDoneInfo) {
+		return func(info trace.TopicListenerCloseDoneInfo) {
+			closedWorkers <- info.WorkersClosed
+		}
+	}
 
 	removed := make(chan struct{})
 	release := make(chan struct{})
@@ -252,6 +258,7 @@ func TestStreamListenerCloseWaitsForRemovedWorker(t *testing.T) {
 	close(release)
 	released = true
 	require.NoError(t, listener.Close(xtest.ContextWithCommonTimeout(sf.Context(e), t), ErrUserCloseTopic))
+	require.Equal(t, 1, xtest.Receive(t, closedWorkers, "closed worker trace count"))
 }
 
 func TestStreamListenerCloseWaitsForStartingWorker(t *testing.T) {
@@ -756,7 +763,7 @@ func TestStreamListener_ReadBufferReleaseSkipsZeroSize(t *testing.T) {
 	})
 }
 
-func TestStreamListenerGoClosePreservesFirstReason(t *testing.T) {
+func TestStreamListenerBeginClosePreservesFirstReason(t *testing.T) {
 	ctx := xtest.Context(t)
 	var closeReasons []error
 	streamCtx, streamClose := context.WithCancelCause(ctx)
@@ -770,8 +777,8 @@ func TestStreamListenerGoClosePreservesFirstReason(t *testing.T) {
 	_ = listener.background.Context()
 	firstErr := errors.New("message handler failed")
 
-	listener.goClose(ctx, firstErr)
-	listener.goClose(ctx, context.Canceled)
+	listener.beginClose(ctx, firstErr)
+	listener.beginClose(ctx, context.Canceled)
 	xtest.WaitChannelClosed(t, listener.background.StopDone())
 
 	require.Equal(t, []error{firstErr}, closeReasons)
@@ -779,7 +786,7 @@ func TestStreamListenerGoClosePreservesFirstReason(t *testing.T) {
 	require.ErrorIs(t, listener.background.CloseReason(), firstErr)
 }
 
-func TestStreamListenerConcurrentGoCloseKeepsStreamCause(t *testing.T) {
+func TestStreamListenerConcurrentBeginCloseKeepsStreamCause(t *testing.T) {
 	ctx := xtest.Context(t)
 	streamCtx, streamClose := context.WithCancelCause(ctx)
 	listener := &streamListener{streamClose: streamClose, tracer: &trace.Topic{}}
@@ -792,7 +799,7 @@ func TestStreamListenerConcurrentGoCloseKeepsStreamCause(t *testing.T) {
 	for _, reason := range []error{firstErr, secondErr} {
 		go func() {
 			<-start
-			listener.goClose(ctx, reason)
+			listener.beginClose(ctx, reason)
 			finished <- struct{}{}
 		}()
 	}

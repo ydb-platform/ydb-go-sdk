@@ -14,14 +14,15 @@ import (
 
 type StreamListenerConfig struct {
 	RetrySettings          topic.RetrySettings
-	clock                  clockwork.Clock
 	BufferSize             int
 	Decoders               *topicreadercommon.MultiDecoder
 	Selectors              []*topicreadercommon.PublicReadSelector
 	Consumer               string
 	ConnectWithoutConsumer bool
-	readerID               int64
 	Tracer                 *trace.Topic
+
+	clock    clockwork.Clock
+	readerID int64
 }
 
 func NewStreamListenerConfig() StreamListenerConfig {

@@ -20,7 +20,6 @@ import (
 
 var (
 	ErrCommitDisabled             = xerrors.Wrap(errors.New("ydb: commits disabled"))
-	ErrWaitAckRequiresSyncMode    = xerrors.Wrap(errors.New("ydb: waiting for commit ack requires sync commit mode"))
 	ErrWrongCommitOrderInSyncMode = xerrors.Wrap(errors.New("ydb: wrong commit order in sync mode. It means you skipped committing some messages. Out-of-order commits are OK for async mode - you can commit the messages later. But im sync mode, it means deadlock: the code waits for a commit ack from the server, but the server waits for the commits of the skipped message. In sync mode, ensure that you commit messages/batches in the same order as you read them")) //nolint:lll
 )
 
@@ -88,19 +87,23 @@ func (c *Committer) Close(ctx context.Context, err error) error {
 
 func (c *Committer) Commit(ctx context.Context, commitRange CommitRange) error {
 	if !c.mode.CommitsEnabled() {
-		return ErrCommitDisabled
+		return xerrors.WithStackTrace(ErrCommitDisabled)
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if c.mode == CommitModeSync && commitRange.PartitionSession != nil &&
 		commitRange.PartitionSession.Context().Err() != nil {
-		return ErrPublicCommitSessionToExpiredSession
+		return xerrors.WithStackTrace(ErrPublicCommitSessionToExpiredSession)
 	}
 
 	waiter, err := c.pushCommit(commitRange)
 	if err != nil {
 		return err
+	}
+
+	if c.mode != CommitModeSync {
+		return nil
 	}
 
 	return c.waitCommitAck(ctx, waiter)
@@ -133,13 +136,13 @@ func (c *Committer) pushCommit(commitRange CommitRange) (commitWaiter, error) {
 func (c *Committer) pushRequest(request *commitRequest) {
 	commitRange := request.commitRange
 	if !c.mode.CommitsEnabled() {
-		request.finishSend(ErrCommitDisabled)
+		request.finishSend(xerrors.WithStackTrace(ErrCommitDisabled))
 
 		return
 	}
 	if c.mode == CommitModeSync && commitRange.PartitionSession != nil &&
 		commitRange.PartitionSession.Context().Err() != nil {
-		request.finishSend(ErrPublicCommitSessionToExpiredSession)
+		request.finishSend(xerrors.WithStackTrace(ErrPublicCommitSessionToExpiredSession))
 
 		return
 	}
@@ -291,10 +294,6 @@ func (c *Committer) waitSendTrigger(ctx context.Context) {
 }
 
 func (c *Committer) waitCommitAck(ctx context.Context, waiter commitWaiter) error {
-	if c.mode != CommitModeSync {
-		return nil
-	}
-
 	defer c.m.WithLock(func() {
 		c.removeWaiterByIDNeedLock(waiter.ID)
 	})
@@ -304,9 +303,9 @@ func (c *Committer) waitCommitAck(ctx context.Context, waiter commitWaiter) erro
 
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return xerrors.WithStackTrace(ctx.Err())
 	case <-waiter.Session.Context().Done():
-		return ErrPublicCommitSessionToExpiredSession
+		return xerrors.WithStackTrace(ErrPublicCommitSessionToExpiredSession)
 	case <-waiter.Committed:
 		return nil
 	}

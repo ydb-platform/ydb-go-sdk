@@ -3,6 +3,7 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -159,11 +160,22 @@ func (lr *TopicListenerReconnector) reconnect(ctx context.Context, reason error)
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
+		if clock.Since(started) >= lr.streamConfig.RetrySettings.StartTimeout {
+			return nil, listenerRetryTimeout(reason)
+		}
 		retryReason := reason
+		retrySettings := lr.streamConfig.RetrySettings
 		if transportErr := xerrors.TransportError(reason); transportErr != nil {
 			retryReason = transportErr
+			if checkError := retrySettings.CheckError; checkError != nil {
+				retrySettings.CheckError = func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+					args.Error = reason
+
+					return checkError(args)
+				}
+			}
 		}
-		backoff, stopReason := topic.RetryDecision(retryReason, lr.streamConfig.RetrySettings, clock.Since(started))
+		backoff, stopReason := topic.RetryDecision(retryReason, retrySettings, clock.Since(started))
 		if stopReason != nil {
 			if !errors.Is(stopReason, reason) {
 				stopReason = errors.Join(stopReason, reason)
@@ -172,7 +184,11 @@ func (lr *TopicListenerReconnector) reconnect(ctx context.Context, reason error)
 			return nil, stopReason
 		}
 
-		timer := clock.NewTimer(backoff.Delay(attempt))
+		delay := backoff.Delay(attempt)
+		if remaining := retrySettings.StartTimeout - clock.Since(started); delay > remaining {
+			delay = remaining
+		}
+		timer := clock.NewTimer(delay)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
@@ -181,6 +197,9 @@ func (lr *TopicListenerReconnector) reconnect(ctx context.Context, reason error)
 		case <-timer.Chan():
 			timer.Stop()
 		}
+		if elapsed := clock.Since(started); elapsed >= lr.streamConfig.RetrySettings.StartTimeout {
+			return nil, listenerRetryTimeout(reason)
+		}
 
 		sl, err := lr.connectStream(ctx)
 		if err == nil {
@@ -188,6 +207,12 @@ func (lr *TopicListenerReconnector) reconnect(ctx context.Context, reason error)
 		}
 		reason = err
 	}
+}
+
+func listenerRetryTimeout(reason error) error {
+	return xerrors.WithStackTrace(fmt.Errorf(
+		"ydb: topic listener reconnection timeout, last error: %w", xerrors.Unretryable(reason),
+	))
 }
 
 func (lr *TopicListenerReconnector) connectStream(ctx context.Context) (*streamListener, error) {

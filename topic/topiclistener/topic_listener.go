@@ -45,8 +45,8 @@ func (cr *TopicListener) WaitInit(ctx context.Context) error {
 	return cr.listenerReconnector.WaitInit(ctx)
 }
 
-// WaitStop waits until listener shutdown and all event handlers complete.
-// Canceling ctx stops this wait but does not stop shutdown.
+// WaitStop waits until the listener stops and all event handlers complete.
+// Canceling ctx stops only this wait. Call Close to request shutdown.
 func (cr *TopicListener) WaitStop(ctx context.Context) error {
 	return cr.listenerReconnector.WaitStop(ctx)
 }

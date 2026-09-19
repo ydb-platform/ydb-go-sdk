@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 // commitRequest coordinates a single commit send across concurrent callers.
@@ -27,40 +28,33 @@ func (c *Committer) NewCommitRequest(commitRange CommitRange) *commitRequest {
 	}
 }
 
-func (r *commitRequest) start() (started bool) {
+func (r *commitRequest) start() {
 	r.startOnce.Do(func() {
-		started = true
 		r.committer.pushRequest(r)
 	})
-
-	return started
 }
 
-// Confirm starts the commit if needed. The caller that starts it waits for the
-// send to finish; other callers do not wait. Confirm neither waits for an ACK
-// nor reports a send error.
+// Confirm queues the commit if needed and returns without waiting for its send
+// or ACK. Use Wait to observe either error.
 func (r *commitRequest) Confirm() {
-	if r.start() {
-		<-r.sendDone
-	}
+	r.start()
 }
 
 // Wait starts the commit if needed, then waits for the send result and ACK.
 // Canceling ctx stops only this wait: another caller can keep waiting without
 // sending the commit again. An already committed range is not sent again.
-// Waiting for an ACK requires sync commit mode.
 //
 //nolint:funlen // Keep the send and ACK phases together to preserve their error order.
 func (r *commitRequest) Wait(ctx context.Context) error {
-	if r.committer.mode != CommitModeSync {
-		return ErrWaitAckRequiresSyncMode
+	if !r.committer.mode.CommitsEnabled() {
+		return xerrors.WithStackTrace(ErrCommitDisabled)
 	}
 	session := r.commitRange.PartitionSession
 	if session == nil {
-		return ErrPublicCommitSessionToExpiredSession
+		return xerrors.WithStackTrace(ErrPublicCommitSessionToExpiredSession)
 	}
 	if err := ctx.Err(); err != nil {
-		return err
+		return xerrors.WithStackTrace(err)
 	}
 	select {
 	case <-r.sendDone:
@@ -80,7 +74,7 @@ func (r *commitRequest) Wait(ctx context.Context) error {
 		}
 	}
 	if session.Context().Err() != nil {
-		return ErrPublicCommitSessionToExpiredSession
+		return xerrors.WithStackTrace(ErrPublicCommitSessionToExpiredSession)
 	}
 	r.start()
 	select {
@@ -89,10 +83,10 @@ func (r *commitRequest) Wait(ctx context.Context) error {
 			return r.sendErr
 		}
 	case <-ctx.Done():
-		return ctx.Err()
+		return xerrors.WithStackTrace(ctx.Err())
 	case <-session.Context().Done():
 		if err := ctx.Err(); err != nil {
-			return err
+			return xerrors.WithStackTrace(err)
 		}
 		select {
 		case <-r.sendDone:
@@ -105,11 +99,11 @@ func (r *commitRequest) Wait(ctx context.Context) error {
 			return nil
 		}
 
-		return ErrPublicCommitSessionToExpiredSession
+		return xerrors.WithStackTrace(ErrPublicCommitSessionToExpiredSession)
 	}
 
 	if err := ctx.Err(); err != nil {
-		return err
+		return xerrors.WithStackTrace(err)
 	}
 
 	waiter := newCommitWaiter(session, r.commitRange.CommitOffsetEnd)

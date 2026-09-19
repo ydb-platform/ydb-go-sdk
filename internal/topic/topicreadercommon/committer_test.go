@@ -83,6 +83,40 @@ func TestCommitRequestKeepsSendError(t *testing.T) {
 	require.Equal(t, 1, sends)
 }
 
+func TestCommitRequestConfirmDoesNotWaitForSend(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	sendStarted := make(chan struct{})
+	releaseSend := make(chan struct{})
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			close(sendStarted)
+			<-releaseSend
+
+			return nil
+		})
+	committer.Start()
+	defer func() {
+		close(releaseSend)
+		_ = committer.Close(ctx, nil)
+	}()
+	request := committer.NewCommitRequest(CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+
+	confirmDone := make(chan struct{})
+	go func() {
+		request.Confirm()
+		close(confirmDone)
+	}()
+	<-sendStarted
+	select {
+	case <-confirmDone:
+	case <-time.After(time.Second):
+		t.Fatal("Confirm waited for the blocked send")
+	}
+}
+
 func TestCommitRequestKeepsSendErrorAfterSessionClose(t *testing.T) {
 	ctx := xtest.Context(t)
 	session := newTestPartitionSession(ctx, 1)
@@ -96,6 +130,7 @@ func TestCommitRequestKeepsSendErrorAfterSessionClose(t *testing.T) {
 	})
 
 	request.Confirm()
+	<-request.sendDone
 	session.Close()
 
 	require.ErrorIs(t, request.Wait(ctx), sendErr)
@@ -338,32 +373,49 @@ func TestCommitRequestWaitRejectsMissingSession(t *testing.T) {
 		ErrPublicCommitSessionToExpiredSession)
 }
 
-func TestCommitRequestWaitRejectsNonSyncModeWithoutQueuing(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		mode PublicCommitMode
-	}{
-		{name: "async", mode: CommitModeAsync},
-		{name: "none", mode: CommitModeNone},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx := xtest.Context(t)
-			committer := NewCommitterStopped(&trace.Topic{}, ctx, tc.mode, nil)
-			session := newTestPartitionSession(ctx, 1)
-			commitRange := CommitRange{
-				PartitionSession:  session,
-				CommitOffsetStart: 1,
-				CommitOffsetEnd:   2,
-			}
+func TestCommitRequestWaitAsyncWaitsForAck(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	sent := make(chan struct{})
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeAsync,
+		func(rawtopicreader.ClientMessage) error {
+			close(sent)
 
-			require.ErrorIs(t, committer.NewCommitRequest(commitRange).Wait(ctx), ErrWaitAckRequiresSyncMode)
-			committer.m.WithLock(func() {
-				require.Empty(t, committer.waiters)
-				require.Empty(t, committer.requests)
-				require.Zero(t, committer.commits.Len())
-			})
+			return nil
 		})
+	committer.Start()
+	defer func() { _ = committer.Close(ctx, nil) }()
+	request := committer.NewCommitRequest(CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+	result := make(chan error, 1)
+	go func() { result <- request.Wait(ctx) }()
+	_ = xtest.Receive(t, sent, "async commit send")
+	require.Eventually(t, func() bool {
+		var waiting bool
+		committer.m.WithLock(func() { waiting = len(committer.waiters) == 1 })
+
+		return waiting
+	}, time.Second, time.Millisecond)
+	session.SetCommittedOffsetForward(2)
+	committer.OnCommitNotify(session, 2)
+	require.NoError(t, xtest.Receive(t, result, "async commit ACK"))
+}
+
+func TestCommitRequestWaitRejectsDisabledModeWithoutQueuing(t *testing.T) {
+	ctx := xtest.Context(t)
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeNone, nil)
+	session := newTestPartitionSession(ctx, 1)
+	commitRange := CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
 	}
+
+	require.ErrorIs(t, committer.NewCommitRequest(commitRange).Wait(ctx), ErrCommitDisabled)
+	committer.m.WithLock(func() {
+		require.Empty(t, committer.waiters)
+		require.Empty(t, committer.requests)
+		require.Zero(t, committer.commits.Len())
+	})
 }
 
 func TestCommitterCommitAsync(t *testing.T) {

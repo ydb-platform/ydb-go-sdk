@@ -127,6 +127,7 @@ func (w *PartitionWorker) Start(ctx context.Context) {
 // AddUnifiedMessage adds a unified message to the processing queue
 func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) {
 	var mergeErr error
+	// Merge adjacent batches from the same server message without reordering control messages.
 	accepted := w.messageQueue.SendWithMerge(msg, func(last, next unifiedMessage) (unifiedMessage, bool) {
 		if last.BatchMessage == nil || next.BatchMessage == nil ||
 			!last.BatchMessage.ServerMessageMetadata.Equals(&next.BatchMessage.ServerMessageMetadata) {
