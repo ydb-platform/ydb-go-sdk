@@ -18,26 +18,24 @@ import (
 )
 
 type grpcClientStream struct {
-	parentConn      *conn
-	stream          grpc.ClientStream
-	trailer         metadata.MD
-	finishedTrailer atomic.Pointer[metadata.MD]
-	requestCtx      context.Context //nolint:containedctx
-	grpcCancel      context.CancelFunc
-	wrapping        bool
-	traceID         string
-	sentMark        *modificationMark
+	parentConn   *conn
+	stream       grpc.ClientStream
+	trailer      metadata.MD
+	trailerReady atomic.Bool
+	requestCtx   context.Context //nolint:containedctx
+	grpcCancel   context.CancelFunc
+	wrapping     bool
+	traceID      string
+	sentMark     *modificationMark
 }
 
 func (s *grpcClientStream) Header() (metadata.MD, error) {
 	return s.stream.Header()
 }
 
-// Trailer returns a snapshot of the server trailers captured after the
-// underlying gRPC stream finishes. It returns nil while the stream is active.
 func (s *grpcClientStream) Trailer() metadata.MD {
-	if trailer := s.finishedTrailer.Load(); trailer != nil && *trailer != nil {
-		return (*trailer).Copy()
+	if s.trailerReady.Load() && len(s.trailer) > 0 {
+		return s.trailer.Copy()
 	}
 
 	return nil
@@ -130,20 +128,15 @@ func (s *grpcClientStream) SendMsg(m any) (err error) {
 }
 
 func (s *grpcClientStream) finish(err error) {
-	// grpc-go v1.78.0 applies TrailerCallOption.after before invoking OnFinish
-	// callbacks from clientStream.finish. Publish the now-immutable trailer;
-	// real-gRPC tests cover this ordering when the dependency is upgraded.
-	trailer := s.trailer
-	if trailer != nil {
-		trailer = trailer.Copy()
+	if s.trailer != nil {
+		s.trailer = s.trailer.Copy()
 	}
-	s.finishedTrailer.Store(&trailer)
-	// Trailer callbacks run inline on gRPC's completion path and must not block.
+	s.trailerReady.Store(true)
+	s.grpcCancel()
 	meta.CallTrailerCallback(s.requestCtx, s.Trailer())
 	gtrace.DriverOnConnStreamFinish(s.parentConn.config.Trace(), s.requestCtx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).finish"), err,
 	)
-	s.grpcCancel()
 }
 
 func (s *grpcClientStream) RecvMsg(m any) (err error) {

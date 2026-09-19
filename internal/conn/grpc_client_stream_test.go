@@ -97,17 +97,20 @@ func TestGrpcClientStream_Trailer(t *testing.T) {
 		s := &grpcClientStream{
 			parentConn: parentConn,
 			stream:     mockStream,
+			trailer:    expectedMD,
 		}
-		s.finishedTrailer.Store(&expectedMD)
+		s.trailerReady.Store(true)
 
 		md := s.Trailer()
 		require.Equal(t, expectedMD, md)
+		md["trailer-key"][0] = "changed in place"
+		require.Equal(t, expectedMD, s.Trailer())
 		md.Set("trailer-key", "changed")
 		require.Equal(t, expectedMD, s.Trailer())
 	})
 
 	t.Run("ReturnsNilBeforeFinish", func(t *testing.T) {
-		s := &grpcClientStream{}
+		s := &grpcClientStream{trailer: metadata.Pairs("trailer-key", "trailer-value")}
 
 		require.Nil(t, s.Trailer())
 	})
@@ -822,16 +825,13 @@ func TestGrpcClientStream_RecvMsg(t *testing.T) {
 	})
 
 	t.Run("OperationErrorDoesNotRaceOnTrailer", func(t *testing.T) {
-		// Regression test: on a non-success YDB operation status the underlying
-		// gRPC RecvMsg returns nil, so the stream is not finished. Before the fix,
-		// RecvMsg read Trailer() while the simulated transport was mutating it.
 		xtest.TestManyTimes(t, func(t testing.TB) {
 			fake := &fakeTrailerStream{
 				recv: func(m any) error {
 					resp := m.(*Ydb_Query.ExecuteQueryResponsePart)
 					resp.Status = Ydb.StatusIds_UNAVAILABLE
 
-					return nil // underlying gRPC RecvMsg succeeds
+					return nil
 				},
 				trailerReadStarted: make(chan struct{}),
 				writerSelected:     make(chan struct{}),
@@ -932,9 +932,11 @@ func TestGrpcClientStream_Finish(t *testing.T) {
 
 		trailer := metadata.Pairs("x-ydb-server-hints", "session-close")
 		var callbackTrailer metadata.MD
-		ctx, cancel := context.WithCancel(meta.WithTrailerCallback(t.Context(), func(md metadata.MD) {
+		ctx, cancel := context.WithCancel(t.Context())
+		ctx = meta.WithTrailerCallback(ctx, func(md metadata.MD) {
+			require.ErrorIs(t, ctx.Err(), context.Canceled)
 			callbackTrailer = md
-		}))
+		})
 
 		s := &grpcClientStream{
 			parentConn: parentConn,
@@ -980,7 +982,7 @@ func TestConn_NewStreamRealGRPCTrailers(t *testing.T) {
 				dialTimeout: 5 * time.Second,
 				driverTrace: &trace.Driver{
 					OnConnStreamFinish: func(trace.DriverConnStreamFinishInfo) {
-						close(finished) // Runs after the SDK's trailer callback.
+						close(finished)
 					},
 				},
 			})
@@ -1006,7 +1008,6 @@ func TestConn_NewStreamRealGRPCTrailers(t *testing.T) {
 			_, err = stream.Recv()
 			require.NoError(t, err)
 			if code == grpcCodes.Canceled {
-				// The server cannot send trailers until it observes this cancellation.
 				cancelStream()
 			}
 			_, err = stream.Recv()
@@ -1034,13 +1035,11 @@ func TestConn_NewStreamRealGRPCTrailers(t *testing.T) {
 			case <-ctx.Done():
 				t.Fatal("trailer callback did not run")
 			}
-			// Cancellation after trailer delivery must preserve the received hints.
 			cancelStream()
 			require.EqualValues(t, 1, callbacks.Load())
 			require.Equal(t, trailer, callerTrailer)
 			require.Equal(t, trailer, stream.Trailer())
 
-			// Invoke must also leave the caller's spare option capacity untouched.
 			_, err = client.EmptyCall(ctx, &grpc_testing.Empty{}, opts[:1]...)
 			require.True(t, xerrors.IsTransportError(err, grpcCodes.Unimplemented))
 			require.Equal(t, []grpc.CallOption{sentinel, sentinel}, opts[1:])
@@ -1048,9 +1047,6 @@ func TestConn_NewStreamRealGRPCTrailers(t *testing.T) {
 	}
 }
 
-// fakeTrailerStream is a grpc.ClientStream whose transport goroutine mutates
-// trailer metadata after Trailer starts reading it. This makes the old
-// RecvMsg trailer read fail deterministically under the race detector.
 type fakeTrailerStream struct {
 	grpc.ClientStream
 

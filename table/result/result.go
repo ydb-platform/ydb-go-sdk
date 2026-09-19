@@ -116,9 +116,6 @@ type BaseResult interface {
 	Err() error
 
 	// Close closes the Result, preventing further iteration.
-	// Always call Close, including after an iteration error. For streaming results,
-	// this finishes the RPC and allows received server trailer hints to be processed.
-	// Closing may cancel the stream; trailers not yet received are unavailable.
 	Close() error
 }
 

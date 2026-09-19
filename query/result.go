@@ -7,10 +7,7 @@ import (
 )
 
 type (
-	// Result must be closed after use, including when iteration returns an error.
-	// Closing releases its stream and allows received server trailer hints to be processed.
-	Result = result.Result
-
+	Result            = result.Result
 	ResultSet         = result.Set
 	ClosableResultSet = result.ClosableResultSet
 	Row               = result.Row
