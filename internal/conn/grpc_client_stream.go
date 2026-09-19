@@ -31,6 +31,9 @@ func (s *grpcClientStream) Header() (metadata.MD, error) {
 	return s.stream.Header()
 }
 
+// Trailer returns the trailer metadata from the server. It must only be called
+// after RecvMsg returns a non-nil error, including io.EOF, as required by
+// grpc.ClientStream.
 func (s *grpcClientStream) Trailer() metadata.MD {
 	return s.stream.Trailer()
 }
@@ -181,6 +184,9 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 					xerrors.WithAddress(s.parentConn.Address()),
 					xerrors.WithNodeID(s.parentConn.NodeID()),
 				))
+				// A non-success operation status is terminal for a wrapped stream.
+				// Cancel it to release its resources and drive grpc.OnFinish. Server
+				// trailers that have not arrived yet are unavailable after cancellation.
 				s.grpcCancel()
 
 				return err

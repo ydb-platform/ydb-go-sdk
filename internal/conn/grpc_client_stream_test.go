@@ -955,6 +955,7 @@ func TestConn_NewStreamCallsTrailerCallbackOnRecvEnd(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			trailer := metadata.Pairs("x-ydb-server-hints", "session-close")
+			var callerTrailer metadata.MD
 			rawStream := &finishCaptureStream{
 				recv: func(any) error {
 					return test.recvErr
@@ -979,9 +980,10 @@ func TestConn_NewStreamCallsTrailerCallbackOnRecvEnd(t *testing.T) {
 				callbackTrailer = md
 			})
 
-			stream, err := parentConn.NewStream(ctx, &grpc.StreamDesc{ServerStreams: true}, "/test.Service/Stream")
+			stream, err := parentConn.NewStream(ctx, &grpc.StreamDesc{ServerStreams: true},
+				"/test.Service/Stream", grpc.Trailer(&callerTrailer))
 			require.NoError(t, err)
-			require.NotNil(t, rawStream.trailerAddr)
+			require.Len(t, rawStream.trailerAddrs, 2)
 			require.NotNil(t, rawStream.onFinish)
 
 			err = stream.RecvMsg(&Ydb_Query.ExecuteQueryResponsePart{})
@@ -992,6 +994,7 @@ func TestConn_NewStreamCallsTrailerCallbackOnRecvEnd(t *testing.T) {
 				require.True(t, xerrors.IsTransportError(err))
 			}
 			require.Equal(t, trailer, callbackTrailer)
+			require.Equal(t, trailer, callerTrailer)
 		})
 	}
 }
@@ -1039,7 +1042,7 @@ func TestConn_NewStreamCancelsOnOperationError(t *testing.T) {
 			return false
 		}
 	}, time.Second, time.Millisecond)
-	require.Equal(t, trailer, callbackTrailer)
+	require.Nil(t, callbackTrailer)
 }
 
 // fakeTrailerStream is a grpc.ClientStream whose transport goroutine mutates
@@ -1106,7 +1109,7 @@ func (f *finishCaptureConn) NewStream(
 	for _, opt := range opts {
 		switch opt := opt.(type) {
 		case grpc.TrailerCallOption:
-			f.stream.trailerAddr = opt.TrailerAddr
+			f.stream.trailerAddrs = append(f.stream.trailerAddrs, opt.TrailerAddr)
 		case grpc.OnFinishCallOption:
 			f.stream.onFinish = opt.OnFinish
 		}
@@ -1130,12 +1133,12 @@ func (f *finishCaptureConn) GetState() connectivity.State {
 type finishCaptureStream struct {
 	grpc.ClientStream
 
-	recv        func(m any) error
-	trailer     metadata.MD
-	trailerAddr *metadata.MD
-	onFinish    func(error)
-	finishOnce  sync.Once
-	finishDone  chan struct{}
+	recv         func(m any) error
+	trailer      metadata.MD
+	trailerAddrs []*metadata.MD
+	onFinish     func(error)
+	finishOnce   sync.Once
+	finishDone   chan struct{}
 }
 
 func (f *finishCaptureStream) RecvMsg(m any) error {
@@ -1149,7 +1152,11 @@ func (f *finishCaptureStream) RecvMsg(m any) error {
 
 func (f *finishCaptureStream) finish(err error) {
 	f.finishOnce.Do(func() {
-		*f.trailerAddr = f.trailer
+		if !errors.Is(err, context.Canceled) {
+			for _, trailerAddr := range f.trailerAddrs {
+				*trailerAddr = f.trailer
+			}
+		}
 		if errors.Is(err, io.EOF) {
 			err = nil
 		}
