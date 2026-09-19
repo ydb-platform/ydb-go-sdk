@@ -54,7 +54,7 @@ func batchReadBufferSize(batch *topicreadercommon.PublicBatch) int {
 	return size
 }
 
-// WorkerStoppedCallback notifies when worker is stopped
+// WorkerStoppedCallback reports why a worker stopped or needs to stop.
 type WorkerStoppedCallback func(sessionID rawtopicreader.PartitionSessionID, reason error)
 
 // PartitionWorker processes messages for a single partition
@@ -126,7 +126,24 @@ func (w *PartitionWorker) Start(ctx context.Context) {
 
 // AddUnifiedMessage adds a unified message to the processing queue
 func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) {
-	if !w.messageQueue.SendWithMerge(msg, w.tryMergeMessages) {
+	// Merge adjacent batches from the same server message without reordering control messages.
+	accepted := w.messageQueue.SendWithMerge(msg, func(last, next unifiedMessage) (unifiedMessage, bool) {
+		if last.BatchMessage == nil || next.BatchMessage == nil ||
+			!last.BatchMessage.ServerMessageMetadata.Equals(&next.BatchMessage.ServerMessageMetadata) {
+			return next, false
+		}
+
+		merged, err := topicreadercommon.BatchAppend(last.BatchMessage.Batch, next.BatchMessage.Batch)
+		if err != nil {
+			return next, false
+		}
+
+		return unifiedMessage{BatchMessage: &batchMessage{
+			ServerMessageMetadata: last.BatchMessage.ServerMessageMetadata,
+			Batch:                 merged,
+		}}, true
+	})
+	if !accepted {
 		w.freeBatchCredit(msg)
 	}
 }
@@ -222,6 +239,12 @@ func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
 
 // processUnifiedMessage handles a single unified message by routing to appropriate processor
 func (w *PartitionWorker) processUnifiedMessage(ctx context.Context, msg unifiedMessage) error {
+	if err := ctx.Err(); err != nil {
+		w.freeBatchCredit(msg)
+
+		return err
+	}
+
 	switch {
 	case msg.RawServerMessage != nil:
 		return w.processRawServerMessage(ctx, *msg.RawServerMessage)
@@ -450,31 +473,4 @@ func (w *PartitionWorker) handleStopPartitionRequest(
 	}
 
 	return nil
-}
-
-// tryMergeMessages attempts to merge messages when possible
-func (w *PartitionWorker) tryMergeMessages(last, new unifiedMessage) (unifiedMessage, bool) {
-	// Only merge batch messages for now
-	if last.BatchMessage != nil && new.BatchMessage != nil {
-		// Validate metadata compatibility before merging
-		if !last.BatchMessage.ServerMessageMetadata.Equals(&new.BatchMessage.ServerMessageMetadata) {
-			return new, false // Don't merge messages with different metadata
-		}
-
-		var err error
-		result, err := topicreadercommon.BatchAppend(last.BatchMessage.Batch, new.BatchMessage.Batch)
-		if err != nil {
-			w.Close(context.Background(), err)
-
-			return new, false
-		}
-
-		return unifiedMessage{BatchMessage: &batchMessage{
-			ServerMessageMetadata: last.BatchMessage.ServerMessageMetadata,
-			Batch:                 result,
-		}}, true
-	}
-
-	// Don't merge other types of messages
-	return new, false
 }

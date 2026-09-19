@@ -1,3 +1,7 @@
+* Added `topicoptions.WithListenerCheckRetryErrorFunction` to customize the topic listener error retry policy
+* Added `topicoptions.WithListenerStartTimeout` to bound listener connection retries; retriable failures on the first connection now retry until success by default
+* Fixed topic listener recovery, error reporting, closing, and message confirmation after stream failures
+
 ## v3.151.3
 * Fixed query session pool metrics during checkout, session creation and warm-up, retries, and waiting for a session
 * Fixed session invalidation to follow the shared error policy for Query Service and Table API requests executed through Query Service, preserving sessions after gRPC `RESOURCE_EXHAUSTED` and `OUT_OF_RANGE`

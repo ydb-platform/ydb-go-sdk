@@ -114,16 +114,8 @@ func (m *mockMessageSender) GetFreedBuffer() []int {
 	return result
 }
 
-// Implement CommitHandler interface for tests
-func (m *mockMessageSender) sendCommit(b *topicreadercommon.PublicBatch) error {
-	// For tests, just record the commit as a message
-	m.SendRaw(&rawtopicreader.ReadRequest{BytesSize: -1}) // Use negative size to indicate commit
-
-	return nil
-}
-
-func (m *mockMessageSender) getSyncCommitter() SyncCommitter {
-	return &mockSyncCommitter{}
+func (m *mockMessageSender) newCommitRequest(*topicreadercommon.PublicBatch) commitRequest {
+	return &mockCommitRequest{sender: m}
 }
 
 func (m *mockMessageSender) GetMessages() []rawtopicreader.ClientMessage {
@@ -143,10 +135,20 @@ func (m *mockMessageSender) GetMessageCount() int {
 	return len(m.messages)
 }
 
-// mockSyncCommitter provides a mock implementation of SyncCommitter for tests
-type mockSyncCommitter struct{}
+type mockCommitRequest struct {
+	sender *mockMessageSender
+	once   sync.Once
+}
 
-func (m *mockSyncCommitter) Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error {
+func (r *mockCommitRequest) Confirm() {
+	r.once.Do(func() {
+		r.sender.SendRaw(&rawtopicreader.ReadRequest{BytesSize: -1})
+	})
+}
+
+func (r *mockCommitRequest) Wait(context.Context) error {
+	r.Confirm()
+
 	return nil
 }
 
@@ -240,6 +242,42 @@ func createTestBatchWithBufferBytes(t *testing.T, size int) *topicreadercommon.P
 // =============================================================================
 // INTERFACE TESTS - Test external behavior through public API only
 // =============================================================================
+
+func TestPartitionWorkerBatchMergeFailureKeepsBatchesSeparate(t *testing.T) {
+	session := createTestPartitionSession()
+	first, err := topicreadercommon.NewBatch(session, nil)
+	require.NoError(t, err)
+	second, err := topicreadercommon.NewBatch(session, nil)
+	require.NoError(t, err)
+	topicreadercommon.BatchSetCommitRangeForTest(first, topicreadercommon.CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+	topicreadercommon.BatchSetCommitRangeForTest(second, topicreadercommon.CommitRange{
+		PartitionSession: session, CommitOffsetStart: 4, CommitOffsetEnd: 5,
+	})
+	stopped := make(chan error, 1)
+	worker := NewPartitionWorker(456, session, newMockMessageSender(),
+		NewMockEventHandler(gomock.NewController(t)),
+		func(_ rawtopicreader.PartitionSessionID, reason error) { stopped <- reason },
+		&trace.Topic{}, "test-listener")
+	metadata := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
+	worker.AddMessagesBatch(metadata, first)
+	worker.AddMessagesBatch(metadata, second)
+
+	select {
+	case err := <-stopped:
+		t.Fatalf("a failed optimization stopped the worker: %v", err)
+	default:
+	}
+	firstMessage, ok, err := worker.messageQueue.Receive(xtest.Context(t))
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Same(t, first, firstMessage.BatchMessage.Batch)
+	secondMessage, ok, err := worker.messageQueue.Receive(xtest.Context(t))
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Same(t, second, secondMessage.BatchMessage.Batch)
+}
 
 func TestPartitionWorkerInterface_StartPartitionSessionFlow(t *testing.T) {
 	ctx := xtest.Context(t)
@@ -649,8 +687,8 @@ func TestPartitionWorkerInterface_CloseFreesQueuedBatchCredits(t *testing.T) {
 	worker.Start(ctx)
 
 	metadata1 := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
-	// Different metadata prevents tryMergeMessages from joining two batches into one
-	// queue item (would look like a single FreeBuffer call in the assertion).
+	// Different metadata keeps the batches as separate queue items,
+	// producing two buffer-release calls.
 	metadata2 := rawtopiccommon.ServerMessageMetadata{
 		Status: rawydb.StatusSuccess,
 		Issues: rawydb.Issues{{Message: "different metadata to prevent queue merge"}},
@@ -997,6 +1035,32 @@ func TestPartitionWorkerImpl_ContextCancellation(t *testing.T) {
 	require.NotNil(t, errPtr)
 	require.NotNil(t, *errPtr) // Graceful shutdown should have meaningful reason
 	require.Contains(t, (*errPtr).Error(), "graceful shutdown PartitionWorker")
+}
+
+// Requirement 3: queued messages must not reach the handler after session cancellation.
+func TestPartitionWorkerImpl_ContextCancellationWithQueuedBatch(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+
+	handler := NewMockEventHandler(gomock.NewController(t))
+	handler.EXPECT().OnReadMessages(gomock.Any(), gomock.Any()).Times(0)
+
+	worker := NewPartitionWorker(
+		123,
+		createTestPartitionSession(),
+		newMockMessageSender(),
+		handler,
+		func(rawtopicreader.PartitionSessionID, error) {},
+		&trace.Topic{},
+		"test-listener",
+	)
+	worker.AddMessagesBatch(
+		rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+		createTestBatch(),
+	)
+
+	cancel()
+	worker.receiveMessagesLoop(ctx)
 }
 
 func TestPartitionWorkerImpl_PanicRecovery(t *testing.T) {

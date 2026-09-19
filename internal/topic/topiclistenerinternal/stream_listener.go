@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -51,12 +50,16 @@ type streamListener struct {
 
 	freeBytes chan int
 
-	closing atomic.Bool
-	tracer  *trace.Topic
+	closing      atomic.Bool
+	tracer       *trace.Topic
+	shutdownDone empty.Chan
+	shutdownErr  error
 
-	m              xsync.Mutex
-	workers        map[rawtopicreader.PartitionSessionID]*PartitionWorker
-	messagesToSend []rawtopicreader.ClientMessage
+	m                xsync.Mutex
+	workers          map[rawtopicreader.PartitionSessionID]*PartitionWorker
+	workerCloseWG    sync.WaitGroup
+	workerCloseCount int
+	messagesToSend   []rawtopicreader.ClientMessage
 }
 
 func newStreamListener(
@@ -92,7 +95,7 @@ func newStreamListener(
 
 	if err := res.initStream(connectionCtx, client); err != nil {
 		initDone("", err)
-		res.goClose(connectionCtx, err)
+		_ = res.Close(xcontext.ValueOnly(connectionCtx), err)
 
 		return nil, err
 	}
@@ -103,7 +106,14 @@ func newStreamListener(
 		res.tracer,
 		res.background.Context(),
 		topicreadercommon.CommitModeSync,
-		res.stream.Send,
+		func(message rawtopicreader.ClientMessage) error {
+			err := res.stream.Send(message)
+			if err != nil {
+				res.beginClose(res.background.Context(), err)
+			}
+
+			return err
+		},
 	)
 
 	res.startBackground()
@@ -116,66 +126,89 @@ func newStreamListener(
 }
 
 func (l *streamListener) Close(ctx context.Context, reason error) error {
-	if !l.closing.CompareAndSwap(false, true) {
-		return errTopicListenerClosed
+	done := l.beginClose(ctx, reason)
+	select {
+	case <-done:
+		return l.shutdownErr
+	default:
+	}
+	select {
+	case <-done:
+		return l.shutdownErr
+	case <-ctx.Done():
+		select {
+		case <-done:
+			return l.shutdownErr
+		default:
+			return ctx.Err()
+		}
+	}
+}
+
+func (l *streamListener) beginClose(ctx context.Context, reason error) empty.Chan {
+	var done empty.Chan
+	var start bool
+	var closedBefore int
+	l.m.WithLock(func() {
+		if l.shutdownDone == nil {
+			l.shutdownDone = make(empty.Chan)
+		}
+		done = l.shutdownDone
+		start = l.closing.CompareAndSwap(false, true)
+		if start {
+			closedBefore = l.workerCloseCount
+		}
+	})
+
+	if start {
+		go l.finishClose(xcontext.ValueOnly(ctx), reason, done, closedBefore)
 	}
 
+	return done
+}
+
+func (l *streamListener) finishClose(ctx context.Context, reason error, done empty.Chan, closedBefore int) {
 	logCtx := ctx
 	closeDone := gtrace.TopicOnListenerClose(l.tracer, &logCtx, l.listenerID, l.sessionID, reason)
 
 	var resErrors []error
 
-	// Stop all partition workers first
-	// Copy workers to avoid holding mutex while closing them (to prevent deadlock)
-	var workers []*PartitionWorker
-	l.m.WithLock(func() {
-		workers = make([]*PartitionWorker, 0, len(l.workers))
-		for _, worker := range l.workers {
-			workers = append(workers, worker)
-		}
-	})
-
-	// Stop the read stream and background workers before closing partition workers,
-	// so receiveMessagesLoop does not route messages into shutting-down workers.
-	if l.stream != nil {
+	if l.streamClose != nil {
 		l.streamClose(reason)
 	}
-
-	if err := l.background.Close(ctx, reason); err != nil {
+	if err := l.background.Close(context.Background(), reason); err != nil &&
+		!errors.Is(err, background.ErrAlreadyClosed) {
 		resErrors = append(resErrors, err)
 	}
 
-	// Close workers without holding the mutex
-	for _, worker := range workers {
-		if err := worker.Close(ctx, reason); err != nil {
+	// Canceling the listener also stops each partition worker. Its callback
+	// closes the worker asynchronously, because it may run in the worker itself.
+	l.workerCloseWG.Wait()
+	var workersClosed int
+	l.m.WithLock(func() {
+		workersClosed = l.workerCloseCount - closedBefore
+	})
+
+	if l.syncCommitter != nil {
+		if err := l.syncCommitter.Close(context.Background(), reason); err != nil &&
+			!errors.Is(err, background.ErrAlreadyClosed) {
 			resErrors = append(resErrors, err)
 		}
 	}
 
-	if err := l.syncCommitter.Close(ctx, reason); err != nil {
-		resErrors = append(resErrors, err)
+	if l.sessions != nil {
+		for _, session := range l.sessions.GetAll() {
+			session.Close()
+		}
 	}
 
-	for _, session := range l.sessions.GetAll() {
-		session.Close()
-		// For shutdown, we don't need to process stop partition requests through workers
-		// since all workers are already being closed above
-	}
-
-	finalErr := errors.Join(resErrors...)
-
-	closeDone(len(workers), finalErr)
-
-	return finalErr
-}
-
-func (l *streamListener) goClose(ctx context.Context, reason error) {
-	ctx, cancel := context.WithTimeout(xcontext.ValueOnly(ctx), time.Second)
-	l.streamClose(reason)
-	go func() {
-		_ = l.background.Close(ctx, reason)
-		cancel()
-	}()
+	var shutdownErr error
+	l.m.WithLock(func() {
+		l.shutdownErr = errors.Join(l.shutdownErr, errors.Join(resErrors...))
+		shutdownErr = l.shutdownErr
+	})
+	closeDone(workersClosed, shutdownErr)
+	close(done)
 }
 
 func (l *streamListener) startBackground() {
@@ -209,7 +242,6 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 			err := xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 				"ydb: topic listener stream init timeout: %w", ctx.Err(),
 			)))
-			l.goClose(ctx, err)
 			l.streamClose(err)
 		case <-initDone:
 			// pass
@@ -260,6 +292,11 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 	}
 
 	l.sessionID = initResp.SessionID
+	if err := ctx.Err(); err != nil {
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+			"ydb: topic listener stream init timeout: %w", err,
+		)))
+	}
 
 	return nil
 }
@@ -311,7 +348,7 @@ func (l *streamListener) flushPendingMessages(ctx context.Context) {
 					"message_type=%s, message_index=%d, total_messages=%d: %w",
 				messageType, i, len(messages), err,
 			)))
-			l.goClose(ctx, reason)
+			l.beginClose(ctx, reason)
 
 			return
 		}
@@ -363,7 +400,7 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 
 			gtrace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, "", 0, err)
 			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
-			l.goClose(ctx, xerrors.WithStackTrace(xerrors.Wrap(
+			l.beginClose(ctx, xerrors.WithStackTrace(xerrors.Wrap(
 				fmt.Errorf("ydb: failed read message from the stream in the topic reader listener: %w", err),
 			)))
 
@@ -380,7 +417,7 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 
 		if err := l.routeMessage(ctx, mess); err != nil {
 			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
-			l.goClose(ctx, err)
+			l.beginClose(ctx, err)
 		}
 	}
 }
@@ -431,6 +468,11 @@ func (l *streamListener) handleStartPartition(
 
 	// Create worker for this partition
 	worker := l.createWorkerForPartition(session)
+	if worker == nil {
+		_, _ = l.sessions.Remove(session.StreamPartitionSessionID)
+
+		return nil
+	}
 
 	// Send StartPartition message to the worker
 	worker.AddRawServerMessage(m)
@@ -502,21 +544,8 @@ func (l *streamListener) onCommitResponse(msg *rawtopicreader.CommitOffsetRespon
 	return nil
 }
 
-func (l *streamListener) sendCommit(b *topicreadercommon.PublicBatch) error {
-	commitRanges := topicreadercommon.CommitRanges{
-		Ranges: []topicreadercommon.CommitRange{topicreadercommon.GetCommitRange(b)},
-	}
-
-	if err := l.stream.Send(commitRanges.ToRawMessage()); err != nil {
-		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to send commit message: %w", err)))
-	}
-
-	return nil
-}
-
-// getSyncCommitter returns the syncCommitter for CommitHandler interface compatibility
-func (l *streamListener) getSyncCommitter() SyncCommitter {
-	return l.syncCommitter
+func (l *streamListener) newCommitRequest(b *topicreadercommon.PublicBatch) commitRequest {
+	return l.syncCommitter.NewCommitRequest(topicreadercommon.GetCommitRange(b))
 }
 
 // collectPendingFreeBytes drains all byte credits already queued in freeBytes after
@@ -609,11 +638,25 @@ func (l *streamListener) SendRaw(msg rawtopicreader.ClientMessage) {
 }
 
 // onWorkerStopped handles worker stopped notifications
-func (l *streamListener) onWorkerStopped(sessionID rawtopicreader.PartitionSessionID, reason error) {
-	// Remove worker from workers map
+func (l *streamListener) onWorkerStopped(
+	worker *PartitionWorker,
+	sessionID rawtopicreader.PartitionSessionID,
+	reason error,
+) {
 	l.m.WithLock(func() {
-		delete(l.workers, sessionID)
+		if l.workers[sessionID] == worker {
+			delete(l.workers, sessionID)
+		}
 	})
+	// If reason from worker, propagate to streamListener shutdown
+	// But avoid cascading shutdowns for normal lifecycle events like queue closure during shutdown
+	if reason != nil && !l.closing.Load() {
+		// Only propagate reason if we're not already closing
+		// and if it's not a normal queue closure reason (which can happen during shutdown)
+		if !xerrors.Is(reason, errPartitionQueueClosed) {
+			l.beginClose(l.background.Context(), reason)
+		}
+	}
 
 	// Remove corresponding session
 	for _, session := range l.sessions.GetAll() {
@@ -623,37 +666,51 @@ func (l *streamListener) onWorkerStopped(sessionID rawtopicreader.PartitionSessi
 			break
 		}
 	}
-
-	// If reason from worker, propagate to streamListener shutdown
-	// But avoid cascading shutdowns for normal lifecycle events like queue closure during shutdown
-	if reason != nil && !l.closing.Load() {
-		// Only propagate reason if we're not already closing
-		// and if it's not a normal queue closure reason (which can happen during shutdown)
-		if !xerrors.Is(reason, errPartitionQueueClosed) {
-			l.goClose(l.background.Context(), reason)
-		}
-	}
 }
 
 // createWorkerForPartition creates a new PartitionWorker for the given session
 func (l *streamListener) createWorkerForPartition(session *topicreadercommon.PartitionSession) *PartitionWorker {
-	worker := NewPartitionWorker(
+	var worker *PartitionWorker
+	var closeOnce sync.Once
+	started := false
+	worker = NewPartitionWorker(
 		session.StreamPartitionSessionID,
 		session,
 		l,
 		l.handler,
-		l.onWorkerStopped,
+		func(sessionID rawtopicreader.PartitionSessionID, reason error) {
+			l.onWorkerStopped(worker, sessionID, reason)
+			closeOnce.Do(func() {
+				// The callback can run in the worker goroutine, so join it elsewhere.
+				go func() {
+					err := worker.Close(context.Background(), reason)
+					l.m.WithLock(func() {
+						if err != nil {
+							l.shutdownErr = errors.Join(l.shutdownErr, err)
+						}
+						l.workerCloseCount++
+					})
+					l.workerCloseWG.Done()
+				}()
+			})
+		},
 		l.tracer,
 		l.listenerID,
 	)
 
-	// Store worker in map
+	// Register and start under the same lock so shutdown cannot wait for an unstarted worker.
 	l.m.WithLock(func() {
+		if l.closing.Load() {
+			return
+		}
 		l.workers[session.StreamPartitionSessionID] = worker
+		l.workerCloseWG.Add(1)
+		worker.Start(l.background.Context())
+		started = true
 	})
-
-	// Start worker
-	worker.Start(l.background.Context())
+	if !started {
+		return nil
+	}
 
 	return worker
 }

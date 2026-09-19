@@ -1,6 +1,8 @@
 package topicoptions
 
 import (
+	"time"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -40,5 +42,27 @@ func WithListenerBufferSizeBytes(size int) ListenerOption {
 func WithListenerAddDecoder(codec topictypes.Codec, decoderCreate CreateDecoderFunc) ListenerOption {
 	return func(cfg *topiclistenerinternal.StreamListenerConfig) {
 		cfg.Decoders.AddDecoder(rawtopiccommon.Codec(codec), decoderCreate)
+	}
+}
+
+// WithListenerCheckRetryErrorFunction overrides the default error retry policy.
+// Return CheckErrorRetryDecisionDefault to use the default policy.
+// The callback must be fast and deterministic; it may be called more than once for an error.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithListenerCheckRetryErrorFunction(callback CheckErrorRetryFunction) ListenerOption {
+	return func(cfg *topiclistenerinternal.StreamListenerConfig) {
+		cfg.RetrySettings.CheckError = callback
+	}
+}
+
+// WithListenerStartTimeout limits the duration of a listener connection retry period.
+// The default allows retries without a time limit.
+// Set timeout to 0 to stop after the first failed connection attempt.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithListenerStartTimeout(timeout time.Duration) ListenerOption {
+	return func(cfg *topiclistenerinternal.StreamListenerConfig) {
+		cfg.RetrySettings.StartTimeout = timeout
 	}
 }

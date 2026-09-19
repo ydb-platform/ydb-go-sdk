@@ -2,7 +2,6 @@ package topiclistenerinternal
 
 import (
 	"context"
-	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
@@ -10,15 +9,15 @@ import (
 
 //go:generate mockgen -source event_handler.go -destination event_handler_mock_test.go --typed -package topiclistenerinternal -write_package_comment=false
 
-// CommitHandler interface for PublicReadMessages commit operations
-type CommitHandler interface {
-	sendCommit(b *topicreadercommon.PublicBatch) error
-	getSyncCommitter() SyncCommitter
+// commitRequest is the listener's view of a single commit shared by its callers.
+type commitRequest interface {
+	Confirm()
+	Wait(ctx context.Context) error
 }
 
-// SyncCommitter interface for ConfirmWithAck support
-type SyncCommitter interface {
-	Commit(ctx context.Context, commitRange topicreadercommon.CommitRange) error
+// CommitHandler interface for PublicReadMessages commit operations
+type CommitHandler interface {
+	newCommitRequest(b *topicreadercommon.PublicBatch) commitRequest
 }
 
 type EventHandler interface {
@@ -30,7 +29,8 @@ type EventHandler interface {
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	OnStartPartitionSessionRequest(ctx context.Context, event *PublicEventStartPartitionSession) error
 
-	// OnReadMessages called with batch of messages. Max count of messages limited by internal buffer size
+	// OnReadMessages called with batch of messages. Max count of messages limited by internal buffer size.
+	// The callback must return when ctx is canceled: shutdown and reconnect wait for it to finish.
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	OnReadMessages(ctx context.Context, event *PublicReadMessages) error
@@ -52,8 +52,7 @@ type EventHandler interface {
 type PublicReadMessages struct {
 	PartitionSession topicreadercommon.PublicPartitionSession
 	Batch            *topicreadercommon.PublicBatch
-	commitHandler    CommitHandler
-	committed        atomic.Bool
+	commitRequest    commitRequest
 }
 
 func NewPublicReadMessages(
@@ -64,7 +63,7 @@ func NewPublicReadMessages(
 	return &PublicReadMessages{
 		PartitionSession: session,
 		Batch:            batch,
-		commitHandler:    commitHandler,
+		commitRequest:    commitHandler.newCommitRequest(batch),
 	}
 }
 
@@ -73,11 +72,7 @@ func NewPublicReadMessages(
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (e *PublicReadMessages) Confirm() {
-	if e.committed.Swap(true) {
-		return
-	}
-
-	_ = e.commitHandler.sendCommit(e.Batch)
+	e.commitRequest.Confirm()
 }
 
 // ConfirmWithAck commit the batch and wait ack from the server. The method will be blocked until
@@ -85,11 +80,7 @@ func (e *PublicReadMessages) Confirm() {
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (e *PublicReadMessages) ConfirmWithAck(ctx context.Context) error {
-	if e.committed.Swap(true) {
-		return nil
-	}
-
-	return e.commitHandler.getSyncCommitter().Commit(ctx, topicreadercommon.GetCommitRange(e.Batch))
+	return e.commitRequest.Wait(ctx)
 }
 
 // PublicEventStartPartitionSession

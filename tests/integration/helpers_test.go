@@ -28,6 +28,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -363,6 +364,29 @@ func (scope *scopeT) TopicReaderNamed(name string) *topicreader.Reader {
 	}
 
 	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: name})
+}
+
+func (scope *scopeT) TopicListener(
+	handler topiclistener.EventHandler,
+	opts ...topicoptions.ListenerOption,
+) *topiclistener.TopicListener {
+	f := func() (*fixenv.GenericResult[*topiclistener.TopicListener], error) {
+		listener, err := scope.Driver().Topic().StartListener(
+			scope.TopicConsumerName(),
+			handler,
+			topicoptions.ReadTopic(scope.TopicPath()),
+			opts...,
+		)
+		cleanup := func() {
+			if listener != nil {
+				_ = listener.Close(scope.Ctx)
+			}
+		}
+
+		return fixenv.NewGenericResultWithCleanup(listener, cleanup), err
+	}
+
+	return fixenv.CacheResult(scope.Env, f)
 }
 
 func (scope *scopeT) TopicWriter() *topicwriter.Writer {
