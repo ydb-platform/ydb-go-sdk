@@ -65,43 +65,43 @@ func main() {
 	prefix = path.Join(db.Name(), prefix)
 
 	// simple creation with composite primary key
-	err = executeQuery(ctx, db.Table(), prefix, simpleCreateQuery)
+	err = executeQuery(ctx, db.Query(), prefix, simpleCreateQuery)
 	if err != nil {
 		panic(err)
 	}
 
 	// creation with column family
-	err = executeQuery(ctx, db.Table(), prefix, familyCreateQuery)
+	err = executeQuery(ctx, db.Query(), prefix, familyCreateQuery)
 	if err != nil {
 		panic(err)
 	}
 
 	// creation with table settings
-	err = executeQuery(ctx, db.Table(), prefix, settingsCreateQuery)
+	err = executeQuery(ctx, db.Query(), prefix, settingsCreateQuery)
 	if err != nil {
 		panic(err)
 	}
 
 	// add column and drop column.
-	err = executeQuery(ctx, db.Table(), prefix, alterQuery)
+	err = executeQuery(ctx, db.Query(), prefix, alterQuery)
 	if err != nil {
 		panic(err)
 	}
 
 	// change AUTO_PARTITIONING_BY_SIZE setting.
-	err = executeQuery(ctx, db.Table(), prefix, alterSettingsQuery)
+	err = executeQuery(ctx, db.Query(), prefix, alterSettingsQuery)
 	if err != nil {
 		panic(err)
 	}
 
 	// add TTL. Clear the old data after the three-hour interval has expired.
-	err = executeQuery(ctx, db.Table(), prefix, alterTTLQuery)
+	err = executeQuery(ctx, db.Query(), prefix, alterTTLQuery)
 	if err != nil {
 		panic(err)
 	}
 
 	// drop tables small_table,small_table2,small_table3.
-	err = executeQuery(ctx, db.Table(), prefix, dropQuery)
+	err = executeQuery(ctx, db.Query(), prefix, dropQuery)
 	if err != nil {
 		panic(err)
 	}

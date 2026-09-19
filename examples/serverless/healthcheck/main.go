@@ -36,7 +36,7 @@ func (u *URLs) Set(s string) error {
 	return nil
 }
 
-func init() { //nolint:gochecknoinits
+func parseFlags() {
 	required := []string{"ydb", "url"}
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	flagSet.Usage = func() {
@@ -84,6 +84,8 @@ func init() { //nolint:gochecknoinits
 }
 
 func main() {
+	parseFlags()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	s, err := getService(ctx, dsn, environ.WithEnvironCredentials())
