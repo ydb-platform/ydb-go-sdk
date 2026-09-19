@@ -138,6 +138,7 @@ func (s *grpcClientStream) finish(err error) {
 		trailer = trailer.Copy()
 	}
 	s.finishedTrailer.Store(&trailer)
+	// Trailer callbacks run inline on gRPC's completion path and must not block.
 	meta.CallTrailerCallback(s.requestCtx, s.Trailer())
 	gtrace.DriverOnConnStreamFinish(s.parentConn.config.Trace(), s.requestCtx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).finish"), err,

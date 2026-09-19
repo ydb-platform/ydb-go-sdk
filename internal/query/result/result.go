@@ -12,7 +12,10 @@ import (
 
 type (
 	Result interface {
-		closer.Closer
+		// Close releases result resources. Always call it, including after an
+		// iteration error, to finish the stream and process received server hints.
+		// Closing may cancel the stream; trailers not yet received are unavailable.
+		Close(ctx context.Context) error
 
 		// NextResultSet returns next result set
 		NextResultSet(ctx context.Context) (Set, error)

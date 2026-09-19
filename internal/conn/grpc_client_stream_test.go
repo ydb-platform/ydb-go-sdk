@@ -947,19 +947,22 @@ func TestGrpcClientStream_Finish(t *testing.T) {
 
 		require.Equal(t, trailer, callbackTrailer)
 		require.ErrorIs(t, ctx.Err(), context.Canceled)
+		trailer.Set("x-ydb-server-hints", "changed")
+		require.Equal(t, callbackTrailer, s.Trailer())
 	})
 }
 
 func TestConn_NewStreamRealGRPCTrailers(t *testing.T) {
-	for _, code := range []grpcCodes.Code{grpcCodes.OK, grpcCodes.Unavailable} {
+	for _, code := range []grpcCodes.Code{grpcCodes.OK, grpcCodes.Unavailable, grpcCodes.Canceled} {
 		t.Run(code.String(), func(t *testing.T) {
 			trailer := metadata.Pairs("x-ydb-server-hints", "session-close")
 			listener := bufconn.Listen(1 << 20)
 			t.Cleanup(func() { _ = listener.Close() })
 			server := grpc.NewServer()
 			grpc_testing.RegisterTestServiceServer(server, &trailerTestService{
-				trailer: trailer,
-				err:     grpcStatus.Error(code, "stream finished"),
+				trailer:       trailer,
+				err:           grpcStatus.Error(code, "stream finished"),
+				waitForCancel: code == grpcCodes.Canceled,
 			})
 			t.Cleanup(server.Stop)
 			go func() { _ = server.Serve(listener) }()
@@ -972,31 +975,57 @@ func TestConn_NewStreamRealGRPCTrailers(t *testing.T) {
 			)
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = rawConn.Close() })
-			parentConn := newConn(endpoint.New("trailer-test"), &mockConfig{dialTimeout: 5 * time.Second})
+			finished := make(chan struct{})
+			parentConn := newConn(endpoint.New("trailer-test"), &mockConfig{
+				dialTimeout: 5 * time.Second,
+				driverTrace: &trace.Driver{
+					OnConnStreamFinish: func(trace.DriverConnStreamFinishInfo) {
+						close(finished) // Runs after the SDK's trailer callback.
+					},
+				},
+			})
 			parentConn.grpcConn = rawConn
 
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
+			streamCtx, cancelStream := context.WithCancel(ctx)
+			defer cancelStream()
 			trailers := make(chan metadata.MD, 1)
 			var callbacks atomic.Int32
-			ctx = meta.WithTrailerCallback(ctx, func(md metadata.MD) {
+			streamCtx = meta.WithTrailerCallback(streamCtx, func(md metadata.MD) {
 				callbacks.Add(1)
 				trailers <- md
 			})
 			var callerTrailer metadata.MD
-			sentinel := grpc.MaxCallRecvMsgSize(42)
+			sentinel := grpc.EmptyCallOption{}
 			opts := []grpc.CallOption{grpc.Trailer(&callerTrailer), sentinel, sentinel}
 			client := grpc_testing.NewTestServiceClient(parentConn)
-			stream, err := client.StreamingOutputCall(ctx, &grpc_testing.StreamingOutputCallRequest{}, opts[:1]...)
+			stream, err := client.StreamingOutputCall(streamCtx, &grpc_testing.StreamingOutputCallRequest{}, opts[:1]...)
 			require.NoError(t, err)
 			require.Equal(t, []grpc.CallOption{sentinel, sentinel}, opts[1:])
 			_, err = stream.Recv()
 			require.NoError(t, err)
+			if code == grpcCodes.Canceled {
+				// The server cannot send trailers until it observes this cancellation.
+				cancelStream()
+			}
 			_, err = stream.Recv()
 			if code == grpcCodes.OK {
 				require.ErrorIs(t, err, io.EOF)
 			} else {
 				require.True(t, xerrors.IsTransportError(err, code))
+			}
+			select {
+			case <-finished:
+			case <-ctx.Done():
+				t.Fatal("stream finish callback did not run")
+			}
+			if code == grpcCodes.Canceled {
+				require.Zero(t, callbacks.Load())
+				require.Empty(t, callerTrailer)
+				require.Empty(t, stream.Trailer())
+
+				return
 			}
 			select {
 			case md := <-trailers:
@@ -1005,6 +1034,8 @@ func TestConn_NewStreamRealGRPCTrailers(t *testing.T) {
 			case <-ctx.Done():
 				t.Fatal("trailer callback did not run")
 			}
+			// Cancellation after trailer delivery must preserve the received hints.
+			cancelStream()
 			require.EqualValues(t, 1, callbacks.Load())
 			require.Equal(t, trailer, callerTrailer)
 			require.Equal(t, trailer, stream.Trailer())
@@ -1067,8 +1098,9 @@ func (f *fakeTrailerStream) Trailer() metadata.MD {
 type trailerTestService struct {
 	grpc_testing.UnimplementedTestServiceServer
 
-	trailer metadata.MD
-	err     error
+	trailer       metadata.MD
+	err           error
+	waitForCancel bool
 }
 
 func (s *trailerTestService) StreamingOutputCall(
@@ -1078,6 +1110,11 @@ func (s *trailerTestService) StreamingOutputCall(
 	stream.SetTrailer(s.trailer)
 	if err := stream.Send(&grpc_testing.StreamingOutputCallResponse{}); err != nil {
 		return err
+	}
+	if s.waitForCancel {
+		<-stream.Context().Done()
+
+		return stream.Context().Err()
 	}
 
 	return s.err
