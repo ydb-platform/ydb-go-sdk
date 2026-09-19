@@ -485,7 +485,10 @@ func (c *conn) NewStream(
 		sentMark:   sentMark,
 	}
 
-	s.stream, err = cc.NewStream(grpcCtx, desc, method, append(opts, grpc.OnFinish(s.finish))...)
+	s.stream, err = cc.NewStream(grpcCtx, desc, method, append(opts,
+		grpc.Trailer(&s.trailer),
+		grpc.OnFinish(s.finish),
+	)...)
 	if err != nil {
 		if xerrors.IsContextError(err) {
 			return nil, xerrors.WithStackTrace(err)

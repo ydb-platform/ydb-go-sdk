@@ -19,6 +19,7 @@ import (
 type grpcClientStream struct {
 	parentConn *conn
 	stream     grpc.ClientStream
+	trailer    metadata.MD
 	requestCtx context.Context //nolint:containedctx
 	grpcCancel context.CancelFunc
 	wrapping   bool
@@ -121,6 +122,7 @@ func (s *grpcClientStream) SendMsg(m any) (err error) {
 }
 
 func (s *grpcClientStream) finish(err error) {
+	meta.CallTrailerCallback(s.requestCtx, s.trailer)
 	gtrace.DriverOnConnStreamFinish(s.parentConn.config.Trace(), s.requestCtx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).finish"), err,
 	)
@@ -137,34 +139,25 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).RecvMsg"),
 		)
 	)
-	var recvErr error
 	defer func() {
 		onDone(err)
-		// Trailers can be read safely only after the underlying gRPC stream has
-		// finished, i.e. when the underlying RecvMsg itself returned a non-nil
-		// error (including io.EOF). A non-success YDB operation status does not
-		// end the gRPC stream, so reading Trailer() in that case would race with
-		// the gRPC transport goroutine that finalizes the trailer metadata.
-		if recvErr != nil {
-			meta.CallTrailerCallback(s.requestCtx, s.stream.Trailer())
-		}
 	}()
 
-	recvErr = s.stream.RecvMsg(m)
-	if recvErr != nil {
-		if xerrors.Is(recvErr, io.EOF) {
+	err = s.stream.RecvMsg(m)
+	if err != nil {
+		if xerrors.Is(err, io.EOF) {
 			return io.EOF
 		}
 
 		if !s.wrapping {
-			return recvErr
+			return err
 		}
 
 		if s.sentMark.canRetry() {
 			return xerrors.WithStackTrace(xerrors.Retryable(
 				xerrors.Join(
 					s.requestCtx.Err(),
-					xerrors.Transport(recvErr, xerrors.WithTraceID(s.traceID)),
+					xerrors.Transport(err, xerrors.WithTraceID(s.traceID)),
 				),
 				xerrors.WithName("RecvMsg"),
 			))
@@ -172,7 +165,7 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 
 		return xerrors.WithStackTrace(xerrors.Join(
 			s.requestCtx.Err(),
-			xerrors.Transport(recvErr,
+			xerrors.Transport(err,
 				xerrors.WithAddress(s.parentConn.Address()),
 				xerrors.WithNodeID(s.parentConn.NodeID()),
 				xerrors.WithTraceID(s.traceID),

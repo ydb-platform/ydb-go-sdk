@@ -1,4 +1,4 @@
-* Fixed data race in `internal/conn.(*grpcClientStream).RecvMsg`: gRPC trailers are no longer read when a non-success YDB operation status is converted into an error, since the underlying gRPC stream is not finished at that point and reading `Trailer()` raced with the transport goroutine
+* Fixed a data race while processing trailers for streaming RPCs by delivering trailer callbacks only after the underlying gRPC stream finishes
 
 ## v3.151.3
 * Fixed query session pool metrics during checkout, session creation and warm-up, retries, and waiting for a session
