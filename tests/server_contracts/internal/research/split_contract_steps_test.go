@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -19,6 +21,69 @@ func initializeSplitContractSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^contract: DescribeTopic eventually shows inactive partition (\d+) `+
 		`with active children \[([0-9, ]+)\] after writer rejection$`,
 		contractChildrenDiscovered)
+	sc.Step(`^contract: DescribeTopic eventually reports exactly this partition activity:$`,
+		contractPartitionActivity)
+}
+
+func contractPartitionActivity(ctx context.Context, table *godog.Table) error {
+	rows, err := contractTable(table, "partition_id", "active")
+	if err != nil {
+		return err
+	}
+	want := make(map[int64]bool, len(rows))
+	for _, row := range rows {
+		partitionID, err := contractNonnegativeInt(row[0])
+		if err != nil {
+			return fmt.Errorf("partition_id: %w", err)
+		}
+		active, err := strconv.ParseBool(row[1])
+		if err != nil {
+			return fmt.Errorf("active: %w", err)
+		}
+		if _, ok := want[partitionID]; ok {
+			return fmt.Errorf("duplicate partition_id %d", partitionID)
+		}
+		want[partitionID] = active
+	}
+
+	world, err := worldFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	pollCtx, cancel := context.WithTimeout(ctx, scenarioTimeout)
+	defer cancel()
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+	var got map[int64]bool
+	var previous map[int64]bool
+	for {
+		description, err := world.DescribeTopic(pollCtx, false)
+		if err != nil {
+			return fmt.Errorf("partition activity: got %v, want %v: %w", got, want, err)
+		}
+		got = partitionActivity(description)
+		if !maps.Equal(got, previous) {
+			godog.Logf(ctx, "Observed partition activity: %v", got)
+			previous = maps.Clone(got)
+		}
+		if maps.Equal(got, want) {
+			return nil
+		}
+		select {
+		case <-ticker.C:
+		case <-pollCtx.Done():
+			return fmt.Errorf("partition activity: got %v, want %v: %w", got, want, pollCtx.Err())
+		}
+	}
+}
+
+func partitionActivity(description *Ydb_Topic.DescribeTopicResult) map[int64]bool {
+	activity := make(map[int64]bool, len(description.GetPartitions()))
+	for _, partition := range description.GetPartitions() {
+		activity[partition.GetPartitionId()] = partition.GetActive()
+	}
+
+	return activity
 }
 
 func contractAlterSucceeded(ctx context.Context) error {

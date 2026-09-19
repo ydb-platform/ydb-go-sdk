@@ -24,8 +24,9 @@ that failure to the server. Run all files in this directory when checking the in
 | C9. A split can invalidate commit even after `written_in_tx`; replay on active children succeeds after that known rejection. | [split_before_commit.feature](split_before_commit.feature): actual inactive parent/active children, ACK after split, aborted commit, complete replay/readback. | Successful Flush cannot hide Commit failure; the next attempt needs refreshed routing. |
 | C10. The next ordinary write on a session bound to a split parent fails with OVERLOADED and the stream ends. | [split_session_and_discovery.feature](split_session_and_discovery.feature): successful pre-split write, split, rejected post-split write and EOF. | A failed session must be replaced; OVERLOADED alone does not establish that fresh routing metadata is available. |
 | C11. DescribeTopic eventually exposes the split children after writer rejection; earlier responses may still show the old topology. | [split_session_and_discovery.feature](split_session_and_discovery.feature): ordinary write probes during split, timestamped descriptions, inactive parent and active children in a request started after rejection. | Route refresh must tolerate a description that still lacks the children. |
+| C12. DescribeTopic reports the current activity of every partition. | [partition_activity.feature](partition_activity.feature): the initial partition is active; after split the parent is inactive and both children are active. | Partition Source can use `active` as the server-authoritative writable state. |
 
-The set has **20 scenarios in 8 feature files**, including the eight sequence-validation examples.
+The set has **21 scenarios in 9 feature files**, including the eight sequence-validation examples.
 
 `Then contract:` steps inspect cloned protobuf responses and the recorded transaction RPC result, not text in the trace.
 Each ACK table row is one `(seq_no, result)` pair. The table describes all ACKs expected so far on that physical stream.
@@ -44,6 +45,10 @@ helpers; all expected server outcomes are asserted by the contract steps.
 
 InitResponse field values and WriteResponse.partition_id are not assertions. The scenarios do not request LastSeqNo.
 ACK seqNo checks match the numbers actually sent and verify response correlation.
+
+The partition-activity contract compares the complete `(partition_id, active)` mapping returned by DescribeTopic before
+and after a split. `active` is a proto3 scalar, so its wire presence is not observable after decoding; the contract asserts
+the decoded value for every returned partition and rejects missing or extra partitions.
 
 General scenarios omit partition_id in StreamWrite Init and subscribe to the topic without a partition filter when reading.
 Their single-partition fixture provides an ordered readback of `(seq_no, data)` without asserting a partition ID.
@@ -91,6 +96,9 @@ go run ./cmd/server-contracts -version trunk \
   -test topic/contracts/producerless_delivery.feature
 ```
 
+The runner starts Compose with `--pull always`, so mutable tags such as `latest`, `edge` and `trunk` are resolved from the
+registry before every run.
+
 The suite uses isolated temporary topics and serializable read-write Query transactions. It never calls the SDK's
 transactional topic writer or retries a rejected transaction implicitly. Each replay is explicit in its scenario.
 
@@ -131,6 +139,25 @@ The SDK-root checks listed above belong to the earlier validation; this update c
 After adding C10 and C11, all **20 contract scenarios passed with `-race` in 52.48 seconds** on the same local server.
 The two separate research scenarios completed three diagnostic runs and a final run with `-race`; the diagnostic runs
 established the timing observations above. Nested-module unit tests with `-race`, `go vet`, and `golangci-lint` passed.
+
+## Validation on 2026-09-19
+
+The partition-activity contract was run against three Docker image tags:
+
+- `latest`: YDB `26.2.1.14.1bd0f9c`, image digest
+  `sha256:9e46fd45875551a75bcf34d0bb9ca0baa1d8763a4ccf2070af45f4467c4b7402` — **FAIL**. The initial description
+  reported `map[0:true]`; AlterTopic returned `SUCCESS`, but the topology remained `map[0:true]` for the full scenario
+  timeout, so this build did not reach the post-split assertion.
+- `edge`: YDB `26.3.1.15.2c6b0d7`, image digest
+  `sha256:afbed0470c7e599e40d4caa99d7418b18fdff002621926aa465716af29f5e6c9` — **PASS**. DescribeTopic changed from
+  `map[0:true]` to `map[0:false 1:true 2:true]` after the split.
+- `trunk`: YDB `main.f5322db`, image digest
+  `sha256:ca76a10ab5ef8d2ef3b923375f95d486e86f6ce9dedbac1c3b9502d266f4b2c2` — **PASS**. DescribeTopic changed from
+  `map[0:true]` to `map[0:false 1:true 2:true]` after the split.
+
+The failed `latest` run establishes the initial `active=true` value but is inconclusive about the post-split value, because
+that build did not perform the requested split. Each run pulled its tag from the registry first. Nested-module tests
+excluding live server scenarios passed with `-race`.
 
 ## Remaining contracts before the corresponding implementation stage
 

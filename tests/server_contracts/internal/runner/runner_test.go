@@ -331,6 +331,17 @@ func TestComposeYAML(t *testing.T) {
 	}
 }
 
+func TestComposeUpAlwaysPullsImage(t *testing.T) {
+	stack := composeStack{
+		file:    "compose.yaml",
+		project: "test-project",
+	}
+	arguments := strings.Join(stack.upCommand(t.Context()).Args, "\n") + "\n"
+	if !strings.Contains(arguments, "\nup\n--pull\nalways\n") {
+		t.Fatalf("docker compose up arguments do not contain --pull always:\n%s", arguments)
+	}
+}
+
 func TestPrintYDBRuntimeIdentity(t *testing.T) {
 	identity := ydbRuntimeIdentity{
 		serverVersions:   []string{"trunk-2026-08-28"},

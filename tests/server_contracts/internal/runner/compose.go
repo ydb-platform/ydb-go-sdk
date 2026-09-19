@@ -128,8 +128,13 @@ func (s *composeStack) command(ctx context.Context, arguments ...string) *exec.C
 	return exec.CommandContext(ctx, "docker", append(base, arguments...)...)
 }
 
+func (s *composeStack) upCommand(ctx context.Context) *exec.Cmd {
+	return s.command(ctx, "up", "--pull", "always", "--detach", "--wait", "--wait-timeout",
+		strconv.Itoa(int(readyTimeout.Seconds())))
+}
+
 func (s *composeStack) Up(ctx context.Context) error {
-	command := s.command(ctx, "up", "--detach", "--wait", "--wait-timeout", strconv.Itoa(int(readyTimeout.Seconds())))
+	command := s.upCommand(ctx)
 	command.Stdout = s.out
 	command.Stderr = s.errOut
 	if err := command.Run(); err != nil {
