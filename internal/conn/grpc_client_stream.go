@@ -3,7 +3,6 @@ package conn
 import (
 	"context"
 	"io"
-	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
@@ -18,15 +17,13 @@ import (
 )
 
 type grpcClientStream struct {
-	parentConn   *conn
-	stream       grpc.ClientStream
-	trailer      metadata.MD
-	trailerReady atomic.Bool
-	requestCtx   context.Context //nolint:containedctx
-	grpcCancel   context.CancelFunc
-	wrapping     bool
-	traceID      string
-	sentMark     *modificationMark
+	parentConn *conn
+	stream     grpc.ClientStream
+	requestCtx context.Context //nolint:containedctx
+	grpcCancel context.CancelFunc
+	wrapping   bool
+	traceID    string
+	sentMark   *modificationMark
 }
 
 func (s *grpcClientStream) Header() (metadata.MD, error) {
@@ -34,11 +31,7 @@ func (s *grpcClientStream) Header() (metadata.MD, error) {
 }
 
 func (s *grpcClientStream) Trailer() metadata.MD {
-	if s.trailerReady.Load() && len(s.trailer) > 0 {
-		return s.trailer.Copy()
-	}
-
-	return nil
+	return s.stream.Trailer()
 }
 
 func (s *grpcClientStream) Context() context.Context {
@@ -128,15 +121,10 @@ func (s *grpcClientStream) SendMsg(m any) (err error) {
 }
 
 func (s *grpcClientStream) finish(err error) {
-	if s.trailer != nil {
-		s.trailer = s.trailer.Copy()
-	}
-	s.trailerReady.Store(true)
-	s.grpcCancel()
-	meta.CallTrailerCallback(s.requestCtx, s.Trailer())
 	gtrace.DriverOnConnStreamFinish(s.parentConn.config.Trace(), s.requestCtx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).finish"), err,
 	)
+	s.grpcCancel()
 }
 
 func (s *grpcClientStream) RecvMsg(m any) (err error) {
@@ -144,17 +132,21 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 	defer stopUsage()
 
 	var (
-		ctx    = s.requestCtx
-		onDone = gtrace.DriverOnConnStreamRecvMsg(s.parentConn.config.Trace(), &ctx,
+		recvErr error
+		ctx     = s.requestCtx
+		onDone  = gtrace.DriverOnConnStreamRecvMsg(s.parentConn.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).RecvMsg"),
 		)
 	)
 	defer func() {
 		onDone(err)
+		if recvErr != nil {
+			meta.CallTrailerCallback(s.requestCtx, s.stream.Trailer())
+		}
 	}()
 
-	err = s.stream.RecvMsg(m)
-	if err != nil {
+	recvErr = s.stream.RecvMsg(m)
+	if err = recvErr; err != nil {
 		if xerrors.Is(err, io.EOF) {
 			return io.EOF
 		}
@@ -190,7 +182,6 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 					xerrors.FromOperation(operation),
 					xerrors.WithAddress(s.parentConn.Address()),
 					xerrors.WithNodeID(s.parentConn.NodeID()),
-					xerrors.WithTraceID(s.traceID),
 				))
 			}
 		}

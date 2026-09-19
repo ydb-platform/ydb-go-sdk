@@ -1,4 +1,4 @@
-* Fixed a data race while processing streaming RPC trailers: callbacks now receive finalized metadata when the RPC finishes; a YDB operation error alone does not finish the RPC, so callers must still close results or cancel their context
+* Fixed a data race when a streaming response contains a YDB operation error: trailers are read only after the underlying gRPC receive returns EOF or an error; stopping on a YDB operation error alone does not deliver trailer callbacks or server close hints
 
 ## v3.151.3
 * Fixed query session pool metrics during checkout, session creation and warm-up, retries, and waiting for a session
