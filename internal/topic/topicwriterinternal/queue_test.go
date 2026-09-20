@@ -569,6 +569,31 @@ func TestQueue_WaitForBatch(t *testing.T) {
 	}
 }
 
+func TestQueue_WaitForBatchWithAckBeforeWait(t *testing.T) {
+	q := newMessageQueue()
+	waiter, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(10, 20))
+	require.NoError(t, err)
+
+	// The first message is already absent when Wait starts; the second is still pending.
+	require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 10}}))
+
+	ctx := &queueWaitContext{Context: t.Context(), waiting: make(empty.Chan, 1)}
+	done := make(chan error, 1)
+	go func() { done <- q.Wait(ctx, waiter) }()
+	requireQueueWaitStarted(t, ctx)
+	acked := waitForMessageAckChannel(t, &q, 2)
+	requireAckChannelOpen(t, acked)
+
+	select {
+	case <-done:
+		t.Fatal("batch waiter returned before the remaining message was acked")
+	default:
+	}
+
+	require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 20}}))
+	require.NoError(t, waitQueueResult(t, done))
+}
+
 func TestQueue_WaitInterrupted(t *testing.T) {
 	t.Run("ContextCanceled", func(t *testing.T) {
 		q := newMessageQueue()
