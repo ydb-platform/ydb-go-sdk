@@ -80,7 +80,7 @@ type Client interface {
 	//
 	// Deprecated: Use StartTransactionalWriterContext to control transaction materialization with a context.
 	// Deprecated policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+	// Experimental policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	StartTransactionalWriter(
 		tx tx.Identifier,
 		topicpath string,
