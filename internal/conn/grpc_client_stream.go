@@ -132,21 +132,17 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 	defer stopUsage()
 
 	var (
-		recvErr error
-		ctx     = s.requestCtx
-		onDone  = gtrace.DriverOnConnStreamRecvMsg(s.parentConn.config.Trace(), &ctx,
+		ctx    = s.requestCtx
+		onDone = gtrace.DriverOnConnStreamRecvMsg(s.parentConn.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).RecvMsg"),
 		)
 	)
 	defer func() {
 		onDone(err)
-		if recvErr != nil {
-			meta.CallTrailerCallback(s.requestCtx, s.stream.Trailer())
-		}
 	}()
 
-	recvErr = s.stream.RecvMsg(m)
-	if err = recvErr; err != nil {
+	if err := s.stream.RecvMsg(m); err != nil {
+		meta.CallTrailerCallback(s.requestCtx, s.stream.Trailer())
 		if xerrors.Is(err, io.EOF) {
 			return io.EOF
 		}
