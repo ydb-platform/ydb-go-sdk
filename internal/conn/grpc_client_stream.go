@@ -142,7 +142,10 @@ func (s *grpcClientStream) RecvMsg(m any) (err error) {
 	}()
 
 	if err := s.stream.RecvMsg(m); err != nil {
-		meta.CallTrailerCallback(s.requestCtx, s.stream.Trailer())
+		defer func() {
+			meta.CallTrailerCallback(s.requestCtx, s.stream.Trailer())
+		}()
+
 		if xerrors.Is(err, io.EOF) {
 			return io.EOF
 		}
