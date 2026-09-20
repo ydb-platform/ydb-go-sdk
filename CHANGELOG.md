@@ -1,3 +1,4 @@
+## v3.151.4
 * Fixed a data race when a streaming response contains a YDB operation error: trailers are read only after the underlying gRPC receive returns EOF or an error; stopping on a YDB operation error alone does not deliver trailer callbacks or server close hints
 
 ## v3.151.3
