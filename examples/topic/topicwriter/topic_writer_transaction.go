@@ -18,7 +18,7 @@ func CopyMessagesBetweenTopicsTxWriter(
 	topic string,
 ) error {
 	return db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-		writer, err := db.Topic().StartTransactionalWriter(tx, topic)
+		writer, err := db.Topic().StartTransactionalWriterContext(ctx, tx, topic)
 		if err != nil {
 			return err
 		}
@@ -59,7 +59,7 @@ func TableAndTopicWithinTransaction(
 
 		// the writer is dedicated for the transaction, it can't be used outside the transaction
 		// it is no needs to close or flush the messages - it happened internally on transaction commit
-		writer, err := db.Topic().StartTransactionalWriter(t, topicPath)
+		writer, err := db.Topic().StartTransactionalWriterContext(ctx, t, topicPath)
 		if err != nil {
 			return err
 		}

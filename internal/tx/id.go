@@ -25,8 +25,13 @@ func (id LazyID) ID() string {
 	return *id.v
 }
 
+// SetTxID initializes a lazy ID. Once materialized, the ID stays unchanged so
+// background topic workers can read it while query responses repeat the metadata.
+// Initialization must finish before the ID is shared with concurrent users.
 func (id *LazyID) SetTxID(txID string) {
-	id.v = &txID
+	if id.v == nil {
+		id.v = &txID
+	}
 }
 
 func (id LazyID) isYdbTx() {}
