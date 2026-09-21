@@ -414,7 +414,7 @@ func Example_scanQueryWithCompression() {
 	err = db.Table().Do( // Do retry operation on errors with best effort
 		ctx, // context manage exiting from Do
 		func(ctx context.Context, s table.Session) (err error) { // retry operation
-			res, err := s.StreamExecuteScanQuery(ctx, query, nil, //nolint:staticcheck
+			res, err := s.StreamExecuteScanQuery(ctx, query, nil,
 				options.WithCallOptions(
 					grpc.UseCompressor(gzip.Name),
 				),
