@@ -50,7 +50,7 @@ func NewTopicListenerReconnector(
 		stopped:             make(empty.Chan),
 	}
 
-	res.background.Start("connection", res.connect)
+	res.background.Start("connection", res.run)
 
 	return res, nil
 }
@@ -86,47 +86,45 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 	return errors.Join(closeErrors...)
 }
 
-func (lr *TopicListenerReconnector) connect(ctx context.Context) {
+func (lr *TopicListenerReconnector) run(ctx context.Context) {
 	defer close(lr.stopped)
 
 	sl, err := lr.connectStream(ctx)
 	if err != nil {
-		sl, err = lr.reconnect(ctx, err)
+		sl, err = lr.retryConnect(ctx, err)
 	}
 	lr.completeConnection(err)
-	if err != nil {
-		if ctx.Err() != nil && errors.Is(err, ctx.Err()) {
+
+	for err == nil {
+		reason, reconnect := lr.waitAndRetireStream(ctx, sl)
+		if !reconnect {
 			return
 		}
-		lr.stopWithError(ctx, err)
+		sl, err = lr.retryConnect(ctx, reason)
+	}
 
+	if ctx.Err() != nil && errors.Is(err, ctx.Err()) {
 		return
 	}
+	lr.stopWithError(ctx, err)
+}
 
-	for {
-		select {
-		case <-ctx.Done():
-			lr.closeStream(sl, lr.background.CloseReason())
+func (lr *TopicListenerReconnector) waitAndRetireStream(
+	ctx context.Context,
+	sl *streamListener,
+) (error, bool) {
+	select {
+	case <-ctx.Done():
+		lr.closeStream(sl, lr.background.CloseReason())
 
-			return
-		case <-sl.background.StopDone():
-		}
-
-		reason := sl.background.CloseReason()
-		lr.closeStream(sl, reason)
-		if ctx.Err() != nil {
-			return
-		}
-		sl, err = lr.reconnect(ctx, reason)
-		if err != nil {
-			if ctx.Err() != nil && errors.Is(err, ctx.Err()) {
-				return
-			}
-			lr.stopWithError(ctx, err)
-
-			return
-		}
+		return nil, false
+	case <-sl.background.StopDone():
 	}
+
+	reason := sl.background.CloseReason()
+	lr.closeStream(sl, reason)
+
+	return reason, ctx.Err() == nil
 }
 
 func (lr *TopicListenerReconnector) closeStream(sl *streamListener, reason error) {
@@ -152,7 +150,7 @@ func (lr *TopicListenerReconnector) stopWithError(ctx context.Context, reason er
 	<-lr.background.Done()
 }
 
-func (lr *TopicListenerReconnector) reconnect(ctx context.Context, reason error) (*streamListener, error) {
+func (lr *TopicListenerReconnector) retryConnect(ctx context.Context, reason error) (*streamListener, error) {
 	clock := lr.streamConfig.clock
 	started := clock.Now()
 

@@ -169,6 +169,48 @@ func TestTopicListenerReconnectorWaitsForBackoff(t *testing.T) {
 	}, time.Second, time.Millisecond, "the stream must be replaced after the backoff expires")
 }
 
+func TestTopicListenerReconnectorResetsRetryTimeoutAfterSuccessfulReconnect(t *testing.T) {
+	ctx := xtest.Context(t)
+	clock := clockwork.NewFakeClock()
+	timers := make(chan time.Duration, 1)
+	cfg := NewStreamListenerConfig()
+	cfg.clock = &recordingListenerClock{Clock: clock, timers: timers}
+	cfg.RetrySettings.StartTimeout = 10 * time.Second
+	client := &countingStreamTopicClient{}
+	listener, err := NewTopicListenerReconnector(
+		client, &cfg, NewMockEventHandler(gomock.NewController(t)),
+	)
+	require.NoError(t, err)
+	defer func() { _ = listener.Close(ctx, ErrUserCloseTopic) }()
+	require.NoError(t, listener.WaitInit(ctx))
+
+	listener.m.Lock()
+	first := listener.streamListener
+	listener.m.Unlock()
+	first.beginClose(ctx, status.Error(codes.Unavailable, "first stream interrupted"))
+	clock.Advance(xtest.Receive(t, timers, "the first reconnect backoff timer"))
+
+	var second *streamListener
+	require.Eventually(t, func() bool {
+		listener.m.Lock()
+		defer listener.m.Unlock()
+		second = listener.streamListener
+
+		return second != nil && second != first
+	}, time.Second, time.Millisecond, "the first stream must be replaced")
+
+	clock.Advance(cfg.RetrySettings.StartTimeout + time.Nanosecond)
+	second.beginClose(ctx, status.Error(codes.Unavailable, "second stream interrupted"))
+	clock.Advance(xtest.Receive(t, timers, "the second reconnect backoff timer"))
+
+	require.Eventually(t, func() bool {
+		listener.m.Lock()
+		defer listener.m.Unlock()
+
+		return listener.streamListener != nil && listener.streamListener != second
+	}, time.Second, time.Millisecond, "the second stream must get a fresh retry timeout")
+}
+
 func TestTopicListenerReconnectorReadSessionIDHidesClosingStream(t *testing.T) {
 	stream := &streamListener{sessionID: "expired-session"}
 	stream.closing.Store(true)
@@ -193,7 +235,7 @@ func TestTopicListenerReconnectorStopsRetryingAfterTimeout(t *testing.T) {
 	}
 	finished := make(chan error, 1)
 	go func() {
-		_, err := listener.reconnect(ctx, streamErr)
+		_, err := listener.retryConnect(ctx, streamErr)
 		finished <- err
 	}()
 
@@ -219,7 +261,7 @@ func TestTopicListenerReconnectorZeroStartTimeoutSkipsRetries(t *testing.T) {
 
 	finished := make(chan error, 1)
 	go func() {
-		_, err := listener.reconnect(ctx, reason)
+		_, err := listener.retryConnect(ctx, reason)
 		finished <- err
 	}()
 	var err error
@@ -248,7 +290,7 @@ func TestTopicListenerReconnectorRetryCallbackReceivesFullError(t *testing.T) {
 	}
 	listener := &TopicListenerReconnector{streamConfig: &cfg}
 
-	_, err := listener.reconnect(ctx, reason)
+	_, err := listener.retryConnect(ctx, reason)
 	require.ErrorIs(t, err, reason)
 	require.ErrorIs(t, seen, reason)
 }
@@ -522,7 +564,7 @@ func TestTopicListenerReconnectorPreservesStreamErrorContext(t *testing.T) {
 	reason := xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("read stream failed: %w", xerrors.TransportError(streamErr))))
 	listener := &TopicListenerReconnector{streamConfig: &cfg}
 
-	_, err := listener.reconnect(ctx, reason)
+	_, err := listener.retryConnect(ctx, reason)
 
 	require.ErrorIs(t, err, reason)
 	require.ErrorIs(t, err, streamErr)
