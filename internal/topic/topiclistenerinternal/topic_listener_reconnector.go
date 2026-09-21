@@ -59,7 +59,7 @@ func (lr *TopicListenerReconnector) ReadSessionID() string {
 	lr.m.Lock()
 	sl := lr.streamListener
 	lr.m.Unlock()
-	if sl != nil {
+	if sl != nil && !sl.closing.Load() {
 		return sl.ReadSessionID()
 	}
 

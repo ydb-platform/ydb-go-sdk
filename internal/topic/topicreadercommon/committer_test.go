@@ -156,6 +156,25 @@ func TestCommitRequestAcknowledgedBeforeSessionCloseSucceeds(t *testing.T) {
 	require.NoError(t, request.Wait(ctx))
 }
 
+func TestCommitRequestAcknowledgedAfterConfirmBeforeSessionCloseSucceeds(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error { return nil })
+	committer.Start()
+	defer func() { _ = committer.Close(ctx, nil) }()
+	request := committer.NewCommitRequest(CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+
+	request.Confirm()
+	<-request.sendDone
+	session.SetCommittedOffsetForward(2)
+	session.Close()
+
+	require.NoError(t, request.Wait(ctx))
+}
+
 func TestCommitRequestWaitAcknowledgedDuringSendBeforeSessionClose(t *testing.T) {
 	ctx := xtest.Context(t)
 	session := newTestPartitionSession(ctx, 1)

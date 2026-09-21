@@ -169,6 +169,14 @@ func TestTopicListenerReconnectorWaitsForBackoff(t *testing.T) {
 	}, time.Second, time.Millisecond, "the stream must be replaced after the backoff expires")
 }
 
+func TestTopicListenerReconnectorReadSessionIDHidesClosingStream(t *testing.T) {
+	stream := &streamListener{sessionID: "expired-session"}
+	stream.closing.Store(true)
+	listener := &TopicListenerReconnector{streamListener: stream}
+
+	require.Empty(t, listener.ReadSessionID())
+}
+
 func TestTopicListenerReconnectorStopsRetryingAfterTimeout(t *testing.T) {
 	ctx := xtest.Context(t)
 	clock := clockwork.NewFakeClock()

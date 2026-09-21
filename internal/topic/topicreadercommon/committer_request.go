@@ -62,14 +62,11 @@ func (r *commitRequest) Wait(ctx context.Context) error {
 	default:
 	}
 	if session.CommittedOffset() >= r.commitRange.CommitOffsetEnd {
-		skipped := false
 		r.startOnce.Do(func() {
-			skipped = true
 			r.finishSend(nil)
 		})
-		if skipped {
-			return nil
-		}
+
+		return nil
 	}
 	if session.Context().Err() != nil {
 		return xerrors.WithStackTrace(ErrPublicCommitSessionToExpiredSession)
