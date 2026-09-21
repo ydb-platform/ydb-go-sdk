@@ -25,6 +25,12 @@ User: "Fix the build using method M"
 Agent: "Method M failed, so I implemented alternative N instead."
 ```
 
+## SLO label (developer only)
+
+- Agents must not add the `SLO` label automatically.
+- Only a developer adds `SLO` manually, after all other review feedback and failing tests have been addressed.
+- A failing `check-slo-label` check is not authorization to add the label or bypass the gate. Finish the other fixes and checks, and leave SLO activation to the developer.
+
 ## Code reuse
 
 1. Search the repo (`rg`, IDE search) for similar helpers before adding new utilities.

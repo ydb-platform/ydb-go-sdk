@@ -1,5 +1,12 @@
 * Deprecated `table.Session.StreamExecuteScanQuery`, use the query service client (`db.Query()`) instead
 
+## v3.151.3
+* Fixed query session pool metrics during checkout, session creation and warm-up, retries, and waiting for a session
+* Fixed session invalidation to follow the shared error policy for Query Service and Table API requests executed through Query Service, preserving sessions after gRPC `RESOURCE_EXHAUSTED` and `OUT_OF_RANGE`
+
+## v3.151.2
+* Fixed `HashPartitionChooser` in topic multiwriter (now it works like in Kafka)
+
 ## v3.151.1
 * Fixed `database/sql` Query Service requests failing on session creation attempt timeouts while the caller context remained active
 
