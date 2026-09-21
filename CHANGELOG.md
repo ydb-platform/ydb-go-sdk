@@ -2,6 +2,9 @@
 * Added `topicoptions.WithListenerStartTimeout` to bound listener connection retries; retriable failures on the first connection now retry until success by default
 * Fixed topic listener recovery, error reporting, closing, and message confirmation after stream failures
 
+## v3.151.4
+* Fixed a data race when a streaming response contains a YDB operation error: trailers are read only after the underlying gRPC receive returns EOF or an error; stopping on a YDB operation error alone does not deliver trailer callbacks or server close hints
+
 ## v3.151.3
 * Fixed query session pool metrics during checkout, session creation and warm-up, retries, and waiting for a session
 * Fixed session invalidation to follow the shared error policy for Query Service and Table API requests executed through Query Service, preserving sessions after gRPC `RESOURCE_EXHAUSTED` and `OUT_OF_RANGE`
