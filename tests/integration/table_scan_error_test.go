@@ -68,7 +68,7 @@ func TestIssue847ScanError(t *testing.T) {
 	)
 	require.NoError(t, err)
 	err = db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
-		res, err := s.StreamExecuteScanQuery(ctx, `SELICT 1;`, nil)
+		res, err := s.StreamExecuteScanQuery(ctx, `SELICT 1;`, nil) //nolint:staticcheck
 		if err != nil {
 			return err
 		}

@@ -558,7 +558,7 @@ func TestBasicExampleTable(sourceTest *testing.T) { //nolint:gocyclo
 					title    string
 					date     time.Time
 				)
-				res, err = s.StreamExecuteScanQuery(ctx, query,
+				res, err = s.StreamExecuteScanQuery(ctx, query, //nolint:staticcheck
 					table.NewQueryParameters(
 						table.ValueParam("$series",
 							types.ListValue(

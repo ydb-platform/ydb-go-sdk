@@ -30,7 +30,7 @@ func TestScanQueryWithCompression(t *testing.T) {
 	)
 	require.NoError(t, err)
 	err = db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
-		res, err := s.StreamExecuteScanQuery(ctx, `SELECT 1 as abc, 2 as def;`, nil, options.WithCallOptions(
+		res, err := s.StreamExecuteScanQuery(ctx, `SELECT 1 as abc, 2 as def;`, nil, options.WithCallOptions( //nolint:staticcheck
 			grpc.UseCompressor(gzip.Name),
 		))
 		if err != nil {

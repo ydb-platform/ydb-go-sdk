@@ -236,7 +236,7 @@ func TestLongStream(sourceTest *testing.T) {
 							rowsCount = 0
 							checkSum  = uint64(0)
 						)
-						res, err := s.StreamExecuteScanQuery(ctx,
+						res, err := s.StreamExecuteScanQuery(ctx, //nolint:staticcheck
 							"SELECT val FROM `"+path.Join(db.Name(), folder, tableName)+"`;", nil,
 						)
 						if err != nil {

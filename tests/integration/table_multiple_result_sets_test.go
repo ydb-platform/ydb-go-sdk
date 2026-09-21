@@ -125,7 +125,7 @@ func TestTableMultipleResultSets(sourceTest *testing.T) {
 		t.Run("scan", func(t *testing.T) {
 			err := db.Table().Do(ctx,
 				func(ctx context.Context, s table.Session) (err error) {
-					res, err := s.StreamExecuteScanQuery(
+					res, err := s.StreamExecuteScanQuery( //nolint:staticcheck
 						ctx, `
 							PRAGMA TablePathPrefix("`+path.Join(db.Name(), scope.folder)+`");
 							SELECT val FROM `+scope.tableName+`;`,

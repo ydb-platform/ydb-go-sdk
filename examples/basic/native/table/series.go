@@ -280,7 +280,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 
 	return c.Do(ctx,
 		func(ctx context.Context, s table.Session) error {
-			res, err := s.StreamExecuteScanQuery(ctx, query,
+			res, err := s.StreamExecuteScanQuery(ctx, query, //nolint:staticcheck
 				table.NewQueryParameters(
 					table.ValueParam("$series",
 						types.ListValue(
