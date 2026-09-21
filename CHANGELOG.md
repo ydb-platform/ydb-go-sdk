@@ -1,3 +1,5 @@
+* Sped up repeated creation of transactional Topic multi-writers by reusing cached partition metadata for the same client and topic
+
 ## v3.151.5
 * Fixed unrelated ACKs waking blocked topic writer calls with `WithWriterWaitServerAck(true)`
 

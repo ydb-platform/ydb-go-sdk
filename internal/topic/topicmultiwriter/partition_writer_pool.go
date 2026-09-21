@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
@@ -21,10 +22,10 @@ type partitionWriterPool struct {
 	writers map[int64]*writerWrapper
 	idle    *idleWriterManager
 
-	ackCallback            func(partitionID int64, seqNo int64)
-	partitionSplitCallback func(partitionID int64)
-	onWriterInit           func()
-	onError                func(err error)
+	ackCallback  func(partitionID int64, seqNo int64)
+	source       *partition.Source
+	onWriterInit func()
+	onError      func(err error)
 }
 
 func newPartitionWriterPool(
@@ -33,21 +34,21 @@ func newPartitionWriterPool(
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	bg *background.Worker,
 	ackCallback func(partitionID int64, seqNo int64),
-	partitionSplitCallback func(partitionID int64),
+	source *partition.Source,
 	onWriterInit func(),
 	onError func(err error),
 ) *partitionWriterPool {
 	p := &partitionWriterPool{
-		cfg:                    cfg,
-		writerCfg:              writerCfg,
-		ctx:                    ctx,
-		bg:                     bg,
-		ackCallback:            ackCallback,
-		partitionSplitCallback: partitionSplitCallback,
-		onWriterInit:           onWriterInit,
-		onError:                onError,
-		writers:                make(map[int64]*writerWrapper),
-		idle:                   newIdleWriterManager(ctx, cfg.WriterIdleTimeout),
+		cfg:          cfg,
+		writerCfg:    writerCfg,
+		ctx:          ctx,
+		bg:           bg,
+		ackCallback:  ackCallback,
+		source:       source,
+		onWriterInit: onWriterInit,
+		onError:      onError,
+		writers:      make(map[int64]*writerWrapper),
+		idle:         newIdleWriterManager(ctx, cfg.WriterIdleTimeout),
 	}
 
 	bg.Start("idle-writer-manager", func(ctx context.Context) {
@@ -80,9 +81,7 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 				p.ackCallback(partitionID, seqNo)
 			}),
 			withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
-				if isOperationErrorOverloaded(args.Error) {
-					p.partitionSplitCallback(partitionID)
-
+				if p.source.NotifySessionError(p.ctx, partitionID, args.Error) != nil {
 					return topic.PublicRetryDecisionStop
 				}
 
@@ -116,77 +115,60 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 	return wr, nil
 }
 
-func (p *partitionWriterPool) createNonDirectWriter(partitionID int64) (writer, error) {
+// readSeqNo uses a temporary session outside the working pool. Its errors return to the caller,
+// which may report a split hint to Source after the session has closed.
+func (p *partitionWriterPool) readSeqNo(ctx context.Context, partitionID int64, active bool) (int64, error) {
 	writerCfg := *p.writerCfg
 	writerCfg.MultiMode = true
 	topicwriterinternal.WithProducerID(p.getProducerID(partitionID))(&writerCfg)
-	writer, err := p.cfg.writersFactory.Create(writerCfg)
+	if active {
+		topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID))(&writerCfg)
+		topicwriterinternal.WithDirectWrite(p.cfg.DirectWrite)(&writerCfg)
+	}
+	// Initialization owns retries; a seqNo session returns its own errors without split handling.
+	writerCfg.RetrySettings.CheckError = func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+		return topic.PublicRetryDecisionStop
+	}
 
-	return writer, err
+	wr, err := p.cfg.writersFactory.Create(writerCfg)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = wr.Close(ctx) }()
+
+	info, err := wr.WaitInitInfo(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return info.LastSeqNum, nil
 }
 
-func (p *partitionWriterPool) get(partitionID int64, direct bool) (*writerWrapper, error) {
+func (p *partitionWriterPool) get(partitionID int64) (*writerWrapper, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	finish := func() (*writerWrapper, error) {
-		return p.createNewWriter(partitionID, direct)
-	}
-
-	existingWriter, ok := p.writers[partitionID]
-	if ok {
-		if existingWriter.direct != direct {
-			p.forceEvictNeedLock(partitionID)
-
-			return finish()
-		}
-
+	if existingWriter, ok := p.writers[partitionID]; ok {
 		return existingWriter, nil
 	}
 
-	idleWriter, ok := p.idle.getWriterIfExists(partitionID)
-	if ok {
-		if idleWriter.direct != direct {
-			_ = idleWriter.Close(p.ctx)
-
-			return finish()
-		}
-
+	if idleWriter, ok := p.idle.getWriterIfExists(partitionID); ok {
 		p.writers[partitionID] = idleWriter
 
 		return idleWriter, nil
 	}
 
-	return finish()
+	return p.createNewWriter(partitionID)
 }
 
-func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*writerWrapper, error) {
-	var (
-		wr  writer
-		err error
-	)
-
-	if direct {
-		wr, err = p.createDirectWriter(partitionID)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		wr, err = p.createNonDirectWriter(partitionID)
-		if err != nil {
-			return nil, err
-		}
+func (p *partitionWriterPool) createNewWriter(partitionID int64) (*writerWrapper, error) {
+	wr, err := p.createDirectWriter(partitionID)
+	if err != nil {
+		return nil, err
 	}
 
-	wrapper := &writerWrapper{
-		writer: wr,
-		direct: direct,
-	}
+	wrapper := &writerWrapper{writer: wr}
 	p.writers[partitionID] = wrapper
-	if !direct {
-		return wrapper, nil
-	}
-
 	p.bg.Start(fmt.Sprintf("writer-init-%d", partitionID), func(ctx context.Context) {
 		_, err := wr.WaitInitInfo(ctx)
 		wrapper.setInitErr(err)
@@ -199,10 +181,17 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 }
 
 func (p *partitionWriterPool) forceEvict(partitionID int64) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.forceEvictNeedLock(partitionID)
+	var writer *writerWrapper
+	p.mu.WithLock(func() {
+		writer = p.writers[partitionID]
+		delete(p.writers, partitionID)
+		if writer == nil {
+			writer, _ = p.idle.getWriterIfExists(partitionID)
+		}
+	})
+	if writer != nil {
+		_ = writer.Close(p.ctx)
+	}
 }
 
 func (p *partitionWriterPool) evict(partitionID int64) {
@@ -215,25 +204,8 @@ func (p *partitionWriterPool) evict(partitionID int64) {
 	}
 
 	delete(p.writers, partitionID)
-
-	if !writer.direct {
-		_ = writer.Close(p.ctx)
-
-		return
-	}
-
 	p.idle.addWriter(partitionID, writer)
 	p.idle.wakeup()
-}
-
-func (p *partitionWriterPool) forceEvictNeedLock(partitionID int64) {
-	writer, ok := p.writers[partitionID]
-	if !ok {
-		return
-	}
-
-	delete(p.writers, partitionID)
-	_ = writer.Close(p.ctx)
 }
 
 func (p *partitionWriterPool) close(ctx context.Context) error {

@@ -5,20 +5,21 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
 type sender struct {
-	ctx                    context.Context //nolint:containedctx
-	wakeupChan             empty.Chan
-	onError                func(err error)
-	partitionSplitReceiver *partitionSplitReceiver
-	buf                    *inflightBuffer
-	mu                     *xsync.Mutex
-	partitions             map[int64]*PartitionInfo
-	writerPool             *partitionWriterPool
+	ctx        context.Context //nolint:containedctx
+	wakeupChan empty.Chan
+	onError    func(err error)
+	source     *partition.Source
+	buf        *inflightBuffer
+	mu         *xsync.Mutex
+	partitions map[int64]*PartitionInfo
+	writerPool *partitionWriterPool
 }
 
 func newSender(
@@ -27,18 +28,18 @@ func newSender(
 	mu *xsync.Mutex,
 	buf *inflightBuffer,
 	writerPool *partitionWriterPool,
-	partitionSplitReceiver *partitionSplitReceiver,
+	source *partition.Source,
 	onError func(err error),
 ) *sender {
 	return &sender{
-		ctx:                    ctx,
-		wakeupChan:             make(empty.Chan, 1),
-		onError:                onError,
-		buf:                    buf,
-		mu:                     mu,
-		partitions:             partitions,
-		writerPool:             writerPool,
-		partitionSplitReceiver: partitionSplitReceiver,
+		ctx:        ctx,
+		wakeupChan: make(empty.Chan, 1),
+		onError:    onError,
+		buf:        buf,
+		mu:         mu,
+		partitions: partitions,
+		writerPool: writerPool,
+		source:     source,
 	}
 }
 
@@ -67,9 +68,9 @@ func (s *sender) wakeup() {
 
 //nolint:funlen
 func (s *sender) iterateThroughMessagesIndex(
+	partitions *partition.Partitions,
 	index map[int64]xlist.List[messagePtr],
-	stopFunc func(msg messagePtr) bool,
-	ignorePartitionLock bool,
+	resend bool,
 ) error {
 	var partitionsToRemove []int64
 
@@ -82,11 +83,12 @@ func (s *sender) iterateThroughMessagesIndex(
 				return fmt.Errorf("partition not found: %d", msg.PartitionID)
 			}
 
-			if (!ignorePartitionLock && partition.Locked) || stopFunc(iter.Value) {
+			canSend := s.canSendNeedLock(partitions, msg.PartitionID, resend)
+			if !canSend {
 				break
 			}
 
-			wr, err := s.writerPool.get(msg.PartitionID, true)
+			wr, err := s.writerPool.get(msg.PartitionID)
 			if err != nil {
 				return fmt.Errorf("failed to get writer: %w", err)
 			}
@@ -96,8 +98,8 @@ func (s *sender) iterateThroughMessagesIndex(
 			}
 
 			if err := wr.getInitErr(); err != nil {
-				if isOperationErrorOverloaded(err) {
-					s.partitionSplitReceiver.push(partitionID)
+				if s.source.NotifySessionError(s.ctx, partitionID, err) != nil {
+					partition.Locked = true
 
 					break
 				}
@@ -109,8 +111,8 @@ func (s *sender) iterateThroughMessagesIndex(
 				s.ctx,
 				[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
 			); err != nil {
-				if isOperationErrorOverloaded(err) {
-					s.partitionSplitReceiver.push(partitionID)
+				if s.source.NotifySessionError(s.ctx, partitionID, err) != nil {
+					partition.Locked = true
 
 					break
 				}
@@ -141,40 +143,45 @@ func (s *sender) iterateThroughMessagesIndex(
 	return nil
 }
 
-func (s *sender) step() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	checkPartitionLocked := func(partitionID int64) bool {
-		partition, ok := s.partitions[partitionID]
-		if !ok {
-			return true
-		}
-
-		return partition.Locked
+// canSendNeedLock combines shared topology with this writer's outstanding messages.
+func (s *sender) canSendNeedLock(partitions *partition.Partitions, partitionID int64, resend bool) bool {
+	state := s.partitions[partitionID]
+	if state.Locked {
+		return false
+	}
+	topicPartition := partitions.ByPartitionID(partitionID)
+	if !topicPartition.IsActive() {
+		return false
 	}
 
-	if err := s.iterateThroughMessagesIndex(
-		s.buf.messagesToResendIndex,
-		func(msg messagePtr) bool {
-			return checkPartitionLocked(msg.Value.PartitionID)
-		},
-		true,
-	); err != nil {
+	// Source may publish a new route before this writer receives its split event.
+	// Neither resends nor new messages may overtake outstanding messages of a parent.
+	for _, parent := range topicPartition.Parents() {
+		if pending, ok := s.buf.inFlightMessagesIndex[parent.ID()]; ok && pending.Len() > 0 {
+			return false
+		}
+	}
+	if resend {
+		return true
+	}
+
+	_, hasResends := s.buf.messagesToResendIndex[partitionID]
+
+	return state.PendingResend == 0 && !hasResends
+}
+
+func (s *sender) step() error {
+	partitions, err := s.source.Partitions(s.ctx)
+	if err != nil {
 		return err
 	}
 
-	return s.iterateThroughMessagesIndex(
-		s.buf.pendingMessagesIndex,
-		func(msg messagePtr) bool {
-			if checkPartitionLocked(msg.Value.PartitionID) {
-				return true
-			}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-			_, ok := s.buf.messagesToResendIndex[msg.Value.PartitionID]
+	if err := s.iterateThroughMessagesIndex(partitions, s.buf.messagesToResendIndex, true); err != nil {
+		return err
+	}
 
-			return ok
-		},
-		false,
-	)
+	return s.iterateThroughMessagesIndex(partitions, s.buf.pendingMessagesIndex, false)
 }

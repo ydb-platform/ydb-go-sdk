@@ -114,6 +114,8 @@ func (s *DescribeWithSplitsState) GetDescription() topictypes.TopicDescription {
 	for _, p := range s.base.Partitions {
 		pi := p
 		if split, ok := s.splits[p.PartitionID]; ok {
+			// DescribeTopic reports a split parent as inactive once its active children appear.
+			pi.Active = false
 			pi.ChildPartitionIDs = []int64{split.child1, split.child2}
 		}
 		out.Partitions = append(out.Partitions, pi)

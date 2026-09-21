@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
 	internalmultiwriter "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
@@ -35,6 +36,8 @@ type Client struct {
 	cred                   credentials.Credentials
 	defaultOperationParams rawydb.OperationParams
 	rawClient              rawtopic.Client
+
+	partitionSources *partition.Sources
 }
 
 func New(
@@ -50,12 +53,19 @@ func New(
 	var defaultOperationParams rawydb.OperationParams
 	topic.OperationParamsFromConfig(&defaultOperationParams, &cfg.Common)
 
-	return &Client{
+	c := &Client{
 		cfg:                    cfg,
 		cred:                   cred,
 		defaultOperationParams: defaultOperationParams,
 		rawClient:              rawClient,
 	}
+	c.partitionSources = partition.NewSources(
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return c.Describe(ctx, path)
+		},
+	)
+
+	return c
 }
 
 func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
@@ -384,10 +394,12 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 	if ok && mwCfg != nil {
 		cfg.MultiMode = true
 
+		// Start each non-transactional multi-writer with freshly loaded partition metadata.
+		source := c.partitionSources.Get(cfg.Topic())
+		source.Invalidate()
+
 		internal, err := internalmultiwriter.NewMultiWriter(
-			func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-				return c.Describe(ctx, path)
-			},
+			source,
 			&cfg,
 			mwCfg,
 		)
@@ -426,10 +438,9 @@ func (c *Client) StartTransactionalWriter(
 	if ok && mwCfg != nil {
 		cfg.MultiMode = true
 
+		// Reuse partition metadata across frequently created transactional writers.
 		multiwriter, err := internalmultiwriter.NewMultiWriter(
-			func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-				return c.Describe(ctx, path)
-			},
+			c.partitionSources.Get(cfg.Topic()),
 			&cfg,
 			mwCfg,
 		)

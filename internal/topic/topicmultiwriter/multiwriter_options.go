@@ -3,6 +3,7 @@ package topicmultiwriter
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 )
 
@@ -16,7 +17,7 @@ func WithProducerIDPrefix(prefix string) PublicMultiWriterOption {
 	}
 }
 
-func WithCustomPartitionChooser(customPartitionChooser PartitionChooser) PublicPartitionChooserOption {
+func WithCustomPartitionChooser(customPartitionChooser partition.Chooser) PublicPartitionChooserOption {
 	return func(cfg *MultiWriterConfig) {
 		cfg.PartitionChooser = customPartitionChooser
 	}
@@ -42,15 +43,15 @@ func WithWriterPartitionByPartitionID() PublicMultiWriterOption {
 	}
 }
 
-func KafkaHashPartitionChooser() PartitionChooser {
+func KafkaHashPartitionChooser() partition.Chooser {
 	return partitionchooser.NewHashPartitionChooser()
 }
 
-func BoundPartitionChooser(options ...partitionchooser.BoundPartitionChooserOption) PartitionChooser {
+func BoundPartitionChooser(options ...partitionchooser.BoundPartitionChooserOption) partition.Chooser {
 	return partitionchooser.NewBoundPartitionChooser(options...)
 }
 
-func WithWriterPartitionByKey(partitionChooser PartitionChooser) PublicPartitionChooserOption {
+func WithWriterPartitionByKey(partitionChooser partition.Chooser) PublicPartitionChooserOption {
 	return func(cfg *MultiWriterConfig) {
 		cfg.PartitionChooser = partitionChooser
 	}

@@ -1138,17 +1138,17 @@ func runTestWithAutoPartitioning(t testing.TB, scope *scopeT) {
 
 type customPartitionChooser struct{}
 
-// ChoosePartition implements [topicmultiwriter.PartitionChooser].
+// ChoosePartition implements the partition chooser interface.
 func (c *customPartitionChooser) ChoosePartition(msg topicwriter.Message) (int64, error) {
 	return 1, nil
 }
 
-// AddNewPartitions implements [topicmultiwriter.PartitionChooser].
+// AddNewPartitions implements the partition chooser interface.
 func (c *customPartitionChooser) AddNewPartitions(partitions ...topictypes.PartitionInfo) error {
 	return nil
 }
 
-// RemovePartition implements [topicmultiwriter.PartitionChooser].
+// RemovePartition implements the partition chooser interface.
 func (c *customPartitionChooser) RemovePartition(partitionID int64) {}
 
 func TestTopicMultiWriter_WithCustomPartitioning(t *testing.T) {
