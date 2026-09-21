@@ -536,6 +536,60 @@ func TestQueue_WaitWokenOnOwnMessageAck(t *testing.T) {
 	require.NoError(t, waitQueueResult(t, done1))
 }
 
+func TestQueue_WaitForPartiallyInvalidAckBatch(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		invalidSeqNo int64
+	}{
+		{name: "Duplicate", invalidSeqNo: 1},
+		{name: "Unexpected", invalidSeqNo: 3},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			q := newMessageQueue()
+			w1, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(1))
+			require.NoError(t, err)
+			w2, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(2))
+			require.NoError(t, err)
+
+			ctx1 := &queueWaitContext{Context: t.Context(), waiting: make(empty.Chan, 1)}
+			ctx2 := &queueWaitContext{Context: t.Context(), waiting: make(empty.Chan, 1)}
+			done1 := make(chan error, 1)
+			done2 := make(chan error, 1)
+			go func() { done1 <- q.Wait(ctx1, w1) }()
+			go func() { done2 <- q.Wait(ctx2, w2) }()
+			requireQueueWaitStarted(t, ctx1)
+			requireQueueWaitStarted(t, ctx2)
+			acked2 := waitForMessageAckChannel(t, &q, 2)
+
+			var receivedCount int
+			q.OnAckReceived = func(count int) { receivedCount += count }
+			var ackedSeqNos []int64
+			q.AckCallback = func(seqNo int64) { ackedSeqNos = append(ackedSeqNos, seqNo) }
+
+			require.ErrorIs(t, q.AcksReceived([]rawtopicwriter.WriteAck{
+				{SeqNo: 1},
+				{SeqNo: test.invalidSeqNo},
+			}), errAckUnexpectedMessage)
+
+			require.NoError(t, waitQueueResult(t, done1))
+			require.Equal(t, 1, receivedCount)
+			require.Equal(t, []int64{1}, ackedSeqNos)
+			requireAckChannelOpen(t, acked2)
+			select {
+			case <-done2:
+				t.Fatal("waiter of the not-acked message returned early")
+			default:
+			}
+
+			closeErr := errors.New("queue closed after invalid ack")
+			require.NoError(t, q.Close(closeErr))
+			require.ErrorIs(t, waitQueueResult(t, done2), closeErr)
+			require.Equal(t, 2, receivedCount)
+			require.Equal(t, []int64{1}, ackedSeqNos)
+		})
+	}
+}
+
 func TestQueue_WaitForBatch(t *testing.T) {
 	for _, reverse := range []bool{false, true} {
 		t.Run(fmt.Sprintf("ReverseAcks=%v", reverse), func(t *testing.T) {
