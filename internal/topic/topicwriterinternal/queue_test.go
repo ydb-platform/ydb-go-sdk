@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"runtime"
 	"runtime/debug"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -686,6 +687,87 @@ func TestQueue_WaitInterrupted(t *testing.T) {
 	})
 }
 
+func TestQueue_WaitWithAckAndInterruptionBeforeSelect(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		closeQueue bool
+		ackFirst   bool
+	}{
+		{name: "AckThenCancel", ackFirst: true},
+		{name: "CancelThenAck"},
+		{name: "AckThenClose", closeQueue: true, ackFirst: true},
+		{name: "CloseThenAck", closeQueue: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			q := newMessageQueue()
+			waiter, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(1))
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(t.Context())
+			resume := make(empty.Chan)
+			resumeWait := sync.OnceFunc(func() { close(resume) })
+			waitCtx := &queueWaitContext{Context: ctx, waiting: make(empty.Chan, 1), resume: resume}
+			waitDone := make(chan error, 1)
+			finished := make(empty.Chan)
+			go func() {
+				defer close(finished)
+				waitDone <- q.Wait(waitCtx, waiter)
+			}()
+			t.Cleanup(func() {
+				cancel()
+				resumeWait()
+				select {
+				case <-finished:
+				case <-time.After(queueWaitTestTimeout):
+					t.Error("queue waiter did not stop during cleanup")
+				}
+			})
+			requireQueueWaitStarted(t, waitCtx)
+			acked := waitForMessageAckChannel(t, &q, 1)
+
+			interruptionErr := context.Canceled
+			interrupted := ctx.Done()
+			interrupt := cancel
+			if test.closeQueue {
+				interruptionErr = errors.New("queue closed")
+				interrupted = q.closedChan
+				interrupt = func() { require.NoError(t, q.Close(interruptionErr)) }
+			}
+			if !test.ackFirst {
+				interrupt()
+			}
+			ackErr := q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 1}})
+			if test.ackFirst {
+				interrupt()
+			}
+
+			ackRejected := test.closeQueue && !test.ackFirst
+			if ackRejected {
+				require.ErrorIs(t, ackErr, errAckOnClosedMessageQueue)
+				requireAckChannelOpen(t, acked)
+			} else {
+				require.NoError(t, ackErr)
+				select {
+				case <-acked:
+				default:
+					t.Fatal("ack notification is not ready before resuming Wait")
+				}
+			}
+			select {
+			case <-interrupted:
+			default:
+				t.Fatal("interruption is not ready before resuming Wait")
+			}
+
+			resumeWait()
+			waitErr := waitQueueResult(t, waitDone)
+			if ackRejected || waitErr != nil {
+				require.ErrorIs(t, waitErr, interruptionErr)
+			}
+		})
+	}
+}
+
 func TestQueue_WaitInterruptionRaceWithAck(t *testing.T) {
 	t.Run("ContextCanceled", func(t *testing.T) {
 		for range 20 {
@@ -797,12 +879,16 @@ type queueWaitContext struct {
 	context.Context //nolint:containedctx // Decorate Done to synchronize the test with Wait.
 
 	waiting empty.Chan
+	resume  empty.ChanReadonly // When set, hold Done until the test releases Wait.
 }
 
 func (c *queueWaitContext) Done() <-chan struct{} {
 	select {
 	case c.waiting <- empty.Struct{}:
 	default:
+	}
+	if c.resume != nil {
+		<-c.resume
 	}
 
 	return c.Context.Done()
