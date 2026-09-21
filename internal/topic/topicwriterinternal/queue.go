@@ -33,9 +33,8 @@ type messageQueue struct {
 	OnAckReceived func(count int)
 	AckCallback   func(seqNo int64)
 
-	hasNewMessages    empty.Chan
-	closedErr         error
-	acksReceivedEvent xsync.EventBroadcast
+	hasNewMessages empty.Chan
+	closedErr      error
 
 	m                         xsync.RWMutex
 	stopReceiveMessagesReason error
@@ -45,13 +44,20 @@ type messageQueue struct {
 	lastSentIndex             int
 	lastSeqNo                 int64
 
-	messagesByOrder map[int]messageWithDataContent
+	messagesByOrder map[int]*queuedMessage
 	seqNoToOrderID  map[int64]int
+}
+
+type queuedMessage struct {
+	messageWithDataContent
+
+	// acked is created on the first Wait and shared by all waiters of this message.
+	acked empty.Chan
 }
 
 func newMessageQueue() messageQueue {
 	return messageQueue{
-		messagesByOrder: make(map[int]messageWithDataContent),
+		messagesByOrder: make(map[int]*queuedMessage),
 		seqNoToOrderID:  make(map[int64]int),
 		hasNewMessages:  make(empty.Chan, 1),
 		closedChan:      make(empty.Chan),
@@ -140,7 +146,7 @@ func (q *messageQueue) addMessageNeedLock(
 		panic(fmt.Errorf("ydb: bad internal state os message queue - already exists with index: %v", messageIndex))
 	}
 
-	q.messagesByOrder[messageIndex] = mess
+	q.messagesByOrder[messageIndex] = &queuedMessage{messageWithDataContent: mess}
 	q.seqNoToOrderID[mess.SeqNo] = messageIndex
 	q.lastSeqNo = mess.SeqNo
 
@@ -172,8 +178,6 @@ func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
 		ackReceivedCounter++
 	}
 
-	q.acksReceivedEvent.Broadcast()
-
 	return nil
 }
 
@@ -183,6 +187,9 @@ func (q *messageQueue) ackReceivedNeedLock(seqNo int64) error {
 		return xerrors.WithStackTrace(errAckUnexpectedMessage)
 	}
 
+	if acked := q.messagesByOrder[orderID].acked; acked != nil {
+		close(acked)
+	}
 	delete(q.seqNoToOrderID, seqNo)
 	delete(q.messagesByOrder, orderID)
 
@@ -300,7 +307,7 @@ func (q *messageQueue) getMessagesForSendWithLock() []messageWithDataContent {
 		// msg may be unexisted if it already has ack from server
 		// pass
 		if msg, ok := q.messagesByOrder[q.lastSentIndex]; ok {
-			res = append(res, msg)
+			res = append(res, msg.messageWithDataContent)
 		}
 	}
 
@@ -312,34 +319,33 @@ func (q *messageQueue) Wait(ctx context.Context, waiter MessageQueueAckWaiter) e
 		return err
 	}
 
-	ctxDone := ctx.Done()
 	for {
-		ackReceived := q.acksReceivedEvent.Waiter()
-
-		hasWaited := false
-		q.m.WithRLock(func() {
+		var acked empty.ChanReadonly
+		q.m.WithLock(func() {
 			for len(waiter.sequenseNumbers) > 0 {
-				checkMessageIndex := waiter.sequenseNumbers[0]
-				if _, ok := q.messagesByOrder[checkMessageIndex]; ok {
-					hasWaited = true
+				index := waiter.sequenseNumbers[0]
+				if msg, ok := q.messagesByOrder[index]; ok {
+					if msg.acked == nil {
+						msg.acked = make(empty.Chan)
+					}
+					acked = msg.acked
 
 					return
 				}
 				waiter.sequenseNumbers = waiter.sequenseNumbers[1:]
 			}
 		})
-
-		if !hasWaited {
+		if acked == nil {
 			return nil
 		}
 
 		select {
-		case <-ctxDone:
+		case <-ctx.Done():
 			return ctx.Err()
 		case <-q.closedChan:
 			return q.closedErr
-		case <-ackReceived.Done():
-			// pass next iteration
+		case <-acked:
+			// Check the remaining messages.
 		}
 	}
 }
