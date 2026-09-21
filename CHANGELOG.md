@@ -1,3 +1,6 @@
+* Fixed data races in table-topic transactions by materializing transactions when creating topic writers and keeping transaction IDs unchanged afterwards
+* Added `topic.Client.StartTransactionalWriterContext` to control transaction materialization with a context; deprecated `StartTransactionalWriter` in favor of it
+
 ## v3.151.4
 * Fixed a data race when a streaming response contains a YDB operation error: trailers are read only after the underlying gRPC receive returns EOF or an error; stopping on a YDB operation error alone does not deliver trailer callbacks or server close hints
 

@@ -106,7 +106,7 @@ func StartTransactionalWriterAcrossPartitions(
 	tx query.TxActor,
 	topicPath string,
 ) (*topicwriter.TxWriter, error) {
-	w, err := db.Topic().StartTransactionalWriter(tx, topicPath,
+	w, err := db.Topic().StartTransactionalWriterContext(ctx, tx, topicPath,
 		topicoptions.WithWriteToManyPartitions(
 			topicoptions.WithProducerIDPrefix("docs-example-tx"),
 

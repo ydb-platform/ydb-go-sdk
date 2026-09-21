@@ -3,6 +3,7 @@ package topicclientinternal
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"google.golang.org/grpc"
@@ -407,7 +408,17 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 	return topicwriter.NewWriter(writer), nil
 }
 
+// Deprecated: Use StartTransactionalWriterContext.
 func (c *Client) StartTransactionalWriter(
+	transaction tx.Identifier,
+	topicPath string,
+	opts ...topicoptions.WriterOption,
+) (*topicwriter.TxWriter, error) {
+	return c.StartTransactionalWriterContext(context.Background(), transaction, topicPath, opts...)
+}
+
+func (c *Client) StartTransactionalWriterContext(
+	ctx context.Context,
 	transaction tx.Identifier,
 	topicPath string,
 	opts ...topicoptions.WriterOption,
@@ -415,6 +426,10 @@ func (c *Client) StartTransactionalWriter(
 	internalTx, ok := transaction.(tx.Transaction)
 	if !ok {
 		return nil, xerrors.WithStackTrace(errUnsupportedTransactionType)
+	}
+
+	if err := internalTx.UnLazy(ctx); err != nil {
+		return nil, fmt.Errorf("ydb: failed to materialize transaction: %w", err)
 	}
 
 	cfg := c.createWriterConfig(topicPath, opts)

@@ -76,10 +76,25 @@ type Client interface {
 	// it is fast non block call, connection starts in background
 	StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error)
 
-	// StartTransactionalWriter start writer for write messages within transaction
+	// StartTransactionalWriter starts a writer within a transaction using context.Background().
+	//
+	// Deprecated: Use StartTransactionalWriterContext to control transaction materialization with a context.
+	// Deprecated policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+	// Experimental policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+	StartTransactionalWriter(
+		tx tx.Identifier,
+		topicpath string,
+		opts ...topicoptions.WriterOption,
+	) (*topicwriter.TxWriter, error)
+
+	// StartTransactionalWriterContext materializes the transaction before creating a writer.
+	// Create writers for a transaction sequentially before using them concurrently.
+	// The context controls transaction materialization; subsequent writer operations
+	// use their own contexts.
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	StartTransactionalWriter(
+	StartTransactionalWriterContext(
+		ctx context.Context,
 		tx tx.Identifier,
 		topicpath string,
 		opts ...topicoptions.WriterOption,

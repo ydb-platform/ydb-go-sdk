@@ -16,6 +16,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -146,7 +147,7 @@ func TestTopicWriterTLI(t *testing.T) {
 		scope.Require.NoError(row.Scan(&cnt))
 		fmt.Println("table items count", cnt)
 
-		txWriter, err := scope.Driver().Topic().StartTransactionalWriter(tx, scope.TopicPath())
+		txWriter, err := scope.Driver().Topic().StartTransactionalWriterContext(ctx, tx, scope.TopicPath())
 		scope.Require.NoError(err)
 
 		err = txWriter.Write(ctx, topicwriter.Message{Data: strings.NewReader("test")})
@@ -188,11 +189,13 @@ func TestTopicTransactionalWriterWithLazyTx(t *testing.T) {
 
 	const payload = "lazy-tx-writer"
 	err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-		writer, err := db.Topic().StartTransactionalWriter(tx, scope.TopicPath(),
+		writer, err := db.Topic().StartTransactionalWriterContext(ctx, tx, scope.TopicPath(),
 			topicoptions.WithWriterWaitServerAck(true))
 		if err != nil {
 			return fmt.Errorf("start transactional writer: %w", err)
 		}
+
+		require.NotEqual(t, baseTx.LazyTxID, tx.ID())
 
 		err = writer.Write(ctx, topicwriter.Message{Data: strings.NewReader(payload)})
 		if err != nil {
@@ -221,7 +224,7 @@ func TestTopicTransactionalMultiWriterWithLazyTx(t *testing.T) {
 
 	const payload = "lazy-tx-multi-writer"
 	err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-		writer, err := db.Topic().StartTransactionalWriter(tx, scope.TopicPath(),
+		writer, err := db.Topic().StartTransactionalWriterContext(ctx, tx, scope.TopicPath(),
 			topicoptions.WithWriterWaitServerAck(true),
 			topicoptions.WithWriteToManyPartitions(
 				topicoptions.WithProducerIDPrefix("lazy-tx-multi"),
@@ -230,6 +233,8 @@ func TestTopicTransactionalMultiWriterWithLazyTx(t *testing.T) {
 		if err != nil {
 			return fmt.Errorf("start transactional writer: %w", err)
 		}
+
+		require.NotEqual(t, baseTx.LazyTxID, tx.ID())
 
 		err = writer.Write(ctx, topicwriter.Message{
 			Data: strings.NewReader(payload),
@@ -251,6 +256,74 @@ func TestTopicTransactionalMultiWriterWithLazyTx(t *testing.T) {
 	require.Equal(t, payload, string(content))
 }
 
+func TestTopicTransactionalWritersInitializeBeforeWrite(t *testing.T) {
+	for _, legacy := range []bool{false, true} {
+		t.Run(fmt.Sprintf("Legacy=%v", legacy), func(t *testing.T) {
+			scope := newScope(t)
+			ctx := scope.Ctx
+			db := scope.Driver()
+			reader := scope.TopicReader()
+
+			const writerCount = 2
+
+			err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+				require.Equal(t, baseTx.LazyTxID, tx.ID())
+
+				writers := make([]*topicwriter.TxWriter, 0, writerCount)
+				for i := range writerCount {
+					var writer *topicwriter.TxWriter
+					var err error
+					producer := topicoptions.WithWriterProducerID(fmt.Sprintf("tx-writer-%d", i))
+
+					if legacy {
+						//nolint:staticcheck // Verify the deprecated method remains safe for lazy transactions.
+						writer, err = db.Topic().StartTransactionalWriter(tx, scope.TopicPath(), producer)
+					} else {
+						startCtx, cancel := context.WithCancel(ctx)
+						writer, err = db.Topic().StartTransactionalWriterContext(startCtx, tx, scope.TopicPath(), producer)
+						cancel() // The creation context must not control subsequent writes.
+					}
+					if err != nil {
+						return err
+					}
+
+					require.NotEqual(t, baseTx.LazyTxID, tx.ID())
+					writers = append(writers, writer)
+				}
+
+				writeErrors := make(chan error, writerCount)
+				for i, writer := range writers {
+					go func() {
+						writeErrors <- writer.Write(ctx, topicwriter.Message{Data: strings.NewReader(strconv.Itoa(i))})
+					}()
+				}
+
+				// Query responses must not mutate the ID shared by the writers.
+				queryErr := tx.Exec(ctx, "SELECT 1")
+				for range writerCount {
+					if err := <-writeErrors; err != nil && queryErr == nil {
+						queryErr = err
+					}
+				}
+
+				return queryErr
+			}, query.WithLazyTx(true))
+			require.NoError(t, err)
+
+			var payloads []string
+			for range writerCount {
+				message, err := reader.ReadMessage(ctx)
+				require.NoError(t, err)
+				payload, err := io.ReadAll(message)
+				require.NoError(t, err)
+				payloads = append(payloads, string(payload))
+			}
+
+			require.ElementsMatch(t, []string{"0", "1"}, payloads)
+		})
+	}
+}
+
 func TestWriteInTransaction(t *testing.T) {
 	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "25.0") {
 		t.Skip("require enables transactions for topics")
@@ -270,7 +343,7 @@ func TestWriteInTransaction(t *testing.T) {
 		transactionsCount := 0
 		for {
 			err := driver.Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
-				writer, err := driver.Topic().StartTransactionalWriter(tx, scope.TopicPath())
+				writer, err := driver.Topic().StartTransactionalWriterContext(ctx, tx, scope.TopicPath())
 				if err != nil {
 					return err
 				}
@@ -310,7 +383,7 @@ func TestWriteInTransaction(t *testing.T) {
 		testErr := errors.New("test")
 		for {
 			err := driver.Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
-				writer, err := driver.Topic().StartTransactionalWriter(tx, scope.TopicPath())
+				writer, err := driver.Topic().StartTransactionalWriterContext(ctx, tx, scope.TopicPath())
 				if err != nil {
 					return err
 				}
@@ -357,7 +430,8 @@ func TestWriteInTransactionMultiWriter(t *testing.T) {
 		transactionsCount := 0
 		for {
 			err := driver.Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
-				writer, err := driver.Topic().StartTransactionalWriter(
+				writer, err := driver.Topic().StartTransactionalWriterContext(
+					ctx,
 					tx,
 					scope.TopicPath(),
 					topicoptions.WithWriterSetAutoSeqNo(true),
@@ -408,7 +482,8 @@ func TestWriteInTransactionMultiWriter(t *testing.T) {
 		testErr := errors.New("test")
 		for {
 			err := driver.Query().DoTx(scope.Ctx, func(ctx context.Context, tx query.TxActor) error {
-				writer, err := driver.Topic().StartTransactionalWriter(
+				writer, err := driver.Topic().StartTransactionalWriterContext(
+					ctx,
 					tx,
 					scope.TopicPath(),
 					topicoptions.WithWriterSetAutoSeqNo(true),
