@@ -43,6 +43,8 @@ func (r *commitRequest) Confirm() {
 // Wait starts the commit if needed, then waits for the send result and ACK.
 // Canceling ctx stops only this wait: another caller can keep waiting without
 // sending the commit again. An already committed range is not sent again.
+// A missing partition session is treated as expired because there is no live
+// session to commit to.
 func (r *commitRequest) Wait(ctx context.Context) error {
 	if !r.committer.mode.CommitsEnabled() {
 		return xerrors.WithStackTrace(ErrCommitDisabled)

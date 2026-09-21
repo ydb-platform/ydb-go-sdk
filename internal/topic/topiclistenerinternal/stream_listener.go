@@ -130,11 +130,6 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 	select {
 	case <-done:
 		return l.shutdownErr
-	default:
-	}
-	select {
-	case <-done:
-		return l.shutdownErr
 	case <-ctx.Done():
 		select {
 		case <-done:
@@ -229,7 +224,6 @@ func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	}
 }
 
-//nolint:funlen
 func (l *streamListener) initStream(ctx context.Context, client TopicClient) error {
 	streamCtx, streamClose := context.WithCancelCause(xcontext.ValueOnly(ctx))
 	l.streamClose = streamClose
@@ -269,16 +263,6 @@ func (l *streamListener) initStream(ctx context.Context, client TopicClient) err
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: failed to receive init response for read stream in the listener: %w",
 			err,
-		)))
-	}
-
-	if status := resp.StatusData(); !status.Status.IsSuccess() {
-		// wrap initialization error as operation status error - for handle with retrier
-		// https://github.com/ydb-platform/ydb-go-sdk/issues/1361
-		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
-			"ydb: received bad status on init the topic stream listener: %v (%v)",
-			status.Status,
-			status.Issues,
 		)))
 	}
 
