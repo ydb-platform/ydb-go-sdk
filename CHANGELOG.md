@@ -1,3 +1,4 @@
+## v3.151.5
 * Fixed unrelated ACKs waking blocked topic writer calls with `WithWriterWaitServerAck(true)`
 
 ## v3.151.4
