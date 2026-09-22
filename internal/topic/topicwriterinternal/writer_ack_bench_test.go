@@ -20,9 +20,9 @@ import (
 // cpu: Apple M3 Pro; Go 1.24.0; medians of 6 runs
 // go test -run='^$' -bench=BenchmarkWriterConcurrentSyncWriteSingleACK -benchtime=3s -cpu=4 .
 //
-// BenchmarkWriterConcurrentSyncWriteSingleACK/inflight=1-4       3480.5 ns/op    2120 B/op    34 allocs/op
-// BenchmarkWriterConcurrentSyncWriteSingleACK/inflight=250-4    78407.5 ns/op    2133 B/op    34 allocs/op
-// BenchmarkWriterConcurrentSyncWriteSingleACK/inflight=900-4   293480.5 ns/op    2138 B/op    34 allocs/op
+// BenchmarkWriterConcurrentSyncWriteSingleACK/inflight=1-4       3424.0 ns/op    2120 B/op    34 allocs/op
+// BenchmarkWriterConcurrentSyncWriteSingleACK/inflight=250-4     3829.5 ns/op    2120 B/op    34 allocs/op
+// BenchmarkWriterConcurrentSyncWriteSingleACK/inflight=900-4     4175.0 ns/op    2120 B/op    34 allocs/op
 func BenchmarkWriterConcurrentSyncWriteSingleACK(b *testing.B) {
 	for _, concurrency := range []int{1, 250, 900} {
 		b.Run(fmt.Sprintf("inflight=%d", concurrency), func(b *testing.B) {

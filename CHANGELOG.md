@@ -1,5 +1,8 @@
 * Deprecated `table.Session.StreamExecuteScanQuery`, use the query service client (`db.Query()`) instead
 
+## v3.151.5
+* Fixed unrelated ACKs waking blocked topic writer calls with `WithWriterWaitServerAck(true)`
+
 ## v3.151.4
 * Fixed a data race when a streaming response contains a YDB operation error: trailers are read only after the underlying gRPC receive returns EOF or an error; stopping on a YDB operation error alone does not deliver trailer callbacks or server close hints
 
