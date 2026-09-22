@@ -295,9 +295,35 @@ func replacementPublished(partitions *Partitions, partitionID int64) bool {
 	if !ok || parent.IsActive() || len(parent.info.ChildPartitionIDs) == 0 {
 		return false
 	}
+	path := map[int64]struct{}{partitionID: {}}
 	for _, childID := range parent.info.ChildPartitionIDs {
-		child, ok := partitions.find(childID)
-		if !ok || !child.IsActive() {
+		if !replacementBranchPublished(partitions, childID, path) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func replacementBranchPublished(partitions *Partitions, partitionID int64, path map[int64]struct{}) bool {
+	partition, ok := partitions.find(partitionID)
+	if !ok {
+		return false
+	}
+	if partition.IsActive() {
+		return true
+	}
+	if len(partition.info.ChildPartitionIDs) == 0 {
+		return false
+	}
+	if _, ok = path[partitionID]; ok {
+		return false
+	}
+	path[partitionID] = struct{}{}
+	defer delete(path, partitionID)
+
+	for _, childID := range partition.info.ChildPartitionIDs {
+		if !replacementBranchPublished(partitions, childID, path) {
 			return false
 		}
 	}

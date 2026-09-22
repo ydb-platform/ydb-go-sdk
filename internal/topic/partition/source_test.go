@@ -357,6 +357,22 @@ func TestSourceNotifySessionErrorHandlesAlreadyPublishedReplacement(t *testing.T
 	assert.NoError(t, waitForReplacement(t.Context()))
 }
 
+func TestReplacementPublishedThroughInactiveDescendants(t *testing.T) {
+	partitions := partitionsFromDescription(topictypes.TopicDescription{
+		Partitions: []topictypes.PartitionInfo{
+			{PartitionID: 1, ChildPartitionIDs: []int64{2, 3}},
+			{PartitionID: 2, ParentPartitionIDs: []int64{1}, ChildPartitionIDs: []int64{4, 5}},
+			{PartitionID: 3, ParentPartitionIDs: []int64{1}, ChildPartitionIDs: []int64{6, 7}},
+			{PartitionID: 4, ParentPartitionIDs: []int64{2}, Active: true},
+			{PartitionID: 5, ParentPartitionIDs: []int64{2}, Active: true},
+			{PartitionID: 6, ParentPartitionIDs: []int64{3}, Active: true},
+			{PartitionID: 7, ParentPartitionIDs: []int64{3}, Active: true},
+		},
+	})
+
+	assert.True(t, replacementPublished(partitions, 1))
+}
+
 func TestSourceNotifySessionErrorRejectsUnrelatedError(t *testing.T) {
 	source := NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
 

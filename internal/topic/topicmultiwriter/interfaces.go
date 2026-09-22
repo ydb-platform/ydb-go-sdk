@@ -3,6 +3,7 @@ package topicmultiwriter
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 )
@@ -16,3 +17,5 @@ type writer interface {
 type writersFactory interface {
 	Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error)
 }
+
+type PartitionChooser partition.Chooser
