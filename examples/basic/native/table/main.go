@@ -62,11 +62,6 @@ func main() {
 		panic(fmt.Errorf("select simple error: %w", err))
 	}
 
-	err = querySelect(ctx, db.Query(), prefix)
-	if err != nil {
-		panic(fmt.Errorf("query select error: %w", err))
-	}
-
 	err = readTable(ctx, db.Table(), path.Join(prefix, "series"))
 	if err != nil {
 		panic(fmt.Errorf("read table error: %w", err))

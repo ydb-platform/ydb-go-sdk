@@ -3,14 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
-	"io"
 	"log"
 	"path"
 	"text/template"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
@@ -242,65 +238,6 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 			return res.Err()
 		},
 	)
-}
-
-func querySelect(ctx context.Context, c query.Client, prefix string) error {
-	sql := render(
-		template.Must(template.New("").Parse(`
-			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-
-			SELECT series_id, season_id, title, CAST(CAST(first_aired AS Date) AS Bytes) AS first_aired
-			FROM seasons
-			WHERE series_id IN $series
-		`)),
-		templateConfig{
-			TablePathPrefix: prefix,
-		},
-	)
-
-	resultSet, err := c.QueryResultSet(ctx, sql,
-		query.WithParameters(ydb.ParamsBuilder().
-			Param("$series").BeginList().
-			Add().Uint64(1).
-			Add().Uint64(10).
-			EndList().
-			Build(),
-		),
-		query.WithIdempotent(),
-	)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = resultSet.Close(ctx)
-	}()
-
-	log.Print("> query_select:")
-	for {
-		row, err := resultSet.NextRow(ctx)
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return err
-		}
-
-		var v struct {
-			SeriesID   *uint64 `sql:"series_id"`
-			SeasonID   *uint64 `sql:"season_id"`
-			Title      *string `sql:"title"`
-			FirstAired *string `sql:"first_aired"`
-		}
-		if err = row.ScanStruct(&v); err != nil {
-			return err
-		}
-		log.Printf(
-			"#  Season, SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s",
-			*v.SeriesID, *v.SeasonID, *v.Title, *v.FirstAired,
-		)
-	}
-
-	return nil
 }
 
 func fillTablesWithData(ctx context.Context, c table.Client, prefix string) error {
