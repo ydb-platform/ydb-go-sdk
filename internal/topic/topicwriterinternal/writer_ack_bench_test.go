@@ -1,4 +1,4 @@
-package topicwriterinternal
+package topicwriterinternal_test
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -39,13 +40,16 @@ func benchmarkWriterConcurrentSyncWriteSingleACK(b *testing.B, concurrency int) 
 		responses:  make(chan rawtopicwriter.ServerMessage, 1),
 		closed:     make(chan struct{}),
 	}
-	writer, err := NewWriterReconnector(NewWriterReconnectorConfig(
-		WithTopic("benchmark-topic"),
-		WithProducerID("benchmark-producer"),
-		WithCodec(rawtopiccommon.CodecRaw),
-		WithWaitAckOnWrite(true),
-		WithMaxQueueLen(concurrency),
-		WithConnectFunc(func(context.Context, *trace.Topic) (RawTopicWriterStream, error) {
+	writer, err := topicwriterinternal.NewWriterReconnector(topicwriterinternal.NewWriterReconnectorConfig(
+		topicwriterinternal.WithTopic("benchmark-topic"),
+		topicwriterinternal.WithProducerID("benchmark-producer"),
+		topicwriterinternal.WithCodec(rawtopiccommon.CodecRaw),
+		topicwriterinternal.WithWaitAckOnWrite(true),
+		topicwriterinternal.WithMaxQueueLen(concurrency),
+		topicwriterinternal.WithConnectFunc(func(context.Context, *trace.Topic) (
+			topicwriterinternal.RawTopicWriterStream,
+			error,
+		) {
 			return stream, nil
 		}),
 	))
@@ -55,7 +59,7 @@ func benchmarkWriterConcurrentSyncWriteSingleACK(b *testing.B, concurrency int) 
 	b.Cleanup(func() {
 		cancel()
 		_ = stream.CloseSend()
-		_ = writer.close(context.Background(), context.Canceled)
+		_ = writer.Close(ctx)
 		workers.Wait()
 	})
 	require.NoError(b, writer.WaitInit(ctx))
@@ -67,7 +71,7 @@ func benchmarkWriterConcurrentSyncWriteSingleACK(b *testing.B, concurrency int) 
 			defer workers.Done()
 			payload := make([]byte, 128)
 			reader := bytes.NewReader(payload)
-			messages := []PublicMessage{{Data: reader}}
+			messages := []topicwriterinternal.PublicMessage{{Data: reader}}
 			for ctx.Err() == nil {
 				reader.Reset(payload)
 				if err := writer.Write(ctx, messages); err != nil {
