@@ -88,6 +88,14 @@ func TestWithListenerBufferSizeBytes(t *testing.T) {
 	require.Equal(t, 42, cfg.BufferSize)
 }
 
+func TestWithListenerStartTimeout(t *testing.T) {
+	cfg := topiclistenerinternal.NewStreamListenerConfig()
+
+	WithListenerStartTimeout(42 * time.Second)(&cfg)
+
+	require.Equal(t, 42*time.Second, cfg.RetrySettings.StartTimeout)
+}
+
 func TestCreateWithMetricsLevel(t *testing.T) {
 	req := &rawtopic.CreateTopicRequest{}
 	CreateWithMetricsLevel(3).ApplyCreateOption(req)

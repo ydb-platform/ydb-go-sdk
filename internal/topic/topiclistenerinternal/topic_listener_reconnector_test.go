@@ -248,6 +248,26 @@ func TestTopicListenerReconnectorStopsRetryingAfterTimeout(t *testing.T) {
 	require.NotErrorIs(t, err, reason, "the expired retry period must prevent another connection attempt")
 }
 
+func TestTopicListenerReconnectorClampsRetryDelayToStartTimeout(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	clock := clockwork.NewFakeClock()
+	timers := make(chan time.Duration, 1)
+	cfg := NewStreamListenerConfig()
+	cfg.clock = &recordingListenerClock{Clock: clock, timers: timers}
+	cfg.RetrySettings.StartTimeout = time.Nanosecond
+	listener := &TopicListenerReconnector{streamConfig: &cfg}
+	finished := make(chan error, 1)
+	go func() {
+		_, err := listener.retryConnect(ctx, status.Error(codes.Unavailable, "connection failed"))
+		finished <- err
+	}()
+
+	delay := xtest.Receive(t, timers, "the clamped reconnect backoff timer")
+	require.LessOrEqual(t, delay, cfg.RetrySettings.StartTimeout)
+	cancel()
+	require.ErrorIs(t, xtest.Receive(t, finished, "the canceled reconnect result"), context.Canceled)
+}
+
 func TestTopicListenerReconnectorZeroStartTimeoutSkipsRetries(t *testing.T) {
 	ctx := xtest.Context(t)
 	cfg := NewStreamListenerConfig()

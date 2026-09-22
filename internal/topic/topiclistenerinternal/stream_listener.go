@@ -635,8 +635,6 @@ func (l *streamListener) onWorkerStopped(
 	// If reason from worker, propagate to streamListener shutdown
 	// But avoid cascading shutdowns for normal lifecycle events like queue closure during shutdown
 	if reason != nil && !l.closing.Load() {
-		// Only propagate reason if we're not already closing
-		// and if it's not a normal queue closure reason (which can happen during shutdown)
 		if !xerrors.Is(reason, errPartitionQueueClosed) {
 			l.beginClose(l.background.Context(), reason)
 		}
