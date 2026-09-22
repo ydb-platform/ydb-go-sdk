@@ -246,7 +246,8 @@ func (c *Conn) execDataQuery(ctx context.Context, sql string, params *params.Par
 func (c *Conn) execScanQuery(ctx context.Context, sql string, params *params.Params) (
 	common.Rows, error,
 ) {
-	res, err := c.session.StreamExecuteScanQuery(ctx, //nolint:staticcheck
+	//nolint:staticcheck
+	res, err := c.session.StreamExecuteScanQuery(ctx,
 		sql, params, c.scanOpts...,
 	)
 	if err != nil {
