@@ -5,7 +5,9 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -26,6 +28,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -540,55 +543,52 @@ func TestBasicExampleTable(sourceTest *testing.T) { //nolint:gocyclo
 		}
 	})
 
-	t.Run("StreamExecuteScanQuery", func(t *testing.T) {
-		query := `
-			PRAGMA TablePathPrefix("` + path.Join(db.Name(), folder) + `");
+	t.Run("Query", func(t *testing.T) {
+		resultSet, err := db.Query().QueryResultSet(ctx, `
+			PRAGMA TablePathPrefix("`+path.Join(db.Name(), folder)+`");
 
 			DECLARE $series AS List<UInt64>;
 
 			SELECT series_id, season_id, title, first_aired
 			FROM seasons
-			WHERE series_id IN $series;`
-		err := db.Table().Do(ctx,
-			func(ctx context.Context, s table.Session) (err error) {
-				var (
-					res      result.StreamResult
-					seriesID uint64
-					seasonID uint64
-					title    string
-					date     time.Time
-				)
-				res, err = s.StreamExecuteScanQuery(ctx, query, //nolint:staticcheck
-					table.NewQueryParameters(
-						table.ValueParam("$series",
-							types.ListValue(
-								types.Uint64Value(1),
-								types.Uint64Value(10),
-							),
-						),
-					),
-				)
-				if err != nil {
-					return err
-				}
-				defer func() {
-					_ = res.Close()
-				}()
-				t.Logf("> scan_query_select:\n")
-				for res.NextResultSet(ctx) {
-					for res.NextRow() {
-						err = res.ScanWithDefaults(&seriesID, &seasonID, &title, &date)
-						if err != nil {
-							return err
-						}
-						t.Logf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s\n", seriesID, seasonID, title, date)
-					}
-				}
-				return res.Err()
-			},
-			table.WithIdempotent(),
+			WHERE series_id IN $series;`,
+			query.WithParameters(ydb.ParamsBuilder().
+				Param("$series").BeginList().
+				Add().Uint64(1).
+				Add().Uint64(10).
+				EndList().
+				Build(),
+			),
+			query.WithIdempotent(),
 		)
 		require.NoError(t, err)
+		defer func() {
+			_ = resultSet.Close(ctx)
+		}()
+
+		t.Logf("> query_select:\n")
+		for {
+			row, err := resultSet.NextRow(ctx)
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			require.NoError(t, err)
+
+			var v struct {
+				SeriesID   *uint64    `sql:"series_id"`
+				SeasonID   *uint64    `sql:"season_id"`
+				Title      *string    `sql:"title"`
+				FirstAired *time.Time `sql:"first_aired"`
+			}
+			err = row.ScanStruct(&v)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Logf(
+				"  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s\n",
+				*v.SeriesID, *v.SeasonID, *v.Title, *v.FirstAired,
+			)
+		}
 	})
 
 	t.Run("StreamReadTable", func(t *testing.T) {

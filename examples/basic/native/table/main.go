@@ -62,9 +62,9 @@ func main() {
 		panic(fmt.Errorf("select simple error: %w", err))
 	}
 
-	err = scanQuerySelect(ctx, db.Table(), prefix)
+	err = querySelect(ctx, db.Query(), prefix)
 	if err != nil {
-		panic(fmt.Errorf("scan query select error: %w", err))
+		panic(fmt.Errorf("query select error: %w", err))
 	}
 
 	err = readTable(ctx, db.Table(), path.Join(prefix, "series"))
