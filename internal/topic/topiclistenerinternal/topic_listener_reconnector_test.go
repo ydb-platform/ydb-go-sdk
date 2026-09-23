@@ -273,6 +273,43 @@ func TestTopicListenerReconnectorUsesStandardInstantBackoff(t *testing.T) {
 	}
 }
 
+func TestTopicListenerReconnectorRetryCallbackPreservesInstantBackoff(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+	backoffCalls := make(chan int, 1)
+	cfg := NewStreamListenerConfig()
+	setListenerRetryBackoff(&cfg, listenerTestBackoff{delay: time.Hour, calls: backoffCalls})
+	cfg.CheckError = func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+		return topic.PublicRetryDecisionRetry
+	}
+	listener := &TopicListenerReconnector{
+		streamConfig: &cfg,
+		client:       freshStreamTopicClient{},
+	}
+	type connectResult struct {
+		stream *streamListener
+		err    error
+	}
+	result := make(chan connectResult, 1)
+	go func() {
+		stream, err := listener.retryConnect(ctx, instantListenerRetryError{})
+		result <- connectResult{stream: stream, err: err}
+	}()
+
+	select {
+	case attempt := <-backoffCalls:
+		cancel()
+		_ = xtest.Receive(t, result, "the canceled reconnect result")
+		t.Fatalf("retry callback replaced instant backoff at attempt %d", attempt)
+	case res := <-result:
+		require.NoError(t, res.err)
+		require.NotNil(t, res.stream)
+		require.NoError(t, res.stream.Close(xtest.Context(t), ErrUserCloseTopic))
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for the instant reconnect")
+	}
+}
+
 func TestTopicListenerReconnectorRetriesEOF(t *testing.T) {
 	ctx := xtest.Context(t)
 	cfg := NewStreamListenerConfig()

@@ -196,12 +196,13 @@ func (lr *TopicListenerReconnector) asRetryError(reason error) error {
 
 		return retryReason
 	case topic.PublicRetryDecisionRetry:
-		backoffType := retry.Check(retryReason).BackoffType()
-		if backoffType != retry.TypeFastBackoff {
-			backoffType = retry.TypeSlowBackoff
+		if retry.Check(retryReason).MustRetry(true) {
+			return retryReason
 		}
 
-		return retry.RetryableError(retryReason, retry.WithBackoff(backoffType))
+		// A forced retry has no applicable backoff from the standard policy.
+		// Use slow backoff to avoid a tight reconnect loop.
+		return retry.RetryableError(retryReason, retry.WithBackoff(retry.TypeSlowBackoff))
 	case topic.PublicRetryDecisionStop:
 		return listenerRetryStopError{reason: fmt.Errorf(
 			"ydb: topic listener unretriable error by check error callback: %w", reason,
