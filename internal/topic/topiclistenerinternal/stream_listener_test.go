@@ -3,6 +3,7 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
@@ -901,6 +903,102 @@ func TestStreamListenerUnexpectedWorkerStopClosesListener(t *testing.T) {
 	require.Eventually(t, listener.closing.Load, time.Second, time.Millisecond)
 	xtest.WaitChannelClosed(t, listener.background.StopDone())
 	require.ErrorIs(t, listener.background.CloseReason(), errPartitionQueueClosed)
+}
+
+func TestStreamListenerBlockedSendBoundsPendingCommits(t *testing.T) {
+	ctx := xtest.Context(t)
+	const batchCount = 100
+
+	releaseSend := make(chan struct{})
+	sendStarted := make(chan struct{})
+	var sendOnce sync.Once
+	send := func(message rawtopicreader.ClientMessage) error {
+		if _, ok := message.(*rawtopicreader.CommitOffsetRequest); !ok {
+			return nil
+		}
+		sendOnce.Do(func() { close(sendStarted) })
+		<-releaseSend
+
+		return nil
+	}
+
+	handler := NewMockEventHandler(gomock.NewController(t))
+	processed := make(chan struct{}, batchCount)
+	var processedCount atomic.Int64
+	handler.EXPECT().OnReadMessages(gomock.Any(), gomock.Any()).Times(batchCount).DoAndReturn(
+		func(_ context.Context, event *PublicReadMessages) error {
+			event.Confirm()
+			processedCount.Add(1)
+			processed <- struct{}{}
+
+			return nil
+		},
+	)
+	cfg := NewStreamListenerConfig()
+	listener := &streamListener{
+		cfg:         &cfg,
+		streamClose: func(error) {},
+		handler:     handler,
+		tracer:      &trace.Topic{},
+		listenerID:  "test-listener-id",
+		sessionID:   "test-session-id",
+		background:  *background.NewWorker(ctx, "blocked-send-listener"),
+	}
+	listener.initVars(&atomic.Int64{})
+	// Occupy the sole credit slot. Until it is drained, the first processed batch
+	// cannot release its credit and the worker cannot create another commit request.
+	listener.freeBytes <- -1
+	listener.syncCommitter = topicreadercommon.NewCommitterStopped(
+		listener.tracer,
+		listener.background.Context(),
+		topicreadercommon.CommitModeSync,
+		send,
+	)
+	listener.syncCommitter.Start()
+
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(releaseSend) }) }
+	defer func() {
+		unblock()
+		require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
+	}()
+
+	session := createTestPartitionSession()
+	require.NoError(t, listener.sessions.Add(session))
+	worker := listener.createWorkerForPartition(session)
+	require.NotNil(t, worker)
+	metadata := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
+	enqueue := func() {
+		worker.AddMessagesBatch(metadata, createTestBatchWithBufferBytes(t, 1))
+		// Keep adjacent batches separate so each one creates its own commit request.
+		worker.AddRawServerMessage(&rawtopicreader.InitResponse{})
+	}
+
+	enqueue()
+	xtest.Receive(t, processed, "the first processed batch")
+	xtest.WaitChannelClosed(t, sendStarted)
+
+	for range batchCount - 1 {
+		enqueue()
+	}
+	// The full credit channel is a deterministic barrier: the worker cannot leave
+	// the first batch while the commit send and read-ahead path are blocked.
+	require.Equal(t, int64(1), processedCount.Load())
+
+	unblock()
+	creditsDrained := make(chan int, 1)
+	go func() {
+		total := 0
+		for range batchCount + 1 { // initial sentinel plus one credit per batch
+			total += <-listener.freeBytes
+		}
+		creditsDrained <- total
+	}()
+	for range batchCount - 1 {
+		xtest.Receive(t, processed, "a batch after unblocking sends")
+	}
+	require.Equal(t, batchCount-1, xtest.Receive(t, creditsDrained, "all released buffer credits"))
+	require.Equal(t, int64(batchCount), processedCount.Load())
 }
 
 func testTime(num int) time.Time {

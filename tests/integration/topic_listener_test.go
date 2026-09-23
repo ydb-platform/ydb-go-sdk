@@ -120,6 +120,135 @@ func TestTopicListenerStartsPartitionAfterStreamCancellation(t *testing.T) {
 	require.NotEqual(t, first.PartitionSession.PartitionSessionID, second.PartitionSession.PartitionSessionID)
 }
 
+func TestTopicListenerDoesNotReplayAcknowledgedMessageAfterReconnect(t *testing.T) {
+	scope := newScope(t)
+	stopper := NewGrpcStopper(status.Error(codes.Canceled, "stream interrupted"))
+	scope.Driver(ydb.With(config.WithGrpcOptions(
+		grpc.WithStreamInterceptor(stopper.StreamClientInterceptor),
+	)))
+	require.NoError(t, scope.TopicWriter().Write(scope.Ctx,
+		topicwriter.Message{Data: strings.NewReader("first")},
+	))
+
+	type readResult struct {
+		content string
+		err     error
+	}
+	partitionStarts := make(chan *topiclistener.EventStartPartitionSession, 2)
+	reads := make(chan readResult, 2)
+	listener := scope.TopicListener(&TestTopicListener_Handler{
+		onStartPartitionSessionRequest: func(ctx context.Context, event *topiclistener.EventStartPartitionSession) error {
+			event.Confirm()
+			select {
+			case partitionStarts <- event:
+			case <-ctx.Done():
+			}
+
+			return nil
+		},
+		onReadMessages: func(ctx context.Context, event *topiclistener.ReadMessages) error {
+			data, err := io.ReadAll(event.Batch.Messages[0])
+			if err == nil {
+				err = event.ConfirmWithAck(ctx)
+			}
+			select {
+			case reads <- readResult{content: string(data), err: err}:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+
+			return err
+		},
+	}, topicoptions.WithListenerBufferSizeBytes(1))
+	require.NoError(t, listener.WaitInit(xtest.ContextWithCommonTimeout(scope.Ctx, t)))
+	firstSession := xtest.Receive(t, partitionStarts, "the initial partition session")
+	firstRead := xtest.Receive(t, reads, "the acknowledged message")
+	require.NoError(t, firstRead.err)
+	require.Equal(t, "first", firstRead.content)
+
+	stopper.StopOnce()
+	secondSession := xtest.Receive(t, partitionStarts, "the partition session after reconnect")
+	require.NotEqual(t,
+		firstSession.PartitionSession.PartitionSessionID,
+		secondSession.PartitionSession.PartitionSessionID,
+	)
+
+	require.NoError(t, scope.TopicWriter().Write(scope.Ctx,
+		topicwriter.Message{Data: strings.NewReader("second")},
+	))
+	secondRead := xtest.Receive(t, reads, "the message after reconnect")
+	require.NoError(t, secondRead.err)
+	require.Equal(t, "second", secondRead.content, "the acknowledged message must not be replayed")
+}
+
+func TestTopicListenerReplaysUnacknowledgedMessageAndContinuesAfterReconnect(t *testing.T) {
+	scope := newScope(t)
+	stopper := NewGrpcStopper(status.Error(codes.Canceled, "stream interrupted"))
+	scope.Driver(ydb.With(config.WithGrpcOptions(
+		grpc.WithStreamInterceptor(stopper.StreamClientInterceptor),
+	)))
+	require.NoError(t, scope.TopicWriter().Write(scope.Ctx,
+		topicwriter.Message{Data: strings.NewReader("first")},
+	))
+
+	type readResult struct {
+		event   *topiclistener.ReadMessages
+		content string
+		err     error
+	}
+	partitionStarts := make(chan *topiclistener.EventStartPartitionSession, 2)
+	reads := make(chan readResult, 3)
+	var deliveryCount atomic.Int32
+	listener := scope.TopicListener(&TestTopicListener_Handler{
+		onStartPartitionSessionRequest: func(ctx context.Context, event *topiclistener.EventStartPartitionSession) error {
+			event.Confirm()
+			select {
+			case partitionStarts <- event:
+			case <-ctx.Done():
+			}
+
+			return nil
+		},
+		onReadMessages: func(ctx context.Context, event *topiclistener.ReadMessages) error {
+			data, err := io.ReadAll(event.Batch.Messages[0])
+			if err == nil && deliveryCount.Add(1) > 1 {
+				err = event.ConfirmWithAck(ctx)
+			}
+			select {
+			case reads <- readResult{event: event, content: string(data), err: err}:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+
+			return err
+		},
+	}, topicoptions.WithListenerBufferSizeBytes(1))
+	require.NoError(t, listener.WaitInit(xtest.ContextWithCommonTimeout(scope.Ctx, t)))
+	firstSession := xtest.Receive(t, partitionStarts, "the initial partition session")
+	firstRead := xtest.Receive(t, reads, "the unacknowledged message")
+	require.NoError(t, firstRead.err)
+	require.Equal(t, "first", firstRead.content)
+
+	stopper.StopOnce()
+	xtest.WaitChannelClosed(t, firstRead.event.Batch.Context().Done())
+	secondSession := xtest.Receive(t, partitionStarts, "the partition session after reconnect")
+	require.NotEqual(t,
+		firstSession.PartitionSession.PartitionSessionID,
+		secondSession.PartitionSession.PartitionSessionID,
+	)
+
+	replayed := xtest.Receive(t, reads, "the replayed unacknowledged message")
+	require.NoError(t, replayed.err)
+	require.Equal(t, "first", replayed.content)
+
+	require.NoError(t, scope.TopicWriter().Write(scope.Ctx,
+		topicwriter.Message{Data: strings.NewReader("second")},
+	))
+	next := xtest.Receive(t, reads, "the next message after replay")
+	require.NoError(t, next.err)
+	require.Equal(t, "second", next.content)
+}
+
 // Session cancellation must stop OnReadMessages calls for queued messages.
 func TestTopicListenerDoesNotDeliverQueuedMessagesAfterCancellation(t *testing.T) {
 	scope := newScope(t)
