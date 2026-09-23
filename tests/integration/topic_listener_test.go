@@ -473,8 +473,7 @@ func TestTopicListenerCustomRetryPolicyRestartsPartition(t *testing.T) {
 	))
 	first := xtest.Receive(t, partitionStarts, "the initial partition session")
 
-	stopper.Stop()
-	stopper.Start()
+	stopper.StopOnce()
 
 	require.ErrorIs(t, xtest.Receive(t, checkedErrors, "the retry policy callback"), streamErr)
 	second := xtest.Receive(t, partitionStarts, "the partition session after the custom retry")
