@@ -108,7 +108,7 @@ func newStreamListener(
 		func(message rawtopicreader.ClientMessage) error {
 			err := res.stream.Send(message)
 			if err != nil {
-				res.beginClose(res.background.Context(), err)
+				res.goClose(res.background.Context(), err)
 			}
 
 			return err
@@ -125,7 +125,7 @@ func newStreamListener(
 }
 
 func (l *streamListener) Close(ctx context.Context, reason error) error {
-	done := l.beginClose(ctx, reason)
+	done := l.goClose(ctx, reason)
 	select {
 	case <-done:
 		return l.shutdownErr
@@ -139,12 +139,12 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 	}
 }
 
-// beginClose starts shutdown exactly once and returns the channel shared by all
+// goClose starts shutdown exactly once and returns the channel shared by all
 // callers waiting for its completion. It must remain non-blocking because listener
 // and partition-worker goroutines call it, while finishClose waits for those same
 // goroutines to stop. The first caller supplies the shutdown reason; later callers
 // only observe the already-started shutdown.
-func (l *streamListener) beginClose(ctx context.Context, reason error) empty.Chan {
+func (l *streamListener) goClose(ctx context.Context, reason error) empty.Chan {
 	return xsync.WithLock(&l.m, func() empty.Chan {
 		if l.closing.CompareAndSwap(false, true) {
 			l.shutdownDone = make(empty.Chan)
@@ -327,7 +327,7 @@ func (l *streamListener) flushPendingMessages(ctx context.Context) {
 					"message_type=%s, message_index=%d, total_messages=%d: %w",
 				messageType, i, len(messages), err,
 			)))
-			l.beginClose(ctx, reason)
+			l.goClose(ctx, reason)
 
 			return
 		}
@@ -379,7 +379,7 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 
 			gtrace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, "", 0, err)
 			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
-			l.beginClose(ctx, xerrors.WithStackTrace(xerrors.Wrap(
+			l.goClose(ctx, xerrors.WithStackTrace(xerrors.Wrap(
 				fmt.Errorf("ydb: failed read message from the stream in the topic reader listener: %w", err),
 			)))
 
@@ -396,7 +396,7 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 
 		if err := l.routeMessage(ctx, mess); err != nil {
 			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
-			l.beginClose(ctx, err)
+			l.goClose(ctx, err)
 		}
 	}
 }
@@ -624,7 +624,7 @@ func (l *streamListener) onWorkerStopped(
 	l.m.WithLock(func() {
 		delete(l.workers, sessionID)
 	})
-	l.beginClose(l.background.Context(), reason)
+	l.goClose(l.background.Context(), reason)
 
 	// Remove corresponding session
 	for _, session := range l.sessions.GetAll() {

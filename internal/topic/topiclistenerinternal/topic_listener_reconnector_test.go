@@ -42,7 +42,7 @@ func TestTopicListenerReconnectorReplacesCanceledStream(t *testing.T) {
 	require.NotNil(t, first)
 
 	streamErr := status.Error(codes.Canceled, "Cancelled on the server side")
-	first.beginClose(ctx, streamErr)
+	first.goClose(ctx, streamErr)
 	xtest.WaitChannelClosed(t, first.background.StopDone())
 	require.ErrorIs(t, first.background.CloseReason(), streamErr)
 
@@ -70,7 +70,7 @@ func TestTopicListenerReconnectorStopsOnStreamError(t *testing.T) {
 	streamListener := listener.streamListener
 	listener.m.Unlock()
 	streamErr := errors.New("message handler failed")
-	streamListener.beginClose(ctx, streamErr)
+	streamListener.goClose(ctx, streamErr)
 
 	require.ErrorIs(t, listener.WaitStop(xtest.ContextWithCommonTimeout(ctx, t)), streamErr)
 	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
@@ -149,7 +149,7 @@ func TestTopicListenerReconnectorWaitsForBackoff(t *testing.T) {
 	listener.m.Lock()
 	first := listener.streamListener
 	listener.m.Unlock()
-	first.beginClose(ctx, status.Error(codes.Canceled, "Cancelled on the server side"))
+	first.goClose(ctx, status.Error(codes.Canceled, "Cancelled on the server side"))
 
 	delay := xtest.Receive(t, timers, "the reconnect backoff timer")
 	if delay > 0 {
@@ -187,7 +187,7 @@ func TestTopicListenerReconnectorResetsRetryTimeoutAfterSuccessfulReconnect(t *t
 	listener.m.Lock()
 	first := listener.streamListener
 	listener.m.Unlock()
-	first.beginClose(ctx, status.Error(codes.Unavailable, "first stream interrupted"))
+	first.goClose(ctx, status.Error(codes.Unavailable, "first stream interrupted"))
 	clock.Advance(xtest.Receive(t, timers, "the first reconnect backoff timer"))
 
 	var second *streamListener
@@ -200,7 +200,7 @@ func TestTopicListenerReconnectorResetsRetryTimeoutAfterSuccessfulReconnect(t *t
 	}, time.Second, time.Millisecond, "the first stream must be replaced")
 
 	clock.Advance(cfg.RetrySettings.StartTimeout + time.Nanosecond)
-	second.beginClose(ctx, status.Error(codes.Unavailable, "second stream interrupted"))
+	second.goClose(ctx, status.Error(codes.Unavailable, "second stream interrupted"))
 	clock.Advance(xtest.Receive(t, timers, "the second reconnect backoff timer"))
 
 	require.Eventually(t, func() bool {
@@ -330,7 +330,7 @@ func TestTopicListenerReconnectorCloseDuringBackoff(t *testing.T) {
 	listener.m.Lock()
 	first := listener.streamListener
 	listener.m.Unlock()
-	first.beginClose(ctx, status.Error(codes.Canceled, "stream interrupted"))
+	first.goClose(ctx, status.Error(codes.Canceled, "stream interrupted"))
 	_ = xtest.Receive(t, timers, "the reconnect backoff timer")
 
 	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
@@ -536,7 +536,7 @@ func TestTopicListenerReconnectorWaitsForCloseTraceBeforeReconnect(t *testing.T)
 	listener.m.Lock()
 	first := listener.streamListener
 	listener.m.Unlock()
-	first.beginClose(ctx, status.Error(codes.Unavailable, "stream interrupted"))
+	first.goClose(ctx, status.Error(codes.Unavailable, "stream interrupted"))
 	_ = xtest.Receive(t, traceDoneStarted, "the stream close trace callback")
 	select {
 	case <-timers:
@@ -571,7 +571,7 @@ func TestTopicListenerReconnectorCloseTraceCanCallClose(t *testing.T) {
 
 		return nil
 	}
-	stream.beginClose(ctx, status.Error(codes.Unavailable, "stream interrupted"))
+	stream.goClose(ctx, status.Error(codes.Unavailable, "stream interrupted"))
 	require.ErrorIs(t, xtest.Receive(t, traceResult, "Close from the trace hook"), context.DeadlineExceeded)
 	require.NoError(t, listener.WaitStop(xtest.ContextWithCommonTimeout(ctx, t)))
 }
