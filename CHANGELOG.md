@@ -1,5 +1,4 @@
 * Added `topicoptions.WithListenerCheckRetryErrorFunction` to customize the topic listener error retry policy
-* Added `topicoptions.WithListenerStartTimeout` to bound listener connection retries; retriable failures on the first connection now retry until success by default
 * Fixed topic listener recovery, error reporting, closing, and message confirmation after stream failures
 
 ## v3.151.5

@@ -3,7 +3,6 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
 var (
@@ -151,52 +151,15 @@ func (lr *TopicListenerReconnector) stopWithError(ctx context.Context, reason er
 }
 
 func (lr *TopicListenerReconnector) retryConnect(ctx context.Context, reason error) (*streamListener, error) {
-	clock := lr.streamConfig.clock
-	started := clock.Now()
+	firstAttempt := true
+	retryOptions := append([]retry.Option{}, lr.streamConfig.retryOptions...)
+	retryOptions = append(retryOptions, retry.WithIdempotent(true))
 
-	for attempt := 0; ; attempt++ {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		if clock.Since(started) >= lr.streamConfig.RetrySettings.StartTimeout {
-			return nil, listenerRetryTimeout(reason)
-		}
-		retryReason := reason
-		retrySettings := lr.streamConfig.RetrySettings
-		if transportErr := xerrors.TransportError(reason); transportErr != nil {
-			retryReason = transportErr
-			if checkError := retrySettings.CheckError; checkError != nil {
-				retrySettings.CheckError = func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
-					args.Error = reason
+	return retry.RetryWithResult(ctx, func(ctx context.Context) (*streamListener, error) {
+		if firstAttempt {
+			firstAttempt = false
 
-					return checkError(args)
-				}
-			}
-		}
-		backoff, stopReason := topic.RetryDecision(retryReason, retrySettings, clock.Since(started))
-		if stopReason != nil {
-			if !errors.Is(stopReason, reason) {
-				stopReason = errors.Join(stopReason, reason)
-			}
-
-			return nil, stopReason
-		}
-
-		delay := backoff.Delay(attempt)
-		if remaining := retrySettings.StartTimeout - clock.Since(started); delay > remaining {
-			delay = remaining
-		}
-		timer := clock.NewTimer(delay)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-
-			return nil, ctx.Err()
-		case <-timer.Chan():
-			timer.Stop()
-		}
-		if elapsed := clock.Since(started); elapsed >= lr.streamConfig.RetrySettings.StartTimeout {
-			return nil, listenerRetryTimeout(reason)
+			return nil, lr.asRetryError(reason)
 		}
 
 		sl, err := lr.connectStream(ctx)
@@ -204,13 +167,73 @@ func (lr *TopicListenerReconnector) retryConnect(ctx context.Context, reason err
 			return sl, nil
 		}
 		reason = err
-	}
+
+		return nil, lr.asRetryError(reason)
+	}, retryOptions...)
 }
 
-func listenerRetryTimeout(reason error) error {
-	return xerrors.WithStackTrace(fmt.Errorf(
-		"ydb: topic listener reconnection timeout, last error: %w", xerrors.Unretryable(reason),
-	))
+// asRetryError adapts the topic retry policy to the standard retryer. Transport
+// errors drive classification, while the user callback still receives the full
+// listener error with its surrounding context.
+func (lr *TopicListenerReconnector) asRetryError(reason error) error {
+	retryReason := reason
+	retrySettings := topic.RetrySettings{
+		StartTimeout: topic.DefaultStartTimeout,
+		CheckError:   lr.streamConfig.CheckError,
+	}
+	hasTransportError := false
+	if transportErr := xerrors.TransportError(reason); transportErr != nil {
+		retryReason = transportErr
+		hasTransportError = true
+		if checkError := retrySettings.CheckError; checkError != nil {
+			retrySettings.CheckError = func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+				args.Error = reason
+
+				return checkError(args)
+			}
+		}
+	}
+	_, stopReason := topic.RetryDecision(retryReason, retrySettings, 0)
+	if stopReason != nil {
+		if !errors.Is(stopReason, reason) {
+			stopReason = errors.Join(stopReason, reason)
+		}
+
+		return listenerRetryStopError{reason: stopReason}
+	}
+
+	retryError := reason
+	if hasTransportError {
+		retryError = errors.Join(retryReason, reason)
+	}
+	backoffType := retry.Check(retryReason).BackoffType()
+	if backoffType != retry.TypeFastBackoff {
+		backoffType = retry.TypeSlowBackoff
+	}
+
+	return retry.RetryableError(retryError, retry.WithBackoff(backoffType))
+}
+
+// listenerRetryStopError preserves the original error identity and status while
+// hiding its retry metadata from retry.Check after the topic policy decides to stop.
+type listenerRetryStopError struct {
+	reason error
+}
+
+func (e listenerRetryStopError) Error() string {
+	return e.reason.Error()
+}
+
+func (e listenerRetryStopError) Is(target error) bool {
+	return errors.Is(e.reason, target)
+}
+
+func (e listenerRetryStopError) As(target any) bool {
+	if _, ok := target.(*xerrors.Error); ok {
+		return false
+	}
+
+	return errors.As(e.reason, target)
 }
 
 func (lr *TopicListenerReconnector) connectStream(ctx context.Context) (*streamListener, error) {

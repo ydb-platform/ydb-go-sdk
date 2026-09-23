@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
@@ -23,6 +22,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -133,49 +133,11 @@ func TestTopicListenerReconnectorRetriesFailedCommitSend(t *testing.T) {
 	}, 2*time.Second, time.Millisecond)
 }
 
-func TestTopicListenerReconnectorWaitsForBackoff(t *testing.T) {
+func TestTopicListenerReconnectorAppliesStreamErrorBeforeReconnect(t *testing.T) {
 	ctx := xtest.Context(t)
-	clock := clockwork.NewFakeClock()
-	timers := make(chan time.Duration, 1)
+	backoffCalls := make(chan int, 1)
 	cfg := NewStreamListenerConfig()
-	cfg.clock = &recordingListenerClock{Clock: clock, timers: timers}
-	listener, err := NewTopicListenerReconnector(
-		freshStreamTopicClient{}, &cfg, NewMockEventHandler(gomock.NewController(t)),
-	)
-	require.NoError(t, err)
-	defer func() { _ = listener.Close(ctx, ErrUserCloseTopic) }()
-	require.NoError(t, listener.WaitInit(ctx))
-
-	listener.m.Lock()
-	first := listener.streamListener
-	listener.m.Unlock()
-	first.goClose(ctx, status.Error(codes.Canceled, "Cancelled on the server side"))
-
-	delay := xtest.Receive(t, timers, "the reconnect backoff timer")
-	if delay > 0 {
-		listener.m.Lock()
-		noActiveStream := listener.streamListener == nil
-		listener.m.Unlock()
-		require.True(t, noActiveStream, "the old stream must be retired before backoff")
-		require.Empty(t, listener.ReadSessionID())
-	}
-	clock.Advance(delay)
-
-	require.Eventually(t, func() bool {
-		listener.m.Lock()
-		defer listener.m.Unlock()
-
-		return listener.streamListener != nil && listener.streamListener != first
-	}, time.Second, time.Millisecond, "the stream must be replaced after the backoff expires")
-}
-
-func TestTopicListenerReconnectorResetsRetryTimeoutAfterSuccessfulReconnect(t *testing.T) {
-	ctx := xtest.Context(t)
-	clock := clockwork.NewFakeClock()
-	timers := make(chan time.Duration, 1)
-	cfg := NewStreamListenerConfig()
-	cfg.clock = &recordingListenerClock{Clock: clock, timers: timers}
-	cfg.RetrySettings.StartTimeout = 10 * time.Second
+	setListenerRetryBackoff(&cfg, listenerTestBackoff{delay: time.Hour, calls: backoffCalls})
 	client := &countingStreamTopicClient{}
 	listener, err := NewTopicListenerReconnector(
 		client, &cfg, NewMockEventHandler(gomock.NewController(t)),
@@ -183,32 +145,26 @@ func TestTopicListenerReconnectorResetsRetryTimeoutAfterSuccessfulReconnect(t *t
 	require.NoError(t, err)
 	defer func() { _ = listener.Close(ctx, ErrUserCloseTopic) }()
 	require.NoError(t, listener.WaitInit(ctx))
+	require.EqualValues(t, 1, client.attempts.Load())
 
 	listener.m.Lock()
 	first := listener.streamListener
 	listener.m.Unlock()
-	first.goClose(ctx, status.Error(codes.Unavailable, "first stream interrupted"))
-	clock.Advance(xtest.Receive(t, timers, "the first reconnect backoff timer"))
+	first.goClose(ctx, status.Error(codes.Canceled, "Cancelled on the server side"))
 
-	var second *streamListener
-	require.Eventually(t, func() bool {
-		listener.m.Lock()
-		defer listener.m.Unlock()
-		second = listener.streamListener
+	select {
+	case attempt := <-backoffCalls:
+		require.Zero(t, attempt, "the closed stream error must be the first retry attempt")
+	case <-time.After(time.Second):
+		t.Fatal("the closed stream error was not passed to the standard retry backoff")
+	}
 
-		return second != nil && second != first
-	}, time.Second, time.Millisecond, "the first stream must be replaced")
-
-	clock.Advance(cfg.RetrySettings.StartTimeout + time.Nanosecond)
-	second.goClose(ctx, status.Error(codes.Unavailable, "second stream interrupted"))
-	clock.Advance(xtest.Receive(t, timers, "the second reconnect backoff timer"))
-
-	require.Eventually(t, func() bool {
-		listener.m.Lock()
-		defer listener.m.Unlock()
-
-		return listener.streamListener != nil && listener.streamListener != second
-	}, time.Second, time.Millisecond, "the second stream must get a fresh retry timeout")
+	listener.m.Lock()
+	noActiveStream := listener.streamListener == nil
+	listener.m.Unlock()
+	require.True(t, noActiveStream, "the old stream must be retired before backoff")
+	require.Empty(t, listener.ReadSessionID())
+	require.EqualValues(t, 1, client.attempts.Load(), "reconnect must wait for the seeded error backoff")
 }
 
 func TestTopicListenerReconnectorReadSessionIDHidesClosingStream(t *testing.T) {
@@ -219,83 +175,6 @@ func TestTopicListenerReconnectorReadSessionIDHidesClosingStream(t *testing.T) {
 	require.Empty(t, listener.ReadSessionID())
 }
 
-func TestTopicListenerReconnectorStopsRetryingAfterTimeout(t *testing.T) {
-	ctx := xtest.Context(t)
-	clock := clockwork.NewFakeClock()
-	timers := make(chan time.Duration, 1)
-	cfg := NewStreamListenerConfig()
-	cfg.clock = &recordingListenerClock{Clock: clock, timers: timers}
-	cfg.RetrySettings.StartTimeout = time.Second
-	streamErr := status.Error(codes.Canceled, "Cancelled on the server side")
-	reason := xerrors.WithStackTrace(fmt.Errorf("open stream failed: %w", xerrors.TransportError(streamErr)))
-	listener := &TopicListenerReconnector{
-		streamConfig:        &cfg,
-		client:              freshStreamTopicClient{openError: reason},
-		connectionCompleted: make(chan struct{}),
-	}
-	finished := make(chan error, 1)
-	go func() {
-		_, err := listener.retryConnect(ctx, streamErr)
-		finished <- err
-	}()
-
-	_ = xtest.Receive(t, timers, "the reconnect backoff timer")
-	clock.Advance(cfg.RetrySettings.StartTimeout + time.Nanosecond)
-
-	err := xtest.Receive(t, finished, "the exhausted retry timeout")
-	require.ErrorIs(t, err, streamErr)
-	require.ErrorContains(t, err, "reconnection timeout")
-	require.NotErrorIs(t, err, reason, "the expired retry period must prevent another connection attempt")
-}
-
-func TestTopicListenerReconnectorClampsRetryDelayToStartTimeout(t *testing.T) {
-	ctx, cancel := context.WithCancel(xtest.Context(t))
-	clock := clockwork.NewFakeClock()
-	timers := make(chan time.Duration, 1)
-	cfg := NewStreamListenerConfig()
-	cfg.clock = &recordingListenerClock{Clock: clock, timers: timers}
-	cfg.RetrySettings.StartTimeout = time.Nanosecond
-	listener := &TopicListenerReconnector{streamConfig: &cfg}
-	finished := make(chan error, 1)
-	go func() {
-		_, err := listener.retryConnect(ctx, status.Error(codes.Unavailable, "connection failed"))
-		finished <- err
-	}()
-
-	delay := xtest.Receive(t, timers, "the clamped reconnect backoff timer")
-	require.LessOrEqual(t, delay, cfg.RetrySettings.StartTimeout)
-	cancel()
-	require.ErrorIs(t, xtest.Receive(t, finished, "the canceled reconnect result"), context.Canceled)
-}
-
-func TestTopicListenerReconnectorZeroStartTimeoutSkipsRetries(t *testing.T) {
-	ctx := xtest.Context(t)
-	cfg := NewStreamListenerConfig()
-	clock := clockwork.NewFakeClock()
-	timers := make(chan time.Duration, 1)
-	cfg.clock = &recordingListenerClock{Clock: clock, timers: timers}
-	cfg.RetrySettings.StartTimeout = 0
-	client := &countingStreamTopicClient{}
-	listener := &TopicListenerReconnector{streamConfig: &cfg, client: client}
-	reason := status.Error(codes.Unavailable, "initial connection failed")
-
-	finished := make(chan error, 1)
-	go func() {
-		_, err := listener.retryConnect(ctx, reason)
-		finished <- err
-	}()
-	var err error
-	select {
-	case <-timers:
-		clock.Advance(time.Second)
-		err = xtest.Receive(t, finished, "zero-timeout reconnect result")
-	case err = <-finished:
-	}
-	require.ErrorIs(t, err, reason)
-	require.ErrorContains(t, err, "reconnection timeout")
-	require.Zero(t, client.attempts.Load())
-}
-
 func TestTopicListenerReconnectorRetryCallbackReceivesFullError(t *testing.T) {
 	ctx := xtest.Context(t)
 	cfg := NewStreamListenerConfig()
@@ -303,7 +182,7 @@ func TestTopicListenerReconnectorRetryCallbackReceivesFullError(t *testing.T) {
 		status.Error(codes.Unavailable, "transport failed"),
 	))
 	var seen error
-	cfg.RetrySettings.CheckError = func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+	cfg.CheckError = func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
 		seen = args.Error
 
 		return topic.PublicRetryDecisionStop
@@ -315,11 +194,54 @@ func TestTopicListenerReconnectorRetryCallbackReceivesFullError(t *testing.T) {
 	require.ErrorIs(t, seen, reason)
 }
 
+func TestTopicListenerReconnectorRetryCallbackCanRetryPermanentError(t *testing.T) {
+	ctx := xtest.Context(t)
+	cfg := NewStreamListenerConfig()
+	setListenerRetryBackoff(&cfg, listenerTestBackoff{})
+	reason := status.Error(codes.PermissionDenied, "initial connection failed")
+	cfg.CheckError = func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+		require.ErrorIs(t, args.Error, reason)
+
+		return topic.PublicRetryDecisionRetry
+	}
+	listener := &TopicListenerReconnector{
+		streamConfig: &cfg,
+		client:       freshStreamTopicClient{},
+	}
+
+	stream, err := listener.retryConnect(ctx, reason)
+	require.NoError(t, err)
+	require.NotNil(t, stream)
+	require.NoError(t, stream.Close(ctx, ErrUserCloseTopic))
+}
+
+func TestTopicListenerReconnectorResetsBackoffAfterStatusCodeChange(t *testing.T) {
+	ctx := xtest.Context(t)
+	backoffCalls := make(chan int, 2)
+	cfg := NewStreamListenerConfig()
+	setListenerRetryBackoff(&cfg, listenerTestBackoff{calls: backoffCalls})
+	listener := &TopicListenerReconnector{
+		streamConfig: &cfg,
+		client: &failFirstStreamTopicClient{
+			openError: status.Error(codes.Aborted, "reconnect failed"),
+		},
+	}
+
+	stream, err := listener.retryConnect(ctx, status.Error(codes.Unavailable, "stream interrupted"))
+	require.NoError(t, err)
+	require.NotNil(t, stream)
+	require.NoError(t, stream.Close(ctx, ErrUserCloseTopic))
+	require.Equal(t, []int{0, 0}, []int{
+		xtest.Receive(t, backoffCalls, "the initial stream error backoff"),
+		xtest.Receive(t, backoffCalls, "the changed status code backoff"),
+	})
+}
+
 func TestTopicListenerReconnectorCloseDuringBackoff(t *testing.T) {
 	ctx := xtest.Context(t)
-	timers := make(chan time.Duration, 1)
+	backoffCalls := make(chan int, 1)
 	cfg := NewStreamListenerConfig()
-	cfg.clock = &recordingListenerClock{Clock: clockwork.NewFakeClock(), timers: timers}
+	setListenerRetryBackoff(&cfg, listenerTestBackoff{delay: time.Hour, calls: backoffCalls})
 	listener, err := NewTopicListenerReconnector(
 		freshStreamTopicClient{}, &cfg, NewMockEventHandler(gomock.NewController(t)),
 	)
@@ -331,7 +253,7 @@ func TestTopicListenerReconnectorCloseDuringBackoff(t *testing.T) {
 	first := listener.streamListener
 	listener.m.Unlock()
 	first.goClose(ctx, status.Error(codes.Canceled, "stream interrupted"))
-	_ = xtest.Receive(t, timers, "the reconnect backoff timer")
+	_ = xtest.Receive(t, backoffCalls, "the reconnect backoff")
 
 	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
 	require.NoError(t, listener.WaitStop(ctx))
@@ -451,10 +373,9 @@ func TestTopicListenerReconnectorWaitStopWaitsForReadHandler(t *testing.T) {
 
 func TestTopicListenerReconnectorWaitsForRetiredWorkerBeforeReconnect(t *testing.T) {
 	ctx := xtest.Context(t)
-	clock := clockwork.NewFakeClock()
-	timers := make(chan time.Duration, 1)
+	backoffCalls := make(chan int, 1)
 	cfg := NewStreamListenerConfig()
-	cfg.clock = &recordingListenerClock{Clock: clock, timers: timers}
+	setListenerRetryBackoff(&cfg, listenerTestBackoff{calls: backoffCalls})
 	client := &countingStreamTopicClient{}
 	listener, err := NewTopicListenerReconnector(
 		client, &cfg, NewMockEventHandler(gomock.NewController(t)),
@@ -489,7 +410,7 @@ func TestTopicListenerReconnectorWaitsForRetiredWorkerBeforeReconnect(t *testing
 
 	xtest.WaitChannelClosed(t, first.background.StopDone())
 	select {
-	case <-timers:
+	case <-backoffCalls:
 		t.Fatal("reconnect started before the retired worker finished")
 	case <-time.After(50 * time.Millisecond):
 	}
@@ -497,17 +418,15 @@ func TestTopicListenerReconnectorWaitsForRetiredWorkerBeforeReconnect(t *testing
 
 	close(release)
 	released = true
-	delay := xtest.Receive(t, timers, "the reconnect backoff timer")
-	clock.Advance(delay)
+	_ = xtest.Receive(t, backoffCalls, "the reconnect backoff")
 	require.Eventually(t, func() bool { return client.attempts.Load() == 2 }, time.Second, time.Millisecond)
 }
 
 func TestTopicListenerReconnectorWaitsForCloseTraceBeforeReconnect(t *testing.T) {
 	ctx := xtest.Context(t)
-	clock := clockwork.NewFakeClock()
-	timers := make(chan time.Duration, 1)
+	backoffCalls := make(chan int, 1)
 	cfg := NewStreamListenerConfig()
-	cfg.clock = &recordingListenerClock{Clock: clock, timers: timers}
+	setListenerRetryBackoff(&cfg, listenerTestBackoff{calls: backoffCalls})
 	traceDoneStarted := make(chan struct{}, 1)
 	traceRelease := make(chan struct{})
 	released := false
@@ -539,15 +458,14 @@ func TestTopicListenerReconnectorWaitsForCloseTraceBeforeReconnect(t *testing.T)
 	first.goClose(ctx, status.Error(codes.Unavailable, "stream interrupted"))
 	_ = xtest.Receive(t, traceDoneStarted, "the stream close trace callback")
 	select {
-	case <-timers:
+	case <-backoffCalls:
 		t.Fatal("reconnect started before the close trace callback returned")
 	case <-time.After(50 * time.Millisecond):
 	}
 
 	close(traceRelease)
 	released = true
-	delay := xtest.Receive(t, timers, "the reconnect backoff timer")
-	clock.Advance(delay)
+	_ = xtest.Receive(t, backoffCalls, "the reconnect backoff")
 	require.Eventually(t, func() bool { return client.attempts.Load() == 2 }, time.Second, time.Millisecond)
 }
 
@@ -611,6 +529,7 @@ func TestTopicListenerReconnectorRetriesInitialConnection(t *testing.T) {
 		t.Run(code.String(), func(t *testing.T) {
 			ctx := xtest.Context(t)
 			cfg := NewStreamListenerConfig()
+			setListenerRetryBackoff(&cfg, listenerTestBackoff{})
 			openErr := status.Error(code, "initial connection failed")
 			client := &failFirstStreamTopicClient{openError: openErr}
 			listener, err := NewTopicListenerReconnector(
@@ -630,19 +549,14 @@ func TestTopicListenerReconnectorRetriesInitialConnection(t *testing.T) {
 
 func TestTopicListenerReconnectorRetriesTransientInitialStatus(t *testing.T) {
 	ctx := xtest.Context(t)
-	clock := clockwork.NewFakeClock()
-	timers := make(chan time.Duration, 1)
 	cfg := NewStreamListenerConfig()
-	cfg.clock = &recordingListenerClock{Clock: clock, timers: timers}
+	setListenerRetryBackoff(&cfg, listenerTestBackoff{})
 	client := &failFirstInitStatusTopicClient{status: Ydb.StatusIds_OVERLOADED}
 	listener, err := NewTopicListenerReconnector(
 		client, &cfg, NewMockEventHandler(gomock.NewController(t)),
 	)
 	require.NoError(t, err)
 	defer func() { _ = listener.Close(ctx, ErrUserCloseTopic) }()
-
-	delay := xtest.Receive(t, timers, "the initial status retry backoff timer")
-	clock.Advance(delay)
 
 	require.NoError(t, listener.WaitInit(xtest.ContextWithCommonTimeout(ctx, t)))
 	require.EqualValues(t, 2, client.attempts.Load())
@@ -651,15 +565,15 @@ func TestTopicListenerReconnectorRetriesTransientInitialStatus(t *testing.T) {
 
 func TestTopicListenerReconnectorCloseDuringInitialBackoff(t *testing.T) {
 	ctx := xtest.Context(t)
-	timers := make(chan time.Duration, 1)
+	backoffCalls := make(chan int, 1)
 	cfg := NewStreamListenerConfig()
-	cfg.clock = &recordingListenerClock{Clock: clockwork.NewFakeClock(), timers: timers}
+	setListenerRetryBackoff(&cfg, listenerTestBackoff{delay: time.Hour, calls: backoffCalls})
 	listener, err := NewTopicListenerReconnector(
 		freshStreamTopicClient{openError: status.Error(codes.Canceled, "initial stream interrupted")},
 		&cfg, NewMockEventHandler(gomock.NewController(t)),
 	)
 	require.NoError(t, err)
-	_ = xtest.Receive(t, timers, "the initial reconnect backoff timer")
+	_ = xtest.Receive(t, backoffCalls, "the initial reconnect backoff")
 
 	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
 	require.ErrorIs(t, listener.WaitInit(ctx), context.Canceled)
@@ -677,7 +591,9 @@ func TestTopicListenerReconnectorStopsOnInitialPermanentError(t *testing.T) {
 	defer func() { _ = listener.Close(ctx, ErrUserCloseTopic) }()
 
 	require.ErrorIs(t, listener.WaitInit(xtest.ContextWithCommonTimeout(ctx, t)), openErr)
-	require.ErrorIs(t, listener.WaitStop(xtest.ContextWithCommonTimeout(ctx, t)), openErr)
+	stopErr := listener.WaitStop(xtest.ContextWithCommonTimeout(ctx, t))
+	require.ErrorIs(t, stopErr, openErr)
+	require.Equal(t, codes.PermissionDenied, status.Code(stopErr))
 	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
 }
 
@@ -794,15 +710,22 @@ func (c *failFirstStreamTopicClient) StreamRead(
 	return freshStreamTopicClient{}.StreamRead(ctx, id, tracer)
 }
 
-type recordingListenerClock struct {
-	clockwork.Clock
-
-	timers chan<- time.Duration
+type listenerTestBackoff struct {
+	delay time.Duration
+	calls chan<- int
 }
 
-func (c *recordingListenerClock) NewTimer(delay time.Duration) clockwork.Timer {
-	timer := c.Clock.NewTimer(delay)
-	c.timers <- delay
+func (b listenerTestBackoff) Delay(attempt int) time.Duration {
+	if b.calls != nil {
+		b.calls <- attempt
+	}
 
-	return timer
+	return b.delay
+}
+
+func setListenerRetryBackoff(cfg *StreamListenerConfig, backoff listenerTestBackoff) {
+	cfg.retryOptions = []retry.Option{
+		retry.WithFastBackoff(backoff),
+		retry.WithSlowBackoff(backoff),
+	}
 }
