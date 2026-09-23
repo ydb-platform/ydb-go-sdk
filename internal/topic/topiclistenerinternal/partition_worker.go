@@ -61,7 +61,10 @@ type WorkerStoppedCallback func(sessionID rawtopicreader.PartitionSessionID, rea
 type PartitionWorker struct {
 	partitionSessionID rawtopicreader.PartitionSessionID
 	partitionSession   *topicreadercommon.PartitionSession
-	messageSender      MessageSender
+	messageSender      interface {
+		MessageSender
+		CommitHandler
+	}
 	readBufferReleaser ReadBufferReleaser
 	userHandler        EventHandler
 	onStopped          WorkerStoppedCallback
@@ -78,6 +81,7 @@ type PartitionWorker struct {
 func NewPartitionWorker[T interface {
 	MessageSender
 	ReadBufferReleaser
+	CommitHandler
 }](
 	sessionID rawtopicreader.PartitionSessionID,
 	session *topicreadercommon.PartitionSession,
@@ -353,17 +357,8 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 		return err
 	}
 
-	// Cast messageSender to CommitHandler (it's the streamListener)
-	commitHandler, ok := w.messageSender.(CommitHandler)
-	if !ok {
-		err := xerrors.WithStackTrace(fmt.Errorf("ydb: messageSender does not implement CommitHandler"))
-		traceDone(0, err)
-
-		return err
-	}
-
 	// Call user handler with tracing
-	if err := w.callUserHandler(ctx, msg, commitHandler, messagesCount); err != nil {
+	if err := w.callUserHandler(ctx, msg, w.messageSender, messagesCount); err != nil {
 		traceDone(0, err)
 
 		return err
@@ -466,6 +461,11 @@ func (w *PartitionWorker) handleStopPartitionRequest(
 
 	// Only send response if graceful
 	if m.Graceful {
+		if err := w.messageSender.flushCommits(); err != nil {
+			return xerrors.WithStackTrace(fmt.Errorf(
+				"ydb: failed to flush commits before stopping partition session: %w", err,
+			))
+		}
 		resp := &rawtopicreader.StopPartitionSessionResponse{
 			PartitionSessionID: w.partitionSession.StreamPartitionSessionID,
 		}

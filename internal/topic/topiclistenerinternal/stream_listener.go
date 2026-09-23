@@ -449,6 +449,7 @@ func (l *streamListener) handleStartPartition(
 	worker := l.createWorkerForPartition(session)
 	if worker == nil {
 		_, _ = l.sessions.Remove(session.StreamPartitionSessionID)
+		session.Close()
 
 		return nil
 	}
@@ -523,8 +524,12 @@ func (l *streamListener) onCommitResponse(msg *rawtopicreader.CommitOffsetRespon
 	return nil
 }
 
-func (l *streamListener) newCommitRequest(b *topicreadercommon.PublicBatch) commitRequest {
+func (l *streamListener) newCommitRequest(b *topicreadercommon.PublicBatch) batchCommit {
 	return l.syncCommitter.NewCommitRequest(topicreadercommon.GetCommitRange(b))
+}
+
+func (l *streamListener) flushCommits() error {
+	return l.syncCommitter.Flush()
 }
 
 // collectPendingFreeBytes drains all byte credits already queued in freeBytes after

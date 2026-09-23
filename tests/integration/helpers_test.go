@@ -370,6 +370,14 @@ func (scope *scopeT) TopicListener(
 	handler topiclistener.EventHandler,
 	opts ...topicoptions.ListenerOption,
 ) *topiclistener.TopicListener {
+	return scope.TopicListenerNamed("default-listener", handler, opts...)
+}
+
+func (scope *scopeT) TopicListenerNamed(
+	name string,
+	handler topiclistener.EventHandler,
+	opts ...topicoptions.ListenerOption,
+) *topiclistener.TopicListener {
 	f := func() (*fixenv.GenericResult[*topiclistener.TopicListener], error) {
 		listener, err := scope.Driver().Topic().StartListener(
 			scope.TopicConsumerName(),
@@ -386,7 +394,7 @@ func (scope *scopeT) TopicListener(
 		return fixenv.NewGenericResultWithCleanup(listener, cleanup), err
 	}
 
-	return fixenv.CacheResult(scope.Env, f)
+	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: name})
 }
 
 func (scope *scopeT) TopicWriter() *topicwriter.Writer {

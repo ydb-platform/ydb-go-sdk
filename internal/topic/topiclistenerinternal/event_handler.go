@@ -9,15 +9,16 @@ import (
 
 //go:generate mockgen -source event_handler.go -destination event_handler_mock_test.go --typed -package topiclistenerinternal -write_package_comment=false
 
-// commitRequest is the listener's view of a single commit shared by its callers.
-type commitRequest interface {
+// batchCommit is the listener's view of a batch commit shared by its callers.
+type batchCommit interface {
 	Confirm()
 	Wait(ctx context.Context) error
 }
 
 // CommitHandler interface for PublicReadMessages commit operations
 type CommitHandler interface {
-	newCommitRequest(b *topicreadercommon.PublicBatch) commitRequest
+	newCommitRequest(b *topicreadercommon.PublicBatch) batchCommit
+	flushCommits() error
 }
 
 type EventHandler interface {
@@ -52,7 +53,7 @@ type EventHandler interface {
 type PublicReadMessages struct {
 	PartitionSession topicreadercommon.PublicPartitionSession
 	Batch            *topicreadercommon.PublicBatch
-	commitRequest    commitRequest
+	commitRequest    batchCommit
 }
 
 func NewPublicReadMessages(

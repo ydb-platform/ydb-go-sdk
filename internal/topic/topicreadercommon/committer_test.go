@@ -61,6 +61,46 @@ func TestCommitterCommit(t *testing.T) {
 	})
 }
 
+func TestCommitterFlushWaitsForConcurrentFlush(t *testing.T) {
+	ctx := xtest.Context(t)
+	sendStarted := make(chan struct{})
+	releaseSend := make(chan struct{})
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			close(sendStarted)
+			<-releaseSend
+
+			return nil
+		},
+	)
+	_, err := committer.pushCommit(CommitRange{
+		PartitionSession:  newTestPartitionSession(ctx, 0),
+		CommitOffsetStart: 1,
+		CommitOffsetEnd:   2,
+	})
+	require.NoError(t, err)
+
+	firstFlush := make(chan error, 1)
+	go func() {
+		firstFlush <- committer.Flush()
+	}()
+	<-sendStarted
+
+	secondFlush := make(chan error, 1)
+	go func() {
+		secondFlush <- committer.Flush()
+	}()
+	select {
+	case err := <-secondFlush:
+		t.Fatalf("second Flush returned before the active send completed: %v", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+
+	close(releaseSend)
+	require.NoError(t, <-firstFlush)
+	require.NoError(t, <-secondFlush)
+}
+
 func TestCommitRequestKeepsSendError(t *testing.T) {
 	ctx := xtest.Context(t)
 	session := newTestPartitionSession(ctx, 1)

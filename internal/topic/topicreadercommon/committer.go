@@ -3,6 +3,7 @@ package topicreadercommon
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -49,6 +50,7 @@ type Committer struct {
 	backgroundWorker background.Worker
 	tracer           *trace.Topic
 
+	flushM   sync.Mutex
 	m        xsync.Mutex
 	waiters  []commitWaiter
 	commits  CommitRanges
@@ -208,8 +210,12 @@ func (c *Committer) pushCommitsLoop(ctx context.Context) {
 // optimizing the commit ranges, and sending them to the server.
 //
 // The caller must not hold the Committer's mutex ([Committer.m]) when calling this method.
-// This method is thread-safe and can be called concurrently with other operations.
+// This method is thread-safe. Concurrent Flush calls are serialized, so returning
+// also guarantees that an earlier flush has finished sending its commits.
 func (c *Committer) Flush() error {
+	c.flushM.Lock()
+	defer c.flushM.Unlock()
+
 	var commits CommitRanges
 	var requests []*commitRequest
 

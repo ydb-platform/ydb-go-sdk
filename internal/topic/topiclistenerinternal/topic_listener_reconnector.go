@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -154,8 +155,7 @@ func (lr *TopicListenerReconnector) stopWithError(ctx context.Context, reason er
 
 func (lr *TopicListenerReconnector) retryConnect(ctx context.Context, reason error) (*streamListener, error) {
 	firstAttempt := true
-	retryOptions := append([]retry.Option{}, lr.streamConfig.retryOptions...)
-	retryOptions = append(retryOptions, retry.WithIdempotent(true))
+	retryOptions := append(slices.Clip(lr.streamConfig.retryOptions), retry.WithIdempotent(true))
 
 	return retry.RetryWithResult(ctx, func(ctx context.Context) (*streamListener, error) {
 		if firstAttempt {
@@ -241,6 +241,9 @@ func (lr *TopicListenerReconnector) connectStream(ctx context.Context) (*streamL
 	defer lr.m.Unlock()
 
 	lr.streamListener = sl
+	if err == nil {
+		lr.streamCloseErr = nil
+	}
 
 	return sl, err
 }

@@ -612,6 +612,27 @@ func TestTopicListenerReconnectorPreservesCompositeCloseError(t *testing.T) {
 	require.ErrorIs(t, listener.streamCloseErr, streamErr)
 }
 
+func TestTopicListenerReconnectorClearsRetiredStreamCloseErrorAfterReconnect(t *testing.T) {
+	ctx := xtest.Context(t)
+	cfg := NewStreamListenerConfig()
+	retiredStreamErr := errors.New("retired stream close failed")
+	listener := &TopicListenerReconnector{
+		streamConfig:   &cfg,
+		client:         freshStreamTopicClient{},
+		handler:        NewMockEventHandler(gomock.NewController(t)),
+		streamCloseErr: retiredStreamErr,
+	}
+
+	stream, err := listener.connectStream(ctx)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, stream.Close(ctx, ErrUserCloseTopic)) }()
+
+	listener.m.Lock()
+	closeErr := listener.streamCloseErr
+	listener.m.Unlock()
+	require.NoError(t, closeErr)
+}
+
 func TestTopicListenerReconnectorRetriesInitialConnection(t *testing.T) {
 	for _, code := range []codes.Code{codes.Canceled, codes.Unavailable} {
 		t.Run(code.String(), func(t *testing.T) {

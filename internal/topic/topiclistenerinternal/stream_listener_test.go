@@ -77,6 +77,29 @@ func TestStreamListener_WorkerCreationAndRouting(t *testing.T) {
 	require.Equal(t, int64(1), session.PartitionID)
 }
 
+func TestStreamListenerClosesSessionRejectedDuringShutdown(t *testing.T) {
+	ctx := xtest.Context(t)
+	cfg := NewStreamListenerConfig()
+	listener := &streamListener{
+		cfg:     &cfg,
+		handler: NewMockEventHandler(gomock.NewController(t)),
+	}
+	listener.initVars(&atomic.Int64{})
+	listener.closing.Store(true)
+	request := &rawtopicreader.StartPartitionSessionRequest{
+		PartitionSession: rawtopicreader.PartitionSession{
+			PartitionSessionID: 42,
+			Path:               "test-topic",
+			PartitionID:        1,
+		},
+	}
+
+	require.NoError(t, listener.handleStartPartition(ctx, request))
+	session, err := listener.sessions.Get(request.PartitionSession.PartitionSessionID)
+	require.NoError(t, err)
+	require.ErrorIs(t, session.Context().Err(), context.Canceled)
+}
+
 func TestStreamListener_RoutingToExistingWorker(t *testing.T) {
 	e := fixenv.New(t)
 	ctx := sf.Context(e)

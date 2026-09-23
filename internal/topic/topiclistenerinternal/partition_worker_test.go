@@ -114,8 +114,12 @@ func (m *mockMessageSender) GetFreedBuffer() []int {
 	return result
 }
 
-func (m *mockMessageSender) newCommitRequest(*topicreadercommon.PublicBatch) commitRequest {
+func (m *mockMessageSender) newCommitRequest(*topicreadercommon.PublicBatch) batchCommit {
 	return &mockCommitRequest{sender: m}
+}
+
+func (*mockMessageSender) flushCommits() error {
+	return nil
 }
 
 func (m *mockMessageSender) GetMessages() []rawtopicreader.ClientMessage {
@@ -147,6 +151,44 @@ func (r *mockCommitRequest) Confirm() {
 }
 
 func (r *mockCommitRequest) Wait(context.Context) error {
+	r.Confirm()
+
+	return nil
+}
+
+type orderedCommitSender struct {
+	pendingCommit bool
+	order         []string
+}
+
+func (s *orderedCommitSender) SendRaw(rawtopicreader.ClientMessage) {
+	s.order = append(s.order, "stop")
+}
+
+func (*orderedCommitSender) ReadBufferRelease(int) {}
+
+func (s *orderedCommitSender) newCommitRequest(*topicreadercommon.PublicBatch) batchCommit {
+	return &orderedCommitRequest{sender: s}
+}
+
+func (s *orderedCommitSender) flushCommits() error {
+	if s.pendingCommit {
+		s.order = append(s.order, "commit")
+		s.pendingCommit = false
+	}
+
+	return nil
+}
+
+type orderedCommitRequest struct {
+	sender *orderedCommitSender
+}
+
+func (r *orderedCommitRequest) Confirm() {
+	r.sender.pendingCommit = true
+}
+
+func (r *orderedCommitRequest) Wait(context.Context) error {
 	r.Confirm()
 
 	return nil
@@ -485,6 +527,43 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 		require.Len(t, messages, 0)
 		require.Nil(t, stoppedErr)
 	})
+}
+
+func TestPartitionWorkerFlushesConfirmedBatchBeforeGracefulStop(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := createTestPartitionSession()
+	sender := &orderedCommitSender{}
+	handler := NewMockEventHandler(gomock.NewController(t))
+	handler.EXPECT().OnReadMessages(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, event *PublicReadMessages) error {
+			event.Confirm()
+
+			return nil
+		})
+	handler.EXPECT().OnStopPartitionSessionRequest(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, event *PublicEventStopPartitionSession) error {
+			event.Confirm()
+
+			return nil
+		})
+	worker := NewPartitionWorker(
+		session.StreamPartitionSessionID,
+		session,
+		sender,
+		handler,
+		func(rawtopicreader.PartitionSessionID, error) {},
+		&trace.Topic{},
+		"test-listener",
+	)
+
+	require.NoError(t, worker.processUnifiedMessage(ctx, unifiedMessage{BatchMessage: &batchMessage{
+		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+		Batch:                 createTestBatch(),
+	}}))
+	require.Empty(t, sender.order, "Confirm must remain asynchronous until a flush boundary")
+	stopRequest := rawtopicreader.ServerMessage(createTestStopPartitionRequest(true))
+	require.NoError(t, worker.processUnifiedMessage(ctx, unifiedMessage{RawServerMessage: &stopRequest}))
+	require.Equal(t, []string{"commit", "stop"}, sender.order)
 }
 
 func TestPartitionWorkerInterface_BatchMessageFlow(t *testing.T) {
@@ -872,57 +951,6 @@ func TestPartitionWorkerInterface_BadBatchMetadataFreesBuffer(t *testing.T) {
 
 	xtest.WaitChannelClosed(t, errorReceived)
 	require.Equal(t, []int{0}, messageSender.GetFreedBuffer())
-}
-
-type bareMessageSender struct {
-	freed []int
-}
-
-func (b *bareMessageSender) SendRaw(rawtopicreader.ClientMessage) {}
-
-func (b *bareMessageSender) ReadBufferRelease(size int) {
-	b.freed = append(b.freed, size)
-}
-
-func TestPartitionWorkerInterface_NonCommitHandlerFreesBuffer(t *testing.T) {
-	ctx := xtest.Context(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	session := createTestPartitionSession()
-	messageSender := &bareMessageSender{}
-	mockHandler := NewMockEventHandler(ctrl)
-
-	errorReceived := make(empty.Chan, 1)
-	onStopped := func(sessionID rawtopicreader.PartitionSessionID, err error) {
-		select {
-		case errorReceived <- empty.Struct{}:
-		default:
-		}
-	}
-
-	worker := NewPartitionWorker(
-		123,
-		session,
-		messageSender,
-		mockHandler,
-		onStopped,
-		&trace.Topic{},
-		"test-listener",
-	)
-
-	worker.Start(ctx)
-	defer func() {
-		require.NoError(t, worker.Close(ctx, nil))
-	}()
-
-	batch := createTestBatch()
-	worker.AddMessagesBatch(rawtopiccommon.ServerMessageMetadata{
-		Status: rawydb.StatusSuccess,
-	}, batch)
-
-	xtest.WaitChannelClosed(t, errorReceived)
-	require.Equal(t, []int{0}, messageSender.freed)
 }
 
 // Note: CommitMessage processing has been moved to streamListener

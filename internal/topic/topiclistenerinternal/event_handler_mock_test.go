@@ -14,67 +14,67 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockcommitRequest is a mock of commitRequest interface.
-type MockcommitRequest struct {
+// MockbatchCommit is a mock of batchCommit interface.
+type MockbatchCommit struct {
 	ctrl     *gomock.Controller
-	recorder *MockcommitRequestMockRecorder
+	recorder *MockbatchCommitMockRecorder
 }
 
-// MockcommitRequestMockRecorder is the mock recorder for MockcommitRequest.
-type MockcommitRequestMockRecorder struct {
-	mock *MockcommitRequest
+// MockbatchCommitMockRecorder is the mock recorder for MockbatchCommit.
+type MockbatchCommitMockRecorder struct {
+	mock *MockbatchCommit
 }
 
-// NewMockcommitRequest creates a new mock instance.
-func NewMockcommitRequest(ctrl *gomock.Controller) *MockcommitRequest {
-	mock := &MockcommitRequest{ctrl: ctrl}
-	mock.recorder = &MockcommitRequestMockRecorder{mock}
+// NewMockbatchCommit creates a new mock instance.
+func NewMockbatchCommit(ctrl *gomock.Controller) *MockbatchCommit {
+	mock := &MockbatchCommit{ctrl: ctrl}
+	mock.recorder = &MockbatchCommitMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockcommitRequest) EXPECT() *MockcommitRequestMockRecorder {
+func (m *MockbatchCommit) EXPECT() *MockbatchCommitMockRecorder {
 	return m.recorder
 }
 
 // Confirm mocks base method.
-func (m *MockcommitRequest) Confirm() {
+func (m *MockbatchCommit) Confirm() {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Confirm")
 }
 
 // Confirm indicates an expected call of Confirm.
-func (mr *MockcommitRequestMockRecorder) Confirm() *MockcommitRequestConfirmCall {
+func (mr *MockbatchCommitMockRecorder) Confirm() *MockbatchCommitConfirmCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Confirm", reflect.TypeOf((*MockcommitRequest)(nil).Confirm))
-	return &MockcommitRequestConfirmCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Confirm", reflect.TypeOf((*MockbatchCommit)(nil).Confirm))
+	return &MockbatchCommitConfirmCall{Call: call}
 }
 
-// MockcommitRequestConfirmCall wrap *gomock.Call
-type MockcommitRequestConfirmCall struct {
+// MockbatchCommitConfirmCall wrap *gomock.Call
+type MockbatchCommitConfirmCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockcommitRequestConfirmCall) Return() *MockcommitRequestConfirmCall {
+func (c *MockbatchCommitConfirmCall) Return() *MockbatchCommitConfirmCall {
 	c.Call = c.Call.Return()
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockcommitRequestConfirmCall) Do(f func()) *MockcommitRequestConfirmCall {
+func (c *MockbatchCommitConfirmCall) Do(f func()) *MockbatchCommitConfirmCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockcommitRequestConfirmCall) DoAndReturn(f func()) *MockcommitRequestConfirmCall {
+func (c *MockbatchCommitConfirmCall) DoAndReturn(f func()) *MockbatchCommitConfirmCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // Wait mocks base method.
-func (m *MockcommitRequest) Wait(ctx context.Context) error {
+func (m *MockbatchCommit) Wait(ctx context.Context) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Wait", ctx)
 	ret0, _ := ret[0].(error)
@@ -82,31 +82,31 @@ func (m *MockcommitRequest) Wait(ctx context.Context) error {
 }
 
 // Wait indicates an expected call of Wait.
-func (mr *MockcommitRequestMockRecorder) Wait(ctx any) *MockcommitRequestWaitCall {
+func (mr *MockbatchCommitMockRecorder) Wait(ctx any) *MockbatchCommitWaitCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Wait", reflect.TypeOf((*MockcommitRequest)(nil).Wait), ctx)
-	return &MockcommitRequestWaitCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Wait", reflect.TypeOf((*MockbatchCommit)(nil).Wait), ctx)
+	return &MockbatchCommitWaitCall{Call: call}
 }
 
-// MockcommitRequestWaitCall wrap *gomock.Call
-type MockcommitRequestWaitCall struct {
+// MockbatchCommitWaitCall wrap *gomock.Call
+type MockbatchCommitWaitCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockcommitRequestWaitCall) Return(arg0 error) *MockcommitRequestWaitCall {
+func (c *MockbatchCommitWaitCall) Return(arg0 error) *MockbatchCommitWaitCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockcommitRequestWaitCall) Do(f func(context.Context) error) *MockcommitRequestWaitCall {
+func (c *MockbatchCommitWaitCall) Do(f func(context.Context) error) *MockbatchCommitWaitCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockcommitRequestWaitCall) DoAndReturn(f func(context.Context) error) *MockcommitRequestWaitCall {
+func (c *MockbatchCommitWaitCall) DoAndReturn(f func(context.Context) error) *MockbatchCommitWaitCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -134,11 +134,49 @@ func (m *MockCommitHandler) EXPECT() *MockCommitHandlerMockRecorder {
 	return m.recorder
 }
 
+// flushCommits mocks base method.
+func (m *MockCommitHandler) flushCommits() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "flushCommits")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// flushCommits indicates an expected call of flushCommits.
+func (mr *MockCommitHandlerMockRecorder) flushCommits() *MockCommitHandlerflushCommitsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "flushCommits", reflect.TypeOf((*MockCommitHandler)(nil).flushCommits))
+	return &MockCommitHandlerflushCommitsCall{Call: call}
+}
+
+// MockCommitHandlerflushCommitsCall wrap *gomock.Call
+type MockCommitHandlerflushCommitsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockCommitHandlerflushCommitsCall) Return(arg0 error) *MockCommitHandlerflushCommitsCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockCommitHandlerflushCommitsCall) Do(f func() error) *MockCommitHandlerflushCommitsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockCommitHandlerflushCommitsCall) DoAndReturn(f func() error) *MockCommitHandlerflushCommitsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // newCommitRequest mocks base method.
-func (m *MockCommitHandler) newCommitRequest(b *topicreadercommon.PublicBatch) commitRequest {
+func (m *MockCommitHandler) newCommitRequest(b *topicreadercommon.PublicBatch) batchCommit {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "newCommitRequest", b)
-	ret0, _ := ret[0].(commitRequest)
+	ret0, _ := ret[0].(batchCommit)
 	return ret0
 }
 
@@ -155,19 +193,19 @@ type MockCommitHandlernewCommitRequestCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockCommitHandlernewCommitRequestCall) Return(arg0 commitRequest) *MockCommitHandlernewCommitRequestCall {
+func (c *MockCommitHandlernewCommitRequestCall) Return(arg0 batchCommit) *MockCommitHandlernewCommitRequestCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockCommitHandlernewCommitRequestCall) Do(f func(*topicreadercommon.PublicBatch) commitRequest) *MockCommitHandlernewCommitRequestCall {
+func (c *MockCommitHandlernewCommitRequestCall) Do(f func(*topicreadercommon.PublicBatch) batchCommit) *MockCommitHandlernewCommitRequestCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockCommitHandlernewCommitRequestCall) DoAndReturn(f func(*topicreadercommon.PublicBatch) commitRequest) *MockCommitHandlernewCommitRequestCall {
+func (c *MockCommitHandlernewCommitRequestCall) DoAndReturn(f func(*topicreadercommon.PublicBatch) batchCommit) *MockCommitHandlernewCommitRequestCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
