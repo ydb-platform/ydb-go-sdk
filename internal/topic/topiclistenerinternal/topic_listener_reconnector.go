@@ -3,6 +3,8 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"sync"
 	"sync/atomic"
 
@@ -177,41 +179,36 @@ func (lr *TopicListenerReconnector) retryConnect(ctx context.Context, reason err
 // listener error with its surrounding context.
 func (lr *TopicListenerReconnector) asRetryError(reason error) error {
 	retryReason := reason
-	retrySettings := topic.RetrySettings{
-		StartTimeout: topic.DefaultStartTimeout,
-		CheckError:   lr.streamConfig.CheckError,
-	}
-	hasTransportError := false
 	if transportErr := xerrors.TransportError(reason); transportErr != nil {
-		retryReason = transportErr
-		hasTransportError = true
-		if checkError := retrySettings.CheckError; checkError != nil {
-			retrySettings.CheckError = func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
-				args.Error = reason
-
-				return checkError(args)
-			}
-		}
+		retryReason = errors.Join(transportErr, reason)
 	}
-	_, stopReason := topic.RetryDecision(retryReason, retrySettings, 0)
-	if stopReason != nil {
-		if !errors.Is(stopReason, reason) {
-			stopReason = errors.Join(stopReason, reason)
+
+	decision := topic.PublicRetryDecisionDefault
+	if checkError := lr.streamConfig.CheckError; checkError != nil {
+		decision = checkError(topic.NewCheckRetryArgs(reason))
+	}
+
+	switch decision {
+	case topic.PublicRetryDecisionDefault:
+		if errors.Is(reason, io.EOF) && xerrors.RetryableError(reason) == nil {
+			return retry.RetryableError(reason, retry.WithBackoff(retry.TypeSlowBackoff))
 		}
 
-		return listenerRetryStopError{reason: stopReason}
-	}
+		return retryReason
+	case topic.PublicRetryDecisionRetry:
+		backoffType := retry.Check(retryReason).BackoffType()
+		if backoffType != retry.TypeFastBackoff {
+			backoffType = retry.TypeSlowBackoff
+		}
 
-	retryError := reason
-	if hasTransportError {
-		retryError = errors.Join(retryReason, reason)
+		return retry.RetryableError(retryReason, retry.WithBackoff(backoffType))
+	case topic.PublicRetryDecisionStop:
+		return listenerRetryStopError{reason: fmt.Errorf(
+			"ydb: topic listener unretriable error by check error callback: %w", reason,
+		)}
+	default:
+		panic(fmt.Errorf("unexpected retry decision: %v", decision))
 	}
-	backoffType := retry.Check(retryReason).BackoffType()
-	if backoffType != retry.TypeFastBackoff {
-		backoffType = retry.TypeSlowBackoff
-	}
-
-	return retry.RetryableError(retryError, retry.WithBackoff(backoffType))
 }
 
 // listenerRetryStopError preserves the original error identity and status while

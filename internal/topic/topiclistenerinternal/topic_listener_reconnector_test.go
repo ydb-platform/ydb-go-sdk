@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
@@ -223,7 +225,7 @@ func TestTopicListenerReconnectorResetsBackoffAfterStatusCodeChange(t *testing.T
 	listener := &TopicListenerReconnector{
 		streamConfig: &cfg,
 		client: &failFirstStreamTopicClient{
-			openError: status.Error(codes.Aborted, "reconnect failed"),
+			openError: status.Error(codes.Canceled, "reconnect failed"),
 		},
 	}
 
@@ -235,6 +237,55 @@ func TestTopicListenerReconnectorResetsBackoffAfterStatusCodeChange(t *testing.T
 		xtest.Receive(t, backoffCalls, "the initial stream error backoff"),
 		xtest.Receive(t, backoffCalls, "the changed status code backoff"),
 	})
+}
+
+func TestTopicListenerReconnectorUsesStandardInstantBackoff(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+	backoffCalls := make(chan int, 1)
+	cfg := NewStreamListenerConfig()
+	setListenerRetryBackoff(&cfg, listenerTestBackoff{delay: time.Hour, calls: backoffCalls})
+	listener := &TopicListenerReconnector{
+		streamConfig: &cfg,
+		client:       freshStreamTopicClient{},
+	}
+	type connectResult struct {
+		stream *streamListener
+		err    error
+	}
+	result := make(chan connectResult, 1)
+	go func() {
+		stream, err := listener.retryConnect(ctx, instantListenerRetryError{})
+		result <- connectResult{stream: stream, err: err}
+	}()
+
+	select {
+	case attempt := <-backoffCalls:
+		cancel()
+		_ = xtest.Receive(t, result, "the canceled reconnect result")
+		t.Fatalf("standard instant backoff was replaced at attempt %d", attempt)
+	case res := <-result:
+		require.NoError(t, res.err)
+		require.NotNil(t, res.stream)
+		require.NoError(t, res.stream.Close(xtest.Context(t), ErrUserCloseTopic))
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for the instant reconnect")
+	}
+}
+
+func TestTopicListenerReconnectorRetriesEOF(t *testing.T) {
+	ctx := xtest.Context(t)
+	cfg := NewStreamListenerConfig()
+	setListenerRetryBackoff(&cfg, listenerTestBackoff{})
+	listener := &TopicListenerReconnector{
+		streamConfig: &cfg,
+		client:       freshStreamTopicClient{},
+	}
+
+	stream, err := listener.retryConnect(ctx, io.EOF)
+	require.NoError(t, err)
+	require.NotNil(t, stream)
+	require.NoError(t, stream.Close(ctx, ErrUserCloseTopic))
 }
 
 func TestTopicListenerReconnectorCloseDuringBackoff(t *testing.T) {
@@ -713,6 +764,28 @@ func (c *failFirstStreamTopicClient) StreamRead(
 type listenerTestBackoff struct {
 	delay time.Duration
 	calls chan<- int
+}
+
+type instantListenerRetryError struct{}
+
+func (instantListenerRetryError) Error() string {
+	return "instant listener retry"
+}
+
+func (instantListenerRetryError) Code() int32 {
+	return -1
+}
+
+func (instantListenerRetryError) Name() string {
+	return "instant listener retry"
+}
+
+func (instantListenerRetryError) Type() xerrors.Type {
+	return xerrors.TypeRetryable
+}
+
+func (instantListenerRetryError) BackoffType() backoff.Type {
+	return backoff.TypeInstant
 }
 
 func (b listenerTestBackoff) Delay(attempt int) time.Duration {
