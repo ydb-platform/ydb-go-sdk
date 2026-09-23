@@ -14,6 +14,7 @@ import (
 const (
 	IssueCodeTransactionLocksInvalidated       = 2001
 	IssueCodeDatashardProgramSizeLimitExceeded = 200509
+	IssueCodeTopicPartitionInactive            = 500029
 )
 
 type issues []*Ydb_Issue.IssueMessage

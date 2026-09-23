@@ -5,10 +5,12 @@ import (
 	"errors"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -21,6 +23,8 @@ var errCreate = errors.New("create error")
 type poolTestWriter struct {
 	closed      atomic.Bool
 	writeCalled atomic.Int64
+	closeResult chan error
+	writeErr    error
 }
 
 func (w *poolTestWriter) Close(_ context.Context) error {
@@ -33,10 +37,19 @@ func (w *poolTestWriter) WaitInitInfo(_ context.Context) (topicwriterinternal.In
 	return topicwriterinternal.InitialInfo{}, nil
 }
 
+func (w *poolTestWriter) WaitClose(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-w.closeResult:
+		return err
+	}
+}
+
 func (w *poolTestWriter) WriteInternal(_ context.Context, _ []topicwritercommon.MessageWithDataContent) error {
 	w.writeCalled.Add(1)
 
-	return nil
+	return w.writeErr
 }
 
 // poolMockFactory records Create calls and returns configurable writers or error.
@@ -47,6 +60,7 @@ type poolMockFactory struct {
 	returnError  bool
 	writers      []*poolTestWriter
 	lastCfg      topicwriterinternal.WriterReconnectorConfig
+	writeErr     error
 }
 
 func (f *poolMockFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
@@ -61,7 +75,7 @@ func (f *poolMockFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig
 		return nil, errCreate
 	}
 
-	w := &poolTestWriter{}
+	w := &poolTestWriter{closeResult: make(chan error, 1), writeErr: f.writeErr}
 	f.writers = append(f.writers, w)
 
 	return w, nil
@@ -87,6 +101,7 @@ func newPoolForTest(t *testing.T, factory *poolMockFactory) (*partitionWriterPoo
 		bg,
 		func(partitionID, seqNo int64) {},
 		func(partitionID int64) {},
+		nil,
 		func() {},
 		func(err error) {},
 	)
@@ -130,6 +145,7 @@ func TestSenderStepReturnsNonOverloadedWriterInitError(t *testing.T) {
 		buf,
 		&partitionWriterPool{writers: map[int64]*writerWrapper{1: wrapper}},
 		newPartitionSplitReceiver(func(partitionID int64) error { return nil }, func(err error) {}),
+		false,
 		func(err error) {},
 	)
 
@@ -245,6 +261,50 @@ func TestPartitionWriterPool_GetProducerIDFormat(t *testing.T) {
 	require.Equal(t, []int64{5}, factory.partitionIDs)
 
 	cancel()
+}
+
+func TestPartitionWriterPool_TransactionalSessionPolicy(t *testing.T) {
+	t.Parallel()
+
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+	pool.transactional = true
+
+	_, err := pool.get(7, true)
+	require.NoError(t, err)
+	require.Equal(t, []string{""}, factory.producerIDs)
+	require.False(t, factory.lastCfg.AutoSetSeqNo)
+	require.Equal(t, topic.PublicRetryDecisionStop,
+		factory.lastCfg.RetrySettings.CheckError(topic.PublicCheckErrorRetryArgs{Error: errors.New("session failed")}))
+}
+
+func TestPartitionWriterPool_TransactionalSessionErrorStopsWriter(t *testing.T) {
+	t.Parallel()
+
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+	pool.transactional = true
+	result := make(chan error, 1)
+	pool.onError = func(err error) {
+		result <- err
+	}
+
+	_, err := pool.get(7, true)
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		return len(factory.writers) == 1
+	}, time.Second, time.Millisecond)
+
+	sessionErr := errors.New("session failed")
+	factory.writers[0].closeResult <- sessionErr
+	select {
+	case err := <-result:
+		require.ErrorIs(t, err, sessionErr)
+	case <-time.After(time.Second):
+		t.Fatal("transactional writer did not stop after its partition session failed")
+	}
 }
 
 func TestPartitionWriterPool_GetReturnsErrorWhenCreateFails(t *testing.T) {

@@ -641,6 +641,8 @@ func TestOrchestratorDescribeTopicWithRetriesCancelsRetrySleep(t *testing.T) {
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return describeResult, nil
 		},
+		nil,
+		false,
 		bg,
 		&topicwriterinternal.WriterReconnectorConfig{},
 		&MultiWriterConfig{},

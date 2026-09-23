@@ -1,3 +1,5 @@
+* Sped up transactional Topic writers
+
 ## v3.151.5
 * Fixed unrelated ACKs waking blocked topic writer calls with `WithWriterWaitServerAck(true)`
 

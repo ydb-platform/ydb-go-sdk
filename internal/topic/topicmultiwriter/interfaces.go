@@ -14,6 +14,10 @@ type writer interface {
 	WriteInternal(ctx context.Context, messages []topicwritercommon.MessageWithDataContent) error
 }
 
+type writerCloseWaiter interface {
+	WaitClose(ctx context.Context) error
+}
+
 type writersFactory interface {
 	Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error)
 }

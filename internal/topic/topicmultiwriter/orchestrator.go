@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
@@ -33,6 +34,9 @@ type orchestrator struct {
 
 	partitionChooser PartitionChooser
 	topicDescriber   TopicDescriber
+	source           *partition.Source
+	router           *partition.Router
+	transactional    bool
 
 	partitions map[int64]*PartitionInfo
 	initDone   empty.Chan
@@ -53,6 +57,8 @@ func newOrchestrator(
 	ctx context.Context,
 	stop context.CancelFunc,
 	topicDescriber TopicDescriber,
+	source *partition.Source,
+	transactional bool,
 	background *background.Worker,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
@@ -74,6 +80,8 @@ func newOrchestrator(
 		multiWriterCfg:   multiWriterCfg,
 		mu:               &xsync.Mutex{},
 		topicDescriber:   topicDescriber,
+		source:           source,
+		transactional:    transactional,
 		ctx:              ctx,
 		stop:             stop,
 		partitions:       make(map[int64]*PartitionInfo),
@@ -99,11 +107,13 @@ func newOrchestrator(
 		background,
 		o.ackReceiver.push,
 		o.partitionSplitReceiver.push,
+		source,
 		func() {
 			o.sender.wakeup()
 		},
 		o.stopWithError,
 	)
+	o.writerPool.transactional = transactional
 	o.sender = newSender(
 		ctx,
 		o.partitions,
@@ -111,6 +121,7 @@ func newOrchestrator(
 		o.buf,
 		o.writerPool,
 		o.partitionSplitReceiver,
+		transactional,
 		o.stopWithError,
 	)
 
@@ -121,9 +132,11 @@ func (o *orchestrator) startWorkers() {
 	o.background.Start("ack receiver", func(ctx context.Context) {
 		o.ackReceiver.run(o.ctx)
 	})
-	o.background.Start("partition splitter", func(ctx context.Context) {
-		o.partitionSplitReceiver.run(ctx)
-	})
+	if !o.transactional {
+		o.background.Start("partition splitter", func(ctx context.Context) {
+			o.partitionSplitReceiver.run(ctx)
+		})
+	}
 	o.background.Start("sender", func(ctx context.Context) {
 		o.sender.run()
 	})
@@ -147,6 +160,17 @@ func (o *orchestrator) sleepOrDone(delay time.Duration) error {
 
 func (o *orchestrator) init() (err error) {
 	defer close(o.initDone)
+	if o.transactional {
+		o.router, err = o.source.NewRouter(o.ctx, o.partitionChooser)
+		if err != nil {
+			o.stopWithError(err)
+
+			return err
+		}
+		o.startWorkers()
+
+		return nil
+	}
 
 	describeResult, err := o.topicDescriber(o.ctx, o.writerCfg.Topic())
 	if err != nil {
@@ -201,9 +225,18 @@ func (o *orchestrator) choosePartition(msg message) (partitionID int64, err erro
 		msg.Key = o.multiWriterCfg.ProducerIDPrefix
 	}
 
-	partitionID, err = o.partitionChooser.ChoosePartition(msg.PublicMessage)
+	if o.transactional {
+		partitionID, err = o.router.ChoosePartition(msg.PublicMessage)
+	} else {
+		partitionID, err = o.partitionChooser.ChoosePartition(msg.PublicMessage)
+	}
 	if err != nil {
 		return 0, fmt.Errorf("choose partition: %w", err)
+	}
+	if o.transactional {
+		if _, ok := o.partitions[partitionID]; !ok {
+			o.partitions[partitionID] = &PartitionInfo{}
+		}
 	}
 
 	return partitionID, nil
@@ -324,7 +357,9 @@ func (o *orchestrator) onAckReceivedNeedLock(partitionID, seqNo int64) {
 	indexChain.Remove(message)
 	if indexChain.Len() == 0 {
 		delete(o.buf.inFlightMessagesIndex, partitionID)
-		o.writerPool.evict(partitionID)
+		if !o.transactional {
+			o.writerPool.evict(partitionID)
+		}
 	}
 
 	partition := o.partitions[partitionID]

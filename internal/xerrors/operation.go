@@ -163,6 +163,14 @@ func IsOperationErrorTransactionLocksInvalidated(err error) (isTLI bool) {
 		})
 }
 
+// IsOperationErrorTopicPartitionInactive reports an OVERLOADED operation error caused by an inactive topic partition.
+func IsOperationErrorTopicPartitionInactive(err error) bool {
+	return IsOperationError(err, Ydb.StatusIds_OVERLOADED) &&
+		iterateByIssues(err, func(_ string, code Ydb.StatusIds_StatusCode, _ uint32) (stop bool) {
+			return code == IssueCodeTopicPartitionInactive
+		})
+}
+
 func (e *operationError) Type() Type {
 	switch e.code {
 	case

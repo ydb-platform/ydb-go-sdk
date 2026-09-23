@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
 	internalmultiwriter "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
@@ -35,6 +36,7 @@ type Client struct {
 	cred                   credentials.Credentials
 	defaultOperationParams rawydb.OperationParams
 	rawClient              rawtopic.Client
+	partitionSources       *partition.Sources
 }
 
 func New(
@@ -50,12 +52,20 @@ func New(
 	var defaultOperationParams rawydb.OperationParams
 	topic.OperationParamsFromConfig(&defaultOperationParams, &cfg.Common)
 
-	return &Client{
+	client := &Client{
 		cfg:                    cfg,
 		cred:                   cred,
 		defaultOperationParams: defaultOperationParams,
 		rawClient:              rawClient,
 	}
+	client.partitionSources = partition.NewSources(func(ctx context.Context, path string) (
+		topictypes.TopicDescription,
+		error,
+	) {
+		return client.Describe(ctx, path)
+	})
+
+	return client
 }
 
 func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
@@ -426,10 +436,8 @@ func (c *Client) StartTransactionalWriter(
 	if ok && mwCfg != nil {
 		cfg.MultiMode = true
 
-		multiwriter, err := internalmultiwriter.NewMultiWriter(
-			func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-				return c.Describe(ctx, path)
-			},
+		multiwriter, err := internalmultiwriter.NewTransactionalMultiWriter(
+			c.partitionSources.Get(cfg.Topic()),
 			&cfg,
 			mwCfg,
 		)
