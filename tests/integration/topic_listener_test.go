@@ -35,14 +35,13 @@ func TestTopicListener(t *testing.T) {
 	// Write message first like commit tests do
 	require.NoError(t, scope.TopicWriter().Write(scope.Ctx, topicwriter.Message{Data: strings.NewReader("asd")}))
 
-	messages := make(chan *topiclistener.ReadMessages, 1)
+	var readMessages *topiclistener.ReadMessages
+	done := make(empty.Chan)
 
 	handler := &TestTopicListener_Handler{
 		onReadMessages: func(ctx context.Context, event *topiclistener.ReadMessages) error {
-			select {
-			case messages <- event:
-			case <-ctx.Done():
-			}
+			readMessages = event
+			close(done)
 
 			return nil
 		},
@@ -51,7 +50,7 @@ func TestTopicListener(t *testing.T) {
 	startedListener := scope.TopicListener(handler)
 	require.NoError(t, startedListener.WaitInit(scope.Ctx))
 
-	readMessages := xtest.Receive(t, messages, "the message")
+	xtest.WaitChannelClosed(t, done)
 
 	require.NotNil(t, readMessages)
 
