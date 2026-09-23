@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -121,9 +121,7 @@ func topicTopologyFromDescription(description topictypes.TopicDescription) (topi
 	if len(activePartitionIDs) == 0 {
 		return topicTopology{}, fmt.Errorf("topic %q has no active partitions", description.Path)
 	}
-	sort.Slice(activePartitionIDs, func(i, j int) bool {
-		return activePartitionIDs[i] < activePartitionIDs[j]
-	})
+	slices.Sort(activePartitionIDs)
 
 	return topicTopology{
 		ActivePartitionIDs: activePartitionIDs,
@@ -136,7 +134,11 @@ func validateAutoSplitTopic(description topictypes.TopicDescription, cfg config)
 	writeSpeed := settings.AutoPartitioningSettings.AutoPartitioningWriteSpeedStrategy
 	switch {
 	case settings.MinActivePartitions != 1:
-		return fmt.Errorf("auto-split topic %q has min_active_partitions=%d, want 1; use a fresh topic", cfg.TopicPath, settings.MinActivePartitions)
+		return fmt.Errorf(
+			"auto-split topic %q has min_active_partitions=%d, want 1; use a fresh topic",
+			cfg.TopicPath,
+			settings.MinActivePartitions,
+		)
 	case settings.MaxActivePartitions != cfg.AutoSplitMaxPartitions:
 		return fmt.Errorf(
 			"auto-split topic %q has max_active_partitions=%d, want %d; use a fresh topic",
@@ -199,11 +201,13 @@ func monitorTopicTopology(
 				if ctx.Err() == nil {
 					recorder.recordError(fmt.Errorf("describe topic %q while monitoring auto-split: %w", topicPath, err))
 				}
+
 				continue
 			}
 			topology, err := topicTopologyFromDescription(description)
 			if err != nil {
 				recorder.recordError(err)
+
 				continue
 			}
 			recorder.record(time.Now(), topology)
@@ -322,6 +326,7 @@ func runWorker(
 		if err != nil {
 			if ctx.Err() != nil {
 				stats.Cancelled++
+
 				continue
 			}
 
@@ -332,6 +337,7 @@ func runWorker(
 			if finalErrors.Add(1) >= uint64(cfg.MaxErrors) {
 				cancelPhase()
 			}
+
 			continue
 		}
 
@@ -448,17 +454,18 @@ func writerOptions(cfg config, workerID int) []topicoptions.WriterOption {
 	multiWriterOptions := []topicoptions.MultiWriterOption{
 		topicoptions.WithMultiWriterDirectWrite(false),
 	}
-	if cfg.Routing == routingModeKey {
+	switch cfg.Routing {
+	case routingModeKey:
 		multiWriterOptions = append(
 			multiWriterOptions,
 			topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
 		)
-	} else if cfg.Routing == routingModeBoundedKey {
+	case routingModeBoundedKey:
 		multiWriterOptions = append(
 			multiWriterOptions,
 			topicoptions.WithWriterPartitionByKey(topicoptions.BoundPartitionChooser()),
 		)
-	} else {
+	case routingModePartitionID:
 		multiWriterOptions = append(multiWriterOptions, topicoptions.WithWriterPartitionByPartitionID())
 	}
 	if slotProducerID != "" {

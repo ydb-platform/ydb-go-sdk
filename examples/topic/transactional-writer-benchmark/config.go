@@ -91,7 +91,12 @@ func parseConfig(args []string, stderr io.Writer) (config, error) {
 		"multiwriter routing: key, bounded-key, or partition-id (ignored in single mode)",
 	)
 	flags.BoolVar(&cfg.AutoSeqNo, "auto-seq-no", true, "let the SDK assign sequence numbers")
-	flags.BoolVar(&cfg.QueryRetries, "query-retries", true, "retry retryable Query transaction errors until the transaction deadline")
+	flags.BoolVar(
+		&cfg.QueryRetries,
+		"query-retries",
+		true,
+		"retry retryable Query transaction errors until the transaction deadline",
+	)
 	flags.DurationVar(&cfg.Duration, "duration", 5*time.Second, "measurement duration")
 	flags.DurationVar(&cfg.Warmup, "warmup", 2*time.Second, "warmup duration excluded from the result")
 	flags.DurationVar(
@@ -116,13 +121,48 @@ func parseConfig(args []string, stderr io.Writer) (config, error) {
 		1,
 		"fixed partition count used by --prepare",
 	)
-	flags.BoolVar(&cfg.AutoSplit, "auto-split", false, "prepare and monitor a multiwriter topic with automatic partition splitting")
-	flags.Int64Var(&cfg.AutoSplitMaxPartitions, "auto-split-max-partitions", 64, "maximum active partitions for --auto-split")
-	flags.Int64Var(&cfg.AutoSplitWriteSpeed, "auto-split-write-speed", 1<<20, "per-partition write speed in bytes/s for --auto-split")
-	flags.Int64Var(&cfg.AutoSplitBurstBytes, "auto-split-burst-bytes", 1<<20, "per-partition write burst bytes for --auto-split")
-	flags.IntVar(&cfg.AutoSplitUpUtilization, "auto-split-up-utilization", 2, "write utilization percentage that triggers scale-up")
-	flags.DurationVar(&cfg.AutoSplitStabilization, "auto-split-stabilization", 2*time.Second, "write-speed stabilization window for --auto-split")
-	flags.DurationVar(&cfg.AutoSplitPollInterval, "auto-split-poll-interval", 250*time.Millisecond, "topology polling interval for --auto-split")
+	flags.BoolVar(
+		&cfg.AutoSplit,
+		"auto-split",
+		false,
+		"prepare and monitor a multiwriter topic with automatic partition splitting",
+	)
+	flags.Int64Var(
+		&cfg.AutoSplitMaxPartitions,
+		"auto-split-max-partitions",
+		64,
+		"maximum active partitions for --auto-split",
+	)
+	flags.Int64Var(
+		&cfg.AutoSplitWriteSpeed,
+		"auto-split-write-speed",
+		1<<20,
+		"per-partition write speed in bytes/s for --auto-split",
+	)
+	flags.Int64Var(
+		&cfg.AutoSplitBurstBytes,
+		"auto-split-burst-bytes",
+		1<<20,
+		"per-partition write burst bytes for --auto-split",
+	)
+	flags.IntVar(
+		&cfg.AutoSplitUpUtilization,
+		"auto-split-up-utilization",
+		2,
+		"write utilization percentage that triggers scale-up",
+	)
+	flags.DurationVar(
+		&cfg.AutoSplitStabilization,
+		"auto-split-stabilization",
+		2*time.Second,
+		"write-speed stabilization window for --auto-split",
+	)
+	flags.DurationVar(
+		&cfg.AutoSplitPollInterval,
+		"auto-split-poll-interval",
+		250*time.Millisecond,
+		"topology polling interval for --auto-split",
+	)
 	flags.BoolVar(&cfg.Anonymous, "anonymous", false, "disable authentication for a local YDB")
 	flags.BoolVar(
 		&cfg.SkipTableWrite,
@@ -182,6 +222,7 @@ func parseConfig(args []string, stderr io.Writer) (config, error) {
 	return cfg, nil
 }
 
+//nolint:gocyclo // Keeping validation in flag order makes CLI errors easy to audit.
 func (c config) validate() error {
 	switch {
 	case c.DSN == "":

@@ -1,8 +1,9 @@
+//nolint:tagliatelle // Benchmark reports intentionally use analysis-friendly snake_case JSON.
 package main
 
 import (
 	"math"
-	"sort"
+	"slices"
 	"time"
 )
 
@@ -24,6 +25,7 @@ type workerStats struct {
 
 type phaseStats struct {
 	workerStats
+
 	Duration time.Duration
 	Aborted  bool
 }
@@ -129,9 +131,7 @@ func summarizeLatencies(samples []time.Duration) latencySummary {
 		return latencySummary{}
 	}
 
-	sort.Slice(samples, func(i, j int) bool {
-		return samples[i] < samples[j]
-	})
+	slices.Sort(samples)
 
 	var total time.Duration
 	for _, sample := range samples {
@@ -150,10 +150,7 @@ func summarizeLatencies(samples []time.Duration) latencySummary {
 }
 
 func nearestRank(sortedSamples []time.Duration, percentile float64) time.Duration {
-	index := int(math.Ceil(percentile*float64(len(sortedSamples)))) - 1
-	if index < 0 {
-		index = 0
-	}
+	index := max(0, int(math.Ceil(percentile*float64(len(sortedSamples))))-1)
 	if index >= len(sortedSamples) {
 		index = len(sortedSamples) - 1
 	}

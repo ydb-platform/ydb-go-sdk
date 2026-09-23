@@ -1,3 +1,4 @@
+//nolint:tagliatelle // Benchmark reports intentionally use analysis-friendly snake_case JSON.
 package main
 
 import (
@@ -17,9 +18,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	"google.golang.org/grpc"
 
-	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	sdkconfig "github.com/ydb-platform/ydb-go-sdk/v3/config"
 )
@@ -354,24 +355,14 @@ func run(args []string, stdout, stderr io.Writer) error {
 	}
 	memoryAtStop := readMemorySnapshot()
 	if cfg.AutoSplit {
-		cancelMonitor()
-		<-monitorDone
-		finalDescribeContext, cancelFinalDescribe := context.WithTimeout(rootContext, cfg.TransactionTimeout)
-		finalDescription, finalDescribeErr := topologyDB.Topic().Describe(finalDescribeContext, cfg.TopicPath)
-		cancelFinalDescribe()
-		if finalDescribeErr != nil {
-			recorder.recordError(fmt.Errorf("describe final topic topology: %w", finalDescribeErr))
-		} else {
-			finalTopology, topologyErr := topicTopologyFromDescription(finalDescription)
-			if topologyErr != nil {
-				recorder.recordError(topologyErr)
-			} else {
-				recorder.record(time.Now(), finalTopology)
-			}
-		}
-		closeContext, cancelClose := context.WithTimeout(context.Background(), 10*time.Second)
-		closeErr := topologyDB.Close(closeContext)
-		cancelClose()
+		closeErr := finishTopologyMonitor(
+			rootContext,
+			cfg,
+			topologyDB,
+			recorder,
+			cancelMonitor,
+			monitorDone,
+		)
 		monitorCleaned = true
 		if closeErr != nil && measurementErr == nil {
 			measurementErr = fmt.Errorf("close topology monitor connection: %w", closeErr)
@@ -402,6 +393,37 @@ func run(args []string, stdout, stderr io.Writer) error {
 	}
 
 	return nil
+}
+
+func finishTopologyMonitor(
+	ctx context.Context,
+	cfg config,
+	db *ydb.Driver,
+	recorder *topologyRecorder,
+	cancel context.CancelFunc,
+	done <-chan struct{},
+) error {
+	cancel()
+	<-done
+
+	describeContext, cancelDescribe := context.WithTimeout(ctx, cfg.TransactionTimeout)
+	description, describeErr := db.Topic().Describe(describeContext, cfg.TopicPath)
+	cancelDescribe()
+	if describeErr != nil {
+		recorder.recordError(fmt.Errorf("describe final topic topology: %w", describeErr))
+	} else {
+		topology, topologyErr := topicTopologyFromDescription(description)
+		if topologyErr != nil {
+			recorder.recordError(topologyErr)
+		} else {
+			recorder.record(time.Now(), topology)
+		}
+	}
+
+	closeContext, cancelClose := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelClose()
+
+	return db.Close(closeContext)
 }
 
 func openDatabase(ctx context.Context, cfg config, metrics *instrumentation) (*ydb.Driver, error) {
