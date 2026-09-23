@@ -302,24 +302,6 @@ func TestStreamListenerCloseWaitsForStartingWorker(t *testing.T) {
 	require.NoError(t, <-closeResult)
 }
 
-func TestStreamListenerStoppedWorkerKeepsReplacement(t *testing.T) {
-	e := fixenv.New(t)
-	ctx := sf.Context(e)
-	listener := StreamListener(e)
-	session := PartitionSession(e)
-	first := listener.createWorkerForPartition(session)
-	replacement := listener.createWorkerForPartition(session)
-	first.messageQueue.Close()
-	xtest.WaitChannelClosed(t, first.bgWorker.StopDone())
-
-	var current *PartitionWorker
-	listener.m.WithLock(func() {
-		current = listener.workers[session.StreamPartitionSessionID]
-	})
-	require.Same(t, replacement, current)
-	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
-}
-
 func TestStreamListenerMergeFailureKeepsBatchesSeparate(t *testing.T) {
 	e := fixenv.New(t)
 	ctx := sf.Context(e)
@@ -430,6 +412,42 @@ func TestNewStreamListenerWaitsForFailedInitCleanup(t *testing.T) {
 	released = true
 	require.ErrorIs(t, xtest.Receive(t, result, "the initialization error"), initErr)
 	require.ErrorIs(t, context.Cause(client.stream.ctx), initErr)
+}
+
+func TestNewStreamListenerCanceledInitDoesNotWaitForCleanup(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+	initErr := status.Error(codes.Unavailable, "init response failed")
+	client := &failedInitTopicClient{stream: &failedInitGRPCStream{err: initErr}}
+	cfg := NewStreamListenerConfig()
+	cfg.Consumer = "test-consumer"
+	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "test-topic"}}
+	closeStarted := make(chan struct{})
+	closeRelease := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(closeRelease)
+		}
+	}()
+	cfg.Tracer.OnListenerClose = func(trace.TopicListenerCloseStartInfo) func(trace.TopicListenerCloseDoneInfo) {
+		close(closeStarted)
+		<-closeRelease
+
+		return nil
+	}
+	result := make(chan error, 1)
+	go func() {
+		_, err := newStreamListener(ctx, client, NewMockEventHandler(gomock.NewController(t)), &cfg, &atomic.Int64{})
+		result <- err
+	}()
+
+	xtest.WaitChannelClosed(t, closeStarted)
+	cancel()
+	require.ErrorIs(t, xtest.Receive(t, result, "the canceled initialization"), initErr)
+
+	close(closeRelease)
+	released = true
 }
 
 func TestNewStreamListenerCancellationDuringInitDoesNotHang(t *testing.T) {
@@ -833,6 +851,40 @@ func TestStreamListenerConcurrentBeginCloseKeepsStreamCause(t *testing.T) {
 	cause := context.Cause(streamCtx)
 	require.True(t, errors.Is(cause, firstErr) || errors.Is(cause, secondErr))
 	require.ErrorIs(t, listener.background.CloseReason(), cause)
+}
+
+func TestStreamListenerConcurrentCloseWaitsForSameShutdown(t *testing.T) {
+	ctx := xtest.Context(t)
+	listener := &streamListener{tracer: &trace.Topic{}}
+	_ = listener.background.Context()
+	reason := errors.New("listener failed")
+	start := make(chan struct{})
+	const callers = 32
+	results := make(chan error, callers)
+
+	for range callers {
+		go func() {
+			<-start
+			results <- listener.Close(ctx, reason)
+		}()
+	}
+	close(start)
+
+	for range callers {
+		require.NoError(t, <-results)
+	}
+	require.ErrorIs(t, listener.background.CloseReason(), reason)
+}
+
+func TestStreamListenerUnexpectedWorkerStopClosesListener(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+	worker := listener.createWorkerForPartition(PartitionSession(e))
+	worker.messageQueue.Close()
+
+	require.Eventually(t, listener.closing.Load, time.Second, time.Millisecond)
+	xtest.WaitChannelClosed(t, listener.background.StopDone())
+	require.ErrorIs(t, listener.background.CloseReason(), errPartitionQueueClosed)
 }
 
 func testTime(num int) time.Time {

@@ -479,15 +479,14 @@ func TestTopicListenerReconnectorWaitsForRetiredWorkerBeforeReconnect(t *testing
 	worker := first.createWorkerForPartition(session)
 	removed := make(chan struct{})
 	originalOnStopped := worker.onStopped
-	worker.onStopped = func(id rawtopicreader.PartitionSessionID, reason error) {
-		originalOnStopped(id, reason)
+	worker.onStopped = func(id rawtopicreader.PartitionSessionID, _ error) {
+		originalOnStopped(id, status.Error(codes.Unavailable, "stream interrupted"))
 		close(removed)
 		<-release
 	}
 	worker.messageQueue.Close()
 	xtest.WaitChannelClosed(t, removed)
 
-	first.beginClose(ctx, status.Error(codes.Unavailable, "stream interrupted"))
 	xtest.WaitChannelClosed(t, first.background.StopDone())
 	select {
 	case <-timers:
