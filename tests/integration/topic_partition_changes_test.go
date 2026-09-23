@@ -114,6 +114,8 @@ func TestTopicTransactionalMultiWriter_ManualPartitionIncrease(t *testing.T) {
 				require.Len(t, byPayload, 2)
 				require.EqualValues(t, 0, byPayload["before-alter"].partitionID)
 				require.EqualValues(t, 0, byPayload["after-alter"].partitionID)
+				require.Empty(t, byPayload["before-alter"].producerID)
+				require.Empty(t, byPayload["after-alter"].producerID)
 				t.Logf("same key %q, sequential commits: partition %d / producer %q -> "+
 					"partition %d / producer %q; DescribeTopic calls: %d",
 					key, byPayload["before-alter"].partitionID, byPayload["before-alter"].producerID,
@@ -292,8 +294,8 @@ func TestTopicPartitionChanges_PartitionKeyDoesNotValidateTarget(t *testing.T) {
 		right.PartitionID, left.PartitionID)
 }
 
-// TestTopicTransactionalMultiWriter_KeyOrderAcrossManualSplit checks order across
-// producer IDs and parent/child partitions, not just seqNo within each producer.
+// TestTopicTransactionalMultiWriter_KeyOrderAcrossManualSplit checks committed
+// transaction order across parent and child partitions without producer IDs.
 func TestTopicTransactionalMultiWriter_KeyOrderAcrossManualSplit(t *testing.T) {
 	if os.Getenv("YDB_VERSION") != "nightly" {
 		t.Skip("manual splitting requires a server with AlterTopic-driven splitting; tested on nightly")
@@ -338,7 +340,8 @@ func TestTopicTransactionalMultiWriter_KeyOrderAcrossManualSplit(t *testing.T) {
 	require.Equal(t, "0", string(messages[0].payload))
 	require.Equal(t, "1", string(messages[1].payload))
 	require.NotEqual(t, messages[0].partitionID, messages[1].partitionID)
-	require.NotEqual(t, messages[0].producerID, messages[1].producerID)
+	require.Empty(t, messages[0].producerID)
+	require.Empty(t, messages[1].producerID)
 }
 
 func partitionChangeTrace(t testing.TB) trace.Topic {

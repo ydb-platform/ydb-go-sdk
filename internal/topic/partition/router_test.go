@@ -1,4 +1,4 @@
-package partition
+package partition_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
@@ -17,7 +18,7 @@ func TestRouterChoosePartitionRejectsMissingPartition(t *testing.T) {
 	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
 		Partitions: []topictypes.PartitionInfo{{PartitionID: 1, Active: true}},
 	}}
-	router, _ := NewSources(describer.Describe).Get("test/topic").NewRouter(
+	router, _ := partition.NewSources(describer.Describe).Get("test/topic").NewRouter(
 		t.Context(), &fixedChooser{partitionID: 2})
 
 	_, err := router.ChoosePartition(topicwriterinternal.PublicMessage{})
@@ -29,7 +30,7 @@ func TestRouterChoosePartitionRejectsInactivePartition(t *testing.T) {
 	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
 		Partitions: []topictypes.PartitionInfo{{PartitionID: 2}},
 	}}
-	router, _ := NewSources(describer.Describe).Get("test/topic").NewRouter(
+	router, _ := partition.NewSources(describer.Describe).Get("test/topic").NewRouter(
 		t.Context(), &fixedChooser{partitionID: 2})
 
 	_, err := router.ChoosePartition(topicwriterinternal.PublicMessage{})
@@ -42,7 +43,7 @@ func TestRouterChoosePartitionReturnsChooserError(t *testing.T) {
 	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
 		Partitions: []topictypes.PartitionInfo{{PartitionID: 1, Active: true}},
 	}}
-	router, _ := NewSources(describer.Describe).Get("test/topic").NewRouter(
+	router, _ := partition.NewSources(describer.Describe).Get("test/topic").NewRouter(
 		t.Context(), &errorChooser{chooseErr: chooseErr})
 
 	_, err := router.ChoosePartition(topicwriterinternal.PublicMessage{})
@@ -54,7 +55,7 @@ func TestRouterChoosePartitionUsesMessagePartitionWithoutChooser(t *testing.T) {
 	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
 		Partitions: []topictypes.PartitionInfo{{PartitionID: 42, Active: true}},
 	}}
-	router, _ := NewSources(describer.Describe).Get("test/topic").NewRouter(t.Context(), nil)
+	router, _ := partition.NewSources(describer.Describe).Get("test/topic").NewRouter(t.Context(), nil)
 
 	partitionID, err := router.ChoosePartition(topicwriterinternal.PublicMessage{PartitionID: 42})
 
@@ -65,7 +66,7 @@ func TestRouterChoosePartitionUsesMessagePartitionWithoutChooser(t *testing.T) {
 func TestRouterStopsChoosingAfterTopologyUpdateFailure(t *testing.T) {
 	updateErr := errors.New("update chooser")
 	var calls atomic.Int64
-	source := NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
 		if calls.Add(1) == 1 {
 			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
 				{PartitionID: 1, Active: true},

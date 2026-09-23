@@ -1,4 +1,4 @@
-package partition
+package partition_test
 
 import (
 	"slices"

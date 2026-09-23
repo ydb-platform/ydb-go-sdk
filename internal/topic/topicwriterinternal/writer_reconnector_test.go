@@ -21,6 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -570,6 +571,35 @@ func TestWriterImpl_WaitInitInfo(t *testing.T) {
 }
 
 func TestWriterImpl_Reconnect(t *testing.T) {
+	t.Run("FirstConnectionWithoutGetLastSeqNo", func(t *testing.T) {
+		w := newTestWriterStopped(WithoutGetLastSeqNo())
+
+		require.False(t, w.needReceiveLastSeqNo())
+	})
+
+	t.Run("StopPolicyDoesNotReconnect", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		testErr := xerrors.Retryable(errors.New("session failed"))
+		connectCalls := 0
+		cfg := NewWriterReconnectorConfig(
+			WithConnectFunc(func(context.Context, *trace.Topic) (RawTopicWriterStream, error) {
+				connectCalls++
+
+				return nil, testErr
+			}),
+		)
+		cfg.RetrySettings.CheckError = func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+			return topic.PublicRetryDecisionStop
+		}
+		w, err := NewWriterReconnector(cfg)
+		require.NoError(t, err)
+
+		err = w.WaitInit(ctx)
+
+		require.Equal(t, 1, connectCalls)
+		require.ErrorIs(t, err, testErr)
+	})
+
 	t.Run("StopReconnectOnUnretryableError", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		strm := NewMockRawTopicWriterStream(mc)

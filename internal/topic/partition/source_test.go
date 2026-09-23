@@ -1,4 +1,4 @@
-package partition
+package partition_test
 
 import (
 	"context"
@@ -11,13 +11,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 func TestSourceNewRouterReturnsRouter(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	source := NewSources(describer.Describe).Get("test/topic")
+	source := partition.NewSources(describer.Describe).Get("test/topic")
 
 	router, _ := source.NewRouter(t.Context(), nil)
 	assert.NotNil(t, router)
@@ -25,7 +26,7 @@ func TestSourceNewRouterReturnsRouter(t *testing.T) {
 
 func TestSourceNewRouterReturnsDescribeError(t *testing.T) {
 	describeErr := errors.New("describe topic failed")
-	source := NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
 		return topictypes.TopicDescription{}, describeErr
 	}).Get("test/topic")
 
@@ -34,7 +35,7 @@ func TestSourceNewRouterReturnsDescribeError(t *testing.T) {
 }
 
 func TestSourceNewRouterReturnsContextErrorForCachedPartitions(t *testing.T) {
-	source := NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
+	source := partition.NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
 	_, _ = source.Partitions(t.Context())
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -47,7 +48,7 @@ func TestSourceNewRouterReturnsContextErrorForCachedPartitions(t *testing.T) {
 func TestSourceNewRouterDescribesRequestedTopic(t *testing.T) {
 	topicName := "test/topic"
 	describer := &mockTopicDescriber{}
-	source := NewSources(describer.Describe).Get(topicName)
+	source := partition.NewSources(describer.Describe).Get(topicName)
 
 	_, _ = source.NewRouter(t.Context(), nil)
 	assert.Equal(t, topicName, describer.Calls()[0].Path)
@@ -59,7 +60,7 @@ func TestSourceNewRouterAddsActivePartitionToChooser(t *testing.T) {
 	}}
 	chooser := &recordingChooser{}
 
-	_, _ = NewSources(describer.Describe).Get("test/topic").NewRouter(t.Context(), chooser)
+	_, _ = partition.NewSources(describer.Describe).Get("test/topic").NewRouter(t.Context(), chooser)
 
 	assert.Equal(t, []int64{42}, chooser.PartitionIDs())
 }
@@ -73,7 +74,7 @@ func TestSourceNewRouterDoesNotAddInactivePartitionToChooser(t *testing.T) {
 	}}
 	chooser := &recordingChooser{}
 
-	_, _ = NewSources(describer.Describe).Get("test/topic").NewRouter(t.Context(), chooser)
+	_, _ = partition.NewSources(describer.Describe).Get("test/topic").NewRouter(t.Context(), chooser)
 
 	assert.Equal(t, []int64{1}, chooser.PartitionIDs())
 }
@@ -159,7 +160,7 @@ func TestSourceNewRouterDoesNotUpdateChooserWhenLifetimeEndsDuringInitialization
 
 func TestSourcePartitionsReturnsPartitions(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	source := NewSources(describer.Describe).Get("test/topic")
+	source := partition.NewSources(describer.Describe).Get("test/topic")
 
 	partitions, _ := source.Partitions(t.Context())
 	assert.NotNil(t, partitions)
@@ -167,7 +168,7 @@ func TestSourcePartitionsReturnsPartitions(t *testing.T) {
 
 func TestSourcePartitionsReturnsDescribeError(t *testing.T) {
 	describeErr := errors.New("describe topic failed")
-	source := NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
 		return topictypes.TopicDescription{}, describeErr
 	}).Get("test/topic")
 
@@ -179,7 +180,7 @@ func TestSourcePartitionsReturnsDescribedPartitionIDs(t *testing.T) {
 	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
 		Partitions: []topictypes.PartitionInfo{{PartitionID: 42, Active: true}},
 	}}
-	source := NewSources(describer.Describe).Get("test/topic")
+	source := partition.NewSources(describer.Describe).Get("test/topic")
 
 	partitions, _ := source.Partitions(t.Context())
 	assert.Equal(t, []int64{42}, partitions.All().IDs())
@@ -187,7 +188,7 @@ func TestSourcePartitionsReturnsDescribedPartitionIDs(t *testing.T) {
 
 func TestSourcePartitionsDescribesTopicOnce(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	source := NewSources(describer.Describe).Get("test/topic")
+	source := partition.NewSources(describer.Describe).Get("test/topic")
 
 	_, _ = source.Partitions(t.Context())
 	_, _ = source.Partitions(t.Context())
@@ -198,7 +199,7 @@ func TestSourcePartitionsDescribesTopicOnce(t *testing.T) {
 func TestSourcePartitionsDescribesTopicOnceConcurrently(t *testing.T) {
 	ctx := t.Context()
 	describer := &mockTopicDescriber{}
-	source := NewSources(describer.Describe).Get("test/topic")
+	source := partition.NewSources(describer.Describe).Get("test/topic")
 	start := make(chan struct{})
 
 	var wg sync.WaitGroup
@@ -219,7 +220,7 @@ func TestSourcePartitionsDescribesTopicOnceConcurrently(t *testing.T) {
 func TestSourcePartitionsRetriesWhenConcurrentLoadContextIsCanceled(t *testing.T) {
 	var calls atomic.Int64
 	describeStarted := make(chan struct{})
-	source := NewSources(func(ctx context.Context, _ string) (topictypes.TopicDescription, error) {
+	source := partition.NewSources(func(ctx context.Context, _ string) (topictypes.TopicDescription, error) {
 		if calls.Add(1) == 1 {
 			close(describeStarted)
 			<-ctx.Done()
@@ -246,7 +247,7 @@ func TestSourcePartitionsReturnsConcurrentDescribeError(t *testing.T) {
 	describeErr := errors.New("describe topic failed")
 	describeStarted := make(chan struct{})
 	releaseDescribe := make(chan struct{})
-	source := NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
 		close(describeStarted)
 		<-releaseDescribe
 
@@ -266,7 +267,7 @@ func TestSourcePartitionsReloadsWhenInvalidatedDuringDescribe(t *testing.T) {
 	var calls atomic.Int64
 	describeStarted := make(chan struct{})
 	releaseDescribe := make(chan struct{})
-	source := NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
 		partitionID := calls.Add(1)
 		if partitionID == 1 {
 			close(describeStarted)
@@ -308,7 +309,7 @@ func TestSourcePartitionsWaitsForRouterUpdateBeforePublishing(t *testing.T) {
 
 func TestSourceNewRouterAndPartitionsDescribeTopicOnce(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	source := NewSources(describer.Describe).Get("test/topic")
+	source := partition.NewSources(describer.Describe).Get("test/topic")
 
 	_, _ = source.NewRouter(t.Context(), nil)
 	_, _ = source.Partitions(t.Context())
@@ -330,19 +331,19 @@ func TestSourcePartitionsReloadsAfterInvalidate(t *testing.T) {
 }
 
 func TestSourceNotifySessionErrorRejectsOverloadedWithoutPartitionInactiveIssue(t *testing.T) {
-	source := NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
+	source := partition.NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
 
 	assert.Nil(t, source.NotifySessionError(t.Context(), 1, overloadedError()))
 }
 
 func TestSourceNotifySessionErrorRejectsOverloadedWithOtherIssue(t *testing.T) {
-	source := NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
+	source := partition.NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
 
 	assert.Nil(t, source.NotifySessionError(t.Context(), 1, overloadedErrorWithIssue(42)))
 }
 
 func TestSourceNotifySessionErrorHandlesPartitionInactiveIssue(t *testing.T) {
-	source := NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
+	source := partition.NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
 
 	assert.NotNil(t, source.NotifySessionError(t.Context(), 1, partitionInactiveError()))
 }
@@ -357,30 +358,39 @@ func TestSourceNotifySessionErrorHandlesAlreadyPublishedReplacement(t *testing.T
 	assert.NoError(t, waitForReplacement(t.Context()))
 }
 
-func TestReplacementPublishedThroughInactiveDescendants(t *testing.T) {
-	partitions := partitionsFromDescription(topictypes.TopicDescription{
-		Partitions: []topictypes.PartitionInfo{
+func TestSourceNotifySessionErrorPublishesReplacementThroughInactiveDescendants(t *testing.T) {
+	source := newSourceWithDescriptions(
+		topicWithActivePartitions(1),
+		topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
 			{PartitionID: 1, ChildPartitionIDs: []int64{2, 3}},
 			{PartitionID: 2, ParentPartitionIDs: []int64{1}, ChildPartitionIDs: []int64{4, 5}},
 			{PartitionID: 3, ParentPartitionIDs: []int64{1}, ChildPartitionIDs: []int64{6, 7}},
-			{PartitionID: 4, ParentPartitionIDs: []int64{2}, Active: true},
-			{PartitionID: 5, ParentPartitionIDs: []int64{2}, Active: true},
-			{PartitionID: 6, ParentPartitionIDs: []int64{3}, Active: true},
-			{PartitionID: 7, ParentPartitionIDs: []int64{3}, Active: true},
-		},
-	})
+			{PartitionID: 4, Active: true, ParentPartitionIDs: []int64{2}},
+			{PartitionID: 5, Active: true, ParentPartitionIDs: []int64{2}},
+			{PartitionID: 6, Active: true, ParentPartitionIDs: []int64{3}},
+			{PartitionID: 7, Active: true, ParentPartitionIDs: []int64{3}},
+		}},
+	)
+	_, err := source.Partitions(t.Context())
+	require.NoError(t, err)
+	waitForReplacement := source.NotifySessionError(t.Context(), 1, partitionInactiveError())
 
-	assert.True(t, replacementPublished(partitions, 1))
+	require.NoError(t, waitForReplacement(t.Context()))
+	partitions, err := source.Partitions(t.Context())
+	require.NoError(t, err)
+	assert.False(t, partitions.ByPartitionID(1).IsActive())
+	assert.True(t, partitions.ByPartitionID(4).IsActive())
+	assert.True(t, partitions.ByPartitionID(7).IsActive())
 }
 
 func TestSourceNotifySessionErrorRejectsUnrelatedError(t *testing.T) {
-	source := NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
+	source := partition.NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
 
 	assert.Nil(t, source.NotifySessionError(t.Context(), 1, errors.New("session failed")))
 }
 
 func TestSourceNotifySessionErrorRejectsCanceledContext(t *testing.T) {
-	source := NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
+	source := partition.NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	overloaded := partitionInactiveError()
@@ -392,7 +402,7 @@ func TestSourceNotifySessionErrorWaiterReturnsCallerContextError(t *testing.T) {
 	var calls atomic.Int64
 	refreshStarted := make(chan struct{})
 	releaseRefresh := make(chan struct{})
-	source := NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
 		if calls.Add(1) == 1 {
 			return topicWithActivePartitions(1), nil
 		}
@@ -468,7 +478,7 @@ func TestSourceReplacementRefreshSurvivesOneReporterCancellation(t *testing.T) {
 	refreshStarted := make(chan struct{})
 	checkCancellation := make(chan struct{})
 	releaseRefresh := make(chan struct{})
-	source := NewSources(func(ctx context.Context, _ string) (topictypes.TopicDescription, error) {
+	source := partition.NewSources(func(ctx context.Context, _ string) (topictypes.TopicDescription, error) {
 		if calls.Add(1) == 1 {
 			return topicWithActivePartitions(1), nil
 		}
@@ -498,7 +508,7 @@ func TestSourceReplacementRefreshSurvivesOneReporterCancellation(t *testing.T) {
 func TestSourceCanceledReplacementRefreshDoesNotFailOtherRouter(t *testing.T) {
 	var calls atomic.Int64
 	refreshStarted := make(chan struct{})
-	source := NewSources(func(ctx context.Context, _ string) (topictypes.TopicDescription, error) {
+	source := partition.NewSources(func(ctx context.Context, _ string) (topictypes.TopicDescription, error) {
 		if calls.Add(1) == 1 {
 			return topicWithActivePartitions(1), nil
 		}

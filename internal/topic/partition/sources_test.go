@@ -1,4 +1,4 @@
-package partition
+package partition_test
 
 import (
 	"sync"
@@ -6,25 +6,27 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 )
 
 func TestNewSourcesReturnsSources(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	sources := NewSources(describer.Describe)
+	sources := partition.NewSources(describer.Describe)
 
 	assert.NotNil(t, sources)
 }
 
 func TestSourcesGetReturnsSource(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	sources := NewSources(describer.Describe)
+	sources := partition.NewSources(describer.Describe)
 
 	assert.NotNil(t, sources.Get("test/topic"))
 }
 
 func TestSourcesGetDoesNotDescribeTopic(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	sources := NewSources(describer.Describe)
+	sources := partition.NewSources(describer.Describe)
 
 	_ = sources.Get("test/topic")
 
@@ -33,7 +35,7 @@ func TestSourcesGetDoesNotDescribeTopic(t *testing.T) {
 
 func TestSourcesGetKeepsTopicCachesIndependent(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	sources := NewSources(describer.Describe)
+	sources := partition.NewSources(describer.Describe)
 
 	_, _ = sources.Get("test/topic-1").Partitions(t.Context())
 	_, _ = sources.Get("test/topic-2").Partitions(t.Context())
@@ -46,7 +48,7 @@ func TestSourcesGetKeepsTopicCachesIndependent(t *testing.T) {
 
 func TestSourcesGetSharesTopicCache(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	sources := NewSources(describer.Describe)
+	sources := partition.NewSources(describer.Describe)
 
 	_, _ = sources.Get("test/topic").NewRouter(t.Context(), nil)
 	_, _ = sources.Get("test/topic").NewRouter(t.Context(), nil)
@@ -57,7 +59,7 @@ func TestSourcesGetSharesTopicCache(t *testing.T) {
 func TestSourcesGetDescribesTopicOnceForConcurrentRouters(t *testing.T) {
 	ctx := t.Context()
 	describer := &mockTopicDescriber{}
-	sources := NewSources(describer.Describe)
+	sources := partition.NewSources(describer.Describe)
 
 	start := make(chan struct{})
 

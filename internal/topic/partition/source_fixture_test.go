@@ -1,4 +1,4 @@
-package partition
+package partition_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
@@ -31,11 +32,11 @@ type routeChangeResult struct {
 }
 
 type partitionsResult struct {
-	partitions *Partitions
+	partitions *partition.Partitions
 	err        error
 }
 
-func newSourceWithDescriptions(descriptions ...topictypes.TopicDescription) *Source {
+func newSourceWithDescriptions(descriptions ...topictypes.TopicDescription) *partition.Source {
 	results := make([]topicDescribeResult, len(descriptions))
 	for i, description := range descriptions {
 		results[i].description = description
@@ -44,10 +45,10 @@ func newSourceWithDescriptions(descriptions ...topictypes.TopicDescription) *Sou
 	return newSourceWithDescribeResults(results...)
 }
 
-func newSourceWithDescribeResults(results ...topicDescribeResult) *Source {
+func newSourceWithDescribeResults(results ...topicDescribeResult) *partition.Source {
 	describer := &scriptedTopicDescriber{results: results}
 
-	return NewSources(describer.Describe).Get("test/topic")
+	return partition.NewSources(describer.Describe).Get("test/topic")
 }
 
 func topicWithActivePartitions(partitionIDs ...int64) topictypes.TopicDescription {
@@ -83,7 +84,7 @@ func topicAfterMerge(parentIDs []int64, childID int64) topictypes.TopicDescripti
 	return topictypes.TopicDescription{Partitions: partitions}
 }
 
-func startNewRouter(ctx context.Context, source *Source, chooser Chooser) <-chan error {
+func startNewRouter(ctx context.Context, source *partition.Source, chooser partition.Chooser) <-chan error {
 	result := make(chan error, 1)
 	go func() {
 		_, err := source.NewRouter(ctx, chooser)
@@ -93,7 +94,7 @@ func startNewRouter(ctx context.Context, source *Source, chooser Chooser) <-chan
 	return result
 }
 
-func startWaitingForRouteChange(router *Router) <-chan routeChangeResult {
+func startWaitingForRouteChange(router *partition.Router) <-chan routeChangeResult {
 	result := make(chan routeChangeResult, 1)
 	go func() {
 		partitionID, err := router.WaitForRouteChange()
@@ -103,7 +104,7 @@ func startWaitingForRouteChange(router *Router) <-chan routeChangeResult {
 	return result
 }
 
-func startLoadingPartitions(ctx context.Context, source *Source) <-chan partitionsResult {
+func startLoadingPartitions(ctx context.Context, source *partition.Source) <-chan partitionsResult {
 	result := make(chan partitionsResult, 1)
 	go func() {
 		partitions, err := source.Partitions(ctx)
@@ -113,7 +114,7 @@ func startLoadingPartitions(ctx context.Context, source *Source) <-chan partitio
 	return result
 }
 
-func startWaitingForPartitions(t *testing.T, source *Source) <-chan partitionsResult {
+func startWaitingForPartitions(t *testing.T, source *partition.Source) <-chan partitionsResult {
 	t.Helper()
 
 	waiting := make(chan struct{})

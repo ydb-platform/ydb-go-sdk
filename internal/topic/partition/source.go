@@ -6,8 +6,11 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
+
+var errReplacementNotPublished = errors.New("partition replacement was not published")
 
 // TopicDescriber loads topic metadata without depending on client or writer options.
 type TopicDescriber func(ctx context.Context, path string) (topictypes.TopicDescription, error)
@@ -345,23 +348,22 @@ func (s *Source) watchReplacementReporter(ctx context.Context, refresh *replacem
 }
 
 func (s *Source) refreshReplacement(partitionID int64, refresh *replacementRefresh) {
-	for {
-		partitions, err := s.Partitions(refresh.ctx)
+	err := retry.Retry(refresh.ctx, func(ctx context.Context) error {
+		partitions, err := s.Partitions(ctx)
 		if err != nil {
-			if refresh.ctx.Err() == nil {
-				s.failSubscriptions(err)
-			}
-			finishReplacementRefresh(refresh, err)
-
-			return
+			return err
 		}
 		if replacementPublished(partitions, partitionID) {
-			finishReplacementRefresh(refresh, nil)
-
-			return
+			return nil
 		}
 		s.Invalidate()
+
+		return retry.RetryableError(errReplacementNotPublished, retry.WithBackoff(retry.TypeFastBackoff))
+	}, retry.WithIdempotent(true))
+	if err != nil && refresh.ctx.Err() == nil {
+		s.failSubscriptions(err)
 	}
+	s.finishReplacementRefresh(partitionID, refresh, err)
 }
 
 func (s *Source) failSubscriptions(err error) {
@@ -384,7 +386,13 @@ func (s *Source) subscriptionsNeedLock() []*subscription {
 	return subscriptions
 }
 
-func finishReplacementRefresh(refresh *replacementRefresh, err error) {
+func (s *Source) finishReplacementRefresh(partitionID int64, refresh *replacementRefresh, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if current := s.replacementRefreshes[partitionID]; current == refresh {
+		delete(s.replacementRefreshes, partitionID)
+	}
 	refresh.err = err
 	close(refresh.done)
 	refresh.cancel()

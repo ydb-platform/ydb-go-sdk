@@ -11,6 +11,8 @@ import (
 
 // Chooser preserves the existing user-supplied partition selection interface.
 // Concurrent calls are not supported.
+// ChoosePartition must return promptly: chooser calls are serialized with topology updates,
+// so a blocking call delays topology publication for every writer sharing the Source.
 // Implementations must not modify PartitionInfo values passed to AddNewPartitions
 // or data referenced by their fields.
 // After RemovePartition returns, ChoosePartition must not return that partition

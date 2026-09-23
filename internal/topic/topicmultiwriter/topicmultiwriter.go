@@ -24,7 +24,27 @@ type MultiWriter struct {
 }
 
 func NewMultiWriter(
+	topicDescriber TopicDescriber,
+	writerCfg *topicwriterinternal.WriterReconnectorConfig,
+	multiWriterCfg *MultiWriterConfig,
+) (*MultiWriter, error) {
+	return newMultiWriter(topicDescriber, nil, false, writerCfg, multiWriterCfg)
+}
+
+// NewTransactionalMultiWriter creates a multiwriter whose partition sessions
+// live only for one transaction and never reconnect after a session error.
+func NewTransactionalMultiWriter(
 	source *partition.Source,
+	writerCfg *topicwriterinternal.WriterReconnectorConfig,
+	multiWriterCfg *MultiWriterConfig,
+) (*MultiWriter, error) {
+	return newMultiWriter(nil, source, true, writerCfg, multiWriterCfg)
+}
+
+func newMultiWriter(
+	topicDescriber TopicDescriber,
+	source *partition.Source,
+	transactional bool,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
@@ -43,12 +63,14 @@ func NewMultiWriter(
 	}
 
 	p := &MultiWriter{
-		ctx:          ctx,
-		cfg:          multiWriterCfg,
-		writerCfg:    writerCfg,
-		encoders:     encoders,
-		orchestrator: newOrchestrator(ctx, cancel, source, background, writerCfg, multiWriterCfg),
-		background:   background,
+		ctx:       ctx,
+		cfg:       multiWriterCfg,
+		writerCfg: writerCfg,
+		encoders:  encoders,
+		orchestrator: newOrchestrator(
+			ctx, cancel, topicDescriber, source, transactional, background, writerCfg, multiWriterCfg,
+		),
+		background: background,
 	}
 
 	p.background.Start("init main worker", func(ctx context.Context) {
@@ -68,8 +90,8 @@ func (p *MultiWriter) Write(ctx context.Context, messages []topicwriterinternal.
 		return ErrAlreadyClosed
 	}
 
-	// Same idea as WriterReconnector.waitFirstInitResponse: do not process writes until
-	// orchestrator init() finished (describe topic, seq baseline, partition chooser).
+	// Same idea as WriterReconnector.waitFirstInitResponse: do not process writes
+	// until partition routing initialization has finished.
 	if err := p.orchestrator.waitInitDone(ctx); err != nil {
 		return err
 	}

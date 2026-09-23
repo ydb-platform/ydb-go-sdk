@@ -6,16 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
@@ -27,13 +25,6 @@ import (
 )
 
 var errTest = errors.New("test error")
-
-func partitionInactiveError() error {
-	return xerrors.Operation(
-		xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
-		xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: xerrors.IssueCodeTopicPartitionInactive}}),
-	)
-}
 
 func (p *MultiWriter) getWritersCount() int {
 	return p.orchestrator.getWritersCount()
@@ -119,7 +110,7 @@ func (w *overloadedInitWriter) Close(ctx context.Context) error {
 }
 
 func (w *overloadedInitWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
-	return topicwriterinternal.InitialInfo{}, partitionInactiveError()
+	return topicwriterinternal.InitialInfo{}, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
 }
 
 func (w *overloadedInitWriter) WriteInternal(
@@ -129,11 +120,9 @@ func (w *overloadedInitWriter) WriteInternal(
 	return nil
 }
 
-type overloadedInitWritersFactory struct{ createCalls atomic.Int64 }
+type overloadedInitWritersFactory struct{}
 
 func (f *overloadedInitWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
-	f.createCalls.Add(1)
-
 	return &overloadedInitWriter{}, nil
 }
 
@@ -225,7 +214,7 @@ func (r *blockingReader) Read(p []byte) (int, error) {
 	return copy(p, r.data), nil
 }
 
-func newTestMultiWriter(t testing.TB, describer partition.TopicDescriber) *MultiWriter {
+func newTestMultiWriter(t testing.TB, describer TopicDescriber) *MultiWriter {
 	t.Helper()
 
 	cfg := MultiWriterConfig{}
@@ -233,8 +222,7 @@ func newTestMultiWriter(t testing.TB, describer partition.TopicDescriber) *Multi
 	WithProducerIDPrefix("test-producer")(&cfg)
 	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
 
-	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
-	writer, err := NewMultiWriter(partition.NewSources(describer).Get(writerCfg.Topic()), writerCfg, &cfg)
+	writer, err := NewMultiWriter(describer, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -242,7 +230,7 @@ func newTestMultiWriter(t testing.TB, describer partition.TopicDescriber) *Multi
 
 func newTestMultiWriterWithInitDelay(
 	t testing.TB,
-	describer partition.TopicDescriber,
+	describer TopicDescriber,
 	initDelay time.Duration,
 ) *MultiWriter {
 	t.Helper()
@@ -251,14 +239,11 @@ func newTestMultiWriterWithInitDelay(
 	WithProducerIDPrefix("test-producer")(&cfg)
 	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
 
-	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
-	describe := func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+	writer, err := NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 		time.Sleep(initDelay)
 
 		return describer(ctx, path)
-	}
-	source := partition.NewSources(describe).Get(writerCfg.Topic())
-	writer, err := NewMultiWriter(source, writerCfg, &cfg)
+	}, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -267,7 +252,7 @@ func newTestMultiWriterWithInitDelay(
 // newTestMultiWriterWithBasicWriter creates a multiwriter that uses basicWriter as writer (no real gRPC).
 func newTestMultiWriterWithBasicWriter(
 	t testing.TB,
-	describer partition.TopicDescriber,
+	describer TopicDescriber,
 	opts ...topicwriterinternal.PublicWriterOption,
 ) *MultiWriter {
 	t.Helper()
@@ -284,7 +269,7 @@ func newTestMultiWriterWithBasicWriter(
 		opt(writerCfg)
 	}
 
-	writer, err := NewMultiWriter(partition.NewSources(describer).Get(writerCfg.Topic()), writerCfg, &cfg)
+	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -292,11 +277,11 @@ func newTestMultiWriterWithBasicWriter(
 
 // newTestMultiWriterWithAutopartitioningWriter creates a multiwriter that uses the autopartitioning stub:
 // client must be from NewStubTopicClientWithSplits(t, state). After 100 messages the writer returns
-// OVERLOADED, Source refreshes metadata; state adds two child partitions
+// OVERLOADED, orchestrator calls onPartitionSplit and Describe; state adds two child partitions
 // with bounds [from, (from+to)/2) and [(from+to)/2, to).
 func newTestMultiWriterWithAutopartitioningWriter(
 	t testing.TB,
-	describer partition.TopicDescriber,
+	describer TopicDescriber,
 	state *stubs.DescribeWithSplitsState,
 ) *MultiWriter {
 	const producerIDPrefix = "test-producer"
@@ -319,13 +304,13 @@ func newTestMultiWriterWithAutopartitioningWriter(
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(partition.NewSources(describer).Get(writerCfg.Topic()), writerCfg, &cfg)
+	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
 }
 
-func newTestMultiWriterWithSmallIdleSessionTimeout(t testing.TB, describer partition.TopicDescriber) *MultiWriter {
+func newTestMultiWriterWithSmallIdleSessionTimeout(t testing.TB, describer TopicDescriber) *MultiWriter {
 	t.Helper()
 	cfg := MultiWriterConfig{}
 	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
@@ -338,7 +323,7 @@ func newTestMultiWriterWithSmallIdleSessionTimeout(t testing.TB, describer parti
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(partition.NewSources(describer).Get(writerCfg.Topic()), writerCfg, &cfg)
+	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -346,7 +331,7 @@ func newTestMultiWriterWithSmallIdleSessionTimeout(t testing.TB, describer parti
 
 func newTestMultiWriterWithAckDelay(
 	t testing.TB,
-	describer partition.TopicDescriber,
+	describer TopicDescriber,
 	ackDelay time.Duration,
 	opts ...topicwriterinternal.PublicWriterOption,
 ) *MultiWriter {
@@ -365,7 +350,7 @@ func newTestMultiWriterWithAckDelay(
 		opt(writerCfg)
 	}
 
-	writer, err := NewMultiWriter(partition.NewSources(describer).Get(writerCfg.Topic()), writerCfg, &cfg)
+	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -373,7 +358,7 @@ func newTestMultiWriterWithAckDelay(
 
 func newTestMultiWriterWithCustomWritersFactory(
 	t testing.TB,
-	describer partition.TopicDescriber,
+	describer TopicDescriber,
 	writersFactory writersFactory,
 	opts ...topicwriterinternal.PublicWriterOption,
 ) *MultiWriter {
@@ -392,14 +377,14 @@ func newTestMultiWriterWithCustomWritersFactory(
 		opt(writerCfg)
 	}
 
-	writer, err := NewMultiWriter(partition.NewSources(describer).Get(writerCfg.Topic()), writerCfg, &cfg)
+	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
 }
 
 type failingAddPartitionChooser struct {
-	delegate partition.Chooser
+	delegate PartitionChooser
 	addCalls int
 	err      error
 }
@@ -438,8 +423,8 @@ func (c *errorPartitionChooser) RemovePartition(partitionID int64) {
 
 func newTestMultiWriterWithPartitionChooser(
 	t testing.TB,
-	describer partition.TopicDescriber,
-	partitionChooser partition.Chooser,
+	describer TopicDescriber,
+	partitionChooser PartitionChooser,
 ) *MultiWriter {
 	t.Helper()
 
@@ -453,7 +438,7 @@ func newTestMultiWriterWithPartitionChooser(
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(partition.NewSources(describer).Get(writerCfg.Topic()), writerCfg, &cfg)
+	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -553,7 +538,7 @@ func TestOrchestratorOnAckReceivedIgnoresMissingPartition(t *testing.T) {
 			},
 		})
 		delete(multiWriter.orchestrator.buf.pendingMessagesIndex, 1)
-		delete(multiWriter.orchestrator.writeStates, 1)
+		delete(multiWriter.orchestrator.partitions, 1)
 		require.NotPanics(t, func() {
 			multiWriter.orchestrator.onAckReceivedNeedLock(1, 1)
 		})
@@ -563,7 +548,7 @@ func TestOrchestratorOnAckReceivedIgnoresMissingPartition(t *testing.T) {
 	require.NoError(t, multiWriter.Close(ctx))
 }
 
-func TestMultiWriter_SplitUpdateFailureStopsWriter(t *testing.T) {
+func TestMultiWriter_OnPartitionSplitReturnsAddPartitionsError(t *testing.T) {
 	t.Parallel()
 
 	ctx := xtest.Context(t)
@@ -586,13 +571,9 @@ func TestMultiWriter_SplitUpdateFailureStopsWriter(t *testing.T) {
 	require.NoError(t, multiWriter.WaitInit(ctx))
 	state.RecordSplit(1)
 
-	require.NotNil(t, multiWriter.orchestrator.source.NotifySessionError(
-		ctx, 1, partitionInactiveError(),
-	))
-	require.Eventually(t, func() bool {
-		return errors.Is(multiWriter.orchestrator.getResultErr(), addPartitionsErr)
-	}, time.Second, time.Millisecond)
-	require.ErrorIs(t, multiWriter.Close(ctx), addPartitionsErr)
+	err := multiWriter.orchestrator.onPartitionSplit(1)
+	require.ErrorIs(t, err, addPartitionsErr)
+	require.NoError(t, multiWriter.Close(ctx))
 }
 
 func TestMultiWriter_ErrAlreadyClosed(t *testing.T) {
@@ -627,49 +608,53 @@ func TestMultiWriter_WaitInit_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestMultiWriter_WaitInitRefreshesSplitAfterSeqNoError(t *testing.T) {
-	t.Parallel()
-
-	ctx := xtest.Context(t)
-	state := stubs.NewDescribeWithSplitsState(t, stubs.DefaultStubTopicDescription(t), 6)
-	factory := &splitDuringSeqNoWritersFactory{state: state}
-	multiWriter := newTestMultiWriterWithCustomWritersFactory(
-		t,
-		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-			return state.GetDescription(), nil
-		},
-		factory,
-	)
-	t.Cleanup(func() { _ = multiWriter.Close(ctx) })
-
-	require.NoError(t, multiWriter.WaitInit(ctx))
-	require.True(t, factory.splitReported.Load(), "initial parent session must report the split")
-	require.Equal(t, int64(17), multiWriter.orchestrator.currentSeqNo,
-		"the baseline must include the new child producer, not just the old partition list")
-}
-
-func TestMultiWriter_CloseCancelsSplitWaitDuringInit(t *testing.T) {
+func TestMultiWriter_CloseCancelsInitSeqNoRetrySleep(t *testing.T) {
 	t.Parallel()
 
 	ctx := xtest.Context(t)
 	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
-	factory := &overloadedInitWritersFactory{}
 	multiWriter := newTestMultiWriterWithCustomWritersFactory(
 		t,
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return stubClient.Describe(ctx, path)
 		},
-		factory,
+		&overloadedInitWritersFactory{},
 	)
-	require.Eventually(t, func() bool {
-		return factory.createCalls.Load() > 0
-	}, time.Second, time.Millisecond)
 
 	closeCtx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
 	startedAt := time.Now()
 	require.NoError(t, multiWriter.Close(closeCtx))
+	require.Less(t, time.Since(startedAt), 100*time.Millisecond)
+}
+
+func TestOrchestratorDescribeTopicWithRetriesCancelsRetrySleep(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	bg := background.NewWorker(ctx, "describe-retry-test")
+	describeResult := stubs.DefaultStubTopicDescription(t)
+	o := newOrchestrator(
+		ctx,
+		cancel,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return describeResult, nil
+		},
+		nil,
+		false,
+		bg,
+		&topicwriterinternal.WriterReconnectorConfig{},
+		&MultiWriterConfig{},
+	)
+	cancel()
+	defer func() {
+		_ = bg.Close(xtest.Context(t), nil)
+	}()
+
+	startedAt := time.Now()
+	_, err := o.describeTopicWithRetries(describeResult.Partitions[0].PartitionID)
+	require.ErrorIs(t, err, context.Canceled)
 	require.Less(t, time.Since(startedAt), 100*time.Millisecond)
 }
 
@@ -966,9 +951,9 @@ func TestMultiWriter_Write_ErrUnorderedSeqNo(t *testing.T) {
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
 	multiWriter, err := NewMultiWriter(
-		partition.NewSources(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return stubClient.Describe(ctx, path)
-		}).Get(writerCfg.Topic()),
+		},
 		writerCfg,
 		&cfg,
 	)
@@ -1023,9 +1008,9 @@ func TestMultiWriter_Write_AutoSeqNoFollowsQueueOrder(t *testing.T) {
 	topicwriterinternal.WithAutoSetSeqNo(true)(writerCfg)
 
 	multiWriter, err := NewMultiWriter(
-		partition.NewSources(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return stubClient.Describe(ctx, path)
-		}).Get(writerCfg.Topic()),
+		},
 		writerCfg,
 		&cfg,
 	)
@@ -1154,7 +1139,7 @@ func TestMultiWriter_Write_WithAutopartitioningWriter(t *testing.T) {
 	require.NoError(t, err)
 
 	// Send enough messages so at least one partition hits MessagesBeforeOverloaded and returns OVERLOADED.
-	// Recovery uses writersFactory.Create + writer.WaitInit (same stub), without StartWriter.
+	// onPartitionSplit uses writersFactory.Create + writer.WaitInit (same stub), so split path runs without StartWriter.
 	messages := make([]topicwriterinternal.PublicMessage, 0, 1000)
 	for i := range 1000 {
 		messages = append(messages, topicwriterinternal.PublicMessage{
@@ -1186,7 +1171,7 @@ func TestMultiWriter_Write_SmallIdleSessionTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	// Send enough messages so at least one partition hits MessagesBeforeOverloaded and returns OVERLOADED.
-	// Recovery uses writersFactory.Create + writer.WaitInit (same stub), without StartWriter.
+	// onPartitionSplit uses writersFactory.Create + writer.WaitInit (same stub), so split path runs without StartWriter.
 	messages := make([]topicwriterinternal.PublicMessage, 0, 5)
 	for i := range 5 {
 		messages = append(messages, topicwriterinternal.PublicMessage{
@@ -1216,33 +1201,12 @@ func TestMultiWriter_Write_SmallIdleSessionTimeout(t *testing.T) {
 
 var errTestStopWriterReconnector = errors.New("ydb: stop writer reconnector")
 
-type splitDuringSeqNoWritersFactory struct {
-	state         *stubs.DescribeWithSplitsState
-	splitReported atomic.Bool
-}
-
-func (f *splitDuringSeqNoWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
-	partitionID, pinned := cfg.PartitionID()
-	if pinned && partitionID == 1 && f.splitReported.CompareAndSwap(false, true) {
-		f.state.RecordSplit(1)
-
-		return &poolTestWriter{initErr: partitionInactiveError()}, nil
-	}
-	if cfg.ProducerID() == "test-producer-6" {
-		return &poolTestWriter{initInfo: topicwriterinternal.InitialInfo{LastSeqNum: 17}}, nil
-	}
-
-	return &poolTestWriter{}, nil
-}
-
 type blockingInitWriter struct {
 	releaseInit <-chan struct{}
 	closeCalled chan struct{}
-	closeCalls  *atomic.Int64
 }
 
 func (w *blockingInitWriter) Close(_ context.Context) error {
-	w.closeCalls.Add(1)
 	select {
 	case w.closeCalled <- struct{}{}:
 	default:
@@ -1271,19 +1235,21 @@ func (w *blockingInitWriter) WriteInternal(
 }
 
 type blockingInitWritersFactory struct {
-	createCalls atomic.Int64
 	releaseInit <-chan struct{}
-	closeCalls  atomic.Int64
 }
 
 func (f *blockingInitWritersFactory) Create(_ topicwriterinternal.WriterReconnectorConfig) (writer, error) {
-	f.createCalls.Add(1)
-
 	return &blockingInitWriter{
 		releaseInit: f.releaseInit,
 		closeCalled: make(chan struct{}, 1),
-		closeCalls:  &f.closeCalls,
 	}, nil
+}
+
+func pendingPartitionSplitCount(r *partitionSplitReceiver) int {
+	r.partitionSplits.mu.Lock()
+	defer r.partitionSplits.mu.Unlock()
+
+	return r.partitionSplits.Len()
 }
 
 func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
@@ -1291,7 +1257,6 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 
 	ctx := xtest.Context(t)
 	releaseInit := make(chan struct{})
-	factory := &blockingInitWritersFactory{releaseInit: releaseInit}
 
 	baseDesc := stubs.DefaultStubTopicDescription(t)
 	state := stubs.NewDescribeWithSplitsState(t, baseDesc, 6)
@@ -1302,7 +1267,7 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return stubClient.Describe(ctx, path)
 		},
-		factory,
+		&blockingInitWritersFactory{releaseInit: releaseInit},
 	)
 	defer func() {
 		select {
@@ -1321,31 +1286,24 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 	}()
 
 	require.Eventually(t, func() bool {
-		return factory.createCalls.Load() > 0
-	}, time.Second, 10*time.Millisecond, "initSeqNo should open a temporary session")
+		return multiWriter.getWritersCount() > 0
+	}, time.Second, 10*time.Millisecond, "initSeqNo should create partition writers")
 
-	// Simulate a split reported by another writer sharing Source while seqNo initialization is blocked.
+	// Simulate a partition split event while initSeqNo is still waiting for writer init.
 	// The split is queued but must not be processed until init completes and workers start.
 	state.RecordSplit(1)
-	require.NotNil(t, multiWriter.orchestrator.source.NotifySessionError(
-		ctx, 1, partitionInactiveError(),
-	))
-	require.Eventually(t, func() bool {
-		partitions, err := multiWriter.orchestrator.source.Partitions(ctx)
-
-		return err == nil && !partitions.ByPartitionID(1).IsActive()
-	}, time.Second, time.Millisecond, "Source should refresh topology while writer init is blocked")
+	multiWriter.orchestrator.partitionSplitReceiver.push(1)
 
 	select {
 	case err := <-waitResult:
-		t.Fatalf("WaitInit finished while initSeqNo is blocked: %v", err)
+		require.NoError(t, err, "WaitInit must not finish while initSeqNo is blocked")
 	default:
 	}
 
 	require.Never(t, func() bool {
-		return factory.closeCalls.Load() > 0
+		return pendingPartitionSplitCount(multiWriter.orchestrator.partitionSplitReceiver) == 0
 	}, 200*time.Millisecond, time.Millisecond,
-		"recovery must not close sessions still used by initSeqNo",
+		"split event must stay queued until init completes",
 	)
 
 	close(releaseInit)
@@ -1357,8 +1315,5 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 		t.Fatal("WaitInit timed out")
 	}
 
-	require.Eventually(t, func() bool {
-		return factory.createCalls.Load() > int64(len(baseDesc.Partitions))
-	}, time.Second, time.Millisecond, "queued split must be recovered after init completes")
 	require.NoError(t, multiWriter.Close(ctx))
 }

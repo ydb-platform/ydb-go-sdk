@@ -36,6 +36,15 @@ func WithAutoSetSeqNo(val bool) PublicWriterOption {
 	}
 }
 
+// WithoutGetLastSeqNo disables loading the producer sequence number during
+// the first stream initialization. It is used by transactional writers,
+// which do not recover a producer stream across transactions.
+func WithoutGetLastSeqNo() PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.skipGetLastSeqNo = true
+	}
+}
+
 func WithAutoCodec() PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.forceCodec = rawtopiccommon.CodecUNSPECIFIED

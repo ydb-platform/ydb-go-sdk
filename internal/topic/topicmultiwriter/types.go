@@ -1,20 +1,29 @@
 package topicmultiwriter
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
-// PartitionInfo stores one writer's state; topology belongs to partition.Source.
+type TopicDescriber func(ctx context.Context, path string) (topictypes.TopicDescription, error)
+
 type PartitionInfo struct {
+	topictypes.PartitionInfo
+
 	Locked          bool
 	PendingResend   int
 	CachedMaxSeqNo  int64
 	LastQueuedSeqNo int64
+}
+
+func (p *PartitionInfo) Splitted() bool {
+	return len(p.ChildPartitionIDs) > 0
 }
 
 type message struct {
@@ -37,6 +46,7 @@ type writerWrapper struct {
 
 	initDone atomic.Bool
 	initErr  atomic.Value
+	direct   bool
 }
 
 func (w *writerWrapper) setInitErr(err error) {

@@ -1,4 +1,4 @@
-package partition
+package partition_test
 
 import (
 	"context"
@@ -7,11 +7,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 )
 
 func TestRouterWaitForRouteChangeReturnsLifetimeContextError(t *testing.T) {
 	routerCtx, cancelRouter := context.WithCancel(t.Context())
-	router, _ := NewSources((&mockTopicDescriber{}).Describe).Get("test/topic").NewRouter(routerCtx, nil)
+	router, _ := partition.NewSources((&mockTopicDescriber{}).Describe).Get("test/topic").NewRouter(routerCtx, nil)
 	cancelRouter()
 
 	_, err := router.WaitForRouteChange()
@@ -40,7 +42,7 @@ func TestSourcePublishesReplacementToEveryRouter(t *testing.T) {
 		topicWithActivePartitions(1),
 		topicAfterReplacement(1, 2),
 	)
-	routers := make([]*Router, 2)
+	routers := make([]*partition.Router, 2)
 	for i := range routers {
 		routers[i], _ = source.NewRouter(t.Context(), nil)
 	}
