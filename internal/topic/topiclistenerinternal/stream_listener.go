@@ -55,11 +55,10 @@ type streamListener struct {
 	shutdownDone empty.Chan
 	shutdownErr  error
 
-	m                xsync.Mutex
-	workers          map[rawtopicreader.PartitionSessionID]*PartitionWorker
-	workerCloseWG    sync.WaitGroup
-	workerCloseCount int
-	messagesToSend   []rawtopicreader.ClientMessage
+	m              xsync.Mutex
+	workers        map[rawtopicreader.PartitionSessionID]*PartitionWorker
+	workerCloseWG  sync.WaitGroup
+	messagesToSend []rawtopicreader.ClientMessage
 }
 
 func newStreamListener(
@@ -140,30 +139,38 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 	}
 }
 
+// beginClose starts shutdown exactly once and returns the channel shared by all
+// callers waiting for its completion. It must remain non-blocking because listener
+// and partition-worker goroutines call it, while finishClose waits for those same
+// goroutines to stop. The first caller supplies the shutdown reason; later callers
+// only observe the already-started shutdown.
 func (l *streamListener) beginClose(ctx context.Context, reason error) empty.Chan {
 	var done empty.Chan
 	var start bool
-	var closedBefore int
+	var workersToClose int
 	l.m.WithLock(func() {
 		start = l.closing.CompareAndSwap(false, true)
 		if start {
 			l.shutdownDone = make(empty.Chan)
-			closedBefore = l.workerCloseCount
+			workersToClose = len(l.workers)
 		}
 		done = l.shutdownDone
 	})
 
 	if start {
-		// Close uses the caller context only to bound its wait. Detach cancellation
-		// from cleanup so WaitStop cannot complete before callbacks and workers stop.
 		cleanupCtx := xcontext.ValueOnly(ctx)
-		go l.finishClose(cleanupCtx, reason, done, closedBefore)
+		go l.finishClose(cleanupCtx, reason, done, workersToClose)
 	}
 
 	return done
 }
 
-func (l *streamListener) finishClose(cleanupCtx context.Context, reason error, done empty.Chan, closedBefore int) {
+// finishClose performs the blocking shutdown work outside the goroutine that
+// initiated it. Its context retains caller values but not cancellation: Close uses
+// the caller context to bound its own wait, while cleanup continues until callbacks
+// and internal workers stop. After all resources are closed, finishClose records the
+// final error and closes done so concurrent Close and WaitStop calls can proceed.
+func (l *streamListener) finishClose(cleanupCtx context.Context, reason error, done empty.Chan, workersToClose int) {
 	logCtx := cleanupCtx
 	closeDone := gtrace.TopicOnListenerClose(l.tracer, &logCtx, l.listenerID, l.sessionID, reason)
 
@@ -180,10 +187,6 @@ func (l *streamListener) finishClose(cleanupCtx context.Context, reason error, d
 	// Canceling the listener also stops each partition worker. Its callback
 	// closes the worker asynchronously, because it may run in the worker itself.
 	l.workerCloseWG.Wait()
-	var workersClosed int
-	l.m.WithLock(func() {
-		workersClosed = l.workerCloseCount - closedBefore
-	})
 
 	if l.syncCommitter != nil {
 		if err := l.syncCommitter.Close(cleanupCtx, reason); err != nil &&
@@ -203,7 +206,7 @@ func (l *streamListener) finishClose(cleanupCtx context.Context, reason error, d
 		l.shutdownErr = errors.Join(l.shutdownErr, errors.Join(resErrors...))
 		shutdownErr = l.shutdownErr
 	})
-	closeDone(workersClosed, shutdownErr)
+	closeDone(workersToClose, shutdownErr)
 	close(done)
 }
 
@@ -662,7 +665,6 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 						if err != nil {
 							l.shutdownErr = errors.Join(l.shutdownErr, err)
 						}
-						l.workerCloseCount++
 					})
 					l.workerCloseWG.Done()
 				}()

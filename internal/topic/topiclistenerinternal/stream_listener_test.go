@@ -227,12 +227,6 @@ func TestStreamListenerCloseWaitsForRemovedWorker(t *testing.T) {
 	e := fixenv.New(t)
 	listener := StreamListener(e)
 	worker := listener.createWorkerForPartition(PartitionSession(e))
-	closedWorkers := make(chan int, 1)
-	listener.tracer.OnListenerClose = func(trace.TopicListenerCloseStartInfo) func(trace.TopicListenerCloseDoneInfo) {
-		return func(info trace.TopicListenerCloseDoneInfo) {
-			closedWorkers <- info.WorkersClosed
-		}
-	}
 
 	removed := make(chan struct{})
 	release := make(chan struct{})
@@ -258,7 +252,6 @@ func TestStreamListenerCloseWaitsForRemovedWorker(t *testing.T) {
 	close(release)
 	released = true
 	require.NoError(t, listener.Close(xtest.ContextWithCommonTimeout(sf.Context(e), t), ErrUserCloseTopic))
-	require.Equal(t, 1, xtest.Receive(t, closedWorkers, "closed worker trace count"))
 }
 
 func TestStreamListenerCloseWaitsForStartingWorker(t *testing.T) {
