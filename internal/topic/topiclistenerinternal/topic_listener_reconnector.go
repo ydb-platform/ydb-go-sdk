@@ -96,7 +96,7 @@ func (lr *TopicListenerReconnector) run(ctx context.Context) {
 	lr.completeConnection(err)
 
 	for err == nil {
-		reason, reconnect := lr.waitAndRetireStream(ctx, sl)
+		reconnect, reason := lr.waitAndRetireStream(ctx, sl)
 		if !reconnect {
 			return
 		}
@@ -112,19 +112,19 @@ func (lr *TopicListenerReconnector) run(ctx context.Context) {
 func (lr *TopicListenerReconnector) waitAndRetireStream(
 	ctx context.Context,
 	sl *streamListener,
-) (error, bool) {
+) (bool, error) {
 	select {
 	case <-ctx.Done():
 		lr.closeStream(sl, lr.background.CloseReason())
 
-		return nil, false
+		return false, nil
 	case <-sl.background.StopDone():
 	}
 
 	reason := sl.background.CloseReason()
 	lr.closeStream(sl, reason)
 
-	return reason, ctx.Err() == nil
+	return ctx.Err() == nil, reason
 }
 
 func (lr *TopicListenerReconnector) closeStream(sl *streamListener, reason error) {
