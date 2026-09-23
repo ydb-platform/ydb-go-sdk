@@ -145,24 +145,15 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 // goroutines to stop. The first caller supplies the shutdown reason; later callers
 // only observe the already-started shutdown.
 func (l *streamListener) beginClose(ctx context.Context, reason error) empty.Chan {
-	var done empty.Chan
-	var start bool
-	var workersToClose int
-	l.m.WithLock(func() {
-		start = l.closing.CompareAndSwap(false, true)
-		if start {
+	return xsync.WithLock(&l.m, func() empty.Chan {
+		if l.closing.CompareAndSwap(false, true) {
 			l.shutdownDone = make(empty.Chan)
-			workersToClose = len(l.workers)
+			cleanupCtx := xcontext.ValueOnly(ctx)
+			go l.finishClose(cleanupCtx, reason, l.shutdownDone, len(l.workers))
 		}
-		done = l.shutdownDone
+
+		return l.shutdownDone
 	})
-
-	if start {
-		cleanupCtx := xcontext.ValueOnly(ctx)
-		go l.finishClose(cleanupCtx, reason, done, workersToClose)
-	}
-
-	return done
 }
 
 // finishClose performs the blocking shutdown work outside the goroutine that
