@@ -1,7 +1,9 @@
 * Added `topicoptions.WithListenerCheckRetryErrorFunction` to customize the topic listener error retry policy
 * Added `topicoptions.WithListenerStartTimeout` to bound listener connection retries; retriable failures on the first connection now retry until success by default
-* Fixed topic readers to reconnect after retryable non-success stream statuses, redelivering uncommitted messages on the new connection
 * Fixed topic listener recovery, error reporting, closing, and message confirmation after stream failures
+
+## v3.151.5
+* Fixed unrelated ACKs waking blocked topic writer calls with `WithWriterWaitServerAck(true)`
 
 ## v3.151.4
 * Fixed a data race when a streaming response contains a YDB operation error: trailers are read only after the underlying gRPC receive returns EOF or an error; stopping on a YDB operation error alone does not deliver trailer callbacks or server close hints
