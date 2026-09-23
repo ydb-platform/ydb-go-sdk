@@ -139,23 +139,6 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 	}
 }
 
-// goClose starts shutdown exactly once and returns the channel shared by all
-// callers waiting for its completion. It must remain non-blocking because listener
-// and partition-worker goroutines call it, while finishClose waits for those same
-// goroutines to stop. The first caller supplies the shutdown reason; later callers
-// only observe the already-started shutdown.
-func (l *streamListener) goClose(ctx context.Context, reason error) empty.Chan {
-	return xsync.WithLock(&l.m, func() empty.Chan {
-		if l.closing.CompareAndSwap(false, true) {
-			l.shutdownDone = make(empty.Chan)
-			cleanupCtx := xcontext.ValueOnly(ctx)
-			go l.finishClose(cleanupCtx, reason, l.shutdownDone, len(l.workers))
-		}
-
-		return l.shutdownDone
-	})
-}
-
 // finishClose performs the blocking shutdown work outside the goroutine that
 // initiated it. Its context retains caller values but not cancellation: Close uses
 // the caller context to bound its own wait, while cleanup continues until callbacks
@@ -199,6 +182,23 @@ func (l *streamListener) finishClose(cleanupCtx context.Context, reason error, d
 	})
 	closeDone(workersToClose, shutdownErr)
 	close(done)
+}
+
+// goClose starts shutdown exactly once and returns the channel shared by all
+// callers waiting for its completion. It must remain non-blocking because listener
+// and partition-worker goroutines call it, while finishClose waits for those same
+// goroutines to stop. The first caller supplies the shutdown reason; later callers
+// only observe the already-started shutdown.
+func (l *streamListener) goClose(ctx context.Context, reason error) empty.Chan {
+	return xsync.WithLock(&l.m, func() empty.Chan {
+		if l.closing.CompareAndSwap(false, true) {
+			l.shutdownDone = make(empty.Chan)
+			cleanupCtx := xcontext.ValueOnly(ctx)
+			go l.finishClose(cleanupCtx, reason, l.shutdownDone, len(l.workers))
+		}
+
+		return l.shutdownDone
+	})
 }
 
 func (l *streamListener) startBackground() {
