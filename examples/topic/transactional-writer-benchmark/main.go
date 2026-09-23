@@ -19,10 +19,9 @@ import (
 	"time"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-	"google.golang.org/grpc"
-
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	sdkconfig "github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"google.golang.org/grpc"
 )
 
 type reportConfig struct {

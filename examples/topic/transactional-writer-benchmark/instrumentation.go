@@ -6,9 +6,8 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"google.golang.org/grpc"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"google.golang.org/grpc"
 )
 
 type instrumentation struct {
