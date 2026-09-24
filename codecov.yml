@@ -9,11 +9,6 @@ coverage:
       default:
         target: auto       # do not drop below the current level...
         threshold: 1%      # ...by more than 1%
-        # Compare one complete matrix slice. Codecov merges repeated reports for
-        # the same commit, so combining every toolchain makes scheduled builds
-        # inflate the base coverage over time.
-        flags:
-          - go-1.21.x
     patch:
       default:
         target: 80%        # new/changed code in the PR diff must be >= 80% covered
