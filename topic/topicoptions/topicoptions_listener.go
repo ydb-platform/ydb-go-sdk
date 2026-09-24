@@ -42,3 +42,16 @@ func WithListenerAddDecoder(codec topictypes.Codec, decoderCreate CreateDecoderF
 		cfg.Decoders.AddDecoder(rawtopiccommon.Codec(codec), decoderCreate)
 	}
 }
+
+// WithListenerCheckRetryErrorFunction overrides the default error retry policy.
+// Return CheckErrorRetryDecisionDefault to use the default policy.
+// The callback must be fast and deterministic; it may be called more than once for an error.
+// By default, retryable errors are retried until the listener reconnects or is closed.
+// A WaitInit context bounds only that wait; call Close to stop background retries.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithListenerCheckRetryErrorFunction(callback CheckErrorRetryFunction) ListenerOption {
+	return func(cfg *topiclistenerinternal.StreamListenerConfig) {
+		cfg.CheckError = callback
+	}
+}

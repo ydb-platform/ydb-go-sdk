@@ -36,6 +36,7 @@ jobs:
       - name: Run tests
         run: go test -race -coverprofile unit.txt -covermode atomic -v ./...
       - name: Upload unit-tests coverage report to Codecov
+        if: github.event_name != 'schedule'
         uses: codecov/codecov-action@v4
         with:
           file: ./unit.txt
@@ -93,6 +94,7 @@ jobs:
       - name: Run tests
         run: go test -race -tags integration -coverpkg=./... -coverprofile integration.txt -covermode atomic ./tests/integration
       - name: Upload integration-tests coverage report to Codecov
+        if: github.event_name != 'schedule'
         uses: codecov/codecov-action@v4
         with:
           file: ./integration.txt
@@ -152,6 +154,7 @@ jobs:
       - name: Run tests
         run: go test -race -tags integration -coverpkg=./... -coverprofile experiment.txt -covermode atomic ./...
       - name: Upload experimental-tests coverage report to Codecov
+        if: github.event_name != 'schedule'
         uses: codecov/codecov-action@v4
         with:
           file: ./experiment.txt
