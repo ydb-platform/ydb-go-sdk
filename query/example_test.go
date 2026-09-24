@@ -206,12 +206,16 @@ func Example_selectWithParameters() {
 	}
 	defer db.Close(ctx) // cleanup resources
 	var (
-		id    int32  // required value
+		id    uint64 // required value
 		myStr string // required value
 	)
 	// Do retry operation on errors with best effort
 	row, err := db.Query().QueryRow(ctx, // context manage exiting from Do
-		`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
+		`
+DECLARE $id AS Uint64;
+DECLARE $myStr AS Text;
+SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr
+`,
 		query.WithParameters(
 			ydb.ParamsBuilder().
 				Param("$id").Uint64(123).
@@ -243,13 +247,17 @@ func Example_resultStats() {
 	}
 	defer db.Close(ctx) // cleanup resources
 	var (
-		id    int32  // required value
+		id    uint64 // required value
 		myStr string // required value
 	)
 	var stats query.Stats
 	// Do retry operation on errors with best effort
 	row, err := db.Query().QueryRow(ctx, // context manage exiting from Do
-		`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
+		`
+DECLARE $id AS Uint64;
+DECLARE $myStr AS Text;
+SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr
+`,
 		query.WithParameters(
 			ydb.ParamsBuilder().
 				Param("$id").Uint64(123).
@@ -309,13 +317,17 @@ func Example_retryWithSessions() {
 	}
 	defer db.Close(ctx) // cleanup resources
 	var (
-		id    int32  // required value
+		id    uint64 // required value
 		myStr string // required value
 	)
 	// Do retry operation on errors with best effort
 	err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
 		streamResult, err := s.Query(ctx, // context manage exiting from Do
-			`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
+			`
+DECLARE $id AS Uint64;
+DECLARE $myStr AS Text;
+SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr
+`,
 			query.WithParameters(
 				ydb.ParamsBuilder().
 					Param("$id").Uint64(123).
@@ -367,7 +379,7 @@ func Example_retryWithTx() {
 	}
 	defer db.Close(ctx) // cleanup resources
 	var (
-		id    int32  // required value
+		id    uint64 // required value
 		myStr string // optional value
 	)
 	// Do retry operation on errors with best effort
@@ -424,7 +436,7 @@ func Example_retryWithLazyTx() {
 	}
 	defer db.Close(ctx) // cleanup resources
 	var (
-		id    int32  // required value
+		id    uint64 // required value
 		myStr string // optional value
 	)
 	// Do retry operation on errors with best effort
@@ -476,9 +488,13 @@ func Example_executeScript() {
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close(ctx)                      // cleanup resources
+	defer db.Close(ctx) // cleanup resources
 	op, err := db.Query().ExecuteScript(ctx, // context manage exiting from Do
-		`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
+		`
+DECLARE $id AS Uint64;
+DECLARE $myStr AS Text;
+SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr
+`,
 		time.Hour,
 		query.WithParameters(
 			ydb.ParamsBuilder().
@@ -519,7 +535,7 @@ func Example_executeScript() {
 				panic(err)
 			}
 			var (
-				id    int64
+				id    uint64
 				myStr string
 			)
 			err = row.Scan(&id, &myStr)
