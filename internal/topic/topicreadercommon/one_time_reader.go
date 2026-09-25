@@ -40,6 +40,7 @@ func (s *oneTimeReader) Read(p []byte) (n int, err error) {
 	if err != nil {
 		s.err = err
 		s.reader = nil
+		s.readerMaker = nil
 	}
 
 	return n, err
