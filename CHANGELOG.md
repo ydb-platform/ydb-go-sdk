@@ -1,3 +1,4 @@
+## v3.152.1
 * Fixed topic reader messages retaining compressed payload bytes after their content had been fully read
 
 ## v3.152.0
