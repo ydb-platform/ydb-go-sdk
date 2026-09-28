@@ -777,12 +777,17 @@ public:
         return {TStatus(EStatus::SUCCESS, NYdb::NIssue::TIssues{}), false};
     }
 
-    void close() noexcept {
+    void abort() noexcept { close(TDuration::Zero()); }
+
+    void close() noexcept { close(TDuration::Seconds(10)); }
+
+private:
+    void close(TDuration timeout) noexcept {
         if (!writer_) {
             return;
         }
         try {
-            const auto success = writer_->Close(TDuration::Seconds(10));
+            const auto success = writer_->Close(timeout);
             lifecycle_.writer_close(success);
         } catch (...) {
             lifecycle_.writer_close(false);
@@ -791,7 +796,6 @@ public:
         token_.reset();
     }
 
-private:
     enum class WaitResult { EventReady, PartitionInactive, TimedOut };
 
     WaitResult wait_for_event() {
@@ -903,6 +907,7 @@ public:
         auto outcome = found->second->write(std::move(message), transaction);
         const auto write_finished_at = Clock::now();
         if (outcome.session_closed) {
+            found->second->abort();
             sessions_.erase(found);
         }
         return {
