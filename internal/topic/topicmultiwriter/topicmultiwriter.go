@@ -122,7 +122,7 @@ func (p *MultiWriter) Close(ctx context.Context) error {
 
 	flushErr := p.orchestrator.flush(ctx)
 
-	p.orchestrator.stop()
+	p.orchestrator.shutdown()
 	backgroundErr := p.background.Close(ctx, nil)
 
 	if flushErr != nil {

@@ -4,19 +4,24 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type StreamListenerConfig struct {
+	CheckError             topic.PublicCheckErrorRetryFunction
 	BufferSize             int
 	Decoders               *topicreadercommon.MultiDecoder
 	Selectors              []*topicreadercommon.PublicReadSelector
 	Consumer               string
 	ConnectWithoutConsumer bool
-	readerID               int64
 	Tracer                 *trace.Topic
+
+	retryOptions []retry.Option
+	readerID     int64
 }
 
 func NewStreamListenerConfig() StreamListenerConfig {

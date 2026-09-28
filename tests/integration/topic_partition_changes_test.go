@@ -18,6 +18,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xhash"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
@@ -32,6 +33,12 @@ import (
 // Transactional writers reuse their client's cached topology, so both writers keep
 // routing the same key to the original partition.
 func TestTopicTransactionalMultiWriter_ManualPartitionIncrease(t *testing.T) {
+	if ydbVersion := os.Getenv("YDB_VERSION"); ydbVersion != "" &&
+		ydbVersion != "nightly" && ydbVersion != "edge" && ydbVersion != "latest" &&
+		version.Lt(ydbVersion, "26.0") {
+		t.Skip("increasing the minimum partition count requires YDB 26.0 or newer")
+	}
+
 	for _, sameClient := range []bool{true, false} {
 		for _, waitServerAck := range []bool{true, false} {
 			t.Run(fmt.Sprintf("same_client=%t/sync=%t", sameClient, waitServerAck), func(t *testing.T) {

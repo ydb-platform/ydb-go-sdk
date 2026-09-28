@@ -14,7 +14,7 @@ func NewSources(describe TopicDescriber) *Sources {
 }
 
 // Get returns the same Source for a topic throughout this collection's lifetime.
-// It does not check whether the topic exists or load metadata; NewRouter reports Describe errors.
+// It does not check whether the topic exists or load metadata; Partitions reports Describe errors.
 func (s *Sources) Get(topicPath string) *Source {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -23,11 +23,7 @@ func (s *Sources) Get(topicPath string) *Source {
 		return existing
 	}
 
-	source := &Source{
-		topicPath:     topicPath,
-		describe:      s.describe,
-		subscriptions: make(map[*subscription]struct{}),
-	}
+	source := &Source{topicPath: topicPath, describe: s.describe}
 	s.sources[topicPath] = source
 
 	return source

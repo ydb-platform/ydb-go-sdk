@@ -34,6 +34,387 @@ func TestCommitterCommit(t *testing.T) {
 		err := c.Commit(ctx, CommitRange{})
 		require.ErrorIs(t, err, context.Canceled)
 	})
+
+	t.Run("ExpiredSession", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		committerCtx, cancelCommitter := context.WithCancel(ctx)
+		committer := NewCommitterStopped(&trace.Topic{}, committerCtx, CommitModeSync, nil)
+		session := newTestPartitionSession(ctx, 1)
+
+		cancelCommitter()
+		session.Close()
+
+		err := committer.Commit(ctx, CommitRange{PartitionSession: session})
+		require.ErrorIs(t, err, ErrPublicCommitSessionToExpiredSession)
+	})
+
+	t.Run("CanceledCallerAndExpiredSession", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync, nil)
+		session := newTestPartitionSession(ctx, 1)
+		session.Close()
+		callCtx, cancel := context.WithCancel(ctx)
+		cancel()
+
+		err := committer.Commit(callCtx, CommitRange{PartitionSession: session})
+		require.ErrorIs(t, err, context.Canceled)
+	})
+}
+
+func TestCommitterFlushWaitsForConcurrentFlush(t *testing.T) {
+	ctx := xtest.Context(t)
+	sendStarted := make(chan struct{})
+	releaseSend := make(chan struct{})
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			close(sendStarted)
+			<-releaseSend
+
+			return nil
+		},
+	)
+	_, err := committer.pushCommit(CommitRange{
+		PartitionSession:  newTestPartitionSession(ctx, 0),
+		CommitOffsetStart: 1,
+		CommitOffsetEnd:   2,
+	})
+	require.NoError(t, err)
+
+	firstFlush := make(chan error, 1)
+	go func() {
+		firstFlush <- committer.Flush()
+	}()
+	<-sendStarted
+
+	secondFlush := make(chan error, 1)
+	go func() {
+		secondFlush <- committer.Flush()
+	}()
+	select {
+	case err := <-secondFlush:
+		t.Fatalf("second Flush returned before the active send completed: %v", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+
+	close(releaseSend)
+	require.NoError(t, <-firstFlush)
+	require.NoError(t, <-secondFlush)
+}
+
+func TestCommitRequestKeepsSendError(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	commitRange := CommitRange{PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2}
+	sendErr := errors.New("send failed")
+	sends := 0
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			sends++
+
+			return sendErr
+		})
+	committer.Start()
+	defer func() { _ = committer.Close(ctx, nil) }()
+	request := committer.NewCommitRequest(commitRange)
+
+	request.Confirm()
+	request.Confirm()
+	require.ErrorIs(t, request.Wait(ctx), sendErr)
+	require.Equal(t, 1, sends)
+}
+
+func TestCommitRequestConfirmDoesNotWaitForSend(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	sendStarted := make(chan struct{})
+	releaseSend := make(chan struct{})
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			close(sendStarted)
+			<-releaseSend
+
+			return nil
+		})
+	committer.Start()
+	defer func() {
+		close(releaseSend)
+		_ = committer.Close(ctx, nil)
+	}()
+	request := committer.NewCommitRequest(CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+
+	confirmDone := make(chan struct{})
+	go func() {
+		request.Confirm()
+		close(confirmDone)
+	}()
+	<-sendStarted
+	select {
+	case <-confirmDone:
+	case <-time.After(time.Second):
+		t.Fatal("Confirm waited for the blocked send")
+	}
+}
+
+func TestCommitRequestKeepsSendErrorAfterSessionClose(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	sendErr := errors.New("send failed")
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error { return sendErr })
+	committer.Start()
+	defer func() { _ = committer.Close(ctx, nil) }()
+	request := committer.NewCommitRequest(CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+
+	request.Confirm()
+	<-request.sendDone
+	session.Close()
+
+	require.ErrorIs(t, request.Wait(ctx), sendErr)
+}
+
+func TestCommitRequestAcknowledgedBeforeSessionCloseSucceeds(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			t.Fatal("acknowledged commit must not be resent")
+
+			return nil
+		})
+	committer.Start()
+	defer func() { _ = committer.Close(ctx, nil) }()
+	request := committer.NewCommitRequest(CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+	session.SetCommittedOffsetForward(2)
+	session.Close()
+
+	require.NoError(t, request.Wait(ctx))
+}
+
+func TestCommitRequestAcknowledgedAfterConfirmBeforeSessionCloseSucceeds(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error { return nil })
+	committer.Start()
+	defer func() { _ = committer.Close(ctx, nil) }()
+	request := committer.NewCommitRequest(CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+
+	request.Confirm()
+	<-request.sendDone
+	session.SetCommittedOffsetForward(2)
+	session.Close()
+
+	require.NoError(t, request.Wait(ctx))
+}
+
+func TestCommitRequestWaitAcknowledgedDuringSendBeforeSessionClose(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			session.SetCommittedOffsetForward(2)
+			session.Close()
+
+			return nil
+		})
+	committer.Start()
+	defer func() { _ = committer.Close(ctx, nil) }()
+	request := committer.NewCommitRequest(CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+
+	require.NoError(t, request.Wait(ctx))
+}
+
+func TestCommitRequestQueuedDuringFailedFlushCompletes(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	sendErr := errors.New("commit send failed")
+	sendStarted := make(chan struct{})
+	releaseSend := make(chan struct{})
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			close(sendStarted)
+			<-releaseSend
+
+			return sendErr
+		})
+	committer.Start()
+	defer func() { _ = committer.Close(ctx, nil) }()
+
+	first := committer.NewCommitRequest(CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+	firstDone := make(chan struct{})
+	go func() {
+		first.Confirm()
+		close(firstDone)
+	}()
+	<-sendStarted
+
+	second := committer.NewCommitRequest(CommitRange{
+		PartitionSession: session, CommitOffsetStart: 2, CommitOffsetEnd: 3,
+	})
+	waitCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	secondResult := make(chan error, 1)
+	go func() { secondResult <- second.Wait(waitCtx) }()
+	require.Eventually(t, func() bool {
+		var queued bool
+		committer.m.WithLock(func() { queued = len(committer.requests) == 1 })
+
+		return queued
+	}, time.Second, time.Millisecond)
+
+	close(releaseSend)
+	<-firstDone
+	require.ErrorIs(t, first.Wait(ctx), sendErr)
+	require.ErrorIs(t, <-secondResult, sendErr)
+}
+
+func TestCommitRequestCancellationDoesNotResend(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	commitRange := CommitRange{PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2}
+	sendStarted := make(chan struct{})
+	releaseSend := make(chan struct{})
+	sends := 0
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			sends++
+			close(sendStarted)
+			<-releaseSend
+
+			return nil
+		})
+	committer.Start()
+	defer func() { _ = committer.Close(ctx, nil) }()
+	request := committer.NewCommitRequest(commitRange)
+	confirmDone := make(chan struct{})
+	go func() {
+		request.Confirm()
+		close(confirmDone)
+	}()
+	<-sendStarted
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	require.ErrorIs(t, request.Wait(cancelled), context.Canceled)
+	close(releaseSend)
+	<-confirmDone
+	session.SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
+	committer.OnCommitNotify(session, commitRange.CommitOffsetEnd)
+	require.NoError(t, request.Wait(ctx))
+	require.Equal(t, 1, sends)
+}
+
+func TestCommitRequestAlreadyAcknowledgedDoesNotSend(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	commitRange := CommitRange{PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2}
+	session.SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			t.Fatal("already acknowledged commit must not be sent")
+
+			return nil
+		})
+	committer.Start()
+	defer func() { _ = committer.Close(ctx, nil) }()
+	request := committer.NewCommitRequest(commitRange)
+
+	require.NoError(t, request.Wait(ctx))
+	request.Confirm()
+	require.NoError(t, request.Wait(ctx))
+}
+
+func TestCommitRequestConcurrentWaitsShareSend(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	commitRange := CommitRange{PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2}
+	sends := 0
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			sends++
+
+			return nil
+		})
+	committer.Start()
+	defer func() { _ = committer.Close(ctx, nil) }()
+	request := committer.NewCommitRequest(commitRange)
+	first, second := make(chan error, 1), make(chan error, 1)
+	go func() { first <- request.Wait(ctx) }()
+	go func() { second <- request.Wait(ctx) }()
+	require.Eventually(t, func() bool {
+		var waiting bool
+		committer.m.WithLock(func() {
+			waiting = len(committer.waiters) == 2
+		})
+
+		return waiting
+	}, time.Second, time.Millisecond)
+	session.SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
+	committer.OnCommitNotify(session, commitRange.CommitOffsetEnd)
+	require.NoError(t, <-first)
+	require.NoError(t, <-second)
+	require.Equal(t, 1, sends)
+}
+
+func TestCommitRequestClosedCommitterReturnsCancellation(t *testing.T) {
+	ctx := xtest.Context(t)
+	committerCtx, cancelCommitter := context.WithCancel(ctx)
+	committer := NewCommitterStopped(&trace.Topic{}, committerCtx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			t.Fatal("commit must not be sent after the committer has closed")
+
+			return nil
+		})
+	cancelCommitter()
+	session := newTestPartitionSession(ctx, 1)
+	request := committer.NewCommitRequest(CommitRange{
+		PartitionSession:  session,
+		CommitOffsetStart: 1,
+		CommitOffsetEnd:   2,
+	})
+
+	request.Confirm()
+	require.NoError(t, session.Context().Err(), "partition session may still be open during shutdown")
+	require.ErrorIs(t, request.Wait(ctx), context.Canceled)
+}
+
+func TestCommitRequestCloseDuringSendReturnsSendError(t *testing.T) {
+	ctx := xtest.Context(t)
+	committerCtx, cancelCommitter := context.WithCancel(ctx)
+	sendErr := errors.New("closed stream")
+	committer := NewCommitterStopped(&trace.Topic{}, committerCtx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error { return sendErr })
+	session := newTestPartitionSession(ctx, 1)
+	request := committer.NewCommitRequest(CommitRange{
+		PartitionSession:  session,
+		CommitOffsetStart: 1,
+		CommitOffsetEnd:   2,
+	})
+	result := make(chan error, 1)
+	go func() { result <- request.Wait(ctx) }()
+	require.Eventually(t, func() bool {
+		var queued bool
+		committer.m.WithLock(func() {
+			queued = len(committer.requests) == 1
+		})
+
+		return queued
+	}, time.Second, time.Millisecond)
+	cancelCommitter()
+	require.ErrorIs(t, committer.Flush(), sendErr)
+	require.NoError(t, session.Context().Err())
+	require.ErrorIs(t, <-result, sendErr)
 }
 
 func TestCommitterCommitDisabled(t *testing.T) {
@@ -43,7 +424,77 @@ func TestCommitterCommitDisabled(t *testing.T) {
 	require.ErrorIs(t, err, ErrCommitDisabled)
 }
 
+func TestCommitRequestWaitRejectsMissingSession(t *testing.T) {
+	ctx := xtest.Context(t)
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync, nil)
+
+	require.ErrorIs(t, committer.NewCommitRequest(CommitRange{}).Wait(ctx),
+		ErrPublicCommitSessionToExpiredSession)
+}
+
+func TestCommitRequestWaitAsyncWaitsForAck(t *testing.T) {
+	ctx := xtest.Context(t)
+	session := newTestPartitionSession(ctx, 1)
+	sent := make(chan struct{})
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeAsync,
+		func(rawtopicreader.ClientMessage) error {
+			close(sent)
+
+			return nil
+		})
+	committer.Start()
+	defer func() { _ = committer.Close(ctx, nil) }()
+	request := committer.NewCommitRequest(CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+	result := make(chan error, 1)
+	go func() { result <- request.Wait(ctx) }()
+	_ = xtest.Receive(t, sent, "async commit send")
+	require.Eventually(t, func() bool {
+		var waiting bool
+		committer.m.WithLock(func() { waiting = len(committer.waiters) == 1 })
+
+		return waiting
+	}, time.Second, time.Millisecond)
+	session.SetCommittedOffsetForward(2)
+	committer.OnCommitNotify(session, 2)
+	require.NoError(t, xtest.Receive(t, result, "async commit ACK"))
+}
+
+func TestCommitRequestWaitRejectsDisabledModeWithoutQueuing(t *testing.T) {
+	ctx := xtest.Context(t)
+	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeNone, nil)
+	session := newTestPartitionSession(ctx, 1)
+	commitRange := CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	}
+
+	require.ErrorIs(t, committer.NewCommitRequest(commitRange).Wait(ctx), ErrCommitDisabled)
+	committer.m.WithLock(func() {
+		require.Empty(t, committer.waiters)
+		require.Empty(t, committer.requests)
+		require.Zero(t, committer.commits.Len())
+	})
+}
+
 func TestCommitterCommitAsync(t *testing.T) {
+	t.Run("ExpiredSessionStillQueuesCommit", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		session := newTestPartitionSession(ctx, 1)
+		committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeAsync, nil)
+		session.Close()
+
+		err := committer.Commit(ctx, CommitRange{
+			PartitionSession:  session,
+			CommitOffsetStart: 1,
+			CommitOffsetEnd:   2,
+		})
+		require.NoError(t, err)
+		committer.m.WithLock(func() {
+			require.Equal(t, 1, committer.commits.Len())
+		})
+	})
+
 	t.Run("SendCommit", func(t *testing.T) {
 		ctx := xtest.Context(t)
 		session := newTestPartitionSession(context.Background(), 1)

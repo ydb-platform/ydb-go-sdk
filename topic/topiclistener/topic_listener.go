@@ -34,19 +34,27 @@ func NewTopicListener(
 
 // ReadSessionID returns the current read session identifier.
 // It can be passed to Topic().CommitOffset() to avoid interrupting the read session.
-// The session ID changes after reconnects.
+// It returns an empty string before the first connection, while reconnecting,
+// and after the listener stops. The session ID changes after reconnects. The returned
+// value is a point-in-time snapshot; the session may start closing immediately afterwards.
 func (cr *TopicListener) ReadSessionID() string {
 	return cr.listenerReconnector.ReadSessionID()
 }
 
+// WaitInit waits for the first successful connection or a terminal retry error.
 func (cr *TopicListener) WaitInit(ctx context.Context) error {
 	return cr.listenerReconnector.WaitInit(ctx)
 }
 
+// WaitStop waits until the listener stops and all event handlers complete.
+// Canceling ctx stops only this wait. Call Close to request shutdown.
 func (cr *TopicListener) WaitStop(ctx context.Context) error {
 	return cr.listenerReconnector.WaitStop(ctx)
 }
 
+// Close waits for listener shutdown while ctx is active. Only the first call requests
+// shutdown; concurrent or later calls return an already-closed error. If ctx expires,
+// shutdown continues; call WaitStop with a new context to wait for completion.
 func (cr *TopicListener) Close(ctx context.Context) error {
 	return cr.listenerReconnector.Close(ctx, xerrors.WithStackTrace(topiclistenerinternal.ErrUserCloseTopic))
 }

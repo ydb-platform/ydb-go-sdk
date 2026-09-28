@@ -55,7 +55,7 @@ type orchestrator struct {
 //nolint:funlen
 func newOrchestrator(
 	ctx context.Context,
-	stop context.CancelFunc,
+	cancel context.CancelFunc,
 	topicDescriber TopicDescriber,
 	source *partition.Source,
 	transactional bool,
@@ -83,7 +83,7 @@ func newOrchestrator(
 		source:           source,
 		transactional:    transactional,
 		ctx:              ctx,
-		stop:             stop,
+		stop:             cancel,
 		partitions:       make(map[int64]*PartitionInfo),
 		initDone:         make(empty.Chan),
 		background:       background,
@@ -161,15 +161,7 @@ func (o *orchestrator) sleepOrDone(delay time.Duration) error {
 func (o *orchestrator) init() (err error) {
 	defer close(o.initDone)
 	if o.transactional {
-		o.router, err = o.source.NewRouter(o.ctx, o.partitionChooser)
-		if err != nil {
-			o.stopWithError(err)
-
-			return err
-		}
-		o.startWorkers()
-
-		return nil
+		return o.initTransactional()
 	}
 
 	describeResult, err := o.topicDescriber(o.ctx, o.writerCfg.Topic())
@@ -215,6 +207,21 @@ func (o *orchestrator) init() (err error) {
 		return err
 	}
 
+	o.startWorkers()
+
+	return nil
+}
+
+func (o *orchestrator) initTransactional() error {
+	partitions, err := o.source.Partitions(o.ctx)
+	if err == nil {
+		o.router, err = partition.NewRouter(partitions, o.partitionChooser)
+	}
+	if err != nil {
+		o.stopWithError(err)
+
+		return err
+	}
 	o.startWorkers()
 
 	return nil
@@ -754,6 +761,10 @@ func (o *orchestrator) stopWithError(err error) {
 		o.err = err
 		o.stop()
 	})
+}
+
+func (o *orchestrator) shutdown() {
+	o.stop()
 }
 
 func (o *orchestrator) flush(ctx context.Context) error {

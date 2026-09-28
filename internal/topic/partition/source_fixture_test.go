@@ -26,11 +26,6 @@ type scriptedTopicDescriber struct {
 	next    int
 }
 
-type routeChangeResult struct {
-	partitionID int64
-	err         error
-}
-
 type partitionsResult struct {
 	partitions *partition.Partitions
 	err        error
@@ -84,26 +79,6 @@ func topicAfterMerge(parentIDs []int64, childID int64) topictypes.TopicDescripti
 	return topictypes.TopicDescription{Partitions: partitions}
 }
 
-func startNewRouter(ctx context.Context, source *partition.Source, chooser partition.Chooser) <-chan error {
-	result := make(chan error, 1)
-	go func() {
-		_, err := source.NewRouter(ctx, chooser)
-		result <- err
-	}()
-
-	return result
-}
-
-func startWaitingForRouteChange(router *partition.Router) <-chan routeChangeResult {
-	result := make(chan routeChangeResult, 1)
-	go func() {
-		partitionID, err := router.WaitForRouteChange()
-		result <- routeChangeResult{partitionID: partitionID, err: err}
-	}()
-
-	return result
-}
-
 func startLoadingPartitions(ctx context.Context, source *partition.Source) <-chan partitionsResult {
 	result := make(chan partitionsResult, 1)
 	go func() {
@@ -118,7 +93,7 @@ func startWaitingForPartitions(t *testing.T, source *partition.Source) <-chan pa
 	t.Helper()
 
 	waiting := make(chan struct{})
-	waitCtx := &doneObservedContext{Context: t.Context(), observed: waiting}
+	waitCtx := newDoneObservedContext(t.Context(), waiting)
 	result := startLoadingPartitions(waitCtx, source)
 	<-waiting
 

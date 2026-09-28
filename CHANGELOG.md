@@ -1,4 +1,9 @@
-* Sped up transactional Topic writers
+* Fixed Topic multi-writers failing to refresh routes after partition splits, and sped up repeated transactional
+  multi-writer creation by reusing cached partition metadata
+
+## v3.152.0
+* Added `topicoptions.WithListenerCheckRetryErrorFunction` to customize the topic listener error retry policy
+* Fixed topic listener recovery, error reporting, closing, and message confirmation after stream failures
 
 ## v3.151.5
 * Fixed unrelated ACKs waking blocked topic writer calls with `WithWriterWaitServerAck(true)`

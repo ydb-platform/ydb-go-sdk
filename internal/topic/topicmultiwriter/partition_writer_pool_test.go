@@ -8,13 +8,18 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 var errCreate = errors.New("create error")
@@ -277,6 +282,78 @@ func TestPartitionWriterPool_TransactionalSessionPolicy(t *testing.T) {
 	require.False(t, factory.lastCfg.AutoSetSeqNo)
 	require.Equal(t, topic.PublicRetryDecisionStop,
 		factory.lastCfg.RetrySettings.CheckError(topic.PublicCheckErrorRetryArgs{Error: errors.New("session failed")}))
+}
+
+func TestPartitionWriterPool_TransactionalInactivePartitionInvalidatesSource(t *testing.T) {
+	t.Parallel()
+
+	var describeCalls atomic.Int64
+	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+		if describeCalls.Add(1) == 1 {
+			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{
+				PartitionID: 7,
+				Active:      true,
+			}}}, nil
+		}
+
+		return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+			{PartitionID: 7, ChildPartitionIDs: []int64{8}},
+			{PartitionID: 8, Active: true, ParentPartitionIDs: []int64{7}},
+		}}, nil
+	}).Get("test/topic")
+	_, err := source.Partitions(t.Context())
+	require.NoError(t, err)
+
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+	pool.transactional = true
+	pool.source = source
+	_, err = pool.get(7, true)
+	require.NoError(t, err)
+	partitionInactive := xerrors.Operation(
+		xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
+		xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: xerrors.IssueCodeTopicPartitionInactive}}),
+	)
+
+	decision := factory.lastCfg.RetrySettings.CheckError(topic.PublicCheckErrorRetryArgs{Error: partitionInactive})
+	partitions, err := source.Partitions(t.Context())
+
+	require.NoError(t, err)
+	require.Equal(t, topic.PublicRetryDecisionStop, decision)
+	require.True(t, partitions.ByPartitionID(8).IsActive())
+	require.Equal(t, int64(2), describeCalls.Load())
+}
+
+func TestPartitionWriterPool_NonTransactionalSessionPolicy(t *testing.T) {
+	t.Parallel()
+
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+
+	var splitPartition atomic.Int64
+	pool.partitionSplitCallback = func(partitionID int64) {
+		splitPartition.Store(partitionID)
+	}
+	pool.writerCfg.RetrySettings.CheckError = func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+		return topic.PublicRetryDecisionRetry
+	}
+
+	_, err := pool.get(7, true)
+	require.NoError(t, err)
+	overloaded := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
+	require.Equal(t, topic.PublicRetryDecisionRetry,
+		factory.lastCfg.RetrySettings.CheckError(topic.PublicCheckErrorRetryArgs{Error: overloaded}))
+	require.Zero(t, splitPartition.Load())
+
+	partitionInactive := xerrors.Operation(
+		xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
+		xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: xerrors.IssueCodeTopicPartitionInactive}}),
+	)
+	require.Equal(t, topic.PublicRetryDecisionStop,
+		factory.lastCfg.RetrySettings.CheckError(topic.PublicCheckErrorRetryArgs{Error: partitionInactive}))
+	require.EqualValues(t, 7, splitPartition.Load())
 }
 
 func TestPartitionWriterPool_TransactionalSessionErrorStopsWriter(t *testing.T) {

@@ -648,12 +648,6 @@ func (r *topicStreamReaderImpl) initSession() (err error) {
 		return err
 	}
 
-	if status := resp.StatusData(); !status.Status.IsSuccess() {
-		// Need wrap status to common ydb operational error
-		// https://github.com/ydb-platform/ydb-go-sdk/issues/1361
-		return xerrors.WithStackTrace(fmt.Errorf("bad status on initial error: %v (%v)", status.Status, status.Issues))
-	}
-
 	initResp, ok := resp.(*rawtopicreader.InitResponse)
 	if !ok {
 		return xerrors.WithStackTrace(fmt.Errorf("bad message type on session init: %v (%v)", resp, reflect.TypeOf(resp)))
@@ -696,15 +690,6 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 			_ = r.CloseWithError(ctx, err)
 
 			return
-		}
-
-		status := serverMessage.StatusData()
-		if !status.Status.IsSuccess() {
-			_ = r.CloseWithError(ctx,
-				xerrors.WithStackTrace(
-					fmt.Errorf("ydb: bad status from pq grpc stream: %v, %v", status.Status, status.Issues.String()),
-				),
-			)
 		}
 
 		switch m := serverMessage.(type) {

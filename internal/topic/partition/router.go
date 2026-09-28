@@ -1,7 +1,7 @@
 package partition
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -9,10 +9,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
+var errNilPartitions = errors.New("partitions snapshot is nil")
+
 // Chooser preserves the existing user-supplied partition selection interface.
 // Concurrent calls are not supported.
-// ChoosePartition must return promptly: chooser calls are serialized with topology updates,
-// so a blocking call delays topology publication for every writer sharing the Source.
 // Implementations must not modify PartitionInfo values passed to AddNewPartitions
 // or data referenced by their fields.
 // After RemovePartition returns, ChoosePartition must not return that partition
@@ -23,22 +23,33 @@ type Chooser interface {
 	RemovePartition(partitionID int64)
 }
 
-// Router binds a writer's chooser to its topic's shared Source. Obtain it through Source.NewRouter.
-// Kafka Hash assumes fixed topology; bound-based routing applies topology changes discovered from session errors.
-// It synchronizes chooser calls with topology updates published by Source.
-// If a topology update fails, Router stops choosing partitions because the chooser may contain
-// a stale or partially updated partition set.
+// Router binds a writer's chooser to an explicitly supplied topology snapshot.
+// It is independent from Source and changes only when its owner calls Apply.
+// If a topology update fails, Router stops choosing partitions because the chooser
+// may contain a stale or partially updated partition set.
 // Its methods are safe for concurrent use and require no external locking.
 type Router struct {
-	ctx          context.Context //nolint:containedctx // Router lifetime context.
-	chooser      Chooser
-	partitions   *Partitions
-	subscription *subscription
-	updateError  error
-	mu           sync.Mutex
+	chooser     Chooser
+	partitions  *Partitions
+	updateError error
+	mu          sync.Mutex
 }
 
-// ChoosePartition selects among registered partitions with internal synchronization.
+// NewRouter initializes chooser with active partitions from partitions.
+func NewRouter(partitions *Partitions, chooser Chooser) (*Router, error) {
+	if partitions == nil {
+		return nil, errNilPartitions
+	}
+	if chooser != nil {
+		if err := chooser.AddNewPartitions(partitions.activeInfos()...); err != nil {
+			return nil, err
+		}
+	}
+
+	return &Router{chooser: chooser, partitions: partitions}, nil
+}
+
+// ChoosePartition selects among partitions in the last successfully applied snapshot.
 // After a topology update fails, it returns that update error without calling the chooser.
 func (r *Router) ChoosePartition(msg topicwriterinternal.PublicMessage) (int64, error) {
 	r.mu.Lock()
@@ -66,37 +77,16 @@ func (r *Router) ChoosePartition(msg topicwriterinternal.PublicMessage) (int64, 
 	return partitionID, nil
 }
 
-// WaitForRouteChange waits for the consequences of a topology change already tracked and published by Source.
-// On success, partitionID identifies a partition replaced by its children, so the Router owner can recover its
-// own in-flight state. It returns a Router-specific update error when this Router's chooser could not be updated,
-// even if other Routers sharing the Source were updated successfully. WaitForRouteChange does not refresh topology.
-// Waiting ends when the lifetime context passed to Source.NewRouter is canceled.
-// Only one goroutine may call WaitForRouteChange for a Router.
-func (r *Router) WaitForRouteChange() (partitionID int64, err error) {
-	event, err := r.subscription.wait()
-	if err != nil {
-		return 0, err
-	}
-
-	return event.partitionID, event.err
-}
-
-func (r *Router) updatePartitions(partitions *Partitions) (previous *Partitions, err error) {
+// Apply reconciles the chooser with partitions and makes the snapshot current.
+func (r *Router) Apply(partitions *Partitions) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	return r.updatePartitionsNeedLock(partitions)
-}
-
-func (r *Router) updatePartitionsNeedLock(partitions *Partitions) (previous *Partitions, err error) {
-	previous = r.partitions
-	select {
-	case <-r.ctx.Done():
-		return previous, nil
-	default:
+	if partitions == nil {
+		return errNilPartitions
 	}
 	if r.updateError != nil {
-		return previous, r.updateError
+		return r.updateError
 	}
 	if r.chooser != nil {
 		toAdd := make([]topictypes.PartitionInfo, 0)
@@ -109,7 +99,7 @@ func (r *Router) updatePartitionsNeedLock(partitions *Partitions) (previous *Par
 		if err := r.chooser.AddNewPartitions(toAdd...); err != nil {
 			r.updateError = err
 
-			return previous, err
+			return err
 		}
 		for _, partition := range r.partitions.all {
 			current, exists := partitions.find(partition.ID())
@@ -120,14 +110,5 @@ func (r *Router) updatePartitionsNeedLock(partitions *Partitions) (previous *Par
 	}
 	r.partitions = partitions
 
-	return previous, nil
-}
-
-func (r *Router) fail(err error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.updateError == nil {
-		r.updateError = err
-	}
+	return nil
 }

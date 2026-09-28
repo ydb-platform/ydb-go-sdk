@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
@@ -22,10 +23,30 @@ type mockTopicDescriber struct {
 
 // doneObservedContext signals when the code under test starts observing context cancellation.
 type doneObservedContext struct {
-	context.Context //nolint:containedctx // Test wrapper around the observed context.
+	deadline    time.Time
+	hasDeadline bool
+	done        <-chan struct{}
+	err         func() error
+	value       func(any) any
+	once        sync.Once
+	observed    chan struct{}
+}
 
-	once     sync.Once
-	observed chan struct{}
+func newDoneObservedContext(parent context.Context, observed chan struct{}) *doneObservedContext {
+	deadline, hasDeadline := parent.Deadline()
+
+	return &doneObservedContext{
+		deadline:    deadline,
+		hasDeadline: hasDeadline,
+		done:        parent.Done(),
+		err:         parent.Err,
+		value:       parent.Value,
+		observed:    observed,
+	}
+}
+
+func (c *doneObservedContext) Deadline() (time.Time, bool) {
+	return c.deadline, c.hasDeadline
 }
 
 func (c *doneObservedContext) Done() <-chan struct{} {
@@ -33,7 +54,15 @@ func (c *doneObservedContext) Done() <-chan struct{} {
 		close(c.observed)
 	})
 
-	return c.Context.Done()
+	return c.done
+}
+
+func (c *doneObservedContext) Err() error {
+	return c.err()
+}
+
+func (c *doneObservedContext) Value(key any) any {
+	return c.value(key)
 }
 
 func (m *mockTopicDescriber) Describe(ctx context.Context, path string) (topictypes.TopicDescription, error) {

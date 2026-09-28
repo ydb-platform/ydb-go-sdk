@@ -34,6 +34,12 @@ type GrpcStopper struct {
 	stopChannels map[string]empty.Chan
 	stopError    error
 	pause        *grpcPause
+	recvPause    empty.Chan
+	streamStop   empty.Chan
+
+	// onRecvMsg can hold a real server response before the SDK receives it.
+	// Set it before opening streams.
+	onRecvMsg func(context.Context, any) error
 }
 
 type grpcPause struct {
@@ -46,6 +52,7 @@ func NewGrpcStopper(closeError error) *GrpcStopper {
 	return &GrpcStopper{
 		stopChannels: make(map[string]empty.Chan),
 		stopError:    closeError,
+		streamStop:   make(empty.Chan),
 	}
 }
 
@@ -83,6 +90,44 @@ func (l *GrpcStopper) Start() {
 	if l.pause != nil {
 		close(l.pause.resume)
 		l.pause = nil
+	}
+	if l.recvPause != nil {
+		close(l.recvPause)
+		l.recvPause = nil
+	}
+}
+
+// StopOnce interrupts in-flight calls while allowing subsequent calls through immediately.
+func (l *GrpcStopper) StopOnce() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if !isClosed(l.streamStop) {
+		close(l.streamStop)
+	}
+	l.streamStop = make(empty.Chan)
+}
+
+// PauseRecv holds received stream messages until the returned function is called.
+func (l *GrpcStopper) PauseRecv() (resume func()) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	resumeRecv := make(empty.Chan)
+	l.recvPause = resumeRecv
+
+	var once sync.Once
+
+	return func() {
+		once.Do(func() {
+			l.mu.Lock()
+			defer l.mu.Unlock()
+
+			if l.recvPause == resumeRecv {
+				l.recvPause = nil
+				close(resumeRecv)
+			}
+		})
 	}
 }
 
@@ -148,6 +193,26 @@ func (l *GrpcStopper) wait(ctx context.Context, method string, stopChannel empty
 	}
 }
 
+func (l *GrpcStopper) waitRecv(ctx context.Context, stopChannel, streamStop empty.Chan) error {
+	l.mu.Lock()
+	recvPause := l.recvPause
+	l.mu.Unlock()
+	if recvPause == nil {
+		return nil
+	}
+
+	select {
+	case <-recvPause:
+		return nil
+	case <-stopChannel:
+		return l.stopError
+	case <-streamStop:
+		return l.stopError
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 func (l *GrpcStopper) stopSignal(method string) empty.Chan {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -162,6 +227,13 @@ func (l *GrpcStopper) stopSignal(method string) empty.Chan {
 	}
 
 	return ch
+}
+
+func (l *GrpcStopper) streamStopSignal() empty.Chan {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	return l.streamStop
 }
 
 func (l *GrpcStopper) UnaryClientInterceptor(
@@ -203,7 +275,12 @@ func (l *GrpcStopper) StreamClientInterceptor(
 
 	stream, err := streamer(ctx, desc, cc, method, opts...)
 	if stream != nil {
-		stream = GrpcStopperStream{ClientStream: stream, stopper: l, method: method}
+		stream = GrpcStopperStream{
+			ClientStream: stream,
+			stopper:      l,
+			method:       method,
+			streamStop:   l.streamStopSignal(),
+		}
 	}
 
 	return stream, err
@@ -211,8 +288,11 @@ func (l *GrpcStopper) StreamClientInterceptor(
 
 func (l *GrpcStopper) intercept(method string, call func() error) error {
 	// Keep this generation so Start cannot hide Stop from an in-flight call.
-	stopChannel := l.stopSignal(method)
-	if isClosed(stopChannel) {
+	return l.interceptWithSignals(l.stopSignal(method), nil, call)
+}
+
+func (l *GrpcStopper) interceptWithSignals(stopChannel, streamStop empty.Chan, call func() error) error {
+	if isClosed(stopChannel) || isClosed(streamStop) {
 		return l.stopError
 	}
 
@@ -229,6 +309,13 @@ func (l *GrpcStopper) intercept(method string, call func() error) error {
 		default:
 			return l.stopError
 		}
+	case <-streamStop:
+		select {
+		case err := <-resChan:
+			return err
+		default:
+			return l.stopError
+		}
 	case err := <-resChan:
 		return err
 	}
@@ -237,20 +324,36 @@ func (l *GrpcStopper) intercept(method string, call func() error) error {
 type GrpcStopperStream struct {
 	grpc.ClientStream
 
-	stopper *GrpcStopper
-	method  string
+	stopper    *GrpcStopper
+	method     string
+	streamStop empty.Chan
 }
 
 func (g GrpcStopperStream) CloseSend() error {
-	return g.stopper.intercept(g.method, g.ClientStream.CloseSend)
+	return g.stopper.interceptWithSignals(g.stopper.stopSignal(g.method), g.streamStop, g.ClientStream.CloseSend)
 }
 
 func (g GrpcStopperStream) SendMsg(m any) error {
-	return g.stopper.intercept(g.method, func() error { return g.ClientStream.SendMsg(m) })
+	return g.stopper.interceptWithSignals(
+		g.stopper.stopSignal(g.method), g.streamStop, func() error { return g.ClientStream.SendMsg(m) },
+	)
 }
 
 func (g GrpcStopperStream) RecvMsg(m any) error {
-	return g.stopper.intercept(g.method, func() error { return g.ClientStream.RecvMsg(m) })
+	stopChannel := g.stopper.stopSignal(g.method)
+	if err := g.stopper.interceptWithSignals(
+		stopChannel, g.streamStop, func() error { return g.ClientStream.RecvMsg(m) },
+	); err != nil {
+		return err
+	}
+	if err := g.stopper.waitRecv(g.Context(), stopChannel, g.streamStop); err != nil {
+		return err
+	}
+	if g.stopper.onRecvMsg != nil {
+		return g.stopper.onRecvMsg(g.Context(), m)
+	}
+
+	return nil
 }
 
 func isClosed(ch empty.Chan) bool {

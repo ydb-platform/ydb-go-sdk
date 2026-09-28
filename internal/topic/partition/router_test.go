@@ -1,9 +1,7 @@
 package partition_test
 
 import (
-	"context"
 	"errors"
-	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,12 +12,40 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
+func TestNewRouterAddsActivePartitionsToChooser(t *testing.T) {
+	chooser := &recordingChooser{}
+	snapshot := snapshotFromDescription(t, topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+		{PartitionID: 1, Active: true},
+		{PartitionID: 2},
+	}})
+
+	router, err := partition.NewRouter(snapshot, chooser)
+
+	require.NoError(t, err)
+	assert.NotNil(t, router)
+	assert.Equal(t, []int64{1}, chooser.PartitionIDs())
+}
+
+func TestNewRouterReturnsChooserInitializationError(t *testing.T) {
+	initializeErr := errors.New("initialize chooser")
+	snapshot := snapshotFromDescription(t, topicWithActivePartitions(1))
+
+	_, err := partition.NewRouter(snapshot, &errorChooser{addErr: initializeErr})
+
+	assert.ErrorIs(t, err, initializeErr)
+}
+
+func TestNewRouterRejectsNilSnapshot(t *testing.T) {
+	_, err := partition.NewRouter(nil, nil)
+
+	assert.EqualError(t, err, "partitions snapshot is nil")
+}
+
 func TestRouterChoosePartitionRejectsMissingPartition(t *testing.T) {
-	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
-		Partitions: []topictypes.PartitionInfo{{PartitionID: 1, Active: true}},
-	}}
-	router, _ := partition.NewSources(describer.Describe).Get("test/topic").NewRouter(
-		t.Context(), &fixedChooser{partitionID: 2})
+	router, _ := partition.NewRouter(
+		snapshotFromDescription(t, topicWithActivePartitions(1)),
+		&fixedChooser{partitionID: 2},
+	)
 
 	_, err := router.ChoosePartition(topicwriterinternal.PublicMessage{})
 
@@ -27,11 +53,10 @@ func TestRouterChoosePartitionRejectsMissingPartition(t *testing.T) {
 }
 
 func TestRouterChoosePartitionRejectsInactivePartition(t *testing.T) {
-	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
+	snapshot := snapshotFromDescription(t, topictypes.TopicDescription{
 		Partitions: []topictypes.PartitionInfo{{PartitionID: 2}},
-	}}
-	router, _ := partition.NewSources(describer.Describe).Get("test/topic").NewRouter(
-		t.Context(), &fixedChooser{partitionID: 2})
+	})
+	router, _ := partition.NewRouter(snapshot, &fixedChooser{partitionID: 2})
 
 	_, err := router.ChoosePartition(topicwriterinternal.PublicMessage{})
 
@@ -40,11 +65,10 @@ func TestRouterChoosePartitionRejectsInactivePartition(t *testing.T) {
 
 func TestRouterChoosePartitionReturnsChooserError(t *testing.T) {
 	chooseErr := errors.New("choose partition")
-	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
-		Partitions: []topictypes.PartitionInfo{{PartitionID: 1, Active: true}},
-	}}
-	router, _ := partition.NewSources(describer.Describe).Get("test/topic").NewRouter(
-		t.Context(), &errorChooser{chooseErr: chooseErr})
+	router, _ := partition.NewRouter(
+		snapshotFromDescription(t, topicWithActivePartitions(1)),
+		&errorChooser{chooseErr: chooseErr},
+	)
 
 	_, err := router.ChoosePartition(topicwriterinternal.PublicMessage{})
 
@@ -52,10 +76,7 @@ func TestRouterChoosePartitionReturnsChooserError(t *testing.T) {
 }
 
 func TestRouterChoosePartitionUsesMessagePartitionWithoutChooser(t *testing.T) {
-	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
-		Partitions: []topictypes.PartitionInfo{{PartitionID: 42, Active: true}},
-	}}
-	router, _ := partition.NewSources(describer.Describe).Get("test/topic").NewRouter(t.Context(), nil)
+	router, _ := partition.NewRouter(snapshotFromDescription(t, topicWithActivePartitions(42)), nil)
 
 	partitionID, err := router.ChoosePartition(topicwriterinternal.PublicMessage{PartitionID: 42})
 
@@ -63,26 +84,40 @@ func TestRouterChoosePartitionUsesMessagePartitionWithoutChooser(t *testing.T) {
 	assert.Equal(t, int64(42), partitionID)
 }
 
-func TestRouterStopsChoosingAfterTopologyUpdateFailure(t *testing.T) {
+func TestRouterApplyUpdatesChooserAndSnapshot(t *testing.T) {
+	chooser := &fixedChooser{partitionID: 2}
+	router, err := partition.NewRouter(snapshotFromDescription(t, topicWithActivePartitions(1)), chooser)
+	require.NoError(t, err)
+
+	err = router.Apply(snapshotFromDescription(t, topicAfterReplacement(1, 2)))
+
+	require.NoError(t, err)
+	assert.Equal(t, []int64{2}, chooser.PartitionIDs())
+	partitionID, err := router.ChoosePartition(topicwriterinternal.PublicMessage{})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), partitionID)
+}
+
+func TestRouterApplyFailureStopsChoosing(t *testing.T) {
 	updateErr := errors.New("update chooser")
-	var calls atomic.Int64
-	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
-		if calls.Add(1) == 1 {
-			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
-				{PartitionID: 1, Active: true},
-			}}, nil
-		}
+	router, err := partition.NewRouter(
+		snapshotFromDescription(t, topicWithActivePartitions(1)),
+		&updateErrorChooser{err: updateErr},
+	)
+	require.NoError(t, err)
 
-		return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
-			{PartitionID: 1, ChildPartitionIDs: []int64{2}},
-			{PartitionID: 2, Active: true, ParentPartitionIDs: []int64{1}},
-		}}, nil
-	}).Get("test/topic")
-	router, _ := source.NewRouter(t.Context(), &updateErrorChooser{err: updateErr})
-	waitForReplacement := source.NotifySessionError(t.Context(), 1, partitionInactiveError())
-	require.NoError(t, waitForReplacement(t.Context()))
+	err = router.Apply(snapshotFromDescription(t, topicAfterReplacement(1, 2)))
+	require.ErrorIs(t, err, updateErr)
 
-	_, err := router.ChoosePartition(topicwriterinternal.PublicMessage{})
-
+	_, err = router.ChoosePartition(topicwriterinternal.PublicMessage{})
 	assert.ErrorIs(t, err, updateErr)
+}
+
+func snapshotFromDescription(t *testing.T, description topictypes.TopicDescription) *partition.Partitions {
+	t.Helper()
+	source := newSourceWithDescriptions(description)
+	snapshot, err := source.Partitions(t.Context())
+	require.NoError(t, err)
+
+	return snapshot
 }

@@ -10,7 +10,6 @@ import (
 )
 
 // recordingChooser keeps the partitions currently visible to a chooser.
-// It is safe to inspect while Source updates it from another goroutine.
 type recordingChooser struct {
 	mu         sync.Mutex
 	partitions map[int64]topictypes.PartitionInfo

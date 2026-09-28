@@ -50,13 +50,13 @@ func TestSourcesGetSharesTopicCache(t *testing.T) {
 	describer := &mockTopicDescriber{}
 	sources := partition.NewSources(describer.Describe)
 
-	_, _ = sources.Get("test/topic").NewRouter(t.Context(), nil)
-	_, _ = sources.Get("test/topic").NewRouter(t.Context(), nil)
+	_, _ = sources.Get("test/topic").Partitions(t.Context())
+	_, _ = sources.Get("test/topic").Partitions(t.Context())
 
 	assert.Len(t, describer.Calls(), 1)
 }
 
-func TestSourcesGetDescribesTopicOnceForConcurrentRouters(t *testing.T) {
+func TestSourcesGetDescribesTopicOnceForConcurrentSnapshots(t *testing.T) {
 	ctx := t.Context()
 	describer := &mockTopicDescriber{}
 	sources := partition.NewSources(describer.Describe)
@@ -69,7 +69,7 @@ func TestSourcesGetDescribesTopicOnceForConcurrentRouters(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			_, _ = sources.Get("test/topic").NewRouter(ctx, nil)
+			_, _ = sources.Get("test/topic").Partitions(ctx)
 		}()
 	}
 	close(start)

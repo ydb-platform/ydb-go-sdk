@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
@@ -100,7 +101,9 @@ func (s *sender) iterateThroughMessagesIndex(
 
 			if err := wr.getInitErr(); err != nil {
 				if s.transactional {
-					return fmt.Errorf("writer init failed for partition %d: %w", msg.PartitionID, err)
+					return xerrors.WithStackTrace(
+						fmt.Errorf("writer init failed for partition %d: %w", msg.PartitionID, err),
+					)
 				}
 				if isOperationErrorOverloaded(err) {
 					s.partitionSplitReceiver.push(partitionID)
@@ -116,7 +119,7 @@ func (s *sender) iterateThroughMessagesIndex(
 				[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
 			); err != nil {
 				if s.transactional {
-					return fmt.Errorf("failed to write message: %w", err)
+					return xerrors.WithStackTrace(fmt.Errorf("failed to write message: %w", err))
 				}
 				if isOperationErrorOverloaded(err) {
 					s.partitionSplitReceiver.push(partitionID)

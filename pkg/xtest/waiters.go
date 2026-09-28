@@ -108,3 +108,26 @@ func SpinWaitProgressWithTimeout(
 		})
 	}
 }
+
+// Receive waits for a value from events using the default timeout.
+func Receive[T any](t testing.TB, events <-chan T, description string) T {
+	t.Helper()
+
+	return ReceiveWithTimeout(t, events, description, commonWaitTimeout)
+}
+
+// ReceiveWithTimeout waits for a value from events and fails the test if the timeout expires.
+func ReceiveWithTimeout[T any](t testing.TB, events <-chan T, description string, timeout time.Duration) T {
+	t.Helper()
+
+	select {
+	case event := <-events:
+		return event
+	case <-time.After(timeout):
+		t.Fatalf("timed out waiting for %s", description)
+
+		var zero T
+
+		return zero
+	}
+}
