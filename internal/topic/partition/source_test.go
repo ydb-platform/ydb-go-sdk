@@ -233,6 +233,35 @@ func TestSourcePartitionsWaitsForPublishedReplacement(t *testing.T) {
 	assert.True(t, partitions.ByPartitionID(2).IsActive())
 }
 
+func TestSourcePartitionsPublishesReplacementReportedInactiveDuringDescribe(t *testing.T) {
+	unexpectedDescribe := errors.New("unexpected extra describe")
+	var (
+		source *partition.Source
+		calls  atomic.Int64
+	)
+	source = partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+		switch calls.Add(1) {
+		case 1:
+			return topicWithActivePartitions(1), nil
+		case 2:
+			source.NotifySessionError(1, partitionInactiveError())
+
+			return topicAfterReplacement(1, 2), nil
+		default:
+			return topictypes.TopicDescription{}, unexpectedDescribe
+		}
+	}).Get("test/topic")
+	_, err := source.Partitions(t.Context())
+	require.NoError(t, err)
+	require.True(t, source.NotifySessionError(1, partitionInactiveError()))
+
+	partitions, err := source.Partitions(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), calls.Load())
+	assert.True(t, partitions.ByPartitionID(2).IsActive())
+}
+
 func TestSourcePartitionsWaitsForReplacementThroughInactiveDescendants(t *testing.T) {
 	source := newSourceWithDescriptions(
 		topicWithActivePartitions(1),

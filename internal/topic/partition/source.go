@@ -25,14 +25,16 @@ type Source struct {
 	partitions *Partitions
 	// pendingReplacements prevents caching metadata that still routes writes to partitions reported inactive.
 	// It tracks every concurrently reported partition until one snapshot contains a complete active replacement
-	// subtree for each of them. Its values are the corresponding session errors wrapped with fast backoff;
-	// returning one from an update makes RetryWithResult repeat Describe while metadata is still stale.
-	pendingReplacements map[int64]error
-	updates             singleflight.Group
-	// revision changes on every invalidation. An update publishes its result only if the revision
-	// has not changed since that update started, so an in-flight stale Describe cannot refill the cache.
-	revision uint64
-	mu       sync.Mutex
+	// subtree for each of them.
+	pendingReplacements map[int64]struct{}
+	// partitionInactiveErr preserves the latest server error for retry diagnostics while replacements are pending.
+	// It is converted to a fast-backoff retryable error only when Describe returns an incomplete topology.
+	partitionInactiveErr error
+	updates              singleflight.Group
+	// reloadRequested prevents an explicit Invalidate from being lost while Describe is in flight.
+	// Session errors do not set it: pendingReplacements are checked atomically when publishing a snapshot.
+	reloadRequested bool
+	mu              sync.Mutex
 }
 
 // Partitions returns a current read-only topology snapshot.
@@ -91,12 +93,13 @@ func (s *Source) NotifySessionError(partitionID int64, err error) bool {
 		return true
 	}
 	if s.pendingReplacements == nil {
-		s.pendingReplacements = make(map[int64]error)
+		s.pendingReplacements = make(map[int64]struct{})
 	}
 	// Describe may keep returning the old topology for a while after a partition becomes inactive.
 	// Keep the partition pending so such a snapshot cannot be cached and used by a new Router.
-	s.pendingReplacements[partitionID] = retry.RetryableError(err, retry.WithBackoff(retry.TypeFastBackoff))
-	s.invalidateNeedLock()
+	s.pendingReplacements[partitionID] = struct{}{}
+	s.partitionInactiveErr = err
+	s.partitions = nil
 
 	return true
 }
@@ -106,61 +109,57 @@ func (s *Source) Invalidate() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.invalidateNeedLock()
-}
-
-func (s *Source) invalidateNeedLock() {
 	s.partitions = nil
-	s.revision++
+	s.reloadRequested = true
 }
 
 func (s *Source) updatePartitions(ctx context.Context) (*Partitions, error) {
 	for {
 		s.mu.Lock()
-		revision := s.revision
+		s.reloadRequested = false
 		s.mu.Unlock()
 
+		published := false
 		partitions, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*Partitions, error) {
 			description, err := s.describe(ctx, s.topicPath)
 			if err != nil {
 				return nil, err
 			}
 			partitions := partitionsFromDescription(description)
-			if err = s.validatePartitionReplacements(partitions); err != nil {
+
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			if s.reloadRequested {
+				return partitions, nil
+			}
+			if err = s.partitionReplacementRetryErrorNeedLock(partitions); err != nil {
 				return nil, err
 			}
+			s.partitions = partitions
+			clear(s.pendingReplacements)
+			s.partitionInactiveErr = nil
+			published = true
 
 			return partitions, nil
 		}, retry.WithIdempotent(true))
 		if err != nil {
 			return nil, err
 		}
-
-		s.mu.Lock()
-		if s.revision != revision {
-			s.mu.Unlock()
-
-			continue
+		if published {
+			return partitions, nil
 		}
-		s.partitions = partitions
-		// validatePartitionReplacements accepted this exact snapshot, so it satisfies every
-		// inactive partition reported before this update's revision was captured.
-		clear(s.pendingReplacements)
-		s.mu.Unlock()
-
-		return partitions, nil
 	}
 }
 
-func (s *Source) validatePartitionReplacements(partitions *Partitions) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+func (s *Source) partitionReplacementRetryErrorNeedLock(partitions *Partitions) error {
 	// Several writers may report different inactive partitions before metadata catches up.
 	// Publish the snapshot only after it contains a complete replacement for all of them.
-	for partitionID, retryErr := range s.pendingReplacements {
+	for partitionID := range s.pendingReplacements {
 		if !replacementPublished(partitions, partitionID) {
-			return retryErr
+			return retry.RetryableError(
+				s.partitionInactiveErr,
+				retry.WithBackoff(retry.TypeFastBackoff),
+			)
 		}
 	}
 
