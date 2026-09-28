@@ -41,12 +41,52 @@ Run from the `examples` module:
 go build -o /tmp/transactional-writer-benchmark ./topic/transactional-writer-benchmark
 ```
 
+### C++ SDK comparison binary
+
+The `cpp` directory contains the same measured transaction implemented with
+YDB C++ SDK v3.23.0. It emits the same primary throughput and latency fields as
+the Go command, so the two SDKs can be run against the same freshly started YDB
+container and compared cell by cell.
+
+The C++ SDK build needs CMake, Ninja, Ragel, Yasm, pkg-config, OpenSSL, and
+libidn. On macOS with Homebrew:
+
+```bash
+brew install cmake ninja ragel yasm pkgconf openssl libidn
+cd topic/transactional-writer-benchmark/cpp
+cmake --preset release
+cmake --build --preset release
+cp build/release/transactional-writer-benchmark-cpp /tmp/
+```
+
+The first configure downloads and builds the pinned C++ SDK and its
+dependencies. The C++ command deliberately does not duplicate schema
+preparation: use the Go command with `--prepare-only`, then run either SDK
+binary against the resulting Topic and table.
+
+The public C++ Topic API does not expose a transactional equivalent of Go's
+`WithWriteToManyPartitions`. For `--mode many`, the comparison command uses the
+idiomatic C++ equivalent: one persistent write-session pool per worker, keyed
+by the explicitly chosen partition. `key`, `bounded-key`, and `partition-id`
+use the same chooser algorithms as the Go benchmark. For `--mode single`, each
+worker keeps one session without `PartitionId`; `ProducerId` supplies the
+stable producer identity. `MessageGroupId` is not used for routing because the
+server ignores it.
+
+Session reuse is reported explicitly as
+`config.session_lifecycle=pooled_per_worker`. This means the comparison is
+between the normal persistent C++ writer lifecycle and the current Go API
+behavior, not an artificial open-and-close-per-transaction C++ workload.
+
 ## Start local YDB 26.3
 
 The local benchmark results in this PR were collected with
 `ydbplatform/local-ydb:26.3.1.16`. Start the container with hostname
 `localhost`: endpoint discovery otherwise advertises the generated container
 hostname, which is not resolvable from the host.
+
+The readiness helper uses `nc` to verify that the healthy container is also
+reachable through Docker's host-port forwarding.
 
 Use a fresh container for every measured matrix cell. Reusing one server for a
 long matrix lets closed StreamWrite sessions accumulate and makes later cells
@@ -72,7 +112,7 @@ restart_ydb() {
   for _ in $(seq 1 90); do
     health=$(docker inspect "$YDB_CONTAINER" \
       --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}')
-    if [ "$health" = healthy ]; then
+    if [ "$health" = healthy ] && nc -z 127.0.0.1 2136; then
       return 0
     fi
     sleep 2
@@ -300,6 +340,98 @@ done
 
 stop_ydb
 ```
+
+### Run the same matrix with C++ SDK
+
+Use the same fixed-topology loop, but keep separate preparation and measurement
+binaries. The Go command prepares the schema; the C++ command runs the measured
+transaction. All other flags, the YDB image, host, and restart cadence stay
+unchanged:
+
+```bash
+GO_BENCHMARK_BIN=/tmp/transactional-writer-benchmark
+CPP_BENCHMARK_BIN=/tmp/transactional-writer-benchmark-cpp
+BENCHMARK_LABEL=cpp-sdk-v3.23.0
+mkdir -p results
+
+for partitions in 64 128 256 512; do
+  for repetition in 1 2 3; do
+    for scenario in \
+      "single:key:single" \
+      "many:key:many-key" \
+      "many:bounded-key:many-bounded-key" \
+      "many:partition-id:many-partition-id"
+    do
+      IFS=: read -r mode routing name <<< "$scenario"
+      restart_ydb || exit 1
+
+      topic="tx-writer-benchmark-${name}-p${partitions}"
+      "$GO_BENCHMARK_BIN" \
+        --dsn grpc://localhost:2136/local \
+        --topic "$topic" \
+        --table tx-writer-benchmark-state \
+        --prepare-only \
+        --prepare-partitions "$partitions" \
+        --routing "$routing" \
+        --transaction-timeout 1m \
+        --anonymous || exit 1
+
+      "$CPP_BENCHMARK_BIN" \
+        --dsn grpc://localhost:2136/local \
+        --topic "$topic" \
+        --table tx-writer-benchmark-state \
+        --mode "$mode" \
+        --routing "$routing" \
+        --label "$BENCHMARK_LABEL" \
+        --warmup 10s \
+        --duration 60s \
+        --transaction-timeout 1m \
+        --max-errors 100 \
+        --anonymous \
+        > "results/${BENCHMARK_LABEL}-${name}-p${partitions}-${repetition}.json" || exit 1
+    done
+  done
+done
+
+stop_ydb
+```
+
+For the C++ auto-split run, prepare a fresh bounded Topic with the Go command,
+then start the topology-aware C++ measurement:
+
+```bash
+restart_ydb || exit 1
+
+"$GO_BENCHMARK_BIN" \
+  --dsn grpc://localhost:2136/local \
+  --topic tx-writer-benchmark-autosplit \
+  --table tx-writer-benchmark-state \
+  --auto-split \
+  --prepare-only \
+  --anonymous || exit 1
+
+"$CPP_BENCHMARK_BIN" \
+  --dsn grpc://localhost:2136/local \
+  --topic tx-writer-benchmark-autosplit \
+  --table tx-writer-benchmark-state \
+  --mode many \
+  --routing bounded-key \
+  --auto-split \
+  --warmup 0s \
+  --duration 2m \
+  --transaction-timeout 1m \
+  --max-errors 100 \
+  --label "$BENCHMARK_LABEL" \
+  --anonymous \
+  > "results/${BENCHMARK_LABEL}-many-bounded-autosplit.json"
+```
+
+The C++ topology monitor refreshes active partitions and bounds while the run
+continues. If a split makes the partition of an in-flight write inactive, the
+writer pool evicts that session and the standard Query retry repeats the whole
+transaction against the refreshed topology. The final report always includes
+the final active-partition count; it does not fail merely because a particular
+repetition did not split.
 
 ## Metrics and profiles
 
