@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -33,6 +34,22 @@ func TestSourcePartitionsReturnsDescribeError(t *testing.T) {
 	_, err := source.Partitions(t.Context())
 
 	assert.ErrorIs(t, err, describeErr)
+}
+
+func TestSourcePartitionsRetriesRetryableDescribeError(t *testing.T) {
+	describeErr := retry.RetryableError(
+		errors.New("describe topic failed"),
+		retry.WithBackoff(retry.TypeNoBackoff),
+	)
+	source := newSourceWithDescribeResults(
+		topicDescribeResult{err: describeErr},
+		topicDescribeResult{description: topicWithActivePartitions(42)},
+	)
+
+	partitions, err := source.Partitions(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, []int64{42}, partitions.All().IDs())
 }
 
 func TestSourcePartitionsDescribesRequestedTopic(t *testing.T) {

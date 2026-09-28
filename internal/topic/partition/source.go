@@ -5,12 +5,12 @@ import (
 	"errors"
 	"sync"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
-
-var errReplacementNotPublished = errors.New("partition replacement was not published")
 
 // TopicDescriber loads topic metadata without depending on client or writer options.
 type TopicDescriber func(ctx context.Context, path string) (topictypes.TopicDescription, error)
@@ -20,18 +20,19 @@ type TopicDescriber func(ctx context.Context, path string) (topictypes.TopicDesc
 // Cached metadata has no time-based expiration or periodic refresh.
 // Reloads are triggered by explicit invalidation or a reported inactive partition.
 type Source struct {
-	topicPath           string
-	describe            TopicDescriber
-	partitions          *Partitions
-	partitionsLoad      *partitionsLoad
-	pendingReplacements map[int64]struct{}
-	mu                  sync.Mutex
-}
-
-type partitionsLoad struct {
-	done        chan struct{}
-	invalidated bool
-	err         error
+	topicPath  string
+	describe   TopicDescriber
+	partitions *Partitions
+	// pendingReplacements prevents caching metadata that still routes writes to partitions reported inactive.
+	// It tracks every concurrently reported partition until one snapshot contains a complete active replacement
+	// subtree for each of them. Its values are the corresponding session errors wrapped with fast backoff;
+	// returning one from an update makes RetryWithResult repeat Describe while metadata is still stale.
+	pendingReplacements map[int64]error
+	updates             singleflight.Group
+	// revision changes on every invalidation. An update publishes its result only if the revision
+	// has not changed since that update started, so an in-flight stale Describe cannot refill the cache.
+	revision uint64
+	mu       sync.Mutex
 }
 
 // Partitions returns a current read-only topology snapshot.
@@ -39,17 +40,40 @@ type partitionsLoad struct {
 // After NotifySessionError accepts an inactive-partition error, Partitions waits until
 // the replacement of every reported partition is present in topic metadata.
 func (s *Source) Partitions(ctx context.Context) (*Partitions, error) {
-	return retry.RetryWithResult(ctx, func(ctx context.Context) (*Partitions, error) {
-		partitions, err := s.partitionsOnce(ctx)
-		if err == nil {
-			return partitions, nil
-		}
-		if errors.Is(err, errReplacementNotPublished) {
-			return nil, retry.RetryableError(errReplacementNotPublished, retry.WithBackoff(retry.TypeFastBackoff))
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
 
-		return nil, xerrors.Unretryable(err)
-	}, retry.WithIdempotent(true))
+		s.mu.Lock()
+		partitions := s.partitions
+		s.mu.Unlock()
+		if partitions != nil {
+			return partitions, nil
+		}
+
+		update := s.updates.DoChan(s.topicPath, func() (any, error) {
+			s.mu.Lock()
+			partitions := s.partitions
+			s.mu.Unlock()
+			if partitions != nil {
+				return partitions, nil
+			}
+
+			return s.updatePartitions(ctx)
+		})
+		select {
+		case result := <-update:
+			if result.Err == nil {
+				return result.Val.(*Partitions), nil
+			}
+			if !isContextError(result.Err) {
+				return nil, result.Err
+			}
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
 }
 
 // NotifySessionError invalidates cached metadata when err reports that partitionID became inactive.
@@ -67,9 +91,11 @@ func (s *Source) NotifySessionError(partitionID int64, err error) bool {
 		return true
 	}
 	if s.pendingReplacements == nil {
-		s.pendingReplacements = make(map[int64]struct{})
+		s.pendingReplacements = make(map[int64]error)
 	}
-	s.pendingReplacements[partitionID] = struct{}{}
+	// Describe may keep returning the old topology for a while after a partition becomes inactive.
+	// Keep the partition pending so such a snapshot cannot be cached and used by a new Router.
+	s.pendingReplacements[partitionID] = retry.RetryableError(err, retry.WithBackoff(retry.TypeFastBackoff))
 	s.invalidateNeedLock()
 
 	return true
@@ -85,100 +111,60 @@ func (s *Source) Invalidate() {
 
 func (s *Source) invalidateNeedLock() {
 	s.partitions = nil
-	if s.partitionsLoad != nil {
-		s.partitionsLoad.invalidated = true
-	}
+	s.revision++
 }
 
-func (s *Source) partitionsOnce(ctx context.Context) (*Partitions, error) {
+func (s *Source) updatePartitions(ctx context.Context) (*Partitions, error) {
 	for {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		partitions, load, created := s.cachedPartitionsOrLoad()
-		if partitions != nil {
-			return partitions, nil
-		}
-		if !created {
-			select {
-			case <-load.done:
-				if load.err != nil && !isContextError(load.err) {
-					return nil, load.err
-				}
+		s.mu.Lock()
+		revision := s.revision
+		s.mu.Unlock()
 
-				continue
-			case <-ctx.Done():
-				return nil, ctx.Err()
+		partitions, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*Partitions, error) {
+			description, err := s.describe(ctx, s.topicPath)
+			if err != nil {
+				return nil, err
 			}
-		}
+			partitions := partitionsFromDescription(description)
+			if err = s.validatePartitionReplacements(partitions); err != nil {
+				return nil, err
+			}
 
-		description, err := s.describe(ctx, s.topicPath)
-		partitions = partitionsFromDescription(description)
-		published, finishErr := s.finishPartitionsLoad(load, partitions, err)
+			return partitions, nil
+		}, retry.WithIdempotent(true))
 		if err != nil {
 			return nil, err
 		}
-		if finishErr != nil {
-			return nil, finishErr
+
+		s.mu.Lock()
+		if s.revision != revision {
+			s.mu.Unlock()
+
+			continue
 		}
-		if published {
-			return partitions, nil
-		}
+		s.partitions = partitions
+		// validatePartitionReplacements accepted this exact snapshot, so it satisfies every
+		// inactive partition reported before this update's revision was captured.
+		clear(s.pendingReplacements)
+		s.mu.Unlock()
+
+		return partitions, nil
 	}
 }
 
-func (s *Source) cachedPartitionsOrLoad() (partitions *Partitions, load *partitionsLoad, created bool) {
+func (s *Source) validatePartitionReplacements(partitions *Partitions) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.partitions != nil {
-		return s.partitions, nil, false
-	}
-	if s.partitionsLoad != nil {
-		return nil, s.partitionsLoad, false
-	}
-	load = &partitionsLoad{done: make(chan struct{})}
-	s.partitionsLoad = load
-
-	return nil, load, true
-}
-
-func (s *Source) finishPartitionsLoad(
-	load *partitionsLoad,
-	partitions *Partitions,
-	describeErr error,
-) (published bool, err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	defer s.finishPartitionsLoadNeedLock(load)
-
-	if describeErr != nil {
-		load.err = describeErr
-
-		return false, describeErr
-	}
-	if load.invalidated {
-		return false, nil
-	}
-	for partitionID := range s.pendingReplacements {
+	// Several writers may report different inactive partitions before metadata catches up.
+	// Publish the snapshot only after it contains a complete replacement for all of them.
+	for partitionID, retryErr := range s.pendingReplacements {
 		if !replacementPublished(partitions, partitionID) {
-			load.err = errReplacementNotPublished
-
-			return false, errReplacementNotPublished
+			return retryErr
 		}
 	}
 
-	s.partitions = partitions
-	clear(s.pendingReplacements)
-
-	return true, nil
-}
-
-func (s *Source) finishPartitionsLoadNeedLock(load *partitionsLoad) {
-	if s.partitionsLoad == load {
-		s.partitionsLoad = nil
-	}
-	close(load.done)
+	return nil
 }
 
 func isContextError(err error) bool {
@@ -202,6 +188,8 @@ func partitionsFromDescription(description topictypes.TopicDescription) *Partiti
 	return partitions
 }
 
+// replacementPublished reports whether partitionID is inactive and every branch of its replacement
+// subtree ends in an active partition. This prevents publishing a topology with missing or intermediate children.
 func replacementPublished(partitions *Partitions, partitionID int64) bool {
 	if partitions == nil {
 		return false
