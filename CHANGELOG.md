@@ -1,3 +1,5 @@
+* Added `sugar.Embedding` helper to construct `types.Value` with `Bytes` type from slice of numbers
+
 ## v3.152.1
 * Fixed topic reader messages retaining compressed payload bytes after their content had been fully read
 
