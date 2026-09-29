@@ -32,5 +32,5 @@ func TestEmbeddingFloat64Precision(t *testing.T) {
 }
 
 func TestEmbeddingEmpty(t *testing.T) {
-	require.Equal(t, types.NullValue(types.TypeBytes), Embedding[float32]())
+	require.Equal(t, types.BytesValue([]byte{0x01}), Embedding[float32]())
 }

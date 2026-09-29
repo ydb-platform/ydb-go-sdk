@@ -25,19 +25,17 @@ type (
 	}
 )
 
+const floatVectorFormatByte = 0x01
+
 // Embedding returns a Bytes value containing the given numbers (except int8 and uint8) in YDB KNN format.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func Embedding[T number](embedding ...T) types.Value {
-	if len(embedding) == 0 {
-		return types.NullValue(types.TypeBytes)
-	}
-
 	bytes := make([]byte, len(embedding)*4+1)
 	for i, value := range embedding {
 		binary.LittleEndian.PutUint32(bytes[i*4:], math.Float32bits(float32(value)))
 	}
-	bytes[len(bytes)-1] = 0x01
+	bytes[len(bytes)-1] = floatVectorFormatByte
 
 	return types.BytesValue(bytes)
 }

@@ -1,3 +1,5 @@
+* Fixed `sugar.Embedding` encoding of an empty vector to match `Knn::ToBinaryStringFloat`
+
 ## v3.153.0
 * Added `sugar.Embedding` helper to construct `types.Value` with `Bytes` type from slice of numbers
 
