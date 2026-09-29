@@ -47,6 +47,12 @@ func newMultiWriter(
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
+	if transactional && multiWriterCfg.ProducerIDPrefix != "" {
+		return nil, fmt.Errorf(
+			"%w: producer ID prefix is not supported for transactional multi-writer",
+			ErrInvalidConfiguration,
+		)
+	}
 	if multiWriterCfg.ProducerIDPrefix == "" {
 		multiWriterCfg.ProducerIDPrefix = uuid.NewString()
 	}

@@ -83,6 +83,13 @@ type updateErrorChooser struct {
 	err      error
 }
 
+// emptyAddErrorChooser rejects empty topology updates while accepting real ones.
+type emptyAddErrorChooser struct {
+	recordingChooser
+
+	err error
+}
+
 // blockingUpdateChooser pauses the second topology update, leaving initialization unblocked.
 type blockingUpdateChooser struct {
 	recordingChooser
@@ -127,6 +134,14 @@ func (c *updateErrorChooser) AddNewPartitions(...topictypes.PartitionInfo) error
 	}
 
 	return nil
+}
+
+func (c *emptyAddErrorChooser) AddNewPartitions(partitions ...topictypes.PartitionInfo) error {
+	if len(partitions) == 0 {
+		return c.err
+	}
+
+	return c.recordingChooser.AddNewPartitions(partitions...)
 }
 
 func (c *updateErrorChooser) ChoosePartition(topicwriterinternal.PublicMessage) (int64, error) {

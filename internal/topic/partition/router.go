@@ -41,8 +41,11 @@ func NewRouter(partitions *Partitions, chooser Chooser) (*Router, error) {
 		return nil, errNilPartitions
 	}
 	if chooser != nil {
-		if err := chooser.AddNewPartitions(partitions.activeInfos()...); err != nil {
-			return nil, err
+		activePartitions := partitions.activeInfos()
+		if len(activePartitions) > 0 {
+			if err := chooser.AddNewPartitions(activePartitions...); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -96,10 +99,12 @@ func (r *Router) Apply(partitions *Partitions) error {
 				toAdd = append(toAdd, partition.info)
 			}
 		}
-		if err := r.chooser.AddNewPartitions(toAdd...); err != nil {
-			r.updateError = err
+		if len(toAdd) > 0 {
+			if err := r.chooser.AddNewPartitions(toAdd...); err != nil {
+				r.updateError = err
 
-			return err
+				return err
+			}
 		}
 		for _, partition := range r.partitions.all {
 			current, exists := partitions.find(partition.ID())

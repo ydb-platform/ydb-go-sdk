@@ -577,6 +577,7 @@ func TestMultiWriter_OnPartitionSplitReturnsAddPartitionsError(t *testing.T) {
 
 	require.NoError(t, multiWriter.WaitInit(ctx))
 	state.RecordSplit(1)
+	multiWriter.orchestrator.source.Invalidate()
 
 	err := multiWriter.orchestrator.onPartitionSplit(1)
 	require.ErrorIs(t, err, addPartitionsErr)

@@ -115,6 +115,22 @@ func TestTransactionalMultiWriter_DoesNotInitializeServerSeqNo(t *testing.T) {
 	require.NoError(t, multiWriter.Close(ctx))
 }
 
+func TestTransactionalMultiWriterRejectsProducerIDPrefix(t *testing.T) {
+	t.Parallel()
+
+	multiWriterCfg := &MultiWriterConfig{ProducerIDPrefix: "custom-prefix"}
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+	topicwriterinternal.WithTopic("test/topic")(writerCfg)
+	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+		return stubs.DefaultStubTopicDescription(t), nil
+	}).Get(writerCfg.Topic())
+
+	multiWriter, err := NewTransactionalMultiWriter(source, writerCfg, multiWriterCfg)
+
+	require.Nil(t, multiWriter)
+	require.ErrorIs(t, err, ErrInvalidConfiguration)
+}
+
 func TestTransactionalMultiWriter_SynchronousWriteReturnsSessionError(t *testing.T) {
 	t.Parallel()
 

@@ -68,7 +68,7 @@ func TestTopicTransactionalMultiWriter_ManualPartitionIncrease(t *testing.T) {
 				err := writerDB.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
 					attempts++
 					writer, err := writerDB.Topic().StartTransactionalWriter(tx, topicPath,
-						partitionChangeWriterOptions("before-alter", waitServerAck)...)
+						partitionChangeWriterOptions(waitServerAck)...)
 					if err != nil {
 						return err
 					}
@@ -100,7 +100,7 @@ func TestTopicTransactionalMultiWriter_ManualPartitionIncrease(t *testing.T) {
 
 				err = writerDB.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
 					writer, err := writerDB.Topic().StartTransactionalWriter(tx, topicPath,
-						partitionChangeWriterOptions("after-alter", waitServerAck)...)
+						partitionChangeWriterOptions(waitServerAck)...)
 					if err != nil {
 						return err
 					}
@@ -193,7 +193,6 @@ func TestTopicTransactionalMultiWriter_ManualSplit(t *testing.T) {
 						writer, err := writerDB.Topic().StartTransactionalWriter(tx, topicPath,
 							topicoptions.WithWriterWaitServerAck(waitServerAck),
 							topicoptions.WithWriteToManyPartitions(
-								topicoptions.WithProducerIDPrefix("manual-split"),
 								topicoptions.WithWriterPartitionByKey(topicoptions.BoundPartitionChooser()),
 							),
 						)
@@ -322,7 +321,6 @@ func TestTopicTransactionalMultiWriter_KeyOrderAcrossManualSplit(t *testing.T) {
 		err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
 			writer, err := db.Topic().StartTransactionalWriter(tx, topicPath,
 				topicoptions.WithWriteToManyPartitions(
-					topicoptions.WithProducerIDPrefix(fmt.Sprintf("key-order-%d", index)),
 					topicoptions.WithWriterPartitionByKey(topicoptions.BoundPartitionChooser()),
 				),
 			)
@@ -434,11 +432,10 @@ func holdFirstTopicDescription(ready chan<- struct{}, resume <-chan struct{}) gr
 	}
 }
 
-func partitionChangeWriterOptions(prefix string, waitServerAck bool) []topicoptions.WriterOption {
+func partitionChangeWriterOptions(waitServerAck bool) []topicoptions.WriterOption {
 	return []topicoptions.WriterOption{
 		topicoptions.WithWriterWaitServerAck(waitServerAck),
 		topicoptions.WithWriteToManyPartitions(
-			topicoptions.WithProducerIDPrefix(prefix),
 			topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
 		),
 	}

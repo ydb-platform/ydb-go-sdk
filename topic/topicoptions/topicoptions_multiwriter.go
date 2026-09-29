@@ -17,8 +17,8 @@ type (
 )
 
 // WithProducerIDPrefix sets a prefix for producer IDs used by non-transactional
-// internal producers. Transactional writers do not send producer IDs; when a
-// message has no key, they use this prefix as the fallback partitioning key.
+// internal producers. Transactional multi-writers reject this option because
+// their partition sessions do not use producer IDs.
 func WithProducerIDPrefix(prefix string) MultiWriterOption {
 	return func(cfg *topicmultiwriter.MultiWriterConfig) {
 		topicmultiwriter.WithProducerIDPrefix(prefix)(cfg)
