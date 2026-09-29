@@ -29,10 +29,6 @@ type (
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func Embedding[T number](embedding ...T) types.Value {
-	if len(embedding) == 0 {
-		return types.NullValue(types.TypeBytes)
-	}
-
 	bytes := make([]byte, len(embedding)*4+1)
 	for i, value := range embedding {
 		binary.LittleEndian.PutUint32(bytes[i*4:], math.Float32bits(float32(value)))
