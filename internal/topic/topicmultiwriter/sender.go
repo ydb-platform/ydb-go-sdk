@@ -19,13 +19,13 @@ type sender struct {
 	transactional          bool
 	buf                    *inflightBuffer
 	mu                     *xsync.Mutex
-	partitions             map[int64]*PartitionInfo
+	partitions             map[int64]*partitionState
 	writerPool             *partitionWriterPool
 }
 
 func newSender(
 	ctx context.Context,
-	partitions map[int64]*PartitionInfo,
+	partitions map[int64]*partitionState,
 	mu *xsync.Mutex,
 	buf *inflightBuffer,
 	writerPool *partitionWriterPool,

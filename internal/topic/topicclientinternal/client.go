@@ -395,9 +395,7 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 		cfg.MultiMode = true
 
 		internal, err := internalmultiwriter.NewMultiWriter(
-			func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-				return c.Describe(ctx, path)
-			},
+			c.partitionSources.Get(cfg.Topic()),
 			&cfg,
 			mwCfg,
 		)

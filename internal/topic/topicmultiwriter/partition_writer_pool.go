@@ -8,7 +8,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
@@ -90,7 +89,7 @@ func (p *partitionWriterPool) directWriterRetryConfig(
 	}
 
 	return p.getProducerID(partitionID), func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
-		if xerrors.IsOperationErrorTopicPartitionInactive(args.Error) {
+		if p.source != nil && p.source.NotifySessionError(partitionID, args.Error) {
 			p.partitionSplitCallback(partitionID)
 
 			return topic.PublicRetryDecisionStop

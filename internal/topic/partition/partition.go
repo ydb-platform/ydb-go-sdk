@@ -19,6 +19,11 @@ func (p Partition) IsActive() bool {
 	return p.info.Active
 }
 
+// HasChildren reports whether this partition has been replaced by child partitions.
+func (p Partition) HasChildren() bool {
+	return len(p.info.ChildPartitionIDs) > 0
+}
+
 // Parents returns all known parents recursively, excluding the partition itself.
 // A parent referenced by ID remains in the result when its metadata is absent;
 // such a parent is inactive, and traversal stops at it.
@@ -27,6 +32,16 @@ func (p Partition) IsActive() bool {
 func (p Partition) Parents() List {
 	return p.walk(func(partition Partition) []int64 {
 		return partition.info.ParentPartitionIDs
+	})
+}
+
+// Children returns all known children recursively, excluding the partition itself.
+// A child referenced by ID remains in the result when its metadata is absent;
+// traversal stops at that child. The order is unspecified, and each partition ID
+// occurs at most once. The returned list must not be modified.
+func (p Partition) Children() List {
+	return p.walk(func(partition Partition) []int64 {
+		return partition.info.ChildPartitionIDs
 	})
 }
 

@@ -1,5 +1,4 @@
-* Fixed Topic multi-writers failing to refresh routes after partition splits, and sped up repeated transactional
-  multi-writer creation by reusing cached partition metadata
+* Sped up transactional Topic multi-writer initialization
 
 ## v3.152.0
 * Added `topicoptions.WithListenerCheckRetryErrorFunction` to customize the topic listener error retry policy

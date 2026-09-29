@@ -130,7 +130,7 @@ func TestSenderStepReturnsNonOverloadedWriterInitError(t *testing.T) {
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	topicwriterinternal.WithMaxQueueLen(10)(writerCfg)
 	buf := newInflightBuffer(ctx, mu, writerCfg, func() error { return nil })
-	partitions := map[int64]*PartitionInfo{1: {}}
+	partitions := map[int64]*partitionState{1: {}}
 
 	mu.WithLock(func() {
 		buf.pushNeedLock(message{
@@ -328,9 +328,27 @@ func TestPartitionWriterPool_TransactionalInactivePartitionInvalidatesSource(t *
 func TestPartitionWriterPool_NonTransactionalSessionPolicy(t *testing.T) {
 	t.Parallel()
 
+	var describeCalls atomic.Int64
+	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+		if describeCalls.Add(1) == 1 {
+			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{
+				PartitionID: 7,
+				Active:      true,
+			}}}, nil
+		}
+
+		return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+			{PartitionID: 7, ChildPartitionIDs: []int64{8}},
+			{PartitionID: 8, Active: true, ParentPartitionIDs: []int64{7}},
+		}}, nil
+	}).Get("test/topic")
+	_, err := source.Partitions(t.Context())
+	require.NoError(t, err)
+
 	factory := &poolMockFactory{}
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
+	pool.source = source
 
 	var splitPartition atomic.Int64
 	pool.partitionSplitCallback = func(partitionID int64) {
@@ -340,7 +358,7 @@ func TestPartitionWriterPool_NonTransactionalSessionPolicy(t *testing.T) {
 		return topic.PublicRetryDecisionRetry
 	}
 
-	_, err := pool.get(7, true)
+	_, err = pool.get(7, true)
 	require.NoError(t, err)
 	overloaded := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
 	require.Equal(t, topic.PublicRetryDecisionRetry,
@@ -354,6 +372,10 @@ func TestPartitionWriterPool_NonTransactionalSessionPolicy(t *testing.T) {
 	require.Equal(t, topic.PublicRetryDecisionStop,
 		factory.lastCfg.RetrySettings.CheckError(topic.PublicCheckErrorRetryArgs{Error: partitionInactive}))
 	require.EqualValues(t, 7, splitPartition.Load())
+	partitions, err := source.Partitions(t.Context())
+	require.NoError(t, err)
+	require.True(t, partitions.ByPartitionID(8).IsActive())
+	require.Equal(t, int64(2), describeCalls.Load())
 }
 
 func TestPartitionWriterPool_TransactionalSessionErrorStopsWriter(t *testing.T) {

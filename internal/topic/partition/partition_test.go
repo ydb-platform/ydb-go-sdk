@@ -28,6 +28,17 @@ func TestPartitionIDReturnsDescribedID(t *testing.T) {
 	assert.Equal(t, int64(42), partitions.All()[0].ID())
 }
 
+func TestPartitionHasChildrenReturnsDescribedState(t *testing.T) {
+	describer := &mockTopicDescriber{description: topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+		{PartitionID: 1, ChildPartitionIDs: []int64{2}},
+		{PartitionID: 2},
+	}}}
+	partitions, _ := partition.NewSources(describer.Describe).Get("test/topic").Partitions(t.Context())
+
+	assert.True(t, partitions.ByPartitionID(1).HasChildren())
+	assert.False(t, partitions.ByPartitionID(2).HasChildren())
+}
+
 func TestPartitionParents(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -125,4 +136,16 @@ func TestPartitionParentsReturnsMissingParentAsInactive(t *testing.T) {
 	assert.Equal(t, int64(99), parents[0].ID())
 	assert.False(t, parents[0].IsActive())
 	assert.Empty(t, parents[0].Parents())
+}
+
+func TestPartitionChildrenReturnsReplacementTree(t *testing.T) {
+	describer := &mockTopicDescriber{description: topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+		{PartitionID: 1, ChildPartitionIDs: []int64{2, 3}},
+		{PartitionID: 2, ChildPartitionIDs: []int64{4}},
+		{PartitionID: 3, Active: true},
+		{PartitionID: 4, Active: true},
+	}}}
+	partitions, _ := partition.NewSources(describer.Describe).Get("test/topic").Partitions(t.Context())
+
+	assert.ElementsMatch(t, []int64{2, 3, 4}, partitions.ByPartitionID(1).Children().IDs())
 }

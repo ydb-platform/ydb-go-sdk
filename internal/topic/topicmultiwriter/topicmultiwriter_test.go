@@ -13,7 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
@@ -26,6 +26,8 @@ import (
 
 var errTest = errors.New("test error")
 
+type TopicDescriber = partition.TopicDescriber
+
 func (p *MultiWriter) getWritersCount() int {
 	return p.orchestrator.getWritersCount()
 }
@@ -33,6 +35,10 @@ func (p *MultiWriter) getWritersCount() int {
 // for test purposes
 func (o *orchestrator) getWritersCount() int {
 	return o.writerPool.getWritersCount()
+}
+
+func newTestPartitionSource(describer TopicDescriber) *partition.Source {
+	return partition.NewSources(describer).Get("test/topic")
 }
 
 type stubWritersFactory struct {
@@ -222,7 +228,7 @@ func newTestMultiWriter(t testing.TB, describer TopicDescriber) *MultiWriter {
 	WithProducerIDPrefix("test-producer")(&cfg)
 	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
 
-	writer, err := NewMultiWriter(describer, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
+	writer, err := NewMultiWriter(newTestPartitionSource(describer), &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -239,11 +245,12 @@ func newTestMultiWriterWithInitDelay(
 	WithProducerIDPrefix("test-producer")(&cfg)
 	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
 
-	writer, err := NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+	source := newTestPartitionSource(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 		time.Sleep(initDelay)
 
 		return describer(ctx, path)
-	}, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
+	})
+	writer, err := NewMultiWriter(source, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -269,7 +276,7 @@ func newTestMultiWriterWithBasicWriter(
 		opt(writerCfg)
 	}
 
-	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
+	writer, err := NewMultiWriter(newTestPartitionSource(describer), writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -304,7 +311,7 @@ func newTestMultiWriterWithAutopartitioningWriter(
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
+	writer, err := NewMultiWriter(newTestPartitionSource(describer), writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -323,7 +330,7 @@ func newTestMultiWriterWithSmallIdleSessionTimeout(t testing.TB, describer Topic
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
+	writer, err := NewMultiWriter(newTestPartitionSource(describer), writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -350,7 +357,7 @@ func newTestMultiWriterWithAckDelay(
 		opt(writerCfg)
 	}
 
-	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
+	writer, err := NewMultiWriter(newTestPartitionSource(describer), writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -377,7 +384,7 @@ func newTestMultiWriterWithCustomWritersFactory(
 		opt(writerCfg)
 	}
 
-	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
+	writer, err := NewMultiWriter(newTestPartitionSource(describer), writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -438,7 +445,7 @@ func newTestMultiWriterWithPartitionChooser(
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
+	writer, err := NewMultiWriter(newTestPartitionSource(describer), writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -626,35 +633,6 @@ func TestMultiWriter_CloseCancelsInitSeqNoRetrySleep(t *testing.T) {
 
 	startedAt := time.Now()
 	require.NoError(t, multiWriter.Close(closeCtx))
-	require.Less(t, time.Since(startedAt), 100*time.Millisecond)
-}
-
-func TestOrchestratorDescribeTopicWithRetriesCancelsRetrySleep(t *testing.T) {
-	t.Parallel()
-
-	ctx, cancel := context.WithCancel(xtest.Context(t))
-	bg := background.NewWorker(ctx, "describe-retry-test")
-	describeResult := stubs.DefaultStubTopicDescription(t)
-	o := newOrchestrator(
-		ctx,
-		cancel,
-		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-			return describeResult, nil
-		},
-		nil,
-		false,
-		bg,
-		&topicwriterinternal.WriterReconnectorConfig{},
-		&MultiWriterConfig{},
-	)
-	cancel()
-	defer func() {
-		_ = bg.Close(xtest.Context(t), nil)
-	}()
-
-	startedAt := time.Now()
-	_, err := o.describeTopicWithRetries(describeResult.Partitions[0].PartitionID)
-	require.ErrorIs(t, err, context.Canceled)
 	require.Less(t, time.Since(startedAt), 100*time.Millisecond)
 }
 
@@ -951,9 +929,9 @@ func TestMultiWriter_Write_ErrUnorderedSeqNo(t *testing.T) {
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
 	multiWriter, err := NewMultiWriter(
-		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		newTestPartitionSource(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return stubClient.Describe(ctx, path)
-		},
+		}),
 		writerCfg,
 		&cfg,
 	)
@@ -1008,9 +986,9 @@ func TestMultiWriter_Write_AutoSeqNoFollowsQueueOrder(t *testing.T) {
 	topicwriterinternal.WithAutoSetSeqNo(true)(writerCfg)
 
 	multiWriter, err := NewMultiWriter(
-		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		newTestPartitionSource(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return stubClient.Describe(ctx, path)
-		},
+		}),
 		writerCfg,
 		&cfg,
 	)

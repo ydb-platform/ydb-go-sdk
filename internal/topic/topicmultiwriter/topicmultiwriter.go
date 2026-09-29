@@ -24,11 +24,11 @@ type MultiWriter struct {
 }
 
 func NewMultiWriter(
-	topicDescriber TopicDescriber,
+	source *partition.Source,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
-	return newMultiWriter(topicDescriber, nil, false, writerCfg, multiWriterCfg)
+	return newMultiWriter(source, false, writerCfg, multiWriterCfg)
 }
 
 // NewTransactionalMultiWriter creates a multiwriter whose partition sessions
@@ -38,11 +38,10 @@ func NewTransactionalMultiWriter(
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
-	return newMultiWriter(nil, source, true, writerCfg, multiWriterCfg)
+	return newMultiWriter(source, true, writerCfg, multiWriterCfg)
 }
 
 func newMultiWriter(
-	topicDescriber TopicDescriber,
 	source *partition.Source,
 	transactional bool,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
@@ -68,7 +67,7 @@ func newMultiWriter(
 		writerCfg: writerCfg,
 		encoders:  encoders,
 		orchestrator: newOrchestrator(
-			ctx, cancel, topicDescriber, source, transactional, background, writerCfg, multiWriterCfg,
+			ctx, cancel, source, transactional, background, writerCfg, multiWriterCfg,
 		),
 		background: background,
 	}
@@ -122,7 +121,7 @@ func (p *MultiWriter) Close(ctx context.Context) error {
 
 	flushErr := p.orchestrator.flush(ctx)
 
-	p.orchestrator.shutdown()
+	p.orchestrator.stop()
 	backgroundErr := p.background.Close(ctx, nil)
 
 	if flushErr != nil {
