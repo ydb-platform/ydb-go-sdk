@@ -26,6 +26,7 @@ type (
 )
 
 // Embedding returns a Bytes value containing the given numbers as float32 values.
+// With no numbers, it returns a Bytes value containing only the type marker.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func Embedding[T number](embedding ...T) types.Value {
