@@ -1,3 +1,4 @@
+## v3.153.1
 * Fixed `sugar.Embedding` encoding of an empty vector to match `Knn::ToBinaryStringFloat`
 
 ## v3.153.0
