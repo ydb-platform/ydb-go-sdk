@@ -9,7 +9,7 @@ import (
 )
 
 func Context(t testing.TB) context.Context {
-	ctx, cancel := xcontext.WithCancel(context.Background())
+	ctx, cancel := xcontext.WithCancel(contextRoot(t))
 	ctx = pprof.WithLabels(ctx, pprof.Labels("test", t.Name()))
 	pprof.SetGoroutineLabels(ctx)
 
