@@ -41,7 +41,7 @@ func TestSugarEmbeddingMatchesKnn(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			row, err := db.Query().QueryRow(scope.Ctx, fmt.Sprintf(`
 				DECLARE $values AS List<%s>;
-				DECLARE $embedded AS String;
+				DECLARE $embedded AS Bytes;
 				SELECT $embedded = Untag(Knn::ToBinaryStringFloat(
 					ListMap($values, ($value) -> (CAST($value AS Float)))
 				), "FloatVector");`, test.yqlType),
