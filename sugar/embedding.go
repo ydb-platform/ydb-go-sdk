@@ -32,7 +32,7 @@ type (
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func Embedding[T number](embedding ...T) types.Value {
-	kind := reflect.TypeOf(embedding).Elem().Kind()
+	kind := reflect.TypeFor[T]().Kind()
 	if kind == reflect.Int8 || kind == reflect.Uint8 {
 		bytes := make([]byte, len(embedding)+1)
 		for i, value := range embedding {
