@@ -1,3 +1,4 @@
+## v3.153.0
 * Added `sugar.Embedding` helper to construct `types.Value` with `Bytes` type from slice of numbers
 
 ## v3.152.1
