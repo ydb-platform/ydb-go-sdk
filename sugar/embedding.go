@@ -7,11 +7,23 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
-type number interface {
-	~int | ~int8 | ~int16 | ~int32 | ~int64 |
-		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr |
+type (
+	signed interface {
+		~int | ~int8 | ~int16 | ~int32 | ~int64
+	}
+	unsigned interface {
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64
+	}
+	integer interface {
+		signed | unsigned
+	}
+	float interface {
 		~float32 | ~float64
-}
+	}
+	number interface {
+		integer | float
+	}
+)
 
 // Embedding returns a Bytes value containing the given numbers as float32 values.
 //
