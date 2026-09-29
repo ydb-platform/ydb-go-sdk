@@ -115,6 +115,7 @@ func (s *DescribeWithSplitsState) GetDescription() topictypes.TopicDescription {
 		pi := p
 		if split, ok := s.splits[p.PartitionID]; ok {
 			pi.ChildPartitionIDs = []int64{split.child1, split.child2}
+			pi.Active = false
 		}
 		out.Partitions = append(out.Partitions, pi)
 	}

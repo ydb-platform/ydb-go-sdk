@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
@@ -15,19 +16,21 @@ type sender struct {
 	wakeupChan             empty.Chan
 	onError                func(err error)
 	partitionSplitReceiver *partitionSplitReceiver
+	transactional          bool
 	buf                    *inflightBuffer
 	mu                     *xsync.Mutex
-	partitions             map[int64]*PartitionInfo
+	partitions             map[int64]*partitionState
 	writerPool             *partitionWriterPool
 }
 
 func newSender(
 	ctx context.Context,
-	partitions map[int64]*PartitionInfo,
+	partitions map[int64]*partitionState,
 	mu *xsync.Mutex,
 	buf *inflightBuffer,
 	writerPool *partitionWriterPool,
 	partitionSplitReceiver *partitionSplitReceiver,
+	transactional bool,
 	onError func(err error),
 ) *sender {
 	return &sender{
@@ -39,6 +42,7 @@ func newSender(
 		partitions:             partitions,
 		writerPool:             writerPool,
 		partitionSplitReceiver: partitionSplitReceiver,
+		transactional:          transactional,
 	}
 }
 
@@ -96,6 +100,11 @@ func (s *sender) iterateThroughMessagesIndex(
 			}
 
 			if err := wr.getInitErr(); err != nil {
+				if s.transactional {
+					return xerrors.WithStackTrace(
+						fmt.Errorf("writer init failed for partition %d: %w", msg.PartitionID, err),
+					)
+				}
 				if isOperationErrorOverloaded(err) {
 					s.partitionSplitReceiver.push(partitionID)
 
@@ -109,6 +118,9 @@ func (s *sender) iterateThroughMessagesIndex(
 				s.ctx,
 				[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
 			); err != nil {
+				if s.transactional {
+					return xerrors.WithStackTrace(fmt.Errorf("failed to write message: %w", err))
+				}
 				if isOperationErrorOverloaded(err) {
 					s.partitionSplitReceiver.push(partitionID)
 

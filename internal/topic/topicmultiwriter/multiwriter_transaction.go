@@ -20,8 +20,7 @@ type MultiWriterWithTransaction struct {
 }
 
 // NewTopicMultiWriterTransaction creates a transactional multi-writer wrapper.
-// The underlying MultiWriter must be created with Transaction-aware writers factory
-// (see newTransactionalWritersFactory).
+// The underlying MultiWriter must be created with NewTransactionalMultiWriter.
 func NewTopicMultiWriterTransaction(
 	mw *MultiWriter,
 	transaction tx.Transaction,
@@ -47,9 +46,6 @@ func NewTopicMultiWriterTransaction(
 func (w *MultiWriterWithTransaction) onBeforeCommitTransaction(ctx context.Context) (err error) {
 	// For multi-writer we do not have a single topic session ID like WriterReconnector,
 	// so we only ensure that all buffered messages are flushed by closing the writer.
-	//
-	// Per-writer transactional wrappers (created by transactionalWritersFactory)
-	// will handle tracing on their own.
 	return w.multiWriter.Close(ctx)
 }
 

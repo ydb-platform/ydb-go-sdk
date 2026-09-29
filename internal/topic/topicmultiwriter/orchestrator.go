@@ -2,7 +2,6 @@ package topicmultiwriter
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -13,12 +12,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -31,10 +30,11 @@ type orchestrator struct {
 	writerCfg      *topicwriterinternal.WriterReconnectorConfig
 	mu             *xsync.Mutex
 
-	partitionChooser PartitionChooser
-	topicDescriber   TopicDescriber
+	source        *partition.Source
+	router        *partition.Router
+	transactional bool
 
-	partitions map[int64]*PartitionInfo
+	partitions map[int64]*partitionState
 	initDone   empty.Chan
 
 	currentSeqNo int64
@@ -51,8 +51,9 @@ type orchestrator struct {
 //nolint:funlen
 func newOrchestrator(
 	ctx context.Context,
-	stop context.CancelFunc,
-	topicDescriber TopicDescriber,
+	cancel context.CancelFunc,
+	source *partition.Source,
+	transactional bool,
 	background *background.Worker,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
@@ -70,16 +71,16 @@ func newOrchestrator(
 	}
 
 	o := &orchestrator{
-		writerCfg:        writerCfg,
-		multiWriterCfg:   multiWriterCfg,
-		mu:               &xsync.Mutex{},
-		topicDescriber:   topicDescriber,
-		ctx:              ctx,
-		stop:             stop,
-		partitions:       make(map[int64]*PartitionInfo),
-		initDone:         make(empty.Chan),
-		background:       background,
-		partitionChooser: multiWriterCfg.PartitionChooser,
+		writerCfg:      writerCfg,
+		multiWriterCfg: multiWriterCfg,
+		mu:             &xsync.Mutex{},
+		source:         source,
+		transactional:  transactional,
+		ctx:            ctx,
+		stop:           cancel,
+		partitions:     make(map[int64]*partitionState),
+		initDone:       make(empty.Chan),
+		background:     background,
 	}
 
 	o.buf = newInflightBuffer(ctx, o.mu, writerCfg, func() error { return o.getResultErr() })
@@ -99,11 +100,13 @@ func newOrchestrator(
 		background,
 		o.ackReceiver.push,
 		o.partitionSplitReceiver.push,
+		source,
 		func() {
 			o.sender.wakeup()
 		},
 		o.stopWithError,
 	)
+	o.writerPool.transactional = transactional
 	o.sender = newSender(
 		ctx,
 		o.partitions,
@@ -111,6 +114,7 @@ func newOrchestrator(
 		o.buf,
 		o.writerPool,
 		o.partitionSplitReceiver,
+		transactional,
 		o.stopWithError,
 	)
 
@@ -121,9 +125,11 @@ func (o *orchestrator) startWorkers() {
 	o.background.Start("ack receiver", func(ctx context.Context) {
 		o.ackReceiver.run(o.ctx)
 	})
-	o.background.Start("partition splitter", func(ctx context.Context) {
-		o.partitionSplitReceiver.run(ctx)
-	})
+	if !o.transactional {
+		o.background.Start("partition splitter", func(ctx context.Context) {
+			o.partitionSplitReceiver.run(ctx)
+		})
+	}
 	o.background.Start("sender", func(ctx context.Context) {
 		o.sender.run()
 	})
@@ -147,50 +153,37 @@ func (o *orchestrator) sleepOrDone(delay time.Duration) error {
 
 func (o *orchestrator) init() (err error) {
 	defer close(o.initDone)
-
-	describeResult, err := o.topicDescriber(o.ctx, o.writerCfg.Topic())
+	partitions, err := o.source.Partitions(o.ctx)
 	if err != nil {
 		o.stopWithError(err)
 
 		return err
 	}
-
-	o.mu.WithLock(func() {
-		for _, partition := range describeResult.Partitions {
-			o.partitions[partition.PartitionID] = &PartitionInfo{
-				PartitionInfo: partition,
-			}
-		}
-	})
-
-	if err := o.initSeqNo(); err != nil {
-		o.stopWithError(err)
-
-		return err
+	chooser := o.multiWriterCfg.PartitionChooser
+	if chooser == nil && !o.transactional {
+		chooser = partitionchooser.NewByPartitionIDPartitionChooser()
 	}
-
-	o.mu.WithLock(func() {
-		if o.partitionChooser == nil {
-			o.partitionChooser = partitionchooser.NewByPartitionIDPartitionChooser()
-		}
-
-		partitionsToAdd := make([]topictypes.PartitionInfo, 0, len(o.partitions))
-		for _, partition := range o.partitions {
-			if partition.Splitted() || !partition.Active {
-				continue
-			}
-
-			partitionsToAdd = append(partitionsToAdd, partition.PartitionInfo)
-		}
-
-		err = o.partitionChooser.AddNewPartitions(partitionsToAdd...)
-	})
+	o.router, err = partition.NewRouter(partitions, chooser)
 	if err != nil {
 		o.stopWithError(err)
 
 		return err
 	}
+	if !o.transactional {
+		o.mu.WithLock(func() {
+			for _, topicPartition := range partitions.All() {
+				o.partitions[topicPartition.ID()] = &partitionState{
+					Replaced:         topicPartition.HasChildren(),
+					RecoveryComplete: topicPartition.HasChildren(),
+				}
+			}
+		})
+		if err = o.initSeqNo(); err != nil {
+			o.stopWithError(err)
 
+			return err
+		}
+	}
 	o.startWorkers()
 
 	return nil
@@ -201,9 +194,12 @@ func (o *orchestrator) choosePartition(msg message) (partitionID int64, err erro
 		msg.Key = o.multiWriterCfg.ProducerIDPrefix
 	}
 
-	partitionID, err = o.partitionChooser.ChoosePartition(msg.PublicMessage)
+	partitionID, err = o.router.ChoosePartition(msg.PublicMessage)
 	if err != nil {
 		return 0, fmt.Errorf("choose partition: %w", err)
+	}
+	if _, ok := o.partitions[partitionID]; !ok {
+		o.partitions[partitionID] = &partitionState{}
 	}
 
 	return partitionID, nil
@@ -324,7 +320,9 @@ func (o *orchestrator) onAckReceivedNeedLock(partitionID, seqNo int64) {
 	indexChain.Remove(message)
 	if indexChain.Len() == 0 {
 		delete(o.buf.inFlightMessagesIndex, partitionID)
-		o.writerPool.evict(partitionID)
+		if !o.transactional {
+			o.writerPool.evict(partitionID)
+		}
 	}
 
 	partition := o.partitions[partitionID]
@@ -339,62 +337,6 @@ func (o *orchestrator) onAckReceivedNeedLock(partitionID, seqNo int64) {
 	if len(o.buf.pendingMessagesIndex) > 0 || (partition != nil && partition.PendingResend == 0) {
 		o.sender.wakeup()
 	}
-}
-
-func (o *orchestrator) getSplittedPartitionAncestors(
-	describeResult *topictypes.TopicDescription,
-	partitionID int64,
-) []int64 {
-	partitionToParent := make(map[int64]int64)
-	for _, partition := range describeResult.Partitions {
-		if len(partition.ParentPartitionIDs) == 0 {
-			continue
-		}
-		partitionToParent[partition.PartitionID] = partition.ParentPartitionIDs[0]
-	}
-
-	var (
-		ancestors          = []int64{partitionID}
-		currentPartitionID = partitionID
-	)
-
-	for {
-		parentID, ok := partitionToParent[currentPartitionID]
-		if !ok {
-			break
-		}
-
-		ancestors = append(ancestors, parentID)
-		currentPartitionID = parentID
-	}
-
-	return ancestors
-}
-
-func (o *orchestrator) addNewPartitions(
-	parentPartition *PartitionInfo,
-	describeResult *topictypes.TopicDescription,
-	splittedPartitionID int64,
-) error {
-	var (
-		childPartitions = make([]int64, 0, 2)
-		partitionsToAdd = make([]topictypes.PartitionInfo, 0, 2)
-	)
-
-	for _, partition := range describeResult.Partitions {
-		if len(partition.ParentPartitionIDs) > 0 && partition.ParentPartitionIDs[0] == splittedPartitionID {
-			childPartitions = append(childPartitions, partition.PartitionID)
-			partitionsToAdd = append(partitionsToAdd, partition)
-			o.partitions[partition.PartitionID] = &PartitionInfo{
-				PartitionInfo: partition,
-				Locked:        true,
-			}
-		}
-	}
-
-	parentPartition.ChildPartitionIDs = childPartitions
-
-	return o.partitionChooser.AddNewPartitions(partitionsToAdd...)
 }
 
 func (o *orchestrator) rechoosePartition(msg *message) (err error) {
@@ -525,6 +467,10 @@ func (o *orchestrator) initSeqNo() error {
 		for _, partitionID := range partitions {
 			o.writerPool.forceEvict(partitionID)
 		}
+		partitions, err = o.refreshPartitionsForInit()
+		if err != nil {
+			return err
+		}
 		if err := o.sleepOrDone(retryDelay); err != nil {
 			return err
 		}
@@ -541,6 +487,35 @@ func (o *orchestrator) initSeqNo() error {
 	return nil
 }
 
+func (o *orchestrator) refreshPartitionsForInit() (partitionIDs []int64, err error) {
+	refreshedPartitions, err := o.source.Partitions(o.ctx)
+	if err != nil {
+		return nil, err
+	}
+	o.mu.WithLock(func() {
+		if err = o.router.Apply(refreshedPartitions); err != nil {
+			return
+		}
+		for _, topicPartition := range refreshedPartitions.All() {
+			state, ok := o.partitions[topicPartition.ID()]
+			if !ok {
+				state = &partitionState{}
+				o.partitions[topicPartition.ID()] = state
+			}
+			state.Replaced = topicPartition.HasChildren()
+			if state.Replaced {
+				state.RecoveryComplete = true
+			}
+		}
+		partitionIDs = make([]int64, 0, len(o.partitions))
+		for partitionID := range o.partitions {
+			partitionIDs = append(partitionIDs, partitionID)
+		}
+	})
+
+	return partitionIDs, err
+}
+
 //nolint:funlen
 func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err error) {
 	var errGroup errgroup.Group
@@ -549,9 +524,9 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 	for _, partition := range partitions {
 		errGroup.Go(func() (resultErr error) {
 			var (
-				partitionInfo      *PartitionInfo
+				partitionInfo      *partitionState
 				seqNoAlreadyCached bool
-				splitted           bool
+				replaced           bool
 			)
 			o.mu.WithLock(func() {
 				partitionInfo = o.partitions[partition]
@@ -560,7 +535,7 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 				}
 				seqNoAlreadyCached = partitionInfo.CachedMaxSeqNo != 0
 				maxSeqNo = max(maxSeqNo, partitionInfo.CachedMaxSeqNo)
-				splitted = partitionInfo.Splitted()
+				replaced = partitionInfo.Replaced
 			})
 			if partitionInfo == nil {
 				return fmt.Errorf("partition not found: %d", partition)
@@ -570,7 +545,7 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 			}
 
 			var writer *writerWrapper
-			if splitted {
+			if replaced {
 				writer, resultErr = o.writerPool.get(partition, false)
 				if resultErr != nil {
 					return resultErr
@@ -606,42 +581,14 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 	return maxSeqNo, nil
 }
 
-func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topictypes.TopicDescription, error) {
-	const (
-		maxRetries = 5
-		retryDelay = 100 * time.Millisecond
-	)
-
-	for range maxRetries {
-		describeResult, err := o.topicDescriber(o.ctx, o.writerCfg.Topic())
-		if err == nil {
-			var needRetry bool
-			for _, partition := range describeResult.Partitions {
-				if partition.PartitionID == splitPartitionID {
-					needRetry = len(partition.ChildPartitionIDs) == 0
-
-					break
-				}
-			}
-
-			if !needRetry {
-				return describeResult, nil
-			}
-		}
-
-		if err := o.sleepOrDone(retryDelay); err != nil {
-			return topictypes.TopicDescription{}, err
-		}
-	}
-
-	return topictypes.TopicDescription{}, errors.New("failed to describe topic")
-}
-
 //nolint:funlen
 func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
-	var isAlreadySplitted bool
+	var (
+		recoveryComplete        bool
+		replacementPartitionIDs []int64
+	)
 
-	describeResult, err := o.describeTopicWithRetries(partitionID)
+	partitions, err := o.source.Partitions(o.ctx)
 	if err != nil {
 		return err
 	}
@@ -653,24 +600,38 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 
 			return
 		}
-		if partition.Splitted() {
-			isAlreadySplitted = true
+		if partition.RecoveryComplete {
+			recoveryComplete = true
 
 			return
 		}
 
 		partition.Locked = true
-		if resultErr = o.addNewPartitions(partition, &describeResult, partitionID); resultErr != nil {
+		if resultErr = o.router.Apply(partitions); resultErr != nil {
 			return
 		}
-		o.partitionChooser.RemovePartition(partitionID)
+		for _, topicPartition := range partitions.All() {
+			state, ok := o.partitions[topicPartition.ID()]
+			if !ok {
+				state = &partitionState{}
+				o.partitions[topicPartition.ID()] = state
+			}
+			state.Replaced = topicPartition.HasChildren()
+		}
+		partition.RecoveryComplete = true
+		for _, replacement := range partitions.ByPartitionID(partitionID).Children() {
+			if replacement.IsActive() {
+				o.partitions[replacement.ID()].Locked = true
+				replacementPartitionIDs = append(replacementPartitionIDs, replacement.ID())
+			}
+		}
 	})
 
-	if resultErr != nil || isAlreadySplitted {
+	if resultErr != nil || recoveryComplete {
 		return resultErr
 	}
 
-	ancestors := o.getSplittedPartitionAncestors(&describeResult, partitionID)
+	ancestors := append([]int64{partitionID}, partitions.ByPartitionID(partitionID).Parents().IDs()...)
 	maxSeqNo, err := o.getMaxSeqNo(ancestors)
 	if err != nil {
 		return err
@@ -691,8 +652,8 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		}
 
 		partition.Locked = false
-		for _, child := range partition.ChildPartitionIDs {
-			o.partitions[child].Locked = false
+		for _, replacementPartitionID := range replacementPartitionIDs {
+			o.partitions[replacementPartitionID].Locked = false
 		}
 
 		for _, ancestor := range ancestors {

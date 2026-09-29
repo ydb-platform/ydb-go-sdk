@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
@@ -144,7 +145,12 @@ func (w *writerWithAutopartitioning) processMessages() {
 
 	if needOverloaded {
 		w.retrySettings.CheckError(topic.PublicCheckErrorRetryArgs{
-			Error: xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED)),
+			Error: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
+				xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{
+					IssueCode: xerrors.IssueCodeTopicPartitionInactive,
+				}}),
+			),
 		})
 	}
 }

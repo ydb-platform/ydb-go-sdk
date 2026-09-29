@@ -5,14 +5,21 @@ import (
 	"errors"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 var errCreate = errors.New("create error")
@@ -21,6 +28,8 @@ var errCreate = errors.New("create error")
 type poolTestWriter struct {
 	closed      atomic.Bool
 	writeCalled atomic.Int64
+	closeResult chan error
+	writeErr    error
 }
 
 func (w *poolTestWriter) Close(_ context.Context) error {
@@ -33,10 +42,19 @@ func (w *poolTestWriter) WaitInitInfo(_ context.Context) (topicwriterinternal.In
 	return topicwriterinternal.InitialInfo{}, nil
 }
 
+func (w *poolTestWriter) WaitClose(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-w.closeResult:
+		return err
+	}
+}
+
 func (w *poolTestWriter) WriteInternal(_ context.Context, _ []topicwritercommon.MessageWithDataContent) error {
 	w.writeCalled.Add(1)
 
-	return nil
+	return w.writeErr
 }
 
 // poolMockFactory records Create calls and returns configurable writers or error.
@@ -47,6 +65,7 @@ type poolMockFactory struct {
 	returnError  bool
 	writers      []*poolTestWriter
 	lastCfg      topicwriterinternal.WriterReconnectorConfig
+	writeErr     error
 }
 
 func (f *poolMockFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
@@ -61,7 +80,7 @@ func (f *poolMockFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig
 		return nil, errCreate
 	}
 
-	w := &poolTestWriter{}
+	w := &poolTestWriter{closeResult: make(chan error, 1), writeErr: f.writeErr}
 	f.writers = append(f.writers, w)
 
 	return w, nil
@@ -87,6 +106,7 @@ func newPoolForTest(t *testing.T, factory *poolMockFactory) (*partitionWriterPoo
 		bg,
 		func(partitionID, seqNo int64) {},
 		func(partitionID int64) {},
+		nil,
 		func() {},
 		func(err error) {},
 	)
@@ -110,7 +130,7 @@ func TestSenderStepReturnsNonOverloadedWriterInitError(t *testing.T) {
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	topicwriterinternal.WithMaxQueueLen(10)(writerCfg)
 	buf := newInflightBuffer(ctx, mu, writerCfg, func() error { return nil })
-	partitions := map[int64]*PartitionInfo{1: {}}
+	partitions := map[int64]*partitionState{1: {}}
 
 	mu.WithLock(func() {
 		buf.pushNeedLock(message{
@@ -130,6 +150,7 @@ func TestSenderStepReturnsNonOverloadedWriterInitError(t *testing.T) {
 		buf,
 		&partitionWriterPool{writers: map[int64]*writerWrapper{1: wrapper}},
 		newPartitionSplitReceiver(func(partitionID int64) error { return nil }, func(err error) {}),
+		false,
 		func(err error) {},
 	)
 
@@ -245,6 +266,144 @@ func TestPartitionWriterPool_GetProducerIDFormat(t *testing.T) {
 	require.Equal(t, []int64{5}, factory.partitionIDs)
 
 	cancel()
+}
+
+func TestPartitionWriterPool_TransactionalSessionPolicy(t *testing.T) {
+	t.Parallel()
+
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+	pool.transactional = true
+
+	_, err := pool.get(7, true)
+	require.NoError(t, err)
+	require.Equal(t, []string{""}, factory.producerIDs)
+	require.False(t, factory.lastCfg.AutoSetSeqNo)
+	require.Equal(t, topic.PublicRetryDecisionStop,
+		factory.lastCfg.RetrySettings.CheckError(topic.PublicCheckErrorRetryArgs{Error: errors.New("session failed")}))
+}
+
+func TestPartitionWriterPool_TransactionalInactivePartitionInvalidatesSource(t *testing.T) {
+	t.Parallel()
+
+	var describeCalls atomic.Int64
+	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+		if describeCalls.Add(1) == 1 {
+			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{
+				PartitionID: 7,
+				Active:      true,
+			}}}, nil
+		}
+
+		return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+			{PartitionID: 7, ChildPartitionIDs: []int64{8}},
+			{PartitionID: 8, Active: true, ParentPartitionIDs: []int64{7}},
+		}}, nil
+	}).Get("test/topic")
+	_, err := source.Partitions(t.Context())
+	require.NoError(t, err)
+
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+	pool.transactional = true
+	pool.source = source
+	_, err = pool.get(7, true)
+	require.NoError(t, err)
+	partitionInactive := xerrors.Operation(
+		xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
+		xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: xerrors.IssueCodeTopicPartitionInactive}}),
+	)
+
+	decision := factory.lastCfg.RetrySettings.CheckError(topic.PublicCheckErrorRetryArgs{Error: partitionInactive})
+	partitions, err := source.Partitions(t.Context())
+
+	require.NoError(t, err)
+	require.Equal(t, topic.PublicRetryDecisionStop, decision)
+	require.True(t, partitions.ByPartitionID(8).IsActive())
+	require.Equal(t, int64(2), describeCalls.Load())
+}
+
+func TestPartitionWriterPool_NonTransactionalSessionPolicy(t *testing.T) {
+	t.Parallel()
+
+	var describeCalls atomic.Int64
+	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+		if describeCalls.Add(1) == 1 {
+			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{
+				PartitionID: 7,
+				Active:      true,
+			}}}, nil
+		}
+
+		return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+			{PartitionID: 7, ChildPartitionIDs: []int64{8}},
+			{PartitionID: 8, Active: true, ParentPartitionIDs: []int64{7}},
+		}}, nil
+	}).Get("test/topic")
+	_, err := source.Partitions(t.Context())
+	require.NoError(t, err)
+
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+	pool.source = source
+
+	var splitPartition atomic.Int64
+	pool.partitionSplitCallback = func(partitionID int64) {
+		splitPartition.Store(partitionID)
+	}
+	pool.writerCfg.RetrySettings.CheckError = func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+		return topic.PublicRetryDecisionRetry
+	}
+
+	_, err = pool.get(7, true)
+	require.NoError(t, err)
+	overloaded := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
+	require.Equal(t, topic.PublicRetryDecisionRetry,
+		factory.lastCfg.RetrySettings.CheckError(topic.PublicCheckErrorRetryArgs{Error: overloaded}))
+	require.Zero(t, splitPartition.Load())
+
+	partitionInactive := xerrors.Operation(
+		xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
+		xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: xerrors.IssueCodeTopicPartitionInactive}}),
+	)
+	require.Equal(t, topic.PublicRetryDecisionStop,
+		factory.lastCfg.RetrySettings.CheckError(topic.PublicCheckErrorRetryArgs{Error: partitionInactive}))
+	require.EqualValues(t, 7, splitPartition.Load())
+	partitions, err := source.Partitions(t.Context())
+	require.NoError(t, err)
+	require.True(t, partitions.ByPartitionID(8).IsActive())
+	require.Equal(t, int64(2), describeCalls.Load())
+}
+
+func TestPartitionWriterPool_TransactionalSessionErrorStopsWriter(t *testing.T) {
+	t.Parallel()
+
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+	pool.transactional = true
+	result := make(chan error, 1)
+	pool.onError = func(err error) {
+		result <- err
+	}
+
+	_, err := pool.get(7, true)
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		return len(factory.writers) == 1
+	}, time.Second, time.Millisecond)
+
+	sessionErr := errors.New("session failed")
+	factory.writers[0].closeResult <- sessionErr
+	select {
+	case err := <-result:
+		require.ErrorIs(t, err, sessionErr)
+	case <-time.After(time.Second):
+		t.Fatal("transactional writer did not stop after its partition session failed")
+	}
 }
 
 func TestPartitionWriterPool_GetReturnsErrorWhenCreateFails(t *testing.T) {

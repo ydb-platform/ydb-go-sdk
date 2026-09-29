@@ -1,29 +1,23 @@
 package topicmultiwriter
 
 import (
-	"context"
 	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
-type TopicDescriber func(ctx context.Context, path string) (topictypes.TopicDescription, error)
-
-type PartitionInfo struct {
-	topictypes.PartitionInfo
-
-	Locked          bool
-	PendingResend   int
-	CachedMaxSeqNo  int64
-	LastQueuedSeqNo int64
-}
-
-func (p *PartitionInfo) Splitted() bool {
-	return len(p.ChildPartitionIDs) > 0
+type partitionState struct {
+	// Replaced reflects topology: the partition has descendants and must not receive new writes.
+	Replaced bool
+	// RecoveryComplete means its in-flight messages have been reconciled with the replacement partitions.
+	RecoveryComplete bool
+	Locked           bool
+	PendingResend    int
+	CachedMaxSeqNo   int64
+	LastQueuedSeqNo  int64
 }
 
 type message struct {

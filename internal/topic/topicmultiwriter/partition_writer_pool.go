@@ -6,12 +6,15 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
 type partitionWriterPool struct {
 	ctx context.Context //nolint:containedctx
+	// transactional selects the no-retry, producer-less session policy.
+	transactional bool
 
 	cfg       *MultiWriterConfig
 	writerCfg *topicwriterinternal.WriterReconnectorConfig
@@ -23,6 +26,7 @@ type partitionWriterPool struct {
 
 	ackCallback            func(partitionID int64, seqNo int64)
 	partitionSplitCallback func(partitionID int64)
+	source                 *partition.Source
 	onWriterInit           func()
 	onError                func(err error)
 }
@@ -34,6 +38,7 @@ func newPartitionWriterPool(
 	bg *background.Worker,
 	ackCallback func(partitionID int64, seqNo int64),
 	partitionSplitCallback func(partitionID int64),
+	source *partition.Source,
 	onWriterInit func(),
 	onError func(err error),
 ) *partitionWriterPool {
@@ -44,6 +49,7 @@ func newPartitionWriterPool(
 		bg:                     bg,
 		ackCallback:            ackCallback,
 		partitionSplitCallback: partitionSplitCallback,
+		source:                 source,
 		onWriterInit:           onWriterInit,
 		onError:                onError,
 		writers:                make(map[int64]*writerWrapper),
@@ -61,47 +67,71 @@ func (p *partitionWriterPool) getProducerID(partitionID int64) string {
 	return fmt.Sprintf("%s-%d", p.cfg.ProducerIDPrefix, partitionID)
 }
 
-func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, error) {
-	withCustomCheckRetryErrorFunction := func(
-		callback topic.PublicCheckErrorRetryFunction,
-	) topicwriterinternal.PublicWriterOption {
-		return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
-			cfg.RetrySettings.CheckError = callback
+func withCustomCheckRetryErrorFunction(
+	callback topic.PublicCheckErrorRetryFunction,
+) topicwriterinternal.PublicWriterOption {
+	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
+		cfg.RetrySettings.CheckError = callback
+	}
+}
+
+func (p *partitionWriterPool) directWriterRetryConfig(
+	partitionID int64,
+) (producerID string, checkError topic.PublicCheckErrorRetryFunction) {
+	if p.transactional {
+		return "", func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+			if p.source != nil {
+				p.source.NotifySessionError(partitionID, args.Error)
+			}
+
+			return topic.PublicRetryDecisionStop
 		}
 	}
 
-	var (
-		writerCfg = *p.writerCfg
-		opts      = []topicwriterinternal.PublicWriterOption{
-			topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID)),
-			topicwriterinternal.WithProducerID(p.getProducerID(partitionID)),
-			topicwriterinternal.WithAutoSetSeqNo(false),
-			topicwriterinternal.WithOnAckReceivedCallback(func(seqNo int64) {
-				p.ackCallback(partitionID, seqNo)
-			}),
-			withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
-				if isOperationErrorOverloaded(args.Error) {
-					p.partitionSplitCallback(partitionID)
+	return p.getProducerID(partitionID), func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+		if p.source != nil && p.source.NotifySessionError(partitionID, args.Error) {
+			p.partitionSplitCallback(partitionID)
 
-					return topic.PublicRetryDecisionStop
-				}
-
-				var checkErrorResult topic.PublicCheckRetryResult
-				p.mu.WithLock(func() {
-					if p.writerCfg.RetrySettings.CheckError != nil {
-						checkErrorResult = p.writerCfg.RetrySettings.CheckError(args)
-					}
-				})
-
-				return checkErrorResult
-			}),
-			topicwriterinternal.WithWaitAckOnWrite(false),
-			topicwriterinternal.WithMaxQueueLen(p.writerCfg.MaxQueueLen),
+			return topic.PublicRetryDecisionStop
 		}
-	)
+
+		var checkErrorResult topic.PublicCheckRetryResult
+		p.mu.WithLock(func() {
+			if p.writerCfg.RetrySettings.CheckError != nil {
+				checkErrorResult = p.writerCfg.RetrySettings.CheckError(args)
+			}
+		})
+
+		return checkErrorResult
+	}
+}
+
+func (p *partitionWriterPool) directWriterOptions(
+	partitionID int64,
+) []topicwriterinternal.PublicWriterOption {
+	producerID, checkError := p.directWriterRetryConfig(partitionID)
+
+	return []topicwriterinternal.PublicWriterOption{
+		topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID)),
+		topicwriterinternal.WithProducerID(producerID),
+		topicwriterinternal.WithAutoSetSeqNo(false),
+		topicwriterinternal.WithOnAckReceivedCallback(func(seqNo int64) {
+			p.ackCallback(partitionID, seqNo)
+		}),
+		withCustomCheckRetryErrorFunction(checkError),
+		topicwriterinternal.WithWaitAckOnWrite(false),
+		topicwriterinternal.WithMaxQueueLen(p.writerCfg.MaxQueueLen),
+	}
+}
+
+func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, error) {
+	writerCfg := *p.writerCfg
 
 	writerCfg.MultiMode = true
-	for _, opt := range opts {
+	if p.transactional {
+		topicwriterinternal.WithoutGetLastSeqNo()(&writerCfg)
+	}
+	for _, opt := range p.directWriterOptions(partitionID) {
 		opt(&writerCfg)
 	}
 	if p.cfg.DirectWrite {
@@ -193,6 +223,16 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 
 		wrapper.initDone.Store(true)
 		p.onWriterInit()
+		if err != nil || !p.transactional {
+			return
+		}
+		closeWaiter, ok := wr.(writerCloseWaiter)
+		if !ok {
+			return
+		}
+		if err := closeWaiter.WaitClose(ctx); err != nil && ctx.Err() == nil {
+			p.onError(err)
+		}
 	})
 
 	return wrapper, nil

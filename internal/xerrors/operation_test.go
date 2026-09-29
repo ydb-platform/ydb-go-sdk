@@ -128,6 +128,55 @@ func TestIsOperationErrorTransactionLocksInvalidated(t *testing.T) {
 	}
 }
 
+func TestIsOperationErrorTopicPartitionInactive(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "inactive partition",
+			err: Operation(
+				WithStatusCode(Ydb.StatusIds_OVERLOADED),
+				WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: IssueCodeTopicPartitionInactive}}),
+			),
+			want: true,
+		},
+		{
+			name: "wrong status",
+			err: Operation(
+				WithStatusCode(Ydb.StatusIds_UNAVAILABLE),
+				WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: IssueCodeTopicPartitionInactive}}),
+			),
+		},
+		{
+			name: "missing issue",
+			err:  Operation(WithStatusCode(Ydb.StatusIds_OVERLOADED)),
+		},
+		{
+			name: "other issue",
+			err: Operation(
+				WithStatusCode(Ydb.StatusIds_OVERLOADED),
+				WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: 42}}),
+			),
+		},
+		{
+			name: "nested inactive partition issue",
+			err: Operation(
+				WithStatusCode(Ydb.StatusIds_OVERLOADED),
+				WithIssues([]*Ydb_Issue.IssueMessage{{
+					Issues: []*Ydb_Issue.IssueMessage{{IssueCode: IssueCodeTopicPartitionInactive}},
+				}}),
+			),
+			want: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, IsOperationErrorTopicPartitionInactive(tt.err))
+		})
+	}
+}
+
 func Test_operationError_Error(t *testing.T) {
 	for _, tt := range []struct {
 		err  error

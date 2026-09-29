@@ -89,6 +89,7 @@ type WriterReconnectorConfig struct {
 	RetrySettings     topic.RetrySettings
 
 	directWriteEnabled bool
+	skipGetLastSeqNo   bool
 
 	connectTimeout time.Duration
 }
@@ -717,7 +718,7 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
-	res := !w.firstConnectionHandled.Load()
+	res := !w.cfg.skipGetLastSeqNo && !w.firstConnectionHandled.Load()
 
 	return res
 }
@@ -792,6 +793,22 @@ func (w *WriterReconnector) WaitInit(ctx context.Context) error {
 
 func (w *WriterReconnector) WaitInitInfo(ctx context.Context) (info InitialInfo, err error) {
 	return w.waitInit(ctx)
+}
+
+// WaitClose waits until the writer stops. A regular caller-initiated Close is
+// reported as success; a stream or initialization failure is returned.
+func (w *WriterReconnector) WaitClose(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-w.background.Done():
+		err := w.background.CloseReason()
+		if errors.Is(err, errStopWriterReconnector) {
+			return nil
+		}
+
+		return err
+	}
 }
 
 func (w *WriterReconnector) onWriterInitCallbackHandler(writerStream *SingleStreamWriter) {

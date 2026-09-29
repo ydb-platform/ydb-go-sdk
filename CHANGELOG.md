@@ -1,3 +1,5 @@
+* Sped up transactional Topic multi-writer initialization
+
 ## v3.152.1
 * Fixed topic reader messages retaining compressed payload bytes after their content had been fully read
 

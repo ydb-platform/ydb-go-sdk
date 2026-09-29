@@ -223,9 +223,7 @@ func TestTopicTransactionalMultiWriterWithLazyTx(t *testing.T) {
 	err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
 		writer, err := db.Topic().StartTransactionalWriter(tx, scope.TopicPath(),
 			topicoptions.WithWriterWaitServerAck(true),
-			topicoptions.WithWriteToManyPartitions(
-				topicoptions.WithProducerIDPrefix("lazy-tx-multi"),
-			),
+			topicoptions.WithWriteToManyPartitions(),
 		)
 		if err != nil {
 			return fmt.Errorf("start transactional writer: %w", err)
@@ -363,7 +361,6 @@ func TestWriteInTransactionMultiWriter(t *testing.T) {
 					topicoptions.WithWriterSetAutoSeqNo(true),
 					topicoptions.WithWriteToManyPartitions(
 						topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
-						topicoptions.WithProducerIDPrefix("tx-multiwriter-ok"),
 					),
 				)
 				if err != nil {
@@ -414,7 +411,6 @@ func TestWriteInTransactionMultiWriter(t *testing.T) {
 					topicoptions.WithWriterSetAutoSeqNo(true),
 					topicoptions.WithWriteToManyPartitions(
 						topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
-						topicoptions.WithProducerIDPrefix("tx-multiwriter-rollback"),
 					),
 				)
 				if err != nil {

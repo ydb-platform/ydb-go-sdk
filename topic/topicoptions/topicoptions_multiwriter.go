@@ -16,7 +16,9 @@ type (
 	MultiWriterOption           = topicmultiwriter.PublicMultiWriterOption
 )
 
-// WithProducerIDPrefix sets a prefix for producer IDs used by the internal producer.
+// WithProducerIDPrefix sets a prefix for producer IDs used by non-transactional
+// internal producers. Transactional multi-writers reject this option because
+// their partition sessions do not use producer IDs.
 func WithProducerIDPrefix(prefix string) MultiWriterOption {
 	return func(cfg *topicmultiwriter.MultiWriterConfig) {
 		topicmultiwriter.WithProducerIDPrefix(prefix)(cfg)
