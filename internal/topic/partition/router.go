@@ -91,26 +91,30 @@ func (r *Router) Apply(partitions *Partitions) error {
 	if r.updateError != nil {
 		return r.updateError
 	}
-	if r.chooser != nil {
-		toAdd := make([]topictypes.PartitionInfo, 0)
-		for _, partition := range partitions.all {
-			previous, exists := r.partitions.find(partition.ID())
-			if partition.IsActive() && (!exists || !previous.IsActive()) {
-				toAdd = append(toAdd, partition.info)
-			}
-		}
-		if len(toAdd) > 0 {
-			if err := r.chooser.AddNewPartitions(toAdd...); err != nil {
-				r.updateError = err
+	if r.chooser == nil {
+		r.partitions = partitions
 
-				return err
-			}
+		return nil
+	}
+
+	toAdd := make([]topictypes.PartitionInfo, 0)
+	for _, partition := range partitions.all {
+		previous, exists := r.partitions.find(partition.ID())
+		if partition.IsActive() && (!exists || !previous.IsActive()) {
+			toAdd = append(toAdd, partition.info)
 		}
-		for _, partition := range r.partitions.all {
-			current, exists := partitions.find(partition.ID())
-			if partition.IsActive() && (!exists || !current.IsActive()) {
-				r.chooser.RemovePartition(partition.ID())
-			}
+	}
+	if len(toAdd) > 0 {
+		if err := r.chooser.AddNewPartitions(toAdd...); err != nil {
+			r.updateError = err
+
+			return err
+		}
+	}
+	for _, partition := range r.partitions.all {
+		current, exists := partitions.find(partition.ID())
+		if partition.IsActive() && (!exists || !current.IsActive()) {
+			r.chooser.RemovePartition(partition.ID())
 		}
 	}
 	r.partitions = partitions

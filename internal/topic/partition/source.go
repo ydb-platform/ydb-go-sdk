@@ -3,6 +3,7 @@ package partition
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"golang.org/x/sync/singleflight"
@@ -67,7 +68,12 @@ func (s *Source) Partitions(ctx context.Context) (*Partitions, error) {
 		select {
 		case result := <-update:
 			if result.Err == nil {
-				return result.Val.(*Partitions), nil
+				partitions, ok := result.Val.(*Partitions)
+				if !ok {
+					return nil, fmt.Errorf("unexpected partitions result type %T", result.Val)
+				}
+
+				return partitions, nil
 			}
 			if !isContextError(result.Err) {
 				return nil, result.Err
