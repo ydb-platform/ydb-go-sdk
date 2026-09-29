@@ -6,13 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
@@ -130,6 +133,51 @@ type overloadedInitWritersFactory struct{}
 
 func (f *overloadedInitWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
 	return &overloadedInitWriter{}, nil
+}
+
+type topologyChangeInitWriter struct {
+	cfg         topicwriterinternal.WriterReconnectorConfig
+	partitionID int64
+	refreshed   *atomic.Bool
+}
+
+func (w *topologyChangeInitWriter) Close(context.Context) error {
+	return nil
+}
+
+func (w *topologyChangeInitWriter) WaitInitInfo(
+	context.Context,
+) (topicwriterinternal.InitialInfo, error) {
+	if w.partitionID != 1 || w.refreshed.Load() {
+		return topicwriterinternal.InitialInfo{}, nil
+	}
+
+	err := xerrors.Operation(
+		xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
+		xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: xerrors.IssueCodeTopicPartitionInactive}}),
+	)
+	w.cfg.RetrySettings.CheckError(topic.PublicCheckErrorRetryArgs{Error: err})
+
+	return topicwriterinternal.InitialInfo{}, err
+}
+
+func (w *topologyChangeInitWriter) WriteInternal(
+	context.Context,
+	[]topicwritercommon.MessageWithDataContent,
+) error {
+	return nil
+}
+
+type topologyChangeInitWritersFactory struct {
+	refreshed *atomic.Bool
+}
+
+func (f *topologyChangeInitWritersFactory) Create(
+	cfg topicwriterinternal.WriterReconnectorConfig,
+) (writer, error) {
+	partitionID, _ := cfg.PartitionID()
+
+	return &topologyChangeInitWriter{cfg: cfg, partitionID: partitionID, refreshed: f.refreshed}, nil
 }
 
 type choosePartitionKeyCheckWritersFactory struct {
@@ -584,6 +632,39 @@ func TestMultiWriter_OnPartitionSplitReturnsAddPartitionsError(t *testing.T) {
 	require.NoError(t, multiWriter.Close(ctx))
 }
 
+func TestMultiWriter_OnPartitionSplitLeavesUnrelatedReplacementsUnlocked(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	baseDesc := stubs.DefaultStubTopicDescription(t)
+	state := stubs.NewDescribeWithSplitsState(t, baseDesc, 6)
+	stubClient := stubs.NewStubTopicClientWithSplits(t, state)
+	multiWriter := newTestMultiWriterWithBasicWriter(
+		t,
+		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			return stubClient.Describe(ctx, path)
+		},
+	)
+
+	require.NoError(t, multiWriter.WaitInit(ctx))
+	state.RecordSplit(1)
+	state.RecordSplit(2)
+	multiWriter.orchestrator.source.Invalidate()
+
+	require.NoError(t, multiWriter.orchestrator.onPartitionSplit(1))
+	partitions, err := multiWriter.orchestrator.source.Partitions(ctx)
+	require.NoError(t, err)
+
+	multiWriter.orchestrator.mu.WithLock(func() {
+		for _, replacement := range partitions.ByPartitionID(2).Children() {
+			if replacement.IsActive() {
+				require.False(t, multiWriter.orchestrator.partitions[replacement.ID()].Locked)
+			}
+		}
+	})
+	require.NoError(t, multiWriter.Close(ctx))
+}
+
 func TestMultiWriter_ErrAlreadyClosed(t *testing.T) {
 	t.Parallel()
 
@@ -635,6 +716,39 @@ func TestMultiWriter_CloseCancelsInitSeqNoRetrySleep(t *testing.T) {
 	startedAt := time.Now()
 	require.NoError(t, multiWriter.Close(closeCtx))
 	require.Less(t, time.Since(startedAt), 100*time.Millisecond)
+}
+
+func TestMultiWriter_WaitInitRefreshesPartitionsAfterInactiveSession(t *testing.T) {
+	t.Parallel()
+
+	var (
+		describeCalls atomic.Int64
+		refreshed     atomic.Bool
+	)
+	describer := func(context.Context, string) (topictypes.TopicDescription, error) {
+		if describeCalls.Add(1) == 1 {
+			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{
+				PartitionID: 1,
+				Active:      true,
+			}}}, nil
+		}
+
+		refreshed.Store(true)
+
+		return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+			{PartitionID: 1, ChildPartitionIDs: []int64{2}},
+			{PartitionID: 2, ParentPartitionIDs: []int64{1}, Active: true},
+		}}, nil
+	}
+	multiWriter := newTestMultiWriterWithCustomWritersFactory(
+		t,
+		describer,
+		&topologyChangeInitWritersFactory{refreshed: &refreshed},
+	)
+
+	require.NoError(t, multiWriter.WaitInit(xtest.Context(t)))
+	require.GreaterOrEqual(t, describeCalls.Load(), int64(2))
+	require.NoError(t, multiWriter.Close(xtest.Context(t)))
 }
 
 func TestMultiWriter_WaitInit_ContextCanceled(t *testing.T) {

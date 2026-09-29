@@ -467,6 +467,10 @@ func (o *orchestrator) initSeqNo() error {
 		for _, partitionID := range partitions {
 			o.writerPool.forceEvict(partitionID)
 		}
+		partitions, err = o.refreshPartitionsForInit()
+		if err != nil {
+			return err
+		}
 		if err := o.sleepOrDone(retryDelay); err != nil {
 			return err
 		}
@@ -481,6 +485,35 @@ func (o *orchestrator) initSeqNo() error {
 	}
 
 	return nil
+}
+
+func (o *orchestrator) refreshPartitionsForInit() (partitionIDs []int64, err error) {
+	refreshedPartitions, err := o.source.Partitions(o.ctx)
+	if err != nil {
+		return nil, err
+	}
+	o.mu.WithLock(func() {
+		if err = o.router.Apply(refreshedPartitions); err != nil {
+			return
+		}
+		for _, topicPartition := range refreshedPartitions.All() {
+			state, ok := o.partitions[topicPartition.ID()]
+			if !ok {
+				state = &partitionState{}
+				o.partitions[topicPartition.ID()] = state
+			}
+			state.Replaced = topicPartition.HasChildren()
+			if state.Replaced {
+				state.RecoveryComplete = true
+			}
+		}
+		partitionIDs = make([]int64, 0, len(o.partitions))
+		for partitionID := range o.partitions {
+			partitionIDs = append(partitionIDs, partitionID)
+		}
+	})
+
+	return partitionIDs, err
 }
 
 //nolint:funlen
@@ -580,7 +613,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		for _, topicPartition := range partitions.All() {
 			state, ok := o.partitions[topicPartition.ID()]
 			if !ok {
-				state = &partitionState{Locked: topicPartition.IsActive()}
+				state = &partitionState{}
 				o.partitions[topicPartition.ID()] = state
 			}
 			state.Replaced = topicPartition.HasChildren()
@@ -588,6 +621,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		partition.RecoveryComplete = true
 		for _, replacement := range partitions.ByPartitionID(partitionID).Children() {
 			if replacement.IsActive() {
+				o.partitions[replacement.ID()].Locked = true
 				replacementPartitionIDs = append(replacementPartitionIDs, replacement.ID())
 			}
 		}
