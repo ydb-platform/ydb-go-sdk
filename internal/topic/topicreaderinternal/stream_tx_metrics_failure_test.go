@@ -112,6 +112,11 @@ func TestTopicStreamReader_PopMessagesBatchTxReleasesBufferWhenMaterializationFa
 	// Closing after the failed pop must not release the same ownership twice.
 	require.NoError(t, reader.Close(context.Background()))
 	readerMetricNoDelta(t, localDeltas)
+	select {
+	case event := <-sessionErrors:
+		t.Fatalf("unexpected duplicate terminal stream session error after close: %+v", event)
+	default:
+	}
 }
 
 func TestTopicStreamReader_PopMessagesBatchTxSkipsRetryableStreamFailure(t *testing.T) {

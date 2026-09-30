@@ -3,7 +3,6 @@ package topiclistenerinternal
 import (
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -32,11 +31,11 @@ func NewStreamListenerConfig() StreamListenerConfig {
 	}
 }
 
-// EnsureReaderName assigns the process-local default after all options have
+// EnsureReaderName assigns the shared default after all options have
 // been applied. An explicitly empty option is equivalent to leaving it unset.
 func (cfg *StreamListenerConfig) EnsureReaderName() {
 	if cfg.ReaderName == "" {
-		cfg.ReaderName = "reader-" + strconv.FormatInt(cfg.readerID, 10)
+		cfg.ReaderName = "default"
 	}
 }
 

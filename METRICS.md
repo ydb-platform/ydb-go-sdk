@@ -25,8 +25,10 @@ are selected by the corresponding `TopicReaderMessageEvents` or
 Absent optional values are emitted as empty strings. `endpoint` is the
 configured endpoint authority, and `database` is the normalized configured
 database path. The `reader.name` attribute comes from `WithReaderName` or
-`WithListenerName`; omitted and empty names default to a process-local
-`reader-N` value. The shared stream attributes intentionally omit `topic`.
+`WithListenerName`; omitted and empty names default to `default`, so readers
+and listeners with the same other attributes share a series. Explicit names,
+including `default`, are preserved. The shared stream attributes intentionally
+omit `topic`.
 
 Message counters are emitted at their event boundaries: `received.messages`
 counts messages accepted from the stream, `delivered.messages` counts messages
@@ -37,6 +39,16 @@ Session-error `retry_decision` records the retry or stop decision. Its
 `Code(n)`, unknown YDB codes use their numeric value, and unspecified or
 unclassified errors use `unknown`. `error.type` is `transport_error`,
 `ydb_error`, or `unknown`.
+
+An initialized pull reader that becomes idle after its raw stream fails does
+not emit a session-error event immediately. A later `Read` handles the failure
+through the normal retry flow. If the caller closes the reader first, `Close`
+emits a stored stream error as a `stop` only when
+`topicoptions.WithReaderCheckRetryErrorFunction` is not configured and the
+default retry policy classifies the error as terminal. This close-time check
+does not invoke a custom retry callback; default-retryable errors and Go
+context cancellation or deadline errors do not produce a close-time `stop`
+event.
 
 Observable gauges are collected on demand through the optional
 `RegistryWithObservableGaugeDescriptors` capability. They do not start polling

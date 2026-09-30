@@ -12,7 +12,8 @@ import (
 type ListenerOption func(cfg *topiclistenerinternal.StreamListenerConfig)
 
 // WithListenerName sets the stable name used to identify this listener in metrics.
-// If omitted or empty, the SDK assigns a process-local name in the form reader-N.
+// If omitted or empty, the name defaults to "default", so listeners with the same
+// other metric attributes share a series.
 func WithListenerName(name string) ListenerOption {
 	return func(cfg *topiclistenerinternal.StreamListenerConfig) {
 		cfg.ReaderName = name

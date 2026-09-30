@@ -288,6 +288,7 @@ func (r *readerReconnector) Commit(
 
 func (r *readerReconnector) CloseWithError(ctx context.Context, reason error) error {
 	var closeErr error
+	var streamError error
 	r.closeOnce.Do(func() {
 		closeErr = r.background.Close(ctx, reason)
 
@@ -303,6 +304,9 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, reason error) er
 		// Make I/O calls outside the lock
 		if streamVal != nil {
 			streamCloseErr := streamVal.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
+			if streamErrer, ok := streamVal.(streamErrorer); ok {
+				streamError = streamErrer.streamError()
+			}
 			if streamCancel != nil {
 				streamCancel(errReaderClosed)
 			}
@@ -318,6 +322,7 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, reason error) er
 			}
 		})
 	})
+	r.traceStoredStreamStop(ctx, streamError)
 	r.closeMetricsSource()
 
 	return closeErr
@@ -622,6 +627,20 @@ func (r *readerReconnector) traceSessionStopIf(ctx context.Context, err error, r
 	}
 
 	topicreadercommon.TraceReaderSessionError(ctx, r.tracer, r.readerInfo, "stop", err)
+}
+
+func (r *readerReconnector) traceStoredStreamStop(ctx context.Context, err error) {
+	if suppressReaderSessionError(context.Background(), err) ||
+		r.retrySettings.CheckError != nil ||
+		xerrors.IsContextError(err) ||
+		r.isRetriableError(err) {
+		return
+	}
+	if ctx != nil {
+		ctx = xcontext.ValueOnly(ctx)
+	}
+
+	r.traceSessionStop(ctx, err)
 }
 
 func (r *readerReconnector) traceSessionStopAfterRead(

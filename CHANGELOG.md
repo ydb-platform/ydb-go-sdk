@@ -1,3 +1,6 @@
+* Fixed missing terminal topic reader session-error metrics on close with the default retry policy
+* Changed omitted or empty topic reader and listener metric names to `default`, allowing metric series with the same other attributes to aggregate; explicitly supplied names are preserved
+
 * Added topic reader and listener metrics for message flow, session errors,
   commit progress, local ownership, and read-ahead credit balance; bumped the
   metrics observability chain to `ydb-sdk-metrics/0.3.0`; received bytes and

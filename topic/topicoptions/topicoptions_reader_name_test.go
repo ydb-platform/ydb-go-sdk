@@ -2,7 +2,6 @@ package topicoptions
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -15,38 +14,50 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestReaderNameDefaultsToGeneratedName(t *testing.T) {
-	for _, names := range [][]string{nil, {""}, {"reader-custom"}} {
-		t.Run(fmt.Sprint(names), func(t *testing.T) {
-			reader, name := newNameTestReader(t, names...)
+func TestReaderNameDefaultsToDefault(t *testing.T) {
+	tests := []struct {
+		name    string
+		options []string
+		want    string
+	}{
+		{name: "omitted", want: "default"},
+		{name: "empty", options: []string{""}, want: "default"},
+		{name: "custom", options: []string{"reader-custom"}, want: "reader-custom"},
+		{name: "explicit default", options: []string{"default"}, want: "default"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			reader, name := newNameTestReader(t, test.options...)
 			defer closeNameTestReader(t, &reader)
 
-			if len(names) == 0 || names[0] == "" {
-				require.Regexp(t, `^reader-[0-9]+$`, name)
-			} else {
-				require.Equal(t, names[0], name)
-			}
+			require.Equal(t, test.want, name)
 		})
 	}
 }
 
-func TestListenerNameDefaultsToGeneratedName(t *testing.T) {
-	for _, names := range [][]string{nil, {""}, {"listener-custom"}} {
-		t.Run(fmt.Sprint(names), func(t *testing.T) {
-			reconnector, name := newNameTestListener(t, names...)
+func TestListenerNameDefaultsToDefault(t *testing.T) {
+	tests := []struct {
+		name    string
+		options []string
+		want    string
+	}{
+		{name: "omitted", want: "default"},
+		{name: "empty", options: []string{""}, want: "default"},
+		{name: "custom", options: []string{"listener-custom"}, want: "listener-custom"},
+		{name: "explicit default", options: []string{"default"}, want: "default"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			reconnector, name := newNameTestListener(t, test.options...)
 			defer closeNameTestListener(t, reconnector)
 
-			if len(names) == 0 || names[0] == "" {
-				require.Regexp(t, `^reader-[0-9]+$`, name)
-			} else {
-				require.Equal(t, names[0], name)
-			}
+			require.Equal(t, test.want, name)
 		})
 	}
 }
 
-func TestDefaultNamesAreUniqueAcrossReadersAndListeners(t *testing.T) {
-	firstReader, firstReaderName := newNameTestReader(t, "")
+func TestDefaultNamesAreSharedAcrossReadersAndListeners(t *testing.T) {
+	firstReader, firstReaderName := newNameTestReader(t)
 	secondReader, secondReaderName := newNameTestReader(t, "")
 	defer closeNameTestReader(t, &firstReader)
 	defer closeNameTestReader(t, &secondReader)
@@ -57,13 +68,13 @@ func TestDefaultNamesAreUniqueAcrossReadersAndListeners(t *testing.T) {
 	secondListener, secondListenerName := newNameTestListener(t)
 	defer closeNameTestListener(t, secondListener)
 
-	names := map[string]struct{}{
-		firstReaderName:    {},
-		secondReaderName:   {},
-		firstListenerName:  {},
-		secondListenerName: {},
-	}
-	require.Len(t, names, 4)
+	require.Equal(t, []string{"default", "default", "default", "default"}, []string{
+		firstReaderName,
+		secondReaderName,
+		firstListenerName,
+		secondListenerName,
+	})
+	require.NotEqual(t, firstReader.ID(), secondReader.ID())
 }
 
 func newNameTestReader(t *testing.T, names ...string) (topicreaderinternal.Reader, string) {
