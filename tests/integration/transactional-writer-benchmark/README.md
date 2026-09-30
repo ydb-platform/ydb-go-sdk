@@ -88,6 +88,10 @@ the usual adaptive `b.N` calibration would measure successive, different
 topologies. Run each repetition against a fresh YDB container so accumulated
 StreamWrite sessions and prior splits do not affect the next result.
 
+When the two-minute phase ends, workers do not start another transaction. A
+transaction already in progress may finish, but its total execution time is
+still limited to one minute.
+
 ```bash
 go test ./tests/integration/transactional-writer-benchmark \
   -run '^$' \
