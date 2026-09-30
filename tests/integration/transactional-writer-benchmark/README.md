@@ -1,6 +1,6 @@
 # Transactional Topic writer benchmark
 
-This command measures the transactional-outbox path used in IOT-10956:
+This command measures a transactional-outbox path:
 
 1. execute one `UPSERT` through the Query API;
 2. create a transactional Topic writer;
