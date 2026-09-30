@@ -356,6 +356,11 @@ func reportStandardBenchmarkMetrics(
 	b.ReportMetric(report.Latency.Transaction.P50MS, "ms/p50")
 	b.ReportMetric(report.Latency.Transaction.P95MS, "ms/p95")
 	b.ReportMetric(report.Latency.Transaction.P99MS, "ms/p99")
+	if report.Latency.TableExec != nil {
+		b.ReportMetric(report.Latency.TableExec.P95MS, "ms/table-p95")
+	}
+	b.ReportMetric(report.Latency.WriterStart.P95MS, "ms/writer-start-p95")
+	b.ReportMetric(report.Latency.WriterWrite.P95MS, "ms/writer-write-p95")
 	b.ReportMetric(float64(stats.Retries)/float64(max(stats.LogicalTransactions, 1)), "retries/tx")
 	b.ReportMetric(
 		float64(lifecycle.StreamWriteOpens)/float64(max(stats.Committed, 1)),
