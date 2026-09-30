@@ -18,6 +18,7 @@ const (
 
 type Config struct {
 	config.Common
+
 	database         string
 	databaseIdentity *querytimestamp.Identity
 
