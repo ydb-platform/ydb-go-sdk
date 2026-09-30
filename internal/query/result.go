@@ -17,6 +17,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/querytimestamp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -35,21 +36,26 @@ var (
 
 type (
 	materializedResult struct {
-		resultSets []result.Set
-		idx        int
+		resultSets      []result.Set
+		idx             int
+		commitTimestamp *query.VirtualTimestamp
 	}
 	streamResult struct {
-		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
-		lastErr        error
-		onClose        func()
-		lastPart       *Ydb_Query.ExecuteQueryResponsePart
-		resultSetIndex int64
-		trace          *trace.Query
-		statsCallback  func(queryStats stats.QueryStats)
-		issuesCallback func(issues []*Ydb_Issue.IssueMessage)
-		onNextPartErr  []func(err error)
-		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
-		closeTimeout   time.Duration
+		stream                   Ydb_Query_V1.QueryService_ExecuteQueryClient
+		lastErr                  error
+		onClose                  func()
+		lastPart                 *Ydb_Query.ExecuteQueryResponsePart
+		databaseIdentity         *querytimestamp.Identity
+		pendingTimestamp         *Ydb.VirtualTimestamp
+		commitTimestamp          *query.VirtualTimestamp
+		commitTimestampCallbacks []func(*query.VirtualTimestamp)
+		resultSetIndex           int64
+		trace                    *trace.Query
+		statsCallback            func(queryStats stats.QueryStats)
+		issuesCallback           func(issues []*Ydb_Issue.IssueMessage)
+		onNextPartErr            []func(err error)
+		onTxMeta                 []func(txMeta *Ydb_Query.TransactionMeta)
+		closeTimeout             time.Duration
 		// streamCancel cancels the gRPC context that backs stream.Recv(). It
 		// is wired up by execute() to point at the executeCtx CancelFunc and
 		// invoked on demand from nextPart so that a Recv blocked on the wire
@@ -58,6 +64,28 @@ type (
 	}
 	resultOption func(s *streamResult)
 )
+
+func (r *streamResult) CommitTimestamp() *query.VirtualTimestamp {
+	return r.commitTimestamp
+}
+
+func (r *materializedResult) CommitTimestamp() *query.VirtualTimestamp {
+	return r.commitTimestamp
+}
+
+func withStreamResultIdentity(identity *querytimestamp.Identity) resultOption {
+	return func(r *streamResult) {
+		r.databaseIdentity = identity
+	}
+}
+
+func withStreamResultCommitTimestampCallback(callback func(*query.VirtualTimestamp)) resultOption {
+	return func(r *streamResult) {
+		if callback != nil {
+			r.commitTimestampCallbacks = append(r.commitTimestampCallbacks, callback)
+		}
+	}
+}
 
 func rangeResultSets(ctx context.Context, r result.Result) xiter.Seq2[result.Set, error] {
 	return func(yield func(result.Set, error) bool) {
@@ -270,6 +298,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 			r.issuesCallback(issues)
 		}
 	}
+	r.captureCommitTimestamp(part, err)
 	if err != nil {
 		err = r.notifyNextPartErr(ctx, err)
 
@@ -279,7 +308,6 @@ func (r *streamResult) nextPart(ctx context.Context) (
 
 		return nil, xerrors.WithStackTrace(err)
 	}
-
 	if txMeta := part.GetTxMeta(); txMeta != nil {
 		for _, f := range r.onTxMeta {
 			f(txMeta)
@@ -291,6 +319,25 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	}
 
 	return part, nil
+}
+
+func (r *streamResult) captureCommitTimestamp(part *Ydb_Query.ExecuteQueryResponsePart, err error) {
+	if err != nil {
+		if xerrors.Is(err, io.EOF) && r.pendingTimestamp != nil {
+			r.commitTimestamp = querytimestamp.FromYDB(r.pendingTimestamp, r.databaseIdentity)
+			for _, callback := range r.commitTimestampCallbacks {
+				callback(r.commitTimestamp)
+			}
+		}
+		r.pendingTimestamp = nil
+
+		return
+	}
+	if part.GetStatus() == Ydb.StatusIds_SUCCESS {
+		r.pendingTimestamp = part.GetCommitTimestamp()
+	} else {
+		r.pendingTimestamp = nil
+	}
 }
 
 func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
@@ -565,6 +612,7 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 	})
 
 	return &materializedResult{
-		resultSets: resultSets,
+		resultSets:      resultSets,
+		commitTimestamp: r.CommitTimestamp(),
 	}, nil
 }

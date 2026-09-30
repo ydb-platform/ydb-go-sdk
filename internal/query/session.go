@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/querytimestamp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -27,6 +28,7 @@ type (
 		Core
 
 		client                   Ydb_Query_V1.QueryServiceClient
+		databaseIdentity         *querytimestamp.Identity
 		trace                    *trace.Query
 		lazyTx                   bool
 		streamResultCloseTimeout time.Duration
@@ -177,6 +179,8 @@ func (s *Session) execute(ctx context.Context,
 	}()
 
 	r, err := execute(ctx, s.ID(), s.client, q, settings, concurrentResultSets, append(opts,
+		withStreamResultIdentity(s.databaseIdentity),
+		withStreamResultCommitTimestampCallback(settings.CommitTimestampCallback()),
 		withStreamResultCloseTimeout(s.streamResultCloseTimeout),
 		withStreamResultOnClose(cancel),
 	)...)

@@ -5,11 +5,13 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/querytimestamp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	baseTx "github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -26,8 +28,9 @@ type (
 	Transaction struct {
 		baseTx.LazyID
 
-		s          *Session
-		txSettings query.TransactionSettings
+		s               *Session
+		txSettings      query.TransactionSettings
+		commitTimestamp *query.VirtualTimestamp
 
 		completed bool
 
@@ -35,6 +38,14 @@ type (
 		onCompleted    xsync.Set[*baseTx.OnTransactionCompletedFunc]
 	}
 )
+
+func (tx *Transaction) CommitTimestamp() *query.VirtualTimestamp {
+	return tx.commitTimestamp
+}
+
+func (tx *Transaction) onCommitTimestamp(timestamp *query.VirtualTimestamp) {
+	tx.commitTimestamp = timestamp
+}
 
 func begin(
 	ctx context.Context,
@@ -101,6 +112,7 @@ func (tx *Transaction) QueryResultSet(
 
 	resultOpts := []resultOption{
 		withStreamResultTrace(tx.s.trace),
+		withStreamResultCommitTimestampCallback(tx.onCommitTimestamp),
 		withIssuesHandler(txSettings.IssuesOpts()),
 		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 			tx.SetTxID(txMeta.GetId())
@@ -151,6 +163,7 @@ func (tx *Transaction) QueryRow(
 
 	resultOpts := []resultOption{
 		withStreamResultTrace(tx.s.trace),
+		withStreamResultCommitTimestampCallback(tx.onCommitTimestamp),
 		withIssuesHandler(txSettings.IssuesOpts()),
 		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 			tx.SetTxID(txMeta.GetId())
@@ -224,6 +237,7 @@ func (tx *Transaction) Exec(ctx context.Context, q string, opts ...options.Execu
 
 	resultOpts := []resultOption{
 		withStreamResultTrace(tx.s.trace),
+		withStreamResultCommitTimestampCallback(tx.onCommitTimestamp),
 		withIssuesHandler(txSettings.IssuesOpts()),
 		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 			tx.SetTxID(txMeta.GetId())
@@ -318,6 +332,7 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 
 	resultOpts := []resultOption{
 		withStreamResultTrace(tx.s.trace),
+		withStreamResultCommitTimestampCallback(tx.onCommitTimestamp),
 		withIssuesHandler(txSettings.IssuesOpts()),
 		onTxMeta(func(txMeta *Ydb_Query.TransactionMeta) {
 			tx.SetTxID(txMeta.GetId())
@@ -345,16 +360,18 @@ func (tx *Transaction) Query(ctx context.Context, q string, opts ...options.Exec
 	return r, nil
 }
 
-func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID, txID string) error {
-	_, err := client.CommitTransaction(ctx, &Ydb_Query.CommitTransactionRequest{
+func commitTx(
+	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID, txID string,
+) (*Ydb_Query.CommitTransactionResponse, error) {
+	response, err := client.CommitTransaction(ctx, &Ydb_Query.CommitTransactionRequest{
 		SessionId: sessionID,
 		TxId:      txID,
 	})
 	if err != nil {
-		return xerrors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return nil
+	return response, nil
 }
 
 func (tx *Transaction) CommitTx(ctx context.Context) (finalErr error) {
@@ -385,9 +402,12 @@ func (tx *Transaction) CommitTx(ctx context.Context) (finalErr error) {
 		return err
 	}
 
-	err = commitTx(ctx, tx.s.client, tx.s.ID(), tx.ID())
+	response, err := commitTx(ctx, tx.s.client, tx.s.ID(), tx.ID())
 	if err != nil {
 		return xerrors.WithStackTrace(err)
+	}
+	if response.GetStatus() == Ydb.StatusIds_SUCCESS {
+		tx.commitTimestamp = querytimestamp.FromYDB(response.GetCommitTimestamp(), tx.s.databaseIdentity)
 	}
 
 	return nil

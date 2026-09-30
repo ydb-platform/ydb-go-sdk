@@ -80,7 +80,7 @@ func TestCommitTx(t *testing.T) {
 			}, nil,
 		)
 		t.Log("commit")
-		err := commitTx(ctx, service, "123", "456")
+		_, err := commitTx(ctx, service, "123", "456")
 		require.NoError(t, err)
 	})
 	t.Run("TransportError", func(t *testing.T) {
@@ -91,7 +91,7 @@ func TestCommitTx(t *testing.T) {
 			nil, grpcStatus.Error(grpcCodes.Unavailable, ""),
 		)
 		t.Log("commit")
-		err := commitTx(ctx, service, "123", "456")
+		_, err := commitTx(ctx, service, "123", "456")
 		require.Error(t, err)
 		require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 	})
@@ -103,7 +103,7 @@ func TestCommitTx(t *testing.T) {
 			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
 		)
 		t.Log("commit")
-		err := commitTx(ctx, service, "123", "456")
+		_, err := commitTx(ctx, service, "123", "456")
 		require.Error(t, err)
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 	})

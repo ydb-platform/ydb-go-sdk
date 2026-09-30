@@ -794,6 +794,7 @@ func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 		}
 
 		s.lazyTx = cfg.LazyTx()
+		s.databaseIdentity = cfg.DatabaseIdentity()
 
 		return s, nil
 	})
@@ -853,6 +854,7 @@ func newWithQueryServiceClient(ctx context.Context,
 			}
 
 			s.lazyTx = cfg.LazyTx()
+			s.databaseIdentity = cfg.DatabaseIdentity()
 
 			return s, nil
 		}),
@@ -956,9 +958,10 @@ func createImplicitSessionPool(ctx context.Context,
 			}
 
 			return &Session{
-				Core:   core,
-				trace:  cfg.Trace(),
-				client: c,
+				Core:             core,
+				trace:            cfg.Trace(),
+				client:           c,
+				databaseIdentity: cfg.DatabaseIdentity(),
 			}, nil
 		}),
 	)

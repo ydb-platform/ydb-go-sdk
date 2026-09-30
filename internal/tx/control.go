@@ -89,7 +89,8 @@ func (ctrl *Control) IsBeginTxWithoutCommit() bool {
 		}
 		// Check if it's a read-write mode
 		switch opt.(type) {
-		case serializableReadWriteTxSettingsOption, snapshotReadWriteTxSettingsOption:
+		case serializableReadWriteTxSettingsOption, strictSerializableReadWriteTxSettingsOption,
+			snapshotReadWriteTxSettingsOption:
 			return true
 		}
 	}
@@ -214,6 +215,15 @@ func SerializableReadWriteTxControl(opts ...ControlOption) *Control {
 	return NewControl(
 		append([]ControlOption{
 			BeginTx(WithSerializableReadWrite()),
+		}, opts...)...,
+	)
+}
+
+// StrictSerializableReadWriteTxControl selects strict serializable read-write mode in Query Service.
+func StrictSerializableReadWriteTxControl(opts ...ControlOption) *Control {
+	return NewControl(
+		append([]ControlOption{
+			BeginTx(WithStrictSerializableReadWrite()),
 		}, opts...)...,
 	)
 }
