@@ -3,9 +3,11 @@ package topicwriterinternal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"runtime"
 	"runtime/debug"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -24,10 +26,10 @@ func TestMessageQueue_AddMessages(t *testing.T) {
 
 		require.Equal(t, 3, q.lastWrittenIndex)
 
-		expected := map[int]messageWithDataContent{
-			1: newTestMessageWithDataContent(1),
-			2: newTestMessageWithDataContent(3),
-			3: newTestMessageWithDataContent(5),
+		expected := map[int]*queuedMessage{
+			1: {messageWithDataContent: newTestMessageWithDataContent(1)},
+			2: {messageWithDataContent: newTestMessageWithDataContent(3)},
+			3: {messageWithDataContent: newTestMessageWithDataContent(5)},
 		}
 		require.Equal(t, expected, q.messagesByOrder)
 
@@ -46,9 +48,9 @@ func TestMessageQueue_AddMessages(t *testing.T) {
 		q.lastWrittenIndex = maxInt - 1
 		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 3, 5)))
 		require.Len(t, q.messagesByOrder, 3)
-		q.messagesByOrder[maxInt] = newTestMessageWithDataContent(1)
-		q.messagesByOrder[minInt] = newTestMessageWithDataContent(3)
-		q.messagesByOrder[minInt+1] = newTestMessageWithDataContent(5)
+		q.messagesByOrder[maxInt] = &queuedMessage{messageWithDataContent: newTestMessageWithDataContent(1)}
+		q.messagesByOrder[minInt] = &queuedMessage{messageWithDataContent: newTestMessageWithDataContent(3)}
+		q.messagesByOrder[minInt+1] = &queuedMessage{messageWithDataContent: newTestMessageWithDataContent(5)}
 		require.Equal(t, minInt+1, q.lastWrittenIndex)
 	})
 	t.Run("BadOrder", func(t *testing.T) {
@@ -401,7 +403,7 @@ func TestSortIndexes(t *testing.T) {
 func TestQueuePanicOnOverflow(t *testing.T) {
 	require.Panics(t, func() {
 		q := newMessageQueue()
-		q.messagesByOrder[123] = messageWithDataContent{}
+		q.messagesByOrder[123] = &queuedMessage{}
 		q.lastWrittenIndex = maxInt
 		q.addMessageNeedLock(messageWithDataContent{})
 	})
@@ -437,9 +439,9 @@ func TestQueue_Ack(t *testing.T) {
 				SeqNo: 2,
 			},
 		}))
-		expectedMap := map[int]messageWithDataContent{
-			1: newTestMessageWithDataContent(1),
-			3: newTestMessageWithDataContent(5),
+		expectedMap := map[int]*queuedMessage{
+			1: {messageWithDataContent: newTestMessageWithDataContent(1)},
+			3: {messageWithDataContent: newTestMessageWithDataContent(5)},
 		}
 		require.Equal(t, expectedMap, q.messagesByOrder)
 	})
@@ -454,8 +456,8 @@ func TestQueue_Ack(t *testing.T) {
 			},
 		}))
 
-		expectedMap := map[int]messageWithDataContent{
-			1: newTestMessageWithDataContent(1),
+		expectedMap := map[int]*queuedMessage{
+			1: {messageWithDataContent: newTestMessageWithDataContent(1)},
 		}
 
 		require.Equal(t, expectedMap, q.messagesByOrder)
@@ -497,6 +499,445 @@ func TestQueue_Ack(t *testing.T) {
 		require.Error(t, err)
 		require.Equal(t, 0, receivedCount)
 	})
+}
+
+func TestQueue_WaitWokenOnOwnMessageAck(t *testing.T) {
+	q := newMessageQueue()
+	w1, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(1))
+	require.NoError(t, err)
+	w2, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(2))
+	require.NoError(t, err)
+
+	done1 := make(chan error, 1)
+	done2 := make(chan error, 1)
+	go func() { done1 <- q.Wait(t.Context(), w1) }()
+	go func() { done2 <- q.Wait(t.Context(), w2) }()
+
+	acked1 := waitForMessageAckChannel(t, &q, 1)
+	acked2 := waitForMessageAckChannel(t, &q, 2)
+
+	// Ack only the second message: its waiter completes, the first keeps blocking.
+	require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 2}}))
+
+	require.NoError(t, waitQueueResult(t, done2))
+	requireAckChannelOpen(t, acked1)
+	select {
+	case <-acked2:
+	default:
+		t.Fatal("acked message notification was not closed")
+	}
+
+	select {
+	case <-done1:
+		t.Fatal("waiter of the not-acked message returned early")
+	default:
+	}
+
+	require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 1}}))
+	require.NoError(t, waitQueueResult(t, done1))
+}
+
+func TestQueue_WaitForPartiallyInvalidAckBatch(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		invalidSeqNo int64
+	}{
+		{name: "Duplicate", invalidSeqNo: 1},
+		{name: "Unexpected", invalidSeqNo: 3},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			q := newMessageQueue()
+			w1, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(1))
+			require.NoError(t, err)
+			w2, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(2))
+			require.NoError(t, err)
+
+			ctx1 := &queueWaitContext{Context: t.Context(), waiting: make(empty.Chan, 1)}
+			ctx2 := &queueWaitContext{Context: t.Context(), waiting: make(empty.Chan, 1)}
+			done1 := make(chan error, 1)
+			done2 := make(chan error, 1)
+			go func() { done1 <- q.Wait(ctx1, w1) }()
+			go func() { done2 <- q.Wait(ctx2, w2) }()
+			requireQueueWaitStarted(t, ctx1)
+			requireQueueWaitStarted(t, ctx2)
+			acked2 := waitForMessageAckChannel(t, &q, 2)
+
+			var receivedCount int
+			q.OnAckReceived = func(count int) { receivedCount += count }
+			var ackedSeqNos []int64
+			q.AckCallback = func(seqNo int64) { ackedSeqNos = append(ackedSeqNos, seqNo) }
+
+			require.ErrorIs(t, q.AcksReceived([]rawtopicwriter.WriteAck{
+				{SeqNo: 1},
+				{SeqNo: test.invalidSeqNo},
+			}), errAckUnexpectedMessage)
+
+			require.NoError(t, waitQueueResult(t, done1))
+			require.Equal(t, 1, receivedCount)
+			require.Equal(t, []int64{1}, ackedSeqNos)
+			requireAckChannelOpen(t, acked2)
+			select {
+			case <-done2:
+				t.Fatal("waiter of the not-acked message returned early")
+			default:
+			}
+
+			closeErr := errors.New("queue closed after invalid ack")
+			require.NoError(t, q.Close(closeErr))
+			require.ErrorIs(t, waitQueueResult(t, done2), closeErr)
+			require.Equal(t, 2, receivedCount)
+			require.Equal(t, []int64{1}, ackedSeqNos)
+		})
+	}
+}
+
+func TestQueue_WaitForBatch(t *testing.T) {
+	for _, reverse := range []bool{false, true} {
+		t.Run(fmt.Sprintf("ReverseAcks=%v", reverse), func(t *testing.T) {
+			q := newMessageQueue()
+			waiter, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(10, 20))
+			require.NoError(t, err)
+			done := make(chan error, 1)
+			go func() { done <- q.Wait(t.Context(), waiter) }()
+			acked := waitForMessageAckChannel(t, &q, 1)
+
+			if reverse {
+				require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 20}}))
+				requireAckChannelOpen(t, acked)
+			} else {
+				require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 10}}))
+				waitForMessageAckChannel(t, &q, 2)
+			}
+			select {
+			case <-done:
+				t.Fatal("batch waiter returned before all messages were acked")
+			default:
+			}
+
+			lastSeqNo := int64(20)
+			if reverse {
+				lastSeqNo = 10
+			}
+			require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: lastSeqNo}}))
+			require.NoError(t, waitQueueResult(t, done))
+		})
+	}
+}
+
+func TestQueue_WaitForBatchWithAckBeforeWait(t *testing.T) {
+	q := newMessageQueue()
+	waiter, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(10, 20))
+	require.NoError(t, err)
+
+	// The first message is already absent when Wait starts; the second is still pending.
+	require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 10}}))
+
+	ctx := &queueWaitContext{Context: t.Context(), waiting: make(empty.Chan, 1)}
+	done := make(chan error, 1)
+	go func() { done <- q.Wait(ctx, waiter) }()
+	requireQueueWaitStarted(t, ctx)
+	acked := waitForMessageAckChannel(t, &q, 2)
+	requireAckChannelOpen(t, acked)
+
+	select {
+	case <-done:
+		t.Fatal("batch waiter returned before the remaining message was acked")
+	default:
+	}
+
+	require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 20}}))
+	require.NoError(t, waitQueueResult(t, done))
+}
+
+func TestQueue_WaitInterrupted(t *testing.T) {
+	t.Run("ContextCanceled", func(t *testing.T) {
+		q := newMessageQueue()
+		waiter, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(1))
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+		go func() { done <- q.Wait(ctx, waiter) }()
+
+		acked := waitForMessageAckChannel(t, &q, 1)
+		cancel()
+
+		require.ErrorIs(t, waitQueueResult(t, done), context.Canceled)
+		requireAckChannelOpen(t, acked)
+
+		// A canceled Wait does not cancel the message or another Wait/Flush.
+		go func() { done <- q.WaitLastWritten(t.Context()) }()
+		require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 1}}))
+		require.NoError(t, waitQueueResult(t, done))
+	})
+
+	t.Run("QueueClosed", func(t *testing.T) {
+		q := newMessageQueue()
+		waiter, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(1))
+		require.NoError(t, err)
+
+		done := make(chan error, 1)
+		go func() { done <- q.Wait(t.Context(), waiter) }()
+
+		waitForMessageAckChannel(t, &q, 1)
+		closeErr := errors.New("queue closed")
+		require.NoError(t, q.Close(closeErr))
+
+		require.ErrorIs(t, waitQueueResult(t, done), closeErr)
+	})
+}
+
+func TestQueue_WaitWithAckAndInterruptionBeforeSelect(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		closeQueue bool
+		ackFirst   bool
+	}{
+		{name: "AckThenCancel", ackFirst: true},
+		{name: "CancelThenAck"},
+		{name: "AckThenClose", closeQueue: true, ackFirst: true},
+		{name: "CloseThenAck", closeQueue: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			q := newMessageQueue()
+			waiter, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(1))
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(t.Context())
+			resume := make(empty.Chan)
+			resumeWait := sync.OnceFunc(func() { close(resume) })
+			waitCtx := &queueWaitContext{Context: ctx, waiting: make(empty.Chan, 1), resume: resume}
+			waitDone := make(chan error, 1)
+			finished := make(empty.Chan)
+			go func() {
+				defer close(finished)
+				waitDone <- q.Wait(waitCtx, waiter)
+			}()
+			t.Cleanup(func() {
+				cancel()
+				resumeWait()
+				select {
+				case <-finished:
+				case <-time.After(queueWaitTestTimeout):
+					t.Error("queue waiter did not stop during cleanup")
+				}
+			})
+			requireQueueWaitStarted(t, waitCtx)
+			acked := waitForMessageAckChannel(t, &q, 1)
+
+			interruptionErr := context.Canceled
+			interrupted := ctx.Done()
+			interrupt := cancel
+			if test.closeQueue {
+				interruptionErr = errors.New("queue closed")
+				interrupted = q.closedChan
+				interrupt = func() { require.NoError(t, q.Close(interruptionErr)) }
+			}
+			if !test.ackFirst {
+				interrupt()
+			}
+			ackErr := q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 1}})
+			if test.ackFirst {
+				interrupt()
+			}
+
+			ackRejected := test.closeQueue && !test.ackFirst
+			if ackRejected {
+				require.ErrorIs(t, ackErr, errAckOnClosedMessageQueue)
+				requireAckChannelOpen(t, acked)
+			} else {
+				require.NoError(t, ackErr)
+				select {
+				case <-acked:
+				default:
+					t.Fatal("ack notification is not ready before resuming Wait")
+				}
+			}
+			select {
+			case <-interrupted:
+			default:
+				t.Fatal("interruption is not ready before resuming Wait")
+			}
+
+			resumeWait()
+			waitErr := waitQueueResult(t, waitDone)
+			if ackRejected || waitErr != nil {
+				require.ErrorIs(t, waitErr, interruptionErr)
+			}
+		})
+	}
+}
+
+func TestQueue_WaitInterruptionRaceWithAck(t *testing.T) {
+	t.Run("ContextCanceled", func(t *testing.T) {
+		for range 20 {
+			q := newMessageQueue()
+			waiter, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(1))
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(t.Context())
+			waitDone := make(chan error, 1)
+			go func() { waitDone <- q.Wait(ctx, waiter) }()
+			waitForMessageAckChannel(t, &q, 1)
+
+			start := make(chan struct{})
+			cancelDone := make(chan struct{})
+			ackDone := make(chan error, 1)
+			go func() {
+				<-start
+				cancel()
+				close(cancelDone)
+			}()
+			go func() {
+				<-start
+				ackDone <- q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 1}})
+			}()
+
+			close(start)
+			<-cancelDone
+			require.NoError(t, waitQueueResult(t, ackDone))
+			waitErr := waitQueueResult(t, waitDone)
+			if waitErr != nil {
+				require.ErrorIs(t, waitErr, context.Canceled)
+			}
+			require.Empty(t, q.messagesByOrder)
+		}
+	})
+
+	t.Run("QueueClosed", func(t *testing.T) {
+		for range 20 {
+			q := newMessageQueue()
+			waiter, err := q.AddMessagesWithWaiter(newTestMessagesWithContent(1))
+			require.NoError(t, err)
+
+			waitDone := make(chan error, 1)
+			go func() { waitDone <- q.Wait(t.Context(), waiter) }()
+			waitForMessageAckChannel(t, &q, 1)
+
+			closeErr := errors.New("queue closed")
+			start := make(chan struct{})
+			closeDone := make(chan error, 1)
+			ackDone := make(chan error, 1)
+			go func() {
+				<-start
+				closeDone <- q.Close(closeErr)
+			}()
+			go func() {
+				<-start
+				ackDone <- q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 1}})
+			}()
+
+			close(start)
+			require.NoError(t, waitQueueResult(t, closeDone))
+			ackErr := waitQueueResult(t, ackDone)
+			if ackErr != nil {
+				require.ErrorIs(t, ackErr, errAckOnClosedMessageQueue)
+			}
+			waitErr := waitQueueResult(t, waitDone)
+			if waitErr != nil {
+				require.ErrorIs(t, waitErr, closeErr)
+			}
+		}
+	})
+}
+
+func TestQueue_WaitLastWrittenSharesAck(t *testing.T) {
+	q := newMessageQueue()
+	require.NoError(t, q.AddMessages(newTestMessagesWithContent(1)))
+	require.Nil(t, q.messagesByOrder[1].acked, "async writes must not allocate ack channels")
+
+	done := make(chan error, 2)
+	ctx1 := &queueWaitContext{Context: t.Context(), waiting: make(empty.Chan, 1)}
+	go func() { done <- q.WaitLastWritten(ctx1) }()
+	requireQueueWaitStarted(t, ctx1)
+	acked := waitForMessageAckChannel(t, &q, 1)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	ctx2 := &queueWaitContext{Context: ctx, waiting: make(empty.Chan, 1)}
+	canceled := make(chan error, 1)
+	go func() { canceled <- q.WaitLastWritten(ctx2) }()
+	requireQueueWaitStarted(t, ctx2)
+	cancel()
+	require.ErrorIs(t, waitQueueResult(t, canceled), context.Canceled)
+	q.m.WithRLock(func() { require.Equal(t, acked, q.messagesByOrder[1].acked) })
+	requireAckChannelOpen(t, acked)
+
+	ctx3 := &queueWaitContext{Context: t.Context(), waiting: make(empty.Chan, 1)}
+	go func() { done <- q.WaitLastWritten(ctx3) }()
+	requireQueueWaitStarted(t, ctx3)
+	require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 1}}))
+	require.NoError(t, waitQueueResult(t, done))
+	require.NoError(t, waitQueueResult(t, done))
+	// An ACK received before Wait starts must not be lost.
+	require.NoError(t, q.WaitLastWritten(t.Context()))
+}
+
+const queueWaitTestTimeout = 5 * time.Second
+
+// Done is called by Wait after obtaining the message's ack channel.
+type queueWaitContext struct {
+	context.Context //nolint:containedctx // Decorate Done to synchronize the test with Wait.
+
+	waiting empty.Chan
+	resume  empty.ChanReadonly // When set, hold Done until the test releases Wait.
+}
+
+func (c *queueWaitContext) Done() <-chan struct{} {
+	select {
+	case c.waiting <- empty.Struct{}:
+	default:
+	}
+	if c.resume != nil {
+		<-c.resume
+	}
+
+	return c.Context.Done()
+}
+
+func requireQueueWaitStarted(t *testing.T, ctx *queueWaitContext) {
+	t.Helper()
+	select {
+	case <-ctx.waiting:
+	case <-time.After(queueWaitTestTimeout):
+		t.Fatal("Wait did not reach the ack notification select")
+	}
+}
+
+func waitForMessageAckChannel(t *testing.T, q *messageQueue, index int) empty.Chan {
+	t.Helper()
+	var acked empty.Chan
+	require.Eventually(t, func() bool {
+		q.m.WithRLock(func() {
+			if msg, ok := q.messagesByOrder[index]; ok {
+				acked = msg.acked
+			}
+		})
+
+		return acked != nil
+	}, queueWaitTestTimeout, time.Millisecond, "Wait did not create the message ack channel")
+
+	return acked
+}
+
+func requireAckChannelOpen(t *testing.T, acked empty.Chan) {
+	t.Helper()
+	select {
+	case <-acked:
+		t.Fatal("unacknowledged message notification was closed")
+	default:
+	}
+}
+
+func waitQueueResult(t *testing.T, done <-chan error) error {
+	t.Helper()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(queueWaitTestTimeout):
+		t.Fatal("timed out waiting for queue operation")
+
+		return nil
+	}
 }
 
 func waitGetMessageStarted(q *messageQueue) {

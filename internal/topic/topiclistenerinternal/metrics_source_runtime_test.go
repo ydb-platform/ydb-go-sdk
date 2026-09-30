@@ -13,6 +13,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
@@ -133,6 +135,47 @@ func TestTopicListenerReconnectorMetricsSourceClosesAfterTerminalStreamStop(t *t
 	require.Zero(t, source.Snapshot())
 }
 
+func TestTopicListenerReconnectorMetricsSourceSurvivesStreamRetry(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	client := &countingStreamTopicClient{}
+	done := make(chan struct{})
+	cfg := NewStreamListenerConfig()
+	cfg.Consumer = "consumer"
+	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "topic"}}
+	cfg.Tracer = &trace.Topic{
+		OnReaderMetricsSource: func(trace.TopicReaderMetricsSourceStartInfo) func(trace.TopicReaderMetricsSourceDoneInfo) {
+			return func(trace.TopicReaderMetricsSourceDoneInfo) { close(done) }
+		},
+	}
+	reconnector, err := NewTopicListenerReconnector(client, &cfg, nil)
+	require.NoError(t, err)
+	require.NoError(t, reconnector.WaitInit(ctx))
+
+	reconnector.m.Lock()
+	first := reconnector.streamListener
+	reconnector.m.Unlock()
+	first.goClose(ctx, status.Error(codes.Canceled, "stream interrupted"))
+	require.Eventually(t, func() bool {
+		reconnector.m.Lock()
+		defer reconnector.m.Unlock()
+
+		return reconnector.streamListener != nil && reconnector.streamListener != first
+	}, time.Second, time.Millisecond)
+	select {
+	case <-done:
+		t.Fatal("metrics source closed when one stream was retired")
+	default:
+	}
+
+	require.NoError(t, reconnector.Close(ctx, ErrUserCloseTopic))
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("metrics source was not closed after the logical listener stopped")
+	}
+}
+
 func TestTopicListenerReconnectorMetricsSourceDoneCanCloseAfterTerminalStop(t *testing.T) {
 	terminal := make(chan error, 1)
 	grpcStream := &terminalMetricsGrpcStream{terminal: terminal}
@@ -227,6 +270,7 @@ func TestTopicListenerReconnectorExplicitCloseOwnsMetricsSourceFinalization(t *t
 
 	lr := &TopicListenerReconnector{
 		background:    *background.NewWorker(context.Background(), "metrics-source-explicit-close"),
+		stopped:       make(chan struct{}),
 		metricsSource: topicreadercommon.NewReaderMetricsSource(),
 		metricsSourceDone: func() {
 			callbackCalls.Add(1)
@@ -235,13 +279,15 @@ func TestTopicListenerReconnectorExplicitCloseOwnsMetricsSourceFinalization(t *t
 		},
 	}
 	lr.background.Start("blocked-worker", func(context.Context) {
+		defer close(lr.stopped)
 		<-workerRelease
 	})
+	watcherDone := make(chan struct{})
+	go func() {
+		lr.waitMetricsSourceStop()
+		close(watcherDone)
+	}()
 
-	// Use a real watcher argument, but invoke the watcher after the parent
-	// cancellation is observable so the explicit close ownership check is
-	// deterministic.
-	sl := &streamListener{background: *background.NewWorker(context.Background(), "metrics-source-watcher")}
 	go func() {
 		closeResult <- lr.Close(context.Background(), errors.New("explicit close"))
 	}()
@@ -251,19 +297,17 @@ func TestTopicListenerReconnectorExplicitCloseOwnsMetricsSourceFinalization(t *t
 		t.Fatal("listener close did not cancel its background worker")
 	}
 
-	watcherDone := make(chan struct{})
-	go func() {
-		lr.waitMetricsSourceStop(sl)
-		close(watcherDone)
-	}()
+	select {
+	case <-callbackStarted:
+		t.Fatal("metrics source finalized before explicit close cleanup completed")
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(workerRelease)
 	select {
 	case <-watcherDone:
-		require.Zero(t, callbackCalls.Load())
 	case <-time.After(time.Second):
-		t.Fatal("metrics source watcher did not return during explicit close")
+		t.Fatal("metrics source watcher did not return after the listener stopped")
 	}
-
-	close(workerRelease)
 	select {
 	case <-callbackStarted:
 	case <-time.After(time.Second):

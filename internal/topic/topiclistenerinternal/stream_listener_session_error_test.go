@@ -11,59 +11,116 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestStreamListenerSessionErrorReportsActualStopOnce(t *testing.T) {
-	var events []trace.TopicReaderSessionErrorInfo
-	listener := newSessionErrorTestListener(&events)
+func TestTopicListenerSessionErrorUsesRetryDecisionOnce(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		decision topic.PublicCheckRetryResult
+		expected string
+	}{
+		{name: "retry", decision: topic.PublicRetryDecisionRetry, expected: "retry"},
+		{name: "stop", decision: topic.PublicRetryDecisionStop, expected: "stop"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var events []trace.TopicReaderSessionErrorInfo
+			checkCalls := 0
+			cfg := NewStreamListenerConfig()
+			cfg.ReaderInfo = topicreadercommon.ReaderInfo{
+				Endpoint:   "endpoint",
+				Database:   "/database",
+				Consumer:   "consumer",
+				ReaderName: "reader",
+				Listener:   true,
+			}
+			cfg.Tracer = &trace.Topic{
+				OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
+					events = append(events, info)
+				},
+			}
+			cfg.CheckError = func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+				checkCalls++
 
-	listener.goClose(context.Background(), grpcStatus.Error(grpcCodes.Unavailable, "connection lost"))
-	listener.goClose(context.Background(), errors.New("second failure"))
+				return test.decision
+			}
+			reason := grpcStatus.Error(grpcCodes.Unavailable, "connection lost")
+			listener := &TopicListenerReconnector{
+				streamConfig: &cfg,
+				client:       freshStreamTopicClient{},
+			}
+			if test.expected == "retry" {
+				setListenerRetryBackoff(&cfg, listenerTestBackoff{})
+			}
 
-	require.Len(t, events, 1)
-	event := events[0]
-	require.Equal(t, "endpoint", event.Endpoint)
-	require.Equal(t, "/database", event.Database)
-	require.Equal(t, "consumer", event.Consumer)
-	require.Equal(t, "reader", event.ReaderName)
-	require.Equal(t, "stop", event.RetryDecision)
-	require.Equal(t, "Unavailable", event.StatusCode)
-	require.Equal(t, "transport_error", event.ErrorType)
-
-	_ = listener.background.Close(context.Background(), errors.New("test finished"))
+			stream, result := listener.retryConnect(context.Background(), reason)
+			if test.expected == "retry" {
+				require.NoError(t, result)
+				require.NotNil(t, stream)
+			} else {
+				require.ErrorIs(t, result, reason)
+			}
+			require.Equal(t, 1, checkCalls)
+			require.Len(t, events, 1)
+			require.Equal(t, "endpoint", events[0].Endpoint)
+			require.Equal(t, "/database", events[0].Database)
+			require.Equal(t, "consumer", events[0].Consumer)
+			require.Equal(t, "reader", events[0].ReaderName)
+			require.Equal(t, test.expected, events[0].RetryDecision)
+			require.Equal(t, "Unavailable", events[0].StatusCode)
+			require.Equal(t, "transport_error", events[0].ErrorType)
+			if stream != nil {
+				require.NoError(t, stream.Close(context.Background(), ErrUserCloseTopic))
+			}
+		})
+	}
 }
 
-func TestStreamListenerSessionErrorSkipsExpectedTermination(t *testing.T) {
+func TestTopicListenerSessionErrorSuppressesExpectedTermination(t *testing.T) {
 	var events []trace.TopicReaderSessionErrorInfo
-	listener := newSessionErrorTestListener(&events)
-	cancelledCtx, cancel := context.WithCancel(context.Background())
+	cfg := NewStreamListenerConfig()
+	cfg.Tracer = &trace.Topic{
+		OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
+			events = append(events, info)
+		},
+	}
+	listener := &TopicListenerReconnector{streamConfig: &cfg}
+
+	_, err := listener.retryConnect(context.Background(), ErrUserCloseTopic)
+	require.ErrorIs(t, err, ErrUserCloseTopic)
+
+	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-
-	listener.traceSessionStop(context.Background(), ErrUserCloseTopic)
-	listener.traceSessionStop(cancelledCtx, context.Canceled)
-	listener.traceSessionStop(context.Background(), errPartitionQueueClosed)
-
+	_, err = listener.retryConnect(ctx, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 	require.Empty(t, events)
-
-	_ = listener.background.Close(context.Background(), errors.New("test finished"))
 }
 
-func TestStreamListenerSessionErrorKeepsDeadlineFailures(t *testing.T) {
+func TestTopicListenerSessionErrorKeepsDeadlineFailures(t *testing.T) {
 	var events []trace.TopicReaderSessionErrorInfo
-	listener := newSessionErrorTestListener(&events)
+	cfg := NewStreamListenerConfig()
+	cfg.Tracer = &trace.Topic{
+		OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
+			events = append(events, info)
+		},
+	}
+	cfg.CheckError = func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+		return topic.PublicRetryDecisionStop
+	}
+	listener := &TopicListenerReconnector{streamConfig: &cfg}
 
-	listener.traceSessionStop(context.Background(), grpcStatus.Error(grpcCodes.DeadlineExceeded, "connect timeout"))
-
+	_, err := listener.retryConnect(
+		context.Background(),
+		grpcStatus.Error(grpcCodes.DeadlineExceeded, "connect timeout"),
+	)
+	require.Error(t, err)
 	require.Len(t, events, 1)
 	require.Equal(t, "DeadlineExceeded", events[0].StatusCode)
 	require.Equal(t, "transport_error", events[0].ErrorType)
-
-	_ = listener.background.Close(context.Background(), errors.New("test finished"))
 }
 
 func TestTopicListenerReconnectorSessionErrorReportsInitialFailure(t *testing.T) {
@@ -100,30 +157,6 @@ func TestTopicListenerReconnectorSessionErrorReportsInitialFailure(t *testing.T)
 	require.Equal(t, "ydb_error", events[0].ErrorType)
 
 	require.NoError(t, reconnector.Close(context.Background(), errors.New("test finished")))
-}
-
-func newSessionErrorTestListener(events *[]trace.TopicReaderSessionErrorInfo) *streamListener {
-	ctx := context.Background()
-	listener := &streamListener{
-		cfg: &StreamListenerConfig{
-			ReaderInfo: topicreadercommon.ReaderInfo{
-				Endpoint:   "endpoint",
-				Database:   "/database",
-				Consumer:   "consumer",
-				ReaderName: "reader",
-			},
-		},
-		background: *background.NewWorker(ctx, "session-error-test"),
-		sessions:   &topicreadercommon.PartitionSessionStorage{},
-		tracer: &trace.Topic{
-			OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
-				*events = append(*events, info)
-			},
-		},
-	}
-	listener.streamClose = func(error) {}
-
-	return listener
 }
 
 type failingTopicClient struct {

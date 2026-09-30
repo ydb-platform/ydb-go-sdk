@@ -20,27 +20,6 @@ type templateConfig struct {
 var fill = template.Must(template.New("fill database").Parse(`
 PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 
-DECLARE $seriesData AS List<Struct<
-	series_id: Uint64,
-	title: Text,
-	series_info: Text,
-	release_date: Date,
-	comment: Optional<Text>>>;
-
-DECLARE $seasonsData AS List<Struct<
-	series_id: Uint64,
-	season_id: Uint64,
-	title: Text,
-	first_aired: Date,
-	last_aired: Date>>;
-
-DECLARE $episodesData AS List<Struct<
-	series_id: Uint64,
-	season_id: Uint64,
-	episode_id: Uint64,
-	title: Text,
-	air_date: Date>>;
-
 REPLACE INTO series
 SELECT
 	series_id,
@@ -193,7 +172,6 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-			DECLARE $seriesID AS Uint64;
 			$format = DateTime::Format("%Y-%m-%d");
 			SELECT
 				series_id,
@@ -266,8 +244,6 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-
-			DECLARE $series AS List<UInt64>;
 
 			SELECT series_id, season_id, title, CAST(CAST(first_aired AS Date) AS Bytes) AS first_aired
 			FROM seasons
@@ -391,20 +367,16 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 }
 
 func describeTable(ctx context.Context, c table.Client, path string) error {
-	return c.Do(ctx,
-		func(ctx context.Context, s table.Session) error {
-			desc, err := s.DescribeTable(ctx, path)
-			if err != nil {
-				return err
-			}
-			log.Printf("> describe table: %s", path)
-			for i := range desc.Columns {
-				log.Printf("column, name: %s, %s", desc.Columns[i].Type, desc.Columns[i].Name)
-			}
+	desc, err := c.DescribeTable(ctx, path)
+	if err != nil {
+		return err
+	}
+	log.Printf("> describe table: %s", path)
+	for i := range desc.Columns {
+		log.Printf("column, name: %s, %s", desc.Columns[i].Type, desc.Columns[i].Name)
+	}
 
-			return nil
-		},
-	)
+	return nil
 }
 
 func render(t *template.Template, data any) string {

@@ -1,15 +1,26 @@
-* Fixed missing terminal topic reader session-error metrics on close with the default retry policy
-* Changed omitted or empty topic reader and listener metric names to `default`, allowing metric series with the same other attributes to aggregate; explicitly supplied names are preserved
+* Added topic reader and listener metrics for message flow, session errors, commit progress, buffers, and partition sessions. See [METRICS.md](METRICS.md).
 
-* Added topic reader and listener metrics for message flow, session errors,
-  commit progress, local ownership, and read-ahead credit balance; bumped the
-  metrics observability chain to `ydb-sdk-metrics/0.3.0`; received bytes and
-  commit counters use exact `Add(int64)` batching, while message and
-  session-error counters retain `Inc()` compatibility; added optional
-  observable gauges for buffer age, commit lag, and active partition sessions.
-  See
-  [METRICS.md](METRICS.md).
+## v3.153.1
+* Fixed `sugar.Embedding` encoding of an empty vector to match `Knn::ToBinaryStringFloat`
 
+## v3.153.0
+* Added `sugar.Embedding` helper to construct `types.Value` with `Bytes` type from slice of numbers
+
+## v3.152.1
+* Fixed topic reader messages retaining compressed payload bytes after their content had been fully read
+
+## v3.152.0
+* Added `topicoptions.WithListenerCheckRetryErrorFunction` to customize the topic listener error retry policy
+* Fixed topic listener recovery, error reporting, closing, and message confirmation after stream failures
+
+## v3.151.5
+* Fixed unrelated ACKs waking blocked topic writer calls with `WithWriterWaitServerAck(true)`
+
+## v3.151.4
+* Fixed a data race when a streaming response contains a YDB operation error: trailers are read only after the underlying gRPC receive returns EOF or an error; stopping on a YDB operation error alone does not deliver trailer callbacks or server close hints
+
+## v3.151.3
+* Fixed query session pool metrics during checkout, session creation and warm-up, retries, and waiting for a session
 * Fixed session invalidation to follow the shared error policy for Query Service and Table API requests executed through Query Service, preserving sessions after gRPC `RESOURCE_EXHAUSTED` and `OUT_OF_RANGE`
 
 ## v3.151.2

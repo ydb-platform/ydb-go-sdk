@@ -12,10 +12,7 @@ import (
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
 
 var (
@@ -97,13 +94,7 @@ func main() {
 }
 
 func list(ctx context.Context, db *ydb.Driver, t *template.Template, p string) {
-	var dir scheme.Directory
-	var err error
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		dir, err = db.Scheme().ListDirectory(ctx, p)
-
-		return err
-	}, retry.WithIdempotent(true))
+	dir, err := db.Scheme().ListDirectory(ctx, p)
 	if err != nil {
 		fmt.Printf("list directory '%s' failed: %v\n", p, err)
 
@@ -120,12 +111,7 @@ func list(ctx context.Context, db *ydb.Driver, t *template.Template, p string) {
 			list(ctx, db, t, pt)
 
 		case scheme.EntryTable:
-			var desc options.Description
-			err = db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
-				desc, err = s.DescribeTable(ctx, pt)
-
-				return err
-			}, table.WithIdempotent())
+			desc, err := db.Table().DescribeTable(ctx, pt)
 			if err != nil {
 				fmt.Printf("describe '%s' failed: %v\n", pt, err)
 

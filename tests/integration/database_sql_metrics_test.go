@@ -21,14 +21,8 @@ func TestDatabaseSqlMetrics(t *testing.T) {
 
 	var (
 		scope    = newScope(t)
-		registry = &registryConfig{
-			details:    trace.DatabaseSQLEvents,
-			gauges:     newVec[gaugeVec](),
-			counters:   newVec[counterVec](),
-			timers:     newVec[timerVec](),
-			histograms: newVec[histogramVec](),
-		}
-		db = scope.SQLDriver(ydb.WithDatabaseSQLTrace(metrics.DatabaseSQL(registry)))
+		registry = newRegistryConfig(trace.DatabaseSQLEvents)
+		db       = scope.SQLDriver(ydb.WithDatabaseSQLTrace(metrics.DatabaseSQL(registry)))
 	)
 
 	require.Equal(t,
@@ -40,40 +34,39 @@ func TestDatabaseSqlMetrics(t *testing.T) {
 	cc1, err := db.Conn(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, cc1)
-	require.NotNil(t, registry.gauges.data["database.sql.conns{}"].gauges["database.sql.conns{}"])
-	require.EqualValues(t, 1, registry.gauges.data["database.sql.conns{}"].gauges["database.sql.conns{}"].value)
+	registry.gauges.AssertEqual(t, "database.sql.conns", 1)
 	require.Empty(t, registry.gauges.data["database.sql.tx{}"].gauges)
 
 	cc2, err := db.Conn(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, cc2)
-	require.EqualValues(t, 2, registry.gauges.data["database.sql.conns{}"].gauges["database.sql.conns{}"].value)
+	registry.gauges.AssertEqual(t, "database.sql.conns", 2)
 	require.Empty(t, registry.gauges.data["database.sql.tx{}"].gauges)
 
 	tx1, err := cc1.BeginTx(ctx, nil)
 	require.NoError(t, err)
 	require.NotNil(t, tx1)
 	require.NotEmpty(t, registry.gauges.data["database.sql.tx{}"].gauges)
-	require.EqualValues(t, 1, registry.gauges.data["database.sql.tx{}"].gauges["database.sql.tx{}"].value)
+	registry.gauges.AssertEqual(t, "database.sql.tx", 1)
 
 	require.NoError(t, tx1.Commit())
-	require.EqualValues(t, 0, registry.gauges.data["database.sql.tx{}"].gauges["database.sql.tx{}"].value)
+	registry.gauges.AssertEqual(t, "database.sql.tx", 0)
 
 	require.NoError(t, cc1.Close())
-	require.EqualValues(t, 2, registry.gauges.data["database.sql.conns{}"].gauges["database.sql.conns{}"].value)
+	registry.gauges.AssertEqual(t, "database.sql.conns", 2)
 
 	tx2, err := cc2.BeginTx(ctx, nil)
 	require.NoError(t, err)
 	require.NotNil(t, tx2)
 	require.NotEmpty(t, registry.gauges.data["database.sql.tx{}"].gauges)
-	require.EqualValues(t, 1, registry.gauges.data["database.sql.tx{}"].gauges["database.sql.tx{}"].value)
+	registry.gauges.AssertEqual(t, "database.sql.tx", 1)
 
 	require.NoError(t, tx2.Rollback())
-	require.EqualValues(t, 0, registry.gauges.data["database.sql.tx{}"].gauges["database.sql.tx{}"].value)
+	registry.gauges.AssertEqual(t, "database.sql.tx", 0)
 
 	require.NoError(t, cc2.Close())
-	require.EqualValues(t, 2, registry.gauges.data["database.sql.conns{}"].gauges["database.sql.conns{}"].value)
+	registry.gauges.AssertEqual(t, "database.sql.conns", 2)
 
 	require.NoError(t, db.Close())
-	require.EqualValues(t, 0, registry.gauges.data["database.sql.conns{}"].gauges["database.sql.conns{}"].value)
+	registry.gauges.AssertEqual(t, "database.sql.conns", 0)
 }

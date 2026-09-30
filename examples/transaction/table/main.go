@@ -9,6 +9,7 @@ import (
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	tableoptions "github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
@@ -48,7 +49,7 @@ func init() { //nolint:gochecknoinits
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	db, err := ydb.Open(ctx, dsn)
+	db, err := ydb.Open(ctx, dsn, ydb.WithLazyTx(true))
 	if err != nil {
 		panic(err)
 	}
@@ -64,12 +65,15 @@ func main() {
 
 func txWithRetries(ctx context.Context, db *ydb.Driver) (words []string, _ error) {
 	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-		words = words[:0] // empty for new retry attempt
+		var attemptWords []string
 
 		result, err := tx.Execute(ctx, "SELECT 'execute';", nil)
 		if err != nil {
 			return err
 		}
+		defer func() {
+			_ = result.Close()
+		}()
 
 		if err := result.NextResultSetErr(ctx); err != nil {
 			return err
@@ -84,19 +88,16 @@ func txWithRetries(ctx context.Context, db *ydb.Driver) (words []string, _ error
 			return err
 		}
 
-		words = append(words, s)
+		attemptWords = append(attemptWords, s)
 
 		if err = result.Err(); err != nil {
 			return err
 		}
+		if err = result.Close(); err != nil {
+			return err
+		}
 
-		_ = result.Close()
-
-		result, err = tx.Execute(ctx, `
-				DECLARE $word1 AS Text;
-				DECLARE $word2 AS Text;
-				DECLARE $word3 AS Text;
-
+		secondResult, err := tx.Execute(ctx, `
 				SELECT w, ord FROM (
 					SELECT $word1 AS w, 1 AS ord 
 					UNION 
@@ -117,31 +118,38 @@ func txWithRetries(ctx context.Context, db *ydb.Driver) (words []string, _ error
 				table.ValueParam("$word2", types.TextValue("transaction")),
 				table.ValueParam("$word3", types.TextValue("retries")),
 			),
+			tableoptions.WithCommit(),
 		)
 		if err != nil {
 			return err
 		}
 
-		defer result.Close()
+		defer func() {
+			_ = secondResult.Close()
+		}()
 
-		if err := result.NextResultSetErr(ctx); err != nil {
+		if err := secondResult.NextResultSetErr(ctx); err != nil {
 			return err
 		}
 
-		for result.NextRow() {
+		for secondResult.NextRow() {
 			var (
 				word string
 				ord  int
 			)
-			err = result.Scan(&word, &ord)
+			err = secondResult.Scan(&word, &ord)
 			if err != nil {
 				return err
 			}
-			words = append(words, word)
+			attemptWords = append(attemptWords, word)
 		}
+		if err = secondResult.Err(); err != nil {
+			return err
+		}
+		words = attemptWords
 
-		return result.Err()
-	})
+		return nil
+	}, table.WithIdempotent())
 	if err != nil {
 		return nil, err
 	}

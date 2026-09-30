@@ -36,6 +36,7 @@ On **"update memory bank"** — review all core files in [`.agents/context/READM
 
 - Comments, godoc, error messages, logs: **English**.
 - Match style in the touched package; do not reformat unrelated code.
+- New PRs must not add complexity to production/runtime code; tests and test harnesses are exempt. If runtime complexity is unavoidable, the PR must categorically justify why the task or problem cannot be solved without adding complexity and why simpler alternatives are insufficient.
 - Do **not** change `go.mod` / `go.sum` unless the task requires it.
 - User-facing PRs need a `CHANGELOG.md` entry at the top (or `no changelog` label) — see `changelog.md`.
 - Non-trivial changes: discuss in a GitHub issue first ([`CONTRIBUTING.md`](CONTRIBUTING.md)).

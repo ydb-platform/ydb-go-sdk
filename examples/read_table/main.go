@@ -11,7 +11,6 @@ import (
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
@@ -74,7 +73,7 @@ func main() {
 	log.Println("Drop table (if exists)...")
 	err = dropTableIfExists(
 		ctx,
-		db.Table(),
+		db.Query(),
 		path.Join(prefix, tableName),
 	)
 	if err != nil {
@@ -85,7 +84,7 @@ func main() {
 	log.Println("Create table...")
 	err = createTable(
 		ctx,
-		db.Table(),
+		db.Query(),
 		path.Join(prefix, tableName),
 	)
 	if err != nil {
@@ -96,7 +95,7 @@ func main() {
 	log.Println("Fill table...")
 	err = fillTable(
 		ctx,
-		db.Table(),
+		db.Query(),
 		prefix,
 	)
 	if err != nil {
@@ -208,33 +207,29 @@ func main() {
 	}
 
 	log.Println("Parallel read all rows from shards")
-	var description options.Description
-	err = db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
-		description, err = s.DescribeTable(ctx, tableName)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
+	description, err := db.Table().DescribeTable(ctx, path.Join(prefix, tableName), options.WithShardKeyBounds())
 	if err != nil {
 		panic(fmt.Errorf("describe table error: %w", err))
 	}
 	var wg sync.WaitGroup
+	errCh := make(chan error, len(description.KeyRanges))
 	wg.Add(len(description.KeyRanges))
 	for _, shard := range description.KeyRanges {
-		go func(options.KeyRange) {
+		go func(shard options.KeyRange) {
 			defer wg.Done()
-			err = readTable(
+			if err := readTable(
 				ctx,
 				db.Table(),
 				path.Join(prefix, tableName),
 				options.ReadKeyRange(shard),
-			)
-			if err != nil {
-				panic(fmt.Errorf("shard %q read error: %w", shard.String(), err))
+			); err != nil {
+				errCh <- fmt.Errorf("shard %q read error: %w", shard.String(), err)
 			}
 		}(shard)
 	}
 	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		panic(err)
+	}
 }

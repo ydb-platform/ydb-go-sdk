@@ -9,9 +9,7 @@ import (
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 const (
@@ -19,37 +17,22 @@ const (
 	interval = time.Second
 )
 
-func dropTableIfExists(ctx context.Context, c table.Client, path string) (err error) {
-	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) error {
-			return s.DropTable(ctx, path)
-		},
-		table.WithIdempotent(),
-	)
-	if !ydb.IsOperationErrorSchemeError(err) {
-		return err
-	}
-
-	return nil
+func dropTableIfExists(ctx context.Context, c query.Client, tablePath string) error {
+	return c.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS `%s`", tablePath), query.WithIdempotent())
 }
 
-func createTable(ctx context.Context, c table.Client, prefix, tableName string) (err error) {
-	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) error {
-			return s.CreateTable(ctx, path.Join(prefix, tableName),
-				options.WithColumn("id", types.Optional(types.TypeUint64)),
-				options.WithColumn("value", types.Optional(types.TypeUTF8)),
-				options.WithPrimaryKeyColumn("id"),
-			)
-		},
-		table.WithIdempotent(),
-	)
+func createTable(ctx context.Context, c query.Client, prefix, tableName string) (err error) {
+	err = c.Exec(ctx, fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
+			id Uint64,
+			value Text,
+			PRIMARY KEY (id)
+		)`, "`"+path.Join(prefix, tableName)+"`"), query.WithIdempotent())
 	if err != nil {
 		return fmt.Errorf("failed to create table: %w", err)
 	}
 
-	err = c.Do(ctx, func(ctx context.Context, s table.Session) error {
-		query := fmt.Sprintf(`
+	err = c.Exec(ctx, fmt.Sprintf(`
 PRAGMA TablePathPrefix("%v");
 
 ALTER TABLE
@@ -60,10 +43,7 @@ WITH (
 	FORMAT = 'JSON',
 	MODE = 'NEW_AND_OLD_IMAGES'
 )
-`, prefix, tableName)
-
-		return s.ExecuteSchemeQuery(ctx, query)
-	})
+`, prefix, tableName))
 	if err != nil {
 		return fmt.Errorf("failed to add changefeed to test table: %w", err)
 	}
@@ -71,12 +51,28 @@ WITH (
 	return nil
 }
 
-func fillTable(ctx context.Context, c table.Client, prefix, tableName string) {
-	query := fmt.Sprintf(`
-PRAGMA TablePathPrefix("%v");
+func runPeriodically(ctx context.Context, every time.Duration, operation func(context.Context) error) error {
+	ticker := time.NewTicker(every)
+	defer ticker.Stop()
 
-DECLARE $id AS Uint64;
-DECLARE $value AS Text;
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := operation(ctx); err != nil {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
+func fillTable(ctx context.Context, c query.Client, prefix, tableName string) error {
+	sql := fmt.Sprintf(`
+PRAGMA TablePathPrefix("%v");
 
 UPSERT INTO
 	%v
@@ -84,44 +80,36 @@ UPSERT INTO
 VALUES
 	($id, $value)
 `, prefix, tableName)
-	for {
+
+	return runPeriodically(ctx, interval, func(ctx context.Context) error {
 		id := uint64(rand.Intn(maxID))              //nolint:gosec
 		val := "val-" + strconv.Itoa(rand.Intn(10)) //nolint:gosec
-		params := table.NewQueryParameters(
-			table.ValueParam("$id", types.Uint64Value(id)),
-			table.ValueParam("$value", types.UTF8Value(val)),
-		)
-		_ = c.DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-			_, err := tx.Execute(ctx, query, params)
 
-			return err
-		})
-
-		time.Sleep(interval)
-	}
+		return c.DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+			return tx.Exec(ctx, sql, query.WithParameters(ydb.ParamsBuilder().
+				Param("$id").Uint64(id).
+				Param("$value").Text(val).
+				Build()))
+		}, query.WithIdempotent())
+	})
 }
 
-func removeFromTable(ctx context.Context, c table.Client, prefix, tableName string) {
-	query := fmt.Sprintf(`
+func removeFromTable(ctx context.Context, c query.Client, prefix, tableName string) error {
+	sql := fmt.Sprintf(`
 PRAGMA TablePathPrefix("%v");
-
-DECLARE $id AS Uint64;
 
 DELETE FROM
 	%v
 WHERE id=$id
 `, prefix, tableName)
-	for {
+
+	return runPeriodically(ctx, interval, func(ctx context.Context) error {
 		id := uint64(rand.Intn(maxID)) //nolint:gosec
-		params := table.NewQueryParameters(
-			table.ValueParam("$id", types.Uint64Value(id)),
-		)
-		_ = c.DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-			_, err := tx.Execute(ctx, query, params)
 
-			return err
-		})
-
-		time.Sleep(interval)
-	}
+		return c.DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+			return tx.Exec(ctx, sql, query.WithParameters(ydb.ParamsBuilder().
+				Param("$id").Uint64(id).
+				Build()))
+		}, query.WithIdempotent())
+	})
 }

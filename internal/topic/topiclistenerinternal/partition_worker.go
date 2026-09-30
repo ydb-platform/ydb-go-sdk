@@ -54,14 +54,17 @@ func batchReadBufferSize(batch *topicreadercommon.PublicBatch) int {
 	return size
 }
 
-// WorkerStoppedCallback notifies when worker is stopped
+// WorkerStoppedCallback reports why a worker stopped or needs to stop.
 type WorkerStoppedCallback func(sessionID rawtopicreader.PartitionSessionID, reason error)
 
 // PartitionWorker processes messages for a single partition
 type PartitionWorker struct {
-	partitionSessionID   rawtopicreader.PartitionSessionID
-	partitionSession     *topicreadercommon.PartitionSession
-	messageSender        MessageSender
+	partitionSessionID rawtopicreader.PartitionSessionID
+	partitionSession   *topicreadercommon.PartitionSession
+	messageSender      interface {
+		MessageSender
+		CommitHandler
+	}
 	readBufferReleaser   ReadBufferReleaser
 	metricsSource        *topicreadercommon.ReaderMetricsSource
 	reserveLocalBufferFn func(topic string, messagesCount int) bool
@@ -82,6 +85,7 @@ type PartitionWorker struct {
 func NewPartitionWorker[T interface {
 	MessageSender
 	ReadBufferReleaser
+	CommitHandler
 }](
 	sessionID rawtopicreader.PartitionSessionID,
 	session *topicreadercommon.PartitionSession,
@@ -259,6 +263,12 @@ func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
 
 // processUnifiedMessage handles a single unified message by routing to appropriate processor
 func (w *PartitionWorker) processUnifiedMessage(ctx context.Context, msg unifiedMessage) error {
+	if err := ctx.Err(); err != nil {
+		w.releaseQueuedBatch(msg)
+
+		return err
+	}
+
 	switch {
 	case msg.RawServerMessage != nil:
 		return w.processRawServerMessage(ctx, *msg.RawServerMessage)
@@ -345,8 +355,6 @@ func (w *PartitionWorker) callUserHandler(
 }
 
 // processBatchMessage handles ready PublicBatch messages
-//
-//nolint:funlen
 func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMessage) error {
 	// Add tracing for batch processing
 	messagesCount := 0
@@ -402,20 +410,11 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 		return err
 	}
 
-	// Cast messageSender to CommitHandler (it's the streamListener)
-	commitHandler, ok := w.messageSender.(CommitHandler)
-	if !ok {
-		err := xerrors.WithStackTrace(fmt.Errorf("ydb: messageSender does not implement CommitHandler"))
-		traceDone(0, err)
-
-		return err
-	}
-
 	releaseLocalBuffer()
 	releaseBatch()
 
 	// Call user handler with tracing
-	if err := w.callUserHandler(ctx, msg, commitHandler, messagesCount); err != nil {
+	if err := w.callUserHandler(ctx, msg, w.messageSender, messagesCount); err != nil {
 		traceDone(0, err)
 
 		return err
@@ -430,19 +429,24 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 // partition queue. In-flight batch is freed by processBatchMessage defer, not here.
 func (w *PartitionWorker) freeBufferedBatchCredits() {
 	for _, msg := range w.messageQueue.DrainBuffered() {
-		if msg.BatchMessage != nil {
-			batch := msg.BatchMessage.Batch
-			if batch != nil {
-				topic := w.partitionSession.Topic
-				if session := topicreadercommon.BatchGetPartitionSession(batch); session != nil {
-					topic = session.Topic
-				}
-				w.releaseLocalBuffer(topic, len(batch.Messages))
-				w.releaseBatch(batch)
-			}
-		}
-		w.freeBatchCredit(msg)
+		w.releaseQueuedBatch(msg)
 	}
+}
+
+func (w *PartitionWorker) releaseQueuedBatch(msg unifiedMessage) {
+	if msg.BatchMessage == nil {
+		return
+	}
+	batch := msg.BatchMessage.Batch
+	if batch != nil {
+		topic := w.partitionSession.Topic
+		if session := topicreadercommon.BatchGetPartitionSession(batch); session != nil {
+			topic = session.Topic
+		}
+		w.releaseLocalBuffer(topic, len(batch.Messages))
+		w.releaseBatch(batch)
+	}
+	w.freeBatchCredit(msg)
 }
 
 func (w *PartitionWorker) releaseBatch(batch *topicreadercommon.PublicBatch) {
@@ -477,6 +481,23 @@ func (w *PartitionWorker) releaseLocalBuffer(topic string, messagesCount int) {
 		return
 	}
 	w.releaseLocalBufferFn(topic, messagesCount)
+}
+
+func (w *PartitionWorker) tryMergeMessages(last, next unifiedMessage) (unifiedMessage, bool) {
+	if last.BatchMessage == nil || next.BatchMessage == nil ||
+		!last.BatchMessage.ServerMessageMetadata.Equals(&next.BatchMessage.ServerMessageMetadata) {
+		return next, false
+	}
+
+	merged, err := topicreadercommon.BatchAppend(last.BatchMessage.Batch, next.BatchMessage.Batch)
+	if err != nil {
+		return next, false
+	}
+
+	return unifiedMessage{BatchMessage: &batchMessage{
+		ServerMessageMetadata: last.BatchMessage.ServerMessageMetadata,
+		Batch:                 merged,
+	}}, true
 }
 
 // handleStartPartitionRequest processes StartPartitionSessionRequest
@@ -554,6 +575,11 @@ func (w *PartitionWorker) handleStopPartitionRequest(
 
 	// Only send response if graceful
 	if m.Graceful {
+		if err := w.messageSender.flushCommits(); err != nil {
+			return xerrors.WithStackTrace(fmt.Errorf(
+				"ydb: failed to flush commits before stopping partition session: %w", err,
+			))
+		}
 		resp := &rawtopicreader.StopPartitionSessionResponse{
 			PartitionSessionID: w.partitionSession.StreamPartitionSessionID,
 		}
@@ -564,31 +590,4 @@ func (w *PartitionWorker) handleStopPartitionRequest(
 	}
 
 	return nil
-}
-
-// tryMergeMessages attempts to merge messages when possible
-func (w *PartitionWorker) tryMergeMessages(last, new unifiedMessage) (unifiedMessage, bool) {
-	// Only merge batch messages for now
-	if last.BatchMessage != nil && new.BatchMessage != nil {
-		// Validate metadata compatibility before merging
-		if !last.BatchMessage.ServerMessageMetadata.Equals(&new.BatchMessage.ServerMessageMetadata) {
-			return new, false // Don't merge messages with different metadata
-		}
-
-		var err error
-		result, err := topicreadercommon.BatchAppend(last.BatchMessage.Batch, new.BatchMessage.Batch)
-		if err != nil {
-			w.Close(context.Background(), err)
-
-			return new, false
-		}
-
-		return unifiedMessage{BatchMessage: &batchMessage{
-			ServerMessageMetadata: last.BatchMessage.ServerMessageMetadata,
-			Batch:                 result,
-		}}, true
-	}
-
-	// Don't merge other types of messages
-	return new, false
 }

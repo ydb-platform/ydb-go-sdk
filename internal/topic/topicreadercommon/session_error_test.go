@@ -8,10 +8,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -85,21 +87,45 @@ func TestClassifySessionError(t *testing.T) {
 
 func TestClassifySessionErrorFromRawTopicStatus(t *testing.T) {
 	for _, test := range []struct {
-		name       string
-		status     Ydb.StatusIds_StatusCode
-		statusCode string
+		name        string
+		status      Ydb.StatusIds_StatusCode
+		statusCode  string
+		issues      []*Ydb_Issue.IssueMessage
+		retryable   bool
+		backoffType backoff.Type
 	}{
-		{name: "unauthorized", status: Ydb.StatusIds_UNAUTHORIZED, statusCode: "UNAUTHORIZED"},
-		{name: "overloaded", status: Ydb.StatusIds_OVERLOADED, statusCode: "OVERLOADED"},
+		{
+			name:        "unauthorized",
+			status:      Ydb.StatusIds_UNAUTHORIZED,
+			statusCode:  "UNAUTHORIZED",
+			backoffType: backoff.TypeInstant,
+		},
+		{
+			name:        "overloaded",
+			status:      Ydb.StatusIds_OVERLOADED,
+			statusCode:  "OVERLOADED",
+			issues:      []*Ydb_Issue.IssueMessage{{Message: "temporary server load"}},
+			retryable:   true,
+			backoffType: backoff.TypeSlow,
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			reader := rawtopicreader.StreamReader{
 				Tracer: &trace.Topic{},
-				Stream: statusGrpcStream{response: &Ydb_Topic.StreamReadMessage_FromServer{Status: test.status}},
+				Stream: statusGrpcStream{response: &Ydb_Topic.StreamReadMessage_FromServer{
+					Status: test.status,
+					Issues: test.issues,
+				}},
 			}
 			_, err := reader.Recv()
 			require.Error(t, err)
-			require.Contains(t, err.Error(), fmt.Sprintf("ydb: bad status from topic server: %v", test.status))
+			require.True(t, xerrors.IsOperationError(err, test.status))
+			operationErr := xerrors.OperationError(err)
+			require.NotNil(t, operationErr)
+			if len(test.issues) > 0 {
+				require.Contains(t, operationErr.Error(), test.issues[0].GetMessage())
+			}
+			require.Equal(t, test.backoffType, operationErr.BackoffType())
 
 			classification := ClassifySessionError(fmt.Errorf("outer: %w", err))
 			require.Equal(t, SessionErrorClassification{
@@ -107,19 +133,13 @@ func TestClassifySessionErrorFromRawTopicStatus(t *testing.T) {
 				ErrorType:  ydbSessionErrorType,
 			}, classification)
 
-			oldPlainError := fmt.Errorf("ydb: bad status from topic server: %v", test.status)
-			wantBackoff, wantStop := topic.RetryDecision(
-				fmt.Errorf("outer: %w", oldPlainError),
-				topic.RetrySettings{},
-				0,
-			)
 			gotBackoff, gotStop := topic.RetryDecision(
 				fmt.Errorf("outer: %w", err),
 				topic.RetrySettings{},
 				0,
 			)
-			require.Equal(t, wantBackoff, gotBackoff)
-			require.Equal(t, wantStop == nil, gotStop == nil)
+			require.Equal(t, test.retryable, gotBackoff != nil)
+			require.Equal(t, test.retryable, gotStop == nil)
 		})
 	}
 }

@@ -3,6 +3,7 @@ package topicreadercommon
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -49,9 +50,11 @@ type Committer struct {
 	backgroundWorker background.Worker
 	tracer           *trace.Topic
 
-	m       xsync.Mutex
-	waiters []commitWaiter
-	commits CommitRanges
+	flushM   sync.Mutex
+	m        xsync.Mutex
+	waiters  []commitWaiter
+	commits  CommitRanges
+	requests []*commitRequest
 }
 
 func NewCommitterStopped(
@@ -86,16 +89,23 @@ func (c *Committer) Close(ctx context.Context, err error) error {
 
 func (c *Committer) Commit(ctx context.Context, commitRange CommitRange) error {
 	if !c.mode.CommitsEnabled() {
-		return ErrCommitDisabled
+		return xerrors.WithStackTrace(ErrCommitDisabled)
 	}
-
-	if ctx.Err() != nil {
-		return ctx.Err()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if c.mode == CommitModeSync && commitRange.PartitionSession != nil &&
+		commitRange.PartitionSession.Context().Err() != nil {
+		return xerrors.WithStackTrace(ErrPublicCommitSessionToExpiredSession)
 	}
 
 	waiter, err := c.pushCommit(commitRange)
 	if err != nil {
 		return err
+	}
+
+	if c.mode != CommitModeSync {
+		return nil
 	}
 
 	return c.waitCommitAck(ctx, waiter)
@@ -136,6 +146,46 @@ func (c *Committer) pushCommit(commitRange CommitRange) (commitWaiter, error) {
 	return waiter, resErr
 }
 
+func (c *Committer) pushRequest(request *commitRequest) int {
+	commitRange := request.commitRange
+	if !c.mode.CommitsEnabled() {
+		request.finishSend(xerrors.WithStackTrace(ErrCommitDisabled))
+
+		return 0
+	}
+	if c.mode == CommitModeSync && commitRange.PartitionSession != nil &&
+		commitRange.PartitionSession.Context().Err() != nil {
+		request.finishSend(xerrors.WithStackTrace(ErrPublicCommitSessionToExpiredSession))
+
+		return 0
+	}
+
+	var resErr error
+	var messagesCount int
+	c.m.WithLock(func() {
+		if err := c.backgroundWorker.Context().Err(); err != nil {
+			resErr = err
+
+			return
+		}
+
+		c.commits.Append(&commitRange)
+		messagesCount = RegisterCommitQueued(commitRange)
+		c.requests = append(c.requests, request)
+	})
+	if resErr != nil {
+		request.finishSend(resErr)
+
+		return 0
+	}
+	select {
+	case c.commitLoopSignal <- struct{}{}:
+	default:
+	}
+
+	return messagesCount
+}
+
 func (c *Committer) pushCommitsLoop(ctx context.Context) {
 	for {
 		c.waitSendTrigger(ctx)
@@ -156,6 +206,15 @@ func (c *Committer) pushCommitsLoop(ctx context.Context) {
 
 		if err := c.Flush(); err != nil {
 			_ = c.backgroundWorker.Close(ctx, err)
+			var requests []*commitRequest
+			c.m.WithLock(func() {
+				requests = c.requests
+				c.requests = nil
+				c.commits = CommitRanges{}
+			})
+			for _, request := range requests {
+				request.finishSend(err)
+			}
 
 			return
 		}
@@ -166,13 +225,20 @@ func (c *Committer) pushCommitsLoop(ctx context.Context) {
 // optimizing the commit ranges, and sending them to the server.
 //
 // The caller must not hold the Committer's mutex ([Committer.m]) when calling this method.
-// This method is thread-safe and can be called concurrently with other operations.
+// This method is thread-safe. Concurrent Flush calls are serialized, so returning
+// also guarantees that an earlier flush has finished sending its commits.
 func (c *Committer) Flush() error {
+	c.flushM.Lock()
+	defer c.flushM.Unlock()
+
 	var commits CommitRanges
+	var requests []*commitRequest
 
 	c.m.WithLock(func() {
 		commits = c.commits
 		c.commits = NewCommitRangesWithCapacity(commits.Len() * 2) //nolint:mnd
+		requests = c.requests
+		c.requests = nil
 	})
 
 	if commits.Len() == 0 {
@@ -189,6 +255,9 @@ func (c *Committer) Flush() error {
 	)
 	err := c.send(commits.ToRawMessage())
 	onDone(err)
+	for _, request := range requests {
+		request.finishSend(err)
+	}
 
 	return err
 }
@@ -246,10 +315,6 @@ func (c *Committer) waitSendTrigger(ctx context.Context) {
 }
 
 func (c *Committer) waitCommitAck(ctx context.Context, waiter commitWaiter) error {
-	if c.mode != CommitModeSync {
-		return nil
-	}
-
 	defer c.m.WithLock(func() {
 		c.removeWaiterByIDNeedLock(waiter.ID)
 	})
@@ -259,9 +324,9 @@ func (c *Committer) waitCommitAck(ctx context.Context, waiter commitWaiter) erro
 
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return xerrors.WithStackTrace(ctx.Err())
 	case <-waiter.Session.Context().Done():
-		return ErrPublicCommitSessionToExpiredSession
+		return xerrors.WithStackTrace(ErrPublicCommitSessionToExpiredSession)
 	case <-waiter.Committed:
 		return nil
 	}

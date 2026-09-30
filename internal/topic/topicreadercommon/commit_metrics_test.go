@@ -370,6 +370,97 @@ func TestCommitterTracesOnlyAcceptedCommits(t *testing.T) {
 	})
 }
 
+func TestCommitterTracesAcceptedLazyRequestOnce(t *testing.T) {
+	ctx := context.Background()
+	queued := make(chan trace.TopicReaderCommitQueuedInfo, 4)
+	acknowledged := make(chan trace.TopicReaderCommitAcknowledgedInfo, 4)
+	var committer *Committer
+	var sends atomic.Int32
+	session := newCommitMetricsTestSession(t, &trace.Topic{
+		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
+			queued <- info
+		},
+		OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
+			acknowledged <- info
+		},
+	})
+	committer = NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			sends.Add(1)
+			committer.OnCommitNotify(session, 1)
+			session.SetCommittedOffsetForward(1)
+
+			return nil
+		})
+	committer.Start()
+	t.Cleanup(func() {
+		require.NoError(t, committer.Close(ctx, errors.New("test committer closed")))
+	})
+	request := committer.NewCommitRequest(CommitRange{
+		PartitionSession: session, CommitOffsetStart: 0, CommitOffsetEnd: 1,
+	})
+
+	request.Confirm()
+	require.NoError(t, request.Wait(ctx))
+	request.Confirm()
+	require.NoError(t, request.Wait(ctx))
+
+	require.Equal(t, int32(1), sends.Load())
+	queuedInfo := xtest.Receive(t, queued, "queued commit metric")
+	acknowledgedInfo := xtest.Receive(t, acknowledged, "acknowledged commit metric")
+	require.Empty(t, queued)
+	require.Empty(t, acknowledged)
+	require.Equal(t, 1, queuedInfo.MessagesCount)
+	require.Equal(t, 1, acknowledgedInfo.MessagesCount)
+}
+
+func TestCommitterQueueTraceCanReenterLazyRequest(t *testing.T) {
+	ctx := context.Background()
+	queued := make(chan trace.TopicReaderCommitQueuedInfo, 4)
+	acknowledged := make(chan trace.TopicReaderCommitAcknowledgedInfo, 4)
+	reentrantWait := make(chan error, 1)
+	var request *commitRequest
+	var committer *Committer
+	session := newCommitMetricsTestSession(t, &trace.Topic{
+		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
+			queued <- info
+			request.Confirm()
+			reentrantWait <- request.Wait(ctx)
+		},
+		OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
+			acknowledged <- info
+		},
+	})
+	committer = NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
+		func(rawtopicreader.ClientMessage) error {
+			committer.OnCommitNotify(session, 1)
+			session.SetCommittedOffsetForward(1)
+
+			return nil
+		})
+	committer.Start()
+	t.Cleanup(func() {
+		require.NoError(t, committer.Close(ctx, errors.New("test committer closed")))
+	})
+	request = committer.NewCommitRequest(CommitRange{
+		PartitionSession: session, CommitOffsetStart: 0, CommitOffsetEnd: 1,
+	})
+	confirmDone := make(chan struct{})
+	go func() {
+		request.Confirm()
+		close(confirmDone)
+	}()
+
+	require.NoError(t, xtest.Receive(t, reentrantWait, "reentrant commit wait"))
+	_ = xtest.Receive(t, confirmDone, "commit confirm")
+	queuedInfo := xtest.Receive(t, queued, "queued commit metric")
+	acknowledgedInfo := xtest.Receive(t, acknowledged, "acknowledged commit metric")
+	require.Empty(t, queued)
+	require.Empty(t, acknowledged)
+	require.Equal(t, 1, queuedInfo.MessagesCount)
+	require.Equal(t, 1, acknowledgedInfo.MessagesCount)
+}
+
 func TestCommitMessageTrackerCountsRangeLengths(t *testing.T) {
 	tracker := NewCommitMessageTracker(10)
 

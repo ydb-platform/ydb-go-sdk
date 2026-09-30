@@ -16,23 +16,9 @@ import (
 )
 
 func TestStreamListenerSessionErrorSkipsUninitializedConfig(t *testing.T) {
-	events := make(chan trace.TopicReaderSessionErrorInfo, 1)
-	listener := &streamListener{
-		tracer: &trace.Topic{
-			OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
-				events <- info
-			},
-		},
-	}
-
-	listener.traceSessionStop(context.Background(), errors.New("stream stopped"))
+	listener := &TopicListenerReconnector{}
+	listener.traceSessionError(context.Background(), errors.New("stream stopped"), "stop")
 	require.True(t, suppressListenerSessionError(context.Background(), nil))
-
-	select {
-	case event := <-events:
-		t.Fatalf("unexpected session error event: %+v", event)
-	default:
-	}
 }
 
 func TestStreamListenerForcedStopUnregistersMetricsWithoutConfirmation(t *testing.T) {

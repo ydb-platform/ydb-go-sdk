@@ -47,7 +47,7 @@ func init() { //nolint:gochecknoinits
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	db, err := ydb.Open(ctx, dsn)
+	db, err := ydb.Open(ctx, dsn, ydb.WithLazyTx(true))
 	if err != nil {
 		panic(err)
 	}
@@ -63,7 +63,7 @@ func main() {
 
 func txWithRetries(ctx context.Context, db *ydb.Driver) (words []string, _ error) {
 	err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
-		words = words[:0] // empty for new retry attempt
+		var attemptWords []string
 
 		row, err := tx.QueryRow(ctx, "SELECT 'execute';")
 		if err != nil {
@@ -75,13 +75,9 @@ func txWithRetries(ctx context.Context, db *ydb.Driver) (words []string, _ error
 			return err
 		}
 
-		words = append(words, s)
+		attemptWords = append(attemptWords, s)
 
 		rows, err := tx.QueryResultSet(ctx, `
-				DECLARE $word1 AS Text;
-				DECLARE $word2 AS Text;
-				DECLARE $word3 AS Text;
-
 				SELECT w, ord FROM (
 					SELECT $word1 AS w, 1 AS ord 
 					UNION 
@@ -104,11 +100,28 @@ func txWithRetries(ctx context.Context, db *ydb.Driver) (words []string, _ error
 					"$word3": "retries",
 				}),
 			),
+			query.WithCommit(),
 		)
 		if err != nil {
 			return err
 		}
-		for row := range rows.Rows(ctx) {
+		closeRows := func() error {
+			if rows == nil {
+				return nil
+			}
+			err := rows.Close(ctx)
+			rows = nil
+
+			return err
+		}
+		defer func() {
+			_ = closeRows()
+		}()
+
+		for row, err := range rows.Rows(ctx) {
+			if err != nil {
+				return err
+			}
 			var (
 				word string
 				ord  int
@@ -117,11 +130,15 @@ func txWithRetries(ctx context.Context, db *ydb.Driver) (words []string, _ error
 			if err != nil {
 				return err
 			}
-			words = append(words, word)
+			attemptWords = append(attemptWords, word)
 		}
+		if err = closeRows(); err != nil {
+			return err
+		}
+		words = attemptWords
 
 		return nil
-	})
+	}, query.WithIdempotent())
 	if err != nil {
 		return nil, err
 	}
