@@ -1,5 +1,5 @@
 //nolint:tagliatelle // Benchmark reports intentionally use analysis-friendly snake_case JSON.
-package main
+package transactionalwriterbenchmark
 
 import (
 	"math"

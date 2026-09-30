@@ -1,4 +1,4 @@
-package main
+package transactionalwriterbenchmark
 
 import (
 	"bytes"
@@ -18,35 +18,35 @@ import (
 )
 
 // Master baseline measured on 2026-09-30 at aaf92e41 with Go 1.26.4 and
-// ydbplatform/local-ydb:26.3.1.16. The linux/amd64 benchmark binary ran inside
-// the YDB container because Colima host port forwarding was unavailable. One
-// fresh container was reused within each suite. Fixed-topology cells used four
-// workers, one 1024-byte message per transaction, a 2s warmup, a 10s measured
-// phase, and three repetitions. The table contains medians; every fixed run had
-// zero retries and zero final failures.
+// ydbplatform/local-ydb:26.3.1.16. The linux/amd64 test binary ran inside the
+// YDB container because Colima host port forwarding was unavailable. The fixed
+// matrix used -benchtime=10s -count=3 -cpu=4 and one 1024-byte message per
+// transaction. The table contains medians; every fixed run had zero retries
+// and zero final failures.
 //
-//	P    scenario               tx/s    p95 ms    StreamWrite/tx
-//	64   single                 170.39    36.61      1
-//	64   many-key                43.16   158.98     64
-//	64   many-bounded-key        19.16   329.68     64
-//	64   many-partition-id       24.05   230.42     64
-//	128  single                 139.72    40.89      1
-//	128  many-key                13.30   409.29    128
-//	128  many-bounded-key        10.73   506.97    128
-//	128  many-partition-id       12.42   400.71    128
-//	256  single                 136.36    41.41      1
-//	256  many-key                 6.45   798.67    256
-//	256  many-bounded-key         5.56   892.93    256
-//	256  many-partition-id        5.80   942.47    256
-//	512  single                 120.02    48.93      1
-//	512  many-key                 2.73  1629.03    512
-//	512  many-bounded-key         2.21  2326.72    512
-//	512  many-partition-id        2.68  1836.40    512
+//	P    scenario               tx/s   p95 ms      B/op  allocs/op  StreamWrite/tx
+//	64   single                192.2     28.78     92606       1441               1
+//	64   many-key               45.13   101.0    2242706      33453              64
+//	64   many-bounded-key       22.09   253.4    2257086      33747              64
+//	64   many-partition-id      23.80   228.3    2242821      33424              64
+//	128  single                146.3     40.16     92526       1443               1
+//	128  many-key               12.59   421.7    4399587      65517             128
+//	128  many-bounded-key       11.35   442.6    4471391      66390             128
+//	128  many-partition-id      12.74   420.8    4408310      65556             128
+//	256  single                146.2     40.15     92449       1442               1
+//	256  many-key                6.393  840.6    8733263     130011             256
+//	256  many-bounded-key        5.546  879.8    8837018     131445             256
+//	256  many-partition-id       6.231  851.6    8744869     130026             256
+//	512  single                152.9     39.60     92362       1442               1
+//	512  many-key                4.607 1358     17432842     259560             512
+//	512  many-bounded-key        4.699  902.1   17677213     262691             512
+//	512  many-partition-id       5.964  790.4   17471938     259758             512
 //
-// The three 2m auto-split repetitions had a median 79.67 tx/s, 83.00ms p95,
-// 1 -> 9 active partitions, 15 retries, 10.189 StreamWrite calls per committed
-// transaction, and zero final failures. Preserve this protocol and environment
-// when comparing a candidate change with the baseline.
+// The auto-split benchmark used -benchtime=1x -count=3 -cpu=4, where one
+// benchmark operation is a two-minute phase. Its medians were 73.05 tx/s,
+// 92.20ms p95, 1 -> 10 active partitions, 0.001892 retries/tx, and 9.501
+// StreamWrite calls per committed transaction, with zero final failures.
+// Preserve this protocol and environment when comparing a candidate change.
 
 const benchmarkTableQueryTemplate = `
 DECLARE $run_id AS Utf8;
