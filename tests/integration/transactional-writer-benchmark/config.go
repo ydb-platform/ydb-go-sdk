@@ -39,7 +39,6 @@ type config struct {
 	LatencySampleEvery     int
 	PreparePartitions      int64
 	AutoSplit              bool
-	AutoSplitMaxPartitions int64
 	AutoSplitWriteSpeed    int64
 	AutoSplitBurstBytes    int64
 	AutoSplitUpUtilization int

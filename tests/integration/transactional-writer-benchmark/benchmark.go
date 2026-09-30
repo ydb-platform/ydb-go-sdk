@@ -46,8 +46,8 @@ import (
 //
 // The auto-split benchmark used -benchtime=1x -count=1 -cpu=4 three times,
 // where one benchmark operation is a two-minute phase and every repetition used
-// a fresh YDB container. Its medians were 130.2 tx/s, 49.02ms p95, 1 -> 12 active
-// partitions, 0.001329 retries/tx, and 11.48 StreamWrite calls per committed
+// a fresh YDB container. Its medians were 87.48 tx/s, 77.91ms p95, 1 -> 11 active
+// partitions, 0.001691 retries/tx, and 9.587 StreamWrite calls per committed
 // transaction, with zero final failures. Preserve this protocol and environment
 // when comparing a candidate change.
 
@@ -59,6 +59,8 @@ DECLARE $seq_no AS Uint64;
 UPSERT INTO %s (run_id, worker_id, seq_no, updated_at)
 VALUES ($run_id, $worker_id, $seq_no, CurrentUtcTimestamp());
 `
+
+const ydbMaxTopicPartitions int64 = 35_000
 
 var noRetryBudget = budget.Percent(0)
 
@@ -129,7 +131,10 @@ CREATE TABLE IF NOT EXISTS %s (
 	if cfg.AutoSplit {
 		createOptions = append(
 			createOptions,
-			topicoptions.CreateWithMaxActivePartitions(cfg.AutoSplitMaxPartitions),
+			// YDB treats an omitted maximum as equal to the minimum, which would
+			// disable splitting. Use the server-wide ceiling so the benchmark does
+			// not introduce a lower partition limit of its own.
+			topicoptions.CreateWithMaxActivePartitions(ydbMaxTopicPartitions),
 			topicoptions.CreateWithPartitionWriteSpeedBytesPerSecond(cfg.AutoSplitWriteSpeed),
 			topicoptions.CreateWithPartitionWriteBurstBytes(cfg.AutoSplitBurstBytes),
 		)
@@ -173,12 +178,12 @@ func validateAutoSplitTopic(description topictypes.TopicDescription, cfg config)
 			cfg.TopicPath,
 			settings.MinActivePartitions,
 		)
-	case settings.MaxActivePartitions != cfg.AutoSplitMaxPartitions:
+	case settings.MaxActivePartitions != ydbMaxTopicPartitions:
 		return fmt.Errorf(
-			"auto-split topic %q has max_active_partitions=%d, want %d; use a fresh topic",
+			"auto-split topic %q has max_active_partitions=%d, want server ceiling %d; use a fresh topic",
 			cfg.TopicPath,
 			settings.MaxActivePartitions,
-			cfg.AutoSplitMaxPartitions,
+			ydbMaxTopicPartitions,
 		)
 	case settings.AutoPartitioningSettings.AutoPartitioningStrategy != topictypes.AutoPartitioningStrategyScaleUp:
 		return fmt.Errorf("auto-split topic %q does not use SCALE_UP; use a fresh topic", cfg.TopicPath)

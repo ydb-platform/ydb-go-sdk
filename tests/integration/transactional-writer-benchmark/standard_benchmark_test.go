@@ -81,7 +81,6 @@ func BenchmarkTransactionalWriterAutoSplit(b *testing.B) {
 	topicPath := fmt.Sprintf("%s-autosplit-%s", *standardBenchmarkTopicPrefix, defaultRunID())
 	cfg := newStandardBenchmarkConfig(topicPath, benchmarkCase, 1)
 	cfg.AutoSplit = true
-	cfg.AutoSplitMaxPartitions = 64
 	cfg.AutoSplitWriteSpeed = 1 << 20
 	cfg.AutoSplitBurstBytes = 1 << 20
 	cfg.AutoSplitUpUtilization = 2
@@ -126,22 +125,21 @@ func newStandardBenchmarkConfig(
 	runID := defaultRunID()
 
 	return config{
-		DSN:                    *standardBenchmarkDSN,
-		TopicPath:              topicPath,
-		TablePath:              *standardBenchmarkTable,
-		RunID:                  runID,
-		ProducerIDPrefix:       runID,
-		Mode:                   benchmarkCase.Mode,
-		Routing:                benchmarkCase.Routing,
-		AutoSeqNo:              true,
-		QueryRetries:           true,
-		TransactionTimeout:     time.Minute,
-		Concurrency:            runtime.GOMAXPROCS(0),
-		MessagesPerTx:          1,
-		MessageSize:            1024,
-		LatencySampleEvery:     1,
-		PreparePartitions:      partitionCount,
-		AutoSplitMaxPartitions: partitionCount,
+		DSN:                *standardBenchmarkDSN,
+		TopicPath:          topicPath,
+		TablePath:          *standardBenchmarkTable,
+		RunID:              runID,
+		ProducerIDPrefix:   runID,
+		Mode:               benchmarkCase.Mode,
+		Routing:            benchmarkCase.Routing,
+		AutoSeqNo:          true,
+		QueryRetries:       true,
+		TransactionTimeout: time.Minute,
+		Concurrency:        runtime.GOMAXPROCS(0),
+		MessagesPerTx:      1,
+		MessageSize:        1024,
+		LatencySampleEvery: 1,
+		PreparePartitions:  partitionCount,
 	}
 }
 

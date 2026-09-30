@@ -20,7 +20,10 @@ requested partition count:
 - `many-partition-id`: `WithWriteToManyPartitions` and explicit partition IDs.
 
 `BenchmarkTransactionalWriterAutoSplit` exercises the bounded-key writer while
-YDB splits a Topic from one active partition toward a maximum of 64.
+YDB splits a Topic from one active partition. The benchmark sets
+`max_active_partitions` to YDB's server-wide ceiling (35,000), because omitting
+it makes YDB use `min_active_partitions` as the maximum and disables splitting.
+The scenario therefore does not impose a lower partition limit of its own.
 
 ## Start local YDB
 
