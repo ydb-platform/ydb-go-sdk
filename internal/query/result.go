@@ -298,14 +298,8 @@ func (r *streamResult) nextPart(ctx context.Context) (
 			r.issuesCallback(issues)
 		}
 	}
+	r.captureCommitTimestamp(part, err)
 	if err != nil {
-		if xerrors.Is(err, io.EOF) && r.pendingTimestamp != nil {
-			r.commitTimestamp = querytimestamp.FromYDB(r.pendingTimestamp, r.databaseIdentity)
-			for _, callback := range r.commitTimestampCallbacks {
-				callback(r.commitTimestamp)
-			}
-		}
-		r.pendingTimestamp = nil
 		err = r.notifyNextPartErr(ctx, err)
 
 		if xerrors.Is(err, io.EOF) {
@@ -314,12 +308,6 @@ func (r *streamResult) nextPart(ctx context.Context) (
 
 		return nil, xerrors.WithStackTrace(err)
 	}
-	if part.GetStatus() == Ydb.StatusIds_SUCCESS {
-		r.pendingTimestamp = part.GetCommitTimestamp()
-	} else {
-		r.pendingTimestamp = nil
-	}
-
 	if txMeta := part.GetTxMeta(); txMeta != nil {
 		for _, f := range r.onTxMeta {
 			f(txMeta)
@@ -331,6 +319,25 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	}
 
 	return part, nil
+}
+
+func (r *streamResult) captureCommitTimestamp(part *Ydb_Query.ExecuteQueryResponsePart, err error) {
+	if err != nil {
+		if xerrors.Is(err, io.EOF) && r.pendingTimestamp != nil {
+			r.commitTimestamp = querytimestamp.FromYDB(r.pendingTimestamp, r.databaseIdentity)
+			for _, callback := range r.commitTimestampCallbacks {
+				callback(r.commitTimestamp)
+			}
+		}
+		r.pendingTimestamp = nil
+
+		return
+	}
+	if part.GetStatus() == Ydb.StatusIds_SUCCESS {
+		r.pendingTimestamp = part.GetCommitTimestamp()
+	} else {
+		r.pendingTimestamp = nil
+	}
 }
 
 func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (

@@ -73,6 +73,39 @@ func TestMaterializedResultRetainsCommitTimestamp(t *testing.T) {
 	require.Equal(t, uint64(4), provider.CommitTimestamp().TxID())
 }
 
+func TestTransactionExecuteWithCommitTimestamp(t *testing.T) {
+	service := NewMockQueryServiceClient(gomock.NewController(t))
+	stream := newExecuteQueryStreamMock(gomock.NewController(t))
+	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+		Status:          Ydb.StatusIds_SUCCESS,
+		CommitTimestamp: &Ydb.VirtualTimestamp{PlanStep: 21, TxId: 22},
+	}, nil)
+	stream.EXPECT().Recv().Return(nil, io.EOF)
+	service.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, request *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
+			Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+		) {
+			require.Equal(t, "tx", request.GetTxControl().GetTxId())
+			require.True(t, request.GetTxControl().GetCommitTx())
+
+			return stream, nil
+		},
+	)
+	session := newTestSessionWithClient("s", service, false)
+	session.databaseIdentity = querytimestamp.NewIdentity("/db")
+	tx := &Transaction{
+		s: session, LazyID: baseTx.ID("tx"),
+		txSettings: query.TxSettings(query.WithStrictSerializableReadWrite()),
+	}
+	result, err := tx.Query(t.Context(), "UPSERT INTO t ...", query.WithCommit())
+	require.NoError(t, err)
+	require.Nil(t, tx.CommitTimestamp())
+	require.NoError(t, result.Close(t.Context()))
+	require.Equal(t, uint64(21), tx.CommitTimestamp().PlanStep())
+	require.Equal(t, uint64(22), tx.CommitTimestamp().TxID())
+	require.Equal(t, "/db", tx.CommitTimestamp().Database())
+}
+
 func TestStrictSerializableRWMode(t *testing.T) {
 	settings := query.TxSettings(query.WithStrictSerializableReadWrite()).ToYdbQuerySettings()
 	require.IsType(t, &Ydb_Query.TransactionSettings_StrictSerializableReadWrite{}, settings.GetTxMode())
