@@ -10,6 +10,12 @@ import (
 
 type Option func(*Config)
 
+func WithDatabase(database string) Option {
+	return func(c *Config) {
+		c.database = database
+	}
+}
+
 // With applies common configuration params
 func With(config config.Common) Option {
 	return func(c *Config) {

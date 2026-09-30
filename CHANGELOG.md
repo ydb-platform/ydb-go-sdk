@@ -1,3 +1,5 @@
+* Added `query.WithStrictSerializableReadWrite` and `query.StrictSerializableReadWriteTxControl`, exposed optional commit timestamps from Query Service transactions and execute results, and added `VirtualTimestamp.Compare` for values from the same Query client
+
 ## v3.153.1
 * Fixed `sugar.Embedding` encoding of an empty vector to match `Knn::ToBinaryStringFloat`
 

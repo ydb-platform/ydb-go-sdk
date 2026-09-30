@@ -58,6 +58,13 @@ func WithStatsMode(mode options.StatsMode, callback func(Stats)) ExecuteOption {
 	return options.WithStatsMode(mode, callback)
 }
 
+// WithCommitTimestamp calls callback after a successful ExecuteQuery stream
+// finishes with a commit timestamp. The callback is not called when the server
+// omits the timestamp or execution fails.
+func WithCommitTimestamp(callback func(*VirtualTimestamp)) ExecuteOption {
+	return options.WithCommitTimestamp(callback)
+}
+
 // WithIssuesHandler is the option which helps collect issues generated during query execution
 // May be more than one call of callback during query execution
 func WithIssuesHandler(callback func(issues []*Ydb_Issue.IssueMessage)) ExecuteOption {
