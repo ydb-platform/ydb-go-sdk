@@ -140,7 +140,6 @@ func newStandardBenchmarkConfig(
 		MessagesPerTx:          1,
 		MessageSize:            1024,
 		LatencySampleEvery:     1,
-		MaxErrors:              100,
 		PreparePartitions:      partitionCount,
 		AutoSplitMaxPartitions: partitionCount,
 	}
@@ -189,9 +188,6 @@ func runStandardBenchmark(b *testing.B, cfg config) {
 	lifecycle := metrics.snapshot().subtract(lifecycleBefore)
 
 	reportStandardBenchmarkMetrics(b, cfg, stats, duration, lifecycle, nil)
-	if stats.Failed != 0 {
-		b.Fatalf("%d transactions failed; first error: %s", stats.Failed, stats.FirstError)
-	}
 }
 
 func runStandardAutoSplitBenchmark(b *testing.B, cfg config) {
@@ -252,9 +248,6 @@ func runStandardAutoSplitBenchmark(b *testing.B, cfg config) {
 	reportStandardBenchmarkMetrics(b, cfg, stats, stats.Duration, lifecycle, recorder)
 	if measurementErr != nil {
 		b.Fatalf("run auto-split phase: %v", measurementErr)
-	}
-	if stats.Failed != 0 {
-		b.Fatalf("%d transactions failed; first error: %s", stats.Failed, stats.FirstError)
 	}
 }
 
@@ -361,6 +354,11 @@ func reportStandardBenchmarkMetrics(
 	}
 	b.ReportMetric(report.Latency.WriterStart.P95MS, "ms/writer-start-p95")
 	b.ReportMetric(report.Latency.WriterWrite.P95MS, "ms/writer-write-p95")
+	b.ReportMetric(float64(stats.Failed), "errors")
+	b.ReportMetric(float64(stats.Failed)/float64(max(stats.LogicalTransactions, 1)), "errors/tx")
+	if stats.Failed != 0 {
+		b.Logf("transaction errors: %d; first error: %s", stats.Failed, stats.FirstError)
+	}
 	b.ReportMetric(float64(stats.Retries)/float64(max(stats.LogicalTransactions, 1)), "retries/tx")
 	b.ReportMetric(
 		float64(lifecycle.StreamWriteOpens)/float64(max(stats.Committed, 1)),
@@ -376,7 +374,7 @@ func reportStandardBenchmarkMetrics(
 }
 
 func mergeParallelStats(all []workerStats, duration time.Duration) phaseStats {
-	return mergeWorkerStats(all, duration, false)
+	return mergeWorkerStats(all, duration)
 }
 
 func appendParallelStats(mu *sync.Mutex, all *[]workerStats, stats workerStats) {

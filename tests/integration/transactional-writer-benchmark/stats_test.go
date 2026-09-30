@@ -63,3 +63,19 @@ func TestPhaseReportRates(t *testing.T) {
 		t.Fatal("TableExec is non-nil for skipped table write")
 	}
 }
+
+func TestMergeWorkerStatsKeepsAllTransactionErrors(t *testing.T) {
+	t.Parallel()
+
+	stats := mergeWorkerStats([]workerStats{
+		{Failed: 40, FirstError: "first"},
+		{Failed: 60, FirstError: "second"},
+	}, time.Second)
+
+	if stats.Failed != 100 {
+		t.Fatalf("Failed = %d, want 100", stats.Failed)
+	}
+	if stats.FirstError != "first" {
+		t.Fatalf("FirstError = %q, want %q", stats.FirstError, "first")
+	}
+}

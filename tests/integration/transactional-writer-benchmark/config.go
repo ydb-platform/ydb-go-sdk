@@ -37,7 +37,6 @@ type config struct {
 	MessagesPerTx          int
 	MessageSize            int
 	LatencySampleEvery     int
-	MaxErrors              int
 	PreparePartitions      int64
 	AutoSplit              bool
 	AutoSplitMaxPartitions int64

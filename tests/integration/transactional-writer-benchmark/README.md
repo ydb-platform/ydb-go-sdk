@@ -68,12 +68,14 @@ The standard `ns/op`, `B/op`, and `allocs/op` columns are accompanied by:
 - `ms/p50`, `ms/p95`, and `ms/p99`: full transaction latency;
 - `ms/table-p95`, `ms/writer-start-p95`, and `ms/writer-write-p95`:
   component latency;
+- `errors` and `errors/tx`: final transaction errors, as a count and a ratio;
 - `retries/tx`: Query transaction retries per logical transaction;
 - `StreamWrite/tx`: Topic StreamWrite sessions opened per commit;
 - `workers`: effective `GOMAXPROCS` and parallel worker count;
 - `measured-s`: duration of the timed region.
 
-A run fails if any logical transaction has a final error. Query retries remain
+Final transaction errors are recorded but do not stop or fail the measurement.
+Setup and connection errors still fail the benchmark. Query retries remain
 enabled because that matches normal SDK usage.
 
 The default DSN can also be supplied through `YDB_CONNECTION_STRING`. Use

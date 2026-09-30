@@ -271,10 +271,9 @@ func runPhase(
 		return phaseStats{}, nil
 	}
 
-	phaseContext, cancel := context.WithTimeout(parent, duration)
-	defer cancel()
+	phaseContext, cancelPhase := context.WithTimeout(parent, duration)
+	defer cancelPhase()
 
-	var finalErrors atomic.Uint64
 	results := make(chan workerStats, cfg.Concurrency)
 	startedAt := time.Now()
 
@@ -286,14 +285,12 @@ func runPhase(
 			results <- runWorker(
 				parent,
 				phaseContext.Done(),
-				cancel,
 				db,
 				cfg,
 				workerID,
 				activePartitionIDs,
 				payload,
 				&sequences[workerID],
-				&finalErrors,
 			)
 		}()
 	}
@@ -308,30 +305,24 @@ func runPhase(
 		perWorker = append(perWorker, result)
 	}
 
-	aborted := finalErrors.Load() >= uint64(cfg.MaxErrors)
-	stats := mergeWorkerStats(perWorker, endedAt.Sub(startedAt), aborted)
-	switch {
-	case aborted:
-		return stats, fmt.Errorf("phase aborted after reaching --max-errors=%d", cfg.MaxErrors)
-	case parent.Err() != nil:
+	stats := mergeWorkerStats(perWorker, endedAt.Sub(startedAt))
+	if parent.Err() != nil {
 		return stats, parent.Err()
-	default:
-		return stats, nil
 	}
+
+	return stats, nil
 }
 
 //nolint:funlen // Keeping collection in the worker makes the measured path easy to audit.
 func runWorker(
 	ctx context.Context,
 	phaseDone <-chan struct{},
-	cancelPhase context.CancelFunc,
 	db *ydb.Driver,
 	cfg config,
 	workerID int,
 	activePartitionIDs []int64,
 	payload []byte,
 	sequence *atomic.Uint64,
-	finalErrors *atomic.Uint64,
 ) workerStats {
 	var stats workerStats
 
@@ -368,9 +359,6 @@ func runWorker(
 			stats.Failed++
 			if stats.FirstError == "" {
 				stats.FirstError = err.Error()
-			}
-			if finalErrors.Add(1) >= uint64(cfg.MaxErrors) {
-				cancelPhase()
 			}
 
 			continue

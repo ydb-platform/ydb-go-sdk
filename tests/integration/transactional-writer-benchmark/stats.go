@@ -27,7 +27,6 @@ type phaseStats struct {
 	workerStats
 
 	Duration time.Duration
-	Aborted  bool
 }
 
 type latencySummary struct {
@@ -60,15 +59,13 @@ type phaseReport struct {
 	TransactionsPerSecond float64       `json:"transactions_per_second"`
 	MessagesPerSecond     float64       `json:"messages_per_second"`
 	PayloadMiBPerSecond   float64       `json:"payload_mib_per_second"`
-	AbortedByErrorLimit   bool          `json:"aborted_by_error_limit"`
 	FirstError            string        `json:"first_error,omitempty"`
 	Latency               latencyReport `json:"latency_ms"`
 }
 
-func mergeWorkerStats(all []workerStats, duration time.Duration, aborted bool) phaseStats {
+func mergeWorkerStats(all []workerStats, duration time.Duration) phaseStats {
 	merged := phaseStats{
 		Duration: duration,
-		Aborted:  aborted,
 	}
 
 	for i := range all {
@@ -105,7 +102,6 @@ func (s phaseStats) report(skipTableWrite bool) phaseReport {
 		Retries:               s.Retries,
 		CommittedMessages:     s.Messages,
 		CommittedPayloadBytes: s.Bytes,
-		AbortedByErrorLimit:   s.Aborted,
 		FirstError:            s.FirstError,
 		Latency: latencyReport{
 			Transaction: summarizeLatencies(s.TransactionLatency),
