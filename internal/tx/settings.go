@@ -9,6 +9,9 @@ var (
 	querySerializableReadWrite = &Ydb_Query.TransactionSettings_SerializableReadWrite{
 		SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
 	}
+	queryStrictSerializableReadWrite = &Ydb_Query.TransactionSettings_StrictSerializableReadWrite{
+		StrictSerializableReadWrite: &Ydb_Query.StrictSerializableRWModeSettings{},
+	}
 	queryStaleReadOnly = &Ydb_Query.TransactionSettings_StaleReadOnly{
 		StaleReadOnly: &Ydb_Query.StaleModeSettings{},
 	}
@@ -122,6 +125,22 @@ func (serializableReadWriteTxSettingsOption) ApplyQueryTxSettingsOption(settings
 
 func WithSerializableReadWrite() SettingsOption {
 	return serializableReadWriteTxSettingsOption{}
+}
+
+var _ SettingsOption = strictSerializableReadWriteTxSettingsOption{}
+
+type strictSerializableReadWriteTxSettingsOption struct{}
+
+func (strictSerializableReadWriteTxSettingsOption) ApplyTableTxSettingsOption(_ *Ydb_Table.TransactionSettings) {
+	panic("StrictSerializableRW is supported only by Query Service")
+}
+
+func (strictSerializableReadWriteTxSettingsOption) ApplyQueryTxSettingsOption(settings *Ydb_Query.TransactionSettings) {
+	settings.TxMode = queryStrictSerializableReadWrite
+}
+
+func WithStrictSerializableReadWrite() SettingsOption {
+	return strictSerializableReadWriteTxSettingsOption{}
 }
 
 var _ SettingsOption = snapshotReadOnlyTxSettingsOption{}
