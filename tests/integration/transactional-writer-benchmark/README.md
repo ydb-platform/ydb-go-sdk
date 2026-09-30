@@ -2,10 +2,14 @@
 
 This package contains standard Go benchmarks for a transactional-outbox path:
 
-1. execute one `UPSERT` through the Query API;
-2. create a transactional Topic writer;
-3. write one 1024-byte message;
+1. create a transactional Topic writer while the Query transaction is lazy;
+2. execute one `UPSERT` through the Query API, materializing the transaction;
+3. write one 1024-byte message through the already-created writer;
 4. commit the transaction, including the Topic flush.
+
+Every attempt uses `query.WithLazyTx(true)`. Creating the writer before the
+`UPSERT` exercises the transition from the lazy transaction ID to the materialized
+transaction before the writer calls `UnLazy` during `Write`.
 
 `BenchmarkTransactionalWriter` covers four fixed-topology scenarios for every
 requested partition count:
@@ -81,18 +85,21 @@ names would collide with another run.
 Auto-split has a time-dependent topology, so it deliberately defines one
 benchmark operation as one two-minute phase. Run it with `-benchtime=1x`; using
 the usual adaptive `b.N` calibration would measure successive, different
-topologies.
+topologies. Run each repetition against a fresh YDB container so accumulated
+StreamWrite sessions and prior splits do not affect the next result.
 
 ```bash
 go test ./tests/integration/transactional-writer-benchmark \
   -run '^$' \
   -bench '^BenchmarkTransactionalWriterAutoSplit$' \
   -benchtime=1x \
-  -count=3 \
+  -count=1 \
   -cpu=4 \
   -args \
   -ydb-benchmark-dsn grpc://localhost:2136/local
 ```
+
+Repeat this command three times, restarting the YDB container before each run.
 
 This benchmark additionally reports the final `active-partitions` and
 `ms/first-split`. Because `b.N` is one, its standard `B/op` and `allocs/op`

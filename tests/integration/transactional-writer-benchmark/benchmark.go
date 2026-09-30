@@ -21,32 +21,35 @@ import (
 // ydbplatform/local-ydb:26.3.1.16. The linux/amd64 test binary ran inside the
 // YDB container because Colima host port forwarding was unavailable. The fixed
 // matrix used -benchtime=10s -count=3 -cpu=4 and one 1024-byte message per
-// transaction. The table contains medians; every fixed run had zero retries
-// and zero final failures.
+// transaction. Each attempt used query.WithLazyTx(true), created the Topic
+// writer before UPSERT materialized the transaction, and then called Write.
+// The table contains medians; every fixed run had zero retries and zero final
+// failures.
 //
 //	P    scenario               tx/s   p95 ms      B/op  allocs/op  StreamWrite/tx
-//	64   single                192.2     28.78     92606       1441               1
-//	64   many-key               45.13   101.0    2242706      33453              64
-//	64   many-bounded-key       22.09   253.4    2257086      33747              64
-//	64   many-partition-id      23.80   228.3    2242821      33424              64
-//	128  single                146.3     40.16     92526       1443               1
-//	128  many-key               12.59   421.7    4399587      65517             128
-//	128  many-bounded-key       11.35   442.6    4471391      66390             128
-//	128  many-partition-id      12.74   420.8    4408310      65556             128
-//	256  single                146.2     40.15     92449       1442               1
-//	256  many-key                6.393  840.6    8733263     130011             256
-//	256  many-bounded-key        5.546  879.8    8837018     131445             256
-//	256  many-partition-id       6.231  851.6    8744869     130026             256
-//	512  single                152.9     39.60     92362       1442               1
-//	512  many-key                4.607 1358     17432842     259560             512
-//	512  many-bounded-key        4.699  902.1   17677213     262691             512
-//	512  many-partition-id       5.964  790.4   17471938     259758             512
+//	64   single                174.3     31.93     79746       1263               1
+//	64   many-key               42.44   113.8    2231570      33285              64
+//	64   many-bounded-key       21.64   252.3    2247785      33606              64
+//	64   many-partition-id      22.77   259.9    2230435      33249              64
+//	128  single                152.9     38.15     79643       1263               1
+//	128  many-key               13.12   400.1    4387854      65352             128
+//	128  many-bounded-key       10.26   560.0    4438662      66057             128
+//	128  many-partition-id      11.56   584.2    4395358      65389             128
+//	256  single                151.2     37.96     79533       1263               1
+//	256  many-key                5.885  866.1    8725378     129891             256
+//	256  many-bounded-key        5.244 1014      8818335     131231             256
+//	256  many-partition-id       5.829  879.0    8729962     129842             256
+//	512  single                140.2     42.49     79463       1263               1
+//	512  many-key                2.835 1807     17347325     258656             512
+//	512  many-bounded-key        1.941 3336     17629466     262029             512
+//	512  many-partition-id       3.517 1464     17465050     259583             512
 //
-// The auto-split benchmark used -benchtime=1x -count=3 -cpu=4, where one
-// benchmark operation is a two-minute phase. Its medians were 73.05 tx/s,
-// 92.20ms p95, 1 -> 10 active partitions, 0.001892 retries/tx, and 9.501
-// StreamWrite calls per committed transaction, with zero final failures.
-// Preserve this protocol and environment when comparing a candidate change.
+// The auto-split benchmark used -benchtime=1x -count=1 -cpu=4 three times,
+// where one benchmark operation is a two-minute phase and every repetition used
+// a fresh YDB container. Its medians were 130.2 tx/s, 49.02ms p95, 1 -> 12 active
+// partitions, 0.001329 retries/tx, and 11.48 StreamWrite calls per committed
+// transaction, with zero final failures. Preserve this protocol and environment
+// when comparing a candidate change.
 
 const benchmarkTableQueryTemplate = `
 DECLARE $run_id AS Utf8;
@@ -406,7 +409,10 @@ func executeTransaction(
 		lastTimings attemptTimings
 	)
 	startedAt := time.Now()
-	doTxOptions := []query.DoTxOption{query.WithIdempotent()}
+	doTxOptions := []query.DoTxOption{
+		query.WithIdempotent(),
+		query.WithLazyTx(true),
+	}
 	if !cfg.QueryRetries {
 		doTxOptions = append(doTxOptions, query.WithRetryBudget(noRetryBudget))
 	}
@@ -416,9 +422,22 @@ func executeTransaction(
 			attempts++
 			currentTimings := attemptTimings{}
 
+			writerStartedAt := time.Now()
+			writer, err := db.Topic().StartTransactionalWriter(
+				tx,
+				cfg.TopicPath,
+				writerOptions(cfg, workerID)...,
+			)
+			currentTimings.WriterStart = time.Since(writerStartedAt)
+			if err != nil {
+				lastTimings = currentTimings
+
+				return fmt.Errorf("start transactional writer: %w", err)
+			}
+
 			if !cfg.SkipTableWrite {
 				tableStartedAt := time.Now()
-				err := tx.Exec(
+				err = tx.Exec(
 					ctx,
 					fmt.Sprintf(benchmarkTableQueryTemplate, quoteYQLPath(cfg.TablePath)),
 					query.WithParameters(
@@ -435,19 +454,6 @@ func executeTransaction(
 
 					return fmt.Errorf("execute benchmark table upsert: %w", err)
 				}
-			}
-
-			writerStartedAt := time.Now()
-			writer, err := db.Topic().StartTransactionalWriter(
-				tx,
-				cfg.TopicPath,
-				writerOptions(cfg, workerID)...,
-			)
-			currentTimings.WriterStart = time.Since(writerStartedAt)
-			if err != nil {
-				lastTimings = currentTimings
-
-				return fmt.Errorf("start transactional writer: %w", err)
 			}
 
 			writeStartedAt := time.Now()
