@@ -212,7 +212,7 @@ func (s *EncoderSelector) CompressMessages(messages []MessageWithDataContent) (r
 		err = CacheMessages(messages, codec, s.parallelCompressors)
 
 		var uncompressedSize, compressedSize int
-		if err == nil {
+		if err == nil && s.tracer.OnWriterCompressMessages != nil {
 			uncompressedSize, compressedSize, err = MessagesContentSize(messages, codec)
 		}
 		onCompressDone(err, uncompressedSize, compressedSize)

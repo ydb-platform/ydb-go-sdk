@@ -298,7 +298,7 @@ func (o *orchestrator) saveMessageContent(msg *message) error {
 	err := msg.CacheMessageData(rawtopiccommon.CodecRaw)
 
 	var uncompressedSize, compressedSize int
-	if err == nil {
+	if err == nil && tracer.OnWriterCompressMessages != nil {
 		uncompressedSize, compressedSize, err = topicwritercommon.MessagesContentSize(
 			[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
 			rawtopiccommon.CodecRaw,
