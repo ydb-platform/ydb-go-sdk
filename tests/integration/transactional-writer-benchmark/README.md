@@ -67,16 +67,15 @@ go test ./tests/integration/transactional-writer-benchmark \
   -ydb-benchmark-partitions 64,128,256,512
 ```
 
-The standard `ns/op`, `B/op`, and `allocs/op` columns are accompanied by:
+The standard `ns/op` column is accompanied by only:
 
-- `tx/s`: aggregate committed transaction throughput;
-- `ms/p50`, `ms/p95`, and `ms/p99`: full transaction latency;
-- `ms/table-p95` and `ms/writer-start-p95`: synchronous component latency;
-- `errors` and `errors/tx`: final transaction errors, as a count and a ratio;
-- `retries/tx`: Query transaction retries per logical transaction;
-- `StreamWrite/tx`: Topic StreamWrite sessions opened per commit;
-- `workers`: effective `GOMAXPROCS` and parallel worker count;
-- `measured-s`: duration of the timed region.
+- `streams/tx`: Topic StreamWrite sessions opened per commit;
+- `errors`: final transaction error count.
+
+The auto-split benchmark also reports `partitions` after the measurement.
+Latency distributions, retry counts, worker counts, and redundant throughput
+or duration columns are deliberately omitted to keep both the output and the
+measured path small.
 
 Final transaction errors are recorded but do not stop or fail the measurement.
 Setup and connection errors still fail the benchmark. Query retries remain
@@ -88,21 +87,17 @@ names would collide with another run.
 
 ## Auto-split scenario
 
-Auto-split has a time-dependent topology, so it deliberately defines one
-benchmark operation as one two-minute phase. Run it with `-benchtime=1x`; using
-the usual adaptive `b.N` calibration would measure successive, different
-topologies. Run each repetition against a fresh YDB container so accumulated
-StreamWrite sessions and prior splits do not affect the next result.
-
-When the two-minute phase ends, workers do not start another transaction. A
-transaction already in progress may finish, but its total execution time is
-still limited to one minute.
+As in the fixed-topology benchmark, one benchmark operation is one transaction.
+Use a fixed operation count so Go does not calibrate `b.N` while the Topic
+topology is changing. The baseline uses 300 transactions, which gives the
+Topic enough sustained load to split. Restart the YDB container before each
+reported repetition so prior splits and StreamWrite sessions cannot affect it.
 
 ```bash
 go test ./tests/integration/transactional-writer-benchmark \
   -run '^$' \
   -bench '^BenchmarkTransactionalWriterAutoSplit$' \
-  -benchtime=1x \
+  -benchtime=300x \
   -count=1 \
   -cpu=4 \
   -args \
@@ -111,11 +106,8 @@ go test ./tests/integration/transactional-writer-benchmark \
 
 Repeat this command three times, restarting the YDB container before each run.
 
-This benchmark describes the Topic once before the measured phase and once
-after it, then reports `initial-active-partitions` and the final
-`active-partitions`. Because `b.N` is one, its standard `B/op` and `allocs/op`
-columns describe the complete two-minute phase; use `tx/s` and latency metrics
-for throughput and response-time comparisons.
+This benchmark describes the Topic once before the measurement and once after
+it, then reports the final `partitions`.
 
 ## Compare revisions
 

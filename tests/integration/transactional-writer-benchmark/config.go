@@ -28,7 +28,6 @@ type config struct {
 	ProducerIDPrefix       string
 	Mode                   writerMode
 	Routing                routingMode
-	Duration               time.Duration
 	TransactionTimeout     time.Duration
 	Concurrency            int
 	MessageSize            int

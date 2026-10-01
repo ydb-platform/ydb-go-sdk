@@ -83,7 +83,6 @@ func BenchmarkTransactionalWriterAutoSplit(b *testing.B) {
 	cfg.AutoSplitBurstBytes = 1 << 20
 	cfg.AutoSplitUpUtilization = 2
 	cfg.AutoSplitStabilization = 2 * time.Second
-	cfg.Duration = 2 * time.Minute
 
 	runStandardAutoSplitBenchmark(b, cfg)
 }
@@ -138,8 +137,6 @@ func newStandardBenchmarkConfig(
 
 func runStandardBenchmark(b *testing.B, cfg config) {
 	b.Helper()
-	b.ReportAllocs()
-	b.SetBytes(int64(cfg.MessageSize))
 	b.StopTimer()
 
 	ctx := context.Background()
@@ -162,25 +159,19 @@ func runStandardBenchmark(b *testing.B, cfg config) {
 
 	payload := makePayload(cfg.MessageSize)
 	runners := newTransactionRunners(db, cfg, payload)
-	workerStats := newFixedBenchmarkWorkerStats(cfg.Concurrency, b.N)
+	workerStats := make([]workerStats, cfg.Concurrency)
 	streamWriteOpensBefore := metrics.streamWriteOpens.Load()
-	startedAt := time.Now()
 	b.ResetTimer()
 	b.StartTimer()
 	stats := runParallelTransactions(ctx, b, runners, workerStats)
 	b.StopTimer()
-	duration := time.Since(startedAt)
 	streamWriteOpens := metrics.streamWriteOpens.Load() - streamWriteOpensBefore
 
-	reportStandardBenchmarkMetrics(b, cfg, stats, duration, streamWriteOpens, nil)
+	reportStandardBenchmarkMetrics(b, stats, streamWriteOpens, nil)
 }
 
 func runStandardAutoSplitBenchmark(b *testing.B, cfg config) {
 	b.Helper()
-	if b.N != 1 {
-		b.Fatalf("auto-split benchmark requires -benchtime=1x; got b.N=%d", b.N)
-	}
-	b.ReportAllocs()
 	b.StopTimer()
 
 	ctx := context.Background()
@@ -200,30 +191,23 @@ func runStandardAutoSplitBenchmark(b *testing.B, cfg config) {
 	if err = prepareSchema(ctx, db, cfg); err != nil {
 		b.Fatal(err)
 	}
-	description, err := db.Topic().Describe(ctx, cfg.TopicPath)
+	_, err = db.Topic().Describe(ctx, cfg.TopicPath)
 	if err != nil {
 		b.Fatalf("describe benchmark topic: %v", err)
-	}
-	initialTopology, err := topicTopologyFromDescription(description)
-	if err != nil {
-		b.Fatal(err)
 	}
 
 	payload := makePayload(cfg.MessageSize)
 	runners := newTransactionRunners(db, cfg, payload)
+	workerStats := make([]workerStats, cfg.Concurrency)
 	streamWriteOpensBefore := metrics.streamWriteOpens.Load()
 	b.ResetTimer()
 	b.StartTimer()
-	stats := runPhase(
-		ctx,
-		runners,
-		cfg.Duration,
-	)
+	stats := runParallelTransactions(ctx, b, runners, workerStats)
 	b.StopTimer()
 	streamWriteOpens := metrics.streamWriteOpens.Load() - streamWriteOpensBefore
 
 	describeContext, cancelDescribe := context.WithTimeout(ctx, cfg.TransactionTimeout)
-	description, err = db.Topic().Describe(describeContext, cfg.TopicPath)
+	description, err := db.Topic().Describe(describeContext, cfg.TopicPath)
 	cancelDescribe()
 	if err != nil {
 		b.Fatalf("describe final benchmark topic: %v", err)
@@ -232,8 +216,7 @@ func runStandardAutoSplitBenchmark(b *testing.B, cfg config) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	b.ReportMetric(float64(initialTopology.ActivePartitions), "initial-active-partitions")
-	reportStandardBenchmarkMetrics(b, cfg, stats, stats.Duration, streamWriteOpens, &finalTopology)
+	reportStandardBenchmarkMetrics(b, stats, streamWriteOpens, &finalTopology)
 }
 
 func runParallelTransactions(
@@ -243,7 +226,6 @@ func runParallelTransactions(
 	allStats []workerStats,
 ) phaseStats {
 	var workerCounter atomic.Uint64
-	startedAt := time.Now()
 	b.RunParallel(func(pb *testing.PB) {
 		workerID := nextParallelWorkerID(&workerCounter)
 		runner := runners[workerID]
@@ -251,76 +233,34 @@ func runParallelTransactions(
 		for pb.Next() {
 			transactionNumber := stats.LogicalTransactions + 1
 			stats.LogicalTransactions++
-			transactionLatency, timings, attempts, err := runner.execute(ctx, transactionNumber)
-			stats.Attempts += uint64(attempts)
-			if attempts > 1 {
-				stats.Retries += uint64(attempts - 1)
-			}
+			err := runner.execute(ctx, transactionNumber)
 			if err != nil {
 				stats.Failed++
-				if stats.FirstError == "" {
-					stats.FirstError = err.Error()
-				}
 
 				continue
 			}
 
 			stats.Committed++
-			stats.Messages++
-			stats.Bytes += uint64(len(runner.payload))
-			stats.TransactionLatency = append(stats.TransactionLatency, transactionLatency)
-			stats.TableLatency = append(stats.TableLatency, timings.Table)
-			stats.WriterStartLatency = append(stats.WriterStartLatency, timings.WriterStart)
 		}
 	})
 
-	return mergeWorkerStats(allStats, time.Since(startedAt))
-}
-
-func newFixedBenchmarkWorkerStats(workerCount, transactionCount int) []workerStats {
-	allStats := make([]workerStats, workerCount)
-	samplesPerWorker := (transactionCount + workerCount - 1) / workerCount
-	for i := range allStats {
-		allStats[i].TransactionLatency = make([]time.Duration, 0, samplesPerWorker)
-		allStats[i].TableLatency = make([]time.Duration, 0, samplesPerWorker)
-		allStats[i].WriterStartLatency = make([]time.Duration, 0, samplesPerWorker)
-	}
-
-	return allStats
+	return mergeWorkerStats(allStats)
 }
 
 func reportStandardBenchmarkMetrics(
 	b *testing.B,
-	cfg config,
 	stats phaseStats,
-	duration time.Duration,
 	streamWriteOpens uint64,
 	finalTopology *topicTopology,
 ) {
 	b.Helper()
-	report := stats.report()
-	b.ReportMetric(report.TransactionsPerSecond, "tx/s")
-	b.ReportMetric(report.Latency.Transaction.P50MS, "ms/p50")
-	b.ReportMetric(report.Latency.Transaction.P95MS, "ms/p95")
-	b.ReportMetric(report.Latency.Transaction.P99MS, "ms/p99")
-	if report.Latency.TableExec != nil {
-		b.ReportMetric(report.Latency.TableExec.P95MS, "ms/table-p95")
-	}
-	b.ReportMetric(report.Latency.WriterStart.P95MS, "ms/writer-start-p95")
 	b.ReportMetric(float64(stats.Failed), "errors")
-	b.ReportMetric(float64(stats.Failed)/float64(max(stats.LogicalTransactions, 1)), "errors/tx")
-	if stats.Failed != 0 {
-		b.Logf("transaction errors: %d; first error: %s", stats.Failed, stats.FirstError)
-	}
-	b.ReportMetric(float64(stats.Retries)/float64(max(stats.LogicalTransactions, 1)), "retries/tx")
 	b.ReportMetric(
 		float64(streamWriteOpens)/float64(max(stats.Committed, 1)),
-		"StreamWrite/tx",
+		"streams/tx",
 	)
-	b.ReportMetric(float64(cfg.Concurrency), "workers")
-	b.ReportMetric(duration.Seconds(), "measured-s")
 	if finalTopology != nil {
-		b.ReportMetric(float64(finalTopology.ActivePartitions), "active-partitions")
+		b.ReportMetric(float64(finalTopology.ActivePartitions), "partitions")
 	}
 }
 
