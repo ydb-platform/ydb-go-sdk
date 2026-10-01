@@ -68,8 +68,7 @@ The standard `ns/op`, `B/op`, and `allocs/op` columns are accompanied by:
 
 - `tx/s`: aggregate committed transaction throughput;
 - `ms/p50`, `ms/p95`, and `ms/p99`: full transaction latency;
-- `ms/table-p95`, `ms/writer-start-p95`, and `ms/writer-write-p95`:
-  component latency;
+- `ms/table-p95` and `ms/writer-start-p95`: synchronous component latency;
 - `errors` and `errors/tx`: final transaction errors, as a count and a ratio;
 - `retries/tx`: Query transaction retries per logical transaction;
 - `StreamWrite/tx`: Topic StreamWrite sessions opened per commit;

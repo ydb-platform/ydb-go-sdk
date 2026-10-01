@@ -16,7 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
-// Fixed master baseline measured on 2026-09-30 at aaf92e41 with Go 1.26.4 and
+// Fixed master baseline measured on 2026-10-01 at aaf92e41 with Go 1.26.4 and
 // ydbplatform/local-ydb:26.3.1.16. The linux/amd64 test binary ran inside the
 // YDB container because Colima host port forwarding was unavailable. The fixed
 // matrix used -benchtime=10s -count=3 -cpu=4 and one 1024-byte message per
@@ -26,26 +26,25 @@ import (
 // failures.
 //
 //	P    scenario               tx/s   p95 ms      B/op  allocs/op  StreamWrite/tx
-//	64   single                174.3     31.93     79746       1263               1
-//	64   many-key               42.44   113.8    2231570      33285              64
-//	64   many-bounded-key       21.64   252.3    2247785      33606              64
-//	128  single                152.9     38.15     79643       1263               1
-//	128  many-key               13.12   400.1    4387854      65352             128
-//	128  many-bounded-key       10.26   560.0    4438662      66057             128
-//	256  single                151.2     37.96     79533       1263               1
-//	256  many-key                5.885  866.1    8725378     129891             256
-//	256  many-bounded-key        5.244 1014      8818335     131231             256
-//	512  single                140.2     42.49     79463       1263               1
-//	512  many-key                2.835 1807     17347325     258656             512
-//	512  many-bounded-key        1.941 3336     17629466     262029             512
+//	64   single                200.3     20.87     79553       1260               1
+//	64   many-key               23.79   207.1    2228985      33259              64
+//	64   many-bounded-key       21.14   261.6    2255127      33668              64
+//	128  single                151.6     38.84     79545       1263               1
+//	128  many-key               11.12   500.7    4392670      65407             128
+//	128  many-bounded-key        9.460  596.5    4436334      66029             128
+//	256  single                144.2     42.32     79431       1263               1
+//	256  many-key                5.507  868.6    8726935     129882             256
+//	256  many-bounded-key        4.958 1094      8821614     131253             256
+//	512  single                149.7     39.58     79377       1263               1
+//	512  many-key                2.865 1827     17373457     258860             512
+//	512  many-bounded-key        2.255 2492     17616668     262044             512
 //
 // The auto-split benchmark was measured on 2026-10-01. It used -benchtime=1x
 // -count=1 -cpu=4 three times, where one benchmark operation is a two-minute
-// phase and every repetition used a fresh YDB container. Its medians were 64.63
-// tx/s, 158.8ms p95, 1 -> 10 active partitions, 0.001676 retries/tx, and 10.58
-// StreamWrite calls per committed transaction. The median final error count was
-// zero; one run recorded two final transaction errors. Preserve this protocol
-// and environment when comparing a candidate change.
+// phase and every repetition used a fresh YDB container. Its medians were 94.52
+// tx/s, 79.27ms p95, 1 -> 10 active partitions, 0.001234 retries/tx, and 9.698
+// StreamWrite calls per committed transaction, with zero final errors. Preserve
+// this protocol and environment when comparing a candidate change.
 
 const benchmarkTableQueryTemplate = `
 DECLARE $run_id AS Utf8;
@@ -81,7 +80,6 @@ func topicAutoPartitioningSettings(cfg config) topictypes.AutoPartitioningSettin
 type attemptTimings struct {
 	Table       time.Duration
 	WriterStart time.Duration
-	WriterWrite time.Duration
 }
 
 type messageSpec struct {
@@ -332,7 +330,6 @@ func runWorker(
 				stats.TableLatency = append(stats.TableLatency, timings.Table)
 			}
 			stats.WriterStartLatency = append(stats.WriterStartLatency, timings.WriterStart)
-			stats.WriterWriteLatency = append(stats.WriterWriteLatency, timings.WriterWrite)
 		}
 	}
 }
@@ -402,9 +399,7 @@ func executeTransaction(
 				}
 			}
 
-			writeStartedAt := time.Now()
 			err = writer.Write(ctx, makeMessages(messageSpecs, payload)...)
-			currentTimings.WriterWrite = time.Since(writeStartedAt)
 			lastTimings = currentTimings
 			if err != nil {
 				return fmt.Errorf("write transactional topic messages: %w", err)

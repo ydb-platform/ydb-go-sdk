@@ -211,7 +211,6 @@ func runStandardAutoSplitBenchmark(b *testing.B, cfg config) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	b.ReportMetric(float64(initialTopology.ActivePartitions), "initial-active-partitions")
 
 	payload := makePayload(cfg.MessageSize)
 	sequences := make([]atomic.Uint64, cfg.Concurrency)
@@ -239,6 +238,7 @@ func runStandardAutoSplitBenchmark(b *testing.B, cfg config) {
 	if err != nil {
 		b.Fatal(err)
 	}
+	b.ReportMetric(float64(initialTopology.ActivePartitions), "initial-active-partitions")
 	reportStandardBenchmarkMetrics(b, cfg, stats, stats.Duration, lifecycle, &finalTopology)
 	if measurementErr != nil {
 		b.Fatalf("run auto-split phase: %v", measurementErr)
@@ -294,7 +294,6 @@ func runParallelTransactions(
 					stats.TableLatency = append(stats.TableLatency, timings.Table)
 				}
 				stats.WriterStartLatency = append(stats.WriterStartLatency, timings.WriterStart)
-				stats.WriterWriteLatency = append(stats.WriterWriteLatency, timings.WriterWrite)
 			}
 		}
 		appendParallelStats(&statsMu, &allStats, stats)
@@ -321,7 +320,6 @@ func reportStandardBenchmarkMetrics(
 		b.ReportMetric(report.Latency.TableExec.P95MS, "ms/table-p95")
 	}
 	b.ReportMetric(report.Latency.WriterStart.P95MS, "ms/writer-start-p95")
-	b.ReportMetric(report.Latency.WriterWrite.P95MS, "ms/writer-write-p95")
 	b.ReportMetric(float64(stats.Failed), "errors")
 	b.ReportMetric(float64(stats.Failed)/float64(max(stats.LogicalTransactions, 1)), "errors/tx")
 	if stats.Failed != 0 {

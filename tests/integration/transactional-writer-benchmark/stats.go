@@ -20,7 +20,6 @@ type workerStats struct {
 	TransactionLatency  []time.Duration
 	TableLatency        []time.Duration
 	WriterStartLatency  []time.Duration
-	WriterWriteLatency  []time.Duration
 }
 
 type phaseStats struct {
@@ -43,7 +42,6 @@ type latencyReport struct {
 	Transaction latencySummary  `json:"transaction"`
 	TableExec   *latencySummary `json:"table_exec,omitempty"`
 	WriterStart latencySummary  `json:"writer_start"`
-	WriterWrite latencySummary  `json:"writer_write"`
 }
 
 type phaseReport struct {
@@ -84,7 +82,6 @@ func mergeWorkerStats(all []workerStats, duration time.Duration) phaseStats {
 		merged.TransactionLatency = append(merged.TransactionLatency, stats.TransactionLatency...)
 		merged.TableLatency = append(merged.TableLatency, stats.TableLatency...)
 		merged.WriterStartLatency = append(merged.WriterStartLatency, stats.WriterStartLatency...)
-		merged.WriterWriteLatency = append(merged.WriterWriteLatency, stats.WriterWriteLatency...)
 	}
 
 	return merged
@@ -106,7 +103,6 @@ func (s phaseStats) report(skipTableWrite bool) phaseReport {
 		Latency: latencyReport{
 			Transaction: summarizeLatencies(s.TransactionLatency),
 			WriterStart: summarizeLatencies(s.WriterStartLatency),
-			WriterWrite: summarizeLatencies(s.WriterWriteLatency),
 		},
 	}
 	if !skipTableWrite {
