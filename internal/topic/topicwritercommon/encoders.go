@@ -210,10 +210,33 @@ func (s *EncoderSelector) CompressMessages(messages []MessageWithDataContent) (r
 			trace.TopicWriterCompressMessagesReasonCompressData,
 		)
 		err = CacheMessages(messages, codec, s.parallelCompressors)
-		onCompressDone(err)
+
+		var uncompressedSize, compressedSize int
+		if err == nil {
+			uncompressedSize, compressedSize, err = MessagesContentSize(messages, codec)
+		}
+		onCompressDone(err, uncompressedSize, compressedSize)
 	}
 
 	return codec, err
+}
+
+// MessagesContentSize returns the total uncompressed and compressed size in bytes
+// of already cached messages for the given codec.
+func MessagesContentSize(
+	messages []MessageWithDataContent,
+	codec rawtopiccommon.Codec,
+) (uncompressedSize, compressedSize int, _ error) {
+	for i := range messages {
+		content, err := messages[i].GetEncodedBytes(codec)
+		if err != nil {
+			return 0, 0, err
+		}
+		compressedSize += len(content)
+		uncompressedSize += messages[i].BufUncompressedSize
+	}
+
+	return uncompressedSize, compressedSize, nil
 }
 
 func (s *EncoderSelector) ResetAllowedCodecs(allowedCodecs rawtopiccommon.SupportedCodecs) {
@@ -282,20 +305,17 @@ func (s *EncoderSelector) measureCodecs(messages []MessageWithDataContent) (rawt
 			trace.TopicWriterCompressMessagesReasonCodecsMeasure,
 		)
 		err := CacheMessages(messages, codec, s.parallelCompressors)
-		onCompressDone(err)
+
+		var uncompressedSize, compressedSize int
+		if err == nil {
+			uncompressedSize, compressedSize, err = MessagesContentSize(messages, codec)
+		}
+		onCompressDone(err, uncompressedSize, compressedSize)
 		if err != nil {
 			return codecUnknown, err
 		}
 
-		size := 0
-		for messIndex := range messages {
-			content, err := messages[messIndex].GetEncodedBytes(codec)
-			if err != nil {
-				return codecUnknown, err
-			}
-			size += len(content)
-		}
-		sizes[codecIndex] = size
+		sizes[codecIndex] = compressedSize
 	}
 
 	minSizeIndex := 0

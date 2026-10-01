@@ -573,6 +573,15 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterCompressMessagesDoneInfo struct {
 		Error error
+
+		// UncompressedSize is the total size in bytes of the messages before compression.
+		// It is zero when Error is non-nil.
+		UncompressedSize int
+
+		// CompressedSize is the total size in bytes of the messages after compression
+		// with the Codec from TopicWriterCompressMessagesStartInfo (equal to UncompressedSize
+		// for the raw codec). It is zero when Error is non-nil.
+		CompressedSize int
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
