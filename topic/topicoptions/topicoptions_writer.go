@@ -261,6 +261,7 @@ func WithWriterCodecAutoSelect() WriterOption {
 // WithWriterSetAutoSeqNo set messages SeqNo by SDK
 // enabled by default
 // if enabled - Message.SeqNo field must be zero
+// Transactional writers select this mode from the presence of a producer ID.
 func WithWriterSetAutoSeqNo(val bool) WriterOption {
 	return topicwriterinternal.WithAutoSetSeqNo(val)
 }
