@@ -55,16 +55,18 @@ func BenchmarkTransactionalWriter(b *testing.B) {
 	}
 
 	for _, partitionCount := range partitions {
-		for _, benchmarkCase := range standardBenchmarkCases {
-			b.Run(fmt.Sprintf("%s/p%d", benchmarkCase.Name, partitionCount), func(b *testing.B) {
-				cfg := newStandardBenchmarkConfig(
-					fmt.Sprintf("%s-%s-p%d", *standardBenchmarkTopicPrefix, benchmarkCase.Name, partitionCount),
-					benchmarkCase,
-					partitionCount,
-				)
-				runStandardBenchmark(b, cfg)
-			})
-		}
+		b.Run(fmt.Sprintf("p%d", partitionCount), func(b *testing.B) {
+			for _, benchmarkCase := range standardBenchmarkCases {
+				b.Run(benchmarkCase.Name, func(b *testing.B) {
+					cfg := newStandardBenchmarkConfig(
+						fmt.Sprintf("%s-%s-p%d", *standardBenchmarkTopicPrefix, benchmarkCase.Name, partitionCount),
+						benchmarkCase,
+						partitionCount,
+					)
+					runStandardBenchmark(b, cfg)
+				})
+			}
+		})
 	}
 }
 
