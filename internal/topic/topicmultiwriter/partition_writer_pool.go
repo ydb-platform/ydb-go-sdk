@@ -58,6 +58,10 @@ func newPartitionWriterPool(
 }
 
 func (p *partitionWriterPool) getProducerID(partitionID int64) string {
+	if p.cfg.ProducerIDPrefix == "" {
+		return ""
+	}
+
 	return fmt.Sprintf("%s-%d", p.cfg.ProducerIDPrefix, partitionID)
 }
 
@@ -80,6 +84,9 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 				p.ackCallback(partitionID, seqNo)
 			}),
 			withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+				if p.writerCfg.Transactional {
+					return topic.PublicRetryDecisionStop
+				}
 				if isOperationErrorOverloaded(args.Error) {
 					p.partitionSplitCallback(partitionID)
 
@@ -101,6 +108,7 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 	)
 
 	writerCfg.MultiMode = true
+	writerCfg.RequestLastSeqNo = p.writerCfg.AutoSetSeqNo && p.cfg.ProducerIDPrefix != ""
 	for _, opt := range opts {
 		opt(&writerCfg)
 	}
@@ -186,23 +194,19 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 	if !direct {
 		return wrapper, nil
 	}
+	wrapper.initCh = make(chan struct{})
 
 	p.bg.Start(fmt.Sprintf("writer-init-%d", partitionID), func(ctx context.Context) {
-		_, err := wr.WaitInitInfo(ctx)
+		info, err := wr.WaitInitInfo(ctx)
+		wrapper.initInfo = info
 		wrapper.setInitErr(err)
 
 		wrapper.initDone.Store(true)
+		close(wrapper.initCh)
 		p.onWriterInit()
 	})
 
 	return wrapper, nil
-}
-
-func (p *partitionWriterPool) forceEvict(partitionID int64) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.forceEvictNeedLock(partitionID)
 }
 
 func (p *partitionWriterPool) evict(partitionID int64) {

@@ -1,3 +1,6 @@
+* Improved topic multi-writer performance for topics with many partitions
+* Changed transactional topic writers to use transaction-level retries and opt-in deduplication
+
 ## v3.153.1
 * Fixed `sugar.Embedding` encoding of an empty vector to match `Knn::ToBinaryStringFloat`
 

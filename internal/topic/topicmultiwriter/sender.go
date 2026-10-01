@@ -19,6 +19,7 @@ type sender struct {
 	mu                     *xsync.Mutex
 	partitions             map[int64]*PartitionInfo
 	writerPool             *partitionWriterPool
+	transactional          bool
 }
 
 func newSender(
@@ -30,6 +31,8 @@ func newSender(
 	partitionSplitReceiver *partitionSplitReceiver,
 	onError func(err error),
 ) *sender {
+	transactional := writerPool != nil && writerPool.writerCfg != nil && writerPool.writerCfg.Transactional
+
 	return &sender{
 		ctx:                    ctx,
 		wakeupChan:             make(empty.Chan, 1),
@@ -38,6 +41,7 @@ func newSender(
 		mu:                     mu,
 		partitions:             partitions,
 		writerPool:             writerPool,
+		transactional:          transactional,
 		partitionSplitReceiver: partitionSplitReceiver,
 	}
 }
@@ -96,7 +100,7 @@ func (s *sender) iterateThroughMessagesIndex(
 			}
 
 			if err := wr.getInitErr(); err != nil {
-				if isOperationErrorOverloaded(err) {
+				if !s.transactional && isOperationErrorOverloaded(err) {
 					s.partitionSplitReceiver.push(partitionID)
 
 					break
@@ -109,7 +113,7 @@ func (s *sender) iterateThroughMessagesIndex(
 				s.ctx,
 				[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
 			); err != nil {
-				if isOperationErrorOverloaded(err) {
+				if !s.transactional && isOperationErrorOverloaded(err) {
 					s.partitionSplitReceiver.push(partitionID)
 
 					break

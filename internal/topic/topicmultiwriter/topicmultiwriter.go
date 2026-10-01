@@ -27,7 +27,7 @@ func NewMultiWriter(
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
-	if multiWriterCfg.ProducerIDPrefix == "" {
+	if multiWriterCfg.ProducerIDPrefix == "" && !writerCfg.Transactional {
 		multiWriterCfg.ProducerIDPrefix = uuid.NewString()
 	}
 
@@ -68,7 +68,7 @@ func (p *MultiWriter) Write(ctx context.Context, messages []topicwriterinternal.
 	}
 
 	// Same idea as WriterReconnector.waitFirstInitResponse: do not process writes until
-	// orchestrator init() finished (describe topic, seq baseline, partition chooser).
+	// orchestrator init() finished (describe topic and partition chooser).
 	if err := p.orchestrator.waitInitDone(ctx); err != nil {
 		return err
 	}

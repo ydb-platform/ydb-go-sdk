@@ -163,12 +163,6 @@ func (o *orchestrator) init() (err error) {
 		}
 	})
 
-	if err := o.initSeqNo(); err != nil {
-		o.stopWithError(err)
-
-		return err
-	}
-
 	o.mu.WithLock(func() {
 		if o.partitionChooser == nil {
 			o.partitionChooser = partitionchooser.NewByPartitionIDPartitionChooser()
@@ -250,6 +244,13 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	if err != nil {
 		return err
 	}
+	var lastSeqNo int64
+	if autoSetSeqNo && o.multiWriterCfg.ProducerIDPrefix != "" {
+		lastSeqNo, err = o.lastSeqNoFromWriter(ctx, msg.PartitionID)
+		if err != nil {
+			return err
+		}
+	}
 
 	// saveMessageContent must run after choosePartition: BoundPartitionChooser may
 	// write choose_partition_key into msg.Metadata; CacheMessageData (inside saveMessageContent)
@@ -258,22 +259,44 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	if err := o.saveMessageContent(&msg); err != nil {
 		return err
 	}
+	if err = o.enqueueMessage(msg, lastSeqNo); err != nil {
+		return err
+	}
+	acquired = false
+
+	return nil
+}
+
+func (o *orchestrator) enqueueMessage(msg message, lastSeqNo int64) (err error) {
 	o.mu.WithLock(func() {
-		if autoSetSeqNo {
+		if o.writerCfg.AutoSetSeqNo {
+			o.currentSeqNo = max(o.currentSeqNo, lastSeqNo)
 			o.currentSeqNo++
 			msg.SeqNo = o.currentSeqNo
-		} else {
-			err = o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo)
-			if err != nil {
-				return
-			}
+		} else if err = o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo); err != nil {
+			return
 		}
 		o.buf.pushNeedLock(msg)
 		o.sender.wakeup()
-		acquired = false
 	})
 
 	return err
+}
+
+func (o *orchestrator) lastSeqNoFromWriter(ctx context.Context, partitionID int64) (int64, error) {
+	writer, err := o.writerPool.get(partitionID, true)
+	if err != nil {
+		return 0, err
+	}
+	if writer.initDone.Load() {
+		if err = writer.getInitErr(); err != nil {
+			return 0, err
+		}
+	} else if err = writer.waitInit(ctx); err != nil {
+		return 0, err
+	}
+
+	return writer.initInfo.LastSeqNum, nil
 }
 
 func (o *orchestrator) saveMessageContent(msg *message) error {
@@ -496,51 +519,6 @@ func (o *orchestrator) scheduleResendMessages(
 	return nil
 }
 
-func (o *orchestrator) initSeqNo() error {
-	const (
-		maxRetries = 5
-		retryDelay = 100 * time.Millisecond
-	)
-
-	partitions := make([]int64, 0, len(o.partitions))
-	for partitionID := range o.partitions {
-		partitions = append(partitions, partitionID)
-	}
-
-	var (
-		maxSeqNo int64
-		err      error
-	)
-
-	for i := range maxRetries {
-		maxSeqNo, err = o.getMaxSeqNo(partitions)
-		if err == nil {
-			break
-		}
-
-		if !isOperationErrorOverloaded(err) || i == maxRetries-1 {
-			return err
-		}
-
-		for _, partitionID := range partitions {
-			o.writerPool.forceEvict(partitionID)
-		}
-		if err := o.sleepOrDone(retryDelay); err != nil {
-			return err
-		}
-	}
-
-	o.mu.WithLock(func() {
-		o.currentSeqNo = maxSeqNo
-	})
-
-	for _, partitionID := range partitions {
-		o.writerPool.evict(partitionID)
-	}
-
-	return nil
-}
-
 //nolint:funlen
 func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err error) {
 	var errGroup errgroup.Group
@@ -592,6 +570,7 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 
 			o.mu.WithLock(func() {
 				maxSeqNo = max(maxSeqNo, initInfo.LastSeqNum)
+				o.currentSeqNo = max(o.currentSeqNo, initInfo.LastSeqNum)
 				partitionInfo.CachedMaxSeqNo = initInfo.LastSeqNum
 			})
 

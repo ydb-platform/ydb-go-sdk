@@ -77,6 +77,11 @@ type Client interface {
 	StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error)
 
 	// StartTransactionalWriter start writer for write messages within transaction
+	// Without a producer ID, messages are written without deduplication. Set
+	// [topicoptions.WithWriterProducerID] or [topicoptions.WithProducerIDPrefix]
+	// for deduplication. SeqNo is assigned automatically unless
+	// [topicoptions.WithWriterSetAutoSeqNo] is used with false.
+	// Session errors are returned for transaction retry.
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	StartTransactionalWriter(
