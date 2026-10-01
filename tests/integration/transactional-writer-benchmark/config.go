@@ -43,7 +43,6 @@ type config struct {
 	AutoSplitBurstBytes    int64
 	AutoSplitUpUtilization int
 	AutoSplitStabilization time.Duration
-	AutoSplitPollInterval  time.Duration
 	SkipTableWrite         bool
 }
 

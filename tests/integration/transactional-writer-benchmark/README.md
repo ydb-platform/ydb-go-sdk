@@ -110,10 +110,10 @@ go test ./tests/integration/transactional-writer-benchmark \
 
 Repeat this command three times, restarting the YDB container before each run.
 
-This benchmark additionally reports the final `active-partitions` and
-`ms/first-split`. Because `b.N` is one, its standard `B/op` and `allocs/op`
-columns describe the complete two-minute phase; use `tx/s` and latency metrics
-for throughput and response-time comparisons.
+This benchmark describes the Topic once before the measured phase and once
+after it, then reports the final `active-partitions`. Because `b.N` is one, its
+standard `B/op` and `allocs/op` columns describe the complete two-minute phase;
+use `tx/s` and latency metrics for throughput and response-time comparisons.
 
 ## Compare revisions
 

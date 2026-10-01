@@ -17,7 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
-// Master baseline measured on 2026-09-30 at aaf92e41 with Go 1.26.4 and
+// Fixed master baseline measured on 2026-09-30 at aaf92e41 with Go 1.26.4 and
 // ydbplatform/local-ydb:26.3.1.16. The linux/amd64 test binary ran inside the
 // YDB container because Colima host port forwarding was unavailable. The fixed
 // matrix used -benchtime=10s -count=3 -cpu=4 and one 1024-byte message per
@@ -44,12 +44,13 @@ import (
 //	512  many-bounded-key        1.941 3336     17629466     262029             512
 //	512  many-partition-id       3.517 1464     17465050     259583             512
 //
-// The auto-split benchmark used -benchtime=1x -count=1 -cpu=4 three times,
-// where one benchmark operation is a two-minute phase and every repetition used
-// a fresh YDB container. Its medians were 87.48 tx/s, 77.91ms p95, 1 -> 11 active
-// partitions, 0.001691 retries/tx, and 9.587 StreamWrite calls per committed
-// transaction, with zero final failures. Preserve this protocol and environment
-// when comparing a candidate change.
+// The auto-split benchmark was measured on 2026-10-01. It used -benchtime=1x
+// -count=1 -cpu=4 three times, where one benchmark operation is a two-minute
+// phase and every repetition used a fresh YDB container. Its medians were 64.63
+// tx/s, 158.8ms p95, 1 -> 10 active partitions, 0.001676 retries/tx, and 10.58
+// StreamWrite calls per committed transaction. The median final error count was
+// zero; one run recorded two final transaction errors. Preserve this protocol
+// and environment when comparing a candidate change.
 
 const benchmarkTableQueryTemplate = `
 DECLARE $run_id AS Utf8;
@@ -218,40 +219,6 @@ func validateAutoSplitTopic(description topictypes.TopicDescription, cfg config)
 	}
 
 	return nil
-}
-
-func monitorTopicTopology(
-	ctx context.Context,
-	db *ydb.Driver,
-	topicPath string,
-	pollInterval time.Duration,
-	recorder *topologyRecorder,
-) {
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			description, err := db.Topic().Describe(ctx, topicPath)
-			if err != nil {
-				if ctx.Err() == nil {
-					recorder.recordError(fmt.Errorf("describe topic %q while monitoring auto-split: %w", topicPath, err))
-				}
-
-				continue
-			}
-			topology, err := topicTopologyFromDescription(description)
-			if err != nil {
-				recorder.recordError(err)
-
-				continue
-			}
-			recorder.record(time.Now(), topology)
-		}
-	}
 }
 
 func makePayload(size int) []byte {

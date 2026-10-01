@@ -85,7 +85,6 @@ func BenchmarkTransactionalWriterAutoSplit(b *testing.B) {
 	cfg.AutoSplitBurstBytes = 1 << 20
 	cfg.AutoSplitUpUtilization = 2
 	cfg.AutoSplitStabilization = 2 * time.Second
-	cfg.AutoSplitPollInterval = 250 * time.Millisecond
 	cfg.Duration = 2 * time.Minute
 
 	runStandardAutoSplitBenchmark(b, cfg)
@@ -221,7 +220,6 @@ func runStandardAutoSplitBenchmark(b *testing.B, cfg config) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	recorder, stopTopology := startBenchmarkTopologyMonitor(ctx, b, cfg, initialTopology)
 
 	payload := makePayload(cfg.MessageSize)
 	sequences := make([]atomic.Uint64, cfg.Concurrency)
@@ -240,10 +238,17 @@ func runStandardAutoSplitBenchmark(b *testing.B, cfg config) {
 	b.StopTimer()
 	lifecycle := metrics.snapshot().subtract(lifecycleBefore)
 
-	if err = stopTopology(); err != nil {
-		b.Errorf("stop topology monitor: %v", err)
+	describeContext, cancelDescribe := context.WithTimeout(ctx, cfg.TransactionTimeout)
+	description, err = db.Topic().Describe(describeContext, cfg.TopicPath)
+	cancelDescribe()
+	if err != nil {
+		b.Fatalf("describe final benchmark topic: %v", err)
 	}
-	reportStandardBenchmarkMetrics(b, cfg, stats, stats.Duration, lifecycle, recorder)
+	finalTopology, err := topicTopologyFromDescription(description)
+	if err != nil {
+		b.Fatal(err)
+	}
+	reportStandardBenchmarkMetrics(b, cfg, stats, stats.Duration, lifecycle, &finalTopology)
 	if measurementErr != nil {
 		b.Fatalf("run auto-split phase: %v", measurementErr)
 	}
@@ -309,37 +314,13 @@ func runParallelTransactions(
 	return mergeParallelStats(allStats, time.Since(startedAt))
 }
 
-func startBenchmarkTopologyMonitor(
-	ctx context.Context,
-	b *testing.B,
-	cfg config,
-	initialTopology topicTopology,
-) (*topologyRecorder, func() error) {
-	b.Helper()
-	monitorDB, err := openDatabase(ctx, cfg, nil)
-	if err != nil {
-		b.Fatalf("open topology monitor driver: %v", err)
-	}
-	recorder := newTopologyRecorder(time.Now(), initialTopology)
-	monitorContext, cancelMonitor := context.WithCancel(ctx)
-	monitorDone := make(chan struct{})
-	go func() {
-		defer close(monitorDone)
-		monitorTopicTopology(monitorContext, monitorDB, cfg.TopicPath, cfg.AutoSplitPollInterval, recorder)
-	}()
-
-	return recorder, func() error {
-		return finishTopologyMonitor(ctx, cfg, monitorDB, recorder, cancelMonitor, monitorDone)
-	}
-}
-
 func reportStandardBenchmarkMetrics(
 	b *testing.B,
 	cfg config,
 	stats phaseStats,
 	duration time.Duration,
 	lifecycle instrumentationSnapshot,
-	recorder *topologyRecorder,
+	finalTopology *topicTopology,
 ) {
 	b.Helper()
 	report := stats.report(cfg.SkipTableWrite)
@@ -364,10 +345,8 @@ func reportStandardBenchmarkMetrics(
 	)
 	b.ReportMetric(float64(cfg.Concurrency), "workers")
 	b.ReportMetric(duration.Seconds(), "measured-s")
-	if recorder != nil {
-		topology := recorder.snapshot()
-		b.ReportMetric(float64(len(topology.Final.ActivePartitionIDs)), "active-partitions")
-		b.ReportMetric(float64(topology.FirstSplitAfter)/float64(time.Millisecond), "ms/first-split")
+	if finalTopology != nil {
+		b.ReportMetric(float64(len(finalTopology.ActivePartitionIDs)), "active-partitions")
 	}
 }
 
