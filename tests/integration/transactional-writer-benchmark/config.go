@@ -29,7 +29,6 @@ type config struct {
 	Mode                   writerMode
 	Routing                routingMode
 	AutoSeqNo              bool
-	QueryRetries           bool
 	Duration               time.Duration
 	TransactionTimeout     time.Duration
 	Concurrency            int

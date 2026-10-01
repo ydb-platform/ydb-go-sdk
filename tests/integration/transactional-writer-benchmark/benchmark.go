@@ -10,7 +10,6 @@ import (
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
@@ -50,8 +49,6 @@ VALUES ($run_id, $worker_id, $seq_no, CurrentUtcTimestamp());
 `
 
 const ydbMaxTopicPartitions int64 = 35_000
-
-var noRetryBudget = budget.Percent(0)
 
 func topicAutoPartitioningSettings(cfg config) topictypes.AutoPartitioningSettings {
 	settings := topictypes.AutoPartitioningSettings{
@@ -346,13 +343,6 @@ func executeTransaction(
 		lastTimings attemptTimings
 	)
 	startedAt := time.Now()
-	doTxOptions := []query.DoTxOption{
-		query.WithIdempotent(),
-		query.WithLazyTx(true),
-	}
-	if !cfg.QueryRetries {
-		doTxOptions = append(doTxOptions, query.WithRetryBudget(noRetryBudget))
-	}
 	err := db.Query().DoTx(
 		transactionContext,
 		func(ctx context.Context, tx query.TxActor) error {
@@ -401,7 +391,8 @@ func executeTransaction(
 
 			return nil
 		},
-		doTxOptions...,
+		query.WithIdempotent(),
+		query.WithLazyTx(true),
 	)
 
 	return time.Since(startedAt), lastTimings, attempts, err

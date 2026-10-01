@@ -131,7 +131,6 @@ func newStandardBenchmarkConfig(
 		Mode:               benchmarkCase.Mode,
 		Routing:            benchmarkCase.Routing,
 		AutoSeqNo:          true,
-		QueryRetries:       true,
 		TransactionTimeout: time.Minute,
 		Concurrency:        runtime.GOMAXPROCS(0),
 		MessagesPerTx:      1,
