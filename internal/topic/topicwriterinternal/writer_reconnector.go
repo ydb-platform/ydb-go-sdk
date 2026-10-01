@@ -68,13 +68,16 @@ var (
 type WriterReconnectorConfig struct {
 	WritersCommonConfig
 
-	MaxMessageSize               int
-	MaxQueueLen                  int
-	Common                       config.Common
-	AdditionalEncoders           map[rawtopiccommon.Codec]topicwritercommon.PublicCreateEncoderFunc
-	Connect                      ConnectFunc
-	WaitServerAck                bool
-	AutoSetSeqNo                 bool
+	MaxMessageSize     int
+	MaxQueueLen        int
+	Common             config.Common
+	AdditionalEncoders map[rawtopiccommon.Codec]topicwritercommon.PublicCreateEncoderFunc
+	Connect            ConnectFunc
+	WaitServerAck      bool
+	AutoSetSeqNo       bool
+	// RequestLastSeqNo lets a multi-writer assign sequence numbers from the
+	// session baseline while its partition writer preserves those numbers.
+	RequestLastSeqNo             bool
 	AutoSetCreatedTime           bool
 	OnWriterInitResponseCallback PublicOnWriterInitResponseCallback
 	OnAckReceivedCallback        func(seqNo int64)
@@ -733,7 +736,8 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
-	res := w.cfg.AutoSetSeqNo && w.cfg.producerID != "" && !w.firstConnectionHandled.Load()
+	res := (w.cfg.AutoSetSeqNo || w.cfg.RequestLastSeqNo) &&
+		w.cfg.producerID != "" && !w.firstConnectionHandled.Load()
 
 	return res
 }

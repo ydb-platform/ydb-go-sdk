@@ -108,6 +108,7 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 	)
 
 	writerCfg.MultiMode = true
+	writerCfg.RequestLastSeqNo = p.writerCfg.AutoSetSeqNo && p.cfg.ProducerIDPrefix != ""
 	for _, opt := range opts {
 		opt(&writerCfg)
 	}

@@ -58,6 +58,14 @@ func TestTransactionalWriterRequiresSeqNoWhenAutomaticSeqNoDisabled(t *testing.T
 	require.ErrorIs(t, err, ErrNoSeqNo)
 }
 
+func TestPartitionWriterRequestsLastSeqNoForExternalAutomaticSequencing(t *testing.T) {
+	cfg := NewWriterReconnectorConfig(WithProducerID("producer"), WithAutoSetSeqNo(false))
+	cfg.RequestLastSeqNo = true
+	writer := newWriterReconnectorStopped(cfg)
+	require.True(t, writer.needReceiveLastSeqNo())
+	require.True(t, testCreateInitRequest(writer).GetLastSeqNo)
+}
+
 func TestTransactionalWriterWithoutProducerIDAssignsLocalSeqNo(t *testing.T) {
 	cfg := NewWriterReconnectorConfig(WithTransactionMode())
 	writer := newWriterReconnectorStopped(cfg)

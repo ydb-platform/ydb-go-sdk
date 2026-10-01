@@ -162,6 +162,7 @@ func TestTransactionalMultiWriterDeduplication(t *testing.T) {
 			case directCfg := <-factory.created:
 				require.Equal(t, tc.wantProducerID, directCfg.ProducerID())
 				require.False(t, directCfg.AutoSetSeqNo)
+				require.Equal(t, cfg.AutoSetSeqNo && tc.prefix != "", directCfg.RequestLastSeqNo)
 				require.Equal(t, topic.PublicRetryDecisionStop, directCfg.RetrySettings.CheckError(
 					topic.PublicCheckErrorRetryArgs{Error: errors.New("session failed")},
 				))
