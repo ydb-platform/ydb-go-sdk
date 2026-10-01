@@ -1185,6 +1185,7 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 					return baseDesc, nil
 				}
 			}
+
 			return stubClient.Describe(ctx, path)
 		},
 		newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0),

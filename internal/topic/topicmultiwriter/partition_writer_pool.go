@@ -61,6 +61,7 @@ func (p *partitionWriterPool) getProducerID(partitionID int64) string {
 	if p.cfg.ProducerIDPrefix == "" {
 		return ""
 	}
+
 	return fmt.Sprintf("%s-%d", p.cfg.ProducerIDPrefix, partitionID)
 }
 
@@ -205,13 +206,6 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 	})
 
 	return wrapper, nil
-}
-
-func (p *partitionWriterPool) forceEvict(partitionID int64) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.forceEvictNeedLock(partitionID)
 }
 
 func (p *partitionWriterPool) evict(partitionID int64) {

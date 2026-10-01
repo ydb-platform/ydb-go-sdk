@@ -32,6 +32,7 @@ func newSender(
 	onError func(err error),
 ) *sender {
 	transactional := writerPool != nil && writerPool.writerCfg != nil && writerPool.writerCfg.Transactional
+
 	return &sender{
 		ctx:                    ctx,
 		wakeupChan:             make(empty.Chan, 1),

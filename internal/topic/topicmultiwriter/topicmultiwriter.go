@@ -27,9 +27,6 @@ func NewMultiWriter(
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
-	if writerCfg.Transactional {
-		writerCfg.AutoSetSeqNo = multiWriterCfg.ProducerIDPrefix == ""
-	}
 	if multiWriterCfg.ProducerIDPrefix == "" && !writerCfg.Transactional {
 		multiWriterCfg.ProducerIDPrefix = uuid.NewString()
 	}

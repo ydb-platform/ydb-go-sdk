@@ -82,7 +82,10 @@ func (w *seqNoSessionWriter) WaitInitInfo(context.Context) (topicwriterinternal.
 	return topicwriterinternal.InitialInfo{LastSeqNum: w.baseline}, nil
 }
 
-func (w *seqNoSessionWriter) WriteInternal(_ context.Context, messages []topicwritercommon.MessageWithDataContent) error {
+func (w *seqNoSessionWriter) WriteInternal(
+	_ context.Context,
+	messages []topicwritercommon.MessageWithDataContent,
+) error {
 	for _, message := range messages {
 		w.written <- message.SeqNo
 		w.ack(message.SeqNo)

@@ -96,11 +96,13 @@ func TestMultiWriterWithTransaction_Write_SetsTx(t *testing.T) {
 
 type transactionalWriterFactory struct {
 	writersFactory
+
 	created chan topicwriterinternal.WriterReconnectorConfig
 }
 
 func (f *transactionalWriterFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
 	f.created <- cfg
+
 	return f.writersFactory.Create(cfg)
 }
 
@@ -112,16 +114,24 @@ func TestTransactionalMultiWriterDeduplication(t *testing.T) {
 		wantExplicitSeqNo bool
 	}{
 		{name: "without producer ID"},
-		{name: "with producer ID prefix", prefix: "producer", wantProducerID: "producer-1", wantExplicitSeqNo: true},
+		{name: "with producer ID prefix", prefix: "producer", wantProducerID: "producer-1"},
+		{
+			name: "explicit sequence numbers", prefix: "producer",
+			wantProducerID: "producer-1", wantExplicitSeqNo: true,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := xtest.Context(t)
 			stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
-			cfg := topicwriterinternal.NewWriterReconnectorConfig(
+			options := []topicwriterinternal.PublicWriterOption{
 				topicwriterinternal.WithTransactionMode(),
 				topicwriterinternal.WithTopic("test/topic"),
 				topicwriterinternal.WithAutosetCreatedTime(false),
-			)
+			}
+			if tc.wantExplicitSeqNo {
+				options = append(options, topicwriterinternal.WithAutoSetSeqNo(false))
+			}
+			cfg := topicwriterinternal.NewWriterReconnectorConfig(options...)
 			mwCfg := MultiWriterConfig{ProducerIDPrefix: tc.prefix}
 			factory := &transactionalWriterFactory{
 				writersFactory: newStubWritersFactory(t, stubs.StubWriterTypeBasic, tc.prefix, nil, 0),
@@ -135,7 +145,9 @@ func TestTransactionalMultiWriterDeduplication(t *testing.T) {
 			require.Equal(t, tc.wantProducerID, writer.orchestrator.writerPool.getProducerID(1))
 			require.Equal(t, !tc.wantExplicitSeqNo, cfg.AutoSetSeqNo)
 
-			err = writer.Write(ctx, []topicwriterinternal.PublicMessage{{Data: bytes.NewReader([]byte("message")), PartitionID: 1}})
+			err = writer.Write(ctx, []topicwriterinternal.PublicMessage{{
+				Data: bytes.NewReader([]byte("message")), PartitionID: 1,
+			}})
 			if tc.wantExplicitSeqNo {
 				require.ErrorIs(t, err, ErrNoSeqNo)
 				err = writer.Write(ctx, []topicwriterinternal.PublicMessage{{

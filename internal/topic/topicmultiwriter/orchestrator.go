@@ -245,19 +245,11 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		return err
 	}
 	var lastSeqNo int64
-	if autoSetSeqNo && !o.writerCfg.Transactional {
-		writer, writerErr := o.writerPool.get(msg.PartitionID, true)
-		if writerErr != nil {
-			return writerErr
+	if autoSetSeqNo && o.multiWriterCfg.ProducerIDPrefix != "" {
+		lastSeqNo, err = o.lastSeqNoFromWriter(ctx, msg.PartitionID)
+		if err != nil {
+			return err
 		}
-		if writer.initDone.Load() {
-			if writerErr = writer.getInitErr(); writerErr != nil {
-				return writerErr
-			}
-		} else if writerErr = writer.waitInit(ctx); writerErr != nil {
-			return writerErr
-		}
-		lastSeqNo = writer.initInfo.LastSeqNum
 	}
 
 	// saveMessageContent must run after choosePartition: BoundPartitionChooser may
@@ -267,23 +259,44 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	if err := o.saveMessageContent(&msg); err != nil {
 		return err
 	}
+	if err = o.enqueueMessage(msg, lastSeqNo); err != nil {
+		return err
+	}
+	acquired = false
+
+	return nil
+}
+
+func (o *orchestrator) enqueueMessage(msg message, lastSeqNo int64) (err error) {
 	o.mu.WithLock(func() {
-		if autoSetSeqNo {
+		if o.writerCfg.AutoSetSeqNo {
 			o.currentSeqNo = max(o.currentSeqNo, lastSeqNo)
 			o.currentSeqNo++
 			msg.SeqNo = o.currentSeqNo
-		} else {
-			err = o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo)
-			if err != nil {
-				return
-			}
+		} else if err = o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo); err != nil {
+			return
 		}
 		o.buf.pushNeedLock(msg)
 		o.sender.wakeup()
-		acquired = false
 	})
 
 	return err
+}
+
+func (o *orchestrator) lastSeqNoFromWriter(ctx context.Context, partitionID int64) (int64, error) {
+	writer, err := o.writerPool.get(partitionID, true)
+	if err != nil {
+		return 0, err
+	}
+	if writer.initDone.Load() {
+		if err = writer.getInitErr(); err != nil {
+			return 0, err
+		}
+	} else if err = writer.waitInit(ctx); err != nil {
+		return 0, err
+	}
+
+	return writer.initInfo.LastSeqNum, nil
 }
 
 func (o *orchestrator) saveMessageContent(msg *message) error {

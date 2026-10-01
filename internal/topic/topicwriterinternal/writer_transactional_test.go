@@ -20,6 +20,7 @@ func TestTransactionalWriterReturnsConnectErrorWithoutRetry(t *testing.T) {
 		WithTransactionMode(),
 		WithConnectFunc(func(context.Context, *trace.Topic) (RawTopicWriterStream, error) {
 			connects.Add(1)
+
 			return nil, want
 		}),
 	)
@@ -33,9 +34,21 @@ func TestTransactionalWriterReturnsConnectErrorWithoutRetry(t *testing.T) {
 	require.EqualValues(t, 1, connects.Load())
 }
 
-func TestTransactionalProducerIDRequiresExplicitSeqNo(t *testing.T) {
+func TestTransactionalProducerIDUsesAutomaticSeqNoByDefault(t *testing.T) {
 	cfg := NewWriterReconnectorConfig(WithTransactionMode(), WithProducerID("producer"))
 	require.Equal(t, "producer", cfg.ProducerID())
+	require.True(t, cfg.AutoSetSeqNo)
+	require.True(t, newWriterReconnectorStopped(cfg).needReceiveLastSeqNo())
+
+	writer := newWriterReconnectorStopped(cfg)
+	writer.onWriterChange(&SingleStreamWriter{LastSeqNumRequested: true, ReceivedLastSeqNum: 9})
+	err := writer.Write(context.Background(), []PublicMessage{{Data: bytes.NewReader([]byte("message"))}})
+	require.NoError(t, err)
+	require.EqualValues(t, 10, writer.queue.messagesByOrder[1].SeqNo)
+}
+
+func TestTransactionalWriterRequiresSeqNoWhenAutomaticSeqNoDisabled(t *testing.T) {
+	cfg := NewWriterReconnectorConfig(WithTransactionMode(), WithProducerID("producer"), WithAutoSetSeqNo(false))
 	require.False(t, cfg.AutoSetSeqNo)
 	require.False(t, newWriterReconnectorStopped(cfg).needReceiveLastSeqNo())
 
@@ -57,6 +70,6 @@ func TestTransactionalWriterWithoutProducerIDAssignsLocalSeqNo(t *testing.T) {
 		err := writer.Write(context.Background(), []PublicMessage{{Data: bytes.NewReader([]byte("message"))}})
 		require.NoError(t, err)
 	}
-	require.EqualValues(t, 0, writer.queue.messagesByOrder[1].SeqNo)
-	require.EqualValues(t, 1, writer.queue.messagesByOrder[2].SeqNo)
+	require.EqualValues(t, 1, writer.queue.messagesByOrder[1].SeqNo)
+	require.EqualValues(t, 2, writer.queue.messagesByOrder[2].SeqNo)
 }

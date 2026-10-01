@@ -37,7 +37,7 @@ var (
 	errConnTimeout           = xerrors.Wrap(errors.New("ydb: connection timeout"))
 	errStopWriterReconnector = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
 	ErrNonZeroSeqNo          = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
-	ErrNoSeqNo               = xerrors.Wrap(errors.New("ydb: seqno is required for transactional writer with producer id"))
+	ErrNoSeqNo               = xerrors.Wrap(errors.New("ydb: seqno is required when automatic sequencing is disabled"))
 	errNoAllowedCodecs       = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
 	errLargeMessage          = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
 	ErrPublicQueueIsFull     = xerrors.Wrap(
@@ -190,7 +190,6 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 	}
 
 	if cfg.Transactional {
-		cfg.AutoSetSeqNo = cfg.producerID == ""
 		cfg.RetrySettings.CheckError = func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
 			return topic.PublicRetryDecisionStop
 		}
@@ -256,6 +255,9 @@ func newWriterReconnectorStopped(
 		encodersMap:                    topicwritercommon.NewMultiEncoder(),
 		writerInstanceID:               writerInstanceID.String(),
 		retrySettings:                  cfg.RetrySettings,
+	}
+	if cfg.Transactional && cfg.producerID == "" {
+		res.lastSeqNo = 0
 	}
 
 	res.queue.OnAckReceived = res.onAckReceived
@@ -324,7 +326,7 @@ func (w *WriterReconnector) WriteInternal(
 
 func (w *WriterReconnector) validateWriteMessages(messages []PublicMessage) error {
 	for i := range messages {
-		if w.cfg.Transactional && w.cfg.producerID != "" && messages[i].SeqNo == 0 {
+		if w.cfg.Transactional && !w.cfg.AutoSetSeqNo && messages[i].SeqNo == 0 {
 			return xerrors.WithStackTrace(ErrNoSeqNo)
 		}
 		if !w.cfg.MultiMode && (messages[i].Key != "" || messages[i].PartitionID != 0) {
@@ -731,7 +733,7 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
-	res := !w.cfg.Transactional && !w.firstConnectionHandled.Load()
+	res := w.cfg.AutoSetSeqNo && w.cfg.producerID != "" && !w.firstConnectionHandled.Load()
 
 	return res
 }
