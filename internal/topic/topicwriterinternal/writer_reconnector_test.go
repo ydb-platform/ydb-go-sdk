@@ -569,6 +569,19 @@ func TestWriterImpl_WaitInitInfo(t *testing.T) {
 	})
 }
 
+func TestWriterImpl_WaitInitInfoWithManualSeqNo(t *testing.T) {
+	w := newTestWriterStopped(WithAutoSetSeqNo(false))
+	require.True(t, testCreateInitRequest(w).GetLastSeqNo)
+
+	w.onWriterChange(&SingleStreamWriter{
+		LastSeqNumRequested: true,
+		ReceivedLastSeqNum:  1,
+	})
+	info, err := w.WaitInitInfo(context.Background())
+	require.NoError(t, err)
+	require.EqualValues(t, 1, info.LastSeqNum)
+}
+
 func TestWriterImpl_Reconnect(t *testing.T) {
 	t.Run("StopReconnectOnUnretryableError", func(t *testing.T) {
 		mc := gomock.NewController(t)

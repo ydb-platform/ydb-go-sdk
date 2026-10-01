@@ -736,7 +736,7 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
-	res := (w.cfg.AutoSetSeqNo || w.cfg.RequestLastSeqNo) &&
+	res := (w.cfg.AutoSetSeqNo || w.cfg.RequestLastSeqNo || (!w.cfg.MultiMode && !w.cfg.Transactional)) &&
 		w.cfg.producerID != "" && !w.firstConnectionHandled.Load()
 
 	return res
