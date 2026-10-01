@@ -1,4 +1,4 @@
-* Added topic reader and listener metrics for message flow, session errors, commit progress, buffers, and partition sessions. See [METRICS.md](METRICS.md).
+* Added topic reader and listener metrics for message flow, session errors, commit progress, and buffers. See [METRICS.md](METRICS.md).
 
 ## v3.153.1
 * Fixed `sugar.Embedding` encoding of an empty vector to match `Knn::ToBinaryStringFloat`

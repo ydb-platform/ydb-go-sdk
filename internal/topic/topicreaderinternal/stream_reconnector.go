@@ -52,9 +52,6 @@ type readerReconnector struct {
 	initDoneCh                 empty.Chan
 	m                          xsync.RWMutex
 	closeOnce                  sync.Once
-	metricsSourceCloseOnce     sync.Once
-	metricsSource              *topicreadercommon.ReaderMetricsSource
-	metricsSourceDone          func()
 	stopSessionErrorReported   atomic.Bool
 	initDone                   bool
 }
@@ -67,21 +64,17 @@ func newReaderReconnector(
 	retrySettings topic.RetrySettings,
 	tracer *trace.Topic,
 	readerInfo topicreadercommon.ReaderInfo,
-	metricsSource *topicreadercommon.ReaderMetricsSource,
-	metricsSourceDone func(),
 ) *readerReconnector {
 	res := &readerReconnector{
-		readerID:          readerID,
-		clock:             clockwork.NewRealClock(),
-		readerConnect:     connector,
-		streamErr:         errUnconnected,
-		connectTimeout:    connectTimeout,
-		logContext:        logContext,
-		tracer:            tracer,
-		readerInfo:        readerInfo,
-		retrySettings:     retrySettings,
-		metricsSource:     metricsSource,
-		metricsSourceDone: metricsSourceDone,
+		readerID:       readerID,
+		clock:          clockwork.NewRealClock(),
+		readerConnect:  connector,
+		streamErr:      errUnconnected,
+		connectTimeout: connectTimeout,
+		logContext:     logContext,
+		tracer:         tracer,
+		readerInfo:     readerInfo,
+		retrySettings:  retrySettings,
 	}
 
 	if res.connectTimeout == 0 {
@@ -247,28 +240,9 @@ func (r *readerReconnector) readOnce(
 	}
 	if err != nil {
 		r.traceSessionStopAfterRead(ctx, stream, err)
-		r.closeMetricsSourceOnTerminalStreamError(ctx, stream)
 	}
 
 	return res, false, err
-}
-
-func (r *readerReconnector) closeMetricsSourceOnTerminalStreamError(
-	ctx context.Context,
-	stream batchedStreamReader,
-) {
-	if ctx != nil && ctx.Err() != nil {
-		return
-	}
-	streamErrer, ok := stream.(streamErrorer)
-	if !ok {
-		return
-	}
-	streamErr := streamErrer.streamError()
-	if streamErr == nil || r.isRetriableError(streamErr) || suppressReaderSessionError(ctx, streamErr) {
-		return
-	}
-	r.closeMetricsSource()
 }
 
 func (r *readerReconnector) Commit(
@@ -323,7 +297,6 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, reason error) er
 		})
 	})
 	r.traceStoredStreamStop(ctx, streamError)
-	r.closeMetricsSource()
 
 	return closeErr
 }
@@ -404,19 +377,6 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 		err := r.reconnect(ctx, request.reason, request.oldReader, request.reportSessionError)
 		logCtx := r.logContext
 		gtrace.TopicOnReaderReconnect(r.tracer, &logCtx, request.reason)(err)
-	}
-}
-
-func (r *readerReconnector) closeMetricsSource() {
-	var closeSource bool
-	r.metricsSourceCloseOnce.Do(func() {
-		closeSource = true
-		if r.metricsSource != nil {
-			r.metricsSource.Close()
-		}
-	})
-	if closeSource && r.metricsSourceDone != nil {
-		r.metricsSourceDone()
 	}
 }
 

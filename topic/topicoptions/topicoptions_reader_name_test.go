@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	grpcCodes "google.golang.org/grpc/codes"
+	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
@@ -82,32 +84,35 @@ func newNameTestReader(t *testing.T, names ...string) (topicreaderinternal.Reade
 
 	var readerName string
 	readerTrace := trace.Topic{
-		OnReaderMetricsSource: func(
-			info trace.TopicReaderMetricsSourceStartInfo,
-		) func(trace.TopicReaderMetricsSourceDoneInfo) {
+		OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
 			readerName = info.ReaderName
-
-			return func(trace.TopicReaderMetricsSourceDoneInfo) {}
 		},
 	}
-	opts := []ReaderOption{WithReaderTrace(readerTrace)}
+	opts := []ReaderOption{
+		WithReaderTrace(readerTrace),
+		WithReaderCheckRetryErrorFunction(func(CheckErrorRetryArgs) CheckErrorRetryResult {
+			return CheckErrorRetryDecisionStop
+		}),
+	}
 	if len(names) != 0 {
 		opts = append(opts, WithReaderName(names[0]))
 	}
 	reader, err := topicreaderinternal.NewReader(
 		nil,
 		func(context.Context, int64, *trace.Topic) (topicreadercommon.RawTopicReaderStream, error) {
-			return nil, context.Canceled
+			return nil, grpcStatus.Error(grpcCodes.PermissionDenied, "reader name test")
 		},
 		"consumer",
 		[]topicreadercommon.PublicReadSelector{{Path: "/topic"}},
 		opts...,
 	)
 	require.NoError(t, err)
-	require.NotEmpty(t, readerName)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	require.ErrorIs(t, reader.WaitInit(ctx), context.Canceled)
+	initErr := reader.WaitInit(ctx)
+	require.Error(t, initErr)
+	require.Equal(t, grpcCodes.PermissionDenied, grpcStatus.Code(initErr))
+	require.NotEmpty(t, readerName)
 
 	return reader, readerName
 }
@@ -118,26 +123,17 @@ func newNameTestListener(
 ) (*topiclistenerinternal.TopicListenerReconnector, string) {
 	t.Helper()
 
-	var readerName string
 	cfg := topiclistenerinternal.NewStreamListenerConfig()
 	cfg.Consumer = "consumer"
 	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "/topic"}}
 	if len(names) != 0 {
 		WithListenerName(names[0])(&cfg)
 	}
-	cfg.Tracer = &trace.Topic{
-		OnReaderMetricsSource: func(
-			info trace.TopicReaderMetricsSourceStartInfo,
-		) func(trace.TopicReaderMetricsSourceDoneInfo) {
-			readerName = info.ReaderName
-
-			return func(trace.TopicReaderMetricsSourceDoneInfo) {}
-		},
-	}
 	reconnector, err := topiclistenerinternal.NewTopicListenerReconnector(
 		nameTestTopicClient{}, &cfg, nil,
 	)
 	require.NoError(t, err)
+	readerName := cfg.ReaderName
 	require.NotEmpty(t, readerName)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

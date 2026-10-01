@@ -4,13 +4,10 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/rekby/fixenv"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -19,70 +16,6 @@ func TestStreamListenerSessionErrorSkipsUninitializedConfig(t *testing.T) {
 	listener := &TopicListenerReconnector{}
 	listener.traceSessionError(context.Background(), errors.New("stream stopped"), "stop")
 	require.True(t, suppressListenerSessionError(context.Background(), nil))
-}
-
-func TestStreamListenerForcedStopUnregistersMetricsWithoutConfirmation(t *testing.T) {
-	e := fixenv.New(t)
-	listener := StreamListener(e)
-	source, session := setupStopMetrics(t, listener, e)
-
-	stopHandled := make(chan *PublicEventStopPartitionSession, 1)
-	EventHandlerMock(e).EXPECT().OnStopPartitionSessionRequest(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, event *PublicEventStopPartitionSession) error {
-			stopHandled <- event
-
-			return nil
-		},
-	)
-
-	require.NoError(t, listener.routeMessage(context.Background(), &rawtopicreader.StopPartitionSessionRequest{
-		PartitionSessionID: session.StreamPartitionSessionID,
-	}, time.Time{}))
-	select {
-	case <-stopHandled:
-	case <-time.After(time.Second):
-		t.Fatal("listener forced stop callback did not run")
-	}
-
-	snapshot := source.Snapshot()
-	require.Zero(t, snapshot.PartitionSessionCount)
-	require.Zero(t, snapshot.CommitOffsetLag)
-}
-
-func TestStreamListenerForcedStopUnregistersMetricsWithGracefulStopPending(t *testing.T) {
-	e := fixenv.New(t)
-	listener := StreamListener(e)
-	source, session := setupStopMetrics(t, listener, e)
-
-	stopHandled := make(chan *PublicEventStopPartitionSession, 2)
-	EventHandlerMock(e).EXPECT().OnStopPartitionSessionRequest(gomock.Any(), gomock.Any()).Times(2).DoAndReturn(
-		func(_ context.Context, event *PublicEventStopPartitionSession) error {
-			stopHandled <- event
-
-			return nil
-		},
-	)
-
-	require.NoError(t, listener.routeMessage(context.Background(), &rawtopicreader.StopPartitionSessionRequest{
-		PartitionSessionID: session.StreamPartitionSessionID,
-		Graceful:           true,
-	}, time.Time{}))
-	first := waitStopEvent(t, stopHandled)
-	snapshot := source.Snapshot()
-	require.Equal(t, int64(1), snapshot.PartitionSessionCount)
-	require.Equal(t, int64(10), snapshot.CommitOffsetLag)
-
-	require.NoError(t, listener.routeMessage(context.Background(), &rawtopicreader.StopPartitionSessionRequest{
-		PartitionSessionID: session.StreamPartitionSessionID,
-		Graceful:           false,
-	}, time.Time{}))
-	snapshot = source.Snapshot()
-	require.Zero(t, snapshot.PartitionSessionCount)
-	require.Zero(t, snapshot.CommitOffsetLag)
-
-	first.Confirm()
-	second := waitStopEvent(t, stopHandled)
-	second.Confirm()
 }
 
 func TestStreamListener_LocalBufferGuardsAndPartialRelease(t *testing.T) {
@@ -169,36 +102,4 @@ func TestStreamListener_LocalBufferFinalizeWithoutOutstandingMessages(t *testing
 		listener.finalizeLocalBuffer()
 		listenerMetricNoDelta(t, deltas)
 	})
-}
-
-func setupStopMetrics(
-	t *testing.T,
-	listener *streamListener,
-	e fixenv.Env,
-) (*topicreadercommon.ReaderMetricsSource, *topicreadercommon.PartitionSession) {
-	t.Helper()
-	source := topicreadercommon.NewReaderMetricsSource()
-	listener.metricsSource = source
-	session := PartitionSession(e)
-	session.SetupMetricsSource(source)
-	source.RegisterPartitionSession(session)
-	source.RegisterCommit(session, 10)
-	listener.createWorkerForPartition(session)
-	t.Cleanup(func() {
-		_ = listener.Close(context.Background(), errors.New("test cleanup"))
-	})
-
-	return source, session
-}
-
-func waitStopEvent(t *testing.T, events <-chan *PublicEventStopPartitionSession) *PublicEventStopPartitionSession {
-	t.Helper()
-	select {
-	case event := <-events:
-		return event
-	case <-time.After(time.Second):
-		t.Fatal("listener stop callback did not run")
-
-		return nil
-	}
 }

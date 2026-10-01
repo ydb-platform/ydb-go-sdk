@@ -2,7 +2,6 @@ package trace
 
 import (
 	"context"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 )
@@ -17,12 +16,6 @@ type (
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderStart func(info TopicReaderStartInfo)
-
-		// TopicReaderMetricsEvents
-
-		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		// gtrace:optional
-		OnReaderMetricsSource func(TopicReaderMetricsSourceStartInfo) func(TopicReaderMetricsSourceDoneInfo)
 
 		// TopicReaderStreamLifeCycleEvents
 
@@ -239,34 +232,6 @@ type (
 		Consumer string
 		Error    error
 	}
-
-	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-	TopicReaderMetricsSnapshot struct {
-		// OldestMessageAge is non-negative and zero when no message is retained.
-		OldestMessageAge      time.Duration
-		CommitOffsetLag       int64
-		PartitionSessionCount int64
-	}
-
-	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-	TopicReaderMetricsSource interface {
-		// Snapshot must return an in-memory point-in-time view and must not issue
-		// RPCs or block on network I/O.
-		Snapshot() TopicReaderMetricsSnapshot
-	}
-
-	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-	TopicReaderMetricsSourceStartInfo struct {
-		Endpoint   string
-		Database   string
-		Consumer   string
-		ReaderName string
-		Listener   bool
-		Source     TopicReaderMetricsSource
-	}
-
-	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-	TopicReaderMetricsSourceDoneInfo struct{}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderPartitionReadStartResponseDoneInfo struct {

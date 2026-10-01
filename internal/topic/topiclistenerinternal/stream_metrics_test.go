@@ -166,7 +166,7 @@ func TestStreamListener_LocalBufferTracksQueueAndHandler(t *testing.T) {
 	session := PartitionSession(e)
 	session.Topic = "/topic"
 	listener.createWorkerForPartition(session)
-	require.NoError(t, listener.splitAndRouteReadResponse(listenerMetricResponse(session, 50), time.Time{}))
+	require.NoError(t, listener.splitAndRouteReadResponse(listenerMetricResponse(session, 50)))
 	select {
 	case deltas := <-handlerDeltas:
 		require.Equal(t, []int{1, -1}, deltas)
@@ -218,7 +218,6 @@ func TestStreamListener_LocalBufferRollbackAfterFinalization(t *testing.T) {
 		listener.onWorkerStopped,
 		listener.tracer,
 		listener.listenerID,
-		nil,
 		listener.reserveLocalBuffer,
 		listener.releaseLocalBuffer,
 	)
@@ -227,7 +226,7 @@ func TestStreamListener_LocalBufferRollbackAfterFinalization(t *testing.T) {
 		listener.workers[session.StreamPartitionSessionID] = worker
 	})
 
-	require.NoError(t, listener.splitAndRouteReadResponse(listenerMetricResponse(session, 50), time.Time{}))
+	require.NoError(t, listener.splitAndRouteReadResponse(listenerMetricResponse(session, 50)))
 	require.Equal(t, []int{1, -1}, localDeltas)
 	require.NoError(t, listener.Close(ctx, errors.New("test close")))
 }
@@ -362,7 +361,7 @@ func TestStreamListener_MetricBalancesArePerStreamForSameReaderName(t *testing.T
 	})
 }
 
-func TestStreamListenerStartCommitOverrideUpdatesOnlyMetricsBaseline(t *testing.T) {
+func TestStreamListenerStartCommitOverridePreservesSessionOffsets(t *testing.T) {
 	e := fixenv.New(t)
 	listener := StreamListener(e)
 	ctx := sf.Context(e)
@@ -378,8 +377,6 @@ func TestStreamListenerStartCommitOverrideUpdatesOnlyMetricsBaseline(t *testing.
 			ReaderName: "reader",
 		},
 	}
-	listener.metricsSource = topicreadercommon.NewReaderMetricsSource()
-
 	listener.background.Start("metrics start test listener send loop", listener.sendMessagesLoop)
 	startPartition := func(
 		testT *testing.T,
@@ -440,17 +437,6 @@ func TestStreamListenerStartCommitOverrideUpdatesOnlyMetricsBaseline(t *testing.
 	require.Equal(t, rawtopiccommon.NewOffset(100), response.CommitOffset.Offset)
 	require.Equal(t, rawtopiccommon.NewOffset(50), session.CommittedOffset())
 	require.Equal(t, rawtopiccommon.NewOffset(49), session.LastReceivedMessageOffset())
-	snapshot := listener.metricsSource.Snapshot()
-	require.Equal(t, int64(1), snapshot.PartitionSessionCount)
-	require.Zero(t, snapshot.CommitOffsetLag)
-
-	listener.metricsSource.RegisterCommit(session, 101)
-	require.Equal(t, int64(1), listener.metricsSource.Snapshot().CommitOffsetLag)
-	listener.metricsSource.AcknowledgeCommit(session, 101)
-	require.Zero(t, listener.metricsSource.Snapshot().CommitOffsetLag)
-	require.Equal(t, rawtopiccommon.NewOffset(50), session.CommittedOffset())
-	require.Equal(t, rawtopiccommon.NewOffset(49), session.LastReceivedMessageOffset())
-
 	for i, test := range []struct {
 		name    string
 		confirm PublicStartPartitionSessionConfirm
@@ -463,12 +449,6 @@ func TestStreamListenerStartCommitOverrideUpdatesOnlyMetricsBaseline(t *testing.
 			session, _ := startPartition(t, rawtopicreader.PartitionSessionID(101+i), 50, test.confirm)
 			require.Equal(t, rawtopiccommon.NewOffset(50), session.CommittedOffset())
 			require.Equal(t, rawtopiccommon.NewOffset(49), session.LastReceivedMessageOffset())
-			require.Zero(t, listener.metricsSource.Snapshot().CommitOffsetLag)
-
-			listener.metricsSource.RegisterCommit(session, 51)
-			require.Equal(t, int64(1), listener.metricsSource.Snapshot().CommitOffsetLag)
-			listener.metricsSource.AcknowledgeCommit(session, 51)
-			require.Zero(t, listener.metricsSource.Snapshot().CommitOffsetLag)
 		})
 	}
 }

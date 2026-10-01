@@ -66,7 +66,6 @@ type PartitionWorker struct {
 		CommitHandler
 	}
 	readBufferReleaser   ReadBufferReleaser
-	metricsSource        *topicreadercommon.ReaderMetricsSource
 	reserveLocalBufferFn func(topic string, messagesCount int) bool
 	releaseLocalBufferFn func(topic string, messagesCount int)
 	userHandler          EventHandler
@@ -94,7 +93,6 @@ func NewPartitionWorker[T interface {
 	onStopped WorkerStoppedCallback,
 	tracer *trace.Topic,
 	listenerID string,
-	metricsSource *topicreadercommon.ReaderMetricsSource,
 	reserveLocalBuffer func(topic string, messagesCount int) bool,
 	releaseLocalBuffer func(topic string, messagesCount int),
 ) *PartitionWorker {
@@ -108,7 +106,6 @@ func NewPartitionWorker[T interface {
 		partitionSession:     session,
 		messageSender:        messageSender,
 		readBufferReleaser:   messageSender,
-		metricsSource:        metricsSource,
 		reserveLocalBufferFn: reserveLocalBuffer,
 		releaseLocalBufferFn: releaseLocalBuffer,
 		userHandler:          userHandler,
@@ -161,9 +158,6 @@ func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) bool {
 	if !accepted {
 		if reserved {
 			w.releaseLocalBuffer(localBufferTopic, localBufferMessages)
-		}
-		if msg.BatchMessage != nil {
-			w.releaseBatch(msg.BatchMessage.Batch)
 		}
 		w.freeBatchCredit(msg)
 	}
@@ -392,16 +386,7 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 		localBufferReleased = true
 		w.releaseLocalBuffer(batchTopic, messagesCount)
 	}
-	batchReleased := false
-	releaseBatch := func() {
-		if batchReleased || msg.Batch == nil || w.metricsSource == nil {
-			return
-		}
-		batchReleased = true
-		w.metricsSource.ReleaseBatch(msg.Batch)
-	}
 	defer releaseLocalBuffer()
-	defer releaseBatch()
 
 	// Check for errors in the metadata
 	if err := w.validateBatchMetadata(msg); err != nil {
@@ -411,7 +396,6 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 	}
 
 	releaseLocalBuffer()
-	releaseBatch()
 
 	// Call user handler with tracing
 	if err := w.callUserHandler(ctx, msg, w.messageSender, messagesCount); err != nil {
@@ -444,16 +428,8 @@ func (w *PartitionWorker) releaseQueuedBatch(msg unifiedMessage) {
 			topic = session.Topic
 		}
 		w.releaseLocalBuffer(topic, len(batch.Messages))
-		w.releaseBatch(batch)
 	}
 	w.freeBatchCredit(msg)
-}
-
-func (w *PartitionWorker) releaseBatch(batch *topicreadercommon.PublicBatch) {
-	if batch == nil || w.metricsSource == nil {
-		return
-	}
-	w.metricsSource.ReleaseBatch(batch)
 }
 
 func (w *PartitionWorker) closeQueueAndFreeBufferedBatchCredits() {
@@ -538,9 +514,6 @@ func (w *PartitionWorker) handleStartPartitionRequest(
 		resp.ReadOffset.HasValue = true
 	}
 	if userResp.CommitOffset != nil {
-		metricsCommittedOffset := max(w.partitionSession.CommittedOffset().ToInt64(), *userResp.CommitOffset)
-		w.partitionSession.SetInitialMetricsCommittedOffset(rawtopiccommon.NewOffset(metricsCommittedOffset))
-
 		resp.CommitOffset.Offset.FromInt64(*userResp.CommitOffset)
 		resp.CommitOffset.HasValue = true
 	}
@@ -584,9 +557,6 @@ func (w *PartitionWorker) handleStopPartitionRequest(
 			PartitionSessionID: w.partitionSession.StreamPartitionSessionID,
 		}
 		w.messageSender.SendRaw(resp)
-	}
-	if w.metricsSource != nil {
-		w.metricsSource.UnregisterPartitionSession(w.partitionSession)
 	}
 
 	return nil

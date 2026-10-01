@@ -25,7 +25,6 @@ type PartitionSession struct {
 	committedOffsetVal       atomic.Int64
 	noMoreMessages           atomic.Bool
 	commitMetrics            *partitionSessionCommitMetrics
-	metricsSource            *ReaderMetricsSource
 }
 
 func NewPartitionSession(
@@ -68,18 +67,6 @@ func (s *PartitionSession) Close() {
 	if s.commitMetrics != nil {
 		s.commitMetrics.close()
 	}
-	if s.metricsSource != nil {
-		s.metricsSource.UnregisterPartitionSession(s)
-	}
-}
-
-// SetupMetricsSource associates the session with its logical reader metrics
-// source. Registration is performed after the session is accepted by storage.
-func (s *PartitionSession) SetupMetricsSource(source *ReaderMetricsSource) {
-	if s == nil {
-		return
-	}
-	s.metricsSource = source
 }
 
 func (s *PartitionSession) CommittedOffset() rawtopiccommon.Offset {
@@ -94,10 +81,6 @@ func (s *PartitionSession) CommittedOffset() rawtopiccommon.Offset {
 // SetCommittedOffsetForward set new offset if new offset greater, then old
 func (s *PartitionSession) SetCommittedOffsetForward(v rawtopiccommon.Offset) {
 	newVal := int64(v)
-	if s.metricsSource != nil {
-		s.metricsSource.AcknowledgeCommit(s, newVal)
-	}
-
 	for {
 		old := s.committedOffsetVal.Load()
 		if newVal <= old {
@@ -126,14 +109,6 @@ func (s *PartitionSession) SetLastReceivedMessageOffset(v rawtopiccommon.Offset)
 func (s *PartitionSession) SetInitialCommitOffset(committedOffset rawtopiccommon.Offset) {
 	s.committedOffsetVal.Store(committedOffset.ToInt64())
 	s.lastReceivedOffsetEndVal.Store(committedOffset.ToInt64() - 1)
-	s.SetInitialMetricsCommittedOffset(committedOffset)
-}
-
-// SetInitialMetricsCommittedOffset updates only the observable commit baseline.
-func (s *PartitionSession) SetInitialMetricsCommittedOffset(committedOffset rawtopiccommon.Offset) {
-	if s.metricsSource != nil {
-		s.metricsSource.SetInitialCommittedOffset(s, committedOffset.ToInt64())
-	}
 }
 
 func (s *PartitionSession) NoMoreMessages() bool {

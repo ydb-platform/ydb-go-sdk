@@ -224,7 +224,7 @@ func TestTopicReader_CommitMetricsRegisterBeforeSynchronousAckAndClose(t *testin
 	}
 
 	// Registration happened before the callback closed the session, so the
-	// acknowledgement remains observable even after the session is closed.
+	// acknowledgement remains reported even after the session is closed.
 	require.NoError(t, test.reader.Close(context.Background()))
 	topicreadercommon.TraceCommitQueued(test.env.ctx, topicreadercommon.GetCommitRange(test.batch))
 	topicreadercommon.TraceCommitAcknowledged(test.env.ctx, test.env.partitionSession, rawtopiccommon.NewOffset(25))

@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -36,12 +35,11 @@ func extractSelectorNames(selectors []*topicreadercommon.PublicReadSelector) []s
 type streamListener struct {
 	cfg *StreamListenerConfig
 
-	stream        topicreadercommon.RawTopicReaderStream
-	streamClose   context.CancelCauseFunc
-	handler       EventHandler
-	sessionID     string
-	listenerID    string
-	metricsSource *topicreadercommon.ReaderMetricsSource
+	stream      topicreadercommon.RawTopicReaderStream
+	streamClose context.CancelCauseFunc
+	handler     EventHandler
+	sessionID   string
+	listenerID  string
 
 	background       background.Worker
 	sessions         *topicreadercommon.PartitionSessionStorage
@@ -86,7 +84,6 @@ func newStreamListener(
 		background:       *background.NewWorker(xcontext.ValueOnly(connectionCtx), "topic reader stream listener"),
 		sessionIDCounter: sessionIDCounter,
 		listenerID:       listenerID,
-		metricsSource:    config.metricsSource,
 		tracer:           config.Tracer,
 	}
 
@@ -391,10 +388,6 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 		}
 
 		mess, err := l.stream.Recv()
-		var receivedAt time.Time
-		if l.metricsSource != nil {
-			receivedAt = time.Now()
-		}
 
 		logCtx := ctx
 		if err != nil {
@@ -421,7 +414,7 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 
 		gtrace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, messageType, bytesSize, nil)
 
-		if err := l.routeMessage(ctx, mess, receivedAt); err != nil {
+		if err := l.routeMessage(ctx, mess); err != nil {
 			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
 			l.goClose(ctx, err)
 		}
@@ -503,7 +496,6 @@ func (l *streamListener) finalizeLocalBuffer() {
 func (l *streamListener) routeMessage(
 	ctx context.Context,
 	mess rawtopicreader.ServerMessage,
-	receivedAt time.Time,
 ) error {
 	if l.closing.Load() {
 		return nil
@@ -514,15 +506,12 @@ func (l *streamListener) routeMessage(
 		return l.handleStartPartition(ctx, m)
 	case *rawtopicreader.StopPartitionSessionRequest:
 		l.routeToWorker(m.PartitionSessionID, func(worker *PartitionWorker) {
-			if !m.Graceful {
-				l.unregisterPartitionSession(worker.partitionSession)
-			}
 			worker.AddRawServerMessage(m)
 		})
 
 		return nil
 	case *rawtopicreader.ReadResponse:
-		return l.splitAndRouteReadResponse(m, receivedAt)
+		return l.splitAndRouteReadResponse(m)
 	case *rawtopicreader.CommitOffsetResponse:
 		return l.onCommitResponse(m)
 	default:
@@ -547,12 +536,8 @@ func (l *streamListener) handleStartPartition(
 		m.CommittedOffset,
 	)
 	session.SetupCommitMetrics(l.tracer, l.cfg.ReaderInfo)
-	session.SetupMetricsSource(l.metricsSource)
 	if err := l.sessions.Add(session); err != nil {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to add partition session: %w", err)))
-	}
-	if l.metricsSource != nil {
-		l.metricsSource.RegisterPartitionSession(session)
 	}
 
 	// Create worker for this partition
@@ -573,7 +558,6 @@ func (l *streamListener) handleStartPartition(
 // splitAndRouteReadResponse splits ReadResponse into batches and routes to workers
 func (l *streamListener) splitAndRouteReadResponse(
 	m *rawtopicreader.ReadResponse,
-	receivedAt time.Time,
 ) error {
 	batches, err := topicreadercommon.ReadRawBatchesToPublicBatches(m, l.sessions, l.cfg.Decoders)
 	if err != nil {
@@ -583,9 +567,6 @@ func (l *streamListener) splitAndRouteReadResponse(
 
 	// Route each batch to its partition worker
 	for _, batch := range batches {
-		if l.metricsSource != nil {
-			l.metricsSource.TrackBatch(batch, receivedAt)
-		}
 		partitionSession := topicreadercommon.BatchGetPartitionSession(batch)
 		topic := batch.Topic()
 		messagesCount := len(batch.Messages)
@@ -597,9 +578,6 @@ func (l *streamListener) splitAndRouteReadResponse(
 			// Worker missing: batch is dropped but buffer was already charged above.
 			// Return credit here; routeToWorker stays non-fatal for protocol mismatch.
 			l.ReadBufferRelease(batchReadBufferSize(batch))
-			if l.metricsSource != nil {
-				l.metricsSource.ReleaseBatch(batch)
-			}
 
 			continue
 		}
@@ -615,12 +593,6 @@ func (l *streamListener) splitAndRouteReadResponse(
 	}
 
 	return nil
-}
-
-func (l *streamListener) unregisterPartitionSession(session *topicreadercommon.PartitionSession) {
-	if l.metricsSource != nil {
-		l.metricsSource.UnregisterPartitionSession(session)
-	}
 }
 
 // onCommitResponse processes CommitOffsetResponse directly in streamListener
@@ -782,7 +754,6 @@ func (l *streamListener) onWorkerStopped(
 	// Remove corresponding session
 	for _, session := range l.sessions.GetAll() {
 		if session.StreamPartitionSessionID == sessionID {
-			l.unregisterPartitionSession(session)
 			_, _ = l.sessions.Remove(session.StreamPartitionSessionID)
 
 			break
@@ -817,7 +788,6 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 		},
 		l.tracer,
 		l.listenerID,
-		l.metricsSource,
 		l.reserveLocalBuffer,
 		l.releaseLocalBuffer,
 	)

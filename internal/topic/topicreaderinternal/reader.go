@@ -93,8 +93,6 @@ func NewReader(
 		cfg.ReaderInfo.ReaderName = "default"
 	}
 
-	metricsSource, metricsSourceDone := setupReaderMetricsSource(&cfg)
-
 	readerConnector := func(ctx context.Context) (batchedStreamReader, error) {
 		stream, err := connector(ctx, readerID, cfg.Trace)
 		if err != nil {
@@ -112,8 +110,6 @@ func NewReader(
 		cfg.RetrySettings,
 		cfg.Trace,
 		cfg.ReaderInfo,
-		metricsSource,
-		metricsSourceDone,
 	)
 
 	res := Reader{
@@ -125,26 +121,6 @@ func NewReader(
 	}
 
 	return res, nil
-}
-
-func setupReaderMetricsSource(cfg *ReaderConfig) (*topicreadercommon.ReaderMetricsSource, func()) {
-	if cfg.Trace == nil || cfg.Trace.OnReaderMetricsSource == nil {
-		return nil, nil
-	}
-
-	metricsSource := topicreadercommon.NewReaderMetricsSource()
-	cfg.MetricsSource = metricsSource
-	metricsSourceDone := gtrace.TopicOnReaderMetricsSource(
-		cfg.Trace,
-		cfg.ReaderInfo.Endpoint,
-		cfg.ReaderInfo.Database,
-		cfg.ReaderInfo.Consumer,
-		cfg.ReaderInfo.ReaderName,
-		cfg.ReaderInfo.Listener,
-		metricsSource,
-	)
-
-	return metricsSource, metricsSourceDone
 }
 
 func (r *Reader) WaitInit(ctx context.Context) error {

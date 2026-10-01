@@ -81,7 +81,6 @@ type topicStreamReaderConfig struct {
 	ReadWithoutConsumer             bool
 	ReadSelectors                   []*topicreadercommon.PublicReadSelector
 	Trace                           *trace.Topic
-	MetricsSource                   *topicreadercommon.ReaderMetricsSource
 	GetPartitionStartOffsetCallback PublicGetPartitionStartOffsetFunc
 	OnStopPartitionSession          PublicOnStopPartitionSessionFunc
 	CommitMode                      topicreadercommon.PublicCommitMode
@@ -243,7 +242,7 @@ func (r *topicStreamReaderImpl) PopMessagesBatchTx(
 	if err = r.commitWithTransaction(ctx, tx, batch); err == nil {
 		return batch, nil
 	}
-	r.releaseBatch(batch)
+	r.releaseLocalBufferForBatch(batch)
 
 	return nil, err
 }
@@ -404,15 +403,8 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 }
 
 func (r *topicStreamReaderImpl) releaseLocalBufferForBatch(batch *topicreadercommon.PublicBatch) {
-	r.releaseBatch(batch)
-}
-
-func (r *topicStreamReaderImpl) releaseBatch(batch *topicreadercommon.PublicBatch) {
 	if batch == nil || len(batch.Messages) == 0 {
 		return
-	}
-	if r.cfg.MetricsSource != nil {
-		r.cfg.MetricsSource.ReleaseBatch(batch)
 	}
 	r.releaseLocalBuffer(batch.Topic(), len(batch.Messages))
 }
@@ -902,10 +894,6 @@ func (r *topicStreamReaderImpl) updateTokenLoop(ctx context.Context) {
 }
 
 func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse) (err error) {
-	var receivedAt time.Time
-	if r.cfg.MetricsSource != nil {
-		receivedAt = time.Now()
-	}
 	logCtx := r.cfg.BaseContext
 	gtrace.TopicOnReaderReceivedBytes(
 		r.cfg.Trace,
@@ -932,17 +920,11 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 	}
 
 	for i := range batches {
-		if r.cfg.MetricsSource != nil {
-			r.cfg.MetricsSource.TrackBatch(batches[i], receivedAt)
-		}
 		topic := batches[i].Topic()
 		messagesCount := len(batches[i].Messages)
 
 		reserved := r.reserveLocalBuffer(topic, messagesCount)
 		if err := r.batcher.PushBatches(batches[i]); err != nil {
-			if r.cfg.MetricsSource != nil {
-				r.cfg.MetricsSource.ReleaseBatch(batches[i])
-			}
 			if reserved {
 				r.releaseLocalBuffer(topic, messagesCount)
 			}
@@ -1018,7 +1000,7 @@ func (r *topicStreamReaderImpl) discardBatches(items []batcherMessageOrderItem) 
 			continue
 		}
 		batch := items[i].Batch
-		r.releaseBatch(batch)
+		r.releaseLocalBufferForBatch(batch)
 	}
 }
 
@@ -1082,12 +1064,8 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequest(m *rawtopicreader
 		m.CommittedOffset,
 	)
 	session.SetupCommitMetrics(r.cfg.Trace, r.cfg.ReaderInfo)
-	session.SetupMetricsSource(r.cfg.MetricsSource)
 	if err := r.sessionController.Add(session); err != nil {
 		return err
-	}
-	if r.cfg.MetricsSource != nil {
-		r.cfg.MetricsSource.RegisterPartitionSession(session)
 	}
 
 	return r.batcher.PushRawMessage(session, m)

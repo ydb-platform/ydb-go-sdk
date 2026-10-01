@@ -43,7 +43,6 @@ func topic(config Config) (t trace.Topic) {
 	setupTopicReaderCommitAcknowledged(&t, readerConfig)
 	setupTopicReaderLocalBufferMessages(&t, readerConfig)
 	setupTopicReaderCreditBalanceBytes(&t, readerConfig)
-	setupTopicReaderObservableMetrics(&t, readerConfig)
 
 	return t
 }

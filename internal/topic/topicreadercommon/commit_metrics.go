@@ -70,9 +70,6 @@ func RegisterCommitQueued(commitRange CommitRange) int {
 	if session == nil {
 		return 0
 	}
-	if session.metricsSource != nil {
-		session.metricsSource.RegisterCommit(session, commitRange.CommitOffsetEnd.ToInt64())
-	}
 	if session.commitMetrics == nil {
 		return 0
 	}
