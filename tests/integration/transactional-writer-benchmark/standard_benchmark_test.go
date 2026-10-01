@@ -49,7 +49,6 @@ var standardBenchmarkCases = []standardBenchmarkCase{
 	{Name: "single", Mode: writerModeSingle, Routing: routingModeKey},
 	{Name: "many-key", Mode: writerModeMany, Routing: routingModeKey},
 	{Name: "many-bounded-key", Mode: writerModeMany, Routing: routingModeBoundedKey},
-	{Name: "many-partition-id", Mode: writerModeMany, Routing: routingModePartitionID},
 }
 
 func BenchmarkTransactionalWriter(b *testing.B) {
@@ -165,21 +164,13 @@ func runStandardBenchmark(b *testing.B, cfg config) {
 	if err = prepareSchema(ctx, db, cfg); err != nil {
 		b.Fatal(err)
 	}
-	description, err := db.Topic().Describe(ctx, cfg.TopicPath)
-	if err != nil {
-		b.Fatalf("describe benchmark topic: %v", err)
-	}
-	initialTopology, err := topicTopologyFromDescription(description)
-	if err != nil {
-		b.Fatal(err)
-	}
 
 	payload := makePayload(cfg.MessageSize)
 	lifecycleBefore := metrics.snapshot()
 	startedAt := time.Now()
 	b.ResetTimer()
 	b.StartTimer()
-	stats := runParallelTransactions(ctx, b, db, cfg, initialTopology.ActivePartitionIDs, payload)
+	stats := runParallelTransactions(ctx, b, db, cfg, payload)
 	b.StopTimer()
 	duration := time.Since(startedAt)
 	lifecycle := metrics.snapshot().subtract(lifecycleBefore)
@@ -220,6 +211,7 @@ func runStandardAutoSplitBenchmark(b *testing.B, cfg config) {
 	if err != nil {
 		b.Fatal(err)
 	}
+	b.ReportMetric(float64(initialTopology.ActivePartitions), "initial-active-partitions")
 
 	payload := makePayload(cfg.MessageSize)
 	sequences := make([]atomic.Uint64, cfg.Concurrency)
@@ -230,7 +222,6 @@ func runStandardAutoSplitBenchmark(b *testing.B, cfg config) {
 		ctx,
 		db,
 		cfg,
-		initialTopology.ActivePartitionIDs,
 		payload,
 		cfg.Duration,
 		sequences,
@@ -259,7 +250,6 @@ func runParallelTransactions(
 	b *testing.B,
 	db *ydb.Driver,
 	cfg config,
-	activePartitionIDs []int64,
 	payload []byte,
 ) phaseStats {
 	var (
@@ -280,7 +270,6 @@ func runParallelTransactions(
 				cfg,
 				workerID,
 				logicalSequence,
-				activePartitionIDs,
 				payload,
 			)
 			stats.Attempts += uint64(attempts)
@@ -346,7 +335,7 @@ func reportStandardBenchmarkMetrics(
 	b.ReportMetric(float64(cfg.Concurrency), "workers")
 	b.ReportMetric(duration.Seconds(), "measured-s")
 	if finalTopology != nil {
-		b.ReportMetric(float64(len(finalTopology.ActivePartitionIDs)), "active-partitions")
+		b.ReportMetric(float64(finalTopology.ActivePartitions), "active-partitions")
 	}
 }
 

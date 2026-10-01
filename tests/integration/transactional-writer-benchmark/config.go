@@ -16,9 +16,8 @@ const (
 type routingMode string
 
 const (
-	routingModeKey         routingMode = "key"
-	routingModeBoundedKey  routingMode = "bounded-key"
-	routingModePartitionID routingMode = "partition-id"
+	routingModeKey        routingMode = "key"
+	routingModeBoundedKey routingMode = "bounded-key"
 )
 
 type config struct {

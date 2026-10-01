@@ -11,13 +11,12 @@ Every attempt uses `query.WithLazyTx(true)`. Creating the writer before the
 `UPSERT` exercises the transition from the lazy transaction ID to the materialized
 transaction before the writer calls `UnLazy` during `Write`.
 
-`BenchmarkTransactionalWriter` covers four fixed-topology scenarios for every
+`BenchmarkTransactionalWriter` covers three fixed-topology scenarios for every
 requested partition count:
 
 - `single`: writer without `WithWriteToManyPartitions`;
 - `many-key`: `WithWriteToManyPartitions` and `KafkaHashPartitionChooser`;
-- `many-bounded-key`: `WithWriteToManyPartitions` and `BoundPartitionChooser`;
-- `many-partition-id`: `WithWriteToManyPartitions` and explicit partition IDs.
+- `many-bounded-key`: `WithWriteToManyPartitions` and `BoundPartitionChooser`.
 
 `BenchmarkTransactionalWriterAutoSplit` exercises the bounded-key writer while
 YDB splits a Topic from one active partition. The benchmark sets
@@ -111,9 +110,10 @@ go test ./tests/integration/transactional-writer-benchmark \
 Repeat this command three times, restarting the YDB container before each run.
 
 This benchmark describes the Topic once before the measured phase and once
-after it, then reports the final `active-partitions`. Because `b.N` is one, its
-standard `B/op` and `allocs/op` columns describe the complete two-minute phase;
-use `tx/s` and latency metrics for throughput and response-time comparisons.
+after it, then reports `initial-active-partitions` and the final
+`active-partitions`. Because `b.N` is one, its standard `B/op` and `allocs/op`
+columns describe the complete two-minute phase; use `tx/s` and latency metrics
+for throughput and response-time comparisons.
 
 ## Compare revisions
 

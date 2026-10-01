@@ -11,8 +11,7 @@ import (
 )
 
 type topicTopology struct {
-	ActivePartitionIDs []int64
-	TotalPartitions    int
+	ActivePartitions int
 }
 
 func openDatabase(ctx context.Context, cfg config, metrics *instrumentation) (*ydb.Driver, error) {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,19 +29,15 @@ import (
 //	64   single                174.3     31.93     79746       1263               1
 //	64   many-key               42.44   113.8    2231570      33285              64
 //	64   many-bounded-key       21.64   252.3    2247785      33606              64
-//	64   many-partition-id      22.77   259.9    2230435      33249              64
 //	128  single                152.9     38.15     79643       1263               1
 //	128  many-key               13.12   400.1    4387854      65352             128
 //	128  many-bounded-key       10.26   560.0    4438662      66057             128
-//	128  many-partition-id      11.56   584.2    4395358      65389             128
 //	256  single                151.2     37.96     79533       1263               1
 //	256  many-key                5.885  866.1    8725378     129891             256
 //	256  many-bounded-key        5.244 1014      8818335     131231             256
-//	256  many-partition-id       5.829  879.0    8729962     129842             256
 //	512  single                140.2     42.49     79463       1263               1
 //	512  many-key                2.835 1807     17347325     258656             512
 //	512  many-bounded-key        1.941 3336     17629466     262029             512
-//	512  many-partition-id       3.517 1464     17465050     259583             512
 //
 // The auto-split benchmark was measured on 2026-10-01. It used -benchtime=1x
 // -count=1 -cpu=4 three times, where one benchmark operation is a two-minute
@@ -90,9 +85,8 @@ type attemptTimings struct {
 }
 
 type messageSpec struct {
-	SeqNo       int64
-	Key         string
-	PartitionID int64
+	SeqNo int64
+	Key   string
 }
 
 func prepareSchema(ctx context.Context, db *ydb.Driver, cfg config) error {
@@ -152,20 +146,18 @@ CREATE TABLE IF NOT EXISTS %s (
 }
 
 func topicTopologyFromDescription(description topictypes.TopicDescription) (topicTopology, error) {
-	activePartitionIDs := make([]int64, 0, len(description.Partitions))
+	activePartitions := 0
 	for _, partition := range description.Partitions {
 		if partition.Active {
-			activePartitionIDs = append(activePartitionIDs, partition.PartitionID)
+			activePartitions++
 		}
 	}
-	if len(activePartitionIDs) == 0 {
+	if activePartitions == 0 {
 		return topicTopology{}, fmt.Errorf("topic %q has no active partitions", description.Path)
 	}
-	slices.Sort(activePartitionIDs)
 
 	return topicTopology{
-		ActivePartitionIDs: activePartitionIDs,
-		TotalPartitions:    len(description.Partitions),
+		ActivePartitions: activePartitions,
 	}, nil
 }
 
@@ -234,7 +226,6 @@ func runPhase(
 	parent context.Context,
 	db *ydb.Driver,
 	cfg config,
-	activePartitionIDs []int64,
 	payload []byte,
 	duration time.Duration,
 	sequences []atomic.Uint64,
@@ -260,7 +251,6 @@ func runPhase(
 				db,
 				cfg,
 				workerID,
-				activePartitionIDs,
 				payload,
 				&sequences[workerID],
 			)
@@ -285,14 +275,12 @@ func runPhase(
 	return stats, nil
 }
 
-//nolint:funlen // Keeping collection in the worker makes the measured path easy to audit.
 func runWorker(
 	ctx context.Context,
 	phaseDone <-chan struct{},
 	db *ydb.Driver,
 	cfg config,
 	workerID int,
-	activePartitionIDs []int64,
 	payload []byte,
 	sequence *atomic.Uint64,
 ) workerStats {
@@ -313,7 +301,6 @@ func runWorker(
 			cfg,
 			workerID,
 			logicalSequence,
-			activePartitionIDs,
 			payload,
 		)
 		stats.Attempts += uint64(attempts)
@@ -357,13 +344,12 @@ func executeTransaction(
 	cfg config,
 	workerID int,
 	sequence uint64,
-	activePartitionIDs []int64,
 	payload []byte,
 ) (time.Duration, attemptTimings, int, error) {
 	transactionContext, cancel := context.WithTimeout(parent, cfg.TransactionTimeout)
 	defer cancel()
 
-	messageSpecs := makeMessageSpecs(cfg, workerID, sequence, activePartitionIDs)
+	messageSpecs := makeMessageSpecs(cfg, workerID, sequence)
 	var (
 		attempts    int
 		lastTimings attemptTimings
@@ -464,8 +450,6 @@ func writerOptions(cfg config, workerID int) []topicoptions.WriterOption {
 			multiWriterOptions,
 			topicoptions.WithWriterPartitionByKey(topicoptions.BoundPartitionChooser()),
 		)
-	case routingModePartitionID:
-		multiWriterOptions = append(multiWriterOptions, topicoptions.WithWriterPartitionByPartitionID())
 	}
 	if slotProducerID != "" {
 		multiWriterOptions = append(multiWriterOptions, topicoptions.WithProducerIDPrefix(slotProducerID))
@@ -478,7 +462,6 @@ func makeMessageSpecs(
 	cfg config,
 	workerID int,
 	sequence uint64,
-	activePartitionIDs []int64,
 ) []messageSpec {
 	specs := make([]messageSpec, cfg.MessagesPerTx)
 	for index := range specs {
@@ -489,14 +472,7 @@ func makeMessageSpecs(
 		if cfg.Mode != writerModeMany {
 			continue
 		}
-		if cfg.Routing == routingModeKey || cfg.Routing == routingModeBoundedKey {
-			specs[index].Key = fmt.Sprintf("worker-%d-message-%d", workerID, messageSequence)
-
-			continue
-		}
-
-		partitionIndex := (messageSequence + uint64(workerID) - 1) % uint64(len(activePartitionIDs))
-		specs[index].PartitionID = activePartitionIDs[partitionIndex]
+		specs[index].Key = fmt.Sprintf("worker-%d-message-%d", workerID, messageSequence)
 	}
 
 	return specs
@@ -506,10 +482,9 @@ func makeMessages(specs []messageSpec, payload []byte) []topicwriter.Message {
 	messages := make([]topicwriter.Message, len(specs))
 	for i := range specs {
 		messages[i] = topicwriter.Message{
-			SeqNo:       specs[i].SeqNo,
-			Key:         specs[i].Key,
-			PartitionID: specs[i].PartitionID,
-			Data:        bytes.NewReader(payload),
+			SeqNo: specs[i].SeqNo,
+			Key:   specs[i].Key,
+			Data:  bytes.NewReader(payload),
 		}
 	}
 
