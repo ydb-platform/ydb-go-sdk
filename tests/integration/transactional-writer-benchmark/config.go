@@ -28,20 +28,16 @@ type config struct {
 	ProducerIDPrefix       string
 	Mode                   writerMode
 	Routing                routingMode
-	AutoSeqNo              bool
 	Duration               time.Duration
 	TransactionTimeout     time.Duration
 	Concurrency            int
-	MessagesPerTx          int
 	MessageSize            int
-	LatencySampleEvery     int
 	PreparePartitions      int64
 	AutoSplit              bool
 	AutoSplitWriteSpeed    int64
 	AutoSplitBurstBytes    int64
 	AutoSplitUpUtilization int
 	AutoSplitStabilization time.Duration
-	SkipTableWrite         bool
 }
 
 func defaultRunID() string {

@@ -48,7 +48,7 @@ func TestPhaseReportRates(t *testing.T) {
 			Bytes:     2 * 1024 * 1024,
 		},
 		Duration: 2 * time.Second,
-	}.report(true)
+	}.report()
 
 	if report.TransactionsPerSecond != 10 {
 		t.Fatalf("TransactionsPerSecond = %f, want 10", report.TransactionsPerSecond)
@@ -58,9 +58,6 @@ func TestPhaseReportRates(t *testing.T) {
 	}
 	if report.PayloadMiBPerSecond != 1 {
 		t.Fatalf("PayloadMiBPerSecond = %f, want 1", report.PayloadMiBPerSecond)
-	}
-	if report.Latency.TableExec != nil {
-		t.Fatal("TableExec is non-nil for skipped table write")
 	}
 }
 

@@ -11,7 +11,6 @@ type workerStats struct {
 	LogicalTransactions uint64
 	Committed           uint64
 	Failed              uint64
-	Cancelled           uint64
 	Attempts            uint64
 	Retries             uint64
 	Messages            uint64
@@ -49,7 +48,6 @@ type phaseReport struct {
 	LogicalTransactions   uint64        `json:"logical_transactions"`
 	CommittedTransactions uint64        `json:"committed_transactions"`
 	FailedTransactions    uint64        `json:"failed_transactions"`
-	CancelledTransactions uint64        `json:"cancelled_transactions"`
 	TransactionAttempts   uint64        `json:"transaction_attempts"`
 	Retries               uint64        `json:"retries"`
 	CommittedMessages     uint64        `json:"committed_messages"`
@@ -71,7 +69,6 @@ func mergeWorkerStats(all []workerStats, duration time.Duration) phaseStats {
 		merged.LogicalTransactions += stats.LogicalTransactions
 		merged.Committed += stats.Committed
 		merged.Failed += stats.Failed
-		merged.Cancelled += stats.Cancelled
 		merged.Attempts += stats.Attempts
 		merged.Retries += stats.Retries
 		merged.Messages += stats.Messages
@@ -87,14 +84,14 @@ func mergeWorkerStats(all []workerStats, duration time.Duration) phaseStats {
 	return merged
 }
 
-func (s phaseStats) report(skipTableWrite bool) phaseReport {
+func (s phaseStats) report() phaseReport {
 	seconds := s.Duration.Seconds()
+	table := summarizeLatencies(s.TableLatency)
 	report := phaseReport{
 		DurationSeconds:       seconds,
 		LogicalTransactions:   s.LogicalTransactions,
 		CommittedTransactions: s.Committed,
 		FailedTransactions:    s.Failed,
-		CancelledTransactions: s.Cancelled,
 		TransactionAttempts:   s.Attempts,
 		Retries:               s.Retries,
 		CommittedMessages:     s.Messages,
@@ -102,12 +99,9 @@ func (s phaseStats) report(skipTableWrite bool) phaseReport {
 		FirstError:            s.FirstError,
 		Latency: latencyReport{
 			Transaction: summarizeLatencies(s.TransactionLatency),
+			TableExec:   &table,
 			WriterStart: summarizeLatencies(s.WriterStartLatency),
 		},
-	}
-	if !skipTableWrite {
-		table := summarizeLatencies(s.TableLatency)
-		report.Latency.TableExec = &table
 	}
 	if seconds > 0 {
 		report.TransactionsPerSecond = float64(s.Committed) / seconds

@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
@@ -23,24 +23,24 @@ import (
 // fixed run had zero retries and zero final failures.
 //
 //	P    scenario                   tx/s    p95 ms      B/op  allocs/op  StreamWrite/tx
-//	64   single                    198.8     21.33     79439       1262               1
-//	64   many-key                  39.29     141.7   2231586      33283              64
-//	64   many-bounded-key          21.69     285.4   2259845      33714              64
-//	128  single                    152.6     37.36     79407       1263               1
-//	128  many-key                  13.24     408.7   4385725      65333             128
-//	128  many-bounded-key          11.77     442.3   4442273      66066             128
-//	256  single                    156.9     37.07     79315       1263               1
-//	256  many-key                  6.637     910.7   8717243     129830             256
-//	256  many-bounded-key          5.846     865.3   8823254     131260             256
-//	512  single                    146.7      41.1     79202       1262               1
-//	512  many-key                  2.209      3664  17396741     259261             512
-//	512  many-bounded-key          1.396      3099  17651404     262448             512
+//	64   single                    200.1     20.94     78545       1241               1
+//	64   many-key                  42.89     110.6   2227984      33112              64
+//	64   many-bounded-key          22.33     241.1   2242017      33416              64
+//	128  single                    153.2      38.3     78552       1245               1
+//	128  many-key                  12.75     442.9   4392125      65129             128
+//	128  many-bounded-key           10.8     488.3   4437713      65711             128
+//	256  single                      148     39.81     78483       1244               1
+//	256  many-key                  6.067     860.2   8753871     129633             256
+//	256  many-bounded-key          5.095      1003   8841670     130854             256
+//	512  single                    139.8     45.09     78386       1244               1
+//	512  many-key                  2.589      2224  17380599     257968             512
+//	512  many-bounded-key          1.625      3020  17660721     261372             512
 //
 // The auto-split benchmark was measured on 2026-10-01. It used -benchtime=1x
 // -count=1 -cpu=4 three times, where one benchmark operation is a two-minute
-// phase and every repetition used a fresh YDB container. Its medians were 88.39
-// tx/s, 92.35ms p95, 1 -> 11 active partitions, 0.001768 retries/tx, and 10.35
-// StreamWrite calls per committed transaction, with zero final errors. Preserve
+// phase and every repetition used a fresh YDB container. Its medians were 24.91
+// tx/s, 29.70ms p95, 1 -> 8 active partitions, 0.002361 retries/tx, and 6.948
+// StreamWrite calls per committed transaction, with 8 final errors. Preserve
 // this protocol and environment when comparing a candidate change.
 
 const benchmarkTableQueryTemplate = `
@@ -73,14 +73,8 @@ type attemptTimings struct {
 	WriterStart time.Duration
 }
 
-type messageSpec struct {
-	SeqNo int64
-	Key   string
-}
-
 func prepareSchema(ctx context.Context, db *ydb.Driver, cfg config) error {
-	if !cfg.SkipTableWrite {
-		statement := fmt.Sprintf(`
+	statement := fmt.Sprintf(`
 CREATE TABLE IF NOT EXISTS %s (
     run_id Utf8 NOT NULL,
     worker_id Uint64 NOT NULL,
@@ -89,9 +83,8 @@ CREATE TABLE IF NOT EXISTS %s (
     PRIMARY KEY (run_id, worker_id)
 );
 `, quoteYQLPath(cfg.TablePath))
-		if err := db.Query().Exec(ctx, statement, query.WithIdempotent()); err != nil {
-			return fmt.Errorf("prepare table %q: %w", cfg.TablePath, err)
-		}
+	if err := db.Query().Exec(ctx, statement, query.WithIdempotent()); err != nil {
+		return fmt.Errorf("prepare table %q: %w", cfg.TablePath, err)
 	}
 
 	_, err := db.Topic().Describe(ctx, cfg.TopicPath)
@@ -155,35 +148,24 @@ func makePayload(size int) []byte {
 
 func runPhase(
 	parent context.Context,
-	db *ydb.Driver,
-	cfg config,
-	payload []byte,
+	runners []*transactionRunner,
 	duration time.Duration,
-	sequences []atomic.Uint64,
-) (phaseStats, error) {
-	if duration == 0 {
-		return phaseStats{}, nil
-	}
-
+) phaseStats {
 	phaseContext, cancelPhase := context.WithTimeout(parent, duration)
 	defer cancelPhase()
 
-	results := make(chan workerStats, cfg.Concurrency)
+	results := make(chan workerStats, len(runners))
 	startedAt := time.Now()
 
 	var workers sync.WaitGroup
-	workers.Add(cfg.Concurrency)
-	for workerID := range cfg.Concurrency {
+	workers.Add(len(runners))
+	for _, runner := range runners {
 		go func() {
 			defer workers.Done()
 			results <- runWorker(
 				parent,
 				phaseContext.Done(),
-				db,
-				cfg,
-				workerID,
-				payload,
-				&sequences[workerID],
+				runner,
 			)
 		}()
 	}
@@ -193,27 +175,18 @@ func runPhase(
 	endedAt := time.Now()
 	close(results)
 
-	perWorker := make([]workerStats, 0, cfg.Concurrency)
+	perWorker := make([]workerStats, 0, len(runners))
 	for result := range results {
 		perWorker = append(perWorker, result)
 	}
 
-	stats := mergeWorkerStats(perWorker, endedAt.Sub(startedAt))
-	if parent.Err() != nil {
-		return stats, parent.Err()
-	}
-
-	return stats, nil
+	return mergeWorkerStats(perWorker, endedAt.Sub(startedAt))
 }
 
 func runWorker(
 	ctx context.Context,
 	phaseDone <-chan struct{},
-	db *ydb.Driver,
-	cfg config,
-	workerID int,
-	payload []byte,
-	sequence *atomic.Uint64,
+	runner *transactionRunner,
 ) workerStats {
 	var stats workerStats
 
@@ -224,28 +197,15 @@ func runWorker(
 		default:
 		}
 
-		logicalSequence := sequence.Add(1)
+		logicalSequence := stats.LogicalTransactions + 1
 		stats.LogicalTransactions++
-		transactionLatency, timings, attempts, err := executeTransaction(
-			ctx,
-			db,
-			cfg,
-			workerID,
-			logicalSequence,
-			payload,
-		)
+		transactionLatency, timings, attempts, err := runner.execute(ctx, logicalSequence)
 		stats.Attempts += uint64(attempts)
 		if attempts > 1 {
 			stats.Retries += uint64(attempts - 1)
 		}
 
 		if err != nil {
-			if ctx.Err() != nil {
-				stats.Cancelled++
-
-				continue
-			}
-
 			stats.Failed++
 			if stats.FirstError == "" {
 				stats.FirstError = err.Error()
@@ -255,47 +215,105 @@ func runWorker(
 		}
 
 		stats.Committed++
-		stats.Messages += uint64(cfg.MessagesPerTx)
-		stats.Bytes += uint64(cfg.MessagesPerTx) * uint64(len(payload))
-		if logicalSequence%uint64(cfg.LatencySampleEvery) == 0 {
-			stats.TransactionLatency = append(stats.TransactionLatency, transactionLatency)
-			if !cfg.SkipTableWrite {
-				stats.TableLatency = append(stats.TableLatency, timings.Table)
-			}
-			stats.WriterStartLatency = append(stats.WriterStartLatency, timings.WriterStart)
-		}
+		stats.Messages++
+		stats.Bytes += uint64(len(runner.payload))
+		stats.TransactionLatency = append(stats.TransactionLatency, transactionLatency)
+		stats.TableLatency = append(stats.TableLatency, timings.Table)
+		stats.WriterStartLatency = append(stats.WriterStartLatency, timings.WriterStart)
 	}
 }
 
-//nolint:funlen // The complete measured transaction is intentionally kept together.
-func executeTransaction(
-	parent context.Context,
-	db *ydb.Driver,
-	cfg config,
-	workerID int,
+type transactionRunner struct {
+	db                 *ydb.Driver
+	topicPath          string
+	tableQuery         string
+	runID              string
+	workerID           int
+	payload            []byte
+	transactionTimeout time.Duration
+	writerOptions      []topicoptions.WriterOption
+	doTxOptions        []query.DoTxOption
+	messageKeyPrefix   string
+	execute            func(context.Context, uint64) (time.Duration, attemptTimings, int, error)
+}
+
+func newTransactionRunner(db *ydb.Driver, cfg config, workerID int, payload []byte) *transactionRunner {
+	runner := &transactionRunner{
+		db:                 db,
+		topicPath:          cfg.TopicPath,
+		tableQuery:         fmt.Sprintf(benchmarkTableQueryTemplate, quoteYQLPath(cfg.TablePath)),
+		runID:              cfg.RunID,
+		workerID:           workerID,
+		payload:            payload,
+		transactionTimeout: cfg.TransactionTimeout,
+		writerOptions:      writerOptions(cfg, workerID),
+		doTxOptions: []query.DoTxOption{
+			query.WithIdempotent(),
+			query.WithLazyTx(true),
+		},
+	}
+	if cfg.Mode == writerModeMany {
+		runner.messageKeyPrefix = fmt.Sprintf("worker-%d-message-", workerID)
+		runner.execute = runner.executeManyWriterTransaction
+	} else {
+		runner.execute = runner.executeSingleWriterTransaction
+	}
+
+	return runner
+}
+
+func newTransactionRunners(db *ydb.Driver, cfg config, payload []byte) []*transactionRunner {
+	runners := make([]*transactionRunner, cfg.Concurrency)
+	for workerID := range runners {
+		runners[workerID] = newTransactionRunner(db, cfg, workerID, payload)
+	}
+
+	return runners
+}
+
+func (r *transactionRunner) executeSingleWriterTransaction(
+	ctx context.Context,
 	sequence uint64,
-	payload []byte,
 ) (time.Duration, attemptTimings, int, error) {
-	transactionContext, cancel := context.WithTimeout(parent, cfg.TransactionTimeout)
+	return r.executeTransaction(ctx, sequence, "")
+}
+
+func (r *transactionRunner) executeManyWriterTransaction(
+	ctx context.Context,
+	sequence uint64,
+) (time.Duration, attemptTimings, int, error) {
+	return r.executeTransaction(ctx, sequence, r.messageKey(sequence))
+}
+
+func (r *transactionRunner) messageKey(sequence uint64) string {
+	return r.messageKeyPrefix + strconv.FormatUint(sequence, 10)
+}
+
+//nolint:funlen // The complete measured transaction is intentionally kept together.
+func (r *transactionRunner) executeTransaction(
+	parent context.Context,
+	sequence uint64,
+	messageKey string,
+) (time.Duration, attemptTimings, int, error) {
+	transactionContext, cancel := context.WithTimeout(parent, r.transactionTimeout)
 	defer cancel()
 
-	messageSpecs := makeMessageSpecs(cfg, workerID, sequence)
 	var (
 		attempts    int
 		lastTimings attemptTimings
 	)
 	startedAt := time.Now()
-	err := db.Query().DoTx(
+	err := r.db.Query().DoTx(
 		transactionContext,
 		func(ctx context.Context, tx query.TxActor) error {
 			attempts++
 			currentTimings := attemptTimings{}
 
 			writerStartedAt := time.Now()
-			writer, err := db.Topic().StartTransactionalWriter(
+			writer, err := r.db.Topic().StartTransactionalWriter(
 				tx,
-				cfg.TopicPath,
-				writerOptions(cfg, workerID)...,
+				r.topicPath,
+				r.writerOptions...,
 			)
 			currentTimings.WriterStart = time.Since(writerStartedAt)
 			if err != nil {
@@ -304,28 +322,29 @@ func executeTransaction(
 				return fmt.Errorf("start transactional writer: %w", err)
 			}
 
-			if !cfg.SkipTableWrite {
-				tableStartedAt := time.Now()
-				err = tx.Exec(
-					ctx,
-					fmt.Sprintf(benchmarkTableQueryTemplate, quoteYQLPath(cfg.TablePath)),
-					query.WithParameters(
-						ydb.ParamsBuilder().
-							Param("$run_id").Text(cfg.RunID).
-							Param("$worker_id").Uint64(uint64(workerID)).
-							Param("$seq_no").Uint64(sequence).
-							Build(),
-					),
-				)
-				currentTimings.Table = time.Since(tableStartedAt)
-				if err != nil {
-					lastTimings = currentTimings
+			tableStartedAt := time.Now()
+			err = tx.Exec(
+				ctx,
+				r.tableQuery,
+				query.WithParameters(
+					ydb.ParamsBuilder().
+						Param("$run_id").Text(r.runID).
+						Param("$worker_id").Uint64(uint64(r.workerID)).
+						Param("$seq_no").Uint64(sequence).
+						Build(),
+				),
+			)
+			currentTimings.Table = time.Since(tableStartedAt)
+			if err != nil {
+				lastTimings = currentTimings
 
-					return fmt.Errorf("execute benchmark table upsert: %w", err)
-				}
+				return fmt.Errorf("execute benchmark table upsert: %w", err)
 			}
 
-			err = writer.Write(ctx, makeMessages(messageSpecs, payload)...)
+			err = writer.Write(ctx, topicwriter.Message{
+				Key:  messageKey,
+				Data: bytes.NewReader(r.payload),
+			})
 			lastTimings = currentTimings
 			if err != nil {
 				return fmt.Errorf("write transactional topic messages: %w", err)
@@ -333,8 +352,7 @@ func executeTransaction(
 
 			return nil
 		},
-		query.WithIdempotent(),
-		query.WithLazyTx(true),
+		r.doTxOptions...,
 	)
 
 	return time.Since(startedAt), lastTimings, attempts, err
@@ -342,7 +360,7 @@ func executeTransaction(
 
 func writerOptions(cfg config, workerID int) []topicoptions.WriterOption {
 	options := []topicoptions.WriterOption{
-		topicoptions.WithWriterSetAutoSeqNo(cfg.AutoSeqNo),
+		topicoptions.WithWriterSetAutoSeqNo(true),
 		topicoptions.WithWriterDirectWrite(false),
 	}
 	slotProducerID := ""
@@ -378,39 +396,6 @@ func writerOptions(cfg config, workerID int) []topicoptions.WriterOption {
 	}
 
 	return append(options, topicoptions.WithWriteToManyPartitions(multiWriterOptions...))
-}
-
-func makeMessageSpecs(
-	cfg config,
-	workerID int,
-	sequence uint64,
-) []messageSpec {
-	specs := make([]messageSpec, cfg.MessagesPerTx)
-	for index := range specs {
-		messageSequence := (sequence-1)*uint64(cfg.MessagesPerTx) + uint64(index) + 1
-		if !cfg.AutoSeqNo {
-			specs[index].SeqNo = int64(messageSequence)
-		}
-		if cfg.Mode != writerModeMany {
-			continue
-		}
-		specs[index].Key = fmt.Sprintf("worker-%d-message-%d", workerID, messageSequence)
-	}
-
-	return specs
-}
-
-func makeMessages(specs []messageSpec, payload []byte) []topicwriter.Message {
-	messages := make([]topicwriter.Message, len(specs))
-	for i := range specs {
-		messages[i] = topicwriter.Message{
-			SeqNo: specs[i].SeqNo,
-			Key:   specs[i].Key,
-			Data:  bytes.NewReader(payload),
-		}
-	}
-
-	return messages
 }
 
 func quoteYQLPath(path string) string {

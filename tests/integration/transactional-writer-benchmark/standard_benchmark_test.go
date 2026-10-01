@@ -8,12 +8,9 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 var (
@@ -130,12 +127,9 @@ func newStandardBenchmarkConfig(
 		ProducerIDPrefix:   runID,
 		Mode:               benchmarkCase.Mode,
 		Routing:            benchmarkCase.Routing,
-		AutoSeqNo:          true,
 		TransactionTimeout: time.Minute,
 		Concurrency:        runtime.GOMAXPROCS(0),
-		MessagesPerTx:      1,
 		MessageSize:        1024,
-		LatencySampleEvery: 1,
 		PreparePartitions:  partitionCount,
 	}
 }
@@ -143,7 +137,7 @@ func newStandardBenchmarkConfig(
 func runStandardBenchmark(b *testing.B, cfg config) {
 	b.Helper()
 	b.ReportAllocs()
-	b.SetBytes(int64(cfg.MessagesPerTx * cfg.MessageSize))
+	b.SetBytes(int64(cfg.MessageSize))
 	b.StopTimer()
 
 	ctx := context.Background()
@@ -165,16 +159,18 @@ func runStandardBenchmark(b *testing.B, cfg config) {
 	}
 
 	payload := makePayload(cfg.MessageSize)
-	lifecycleBefore := metrics.snapshot()
+	runners := newTransactionRunners(db, cfg, payload)
+	workerStats := newFixedBenchmarkWorkerStats(cfg.Concurrency, b.N)
+	streamWriteOpensBefore := metrics.streamWriteOpens.Load()
 	startedAt := time.Now()
 	b.ResetTimer()
 	b.StartTimer()
-	stats := runParallelTransactions(ctx, b, db, cfg, payload)
+	stats := runParallelTransactions(ctx, b, runners, workerStats)
 	b.StopTimer()
 	duration := time.Since(startedAt)
-	lifecycle := metrics.snapshot().subtract(lifecycleBefore)
+	streamWriteOpens := metrics.streamWriteOpens.Load() - streamWriteOpensBefore
 
-	reportStandardBenchmarkMetrics(b, cfg, stats, duration, lifecycle, nil)
+	reportStandardBenchmarkMetrics(b, cfg, stats, duration, streamWriteOpens, nil)
 }
 
 func runStandardAutoSplitBenchmark(b *testing.B, cfg config) {
@@ -212,20 +208,17 @@ func runStandardAutoSplitBenchmark(b *testing.B, cfg config) {
 	}
 
 	payload := makePayload(cfg.MessageSize)
-	sequences := make([]atomic.Uint64, cfg.Concurrency)
-	lifecycleBefore := metrics.snapshot()
+	runners := newTransactionRunners(db, cfg, payload)
+	streamWriteOpensBefore := metrics.streamWriteOpens.Load()
 	b.ResetTimer()
 	b.StartTimer()
-	stats, measurementErr := runPhase(
+	stats := runPhase(
 		ctx,
-		db,
-		cfg,
-		payload,
+		runners,
 		cfg.Duration,
-		sequences,
 	)
 	b.StopTimer()
-	lifecycle := metrics.snapshot().subtract(lifecycleBefore)
+	streamWriteOpens := metrics.streamWriteOpens.Load() - streamWriteOpensBefore
 
 	describeContext, cancelDescribe := context.WithTimeout(ctx, cfg.TransactionTimeout)
 	description, err = db.Topic().Describe(describeContext, cfg.TopicPath)
@@ -238,39 +231,25 @@ func runStandardAutoSplitBenchmark(b *testing.B, cfg config) {
 		b.Fatal(err)
 	}
 	b.ReportMetric(float64(initialTopology.ActivePartitions), "initial-active-partitions")
-	reportStandardBenchmarkMetrics(b, cfg, stats, stats.Duration, lifecycle, &finalTopology)
-	if measurementErr != nil {
-		b.Fatalf("run auto-split phase: %v", measurementErr)
-	}
+	reportStandardBenchmarkMetrics(b, cfg, stats, stats.Duration, streamWriteOpens, &finalTopology)
 }
 
 func runParallelTransactions(
 	ctx context.Context,
 	b *testing.B,
-	db *ydb.Driver,
-	cfg config,
-	payload []byte,
+	runners []*transactionRunner,
+	allStats []workerStats,
 ) phaseStats {
-	var (
-		workerCounter atomic.Uint64
-		statsMu       sync.Mutex
-		allStats      []workerStats
-	)
+	var workerCounter atomic.Uint64
 	startedAt := time.Now()
 	b.RunParallel(func(pb *testing.PB) {
 		workerID := nextParallelWorkerID(&workerCounter)
-		var stats workerStats
+		runner := runners[workerID]
+		stats := &allStats[workerID]
 		for pb.Next() {
 			logicalSequence := stats.LogicalTransactions + 1
 			stats.LogicalTransactions++
-			transactionLatency, timings, attempts, err := executeTransaction(
-				ctx,
-				db,
-				cfg,
-				workerID,
-				logicalSequence,
-				payload,
-			)
+			transactionLatency, timings, attempts, err := runner.execute(ctx, logicalSequence)
 			stats.Attempts += uint64(attempts)
 			if attempts > 1 {
 				stats.Retries += uint64(attempts - 1)
@@ -285,20 +264,27 @@ func runParallelTransactions(
 			}
 
 			stats.Committed++
-			stats.Messages += uint64(cfg.MessagesPerTx)
-			stats.Bytes += uint64(cfg.MessagesPerTx) * uint64(len(payload))
-			if logicalSequence%uint64(cfg.LatencySampleEvery) == 0 {
-				stats.TransactionLatency = append(stats.TransactionLatency, transactionLatency)
-				if !cfg.SkipTableWrite {
-					stats.TableLatency = append(stats.TableLatency, timings.Table)
-				}
-				stats.WriterStartLatency = append(stats.WriterStartLatency, timings.WriterStart)
-			}
+			stats.Messages++
+			stats.Bytes += uint64(len(runner.payload))
+			stats.TransactionLatency = append(stats.TransactionLatency, transactionLatency)
+			stats.TableLatency = append(stats.TableLatency, timings.Table)
+			stats.WriterStartLatency = append(stats.WriterStartLatency, timings.WriterStart)
 		}
-		appendParallelStats(&statsMu, &allStats, stats)
 	})
 
-	return mergeParallelStats(allStats, time.Since(startedAt))
+	return mergeWorkerStats(allStats, time.Since(startedAt))
+}
+
+func newFixedBenchmarkWorkerStats(workerCount, transactionCount int) []workerStats {
+	allStats := make([]workerStats, workerCount)
+	samplesPerWorker := (transactionCount + workerCount - 1) / workerCount
+	for i := range allStats {
+		allStats[i].TransactionLatency = make([]time.Duration, 0, samplesPerWorker)
+		allStats[i].TableLatency = make([]time.Duration, 0, samplesPerWorker)
+		allStats[i].WriterStartLatency = make([]time.Duration, 0, samplesPerWorker)
+	}
+
+	return allStats
 }
 
 func reportStandardBenchmarkMetrics(
@@ -306,11 +292,11 @@ func reportStandardBenchmarkMetrics(
 	cfg config,
 	stats phaseStats,
 	duration time.Duration,
-	lifecycle instrumentationSnapshot,
+	streamWriteOpens uint64,
 	finalTopology *topicTopology,
 ) {
 	b.Helper()
-	report := stats.report(cfg.SkipTableWrite)
+	report := stats.report()
 	b.ReportMetric(report.TransactionsPerSecond, "tx/s")
 	b.ReportMetric(report.Latency.Transaction.P50MS, "ms/p50")
 	b.ReportMetric(report.Latency.Transaction.P95MS, "ms/p95")
@@ -326,7 +312,7 @@ func reportStandardBenchmarkMetrics(
 	}
 	b.ReportMetric(float64(stats.Retries)/float64(max(stats.LogicalTransactions, 1)), "retries/tx")
 	b.ReportMetric(
-		float64(lifecycle.StreamWriteOpens)/float64(max(stats.Committed, 1)),
+		float64(streamWriteOpens)/float64(max(stats.Committed, 1)),
 		"StreamWrite/tx",
 	)
 	b.ReportMetric(float64(cfg.Concurrency), "workers")
@@ -334,16 +320,6 @@ func reportStandardBenchmarkMetrics(
 	if finalTopology != nil {
 		b.ReportMetric(float64(finalTopology.ActivePartitions), "active-partitions")
 	}
-}
-
-func mergeParallelStats(all []workerStats, duration time.Duration) phaseStats {
-	return mergeWorkerStats(all, duration)
-}
-
-func appendParallelStats(mu *sync.Mutex, all *[]workerStats, stats workerStats) {
-	mu.Lock()
-	defer mu.Unlock()
-	*all = append(*all, stats)
 }
 
 func nextParallelWorkerID(counter *atomic.Uint64) int {

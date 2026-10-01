@@ -30,63 +30,12 @@ func TestFixedHashTopicDisablesAutoPartitioningToAvoidBounds(t *testing.T) {
 	}
 }
 
-func TestMakeMessageSpecsUsesKeysForKeyRouting(t *testing.T) {
+func TestManyWriterMessageKey(t *testing.T) {
 	t.Parallel()
 
-	specs := makeMessageSpecs(
-		config{
-			Mode:          writerModeMany,
-			Routing:       routingModeKey,
-			AutoSeqNo:     true,
-			MessagesPerTx: 1,
-		},
-		3,
-		7,
-	)
-
-	if specs[0].Key != "worker-3-message-7" {
-		t.Fatalf("Key = %q, want %q", specs[0].Key, "worker-3-message-7")
-	}
-	if specs[0].SeqNo != 0 {
-		t.Fatalf("SeqNo = %d, want zero with automatic sequence numbers", specs[0].SeqNo)
-	}
-}
-
-func TestMakeMessageSpecsUsesKeysForBoundedKeyRouting(t *testing.T) {
-	t.Parallel()
-
-	specs := makeMessageSpecs(
-		config{
-			Mode:          writerModeMany,
-			Routing:       routingModeBoundedKey,
-			AutoSeqNo:     true,
-			MessagesPerTx: 1,
-		},
-		2,
-		5,
-	)
-
-	if specs[0].Key != "worker-2-message-5" {
-		t.Fatalf("Key = %q, want %q", specs[0].Key, "worker-2-message-5")
-	}
-}
-
-func TestMakeMessageSpecsLeavesSingleWriterRoutingUnset(t *testing.T) {
-	t.Parallel()
-
-	specs := makeMessageSpecs(
-		config{
-			Mode:          writerModeSingle,
-			Routing:       routingModeKey,
-			AutoSeqNo:     true,
-			MessagesPerTx: 1,
-		},
-		0,
-		1,
-	)
-
-	if specs[0].Key != "" {
-		t.Fatalf("single writer key = %q, want unset", specs[0].Key)
+	runner := transactionRunner{messageKeyPrefix: "worker-3-message-"}
+	if got := runner.messageKey(7); got != "worker-3-message-7" {
+		t.Fatalf("messageKey() = %q, want %q", got, "worker-3-message-7")
 	}
 }
 
