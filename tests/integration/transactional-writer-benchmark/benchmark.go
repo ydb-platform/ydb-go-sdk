@@ -26,31 +26,27 @@ import (
 // failures.
 //
 //	P    scenario               tx/s   p95 ms      B/op  allocs/op  StreamWrite/tx
-//	64   single                200.3     20.87     79553       1260               1
-//	64   many-key               23.79   207.1    2228985      33259              64
-//	64   many-bounded-key       21.14   261.6    2255127      33668              64
-//	128  single                151.6     38.84     79545       1263               1
-//	128  many-key               11.12   500.7    4392670      65407             128
-//	128  many-bounded-key        9.460  596.5    4436334      66029             128
-//	256  single                144.2     42.32     79431       1263               1
-//	256  many-key                5.507  868.6    8726935     129882             256
-//	256  many-bounded-key        4.958 1094      8821614     131253             256
-//	512  single                149.7     39.58     79377       1263               1
-//	512  many-key                2.865 1827     17373457     258860             512
-//	512  many-bounded-key        2.255 2492     17616668     262044             512
+//	64   single                198.8     21.33     79439       1262               1
+//	64   many-key               39.29   141.7    2231586      33283              64
+//	64   many-bounded-key       21.69   285.4    2259845      33714              64
+//	128  single                152.6     37.36     79407       1263               1
+//	128  many-key               13.24   408.7    4385725      65333             128
+//	128  many-bounded-key       11.77   442.3    4442273      66066             128
+//	256  single                156.9     37.07     79315       1263               1
+//	256  many-key                6.637  910.7    8717243     129830             256
+//	256  many-bounded-key        5.846  865.3    8823254     131260             256
+//	512  single                146.7     41.10     79202       1262               1
+//	512  many-key                2.209 3664     17396741     259261             512
+//	512  many-bounded-key        1.396 3099     17651404     262448             512
 //
 // The auto-split benchmark was measured on 2026-10-01. It used -benchtime=1x
 // -count=1 -cpu=4 three times, where one benchmark operation is a two-minute
-// phase and every repetition used a fresh YDB container. Its medians were 94.52
-// tx/s, 79.27ms p95, 1 -> 10 active partitions, 0.001234 retries/tx, and 9.698
+// phase and every repetition used a fresh YDB container. Its medians were 88.39
+// tx/s, 92.35ms p95, 1 -> 11 active partitions, 0.001768 retries/tx, and 10.35
 // StreamWrite calls per committed transaction, with zero final errors. Preserve
 // this protocol and environment when comparing a candidate change.
 
 const benchmarkTableQueryTemplate = `
-DECLARE $run_id AS Utf8;
-DECLARE $worker_id AS Uint64;
-DECLARE $seq_no AS Uint64;
-
 UPSERT INTO %s (run_id, worker_id, seq_no, updated_at)
 VALUES ($run_id, $worker_id, $seq_no, CurrentUtcTimestamp());
 `
