@@ -129,6 +129,12 @@ func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
 // ydbplatform/local-ydb:26.3.1.16. A single -benchtime=300x -count=3 -cpu=4
 // invocation ran all three repetitions on the same YDB instance, with a
 // separate topic for each repetition. Every operation is one transaction.
+// A remote rerun on 2026-10-01 used YDB ydb-stable-26-3-1-17 on a dedicated
+// single node with 4 cores and 8 GB RAM. Its -benchtime=300x -count=3 run did
+// not finish the first repetition, so no comparable ns/op result is available.
+// A separate diagnostic run showed two workers waiting for message
+// acknowledgements in MultiWriter.Close before transaction commit; that topic
+// had reached three active partitions. No split was awaited by the benchmark.
 // Result:
 /*
 goos: linux
@@ -260,6 +266,7 @@ func txWriterRunBenchmark(b *testing.B, cfg txWriterConfig) {
 
 	var finalTopology *txWriterTopicTopology
 	if cfg.AutoSplit {
+		// Observe the final topology without waiting for a split.
 		description, err := db.Topic().Describe(ctx, cfg.TopicPath)
 		if err != nil {
 			b.Fatalf("describe final benchmark topic: %v", err)
