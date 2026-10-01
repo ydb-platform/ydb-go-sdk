@@ -299,10 +299,10 @@ func (o *orchestrator) saveMessageContent(msg *message) error {
 
 	var uncompressedSize, compressedSize int
 	if err == nil {
-		var content []byte
-		content, err = msg.GetEncodedBytes(rawtopiccommon.CodecRaw)
-		compressedSize = len(content)
-		uncompressedSize = msg.BufUncompressedSize
+		uncompressedSize, compressedSize, err = topicwritercommon.MessagesContentSize(
+			[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
+			rawtopiccommon.CodecRaw,
+		)
 	}
 	onCompressDone(err, uncompressedSize, compressedSize)
 	if err != nil {

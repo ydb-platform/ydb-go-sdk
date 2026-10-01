@@ -226,7 +226,8 @@ func (s *EncoderSelector) CompressMessages(messages []MessageWithDataContent) (r
 func MessagesContentSize(
 	messages []MessageWithDataContent,
 	codec rawtopiccommon.Codec,
-) (uncompressedSize, compressedSize int, _ error) {
+) (int, int, error) {
+	var uncompressedSize, compressedSize int
 	for i := range messages {
 		content, err := messages[i].GetEncodedBytes(codec)
 		if err != nil {
