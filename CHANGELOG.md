@@ -1,4 +1,4 @@
-* Changed topic multi-writers to initialize sequence numbers from write sessions opened for actual messages instead of opening every partition session during writer initialization
+* Improved topic multi-writer performance for topics with many partitions
 
 ## v3.153.1
 * Fixed `sugar.Embedding` encoding of an empty vector to match `Knn::ToBinaryStringFloat`
