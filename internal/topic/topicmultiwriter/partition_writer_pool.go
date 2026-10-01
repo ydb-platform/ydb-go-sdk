@@ -23,6 +23,7 @@ type partitionWriterPool struct {
 
 	ackCallback            func(partitionID int64, seqNo int64)
 	partitionSplitCallback func(partitionID int64)
+	onSeqNo                func(seqNo int64)
 	onWriterInit           func()
 	onError                func(err error)
 }
@@ -186,12 +187,18 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 	if !direct {
 		return wrapper, nil
 	}
+	wrapper.initCh = make(chan struct{})
 
 	p.bg.Start(fmt.Sprintf("writer-init-%d", partitionID), func(ctx context.Context) {
-		_, err := wr.WaitInitInfo(ctx)
+		info, err := wr.WaitInitInfo(ctx)
+		wrapper.initInfo = info
 		wrapper.setInitErr(err)
+		if err == nil && p.onSeqNo != nil {
+			p.onSeqNo(info.LastSeqNum)
+		}
 
 		wrapper.initDone.Store(true)
+		close(wrapper.initCh)
 		p.onWriterInit()
 	})
 

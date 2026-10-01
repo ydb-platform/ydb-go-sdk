@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -46,7 +47,18 @@ type writerWrapper struct {
 
 	initDone atomic.Bool
 	initErr  atomic.Value
+	initInfo topicwriterinternal.InitialInfo
+	initCh   chan struct{}
 	direct   bool
+}
+
+func (w *writerWrapper) waitInit(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+	select {
+	case <-ctx.Done():
+		return topicwriterinternal.InitialInfo{}, ctx.Err()
+	case <-w.initCh:
+		return w.initInfo, w.getInitErr()
+	}
 }
 
 func (w *writerWrapper) setInitErr(err error) {

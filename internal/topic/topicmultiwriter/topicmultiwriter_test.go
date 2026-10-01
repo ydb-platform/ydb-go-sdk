@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
@@ -18,7 +18,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -101,29 +100,6 @@ func (f *stubWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorCon
 	default:
 		return nil, errors.New("invalid stub writer type")
 	}
-}
-
-type overloadedInitWriter struct{}
-
-func (w *overloadedInitWriter) Close(ctx context.Context) error {
-	return nil
-}
-
-func (w *overloadedInitWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
-	return topicwriterinternal.InitialInfo{}, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
-}
-
-func (w *overloadedInitWriter) WriteInternal(
-	ctx context.Context,
-	messages []topicwritercommon.MessageWithDataContent,
-) error {
-	return nil
-}
-
-type overloadedInitWritersFactory struct{}
-
-func (f *overloadedInitWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
-	return &overloadedInitWriter{}, nil
 }
 
 type choosePartitionKeyCheckWritersFactory struct {
@@ -608,27 +584,6 @@ func TestMultiWriter_WaitInit_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestMultiWriter_CloseCancelsInitSeqNoRetrySleep(t *testing.T) {
-	t.Parallel()
-
-	ctx := xtest.Context(t)
-	stubClient := stubs.NewStubTopicClient(t, stubs.DefaultStubTopicDescription(t))
-	multiWriter := newTestMultiWriterWithCustomWritersFactory(
-		t,
-		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-			return stubClient.Describe(ctx, path)
-		},
-		&overloadedInitWritersFactory{},
-	)
-
-	closeCtx, cancel := context.WithTimeout(ctx, time.Second)
-	defer cancel()
-
-	startedAt := time.Now()
-	require.NoError(t, multiWriter.Close(closeCtx))
-	require.Less(t, time.Since(startedAt), 100*time.Millisecond)
-}
-
 func TestOrchestratorDescribeTopicWithRetriesCancelsRetrySleep(t *testing.T) {
 	t.Parallel()
 
@@ -818,9 +773,11 @@ func TestMultiWriter_Write_WithErrorWritersFactory(t *testing.T) {
 			return stubClient.Describe(ctx, path)
 		},
 		newStubWritersFactory(t, stubs.StubWriterTypeError, "test-producer", nil, 0),
+		topicwriterinternal.WithAutoSetSeqNo(true),
 	)
 
-	err := multiWriter.WaitInit(ctx)
+	require.NoError(t, multiWriter.WaitInit(ctx))
+	err := multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{{Data: bytes.NewReader([]byte("message"))}})
 	require.ErrorIs(t, err, errTest)
 }
 
@@ -1197,52 +1154,6 @@ func TestMultiWriter_Write_SmallIdleSessionTimeout(t *testing.T) {
 	require.NoError(t, multiWriter.Close(ctx))
 }
 
-var errTestStopWriterReconnector = errors.New("ydb: stop writer reconnector")
-
-type blockingInitWriter struct {
-	releaseInit <-chan struct{}
-	closeCalled chan struct{}
-}
-
-func (w *blockingInitWriter) Close(_ context.Context) error {
-	select {
-	case w.closeCalled <- struct{}{}:
-	default:
-	}
-
-	return errTestStopWriterReconnector
-}
-
-func (w *blockingInitWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
-	select {
-	case <-ctx.Done():
-		return topicwriterinternal.InitialInfo{}, ctx.Err()
-	case <-w.closeCalled:
-		return topicwriterinternal.InitialInfo{}, errTestStopWriterReconnector
-	case <-w.releaseInit:
-	}
-
-	return topicwriterinternal.InitialInfo{}, nil
-}
-
-func (w *blockingInitWriter) WriteInternal(
-	_ context.Context,
-	_ []topicwritercommon.MessageWithDataContent,
-) error {
-	return nil
-}
-
-type blockingInitWritersFactory struct {
-	releaseInit <-chan struct{}
-}
-
-func (f *blockingInitWritersFactory) Create(_ topicwriterinternal.WriterReconnectorConfig) (writer, error) {
-	return &blockingInitWriter{
-		releaseInit: f.releaseInit,
-		closeCalled: make(chan struct{}, 1),
-	}, nil
-}
-
 func pendingPartitionSplitCount(r *partitionSplitReceiver) int {
 	r.partitionSplits.mu.Lock()
 	defer r.partitionSplits.mu.Unlock()
@@ -1254,7 +1165,9 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 	t.Parallel()
 
 	ctx := xtest.Context(t)
-	releaseInit := make(chan struct{})
+	releaseDescribe := make(chan struct{})
+	describeStarted := make(chan struct{})
+	var firstDescribe atomic.Bool
 
 	baseDesc := stubs.DefaultStubTopicDescription(t)
 	state := stubs.NewDescribeWithSplitsState(t, baseDesc, 6)
@@ -1263,15 +1176,24 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 	multiWriter := newTestMultiWriterWithCustomWritersFactory(
 		t,
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+			if !firstDescribe.Swap(true) {
+				close(describeStarted)
+				select {
+				case <-ctx.Done():
+					return topictypes.TopicDescription{}, ctx.Err()
+				case <-releaseDescribe:
+					return baseDesc, nil
+				}
+			}
 			return stubClient.Describe(ctx, path)
 		},
-		&blockingInitWritersFactory{releaseInit: releaseInit},
+		newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0),
 	)
 	defer func() {
 		select {
-		case <-releaseInit:
+		case <-releaseDescribe:
 		default:
-			close(releaseInit)
+			close(releaseDescribe)
 		}
 		if !multiWriter.closed.Load() {
 			_ = multiWriter.Close(ctx)
@@ -1283,18 +1205,16 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 		waitResult <- multiWriter.WaitInit(ctx)
 	}()
 
-	require.Eventually(t, func() bool {
-		return multiWriter.getWritersCount() > 0
-	}, time.Second, 10*time.Millisecond, "initSeqNo should create partition writers")
+	<-describeStarted
 
-	// Simulate a partition split event while initSeqNo is still waiting for writer init.
+	// Simulate a partition split event while topic Describe is still in progress.
 	// The split is queued but must not be processed until init completes and workers start.
 	state.RecordSplit(1)
 	multiWriter.orchestrator.partitionSplitReceiver.push(1)
 
 	select {
 	case err := <-waitResult:
-		require.NoError(t, err, "WaitInit must not finish while initSeqNo is blocked")
+		require.NoError(t, err, "WaitInit must not finish while Describe is blocked")
 	default:
 	}
 
@@ -1304,7 +1224,7 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 		"split event must stay queued until init completes",
 	)
 
-	close(releaseInit)
+	close(releaseDescribe)
 
 	select {
 	case err := <-waitResult:
