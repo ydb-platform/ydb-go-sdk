@@ -31,7 +31,8 @@ import (
 // Run against local YDB (ydbplatform/local-ydb:26.3.1.16):
 //
 //	go test -tags integration ./tests/integration -run '^$' \
-//	  -bench '^BenchmarkTransactionalWriter$' -benchtime=10s -count=3 -cpu=4 \
+//	  -bench '^BenchmarkTransactionalWriter(Single|ManyKey|ManyBoundedKey)$' \
+//	  -benchtime=10s -count=3 -cpu=4 \
 //	  -args -ydb-benchmark-dsn grpc://localhost:2136/local \
 //	  -ydb-benchmark-partitions 64,128,256,512
 //
@@ -69,12 +70,6 @@ type txWriterStandardBenchmarkCase struct {
 	Name    string
 	Mode    txWriterWriterMode
 	Routing txWriterRoutingMode
-}
-
-var txWriterStandardBenchmarkCases = []txWriterStandardBenchmarkCase{
-	{Name: "single", Mode: txWriterWriterModeSingle, Routing: txWriterRoutingModeKey},
-	{Name: "many-key", Mode: txWriterWriterModeMany, Routing: txWriterRoutingModeKey},
-	{Name: "many-bounded-key", Mode: txWriterWriterModeMany, Routing: txWriterRoutingModeBoundedKey},
 }
 
 func txWriterBenchmarkDSNFromEnvironment() string {
@@ -320,53 +315,85 @@ func txWriterOpenDatabase(
 	return db, nil
 }
 
-// BenchmarkTransactionalWriter
+// BenchmarkTransactionalWriterSingle
 // Master baseline measured on 2026-10-01 at aaf92e41 with Go 1.26.4 and
 // ydbplatform/local-ydb:26.3.1.16. The fixed benchmark used -benchtime=10s
 // -count=3 -cpu=4 and one 1024-byte message per transaction. Each attempt used
 // query.WithLazyTx(true), created the Topic writer before UPSERT materialized
 // the transaction, and then called Write. Every fixed run had zero final
-// failures.
+// failures. The baseline predates the split into separate Benchmark functions;
+// the old result names are retained below.
 // Result:
 /*
 BenchmarkTransactionalWriter/p64/single-4	2200	5036600 ns/op	0 errors	1.000 streams/tx
 BenchmarkTransactionalWriter/p64/single-4	2462	5001744 ns/op	0 errors	1.000 streams/tx
 BenchmarkTransactionalWriter/p64/single-4	2406	5123537 ns/op	0 errors	1.000 streams/tx
-BenchmarkTransactionalWriter/p64/many-key-4	416	45144961 ns/op	0 errors	64.00 streams/tx
-BenchmarkTransactionalWriter/p64/many-key-4	344	44764447 ns/op	0 errors	64.00 streams/tx
-BenchmarkTransactionalWriter/p64/many-key-4	271	41235433 ns/op	0 errors	64.00 streams/tx
-BenchmarkTransactionalWriter/p64/many-bounded-key-4	291	48043881 ns/op	0 errors	64.00 streams/tx
-BenchmarkTransactionalWriter/p64/many-bounded-key-4	271	45016214 ns/op	0 errors	64.00 streams/tx
-BenchmarkTransactionalWriter/p64/many-bounded-key-4	272	48681808 ns/op	0 errors	64.00 streams/tx
 BenchmarkTransactionalWriter/p128/single-4	1834	6530249 ns/op	0 errors	1.000 streams/tx
 BenchmarkTransactionalWriter/p128/single-4	1737	6608322 ns/op	0 errors	1.000 streams/tx
 BenchmarkTransactionalWriter/p128/single-4	2014	6482218 ns/op	0 errors	1.000 streams/tx
-BenchmarkTransactionalWriter/p128/many-key-4	138	78284050 ns/op	0 errors	128.0 streams/tx
-BenchmarkTransactionalWriter/p128/many-key-4	177	82167643 ns/op	0 errors	128.0 streams/tx
-BenchmarkTransactionalWriter/p128/many-key-4	153	83373821 ns/op	0 errors	128.0 streams/tx
-BenchmarkTransactionalWriter/p128/many-bounded-key-4	87	115658159 ns/op	0 errors	128.0 streams/tx
-BenchmarkTransactionalWriter/p128/many-bounded-key-4	165	83402487 ns/op	0 errors	128.0 streams/tx
-BenchmarkTransactionalWriter/p128/many-bounded-key-4	127	112196606 ns/op	0 errors	128.0 streams/tx
 BenchmarkTransactionalWriter/p256/single-4	1633	7742370 ns/op	0 errors	1.000 streams/tx
 BenchmarkTransactionalWriter/p256/single-4	1647	8465182 ns/op	0 errors	1.000 streams/tx
 BenchmarkTransactionalWriter/p256/single-4	1683	7752079 ns/op	0 errors	1.000 streams/tx
-BenchmarkTransactionalWriter/p256/many-key-4	70	183954268 ns/op	0 errors	256.0 streams/tx
-BenchmarkTransactionalWriter/p256/many-key-4	64	172030198 ns/op	0 errors	256.0 streams/tx
-BenchmarkTransactionalWriter/p256/many-key-4	63	170444968 ns/op	0 errors	256.0 streams/tx
-BenchmarkTransactionalWriter/p256/many-bounded-key-4	58	209538608 ns/op	0 errors	256.0 streams/tx
-BenchmarkTransactionalWriter/p256/many-bounded-key-4	51	206661558 ns/op	0 errors	256.0 streams/tx
-BenchmarkTransactionalWriter/p256/many-bounded-key-4	66	225842906 ns/op	0 errors	256.0 streams/tx
 BenchmarkTransactionalWriter/p512/single-4	1624	7571217 ns/op	0 errors	1.000 streams/tx
 BenchmarkTransactionalWriter/p512/single-4	1428	8338628 ns/op	0 errors	1.000 streams/tx
 BenchmarkTransactionalWriter/p512/single-4	1560	8429209 ns/op	0 errors	1.000 streams/tx
+*/
+func BenchmarkTransactionalWriterSingle(b *testing.B) {
+	txWriterRunFixedPartitionBenchmark(b, txWriterStandardBenchmarkCase{
+		Name: "single", Mode: txWriterWriterModeSingle, Routing: txWriterRoutingModeKey,
+	})
+}
+
+// BenchmarkTransactionalWriterManyKey
+// Same master baseline and protocol as BenchmarkTransactionalWriterSingle.
+// The old result names are retained because the baseline predates the split.
+// Result:
+/*
+BenchmarkTransactionalWriter/p64/many-key-4	416	45144961 ns/op	0 errors	64.00 streams/tx
+BenchmarkTransactionalWriter/p64/many-key-4	344	44764447 ns/op	0 errors	64.00 streams/tx
+BenchmarkTransactionalWriter/p64/many-key-4	271	41235433 ns/op	0 errors	64.00 streams/tx
+BenchmarkTransactionalWriter/p128/many-key-4	138	78284050 ns/op	0 errors	128.0 streams/tx
+BenchmarkTransactionalWriter/p128/many-key-4	177	82167643 ns/op	0 errors	128.0 streams/tx
+BenchmarkTransactionalWriter/p128/many-key-4	153	83373821 ns/op	0 errors	128.0 streams/tx
+BenchmarkTransactionalWriter/p256/many-key-4	70	183954268 ns/op	0 errors	256.0 streams/tx
+BenchmarkTransactionalWriter/p256/many-key-4	64	172030198 ns/op	0 errors	256.0 streams/tx
+BenchmarkTransactionalWriter/p256/many-key-4	63	170444968 ns/op	0 errors	256.0 streams/tx
 BenchmarkTransactionalWriter/p512/many-key-4	24	501249553 ns/op	0 errors	512.0 streams/tx
 BenchmarkTransactionalWriter/p512/many-key-4	21	630094687 ns/op	0 errors	512.0 streams/tx
 BenchmarkTransactionalWriter/p512/many-key-4	13	968463503 ns/op	0 errors	512.0 streams/tx
+*/
+func BenchmarkTransactionalWriterManyKey(b *testing.B) {
+	txWriterRunFixedPartitionBenchmark(b, txWriterStandardBenchmarkCase{
+		Name: "many-key", Mode: txWriterWriterModeMany, Routing: txWriterRoutingModeKey,
+	})
+}
+
+// BenchmarkTransactionalWriterManyBoundedKey
+// Same master baseline and protocol as BenchmarkTransactionalWriterSingle.
+// The old result names are retained because the baseline predates the split.
+// Result:
+/*
+BenchmarkTransactionalWriter/p64/many-bounded-key-4	291	48043881 ns/op	0 errors	64.00 streams/tx
+BenchmarkTransactionalWriter/p64/many-bounded-key-4	271	45016214 ns/op	0 errors	64.00 streams/tx
+BenchmarkTransactionalWriter/p64/many-bounded-key-4	272	48681808 ns/op	0 errors	64.00 streams/tx
+BenchmarkTransactionalWriter/p128/many-bounded-key-4	87	115658159 ns/op	0 errors	128.0 streams/tx
+BenchmarkTransactionalWriter/p128/many-bounded-key-4	165	83402487 ns/op	0 errors	128.0 streams/tx
+BenchmarkTransactionalWriter/p128/many-bounded-key-4	127	112196606 ns/op	0 errors	128.0 streams/tx
+BenchmarkTransactionalWriter/p256/many-bounded-key-4	58	209538608 ns/op	0 errors	256.0 streams/tx
+BenchmarkTransactionalWriter/p256/many-bounded-key-4	51	206661558 ns/op	0 errors	256.0 streams/tx
+BenchmarkTransactionalWriter/p256/many-bounded-key-4	66	225842906 ns/op	0 errors	256.0 streams/tx
 BenchmarkTransactionalWriter/p512/many-bounded-key-4	12	1000694106 ns/op	0 errors	512.0 streams/tx
 BenchmarkTransactionalWriter/p512/many-bounded-key-4	12	975123006 ns/op	0 errors	512.0 streams/tx
 BenchmarkTransactionalWriter/p512/many-bounded-key-4	14	754791876 ns/op	0 errors	512.0 streams/tx
 */
-func BenchmarkTransactionalWriter(b *testing.B) {
+func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
+	txWriterRunFixedPartitionBenchmark(b, txWriterStandardBenchmarkCase{
+		Name: "many-bounded-key", Mode: txWriterWriterModeMany, Routing: txWriterRoutingModeBoundedKey,
+	})
+}
+
+func txWriterRunFixedPartitionBenchmark(b *testing.B, benchmarkCase txWriterStandardBenchmarkCase) {
+	b.Helper()
 	partitions, err := txWriterParseBenchmarkPartitions(*txWriterStandardBenchmarkPartitions)
 	if err != nil {
 		b.Fatal(err)
@@ -374,16 +401,12 @@ func BenchmarkTransactionalWriter(b *testing.B) {
 
 	for _, partitionCount := range partitions {
 		b.Run(fmt.Sprintf("p%d", partitionCount), func(b *testing.B) {
-			for _, benchmarkCase := range txWriterStandardBenchmarkCases {
-				b.Run(benchmarkCase.Name, func(b *testing.B) {
-					cfg := txWriterNewStandardBenchmarkConfig(
-						fmt.Sprintf("%s-%s-p%d", *txWriterStandardBenchmarkTopicPrefix, benchmarkCase.Name, partitionCount),
-						benchmarkCase,
-						partitionCount,
-					)
-					txWriterRunBenchmark(b, cfg)
-				})
-			}
+			cfg := txWriterNewStandardBenchmarkConfig(
+				fmt.Sprintf("%s-%s-p%d", *txWriterStandardBenchmarkTopicPrefix, benchmarkCase.Name, partitionCount),
+				benchmarkCase,
+				partitionCount,
+			)
+			txWriterRunBenchmark(b, cfg)
 		})
 	}
 }
