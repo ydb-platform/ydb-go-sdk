@@ -104,7 +104,6 @@ func newOrchestrator(
 		},
 		o.stopWithError,
 	)
-	o.writerPool.onSeqNo = o.onSessionInit
 	o.sender = newSender(
 		ctx,
 		o.partitions,
@@ -245,14 +244,17 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	if err != nil {
 		return err
 	}
+	var lastSeqNo int64
 	if autoSetSeqNo {
 		writer, writerErr := o.writerPool.get(msg.PartitionID, true)
 		if writerErr != nil {
 			return writerErr
 		}
-		if _, writerErr = writer.waitInit(ctx); writerErr != nil {
+		initInfo, writerErr := writer.waitInit(ctx)
+		if writerErr != nil {
 			return writerErr
 		}
+		lastSeqNo = initInfo.LastSeqNum
 	}
 
 	// saveMessageContent must run after choosePartition: BoundPartitionChooser may
@@ -264,6 +266,7 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	}
 	o.mu.WithLock(func() {
 		if autoSetSeqNo {
+			o.currentSeqNo = max(o.currentSeqNo, lastSeqNo)
 			o.currentSeqNo++
 			msg.SeqNo = o.currentSeqNo
 		} else {
@@ -426,12 +429,6 @@ func (o *orchestrator) reserveSeqNoNeedLock(partitionID, seqNo int64) error {
 	partition.LastQueuedSeqNo = seqNo
 
 	return nil
-}
-
-func (o *orchestrator) onSessionInit(seqNo int64) {
-	o.mu.WithLock(func() {
-		o.currentSeqNo = max(o.currentSeqNo, seqNo)
-	})
 }
 
 //nolint:funlen
