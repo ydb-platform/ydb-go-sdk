@@ -17,13 +17,11 @@ import (
 )
 
 // Fixed master baseline measured on 2026-10-01 at aaf92e41 with Go 1.26.4 and
-// ydbplatform/local-ydb:26.3.1.16. The linux/amd64 test binary ran inside the
-// YDB container because Colima host port forwarding was unavailable. The fixed
-// matrix used -benchtime=10s -count=3 -cpu=4 and one 1024-byte message per
-// transaction. Each attempt used query.WithLazyTx(true), created the Topic
-// writer before UPSERT materialized the transaction, and then called Write.
-// The table contains medians; every fixed run had zero retries and zero final
-// failures.
+// ydbplatform/local-ydb:26.3.1.16. The fixed matrix used -benchtime=10s
+// -count=3 -cpu=4 and one 1024-byte message per transaction. Each attempt used
+// query.WithLazyTx(true), created the Topic writer before UPSERT materialized
+// the transaction, and then called Write. The table contains medians; every
+// fixed run had zero retries and zero final failures.
 //
 //	P    scenario               tx/s   p95 ms      B/op  allocs/op  StreamWrite/tx
 //	64   single                198.8     21.33     79439       1262               1
