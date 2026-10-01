@@ -39,7 +39,7 @@ import (
 //
 //	go test -tags integration ./tests/integration -run '^$' \
 //	  -bench '^BenchmarkTransactionalWriterAutoSplit$' -benchtime=300x \
-//	  -count=1 -cpu=4
+//	  -count=3 -cpu=4
 //
 // Connection and credentials use the integration scope environment settings.
 // Each invocation uses a new topic and removes it after the measurement.
@@ -122,16 +122,19 @@ func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
 }
 
 // BenchmarkTransactionalWriterAutoSplit
-// Master baseline measured on 2026-10-01 at aaf92e41 with Go 1.26.4 and
-// ydbplatform/local-ydb:26.3.1.16. The auto-split benchmark used
-// -benchtime=300x -count=1 -cpu=4 three times. Every operation is one
-// transaction. The recorded baseline used a fresh YDB container for each
-// repetition; current runs use separate topics on the same YDB instance.
+// Measured on 2026-10-01 at 9b19136b6 with Go 1.26.4 and
+// ydbplatform/local-ydb:26.3.1.16. A single -benchtime=300x -count=3 -cpu=4
+// invocation ran all three repetitions on the same YDB instance, with a
+// separate topic for each repetition. Every operation is one transaction.
 // Result:
 /*
-BenchmarkTransactionalWriterAutoSplit-4	300	201452459 ns/op	2.000 errors	4.000 partitions	2.745 streams/tx
-BenchmarkTransactionalWriterAutoSplit-4	300	202494712 ns/op	2.000 errors	4.000 partitions	2.738 streams/tx
-BenchmarkTransactionalWriterAutoSplit-4	300	203012633 ns/op	1.000 errors	4.000 partitions	2.759 streams/tx
+goos: linux
+goarch: amd64
+pkg: github.com/ydb-platform/ydb-go-sdk/v3/tests/integration
+cpu: VirtualApple @ 2.50GHz
+BenchmarkTransactionalWriterAutoSplit-4   	     300	 203306241 ns/op	         1.000 errors	         4.000 partitions	         2.759 streams/tx
+BenchmarkTransactionalWriterAutoSplit-4   	     300	 201648559 ns/op	         3.000 errors	         3.000 partitions	         2.785 streams/tx
+BenchmarkTransactionalWriterAutoSplit-4   	     300	 201846098 ns/op	         2.000 errors	         4.000 partitions	         2.772 streams/tx
 */
 func BenchmarkTransactionalWriterAutoSplit(b *testing.B) {
 	benchmarkCase := txWriterStandardBenchmarkCase{
