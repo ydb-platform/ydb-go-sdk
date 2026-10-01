@@ -94,14 +94,8 @@ CREATE TABLE IF NOT EXISTS %s (
 		}
 	}
 
-	description, err := db.Topic().Describe(ctx, cfg.TopicPath)
+	_, err := db.Topic().Describe(ctx, cfg.TopicPath)
 	if err == nil {
-		if cfg.AutoSplit {
-			if err := validateAutoSplitTopic(description, cfg); err != nil {
-				return err
-			}
-		}
-
 		return nil
 	}
 	if !ydb.IsOperationErrorNotFoundError(err) && !ydb.IsOperationErrorSchemeError(err) {
@@ -148,58 +142,6 @@ func topicTopologyFromDescription(description topictypes.TopicDescription) (topi
 	return topicTopology{
 		ActivePartitions: activePartitions,
 	}, nil
-}
-
-func validateAutoSplitTopic(description topictypes.TopicDescription, cfg config) error {
-	settings := description.PartitionSettings
-	writeSpeed := settings.AutoPartitioningSettings.AutoPartitioningWriteSpeedStrategy
-	switch {
-	case settings.MinActivePartitions != 1:
-		return fmt.Errorf(
-			"auto-split topic %q has min_active_partitions=%d, want 1; use a fresh topic",
-			cfg.TopicPath,
-			settings.MinActivePartitions,
-		)
-	case settings.MaxActivePartitions != ydbMaxTopicPartitions:
-		return fmt.Errorf(
-			"auto-split topic %q has max_active_partitions=%d, want server ceiling %d; use a fresh topic",
-			cfg.TopicPath,
-			settings.MaxActivePartitions,
-			ydbMaxTopicPartitions,
-		)
-	case settings.AutoPartitioningSettings.AutoPartitioningStrategy != topictypes.AutoPartitioningStrategyScaleUp:
-		return fmt.Errorf("auto-split topic %q does not use SCALE_UP; use a fresh topic", cfg.TopicPath)
-	case writeSpeed.UpUtilizationPercent != int32(cfg.AutoSplitUpUtilization):
-		return fmt.Errorf(
-			"auto-split topic %q has up_utilization_percent=%d, want %d; use a fresh topic",
-			cfg.TopicPath,
-			writeSpeed.UpUtilizationPercent,
-			cfg.AutoSplitUpUtilization,
-		)
-	case writeSpeed.StabilizationWindow != cfg.AutoSplitStabilization:
-		return fmt.Errorf(
-			"auto-split topic %q has stabilization_window=%s, want %s; use a fresh topic",
-			cfg.TopicPath,
-			writeSpeed.StabilizationWindow,
-			cfg.AutoSplitStabilization,
-		)
-	case description.PartitionWriteSpeedBytesPerSecond != cfg.AutoSplitWriteSpeed:
-		return fmt.Errorf(
-			"auto-split topic %q has partition_write_speed=%d, want %d; use a fresh topic",
-			cfg.TopicPath,
-			description.PartitionWriteSpeedBytesPerSecond,
-			cfg.AutoSplitWriteSpeed,
-		)
-	case description.PartitionWriteBurstBytes != cfg.AutoSplitBurstBytes:
-		return fmt.Errorf(
-			"auto-split topic %q has partition_write_burst=%d, want %d; use a fresh topic",
-			cfg.TopicPath,
-			description.PartitionWriteBurstBytes,
-			cfg.AutoSplitBurstBytes,
-		)
-	}
-
-	return nil
 }
 
 func makePayload(size int) []byte {
