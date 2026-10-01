@@ -23,29 +23,29 @@ import (
 // fixed run had zero retries and zero final failures.
 //
 //	P    scenario                   tx/s    p95 ms      B/op  allocs/op  StreamWrite/tx
-//	64   single                    200.1     20.94     78545       1241               1
-//	64   many-key                  42.89     110.6   2227984      33112              64
-//	64   many-bounded-key          22.33     241.1   2242017      33416              64
-//	128  single                    153.2      38.3     78552       1245               1
-//	128  many-key                  12.75     442.9   4392125      65129             128
-//	128  many-bounded-key           10.8     488.3   4437713      65711             128
-//	256  single                      148     39.81     78483       1244               1
-//	256  many-key                  6.067     860.2   8753871     129633             256
-//	256  many-bounded-key          5.095      1003   8841670     130854             256
-//	512  single                    139.8     45.09     78386       1244               1
-//	512  many-key                  2.589      2224  17380599     257968             512
-//	512  many-bounded-key          1.625      3020  17660721     261372             512
+//	64   single                    198.5     21.29     78098       1234               1
+//	64   many-key                  22.34     251.8   2221079      33058              64
+//	64   many-bounded-key          20.81     274.1   2249062      33435              64
+//	128  single                    153.1     38.37     78133       1237               1
+//	128  many-key                  12.17     435.9   4378949      65027             128
+//	128  many-bounded-key          8.913     699.5   4451088      65848             128
+//	256  single                      129     49.81     78054       1237               1
+//	256  many-key                  5.813     997.2   8726644     129409             256
+//	256  many-bounded-key          4.772      1505   8820197     130633             256
+//	512  single                    119.9     51.89     77967       1236               1
+//	512  many-key                  1.587      3339  17371899     257991             512
+//	512  many-bounded-key          1.026      4330  17755273     262297             512
 //
 // The auto-split benchmark was measured on 2026-10-01. It used -benchtime=1x
 // -count=1 -cpu=4 three times, where one benchmark operation is a two-minute
-// phase and every repetition used a fresh YDB container. Its medians were 24.91
-// tx/s, 29.70ms p95, 1 -> 8 active partitions, 0.002361 retries/tx, and 6.948
-// StreamWrite calls per committed transaction, with 8 final errors. Preserve
+// phase and every repetition used a fresh YDB container. Its medians were 20.21
+// tx/s, 67.99ms p95, 1 -> 7 active partitions, 0.002043 retries/tx, and 5.967
+// StreamWrite calls per committed transaction, with 7 final errors. Preserve
 // this protocol and environment when comparing a candidate change.
 
 const benchmarkTableQueryTemplate = `
-UPSERT INTO %s (run_id, worker_id, seq_no, updated_at)
-VALUES ($run_id, $worker_id, $seq_no, CurrentUtcTimestamp());
+UPSERT INTO %s (run_id, worker_id, updated_at)
+VALUES ($run_id, $worker_id, CurrentUtcTimestamp());
 `
 
 const ydbMaxTopicPartitions int64 = 35_000
@@ -78,7 +78,6 @@ func prepareSchema(ctx context.Context, db *ydb.Driver, cfg config) error {
 CREATE TABLE IF NOT EXISTS %s (
     run_id Utf8 NOT NULL,
     worker_id Uint64 NOT NULL,
-    seq_no Uint64,
     updated_at Timestamp,
     PRIMARY KEY (run_id, worker_id)
 );
@@ -197,9 +196,9 @@ func runWorker(
 		default:
 		}
 
-		logicalSequence := stats.LogicalTransactions + 1
+		transactionNumber := stats.LogicalTransactions + 1
 		stats.LogicalTransactions++
-		transactionLatency, timings, attempts, err := runner.execute(ctx, logicalSequence)
+		transactionLatency, timings, attempts, err := runner.execute(ctx, transactionNumber)
 		stats.Attempts += uint64(attempts)
 		if attempts > 1 {
 			stats.Retries += uint64(attempts - 1)
@@ -273,26 +272,25 @@ func newTransactionRunners(db *ydb.Driver, cfg config, payload []byte) []*transa
 
 func (r *transactionRunner) executeSingleWriterTransaction(
 	ctx context.Context,
-	sequence uint64,
+	_ uint64,
 ) (time.Duration, attemptTimings, int, error) {
-	return r.executeTransaction(ctx, sequence, "")
+	return r.executeTransaction(ctx, "")
 }
 
 func (r *transactionRunner) executeManyWriterTransaction(
 	ctx context.Context,
-	sequence uint64,
+	transactionNumber uint64,
 ) (time.Duration, attemptTimings, int, error) {
-	return r.executeTransaction(ctx, sequence, r.messageKey(sequence))
+	return r.executeTransaction(ctx, r.messageKey(transactionNumber))
 }
 
-func (r *transactionRunner) messageKey(sequence uint64) string {
-	return r.messageKeyPrefix + strconv.FormatUint(sequence, 10)
+func (r *transactionRunner) messageKey(transactionNumber uint64) string {
+	return r.messageKeyPrefix + strconv.FormatUint(transactionNumber, 10)
 }
 
 //nolint:funlen // The complete measured transaction is intentionally kept together.
 func (r *transactionRunner) executeTransaction(
 	parent context.Context,
-	sequence uint64,
 	messageKey string,
 ) (time.Duration, attemptTimings, int, error) {
 	transactionContext, cancel := context.WithTimeout(parent, r.transactionTimeout)
@@ -330,7 +328,6 @@ func (r *transactionRunner) executeTransaction(
 					ydb.ParamsBuilder().
 						Param("$run_id").Text(r.runID).
 						Param("$worker_id").Uint64(uint64(r.workerID)).
-						Param("$seq_no").Uint64(sequence).
 						Build(),
 				),
 			)
@@ -360,7 +357,6 @@ func (r *transactionRunner) executeTransaction(
 
 func writerOptions(cfg config, workerID int) []topicoptions.WriterOption {
 	options := []topicoptions.WriterOption{
-		topicoptions.WithWriterSetAutoSeqNo(true),
 		topicoptions.WithWriterDirectWrite(false),
 	}
 	slotProducerID := ""

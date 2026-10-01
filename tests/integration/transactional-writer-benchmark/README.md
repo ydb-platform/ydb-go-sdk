@@ -11,6 +11,9 @@ Every attempt uses `query.WithLazyTx(true)`. Creating the writer before the
 `UPSERT` exercises the transition from the lazy transaction ID to the materialized
 transaction before the writer calls `UnLazy` during `Write`.
 
+Messages leave `SeqNo` unset. The writer's default automatic numbering is used,
+so the benchmark does not generate or measure user-provided sequence numbers.
+
 `BenchmarkTransactionalWriter` covers three fixed-topology scenarios for every
 requested partition count:
 

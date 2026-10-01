@@ -247,9 +247,9 @@ func runParallelTransactions(
 		runner := runners[workerID]
 		stats := &allStats[workerID]
 		for pb.Next() {
-			logicalSequence := stats.LogicalTransactions + 1
+			transactionNumber := stats.LogicalTransactions + 1
 			stats.LogicalTransactions++
-			transactionLatency, timings, attempts, err := runner.execute(ctx, logicalSequence)
+			transactionLatency, timings, attempts, err := runner.execute(ctx, transactionNumber)
 			stats.Attempts += uint64(attempts)
 			if attempts > 1 {
 				stats.Retries += uint64(attempts - 1)
