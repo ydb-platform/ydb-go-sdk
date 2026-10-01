@@ -20,8 +20,7 @@ import (
 )
 
 //nolint:errcheck
-func TestCoordinationSemaphore(sourceTest *testing.T) {
-	t := xtest.MakeSyncedTest(sourceTest)
+func TestCoordinationSemaphore(t *testing.T) {
 	ctx := xtest.Context(t)
 	db, err := ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
@@ -115,8 +114,7 @@ func TestCoordinationSemaphore(sourceTest *testing.T) {
 	fmt.Printf("deleted semaphore my-semaphore\n")
 }
 
-func TestCoordinationSemaphoreWatch(sourceTest *testing.T) {
-	t := xtest.MakeSyncedTest(sourceTest)
+func TestCoordinationSemaphoreWatch(t *testing.T) {
 	ctx := xtest.Context(t)
 	db, err := ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),

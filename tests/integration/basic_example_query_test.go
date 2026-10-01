@@ -25,18 +25,16 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestBasicExampleQuery(sourceTest *testing.T) { //nolint:gocyclo
+func TestBasicExampleQuery(t *testing.T) { //nolint:gocyclo
 	if os.Getenv("YDB_VERSION") != "nightly" && version.Lt(os.Getenv("YDB_VERSION"), "24.3") {
-		sourceTest.Skip("query service has been production ready since 24.3")
+		t.Skip("query service has been production ready since 24.3")
 	}
 
-	t := xtest.MakeSyncedTest(sourceTest)
 	folder := t.Name()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
