@@ -116,7 +116,8 @@ func WithProducerID(producerID string) WriterOption {
 	return WithWriterProducerID(producerID)
 }
 
-// WithWriterProducerID set producer for write session
+// WithWriterProducerID sets the producer for a write session. For transactional
+// writers, this enables deduplication and requires SeqNo on every message.
 func WithWriterProducerID(producerID string) WriterOption {
 	return topicwriterinternal.WithProducerID(producerID)
 }

@@ -417,7 +417,9 @@ func (c *Client) StartTransactionalWriter(
 		return nil, xerrors.WithStackTrace(errUnsupportedTransactionType)
 	}
 
-	cfg := c.createWriterConfig(topicPath, opts)
+	cfg := c.createWriterConfig(topicPath, append(
+		[]topicoptions.WriterOption{topicwriterinternal.WithTransactionMode()}, opts...,
+	))
 
 	mwCfg, ok := cfg.MultiWriterConfig.(*internalmultiwriter.MultiWriterConfig)
 

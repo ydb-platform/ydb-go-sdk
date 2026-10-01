@@ -167,6 +167,12 @@ func WithProducerID(producerID string) PublicWriterOption {
 	}
 }
 
+func WithTransactionMode() PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.Transactional = true
+	}
+}
+
 func WithSessionMeta(meta map[string]string) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		if len(meta) == 0 {

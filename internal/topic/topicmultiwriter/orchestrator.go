@@ -245,7 +245,7 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		return err
 	}
 	var lastSeqNo int64
-	if autoSetSeqNo {
+	if autoSetSeqNo && !o.writerCfg.Transactional {
 		writer, writerErr := o.writerPool.get(msg.PartitionID, true)
 		if writerErr != nil {
 			return writerErr

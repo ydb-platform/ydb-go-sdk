@@ -58,6 +58,9 @@ func newPartitionWriterPool(
 }
 
 func (p *partitionWriterPool) getProducerID(partitionID int64) string {
+	if p.cfg.ProducerIDPrefix == "" {
+		return ""
+	}
 	return fmt.Sprintf("%s-%d", p.cfg.ProducerIDPrefix, partitionID)
 }
 
@@ -80,6 +83,9 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 				p.ackCallback(partitionID, seqNo)
 			}),
 			withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+				if p.writerCfg.Transactional {
+					return topic.PublicRetryDecisionStop
+				}
 				if isOperationErrorOverloaded(args.Error) {
 					p.partitionSplitCallback(partitionID)
 
