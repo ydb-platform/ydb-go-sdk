@@ -35,13 +35,14 @@ import (
 //	  -benchtime=10s -count=3 -cpu=4 \
 //	  -args -ydb-benchmark-partitions 64,128,256,512
 //
-// For auto-split, restart YDB before each run and use:
+// For auto-split, use:
 //
 //	go test -tags integration ./tests/integration -run '^$' \
 //	  -bench '^BenchmarkTransactionalWriterAutoSplit$' -benchtime=300x \
 //	  -count=1 -cpu=4
 //
 // Connection and credentials use the integration scope environment settings.
+// Each invocation uses a new topic and removes it after the measurement.
 
 // BenchmarkTransactionalWriterSingle
 // Master baseline measured on 2026-10-01 at aaf92e41 with Go 1.26.4 and
@@ -49,8 +50,8 @@ import (
 // -count=3 -cpu=4 and one 1024-byte message per transaction. Each attempt used
 // query.WithLazyTx(true), created the Topic writer before UPSERT materialized
 // the transaction, and then called Write. Every fixed run had zero final
-// failures. The baseline predates the split into separate Benchmark functions;
-// the old result names are retained below.
+// failures. The baseline predates the split into separate Benchmark functions
+// and per-invocation topics; the old result names are retained below.
 // Result:
 /*
 BenchmarkTransactionalWriter/p64/single-4	2200	5036600 ns/op	0 errors	1.000 streams/tx
@@ -124,7 +125,8 @@ func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
 // Master baseline measured on 2026-10-01 at aaf92e41 with Go 1.26.4 and
 // ydbplatform/local-ydb:26.3.1.16. The auto-split benchmark used
 // -benchtime=300x -count=1 -cpu=4 three times. Every operation is one
-// transaction, and every repetition used a fresh YDB container.
+// transaction. The recorded baseline used a fresh YDB container for each
+// repetition; current runs use separate topics on the same YDB instance.
 // Result:
 /*
 BenchmarkTransactionalWriterAutoSplit-4	300	201452459 ns/op	2.000 errors	4.000 partitions	2.745 streams/tx
@@ -137,7 +139,7 @@ func BenchmarkTransactionalWriterAutoSplit(b *testing.B) {
 		Mode:    txWriterWriterModeMany,
 		Routing: txWriterRoutingModeBoundedKey,
 	}
-	topicPath := fmt.Sprintf("%s-autosplit-%s", *txWriterStandardBenchmarkTopicPrefix, txWriterDefaultRunID())
+	topicPath := fmt.Sprintf("%s-autosplit", *txWriterStandardBenchmarkTopicPrefix)
 	cfg := txWriterNewStandardBenchmarkConfig(topicPath, benchmarkCase, 1)
 	cfg.AutoSplit = true
 	cfg.AutoSplitWriteSpeed = 1 << 20
@@ -198,7 +200,7 @@ func txWriterNewStandardBenchmarkConfig(
 	runID := txWriterDefaultRunID()
 
 	return txWriterConfig{
-		TopicPath:          topicPath,
+		TopicPath:          topicPath + "-" + runID,
 		TablePath:          *txWriterStandardBenchmarkTable,
 		RunID:              runID,
 		ProducerIDPrefix:   runID,
@@ -223,6 +225,13 @@ func txWriterRunBenchmark(b *testing.B, cfg txWriterConfig) {
 	if err := txWriterPrepareSchema(ctx, db, cfg); err != nil {
 		b.Fatal(err)
 	}
+	b.Cleanup(func() {
+		dropContext, cancelDrop := context.WithTimeout(context.Background(), cfg.TransactionTimeout)
+		defer cancelDrop()
+		if err := db.Topic().Drop(dropContext, cfg.TopicPath); err != nil {
+			b.Errorf("drop benchmark topic %q: %v", cfg.TopicPath, err)
+		}
+	})
 	if cfg.AutoSplit {
 		if _, err := db.Topic().Describe(ctx, cfg.TopicPath); err != nil {
 			b.Fatalf("describe benchmark topic: %v", err)
