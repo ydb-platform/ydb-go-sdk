@@ -19,40 +19,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
-// stubTopicTransaction is a minimal tx.Transaction for MultiWriterWithTransaction tests.
-type stubTopicTransaction struct {
-	tx.Identifier
-
-	sessionID string
-}
-
-func newStubTopicTransaction(id string) *stubTopicTransaction {
-	return &stubTopicTransaction{
-		Identifier: tx.ID(id),
-		sessionID:  "test-session",
-	}
-}
-
-func (s *stubTopicTransaction) UnLazy(context.Context) error {
-	return nil
-}
-
-func (s *stubTopicTransaction) SessionID() string {
-	return s.sessionID
-}
-
-func (s *stubTopicTransaction) NodeID() uint32 {
-	return 0
-}
-
-func (*stubTopicTransaction) OnBeforeCommit(tx.OnTransactionBeforeCommit) {}
-
-func (*stubTopicTransaction) OnCompleted(tx.OnTransactionCompletedFunc) {}
-
-func (*stubTopicTransaction) Rollback(context.Context) error {
-	return nil
-}
-
 func TestMultiWriterWithTransaction_Write_SetsTx(t *testing.T) {
 	t.Parallel()
 
@@ -92,18 +58,6 @@ func TestMultiWriterWithTransaction_Write_SetsTx(t *testing.T) {
 	}
 
 	require.NoError(t, multiWriter.Close(ctx))
-}
-
-type transactionalWriterFactory struct {
-	writersFactory
-
-	created chan topicwriterinternal.WriterReconnectorConfig
-}
-
-func (f *transactionalWriterFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
-	f.created <- cfg
-
-	return f.writersFactory.Create(cfg)
 }
 
 func TestTransactionalMultiWriterDeduplication(t *testing.T) {
@@ -200,4 +154,50 @@ func TestTransactionalMultiWriterDoesNotOpenSessionForSeqNo(t *testing.T) {
 	)})
 	require.NoError(t, err)
 	require.Zero(t, orchestrator.getWritersCount())
+}
+
+// stubTopicTransaction is a minimal [tx.Transaction] for MultiWriterWithTransaction tests.
+type stubTopicTransaction struct {
+	tx.Identifier
+
+	sessionID string
+}
+
+func newStubTopicTransaction(id string) *stubTopicTransaction {
+	return &stubTopicTransaction{
+		Identifier: tx.ID(id),
+		sessionID:  "test-session",
+	}
+}
+
+func (s *stubTopicTransaction) UnLazy(context.Context) error {
+	return nil
+}
+
+func (s *stubTopicTransaction) SessionID() string {
+	return s.sessionID
+}
+
+func (s *stubTopicTransaction) NodeID() uint32 {
+	return 0
+}
+
+func (*stubTopicTransaction) OnBeforeCommit(tx.OnTransactionBeforeCommit) {}
+
+func (*stubTopicTransaction) OnCompleted(tx.OnTransactionCompletedFunc) {}
+
+func (*stubTopicTransaction) Rollback(context.Context) error {
+	return nil
+}
+
+type transactionalWriterFactory struct {
+	writersFactory
+
+	created chan topicwriterinternal.WriterReconnectorConfig
+}
+
+func (f *transactionalWriterFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	f.created <- cfg
+
+	return f.writersFactory.Create(cfg)
 }
