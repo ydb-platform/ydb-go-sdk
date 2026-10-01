@@ -23,19 +23,19 @@ import (
 // the transaction, and then called Write. The table contains medians; every
 // fixed run had zero retries and zero final failures.
 //
-//	P    scenario               tx/s   p95 ms      B/op  allocs/op  StreamWrite/tx
-//	64   single                198.8     21.33     79439       1262               1
-//	64   many-key               39.29   141.7    2231586      33283              64
-//	64   many-bounded-key       21.69   285.4    2259845      33714              64
-//	128  single                152.6     37.36     79407       1263               1
-//	128  many-key               13.24   408.7    4385725      65333             128
-//	128  many-bounded-key       11.77   442.3    4442273      66066             128
-//	256  single                156.9     37.07     79315       1263               1
-//	256  many-key                6.637  910.7    8717243     129830             256
-//	256  many-bounded-key        5.846  865.3    8823254     131260             256
-//	512  single                146.7     41.10     79202       1262               1
-//	512  many-key                2.209 3664     17396741     259261             512
-//	512  many-bounded-key        1.396 3099     17651404     262448             512
+//	P    scenario                   tx/s    p95 ms      B/op  allocs/op  StreamWrite/tx
+//	64   single                    198.8     21.33     79439       1262               1
+//	64   many-key                  39.29     141.7   2231586      33283              64
+//	64   many-bounded-key          21.69     285.4   2259845      33714              64
+//	128  single                    152.6     37.36     79407       1263               1
+//	128  many-key                  13.24     408.7   4385725      65333             128
+//	128  many-bounded-key          11.77     442.3   4442273      66066             128
+//	256  single                    156.9     37.07     79315       1263               1
+//	256  many-key                  6.637     910.7   8717243     129830             256
+//	256  many-bounded-key          5.846     865.3   8823254     131260             256
+//	512  single                    146.7      41.1     79202       1262               1
+//	512  many-key                  2.209      3664  17396741     259261             512
+//	512  many-bounded-key          1.396      3099  17651404     262448             512
 //
 // The auto-split benchmark was measured on 2026-10-01. It used -benchtime=1x
 // -count=1 -cpu=4 three times, where one benchmark operation is a two-minute

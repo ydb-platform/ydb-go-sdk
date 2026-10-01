@@ -137,6 +137,14 @@ go test ./tests/integration/transactional-writer-benchmark \
 benchstat master.txt candidate.txt
 ```
 
+The benchmark command writes raw samples; it does not update the baseline
+comment in the source. Render the fixed-topology median table in that comment's
+format from the three master samples with:
+
+```bash
+./tests/integration/transactional-writer-benchmark/format-fixed-baseline.sh master.txt
+```
+
 Compare medians and spread across repetitions, not only the best result. The
 master baseline and its exact environment are recorded in a comment near the
 benchmark implementation so a later PR can compare against the same protocol.
