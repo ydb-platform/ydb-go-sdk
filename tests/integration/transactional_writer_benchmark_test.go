@@ -33,22 +33,17 @@ import (
 //	go test -tags integration ./tests/integration -run '^$' \
 //	  -bench '^BenchmarkTransactionalWriter(Single|ManyKey|ManyBoundedKey)$' \
 //	  -benchtime=10s -count=3 -cpu=4 \
-//	  -args -ydb-benchmark-dsn grpc://localhost:2136/local \
-//	  -ydb-benchmark-partitions 64,128,256,512
+//	  -args -ydb-benchmark-partitions 64,128,256,512
 //
 // For auto-split, restart YDB before each run and use:
 //
 //	go test -tags integration ./tests/integration -run '^$' \
 //	  -bench '^BenchmarkTransactionalWriterAutoSplit$' -benchtime=300x \
-//	  -count=1 -cpu=4 -args -ydb-benchmark-dsn grpc://localhost:2136/local
+//	  -count=1 -cpu=4
 //
+// Connection and credentials use the integration scope environment settings.
 
 var (
-	txWriterStandardBenchmarkDSN = flag.String(
-		"ydb-benchmark-dsn",
-		txWriterBenchmarkDSNFromEnvironment(),
-		"YDB connection string used by transactional writer benchmarks",
-	)
 	txWriterStandardBenchmarkTopicPrefix = flag.String(
 		"ydb-benchmark-topic-prefix",
 		"tx-writer-benchmark",
@@ -70,14 +65,6 @@ type txWriterStandardBenchmarkCase struct {
 	Name    string
 	Mode    txWriterWriterMode
 	Routing txWriterRoutingMode
-}
-
-func txWriterBenchmarkDSNFromEnvironment() string {
-	if dsn := os.Getenv("YDB_CONNECTION_STRING"); dsn != "" {
-		return dsn
-	}
-
-	return "grpc://localhost:2136/local"
 }
 
 func txWriterParseBenchmarkPartitions(value string) ([]int64, error) {
@@ -106,7 +93,6 @@ func txWriterNewStandardBenchmarkConfig(
 	runID := txWriterDefaultRunID()
 
 	return txWriterConfig{
-		DSN:                *txWriterStandardBenchmarkDSN,
 		TopicPath:          topicPath,
 		TablePath:          *txWriterStandardBenchmarkTable,
 		RunID:              runID,
@@ -124,25 +110,16 @@ func txWriterRunBenchmark(b *testing.B, cfg txWriterConfig) {
 	b.Helper()
 	b.StopTimer()
 
-	ctx := context.Background()
+	scope := newScope(b)
+	ctx := scope.Ctx
 	metrics := &txWriterInstrumentation{}
-	db, err := txWriterOpenDatabase(ctx, cfg, metrics)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		closeContext, cancelClose := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancelClose()
-		if closeErr := db.Close(closeContext); closeErr != nil {
-			b.Errorf("close benchmark driver: %v", closeErr)
-		}
-	}()
+	db := scope.Driver(ydb.WithTraceTopic(metrics.topicTrace()))
 
-	if err = txWriterPrepareSchema(ctx, db, cfg); err != nil {
+	if err := txWriterPrepareSchema(ctx, db, cfg); err != nil {
 		b.Fatal(err)
 	}
 	if cfg.AutoSplit {
-		if _, err = db.Topic().Describe(ctx, cfg.TopicPath); err != nil {
+		if _, err := db.Topic().Describe(ctx, cfg.TopicPath); err != nil {
 			b.Fatalf("describe benchmark topic: %v", err)
 		}
 	}
@@ -234,7 +211,6 @@ const (
 )
 
 type txWriterConfig struct {
-	DSN                    string
 	TopicPath              string
 	TablePath              string
 	RunID                  string
@@ -294,25 +270,6 @@ func (m *txWriterInstrumentation) topicTrace() trace.Topic {
 
 type txWriterTopicTopology struct {
 	ActivePartitions int
-}
-
-func txWriterOpenDatabase(
-	ctx context.Context,
-	cfg txWriterConfig,
-	metrics *txWriterInstrumentation,
-) (*ydb.Driver, error) {
-	options := make([]ydb.Option, 0, 2)
-	if metrics != nil {
-		options = append(options, ydb.WithTraceTopic(metrics.topicTrace()))
-	}
-	options = append(options, ydb.WithAnonymousCredentials())
-
-	db, err := ydb.Open(ctx, cfg.DSN, options...)
-	if err != nil {
-		return nil, fmt.Errorf("open YDB driver: %w", err)
-	}
-
-	return db, nil
 }
 
 // BenchmarkTransactionalWriterSingle
