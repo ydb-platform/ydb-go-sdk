@@ -52,12 +52,12 @@ type writerWrapper struct {
 	direct   bool
 }
 
-func (w *writerWrapper) waitInit(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+func (w *writerWrapper) waitInit(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
-		return topicwriterinternal.InitialInfo{}, ctx.Err()
+		return ctx.Err()
 	case <-w.initCh:
-		return w.initInfo, w.getInitErr()
+		return w.getInitErr()
 	}
 }
 

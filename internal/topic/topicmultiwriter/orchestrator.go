@@ -250,11 +250,14 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		if writerErr != nil {
 			return writerErr
 		}
-		initInfo, writerErr := writer.waitInit(ctx)
-		if writerErr != nil {
+		if writer.initDone.Load() {
+			if writerErr = writer.getInitErr(); writerErr != nil {
+				return writerErr
+			}
+		} else if writerErr = writer.waitInit(ctx); writerErr != nil {
 			return writerErr
 		}
-		lastSeqNo = initInfo.LastSeqNum
+		lastSeqNo = writer.initInfo.LastSeqNum
 	}
 
 	// saveMessageContent must run after choosePartition: BoundPartitionChooser may
