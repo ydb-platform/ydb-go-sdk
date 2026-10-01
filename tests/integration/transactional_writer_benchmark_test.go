@@ -42,7 +42,10 @@ import (
 //	  -count=3 -cpu=4
 //
 // Connection and credentials use the integration scope environment settings.
-// Each invocation uses a new topic and removes it after the measurement.
+// Each invocation uses a new topic and removes it after a successful measurement.
+// Each benchmark invocation has one 20-minute deadline; transactions have no
+// separate timeout. The historical results below used a one-minute deadline
+// per transaction.
 
 // BenchmarkTransactionalWriterSingle
 // Master baseline measured on 2026-10-01 at aaf92e41 with Go 1.26.4 and
@@ -171,6 +174,8 @@ var (
 	)
 )
 
+const txWriterBenchmarkTimeout = 20 * time.Minute
+
 type txWriterStandardBenchmarkCase struct {
 	Name    string
 	Mode    txWriterWriterMode
@@ -203,16 +208,15 @@ func txWriterNewStandardBenchmarkConfig(
 	runID := txWriterDefaultRunID()
 
 	return txWriterConfig{
-		TopicPath:          topicPath + "-" + runID,
-		TablePath:          *txWriterStandardBenchmarkTable,
-		RunID:              runID,
-		ProducerIDPrefix:   runID,
-		Mode:               benchmarkCase.Mode,
-		Routing:            benchmarkCase.Routing,
-		TransactionTimeout: time.Minute,
-		Concurrency:        runtime.GOMAXPROCS(0),
-		MessageSize:        1024,
-		PreparePartitions:  partitionCount,
+		TopicPath:         topicPath + "-" + runID,
+		TablePath:         *txWriterStandardBenchmarkTable,
+		RunID:             runID,
+		ProducerIDPrefix:  runID,
+		Mode:              benchmarkCase.Mode,
+		Routing:           benchmarkCase.Routing,
+		Concurrency:       runtime.GOMAXPROCS(0),
+		MessageSize:       1024,
+		PreparePartitions: partitionCount,
 	}
 }
 
@@ -221,7 +225,9 @@ func txWriterRunBenchmark(b *testing.B, cfg txWriterConfig) {
 	b.StopTimer()
 
 	scope := newScope(b)
-	ctx := scope.Ctx
+	// Go's -timeout alarm is stopped before benchmarks run.
+	ctx, cancel := context.WithTimeout(scope.Ctx, txWriterBenchmarkTimeout)
+	b.Cleanup(cancel)
 	metrics := &txWriterInstrumentation{}
 	db := scope.Driver(ydb.WithTraceTopic(metrics.topicTrace()))
 
@@ -229,9 +235,7 @@ func txWriterRunBenchmark(b *testing.B, cfg txWriterConfig) {
 		b.Fatal(err)
 	}
 	b.Cleanup(func() {
-		dropContext, cancelDrop := context.WithTimeout(context.Background(), cfg.TransactionTimeout)
-		defer cancelDrop()
-		if err := db.Topic().Drop(dropContext, cfg.TopicPath); err != nil {
+		if err := db.Topic().Drop(ctx, cfg.TopicPath); err != nil {
 			b.Errorf("drop benchmark topic %q: %v", cfg.TopicPath, err)
 		}
 	})
@@ -249,13 +253,14 @@ func txWriterRunBenchmark(b *testing.B, cfg txWriterConfig) {
 	b.StartTimer()
 	stats := txWriterRunParallelTransactions(ctx, b, runners, workerStats)
 	b.StopTimer()
+	if err := ctx.Err(); err != nil {
+		b.Fatalf("benchmark did not finish within %s: %v", txWriterBenchmarkTimeout, err)
+	}
 	streamWriteOpens := metrics.streamWriteOpens.Load() - streamWriteOpensBefore
 
 	var finalTopology *txWriterTopicTopology
 	if cfg.AutoSplit {
-		describeContext, cancelDescribe := context.WithTimeout(ctx, cfg.TransactionTimeout)
-		description, err := db.Topic().Describe(describeContext, cfg.TopicPath)
-		cancelDescribe()
+		description, err := db.Topic().Describe(ctx, cfg.TopicPath)
 		if err != nil {
 			b.Fatalf("describe final benchmark topic: %v", err)
 		}
@@ -285,6 +290,9 @@ func txWriterRunParallelTransactions(
 			err := runner.execute(ctx, transactionNumber)
 			if err != nil {
 				stats.Failed++
+				if ctx.Err() != nil {
+					return
+				}
 
 				continue
 			}
@@ -334,7 +342,6 @@ type txWriterConfig struct {
 	ProducerIDPrefix       string
 	Mode                   txWriterWriterMode
 	Routing                txWriterRoutingMode
-	TransactionTimeout     time.Duration
 	Concurrency            int
 	MessageSize            int
 	PreparePartitions      int64
@@ -512,7 +519,6 @@ type txWriterTransactionRunner struct {
 	runID                 string
 	workerID              int
 	payload               []byte
-	transactionTimeout    time.Duration
 	txWriterWriterOptions []topicoptions.WriterOption
 	doTxOptions           []query.DoTxOption
 	messageKeyPrefix      string
@@ -532,7 +538,6 @@ func txWriterNewTransactionRunner(
 		runID:                 cfg.RunID,
 		workerID:              workerID,
 		payload:               payload,
-		transactionTimeout:    cfg.TransactionTimeout,
 		txWriterWriterOptions: txWriterWriterOptions(cfg, workerID),
 		doTxOptions: []query.DoTxOption{
 			query.WithIdempotent(),
@@ -577,14 +582,11 @@ func (r *txWriterTransactionRunner) messageKey(transactionNumber uint64) string 
 }
 
 func (r *txWriterTransactionRunner) executeTransaction(
-	parent context.Context,
+	ctx context.Context,
 	messageKey string,
 ) error {
-	transactionContext, cancel := context.WithTimeout(parent, r.transactionTimeout)
-	defer cancel()
-
 	return r.db.Query().DoTx(
-		transactionContext,
+		ctx,
 		func(ctx context.Context, tx query.TxActor) error {
 			writer, err := r.db.Topic().StartTransactionalWriter(
 				tx,
