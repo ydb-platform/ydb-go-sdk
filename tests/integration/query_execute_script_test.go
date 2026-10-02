@@ -19,8 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
-func TestQueryExecuteScript(sourceTest *testing.T) {
-	t := xtest.MakeSyncedTest(sourceTest)
+func TestQueryExecuteScript(t *testing.T) {
 	var (
 		folder           = t.Name()
 		tableName        = `test`
