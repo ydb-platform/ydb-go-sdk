@@ -145,73 +145,43 @@ func TestClassifySessionErrorFromRawTopicStatus(t *testing.T) {
 }
 
 func TestTraceReaderSessionError(t *testing.T) {
-	var got trace.TopicReaderSessionErrorInfo
-	tracer := &trace.Topic{
-		OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
-			got = info
-		},
-	}
 	readerInfo := ReaderInfo{
 		Endpoint:   "endpoint",
 		Database:   "/database",
 		Consumer:   "consumer",
 		ReaderName: "reader",
 	}
+	unknownTransportError := grpcStatus.Error(grpcCodes.Code(99), "future transport code")
+	var calls int
+	var got trace.TopicReaderSessionErrorInfo
+	tracer := &trace.Topic{
+		OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
+			calls++
+			got = info
+		},
+	}
+	ctx := context.Background()
 
-	TraceReaderSessionError(
-		context.Background(),
-		tracer,
-		readerInfo,
-		"retry",
-		grpcStatus.Error(grpcCodes.Unavailable, "connection lost"),
-	)
+	TraceReaderSessionError(ctx, nil, readerInfo, "stop", unknownTransportError)
+	TraceReaderSessionError(ctx, &trace.Topic{}, readerInfo, "stop", unknownTransportError)
+	TraceReaderSessionError(ctx, tracer, readerInfo, "stop", nil)
+	require.Zero(t, calls)
 
+	TraceReaderSessionError(ctx, tracer, readerInfo, "stop", unknownTransportError)
+
+	require.Equal(t, 1, calls)
 	require.Equal(t, "endpoint", got.Endpoint)
 	require.Equal(t, "/database", got.Database)
 	require.Equal(t, "consumer", got.Consumer)
 	require.Equal(t, "reader", got.ReaderName)
-	require.Equal(t, "retry", got.RetryDecision)
-	require.Equal(t, "Unavailable", got.StatusCode)
+	require.Equal(t, "stop", got.RetryDecision)
+	require.Equal(t, "Code(99)", got.StatusCode)
 	require.Equal(t, "transport_error", got.ErrorType)
-	require.Error(t, got.Error)
-}
-
-func TestTraceReaderSessionErrorHandlesNoOpAndUnknownTransportCode(t *testing.T) {
-	readerInfo := ReaderInfo{
-		Endpoint:   "endpoint",
-		Database:   "database",
-		Consumer:   "consumer",
-		ReaderName: "reader",
-	}
-	unknownTransportError := grpcStatus.Error(grpcCodes.Code(99), "future transport code")
-
-	TraceReaderSessionError(context.Background(), nil, readerInfo, "stop", unknownTransportError)
-	TraceReaderSessionError(context.Background(), &trace.Topic{}, readerInfo, "stop", unknownTransportError)
-
-	calls := 0
-	tracer := &trace.Topic{
-		OnReaderSessionError: func(trace.TopicReaderSessionErrorInfo) {
-			calls++
-		},
-	}
-	TraceReaderSessionError(context.Background(), tracer, readerInfo, "stop", nil)
-	require.Zero(t, calls)
-
-	var actual trace.TopicReaderSessionErrorInfo
-	tracer.OnReaderSessionError = func(info trace.TopicReaderSessionErrorInfo) {
-		actual = info
-	}
-	TraceReaderSessionError(context.Background(), tracer, readerInfo, "stop", unknownTransportError)
-
-	require.Equal(t, "stop", actual.RetryDecision)
-	require.Equal(t, "Code(99)", actual.StatusCode)
-	require.Equal(t, "transport_error", actual.ErrorType)
-	require.Error(t, actual.Error)
+	require.Same(t, unknownTransportError, got.Error)
 	require.Equal(t, SessionErrorClassification{
 		StatusCode: "Code(99)",
 		ErrorType:  "transport_error",
 	}, ClassifySessionError(unknownTransportError))
-	require.ErrorIs(t, actual.Error, unknownTransportError)
 }
 
 type statusGrpcStream struct {

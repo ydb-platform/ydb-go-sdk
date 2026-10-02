@@ -27,12 +27,6 @@ func TestReaderInfoPropagatesDriverAttributes(t *testing.T) {
 		Database: configuredDatabase,
 		Consumer: "consumer",
 	}, client.readerInfo("consumer"))
-
-	require.Equal(t, topicreadercommon.ReaderInfo{
-		Endpoint: configuredEndpoint,
-		Database: configuredDatabase,
-		Consumer: "consumer",
-	}, client.readerInfo("consumer"))
 }
 
 func TestReaderInfoNormalizesConfiguredDatabase(t *testing.T) {

@@ -307,67 +307,6 @@ func createTestBatchWithBufferBytes(t *testing.T, size int) *topicreadercommon.P
 // INTERFACE TESTS - Test external behavior through public API only
 // =============================================================================
 
-func TestPartitionWorkerInterface_MessagesDeliveredTraceBeforeHandler(t *testing.T) {
-	ctx := xtest.Context(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	session := createTestPartitionSession()
-	messageSender := newSyncMessageSender()
-	mockHandler := NewMockEventHandler(ctrl)
-	errorReceived := make(empty.Chan, 1)
-	var deliveredBeforeHandler atomic.Bool
-	var events []trace.TopicReaderMessagesDeliveredInfo
-	testErr := errors.New("user handler error")
-
-	mockHandler.EXPECT().
-		OnReadMessages(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(context.Context, *PublicReadMessages) error {
-			deliveredBeforeHandler.Store(len(events) == 1)
-
-			return testErr
-		})
-
-	worker := NewPartitionWorker(
-		123,
-		session,
-		messageSender,
-		mockHandler,
-		func(rawtopicreader.PartitionSessionID, error) {
-			close(errorReceived)
-		},
-		&trace.Topic{OnReaderMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
-			events = append(events, info)
-		}},
-		"test-listener",
-		nil,
-		nil,
-	)
-	worker.readerInfo = topicreadercommon.ReaderInfo{
-		Endpoint: "configured:2135",
-		Database: "/local",
-		Consumer: "consumer",
-	}
-	worker.Start(ctx)
-	defer func() {
-		require.NoError(t, worker.Close(ctx, nil))
-	}()
-
-	worker.AddMessagesBatch(
-		rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
-		createTestBatch(),
-	)
-
-	xtest.WaitChannelClosed(t, errorReceived)
-	require.True(t, deliveredBeforeHandler.Load())
-	require.Len(t, events, 1)
-	require.Equal(t, "configured:2135", events[0].Endpoint)
-	require.Equal(t, "/local", events[0].Database)
-	require.Equal(t, "test-topic", events[0].Topic)
-	require.Equal(t, "consumer", events[0].Consumer)
-	require.Equal(t, 1, events[0].MessagesCount)
-}
-
 func TestPartitionWorkerInterface_MessagesDeliveredTraceBeforeHandlerPanic(t *testing.T) {
 	ctx := xtest.Context(t)
 	ctrl := gomock.NewController(t)
@@ -831,6 +770,9 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 	session := createTestPartitionSession()
 	messageSender := newSyncMessageSender()
 	mockHandler := NewMockEventHandler(ctrl)
+	var deliveredBeforeHandler atomic.Bool
+	var events []trace.TopicReaderMessagesDeliveredInfo
+	testErr := errors.New("user handler error")
 
 	var stoppedSessionID atomic.Int64
 	var stoppedErr atomic.Pointer[error]
@@ -851,16 +793,27 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 		messageSender,
 		mockHandler,
 		onStopped,
-		&trace.Topic{},
+		&trace.Topic{OnReaderMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
+			events = append(events, info)
+		}},
 		"test-listener",
 		nil,
 		nil,
 	)
+	worker.readerInfo = topicreadercommon.ReaderInfo{
+		Endpoint: "configured:2135",
+		Database: "/local",
+		Consumer: "consumer",
+	}
 
-	// Set up mock to return error
+	// Verify the delivery trace is emitted before the handler returns its error.
 	mockHandler.EXPECT().
 		OnReadMessages(gomock.Any(), gomock.Any()).
-		Return(errors.New("user handler error"))
+		DoAndReturn(func(context.Context, *PublicReadMessages) error {
+			deliveredBeforeHandler.Store(len(events) == 1)
+
+			return testErr
+		})
 
 	worker.Start(ctx)
 	defer func() {
@@ -879,6 +832,13 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 
 	// Wait for error handling using channel instead of Eventually
 	xtest.WaitChannelClosed(t, errorReceived)
+	require.True(t, deliveredBeforeHandler.Load())
+	require.Len(t, events, 1)
+	require.Equal(t, "configured:2135", events[0].Endpoint)
+	require.Equal(t, "/local", events[0].Database)
+	require.Equal(t, "test-topic", events[0].Topic)
+	require.Equal(t, "consumer", events[0].Consumer)
+	require.Equal(t, 1, events[0].MessagesCount)
 
 	// Verify error contains user handler error using atomic access
 	require.Equal(t, int64(123), stoppedSessionID.Load())

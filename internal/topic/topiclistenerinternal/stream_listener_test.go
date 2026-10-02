@@ -873,6 +873,12 @@ func TestStreamListener_FlushPendingMessagesSendError(t *testing.T) {
 	ctx := sf.Context(e)
 	listener := StreamListener(e)
 	streamMock := StreamMock(e)
+	creditDeltas := make(chan int, 1)
+	listener.tracer = &trace.Topic{
+		OnReaderCreditBalanceChanged: func(info trace.TopicReaderCreditBalanceChangedInfo) {
+			creditDeltas <- info.BytesDelta
+		},
+	}
 
 	streamMock.EXPECT().Send(gomock.Any()).Return(errors.New("send failed"))
 
@@ -888,6 +894,7 @@ func TestStreamListener_FlushPendingMessagesSendError(t *testing.T) {
 		t.Fatal("timeout waiting for listener to close after send error")
 	case <-listener.background.Context().Done():
 	}
+	listenerMetricNoDelta(t, creditDeltas)
 }
 
 func TestStreamListener_FlushPendingMessagesEmpty(t *testing.T) {

@@ -50,6 +50,7 @@ func TestTopicStreamReader_PopMessagesBatchTxReleasesBufferWhenMaterializationFa
 
 	materializeErr := errors.New("materialize transaction failed")
 	reader := newMetricsReader(&e)
+	reconnector := reader.reader.(*readerReconnector)
 	batch, err := reader.PopBatchTx(
 		e.ctx,
 		&failingMaterializeTransaction{
@@ -71,6 +72,7 @@ func TestTopicStreamReader_PopMessagesBatchTxReleasesBufferWhenMaterializationFa
 		t.Fatalf("unexpected session error after transaction materialization failure: %+v", event)
 	default:
 	}
+	require.False(t, reconnector.stopSessionErrorReported.Load())
 
 	// The failed transactional pop has returned its message buffer ownership.
 	// Drain that token so the next ordinary read can return another batch.
@@ -89,26 +91,6 @@ func TestTopicStreamReader_PopMessagesBatchTxReleasesBufferWhenMaterializationFa
 	default:
 	}
 
-	fatalErr := errors.New("fatal stream failure")
-	require.NoError(t, e.reader.CloseWithError(e.ctx, fatalErr))
-	readerMetricNoDelta(t, localDeltas)
-	for range 2 {
-		_, err = reader.ReadMessageBatch(e.ctx)
-		require.ErrorIs(t, err, fatalErr)
-	}
-	select {
-	case event := <-sessionErrors:
-		require.Equal(t, "stop", event.RetryDecision)
-		require.ErrorIs(t, event.Error, fatalErr)
-	case <-time.After(time.Second):
-		t.Fatal("fatal stream session error was not emitted")
-	}
-	select {
-	case event := <-sessionErrors:
-		t.Fatalf("unexpected duplicate fatal stream session error: %+v", event)
-	default:
-	}
-
 	// Closing after the failed pop must not release the same ownership twice.
 	require.NoError(t, reader.Close(context.Background()))
 	readerMetricNoDelta(t, localDeltas)
@@ -119,90 +101,79 @@ func TestTopicStreamReader_PopMessagesBatchTxReleasesBufferWhenMaterializationFa
 	}
 }
 
-func TestTopicStreamReader_PopMessagesBatchTxSkipsRetryableStreamFailure(t *testing.T) {
-	e := newTopicReaderTestEnv(t)
-	sessionErrors := make(chan trace.TopicReaderSessionErrorInfo, 1)
-	e.reader.cfg.Trace = &trace.Topic{
-		OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
-			sessionErrors <- info
-		},
+func TestTopicStreamReader_PopMessagesBatchTxHandlesUnLazyStreamFailure(t *testing.T) {
+	tests := []struct {
+		name      string
+		streamErr string
+		retryable bool
+	}{
+		{name: "retryable suppressed", streamErr: "retryable stream failure", retryable: true},
+		{name: "terminal reported once", streamErr: "terminal stream failure"},
 	}
 
-	<-e.reader.freeBytes
-	require.NoError(t, e.reader.onReadResponse(readerMetricResponse(&e, 50)))
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			e := newTopicReaderTestEnv(t)
+			sessionErrors := make(chan trace.TopicReaderSessionErrorInfo, 4)
+			e.reader.cfg.Trace = &trace.Topic{
+				OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
+					sessionErrors <- info
+				},
+			}
 
-	materializeErr := errors.New("materialize transaction failed")
-	streamErr := xerrors.Retryable(errors.New("retryable stream failure"))
-	reader := newMetricsReader(&e)
-	reconnector := reader.reader.(*readerReconnector)
-	batch, err := reader.PopBatchTx(
-		e.ctx,
-		&failingMaterializeTransaction{
-			mockTransaction: newMockTransactionWrapper("session", "transaction"),
-			err:             materializeErr,
-			onUnLazy: func() {
-				require.NoError(t, e.reader.CloseWithError(e.ctx, streamErr))
-			},
-		},
-	)
+			<-e.reader.freeBytes
+			require.NoError(t, e.reader.onReadResponse(readerMetricResponse(&e, 50)))
 
-	require.Nil(t, batch)
-	require.ErrorIs(t, err, materializeErr)
-	select {
-	case event := <-sessionErrors:
-		t.Fatalf("unexpected session error for retryable stream failure: %+v", event)
-	default:
-	}
-	require.False(t, reconnector.stopSessionErrorReported.Load())
-}
+			materializeErr := errors.New("materialize transaction failed")
+			streamErr := errors.New(test.streamErr)
+			if test.retryable {
+				streamErr = xerrors.Retryable(streamErr)
+			}
+			reader := newMetricsReader(&e)
+			reconnector := reader.reader.(*readerReconnector)
+			batch, err := reader.PopBatchTx(
+				e.ctx,
+				&failingMaterializeTransaction{
+					mockTransaction: newMockTransactionWrapper("session", "transaction"),
+					err:             materializeErr,
+					onUnLazy: func() {
+						require.NoError(t, e.reader.CloseWithError(e.ctx, streamErr))
+					},
+				},
+			)
 
-func TestTopicStreamReader_PopMessagesBatchTxReportsTerminalStreamFailure(t *testing.T) {
-	e := newTopicReaderTestEnv(t)
-	sessionErrors := make(chan trace.TopicReaderSessionErrorInfo, 4)
-	e.reader.cfg.Trace = &trace.Topic{
-		OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
-			sessionErrors <- info
-		},
-	}
+			require.Nil(t, batch)
+			require.ErrorIs(t, err, materializeErr)
+			if test.retryable {
+				select {
+				case event := <-sessionErrors:
+					t.Fatalf("unexpected session error for retryable stream failure: %+v", event)
+				default:
+				}
+				require.False(t, reconnector.stopSessionErrorReported.Load())
 
-	<-e.reader.freeBytes
-	require.NoError(t, e.reader.onReadResponse(readerMetricResponse(&e, 50)))
+				return
+			}
 
-	materializeErr := errors.New("materialize transaction failed")
-	streamErr := errors.New("terminal stream failure")
-	reader := newMetricsReader(&e)
-	reconnector := reader.reader.(*readerReconnector)
-	batch, err := reader.PopBatchTx(
-		e.ctx,
-		&failingMaterializeTransaction{
-			mockTransaction: newMockTransactionWrapper("session", "transaction"),
-			err:             materializeErr,
-			onUnLazy: func() {
-				require.NoError(t, e.reader.CloseWithError(e.ctx, streamErr))
-			},
-		},
-	)
+			select {
+			case event := <-sessionErrors:
+				require.Equal(t, "stop", event.RetryDecision)
+				require.ErrorIs(t, event.Error, streamErr)
+				require.NotErrorIs(t, event.Error, materializeErr)
+			case <-time.After(time.Second):
+				t.Fatal("terminal stream session error was not emitted")
+			}
 
-	require.Nil(t, batch)
-	require.ErrorIs(t, err, materializeErr)
-	select {
-	case event := <-sessionErrors:
-		require.Equal(t, "stop", event.RetryDecision)
-		require.ErrorIs(t, event.Error, streamErr)
-		require.NotErrorIs(t, event.Error, materializeErr)
-	case <-time.After(time.Second):
-		t.Fatal("terminal stream session error was not emitted")
-	}
-	require.True(t, reconnector.stopSessionErrorReported.Load())
-
-	for range 2 {
-		_, readErr := reader.ReadMessageBatch(e.ctx)
-		require.ErrorIs(t, readErr, streamErr)
-	}
-	select {
-	case event := <-sessionErrors:
-		t.Fatalf("unexpected duplicate terminal stream session error: %+v", event)
-	default:
+			for range 2 {
+				_, readErr := reader.ReadMessageBatch(e.ctx)
+				require.ErrorIs(t, readErr, streamErr)
+			}
+			select {
+			case event := <-sessionErrors:
+				t.Fatalf("unexpected duplicate terminal stream session error: %+v", event)
+			default:
+			}
+		})
 	}
 }
 

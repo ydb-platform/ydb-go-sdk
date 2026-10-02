@@ -51,28 +51,6 @@ func TestStreamListener_CreditBalanceTracksSendAndClose(t *testing.T) {
 		listener.changeCreditBalance(1)
 		listenerMetricNoDelta(t, creditDeltas)
 	})
-
-	t.Run("failed send", func(t *testing.T) {
-		e := fixenv.New(t)
-		listener := StreamListener(e)
-		creditDeltas := make(chan int, 1)
-		listener.tracer = &trace.Topic{
-			OnReaderCreditBalanceChanged: func(info trace.TopicReaderCreditBalanceChangedInfo) {
-				creditDeltas <- info.BytesDelta
-			},
-		}
-
-		StreamMock(e).EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: 17}).Return(errors.New("send failed"))
-		listener.background.Start("metrics send loop", listener.sendMessagesLoop)
-		listener.sendMessage(&rawtopicreader.ReadRequest{BytesSize: 17})
-
-		select {
-		case <-listener.background.Context().Done():
-		case <-time.After(time.Second):
-			t.Fatal("listener did not stop after failed send")
-		}
-		listenerMetricNoDelta(t, creditDeltas)
-	})
 }
 
 func TestStreamListener_ReceivedBytesUsesProtocolSizeForDroppedBatch(t *testing.T) {

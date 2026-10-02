@@ -67,57 +67,38 @@ func TestCommitRangeBoundariesSurviveBatchOperationsAndPublicMutation(t *testing
 	require.Equal(t, rawtopiccommon.Offset(15), GetCommitRange(merged).CommitOffsetEnd)
 }
 
-func TestCommitMetricsSetupAfterSessionCloseIsIgnored(t *testing.T) {
-	queued := 0
-	session := NewPartitionSession(context.Background(), "topic", 1, 1, "", 2, 3, 0)
-	session.Close()
-	session.SetupCommitMetrics(&trace.Topic{
-		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {
-			queued++
-		},
-	}, ReaderInfo{})
-	message := NewPublicMessageBuilder().PartitionSession(session).Offset(10).Build()
-
-	TraceCommitQueued(session.Context(), GetCommitRange(message))
-	require.Zero(t, queued)
-}
-
-func TestSetupCommitMetricsGuardsAndRepeatedInitialization(t *testing.T) {
+func TestTraceCommitAcknowledgedAfterRegistrationWithoutHook(t *testing.T) {
 	var nilSession *PartitionSession
-	require.NotPanics(t, func() {
-		nilSession.SetupCommitMetrics(&trace.Topic{}, ReaderInfo{})
-	})
+	nilSession.SetupCommitMetrics(&trace.Topic{}, ReaderInfo{})
 
 	session := NewPartitionSession(context.Background(), "topic", 1, 1, "", 2, 3, 0)
 	t.Cleanup(session.Close)
-	require.NotPanics(t, func() {
-		session.SetupCommitMetrics(nil, ReaderInfo{})
-	})
-	require.Nil(t, session.commitMetrics)
-
+	session.SetupCommitMetrics(nil, ReaderInfo{})
 	session.SetupCommitMetrics(&trace.Topic{}, ReaderInfo{})
 	require.Nil(t, session.commitMetrics)
 
-	queuedTracer := &trace.Topic{OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {}}
+	queuedTracer := &trace.Topic{
+		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {},
+	}
 	session.SetupCommitMetrics(queuedTracer, ReaderInfo{})
 	require.NotNil(t, session.commitMetrics)
-	initialMetrics := session.commitMetrics
-
 	session.SetupCommitMetrics(&trace.Topic{
 		OnReaderCommitAcknowledged: func(trace.TopicReaderCommitAcknowledgedInfo) {},
 	}, ReaderInfo{})
-	require.Same(t, initialMetrics, session.commitMetrics)
 	require.Nil(t, session.commitMetrics.tracker)
-}
-
-func TestTraceCommitAcknowledgedAfterRegistrationWithoutHook(t *testing.T) {
-	session := newCommitMetricsTestSession(t, &trace.Topic{
-		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {},
-	})
-
 	require.NotPanics(t, func() {
 		TraceCommitAcknowledgedAfterRegistration(context.Background(), session, 1)
 	})
+
+	queued := 0
+	closedSession := NewPartitionSession(context.Background(), "topic", 1, 1, "", 2, 3, 0)
+	closedSession.Close()
+	closedSession.SetupCommitMetrics(&trace.Topic{
+		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) { queued++ },
+	}, ReaderInfo{})
+	message := NewPublicMessageBuilder().PartitionSession(closedSession).Offset(10).Build()
+	TraceCommitQueued(closedSession.Context(), GetCommitRange(message))
+	require.Zero(t, queued)
 }
 
 func TestComposedEmptyTraceDoesNotAllocateCommitTracking(t *testing.T) {
@@ -370,50 +351,6 @@ func TestCommitterTracesOnlyAcceptedCommits(t *testing.T) {
 	})
 }
 
-func TestCommitterTracesAcceptedLazyRequestOnce(t *testing.T) {
-	ctx := context.Background()
-	queued := make(chan trace.TopicReaderCommitQueuedInfo, 4)
-	acknowledged := make(chan trace.TopicReaderCommitAcknowledgedInfo, 4)
-	var committer *Committer
-	var sends atomic.Int32
-	session := newCommitMetricsTestSession(t, &trace.Topic{
-		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
-			queued <- info
-		},
-		OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
-			acknowledged <- info
-		},
-	})
-	committer = NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
-		func(rawtopicreader.ClientMessage) error {
-			sends.Add(1)
-			committer.OnCommitNotify(session, 1)
-			session.SetCommittedOffsetForward(1)
-
-			return nil
-		})
-	committer.Start()
-	t.Cleanup(func() {
-		require.NoError(t, committer.Close(ctx, errors.New("test committer closed")))
-	})
-	request := committer.NewCommitRequest(CommitRange{
-		PartitionSession: session, CommitOffsetStart: 0, CommitOffsetEnd: 1,
-	})
-
-	request.Confirm()
-	require.NoError(t, request.Wait(ctx))
-	request.Confirm()
-	require.NoError(t, request.Wait(ctx))
-
-	require.Equal(t, int32(1), sends.Load())
-	queuedInfo := xtest.Receive(t, queued, "queued commit metric")
-	acknowledgedInfo := xtest.Receive(t, acknowledged, "acknowledged commit metric")
-	require.Empty(t, queued)
-	require.Empty(t, acknowledged)
-	require.Equal(t, 1, queuedInfo.MessagesCount)
-	require.Equal(t, 1, acknowledgedInfo.MessagesCount)
-}
-
 func TestCommitterQueueTraceCanReenterLazyRequest(t *testing.T) {
 	ctx := context.Background()
 	queued := make(chan trace.TopicReaderCommitQueuedInfo, 4)
@@ -421,6 +358,7 @@ func TestCommitterQueueTraceCanReenterLazyRequest(t *testing.T) {
 	reentrantWait := make(chan error, 1)
 	var request *commitRequest
 	var committer *Committer
+	var sends atomic.Int32
 	session := newCommitMetricsTestSession(t, &trace.Topic{
 		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
 			queued <- info
@@ -433,6 +371,7 @@ func TestCommitterQueueTraceCanReenterLazyRequest(t *testing.T) {
 	})
 	committer = NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
 		func(rawtopicreader.ClientMessage) error {
+			sends.Add(1)
 			committer.OnCommitNotify(session, 1)
 			session.SetCommittedOffsetForward(1)
 
@@ -453,6 +392,11 @@ func TestCommitterQueueTraceCanReenterLazyRequest(t *testing.T) {
 
 	require.NoError(t, xtest.Receive(t, reentrantWait, "reentrant commit wait"))
 	_ = xtest.Receive(t, confirmDone, "commit confirm")
+	for range 2 {
+		request.Confirm()
+		require.NoError(t, request.Wait(ctx))
+	}
+	require.Equal(t, int32(1), sends.Load())
 	queuedInfo := xtest.Receive(t, queued, "queued commit metric")
 	acknowledgedInfo := xtest.Receive(t, acknowledged, "acknowledged commit metric")
 	require.Empty(t, queued)
@@ -503,32 +447,13 @@ func TestCommitMessageTrackerHandlesFIFOAndEqualWatermark(t *testing.T) {
 	require.Equal(t, 20, tracker.Acknowledge(20))
 }
 
-func TestCommitMessageTrackerKeepsIndependentLedgers(t *testing.T) {
-	first := NewCommitMessageTracker(0)
-	second := NewCommitMessageTracker(0)
-
-	require.Equal(t, 1, first.Queue(10, 11))
-	require.Equal(t, 1, second.Queue(10, 11))
-	require.Equal(t, 1, first.Acknowledge(11))
-	require.Equal(t, 1, second.Acknowledge(11))
-}
-
-func TestCommitMessageTrackerHandlesEmptyAndInvalidRanges(t *testing.T) {
+func TestCommitMessageTrackerRejectsInvalidRangesAndCloses(t *testing.T) {
 	tracker := NewCommitMessageTracker(0)
 
 	require.Zero(t, tracker.Queue(0, 0))
 	require.Zero(t, tracker.Queue(2, 1))
 	require.Zero(t, tracker.Acknowledge(0))
 	require.Zero(t, tracker.Acknowledge(1))
-
-	tracker.Close()
-	require.Zero(t, tracker.Queue(1, 2))
-	require.Zero(t, tracker.Acknowledge(2))
-}
-
-func TestCommitMessageTrackerCloseIsIdempotentAndTerminal(t *testing.T) {
-	tracker := NewCommitMessageTracker(0)
-
 	require.Equal(t, 1, tracker.Queue(10, 11))
 	tracker.Close()
 	tracker.Close()

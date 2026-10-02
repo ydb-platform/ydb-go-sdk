@@ -27,12 +27,16 @@ func TestReaderNameDefaultsToDefault(t *testing.T) {
 		{name: "custom", options: []string{"reader-custom"}, want: "reader-custom"},
 		{name: "explicit default", options: []string{"default"}, want: "default"},
 	}
+	readerIDs := make(map[int64]struct{}, len(tests))
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			reader, name := newNameTestReader(t, test.options...)
 			defer closeNameTestReader(t, &reader)
 
 			require.Equal(t, test.want, name)
+			readerID := reader.ID()
+			require.NotContains(t, readerIDs, readerID)
+			readerIDs[readerID] = struct{}{}
 		})
 	}
 }
@@ -56,27 +60,6 @@ func TestListenerNameDefaultsToDefault(t *testing.T) {
 			require.Equal(t, test.want, name)
 		})
 	}
-}
-
-func TestDefaultNamesAreSharedAcrossReadersAndListeners(t *testing.T) {
-	firstReader, firstReaderName := newNameTestReader(t)
-	secondReader, secondReaderName := newNameTestReader(t, "")
-	defer closeNameTestReader(t, &firstReader)
-	defer closeNameTestReader(t, &secondReader)
-
-	firstListener, firstListenerName := newNameTestListener(t)
-	defer closeNameTestListener(t, firstListener)
-
-	secondListener, secondListenerName := newNameTestListener(t)
-	defer closeNameTestListener(t, secondListener)
-
-	require.Equal(t, []string{"default", "default", "default", "default"}, []string{
-		firstReaderName,
-		secondReaderName,
-		firstListenerName,
-		secondListenerName,
-	})
-	require.NotEqual(t, firstReader.ID(), secondReader.ID())
 }
 
 func newNameTestReader(t *testing.T, names ...string) (topicreaderinternal.Reader, string) {
