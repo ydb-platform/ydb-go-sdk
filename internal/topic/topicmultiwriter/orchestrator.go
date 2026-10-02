@@ -300,14 +300,11 @@ func (o *orchestrator) saveMessageContent(msg *message) error {
 	traceErr := err
 	var uncompressedSize, compressedSize int
 	if traceErr == nil && tracer.OnWriterCompressMessages != nil {
-		compressedSize, traceErr = topicwritercommon.CompressedContentSize(
-			[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
-			rawtopiccommon.CodecRaw,
-		)
+		var content []byte
+		content, traceErr = msg.GetEncodedBytes(rawtopiccommon.CodecRaw)
 		if traceErr == nil {
-			uncompressedSize = topicwritercommon.UncompressedContentSize(
-				[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
-			)
+			compressedSize = len(content)
+			uncompressedSize = msg.BufUncompressedSize
 		}
 	}
 	onCompressDone(traceErr, uncompressedSize, compressedSize)
