@@ -42,59 +42,58 @@ import (
 //	  -benchtime=300x -count=3 -cpu=4
 //
 // Each invocation creates a unique topic and drops it on normal completion.
-// The benchmark adds no transaction or run deadline.
+// Each operation has a 10-second deadline, shared across DoTx retries.
+// The benchmark has no separate run deadline.
 //
-// Baseline measured on 2026-10-01 with Go 1.26.4 on Apple M3 Pro
+// Baseline measured on 2026-10-02 with Go 1.26.4 on Apple M3 Pro
 // (darwin/arm64), against YDB ydb-stable-26-3-1-17 on one dedicated node
-// with 4 CPU cores and 8 GB RAM. The fixed run was interrupted while its
-// third ManyBoundedKey/p512 repetition was waiting for an ACK; all three
-// p512 rows below are from a separate successful run with the same flags.
-// Auto-split was measured in a separate successful run. All rows below are
-// unmodified benchmark output and contain no failed operations.
+// with 4 CPU cores and 8 GB RAM. Each transaction had a 10-second deadline.
+// The fixed and auto-split commands above each completed with PASS; all
+// 39 rows below are unmodified benchmark output with no failed operations.
 /*
 goos: darwin
 goarch: arm64
 pkg: github.com/ydb-platform/ydb-go-sdk/v3/tests/integration
 cpu: Apple M3 Pro
-BenchmarkTransactionalWriterSingle/p64-4       	     523	  22252317 ns/op
-BenchmarkTransactionalWriterSingle/p64-4       	     531	  21984365 ns/op
-BenchmarkTransactionalWriterSingle/p64-4       	     504	  22003867 ns/op
-BenchmarkTransactionalWriterSingle/p128-4      	     520	  22302889 ns/op
-BenchmarkTransactionalWriterSingle/p128-4      	     522	  21439695 ns/op
-BenchmarkTransactionalWriterSingle/p128-4      	     530	  22768574 ns/op
-BenchmarkTransactionalWriterSingle/p256-4      	     513	  22534837 ns/op
-BenchmarkTransactionalWriterSingle/p256-4      	     523	  22206319 ns/op
-BenchmarkTransactionalWriterSingle/p256-4      	     517	  22733531 ns/op
-BenchmarkTransactionalWriterSingle/p512-4      	     522	  22938437 ns/op
-BenchmarkTransactionalWriterSingle/p512-4      	     532	  22790307 ns/op
-BenchmarkTransactionalWriterSingle/p512-4      	     528	  23100476 ns/op
-BenchmarkTransactionalWriterManyKey/p64-4      	      99	 116671595 ns/op
-BenchmarkTransactionalWriterManyKey/p64-4      	      91	 130786465 ns/op
-BenchmarkTransactionalWriterManyKey/p64-4      	     102	 128249642 ns/op
-BenchmarkTransactionalWriterManyKey/p128-4     	      91	 179087144 ns/op
-BenchmarkTransactionalWriterManyKey/p128-4     	      76	 183308157 ns/op
-BenchmarkTransactionalWriterManyKey/p128-4     	      51	 228162133 ns/op
-BenchmarkTransactionalWriterManyKey/p256-4     	      30	 381482356 ns/op
-BenchmarkTransactionalWriterManyKey/p256-4     	      34	 420758635 ns/op
-BenchmarkTransactionalWriterManyKey/p256-4     	      33	 365258843 ns/op
-BenchmarkTransactionalWriterManyKey/p512-4     	      18	 747634586 ns/op
-BenchmarkTransactionalWriterManyKey/p512-4     	      15	 719090169 ns/op
-BenchmarkTransactionalWriterManyKey/p512-4     	      14	 861288092 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	     118	 104591742 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	      81	 151053950 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	      82	 150262310 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	      55	 184374811 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	      56	 207419739 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	      58	 199911147 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	      32	 372691786 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	      31	 341698915 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	      36	 335347509 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4         	      12	 838816962 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4         	      15	 924655708 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4         	      10	1037697071 ns/op
-BenchmarkTransactionalWriterAutoSplit-4   	     300	  29645396 ns/op
-BenchmarkTransactionalWriterAutoSplit-4   	     300	  29168507 ns/op
-BenchmarkTransactionalWriterAutoSplit-4   	     300	  32026051 ns/op
+BenchmarkTransactionalWriterSingle/p64-4       	     355	  32497124 ns/op
+BenchmarkTransactionalWriterSingle/p64-4       	     367	  32464069 ns/op
+BenchmarkTransactionalWriterSingle/p64-4       	     351	  33439357 ns/op
+BenchmarkTransactionalWriterSingle/p128-4      	     367	  33148925 ns/op
+BenchmarkTransactionalWriterSingle/p128-4      	     363	  32243353 ns/op
+BenchmarkTransactionalWriterSingle/p128-4      	     351	  32412980 ns/op
+BenchmarkTransactionalWriterSingle/p256-4      	     342	  33911433 ns/op
+BenchmarkTransactionalWriterSingle/p256-4      	     369	  33088799 ns/op
+BenchmarkTransactionalWriterSingle/p256-4      	     364	  33357379 ns/op
+BenchmarkTransactionalWriterSingle/p512-4      	     356	  32997020 ns/op
+BenchmarkTransactionalWriterSingle/p512-4      	     355	  34146597 ns/op
+BenchmarkTransactionalWriterSingle/p512-4      	     331	  33937414 ns/op
+BenchmarkTransactionalWriterManyKey/p64-4      	      75	 144769740 ns/op
+BenchmarkTransactionalWriterManyKey/p64-4      	      80	 139769938 ns/op
+BenchmarkTransactionalWriterManyKey/p64-4      	      78	 156178657 ns/op
+BenchmarkTransactionalWriterManyKey/p128-4     	      46	 240760663 ns/op
+BenchmarkTransactionalWriterManyKey/p128-4     	      48	 254393774 ns/op
+BenchmarkTransactionalWriterManyKey/p128-4     	      46	 259458513 ns/op
+BenchmarkTransactionalWriterManyKey/p256-4     	      24	 451599054 ns/op
+BenchmarkTransactionalWriterManyKey/p256-4     	      24	 449597504 ns/op
+BenchmarkTransactionalWriterManyKey/p256-4     	      22	 528529062 ns/op
+BenchmarkTransactionalWriterManyKey/p512-4     	      10	1585128883 ns/op
+BenchmarkTransactionalWriterManyKey/p512-4     	      10	1139400546 ns/op
+BenchmarkTransactionalWriterManyKey/p512-4     	      12	1079705983 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p64-4         	      76	 155905867 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p64-4         	      75	 148476898 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p64-4         	      90	 135516182 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p128-4        	      40	 267564233 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p128-4        	      42	 287812634 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p128-4        	      39	 312839130 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p256-4        	      20	 583097671 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p256-4        	      20	 570857850 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p256-4        	      20	 543307648 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p512-4        	      10	1007578271 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p512-4        	      12	 953287396 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       9	1146171921 ns/op
+BenchmarkTransactionalWriterAutoSplit-4   	     300	  43111233 ns/op
+BenchmarkTransactionalWriterAutoSplit-4   	     300	  42265395 ns/op
+BenchmarkTransactionalWriterAutoSplit-4   	     300	  42511449 ns/op
 */
 
 // BenchmarkTransactionalWriterSingle measures a single-partition writer.
@@ -153,6 +152,8 @@ var (
 		"comma-separated fixed partition counts",
 	)
 )
+
+const txWriterTransactionTimeout = 10 * time.Second
 
 type txWriterStandardBenchmarkCase struct {
 	Name    string
@@ -243,6 +244,9 @@ func txWriterRunParallelTransactions(
 			err := runner.execute(ctx, transactionNumber)
 			if err != nil {
 				stats.FirstError = err
+				// RunParallel requires each worker to exhaust pb.Next.
+				for pb.Next() {
+				}
 				return
 			}
 		}
@@ -474,8 +478,11 @@ func (r *txWriterTransactionRunner) executeTransaction(
 	ctx context.Context,
 	messageKey string,
 ) error {
+	txCtx, cancel := context.WithTimeout(ctx, txWriterTransactionTimeout)
+	defer cancel()
+
 	return r.db.Query().DoTx(
-		ctx,
+		txCtx,
 		func(ctx context.Context, tx query.TxActor) error {
 			// Partition choosers keep mutable partition state. DoTx may call this
 			// callback more than once, so each writer needs a fresh chooser.
