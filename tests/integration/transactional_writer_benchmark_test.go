@@ -47,18 +47,18 @@ import (
 // Each transaction had a 10-second deadline; no operation failed.
 
 /*
-BenchmarkTransactionalWriterSingle/p64-4       	      43	  23399800 ns/op
-BenchmarkTransactionalWriterSingle/p64-4       	      52	  23673329 ns/op
-BenchmarkTransactionalWriterSingle/p64-4       	      45	  22694831 ns/op
-BenchmarkTransactionalWriterSingle/p128-4      	      45	  24999329 ns/op
-BenchmarkTransactionalWriterSingle/p128-4      	      45	  22980434 ns/op
-BenchmarkTransactionalWriterSingle/p128-4      	      44	  23262187 ns/op
-BenchmarkTransactionalWriterSingle/p256-4      	      43	  24384788 ns/op
-BenchmarkTransactionalWriterSingle/p256-4      	      43	  24057471 ns/op
-BenchmarkTransactionalWriterSingle/p256-4      	      50	  24257687 ns/op
-BenchmarkTransactionalWriterSingle/p512-4      	      50	  23691647 ns/op
-BenchmarkTransactionalWriterSingle/p512-4      	      46	  24156962 ns/op
-BenchmarkTransactionalWriterSingle/p512-4      	      45	  24110108 ns/op
+BenchmarkTransactionalWriterSingle/p64-4       	      46	  25466432 ns/op	   80722 B/op	    1271 allocs/op
+BenchmarkTransactionalWriterSingle/p64-4       	      45	  23763003 ns/op	   79718 B/op	    1270 allocs/op
+BenchmarkTransactionalWriterSingle/p64-4       	      39	  27836536 ns/op	   80424 B/op	    1273 allocs/op
+BenchmarkTransactionalWriterSingle/p128-4      	      32	  64214426 ns/op	   82066 B/op	    1284 allocs/op
+BenchmarkTransactionalWriterSingle/p128-4      	      39	  34164573 ns/op	   81086 B/op	    1276 allocs/op
+BenchmarkTransactionalWriterSingle/p128-4      	      50	  23628662 ns/op	   79890 B/op	    1267 allocs/op
+BenchmarkTransactionalWriterSingle/p256-4      	      43	  30344337 ns/op	   80493 B/op	    1273 allocs/op
+BenchmarkTransactionalWriterSingle/p256-4      	      45	  24497304 ns/op	   80199 B/op	    1273 allocs/op
+BenchmarkTransactionalWriterSingle/p256-4      	      44	  23715019 ns/op	   80147 B/op	    1272 allocs/op
+BenchmarkTransactionalWriterSingle/p512-4      	      42	  33689625 ns/op	   80741 B/op	    1275 allocs/op
+BenchmarkTransactionalWriterSingle/p512-4      	      38	  31314998 ns/op	   80181 B/op	    1275 allocs/op
+BenchmarkTransactionalWriterSingle/p512-4      	      43	  24210318 ns/op	   80296 B/op	    1272 allocs/op
 */
 // BenchmarkTransactionalWriterSingle measures a single-partition writer.
 func BenchmarkTransactionalWriterSingle(b *testing.B) {
@@ -68,18 +68,18 @@ func BenchmarkTransactionalWriterSingle(b *testing.B) {
 }
 
 /*
-BenchmarkTransactionalWriterManyKey/p64-4      	       9	 127784208 ns/op
-BenchmarkTransactionalWriterManyKey/p64-4      	       9	 142928583 ns/op
-BenchmarkTransactionalWriterManyKey/p64-4      	      10	 125922075 ns/op
-BenchmarkTransactionalWriterManyKey/p128-4     	       1	1477367042 ns/op
-BenchmarkTransactionalWriterManyKey/p128-4     	       4	 355355823 ns/op
-BenchmarkTransactionalWriterManyKey/p128-4     	       1	1027614042 ns/op
-BenchmarkTransactionalWriterManyKey/p256-4     	       1	1868199709 ns/op
-BenchmarkTransactionalWriterManyKey/p256-4     	       2	 521324125 ns/op
-BenchmarkTransactionalWriterManyKey/p256-4     	       2	 556673917 ns/op
-BenchmarkTransactionalWriterManyKey/p512-4     	       1	1606657375 ns/op
-BenchmarkTransactionalWriterManyKey/p512-4     	       1	1549169875 ns/op
-BenchmarkTransactionalWriterManyKey/p512-4     	       1	1544174791 ns/op
+BenchmarkTransactionalWriterManyKey/p64-4      	       7	 167590333 ns/op	 2323629 B/op	   33731 allocs/op
+BenchmarkTransactionalWriterManyKey/p64-4      	       8	 193732599 ns/op	 2286624 B/op	   33595 allocs/op
+BenchmarkTransactionalWriterManyKey/p64-4      	       8	 130261031 ns/op	 2277195 B/op	   33550 allocs/op
+BenchmarkTransactionalWriterManyKey/p128-4     	       5	 300960475 ns/op	 4468344 B/op	   65788 allocs/op
+BenchmarkTransactionalWriterManyKey/p128-4     	       4	 261798323 ns/op	 4517594 B/op	   66163 allocs/op
+BenchmarkTransactionalWriterManyKey/p128-4     	       3	 570498444 ns/op	 4511770 B/op	   66137 allocs/op
+BenchmarkTransactionalWriterManyKey/p256-4     	       1	1453345416 ns/op	 8879000 B/op	  130467 allocs/op
+BenchmarkTransactionalWriterManyKey/p256-4     	       1	1056013500 ns/op	 8882776 B/op	  130598 allocs/op
+BenchmarkTransactionalWriterManyKey/p256-4     	       1	1026983375 ns/op	 8898000 B/op	  130562 allocs/op
+BenchmarkTransactionalWriterManyKey/p512-4     	       1	1873451000 ns/op	17709648 B/op	  260295 allocs/op
+BenchmarkTransactionalWriterManyKey/p512-4     	       1	2012563042 ns/op	17716816 B/op	  260312 allocs/op
+BenchmarkTransactionalWriterManyKey/p512-4     	       1	1692550417 ns/op	17721160 B/op	  260398 allocs/op
 */
 // BenchmarkTransactionalWriterManyKey measures keyed multi-partition writing.
 func BenchmarkTransactionalWriterManyKey(b *testing.B) {
@@ -89,18 +89,18 @@ func BenchmarkTransactionalWriterManyKey(b *testing.B) {
 }
 
 /*
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       9	 127129444 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       9	 127169787 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       9	 125453593 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       5	 257912083 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       6	 175197021 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       7	 154930804 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       2	 629736146 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       2	 651915458 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       1	1031985709 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1777262167 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	2003394458 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1807805083 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       9	 160001620 ns/op	 2280127 B/op	   33679 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       8	 137421885 ns/op	 2280066 B/op	   33678 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       7	 146103661 ns/op	 2284635 B/op	   33735 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       3	 364896278 ns/op	 4567584 B/op	   66788 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       5	 309346125 ns/op	 4526649 B/op	   66438 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       4	 286329334 ns/op	 4575468 B/op	   66857 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       2	 674821521 ns/op	 9008324 B/op	  132046 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       2	 652508896 ns/op	 9014664 B/op	  132060 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       1	1141689875 ns/op	 9002440 B/op	  131848 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	2395160084 ns/op	17960936 B/op	  263226 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1874945250 ns/op	17973016 B/op	  263281 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	2301778125 ns/op	17952104 B/op	  262982 allocs/op
 */
 // BenchmarkTransactionalWriterManyBoundedKey measures bounded-key multi-partition writing.
 func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
@@ -110,9 +110,9 @@ func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
 }
 
 /*
-BenchmarkTransactionalWriterAutoSplit-4   	     300	  34114646 ns/op
-BenchmarkTransactionalWriterAutoSplit-4   	     300	  30775598 ns/op
-BenchmarkTransactionalWriterAutoSplit-4   	     300	  31640869 ns/op
+BenchmarkTransactionalWriterAutoSplit-4   	     300	  31890316 ns/op	  160822 B/op	    2502 allocs/op
+BenchmarkTransactionalWriterAutoSplit-4   	     300	  30505174 ns/op	  168352 B/op	    2619 allocs/op
+BenchmarkTransactionalWriterAutoSplit-4   	     300	  33228285 ns/op	  160393 B/op	    2501 allocs/op
 */
 // BenchmarkTransactionalWriterAutoSplit measures bounded-key writing while YDB may split partitions.
 func BenchmarkTransactionalWriterAutoSplit(b *testing.B) {
@@ -184,6 +184,7 @@ func txWriterRunBenchmark(b *testing.B, cfg txWriterConfig) {
 	payload := txWriterMakePayload(cfg.MessageSize)
 	runners := txWriterNewTransactionRunners(db, cfg, payload)
 	workerStats := make([]txWriterWorkerStats, cfg.Concurrency)
+	b.ReportAllocs()
 	b.ResetTimer()
 	b.StartTimer()
 	err := txWriterRunParallelTransactions(ctx, b, runners, workerStats)
