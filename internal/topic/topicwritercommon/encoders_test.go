@@ -186,7 +186,7 @@ func TestEncoderSelector_CompressMessages(t *testing.T) {
 		}
 
 		s := NewEncoderSelector(
-			context.TODO(),
+			t.Context(),
 			testCommonEncoders,
 			rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
 			1,
@@ -222,7 +222,7 @@ func TestEncoderSelector_CompressMessages(t *testing.T) {
 		}
 
 		s := NewEncoderSelector(
-			context.TODO(),
+			t.Context(),
 			testCommonEncoders,
 			rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
 			1,
