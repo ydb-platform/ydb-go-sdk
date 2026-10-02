@@ -25,26 +25,17 @@ import (
 // writes a 1024-byte message, and commits. The writer is created before
 // UPSERT so Write exercises UnLazyTX. Any failed operation fails the benchmark.
 //
-// Configure the integration scope connection and credentials for the target YDB.
-// Fixed-partition benchmark:
-//
-//	go test -tags integration ./tests/integration -run '^$' \
-//	  -bench '^BenchmarkTransactionalWriter(Single|ManyKey|ManyBoundedKey)$' \
-//	  -count=3 -cpu=4
-//
-// Auto-split benchmark:
-//
-//	go test -tags integration ./tests/integration -run '^$' \
-//	  -bench '^BenchmarkTransactionalWriterAutoSplit$' \
-//	  -benchtime=300x -count=3 -cpu=4
-//
 // Each invocation creates a unique topic and drops it on normal completion.
 // Each operation has a 10-second deadline, shared across DoTx retries.
 // The benchmark has no separate run deadline.
-//
-// Baseline: 2026-10-02, Go 1.26.4, Apple M3 Pro (darwin/arm64), YDB
+
+// Set the integration scope connection and credentials before running.
+// Baseline: 2026-10-02, Go 1.26.4 on Apple M3 Pro (darwin/arm64), YDB
 // ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
-// Each transaction had a 10-second deadline; no operation failed.
+// Run:
+//
+//	go test -tags integration ./tests/integration -run '^$' \
+//	  -bench '^BenchmarkTransactionalWriterSingle$' -count=3 -cpu=4
 
 /*
 BenchmarkTransactionalWriterSingle/p64-4       	      46	  25466432 ns/op	   80722 B/op	    1271 allocs/op
@@ -67,6 +58,14 @@ func BenchmarkTransactionalWriterSingle(b *testing.B) {
 	})
 }
 
+// Set the integration scope connection and credentials before running.
+// Baseline: 2026-10-02, Go 1.26.4 on Apple M3 Pro (darwin/arm64), YDB
+// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
+// Run:
+//
+//	go test -tags integration ./tests/integration -run '^$' \
+//	  -bench '^BenchmarkTransactionalWriterManyKey$' -count=3 -cpu=4
+
 /*
 BenchmarkTransactionalWriterManyKey/p64-4      	       7	 167590333 ns/op	 2323629 B/op	   33731 allocs/op
 BenchmarkTransactionalWriterManyKey/p64-4      	       8	 193732599 ns/op	 2286624 B/op	   33595 allocs/op
@@ -88,6 +87,14 @@ func BenchmarkTransactionalWriterManyKey(b *testing.B) {
 	})
 }
 
+// Set the integration scope connection and credentials before running.
+// Baseline: 2026-10-02, Go 1.26.4 on Apple M3 Pro (darwin/arm64), YDB
+// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
+// Run:
+//
+//	go test -tags integration ./tests/integration -run '^$' \
+//	  -bench '^BenchmarkTransactionalWriterManyBoundedKey$' -count=3 -cpu=4
+
 /*
 BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       9	 160001620 ns/op	 2280127 B/op	   33679 allocs/op
 BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       8	 137421885 ns/op	 2280066 B/op	   33678 allocs/op
@@ -108,6 +115,15 @@ func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
 		Name: "many-bounded-key", Mode: txWriterWriterModeMany, Routing: txWriterRoutingModeBoundedKey,
 	})
 }
+
+// Set the integration scope connection and credentials before running.
+// Baseline: 2026-10-02, Go 1.26.4 on Apple M3 Pro (darwin/arm64), YDB
+// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
+// Run:
+//
+//	go test -tags integration ./tests/integration -run '^$' \
+//	  -bench '^BenchmarkTransactionalWriterAutoSplit$' \
+//	  -benchtime=300x -count=3 -cpu=4
 
 /*
 BenchmarkTransactionalWriterAutoSplit-4   	     300	  31890316 ns/op	  160822 B/op	    2502 allocs/op
