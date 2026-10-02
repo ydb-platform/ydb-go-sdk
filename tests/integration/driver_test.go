@@ -42,8 +42,7 @@ import (
 )
 
 //nolint:gocyclo
-func TestDriver(sourceTest *testing.T) {
-	t := xtest.MakeSyncedTest(sourceTest)
+func TestDriver(t *testing.T) {
 	const sumColumn = "sum"
 	var (
 		userAgent     = "connection user agent"
@@ -89,7 +88,7 @@ func TestDriver(sourceTest *testing.T) {
 		ctx = meta.WithTraceParent(xtest.Context(t), traceParentID)
 	)
 
-	t.RunSynced("ydb.New", func(t *xtest.SyncedTest) {
+	t.Run("ydb.New", func(t *testing.T) {
 		db, err := ydb.New(ctx, //nolint:gocritic
 			ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 			ydb.WithAccessTokenCredentials(
@@ -116,7 +115,7 @@ func TestDriver(sourceTest *testing.T) {
 			}
 		}()
 	})
-	t.RunSynced("ydb.Open", func(t *xtest.SyncedTest) {
+	t.Run("ydb.Open", func(t *testing.T) {
 		db, err := ydb.Open(ctx,
 			os.Getenv("YDB_CONNECTION_STRING"),
 			ydb.WithAccessTokenCredentials(
@@ -170,7 +169,7 @@ func TestDriver(sourceTest *testing.T) {
 				t.Fatalf("close failed: %+v", e)
 			}
 		}()
-		t.RunSynced("WithStaticCredentials", func(t *xtest.SyncedTest) {
+		t.Run("WithStaticCredentials", func(t *testing.T) {
 			db, err := ydb.Open(ctx,
 				os.Getenv("YDB_CONNECTION_STRING"),
 				ydb.WithAccessTokenCredentials(
@@ -188,8 +187,8 @@ func TestDriver(sourceTest *testing.T) {
 			defer func() {
 				_ = db.Query().Exec(ctx, `DROP USER test`)
 			}()
-			t.RunSynced("UsingConnectionString", func(t *xtest.SyncedTest) {
-				t.RunSynced("HappyWay", func(t *xtest.SyncedTest) {
+			t.Run("UsingConnectionString", func(t *testing.T) {
+				t.Run("HappyWay", func(t *testing.T) {
 					u, err := url.Parse(os.Getenv("YDB_CONNECTION_STRING"))
 					require.NoError(t, err)
 					u.User = url.UserPassword("test", "password")
@@ -205,7 +204,7 @@ func TestDriver(sourceTest *testing.T) {
 					err = row.Scan(&v)
 					require.NoError(t, err)
 					tableName := path.Join(db.Name(), t.Name(), "test")
-					t.RunSynced("CreateTable", func(t *xtest.SyncedTest) {
+					t.Run("CreateTable", func(t *testing.T) {
 						err := db.Query().Exec(ctx, fmt.Sprintf(`
 							CREATE TABLE IF NOT EXISTS %s (
 								id Uint64,
@@ -215,7 +214,7 @@ func TestDriver(sourceTest *testing.T) {
 						)
 						require.NoError(t, err)
 					})
-					t.RunSynced("DescribeTable", func(t *xtest.SyncedTest) {
+					t.Run("DescribeTable", func(t *testing.T) {
 						var d options.Description
 						err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
 							d, err = s.DescribeTable(ctx, tableName)
@@ -233,7 +232,7 @@ func TestDriver(sourceTest *testing.T) {
 						require.Equal(t, []string{"id"}, d.PrimaryKey)
 					})
 				})
-				t.RunSynced("WrongLogin", func(t *xtest.SyncedTest) {
+				t.Run("WrongLogin", func(t *testing.T) {
 					u, err := url.Parse(os.Getenv("YDB_CONNECTION_STRING"))
 					require.NoError(t, err)
 					u.User = url.UserPassword("wrong_login", "password")
@@ -242,7 +241,7 @@ func TestDriver(sourceTest *testing.T) {
 					require.Nil(t, db)
 					require.True(t, credentials.IsAccessError(err))
 				})
-				t.RunSynced("WrongPassword", func(t *xtest.SyncedTest) {
+				t.Run("WrongPassword", func(t *testing.T) {
 					u, err := url.Parse(os.Getenv("YDB_CONNECTION_STRING"))
 					require.NoError(t, err)
 					u.User = url.UserPassword("test", "wrong_password")
@@ -252,9 +251,9 @@ func TestDriver(sourceTest *testing.T) {
 					require.True(t, credentials.IsAccessError(err))
 				})
 			})
-			t.RunSynced("UsingExplicitStaticCredentials", func(t *xtest.SyncedTest) {
-				t.RunSynced("HappyWay", func(t *xtest.SyncedTest) {
-					t.RunSynced("WithStaticCredentials", func(t *xtest.SyncedTest) {
+			t.Run("UsingExplicitStaticCredentials", func(t *testing.T) {
+				t.Run("HappyWay", func(t *testing.T) {
+					t.Run("WithStaticCredentials", func(t *testing.T) {
 						db, err := ydb.Open(ctx,
 							os.Getenv("YDB_CONNECTION_STRING"),
 							ydb.WithStaticCredentials("test", "password"),
@@ -264,7 +263,7 @@ func TestDriver(sourceTest *testing.T) {
 							_ = db.Close(ctx)
 						}()
 						tableName := path.Join(db.Name(), t.Name(), "test")
-						t.RunSynced("CreateTable", func(t *xtest.SyncedTest) {
+						t.Run("CreateTable", func(t *testing.T) {
 							err := db.Query().Exec(ctx, fmt.Sprintf(`
 								CREATE TABLE IF NOT EXISTS %s (
 									id Uint64,
@@ -274,14 +273,14 @@ func TestDriver(sourceTest *testing.T) {
 							)
 							require.NoError(t, err)
 						})
-						t.RunSynced("Query", func(t *xtest.SyncedTest) {
+						t.Run("Query", func(t *testing.T) {
 							row, err := db.Query().QueryRow(ctx, `SELECT 1`)
 							require.NoError(t, err)
 							var v int
 							err = row.Scan(&v)
 							require.NoError(t, err)
 						})
-						t.RunSynced("DescribeTable", func(t *xtest.SyncedTest) {
+						t.Run("DescribeTable", func(t *testing.T) {
 							var d options.Description
 							err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
 								d, err = s.DescribeTable(ctx, tableName)
@@ -299,8 +298,8 @@ func TestDriver(sourceTest *testing.T) {
 							require.Equal(t, []string{"id"}, d.PrimaryKey)
 						})
 					})
-					t.RunSynced("WithStaticCredentialsLogin+WithStaticCredentialsPassword",
-						func(t *xtest.SyncedTest) {
+					t.Run("WithStaticCredentialsLogin+WithStaticCredentialsPassword",
+						func(t *testing.T) {
 							db, err := ydb.Open(ctx,
 								os.Getenv("YDB_CONNECTION_STRING"),
 								ydb.WithStaticCredentialsLogin("test"),
@@ -311,7 +310,7 @@ func TestDriver(sourceTest *testing.T) {
 								_ = db.Close(ctx)
 							}()
 							tableName := path.Join(db.Name(), t.Name(), "test")
-							t.RunSynced("CreateTable", func(t *xtest.SyncedTest) {
+							t.Run("CreateTable", func(t *testing.T) {
 								err := db.Query().Exec(ctx, fmt.Sprintf(`
 							CREATE TABLE IF NOT EXISTS %s (
 								id Uint64,
@@ -321,14 +320,14 @@ func TestDriver(sourceTest *testing.T) {
 								)
 								require.NoError(t, err)
 							})
-							t.RunSynced("Query", func(t *xtest.SyncedTest) {
+							t.Run("Query", func(t *testing.T) {
 								row, err := db.Query().QueryRow(ctx, `SELECT 1`)
 								require.NoError(t, err)
 								var v int
 								err = row.Scan(&v)
 								require.NoError(t, err)
 							})
-							t.RunSynced("DescribeTable", func(t *xtest.SyncedTest) {
+							t.Run("DescribeTable", func(t *testing.T) {
 								var d options.Description
 								err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
 									d, err = s.DescribeTable(ctx, tableName)
@@ -347,7 +346,7 @@ func TestDriver(sourceTest *testing.T) {
 							})
 						})
 				})
-				t.RunSynced("WrongLogin", func(t *xtest.SyncedTest) {
+				t.Run("WrongLogin", func(t *testing.T) {
 					db, err := ydb.Open(ctx,
 						os.Getenv("YDB_CONNECTION_STRING"),
 						ydb.WithStaticCredentials("wrong_user", "password"),
@@ -356,7 +355,7 @@ func TestDriver(sourceTest *testing.T) {
 					require.Nil(t, db)
 					require.True(t, credentials.IsAccessError(err))
 				})
-				t.RunSynced("WrongPassword", func(t *xtest.SyncedTest) {
+				t.Run("WrongPassword", func(t *testing.T) {
 					db, err := ydb.Open(ctx,
 						os.Getenv("YDB_CONNECTION_STRING"),
 						ydb.WithStaticCredentials("test", "wrong_password"),
@@ -367,7 +366,7 @@ func TestDriver(sourceTest *testing.T) {
 				})
 			})
 		})
-		t.RunSynced("With", func(t *xtest.SyncedTest) {
+		t.Run("With", func(t *testing.T) {
 			t.Run("WithSharedBalancer", func(t *testing.T) {
 				child, err := db.With(ctx, ydb.WithSharedBalancer(db))
 				require.NoError(t, err)

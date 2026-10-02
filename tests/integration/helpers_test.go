@@ -44,21 +44,17 @@ type scopeT struct {
 }
 
 func newScope(t testing.TB) *scopeT {
-	st := t
-	if test, ok := t.(*testing.T); ok {
-		st = xtest.MakeSyncedTest(test)
-	}
-	at := require.New(st)
-	fEnv := fixenv.New(st)
+	at := require.New(t)
+	fEnv := fixenv.New(t)
 	ctx, ctxCancel := context.WithCancel(context.Background())
-	st.Cleanup(func() {
+	t.Cleanup(func() {
 		ctxCancel()
 	})
 	res := &scopeT{
 		Ctx:     ctx,
 		Env:     fEnv,
 		Require: at,
-		t:       st,
+		t:       t,
 	}
 	return res
 }

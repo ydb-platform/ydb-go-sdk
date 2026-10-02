@@ -1,3 +1,5 @@
+* Deprecated `pkg/xtest.SyncedTest`, `MakeSyncedTest`, and their wrapper methods in favor of `testing.T`.
+
 ## v3.153.1
 * Fixed `sugar.Embedding` encoding of an empty vector to match `Knn::ToBinaryStringFloat`
 
