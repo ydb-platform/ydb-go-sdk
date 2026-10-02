@@ -124,9 +124,6 @@ func (scope *scopeT) DriverWithGRPCLogging() *ydb.Driver {
 
 func (scope *scopeT) driverNamed(name string, opts ...ydb.Option) *ydb.Driver {
 	f := func() (*fixenv.GenericResult[*ydb.Driver], error) {
-		connectionString := scope.ConnectionString()
-		scope.Logf("Connect with connection string, driver name %q: %v", name, connectionString)
-
 		driver := scope.NonCachingDriver(opts...)
 
 		clean := func() {
@@ -143,22 +140,17 @@ func (scope *scopeT) driverNamed(name string, opts ...ydb.Option) *ydb.Driver {
 
 func (scope *scopeT) NonCachingDriver(opts ...ydb.Option) *ydb.Driver {
 	connectionString := scope.ConnectionString()
-	scope.Logf("Connect with connection string: %v", connectionString)
 
 	token := scope.AuthToken()
 	if token == "" {
-		scope.Logf("With empty auth token")
 		opts = append(opts, ydb.WithAnonymousCredentials())
 	} else {
-		scope.Logf("With auth token")
 		opts = append(opts, ydb.WithAccessTokenCredentials(token))
 	}
 	cert := scope.CertFile()
 	if cert == "" {
-		scope.Logf("Without tls")
 		opts = append(opts, ydb.WithTLSSInsecureSkipVerify())
 	} else {
-		scope.Logf("With tls")
 		opts = append(opts, ydb.WithCertificatesFromFile(cert))
 	}
 
@@ -174,7 +166,6 @@ func (scope *scopeT) NonCachingDriver(opts ...ydb.Option) *ydb.Driver {
 func (scope *scopeT) SQLDriver(opts ...ydb.ConnectorOption) *sql.DB {
 	f := func() (*fixenv.GenericResult[*sql.DB], error) {
 		driver := scope.Driver()
-		scope.Logf("Create database/sql connector for YDB")
 		connector, err := ydb.Connector(driver, opts...)
 		if err != nil {
 			return nil, err
@@ -201,14 +192,12 @@ func (scope *scopeT) Folder() string {
 		folderPath := path.Join(driver.Name(), scope.T().Name())
 		scope.Require.NoError(sugar.RemoveRecursive(scope.Ctx, driver, folderPath))
 
-		scope.Logf("Creating folder: %v", folderPath)
 		scope.Require.NoError(driver.Scheme().MakeDirectory(scope.Ctx, folderPath))
 		clean := func() {
 			if !scope.Failed() {
 				scope.Require.NoError(sugar.RemoveRecursive(scope.Ctx, driver, folderPath))
 			}
 		}
-		scope.Logf("Creating folder done: %v", folderPath)
 		return fixenv.NewGenericResultWithCleanup(folderPath, clean), nil
 	}
 	return fixenv.CacheResult(scope.Env, f)
@@ -243,12 +232,9 @@ func (scope *scopeT) TopicPath(opts ...topicoptions.CreateOption) string {
 		}
 		cleanup()
 
-		scope.Logf("Drop topic if exists: %q", topicPath)
 		if err := client.Drop(scope.Ctx, topicPath); err != nil && !ydb.IsOperationErrorSchemeError(err) {
 			scope.t.Logf("failed drop previous topic %q: %v", topicPath, err)
 		}
-
-		scope.Logf("Creating topic %q", topicPath)
 
 		options := []topicoptions.CreateOption{
 			topicoptions.CreateWithConsumer(
@@ -259,8 +245,6 @@ func (scope *scopeT) TopicPath(opts ...topicoptions.CreateOption) string {
 		}
 		options = append(options, opts...)
 		err := client.Create(scope.Ctx, topicPath, options...)
-
-		scope.Logf("Topic created: %q", topicPath)
 
 		return fixenv.NewGenericResultWithCleanup(topicPath, cleanup), err
 	}

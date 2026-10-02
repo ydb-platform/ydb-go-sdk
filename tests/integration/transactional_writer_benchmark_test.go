@@ -5,12 +5,10 @@ package integration
 import (
 	"bytes"
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -32,8 +30,7 @@ import (
 //
 //	go test -tags integration ./tests/integration -run '^$' \
 //	  -bench '^BenchmarkTransactionalWriter(Single|ManyKey|ManyBoundedKey)$' \
-//	  -benchtime=10s -count=3 -cpu=4 \
-//	  -args -ydb-benchmark-partitions 64,128,256,512
+//	  -count=3 -cpu=4
 //
 // Auto-split benchmark:
 //
@@ -45,57 +42,24 @@ import (
 // Each operation has a 10-second deadline, shared across DoTx retries.
 // The benchmark has no separate run deadline.
 //
-// Baseline measured on 2026-10-02 with Go 1.26.4 on Apple M3 Pro
-// (darwin/arm64), against YDB ydb-stable-26-3-1-17 on one dedicated node
-// with 4 CPU cores and 8 GB RAM. Each transaction had a 10-second deadline.
-// The fixed and auto-split commands above each completed with PASS; all
-// 39 rows below are unmodified benchmark output with no failed operations.
-/*
-goos: darwin
-goarch: arm64
-pkg: github.com/ydb-platform/ydb-go-sdk/v3/tests/integration
-cpu: Apple M3 Pro
-BenchmarkTransactionalWriterSingle/p64-4       	     355	  32497124 ns/op
-BenchmarkTransactionalWriterSingle/p64-4       	     367	  32464069 ns/op
-BenchmarkTransactionalWriterSingle/p64-4       	     351	  33439357 ns/op
-BenchmarkTransactionalWriterSingle/p128-4      	     367	  33148925 ns/op
-BenchmarkTransactionalWriterSingle/p128-4      	     363	  32243353 ns/op
-BenchmarkTransactionalWriterSingle/p128-4      	     351	  32412980 ns/op
-BenchmarkTransactionalWriterSingle/p256-4      	     342	  33911433 ns/op
-BenchmarkTransactionalWriterSingle/p256-4      	     369	  33088799 ns/op
-BenchmarkTransactionalWriterSingle/p256-4      	     364	  33357379 ns/op
-BenchmarkTransactionalWriterSingle/p512-4      	     356	  32997020 ns/op
-BenchmarkTransactionalWriterSingle/p512-4      	     355	  34146597 ns/op
-BenchmarkTransactionalWriterSingle/p512-4      	     331	  33937414 ns/op
-BenchmarkTransactionalWriterManyKey/p64-4      	      75	 144769740 ns/op
-BenchmarkTransactionalWriterManyKey/p64-4      	      80	 139769938 ns/op
-BenchmarkTransactionalWriterManyKey/p64-4      	      78	 156178657 ns/op
-BenchmarkTransactionalWriterManyKey/p128-4     	      46	 240760663 ns/op
-BenchmarkTransactionalWriterManyKey/p128-4     	      48	 254393774 ns/op
-BenchmarkTransactionalWriterManyKey/p128-4     	      46	 259458513 ns/op
-BenchmarkTransactionalWriterManyKey/p256-4     	      24	 451599054 ns/op
-BenchmarkTransactionalWriterManyKey/p256-4     	      24	 449597504 ns/op
-BenchmarkTransactionalWriterManyKey/p256-4     	      22	 528529062 ns/op
-BenchmarkTransactionalWriterManyKey/p512-4     	      10	1585128883 ns/op
-BenchmarkTransactionalWriterManyKey/p512-4     	      10	1139400546 ns/op
-BenchmarkTransactionalWriterManyKey/p512-4     	      12	1079705983 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	      76	 155905867 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	      75	 148476898 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	      90	 135516182 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	      40	 267564233 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	      42	 287812634 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	      39	 312839130 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	      20	 583097671 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	      20	 570857850 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	      20	 543307648 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4        	      10	1007578271 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4        	      12	 953287396 ns/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       9	1146171921 ns/op
-BenchmarkTransactionalWriterAutoSplit-4   	     300	  43111233 ns/op
-BenchmarkTransactionalWriterAutoSplit-4   	     300	  42265395 ns/op
-BenchmarkTransactionalWriterAutoSplit-4   	     300	  42511449 ns/op
-*/
+// Baseline: 2026-10-02, Go 1.26.4, Apple M3 Pro (darwin/arm64), YDB
+// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
+// Each transaction had a 10-second deadline; no operation failed.
 
+/*
+BenchmarkTransactionalWriterSingle/p64-4       	      43	  23399800 ns/op
+BenchmarkTransactionalWriterSingle/p64-4       	      52	  23673329 ns/op
+BenchmarkTransactionalWriterSingle/p64-4       	      45	  22694831 ns/op
+BenchmarkTransactionalWriterSingle/p128-4      	      45	  24999329 ns/op
+BenchmarkTransactionalWriterSingle/p128-4      	      45	  22980434 ns/op
+BenchmarkTransactionalWriterSingle/p128-4      	      44	  23262187 ns/op
+BenchmarkTransactionalWriterSingle/p256-4      	      43	  24384788 ns/op
+BenchmarkTransactionalWriterSingle/p256-4      	      43	  24057471 ns/op
+BenchmarkTransactionalWriterSingle/p256-4      	      50	  24257687 ns/op
+BenchmarkTransactionalWriterSingle/p512-4      	      50	  23691647 ns/op
+BenchmarkTransactionalWriterSingle/p512-4      	      46	  24156962 ns/op
+BenchmarkTransactionalWriterSingle/p512-4      	      45	  24110108 ns/op
+*/
 // BenchmarkTransactionalWriterSingle measures a single-partition writer.
 func BenchmarkTransactionalWriterSingle(b *testing.B) {
 	txWriterRunFixedPartitionBenchmark(b, txWriterStandardBenchmarkCase{
@@ -103,6 +67,20 @@ func BenchmarkTransactionalWriterSingle(b *testing.B) {
 	})
 }
 
+/*
+BenchmarkTransactionalWriterManyKey/p64-4      	       9	 127784208 ns/op
+BenchmarkTransactionalWriterManyKey/p64-4      	       9	 142928583 ns/op
+BenchmarkTransactionalWriterManyKey/p64-4      	      10	 125922075 ns/op
+BenchmarkTransactionalWriterManyKey/p128-4     	       1	1477367042 ns/op
+BenchmarkTransactionalWriterManyKey/p128-4     	       4	 355355823 ns/op
+BenchmarkTransactionalWriterManyKey/p128-4     	       1	1027614042 ns/op
+BenchmarkTransactionalWriterManyKey/p256-4     	       1	1868199709 ns/op
+BenchmarkTransactionalWriterManyKey/p256-4     	       2	 521324125 ns/op
+BenchmarkTransactionalWriterManyKey/p256-4     	       2	 556673917 ns/op
+BenchmarkTransactionalWriterManyKey/p512-4     	       1	1606657375 ns/op
+BenchmarkTransactionalWriterManyKey/p512-4     	       1	1549169875 ns/op
+BenchmarkTransactionalWriterManyKey/p512-4     	       1	1544174791 ns/op
+*/
 // BenchmarkTransactionalWriterManyKey measures keyed multi-partition writing.
 func BenchmarkTransactionalWriterManyKey(b *testing.B) {
 	txWriterRunFixedPartitionBenchmark(b, txWriterStandardBenchmarkCase{
@@ -110,6 +88,20 @@ func BenchmarkTransactionalWriterManyKey(b *testing.B) {
 	})
 }
 
+/*
+BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       9	 127129444 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       9	 127169787 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       9	 125453593 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       5	 257912083 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       6	 175197021 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       7	 154930804 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       2	 629736146 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       2	 651915458 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       1	1031985709 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1777262167 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	2003394458 ns/op
+BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1807805083 ns/op
+*/
 // BenchmarkTransactionalWriterManyBoundedKey measures bounded-key multi-partition writing.
 func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
 	txWriterRunFixedPartitionBenchmark(b, txWriterStandardBenchmarkCase{
@@ -117,6 +109,11 @@ func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
 	})
 }
 
+/*
+BenchmarkTransactionalWriterAutoSplit-4   	     300	  34114646 ns/op
+BenchmarkTransactionalWriterAutoSplit-4   	     300	  30775598 ns/op
+BenchmarkTransactionalWriterAutoSplit-4   	     300	  31640869 ns/op
+*/
 // BenchmarkTransactionalWriterAutoSplit measures bounded-key writing while YDB may split partitions.
 func BenchmarkTransactionalWriterAutoSplit(b *testing.B) {
 	benchmarkCase := txWriterStandardBenchmarkCase{
@@ -124,7 +121,7 @@ func BenchmarkTransactionalWriterAutoSplit(b *testing.B) {
 		Mode:    txWriterWriterModeMany,
 		Routing: txWriterRoutingModeBoundedKey,
 	}
-	topicPath := fmt.Sprintf("%s-autosplit", *txWriterStandardBenchmarkTopicPrefix)
+	topicPath := txWriterStandardBenchmarkTopicPrefix + "-autosplit"
 	cfg := txWriterNewStandardBenchmarkConfig(topicPath, benchmarkCase, 1)
 	cfg.AutoSplit = true
 	cfg.AutoSplitWriteSpeed = 1 << 20
@@ -135,22 +132,9 @@ func BenchmarkTransactionalWriterAutoSplit(b *testing.B) {
 	txWriterRunBenchmark(b, cfg)
 }
 
-var (
-	txWriterStandardBenchmarkTopicPrefix = flag.String(
-		"ydb-benchmark-topic-prefix",
-		"tx-writer-benchmark",
-		"topic name prefix used by transactional writer benchmarks",
-	)
-	txWriterStandardBenchmarkTable = flag.String(
-		"ydb-benchmark-table",
-		"tx-writer-benchmark-state",
-		"table used by transactional writer benchmarks",
-	)
-	txWriterStandardBenchmarkPartitions = flag.String(
-		"ydb-benchmark-partitions",
-		"64,128,256,512",
-		"comma-separated fixed partition counts",
-	)
+const (
+	txWriterStandardBenchmarkTopicPrefix = "tx-writer-benchmark"
+	txWriterStandardBenchmarkTable       = "tx-writer-benchmark-state"
 )
 
 const txWriterTransactionTimeout = 10 * time.Second
@@ -159,24 +143,6 @@ type txWriterStandardBenchmarkCase struct {
 	Name    string
 	Mode    txWriterWriterMode
 	Routing txWriterRoutingMode
-}
-
-func txWriterParseBenchmarkPartitions(value string) ([]int64, error) {
-	if strings.TrimSpace(value) == "" {
-		return nil, fmt.Errorf("partition list is empty")
-	}
-
-	parts := strings.Split(value, ",")
-	partitions := make([]int64, 0, len(parts))
-	for _, part := range parts {
-		partitionCount, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
-		if err != nil || partitionCount <= 0 {
-			return nil, fmt.Errorf("invalid partition count %q", part)
-		}
-		partitions = append(partitions, partitionCount)
-	}
-
-	return partitions, nil
 }
 
 func txWriterNewStandardBenchmarkConfig(
@@ -188,7 +154,7 @@ func txWriterNewStandardBenchmarkConfig(
 
 	return txWriterConfig{
 		TopicPath:         topicPath + "-" + runID,
-		TablePath:         *txWriterStandardBenchmarkTable,
+		TablePath:         txWriterStandardBenchmarkTable,
 		RunID:             runID,
 		ProducerIDPrefix:  runID,
 		Mode:              benchmarkCase.Mode,
@@ -307,15 +273,10 @@ type txWriterWorkerStats struct {
 
 func txWriterRunFixedPartitionBenchmark(b *testing.B, benchmarkCase txWriterStandardBenchmarkCase) {
 	b.Helper()
-	partitions, err := txWriterParseBenchmarkPartitions(*txWriterStandardBenchmarkPartitions)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	for _, partitionCount := range partitions {
+	for _, partitionCount := range [...]int64{64, 128, 256, 512} {
 		b.Run(fmt.Sprintf("p%d", partitionCount), func(b *testing.B) {
 			cfg := txWriterNewStandardBenchmarkConfig(
-				fmt.Sprintf("%s-%s-p%d", *txWriterStandardBenchmarkTopicPrefix, benchmarkCase.Name, partitionCount),
+				fmt.Sprintf("%s-%s-p%d", txWriterStandardBenchmarkTopicPrefix, benchmarkCase.Name, partitionCount),
 				benchmarkCase,
 				partitionCount,
 			)
