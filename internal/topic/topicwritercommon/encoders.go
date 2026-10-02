@@ -211,33 +211,46 @@ func (s *EncoderSelector) CompressMessages(messages []MessageWithDataContent) (r
 		)
 		err = CacheMessages(messages, codec, s.parallelCompressors)
 
+		traceErr := err
 		var uncompressedSize, compressedSize int
-		if err == nil && s.tracer.OnWriterCompressMessages != nil {
-			uncompressedSize, compressedSize, err = MessagesContentSize(messages, codec)
+		if traceErr == nil && s.tracer.OnWriterCompressMessages != nil {
+			compressedSize, traceErr = CompressedContentSize(messages, codec)
+			if traceErr == nil {
+				uncompressedSize = UncompressedContentSize(messages)
+			}
 		}
-		onCompressDone(err, uncompressedSize, compressedSize)
+		onCompressDone(traceErr, uncompressedSize, compressedSize)
 	}
 
 	return codec, err
 }
 
-// MessagesContentSize returns the total uncompressed and compressed size in bytes
-// of already cached messages for the given codec.
-func MessagesContentSize(
+// UncompressedContentSize returns the total uncompressed size in bytes of the messages.
+func UncompressedContentSize(messages []MessageWithDataContent) int {
+	size := 0
+	for i := range messages {
+		size += messages[i].BufUncompressedSize
+	}
+
+	return size
+}
+
+// CompressedContentSize returns the total size in bytes of already cached messages
+// encoded with the given codec.
+func CompressedContentSize(
 	messages []MessageWithDataContent,
 	codec rawtopiccommon.Codec,
-) (int, int, error) {
-	var uncompressedSize, compressedSize int
+) (int, error) {
+	size := 0
 	for i := range messages {
 		content, err := messages[i].GetEncodedBytes(codec)
 		if err != nil {
-			return 0, 0, err
+			return 0, err
 		}
-		compressedSize += len(content)
-		uncompressedSize += messages[i].BufUncompressedSize
+		size += len(content)
 	}
 
-	return uncompressedSize, compressedSize, nil
+	return size, nil
 }
 
 func (s *EncoderSelector) ResetAllowedCodecs(allowedCodecs rawtopiccommon.SupportedCodecs) {
@@ -309,7 +322,10 @@ func (s *EncoderSelector) measureCodecs(messages []MessageWithDataContent) (rawt
 
 		var uncompressedSize, compressedSize int
 		if err == nil {
-			uncompressedSize, compressedSize, err = MessagesContentSize(messages, codec)
+			compressedSize, err = CompressedContentSize(messages, codec)
+			if err == nil {
+				uncompressedSize = UncompressedContentSize(messages)
+			}
 		}
 		onCompressDone(err, uncompressedSize, compressedSize)
 		if err != nil {

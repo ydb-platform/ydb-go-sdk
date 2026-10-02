@@ -246,7 +246,17 @@ func TestEncoderSelector_CompressMessages(t *testing.T) {
 	})
 }
 
-func TestMessagesContentSize(t *testing.T) {
+func TestUncompressedContentSize(t *testing.T) {
+	messages := []MessageWithDataContent{
+		NewMessageDataWithContent(PublicMessage{Data: strings.NewReader("ab")}, testCommonEncoders),
+		NewMessageDataWithContent(PublicMessage{Data: strings.NewReader("cde")}, testCommonEncoders),
+	}
+	require.NoError(t, CacheMessages(messages, rawtopiccommon.CodecRaw, 1))
+
+	require.Equal(t, 5, UncompressedContentSize(messages))
+}
+
+func TestCompressedContentSize(t *testing.T) {
 	t.Run("Ok", func(t *testing.T) {
 		messages := []MessageWithDataContent{
 			NewMessageDataWithContent(PublicMessage{Data: strings.NewReader("ab")}, testCommonEncoders),
@@ -254,9 +264,8 @@ func TestMessagesContentSize(t *testing.T) {
 		}
 		require.NoError(t, CacheMessages(messages, rawtopiccommon.CodecRaw, 1))
 
-		uncompressedSize, compressedSize, err := MessagesContentSize(messages, rawtopiccommon.CodecRaw)
+		compressedSize, err := CompressedContentSize(messages, rawtopiccommon.CodecRaw)
 		require.NoError(t, err)
-		require.Equal(t, 5, uncompressedSize)
 		require.Equal(t, 5, compressedSize)
 	})
 
@@ -265,7 +274,7 @@ func TestMessagesContentSize(t *testing.T) {
 		_, err := mess.GetEncodedBytes(rawtopiccommon.CodecGzip)
 		require.NoError(t, err)
 
-		_, _, err = MessagesContentSize([]MessageWithDataContent{mess}, rawtopiccommon.CodecRaw)
+		_, err = CompressedContentSize([]MessageWithDataContent{mess}, rawtopiccommon.CodecRaw)
 		require.Error(t, err)
 	})
 }

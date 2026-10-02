@@ -480,11 +480,15 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	}
 	err := topicwritercommon.CacheMessages(res, targetCodec, w.cfg.compressorCount)
 
+	traceErr := err
 	var uncompressedSize, compressedSize int
-	if err == nil && w.cfg.Tracer.OnWriterCompressMessages != nil {
-		uncompressedSize, compressedSize, err = topicwritercommon.MessagesContentSize(res, targetCodec)
+	if traceErr == nil && w.cfg.Tracer.OnWriterCompressMessages != nil {
+		compressedSize, traceErr = topicwritercommon.CompressedContentSize(res, targetCodec)
+		if traceErr == nil {
+			uncompressedSize = topicwritercommon.UncompressedContentSize(res)
+		}
 	}
-	onCompressDone(err, uncompressedSize, compressedSize)
+	onCompressDone(traceErr, uncompressedSize, compressedSize)
 
 	if err != nil {
 		return nil, err

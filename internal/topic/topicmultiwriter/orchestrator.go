@@ -297,14 +297,20 @@ func (o *orchestrator) saveMessageContent(msg *message) error {
 	// reads the original reader and fails before enqueueing to its own buffer.
 	err := msg.CacheMessageData(rawtopiccommon.CodecRaw)
 
+	traceErr := err
 	var uncompressedSize, compressedSize int
-	if err == nil && tracer.OnWriterCompressMessages != nil {
-		uncompressedSize, compressedSize, err = topicwritercommon.MessagesContentSize(
+	if traceErr == nil && tracer.OnWriterCompressMessages != nil {
+		compressedSize, traceErr = topicwritercommon.CompressedContentSize(
 			[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
 			rawtopiccommon.CodecRaw,
 		)
+		if traceErr == nil {
+			uncompressedSize = topicwritercommon.UncompressedContentSize(
+				[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
+			)
+		}
 	}
-	onCompressDone(err, uncompressedSize, compressedSize)
+	onCompressDone(traceErr, uncompressedSize, compressedSize)
 	if err != nil {
 		return err
 	}
