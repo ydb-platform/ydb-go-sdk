@@ -182,7 +182,8 @@ jobs:
         with:
           builder: ${{ steps.buildx.outputs.name }}
           context: baseline
-          file: baseline/tests/slo/Dockerfile
+          # Match the current workload's Go toolchain while building baseline sources.
+          file: current/tests/slo/Dockerfile
           load: true
           platforms: linux/amd64
           tags: ydb-app-baseline
