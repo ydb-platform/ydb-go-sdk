@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
@@ -45,6 +46,8 @@ func NewTopicListenerReconnector(
 	streamConfig *StreamListenerConfig,
 	handler EventHandler,
 ) (*TopicListenerReconnector, error) {
+	streamConfig.EnsureReaderName()
+	streamConfig.ReaderInfo.Listener = true
 	res := &TopicListenerReconnector{
 		streamConfig:        streamConfig,
 		client:              client,
@@ -52,7 +55,6 @@ func NewTopicListenerReconnector(
 		connectionCompleted: make(empty.Chan),
 		stopped:             make(empty.Chan),
 	}
-
 	res.background.Start("connection", res.run)
 
 	return res, nil
@@ -157,13 +159,14 @@ func (lr *TopicListenerReconnector) retryConnect(ctx context.Context, reason err
 	firstAttempt := true
 	retryOptions := append(slices.Clip(lr.streamConfig.retryOptions), retry.WithIdempotent(true))
 
-	return retry.RetryWithResult(ctx, func(ctx context.Context) (*streamListener, error) {
+	stream, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*streamListener, error) {
 		if firstAttempt {
 			firstAttempt = false
 
 			return nil, lr.asRetryError(reason)
 		}
 
+		lr.traceSessionError(ctx, reason, "retry")
 		sl, err := lr.connectStream(ctx)
 		if err == nil {
 			return sl, nil
@@ -172,6 +175,11 @@ func (lr *TopicListenerReconnector) retryConnect(ctx context.Context, reason err
 
 		return nil, lr.asRetryError(reason)
 	}, retryOptions...)
+	if err != nil {
+		lr.traceSessionError(ctx, reason, "stop")
+	}
+
+	return stream, err
 }
 
 // asRetryError adapts the topic retry policy to the standard retryer. Transport
@@ -210,6 +218,19 @@ func (lr *TopicListenerReconnector) asRetryError(reason error) error {
 	default:
 		panic(fmt.Errorf("unexpected retry decision: %v", decision))
 	}
+}
+
+func (lr *TopicListenerReconnector) traceSessionError(ctx context.Context, err error, decision string) {
+	if suppressListenerSessionError(ctx, err) || lr.streamConfig == nil {
+		return
+	}
+	topicreadercommon.TraceReaderSessionError(
+		ctx,
+		lr.streamConfig.Tracer,
+		lr.streamConfig.ReaderInfo,
+		decision,
+		err,
+	)
 }
 
 // listenerRetryStopError preserves the original error identity and status while

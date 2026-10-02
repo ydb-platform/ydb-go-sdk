@@ -12,11 +12,12 @@ import (
 )
 
 type StreamListenerConfig struct {
+	topicreadercommon.ReaderInfo
+
 	CheckError             topic.PublicCheckErrorRetryFunction
 	BufferSize             int
 	Decoders               *topicreadercommon.MultiDecoder
 	Selectors              []*topicreadercommon.PublicReadSelector
-	Consumer               string
 	ConnectWithoutConsumer bool
 	Tracer                 *trace.Topic
 
@@ -29,9 +30,16 @@ func NewStreamListenerConfig() StreamListenerConfig {
 		BufferSize: topicreadercommon.DefaultBufferSize,
 		Decoders:   topicreadercommon.NewMultiDecoder(),
 		Selectors:  nil,
-		Consumer:   "",
 		readerID:   topicreadercommon.NextReaderID(),
 		Tracer:     &trace.Topic{},
+	}
+}
+
+// EnsureReaderName assigns the shared default after all options have
+// been applied. An explicitly empty option is equivalent to leaving it unset.
+func (cfg *StreamListenerConfig) EnsureReaderName() {
+	if cfg.ReaderName == "" {
+		cfg.ReaderName = "default"
 	}
 }
 

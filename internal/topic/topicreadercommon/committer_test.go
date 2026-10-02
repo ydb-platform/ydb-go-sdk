@@ -317,7 +317,12 @@ func TestCommitRequestCancellationDoesNotResend(t *testing.T) {
 
 func TestCommitRequestAlreadyAcknowledgedDoesNotSend(t *testing.T) {
 	ctx := xtest.Context(t)
-	session := newTestPartitionSession(ctx, 1)
+	var queued int
+	session := newCommitMetricsTestSession(t, &trace.Topic{
+		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {
+			queued++
+		},
+	})
 	commitRange := CommitRange{PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2}
 	session.SetCommittedOffsetForward(commitRange.CommitOffsetEnd)
 	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
@@ -333,6 +338,7 @@ func TestCommitRequestAlreadyAcknowledgedDoesNotSend(t *testing.T) {
 	require.NoError(t, request.Wait(ctx))
 	request.Confirm()
 	require.NoError(t, request.Wait(ctx))
+	require.Zero(t, queued)
 }
 
 func TestCommitRequestConcurrentWaitsShareSend(t *testing.T) {
@@ -464,12 +470,20 @@ func TestCommitRequestWaitAsyncWaitsForAck(t *testing.T) {
 func TestCommitRequestWaitRejectsDisabledModeWithoutQueuing(t *testing.T) {
 	ctx := xtest.Context(t)
 	committer := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeNone, nil)
-	session := newTestPartitionSession(ctx, 1)
+	var queued int
+	session := newCommitMetricsTestSession(t, &trace.Topic{
+		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {
+			queued++
+		},
+	})
 	commitRange := CommitRange{
 		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
 	}
 
-	require.ErrorIs(t, committer.NewCommitRequest(commitRange).Wait(ctx), ErrCommitDisabled)
+	request := committer.NewCommitRequest(commitRange)
+	request.Confirm()
+	require.ErrorIs(t, request.Wait(ctx), ErrCommitDisabled)
+	require.Zero(t, queued)
 	committer.m.WithLock(func() {
 		require.Empty(t, committer.waiters)
 		require.Empty(t, committer.requests)

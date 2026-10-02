@@ -3,6 +3,7 @@ package topicclientinternal
 import (
 	"context"
 	"errors"
+	"path"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"google.golang.org/grpc"
@@ -307,10 +308,8 @@ func (c *Client) StartListener(
 	opts ...topicoptions.ListenerOption,
 ) (*topiclistener.TopicListener, error) {
 	cfg := topiclistenerinternal.NewStreamListenerConfig()
-
-	cfg.Consumer = consumer
-	cfg.Tracer = c.cfg.Trace // Set tracer from client config
-
+	cfg.ReaderInfo = c.readerInfo(consumer)
+	cfg.Tracer = c.cfg.Trace
 	cfg.Selectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))
 	for i := range readSelectors {
 		cfg.Selectors[i] = readSelectors[i].Clone()
@@ -348,13 +347,13 @@ func (c *Client) StartReader(
 		return c.rawClient.StreamRead(ctx, readerID, tracer)
 	}
 
-	defaultOpts := []topicoptions.ReaderOption{
+	opts = append([]topicoptions.ReaderOption{
 		topicoptions.WithCommonConfig(c.cfg.Common),
 		topicreaderinternal.WithCredentials(c.cred),
+		topicreaderinternal.WithReaderInfo(c.readerInfo(consumer)),
 		topicreaderinternal.WithTrace(c.cfg.Trace),
 		topicoptions.WithReaderStartTimeout(topic.DefaultStartTimeout),
-	}
-	opts = append(defaultOpts, opts...)
+	}, opts...)
 
 	internalReader, err := topicreaderinternal.NewReader(&c.rawClient, connector, consumer, readSelectors, opts...)
 	if err != nil {
@@ -364,6 +363,19 @@ func (c *Client) StartReader(
 	internalReader.TopicOnReaderStart(consumer, err)
 
 	return topicreader.NewReader(internalReader), nil
+}
+
+func (c *Client) readerInfo(consumer string) topicreadercommon.ReaderInfo {
+	database := c.cfg.Database
+	if database != "" {
+		database = path.Clean("/" + database)
+	}
+
+	return topicreadercommon.ReaderInfo{
+		Endpoint: c.cfg.Endpoint,
+		Database: database,
+		Consumer: consumer,
+	}
 }
 
 // StartWriter create new topic writer wrapper

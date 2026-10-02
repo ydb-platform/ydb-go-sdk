@@ -14,7 +14,120 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestReader_MessagesDeliveredTrace(t *testing.T) {
+	mc := gomock.NewController(t)
+	defer mc.Finish()
+
+	cancelledBatch := newTestReaderBatch(t, "/local/topic", 2)
+	topicreadercommon.BatchGetPartitionSession(cancelledBatch).Close()
+	deliveredBatch := newTestReaderBatch(t, "/local/topic", 3)
+	singleMessageBatch := newTestReaderBatch(t, "/local/topic", 1)
+	testErr := errors.New("test read error")
+
+	baseReader := NewMockbatchedStreamReader(mc)
+	gomock.InOrder(
+		baseReader.EXPECT().ReadMessageBatch(gomock.Any(), ReadMessageBatchOptions{}).
+			Return(cancelledBatch, nil),
+		baseReader.EXPECT().ReadMessageBatch(gomock.Any(), ReadMessageBatchOptions{}).
+			Return(deliveredBatch, nil),
+		baseReader.EXPECT().ReadMessageBatch(
+			gomock.Any(),
+			ReadMessageBatchOptions{batcherGetOptions: batcherGetOptions{MinCount: 1, MaxCount: 1}},
+		).Return(singleMessageBatch, nil),
+		baseReader.EXPECT().ReadMessageBatch(gomock.Any(), ReadMessageBatchOptions{}).
+			Return(nil, testErr),
+	)
+
+	var events []trace.TopicReaderMessagesDeliveredInfo
+	reader := &Reader{
+		reader: baseReader,
+		tracer: &trace.Topic{OnReaderMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
+			events = append(events, info)
+		}},
+		readerInfo: topicreadercommon.ReaderInfo{
+			Endpoint: "configured:2135",
+			Database: "/local",
+			Consumer: "consumer",
+		},
+	}
+
+	batch, err := reader.ReadMessageBatch(context.Background())
+	require.NoError(t, err)
+	require.Same(t, deliveredBatch, batch)
+	require.Len(t, events, 1)
+	require.NotNil(t, events[0].Context)
+	require.Equal(t, "configured:2135", events[0].Endpoint)
+	require.Equal(t, "/local", events[0].Database)
+	require.Equal(t, "/local/topic", events[0].Topic)
+	require.Equal(t, "consumer", events[0].Consumer)
+	require.Equal(t, 3, events[0].MessagesCount)
+
+	message, err := reader.ReadMessage(context.Background())
+	require.NoError(t, err)
+	require.Same(t, singleMessageBatch.Messages[0], message)
+	require.Len(t, events, 2)
+	require.Equal(t, 1, events[1].MessagesCount)
+
+	_, err = reader.ReadMessageBatch(context.Background())
+	require.ErrorIs(t, err, testErr)
+	require.Len(t, events, 2)
+}
+
+func TestReader_PopBatchTxMessagesDeliveredTrace(t *testing.T) {
+	mc := gomock.NewController(t)
+	defer mc.Finish()
+
+	transaction := newMockTransactionWrapper("session", "transaction")
+	deliveredBatch := newTestReaderBatch(t, "/local/topic", 2)
+	testErr := errors.New("test transaction error")
+	baseReader := NewMockbatchedStreamReader(mc)
+	gomock.InOrder(
+		baseReader.EXPECT().PopMessagesBatchTx(gomock.Any(), transaction, ReadMessageBatchOptions{}).
+			Return(deliveredBatch, nil),
+		baseReader.EXPECT().PopMessagesBatchTx(gomock.Any(), transaction, ReadMessageBatchOptions{}).
+			Return(nil, testErr),
+	)
+
+	var events []trace.TopicReaderMessagesDeliveredInfo
+	reader := &Reader{
+		reader: baseReader,
+		tracer: &trace.Topic{OnReaderMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
+			events = append(events, info)
+		}},
+		readerInfo: topicreadercommon.ReaderInfo{
+			Endpoint: "configured:2135",
+			Database: "/local",
+			Consumer: "consumer",
+		},
+	}
+
+	batch, err := reader.PopBatchTx(context.Background(), transaction)
+	require.NoError(t, err)
+	require.Same(t, deliveredBatch, batch)
+	require.Len(t, events, 1)
+	require.Equal(t, 2, events[0].MessagesCount)
+
+	_, err = reader.PopBatchTx(context.Background(), transaction)
+	require.ErrorIs(t, err, testErr)
+	require.Len(t, events, 1)
+}
+
+func TestReader_EmptyBatchDoesNotTraceMessagesDelivered(t *testing.T) {
+	var events []trace.TopicReaderMessagesDeliveredInfo
+	reader := &Reader{
+		tracer: &trace.Topic{OnReaderMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
+			events = append(events, info)
+		}},
+	}
+
+	reader.traceMessagesDelivered(context.Background(), nil)
+	reader.traceMessagesDelivered(context.Background(), &topicreadercommon.PublicBatch{})
+
+	require.Empty(t, events)
+}
 
 func TestReader_Close(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
@@ -204,4 +317,27 @@ func newTestPartitionSessionReaderID(
 		int64(partitionSessionID+100),
 		0,
 	)
+}
+
+func newTestReaderBatch(t *testing.T, topic string, messagesCount int) *topicreadercommon.PublicBatch {
+	t.Helper()
+
+	session := topicreadercommon.NewPartitionSession(
+		context.Background(),
+		topic,
+		1,
+		1,
+		"connection",
+		1,
+		1,
+		0,
+	)
+	messages := make([]*topicreadercommon.PublicMessage, messagesCount)
+	for i := range messages {
+		messages[i] = &topicreadercommon.PublicMessage{}
+	}
+	batch, err := topicreadercommon.NewBatch(session, messages)
+	require.NoError(t, err)
+
+	return batch
 }

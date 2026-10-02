@@ -17,6 +17,7 @@ func WithTraces(config Config) ydb.Option {
 		ydb.WithTraceDriver(driver(config)),
 		ydb.WithTraceTable(table(config)),
 		ydb.WithTraceQuery(query(config)),
+		ydb.WithTraceTopic(topic(config)),
 		ydb.WithTraceScripting(scripting(config)),
 		ydb.WithTraceScheme(scheme(config)),
 		ydb.WithTraceCoordination(coordination(config)),

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -26,6 +27,136 @@ import (
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestTopicStreamReaderImpl_MessagesReceivedTraceUsesConfiguredEndpoint(t *testing.T) {
+	e := newTopicReaderTestEnv(t)
+	e.reader.cfg.ReaderInfo = topicreadercommon.ReaderInfo{
+		Endpoint: "configured:2135",
+		Database: "/local",
+		Consumer: "consumer",
+	}
+
+	var events []trace.TopicReaderMessagesReceivedInfo
+	e.reader.cfg.Trace = &trace.Topic{
+		OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
+			events = append(events, info)
+		},
+	}
+
+	require.NoError(t, e.reader.onReadResponse(readerMetricResponseWithOffsets(&e, 2, 1, 2)))
+
+	require.Len(t, events, 1)
+	for _, event := range events {
+		require.Equal(t, "configured:2135", event.Endpoint)
+		require.Equal(t, "/local", event.Database)
+		require.Equal(t, "/test", event.Topic)
+		require.Equal(t, "consumer", event.Consumer)
+		require.Equal(t, 2, event.MessagesCount)
+	}
+
+	invalidResponse := readerMetricResponseWithOffsets(&e, 2, 5, 6)
+	invalidResponse.PartitionData[0].PartitionSessionID++
+	require.Error(t, e.reader.onReadResponse(invalidResponse))
+	require.Len(t, events, 1)
+
+	require.NoError(t, e.reader.batcher.Close(errors.New("test batcher closed")))
+	require.Error(t, e.reader.onReadResponse(readerMetricResponseWithOffsets(&e, 2, 7, 8)))
+	require.Len(t, events, 1)
+}
+
+func TestTopicStreamReaderImpl_MessagesReceivedTraceSnapshotsBatchBeforeHandoff(t *testing.T) {
+	xtest.TestManyTimesWithName(t, "ConcurrentBatchOwnership", func(t testing.TB) {
+		e := newTopicReaderTestEnv(t)
+		e.reader.freeBytes = make(chan int, 1)
+		e.reader.cfg.ReaderInfo = topicreadercommon.ReaderInfo{
+			Endpoint: "configured:2135",
+			Database: "/local",
+			Consumer: "consumer",
+		}
+
+		events := make(chan trace.TopicReaderMessagesReceivedInfo, 1)
+		e.reader.cfg.Trace = &trace.Topic{
+			OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
+				events <- info
+			},
+		}
+
+		readResponse := readerMetricResponseWithOffsets(&e, 2, 1, 2)
+
+		type readResult struct {
+			batch *topicreadercommon.PublicBatch
+			err   error
+		}
+		readResultCh := make(chan readResult, 1)
+		mutationFinished := make(chan struct{})
+		responseFinished := make(chan struct{})
+		go func() {
+			defer close(mutationFinished)
+			batch, err := e.reader.ReadMessageBatch(e.ctx, ReadMessageBatchOptions{
+				batcherGetOptions: batcherGetOptions{MinCount: 1},
+			})
+			if err != nil || batch == nil {
+				readResultCh <- readResult{batch: batch, err: err}
+
+				return
+			}
+
+			originalMessages := batch.Messages
+			batch.Messages = nil
+			batch.Messages = originalMessages
+			readResultCh <- readResult{batch: batch, err: err}
+			for {
+				batch.Messages = nil
+				batch.Messages = originalMessages
+
+				select {
+				case <-responseFinished:
+					return
+				case <-e.ctx.Done():
+					return
+				default:
+				}
+
+				runtime.Gosched()
+			}
+		}()
+
+		// Ensure the reader is waiting for the batcher notification before handing it a response.
+		e.reader.batcher.notifyAboutNewMessages()
+		xtest.SpinWaitCondition(t, &e.reader.batcher.m, func() bool {
+			return len(e.reader.batcher.hasNewMessages) == 0
+		})
+
+		var responseErr error
+		go func() {
+			responseErr = e.reader.onReadResponse(readResponse)
+			close(responseFinished)
+		}()
+
+		var result readResult
+		select {
+		case result = <-readResultCh:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for reader batch")
+		}
+		require.NoError(t, result.err)
+		require.NotNil(t, result.batch)
+		xtest.WaitChannelClosed(t, responseFinished)
+		xtest.WaitChannelClosed(t, mutationFinished)
+		require.NoError(t, responseErr)
+
+		select {
+		case event := <-events:
+			require.Equal(t, "configured:2135", event.Endpoint)
+			require.Equal(t, "/local", event.Database)
+			require.Equal(t, "/test", event.Topic)
+			require.Equal(t, "consumer", event.Consumer)
+			require.Equal(t, 2, event.MessagesCount)
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for received messages trace")
+		}
+	})
+}
 
 func TestTopicStreamReaderImpl_BufferCounterOnStopPartition(t *testing.T) {
 	table := []struct {

@@ -58,6 +58,9 @@ type topicStreamReaderImpl struct {
 	readConnectionID string
 	readerID         int64
 
+	creditBalance      topicreadercommon.CreditBalance
+	localBufferBalance topicreadercommon.LocalBufferBalance
+
 	m       xsync.RWMutex
 	err     error
 	started bool
@@ -67,13 +70,14 @@ type topicStreamReaderImpl struct {
 }
 
 type topicStreamReaderConfig struct {
+	topicreadercommon.ReaderInfo
+
 	CommitterBatchTimeLag           time.Duration
 	CommitterBatchCounterTrigger    int
 	BaseContext                     context.Context //nolint:containedctx
 	BufferSizeProtoBytes            int
 	Cred                            credentials.Credentials
 	CredUpdateInterval              time.Duration
-	Consumer                        string
 	ReadWithoutConsumer             bool
 	ReadSelectors                   []*topicreadercommon.PublicReadSelector
 	Trace                           *trace.Topic
@@ -82,6 +86,10 @@ type topicStreamReaderConfig struct {
 	CommitMode                      topicreadercommon.PublicCommitMode
 	Decoders                        *topicreadercommon.MultiDecoder
 	EnableSplitMergeSupport         bool
+}
+
+type localBufferBatchReleaser interface {
+	releaseLocalBufferForBatch(batch *topicreadercommon.PublicBatch)
 }
 
 func newTopicStreamReaderConfig() topicStreamReaderConfig {
@@ -186,6 +194,15 @@ func (r *topicStreamReaderImpl) ReadSessionID() string {
 	return r.readConnectionID
 }
 
+func (r *topicStreamReaderImpl) streamError() error {
+	var err error
+	r.m.WithRLock(func() {
+		err = r.err
+	})
+
+	return err
+}
+
 func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 	if !r.started {
 		return errors.New("not started: can be started only after initialize from constructor")
@@ -225,6 +242,7 @@ func (r *topicStreamReaderImpl) PopMessagesBatchTx(
 	if err = r.commitWithTransaction(ctx, tx, batch); err == nil {
 		return batch, nil
 	}
+	r.releaseLocalBufferForBatch(batch)
 
 	return nil, err
 }
@@ -379,7 +397,16 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 		}
 	}()
 
-	return r.consumeMessagesUntilBatch(ctx, opts)
+	batch, err = r.consumeMessagesUntilBatch(ctx, opts)
+
+	return batch, err
+}
+
+func (r *topicStreamReaderImpl) releaseLocalBufferForBatch(batch *topicreadercommon.PublicBatch) {
+	if batch == nil || len(batch.Messages) == 0 {
+		return
+	}
+	r.releaseLocalBuffer(batch.Topic(), len(batch.Messages))
 }
 
 func (r *topicStreamReaderImpl) consumeMessagesUntilBatch(
@@ -512,6 +539,7 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 			// pass
 		}
 	}
+	r.discardBatches(r.batcher.DrainPartitionSession(session))
 
 	return nil
 }
@@ -773,6 +801,7 @@ func (r *topicStreamReaderImpl) dataRequestLoop(ctx context.Context) {
 			if err := r.sendDataRequest(sum); err != nil {
 				return
 			}
+			r.changeCreditBalance(sum)
 		}
 	}
 }
@@ -792,6 +821,63 @@ func (r *topicStreamReaderImpl) freeBufferFromMessages(batch *topicreadercommon.
 	}
 }
 
+func (r *topicStreamReaderImpl) changeCreditBalance(delta int) {
+	if r.cfg.Trace == nil || r.cfg.Trace.OnReaderCreditBalanceChanged == nil {
+		return
+	}
+
+	r.creditBalance.Change(delta, r.traceCreditDelta)
+}
+
+func (r *topicStreamReaderImpl) finalizeCreditBalance() {
+	if r.cfg.Trace == nil || r.cfg.Trace.OnReaderCreditBalanceChanged == nil {
+		return
+	}
+
+	r.creditBalance.Finalize(r.traceCreditDelta)
+}
+
+func (r *topicStreamReaderImpl) traceCreditDelta(delta int) {
+	logCtx := r.cfg.BaseContext
+	gtrace.TopicOnReaderCreditBalanceChanged(
+		r.cfg.Trace, &logCtx,
+		r.cfg.ReaderInfo.Endpoint, r.cfg.ReaderInfo.Database, r.cfg.ReaderInfo.Consumer,
+		r.cfg.ReaderInfo.ReaderName, r.cfg.ReaderInfo.Listener, delta,
+	)
+}
+
+func (r *topicStreamReaderImpl) traceLocalBufferDelta(topic string, delta int) {
+	topicreadercommon.TraceLocalBufferChanged(r.cfg.BaseContext, r.cfg.Trace, r.cfg.ReaderInfo, topic, delta)
+}
+
+func (r *topicStreamReaderImpl) localBufferTrackingEnabled() bool {
+	return r.cfg.Trace != nil && r.cfg.Trace.OnReaderLocalBufferChanged != nil
+}
+
+func (r *topicStreamReaderImpl) reserveLocalBuffer(topic string, messagesCount int) bool {
+	if messagesCount <= 0 || !r.localBufferTrackingEnabled() {
+		return false
+	}
+
+	return r.localBufferBalance.Reserve(topic, messagesCount, r.traceLocalBufferDelta)
+}
+
+func (r *topicStreamReaderImpl) releaseLocalBuffer(topic string, messagesCount int) {
+	if messagesCount <= 0 || !r.localBufferTrackingEnabled() {
+		return
+	}
+
+	r.localBufferBalance.Release(topic, messagesCount, r.traceLocalBufferDelta)
+}
+
+func (r *topicStreamReaderImpl) finalizeLocalBuffer() {
+	if !r.localBufferTrackingEnabled() {
+		return
+	}
+
+	r.localBufferBalance.Finalize(r.traceLocalBufferDelta)
+}
+
 func (r *topicStreamReaderImpl) updateTokenLoop(ctx context.Context) {
 	ticker := time.NewTicker(r.cfg.CredUpdateInterval)
 	defer ticker.Stop()
@@ -808,9 +894,21 @@ func (r *topicStreamReaderImpl) updateTokenLoop(ctx context.Context) {
 }
 
 func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse) (err error) {
+	logCtx := r.cfg.BaseContext
+	gtrace.TopicOnReaderReceivedBytes(
+		r.cfg.Trace,
+		&logCtx,
+		r.cfg.ReaderInfo.Endpoint,
+		r.cfg.ReaderInfo.Database,
+		r.cfg.ReaderInfo.Consumer,
+		r.cfg.ReaderInfo.ReaderName,
+		r.cfg.ReaderInfo.Listener,
+		msg.BytesSize,
+	)
+	r.changeCreditBalance(-msg.BytesSize)
+
 	resCapacity := r.addRestBufferBytes(-msg.BytesSize)
 
-	logCtx := r.cfg.BaseContext
 	onDone := gtrace.TopicOnReaderReceiveDataResponse(r.cfg.Trace, &logCtx, r.readConnectionID, resCapacity, msg)
 	defer func() {
 		onDone(err)
@@ -822,9 +920,25 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 	}
 
 	for i := range batches {
+		topic := batches[i].Topic()
+		messagesCount := len(batches[i].Messages)
+
+		reserved := r.reserveLocalBuffer(topic, messagesCount)
 		if err := r.batcher.PushBatches(batches[i]); err != nil {
+			if reserved {
+				r.releaseLocalBuffer(topic, messagesCount)
+			}
+
 			return err
 		}
+
+		topicreadercommon.TraceMessagesReceived(
+			r.cfg.BaseContext,
+			r.cfg.Trace,
+			r.cfg.ReaderInfo,
+			topic,
+			messagesCount,
+		)
 	}
 
 	return nil
@@ -851,10 +965,16 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 	if !isFirstClose {
 		return nil
 	}
+	for _, session := range r.sessionController.GetAll() {
+		session.Close()
+	}
+	r.finalizeCreditBalance()
 
 	closeErr = r.committer.Close(ctx, reason)
 
 	batcherErr := r.batcher.Close(reason)
+	r.discardBatches(r.batcher.Drain())
+	r.finalizeLocalBuffer()
 	if closeErr == nil {
 		closeErr = batcherErr
 	}
@@ -874,13 +994,28 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 	return closeErr
 }
 
+func (r *topicStreamReaderImpl) discardBatches(items []batcherMessageOrderItem) {
+	for i := range items {
+		if !items[i].IsBatch() {
+			continue
+		}
+		batch := items[i].Batch
+		r.releaseLocalBufferForBatch(batch)
+	}
+}
+
 func (r *topicStreamReaderImpl) onCommitResponse(msg *rawtopicreader.CommitOffsetResponse) error {
+	if !msg.StatusData().Status.IsSuccess() {
+		return nil
+	}
+
 	for i := range msg.PartitionsCommittedOffsets {
 		commit := &msg.PartitionsCommittedOffsets[i]
 		partition, err := r.sessionController.Get(commit.PartitionSessionID)
 		if err != nil {
 			return fmt.Errorf("ydb: can't found session on commit response: %w", err)
 		}
+		messagesCount := topicreadercommon.RegisterCommitAcknowledged(partition, commit.CommittedOffset)
 		partition.SetCommittedOffsetForward(commit.CommittedOffset)
 
 		logCtx := r.cfg.BaseContext
@@ -894,7 +1029,7 @@ func (r *topicStreamReaderImpl) onCommitResponse(msg *rawtopicreader.CommitOffse
 			commit.CommittedOffset.ToInt64(),
 		)
 
-		r.committer.OnCommitNotify(partition, commit.CommittedOffset)
+		r.committer.OnCommitNotifyAfterAcknowledgedRegistration(partition, commit.CommittedOffset, messagesCount)
 	}
 
 	return nil
@@ -928,6 +1063,7 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequest(m *rawtopicreader
 		clientSessionCounter.Add(1),
 		m.CommittedOffset,
 	)
+	session.SetupCommitMetrics(r.cfg.Trace, r.cfg.ReaderInfo)
 	if err := r.sessionController.Add(session); err != nil {
 		return err
 	}
