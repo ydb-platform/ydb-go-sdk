@@ -36,7 +36,10 @@ func Decode(ctx context.Context, columns []query.ArrowColumn, part io.Reader) ([
 				return nil, fmt.Errorf("arrow column %q differs from YDB column %q", field.Name, columns[i].Name)
 			}
 		}
-		for i := 0; i < int(batch.NumRows()); i++ {
+		count := int(batch.NumRows())
+		start := len(rows)
+		rows = append(rows, make([][]types.Value, count)...)
+		for i := 0; i < count; i++ {
 			if err := ctx.Err(); err != nil {
 				return nil, err
 			}
@@ -47,7 +50,7 @@ func Decode(ctx context.Context, columns []query.ArrowColumn, part io.Reader) ([
 					return nil, fmt.Errorf("column %q: %w", column.Name, err)
 				}
 			}
-			rows = append(rows, row)
+			rows[start+i] = row
 		}
 	}
 	return rows, reader.Err()

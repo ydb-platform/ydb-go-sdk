@@ -112,6 +112,13 @@ func consumeRows(ctx context.Context, s query.Session, sql string, opts []query.
 	defer res.Close(ctx)
 	n := 0
 	hash := uint64(14695981039346656037)
+	var id uint64
+	var score *int32
+	var active *bool
+	var amount *float64
+	var name *string
+	var payload *[]byte
+	dst := []any{&id, &score, &active, &amount, &name, &payload}
 	for rs, err := range res.ResultSets(ctx) {
 		if err != nil {
 			return 0, 0, err
@@ -120,13 +127,7 @@ func consumeRows(ctx context.Context, s query.Session, sql string, opts []query.
 			if err != nil {
 				return 0, 0, err
 			}
-			var id uint64
-			var score *int32
-			var active *bool
-			var amount *float64
-			var name *string
-			var payload *[]byte
-			if err := row.Scan(&id, &score, &active, &amount, &name, &payload); err != nil {
+			if err := row.Scan(dst...); err != nil {
 				return 0, 0, err
 			}
 			hash = checksum(hash, id, score, active, amount, name, payload)

@@ -1,7 +1,6 @@
 package query
 
 import (
-	"errors"
 	"io"
 	"strconv"
 	"testing"
@@ -14,66 +13,55 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
-type testScanner struct {
-	err error
-}
-
-func (s testScanner) Scan(dst ...any) error {
-	return s.err
-}
-
-func (s testScanner) ScanNamed(dst ...scanner.NamedDestination) error {
-	return s.err
-}
-
-func (s testScanner) ScanStruct(dst any, opts ...scanner.ScanStructOption) error {
-	return s.err
-}
-
 func TestRowScan(t *testing.T) {
-	expErr := errors.New("test error")
-	row := Row{
-		indexedScanner: testScanner{err: expErr},
-		namedScanner:   testScanner{err: expErr},
-		structScanner:  testScanner{err: expErr},
-	}
+	row := newDecodedRow([]*Ydb.Column{{Name: "id"}}, []value.Value{value.Int32Value(42)})
 	for _, tt := range []struct {
-		name      string
-		scan      func() error
-		expErrStr string
+		name string
+		scan func() error
 	}{
 		{
 			name: "indexed scan",
 			scan: func() error {
-				return row.Scan()
+				return row.Scan(new(bool))
 			},
-			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.Scan(row.go:56)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func1(row_test.go:50)`", //nolint:lll
 		},
 		{
 			name: "named scan",
 			scan: func() error {
-				return row.ScanNamed()
+				return row.ScanNamed(scanner.NamedRef("id", new(bool)))
 			},
-			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.ScanNamed(row.go:68)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func2(row_test.go:57)`", //nolint:lll
 		},
 		{
 			name: "struct scan",
 			scan: func() error {
-				return row.ScanStruct(nil)
+				return row.ScanStruct(&struct {
+					ID bool `sql:"id"`
+				}{})
 			},
-			expErrStr: "test error at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.Row.ScanStruct(row.go:80)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func3(row_test.go:64)`", //nolint:lll
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.scan()
 			require.Error(t, err)
-			require.ErrorIs(t, err, expErr)
-			require.Equal(t, tt.expErrStr, err.Error())
+			require.ErrorContains(t, err, "scan error on")
+			require.ErrorContains(t, err, "github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Row).Scan")
 		})
 	}
 }
+
+func BenchmarkDecodedRow(b *testing.B) {
+	columns := []*Ydb.Column{{Name: "id"}}
+	values := []value.Value{value.Int32Value(42)}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		benchmarkRow = newDecodedRow(columns, values)
+	}
+}
+
+var benchmarkRow *Row
 
 func generateData(count int) []*Row {
 	columns := []*Ydb.Column{{

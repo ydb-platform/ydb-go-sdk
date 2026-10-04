@@ -1810,7 +1810,7 @@ func NullValue(t types.Type) *optionalValue {
 }
 
 type optionalValue struct {
-	innerType types.Type
+	innerType types.Optional
 	value     Value
 }
 

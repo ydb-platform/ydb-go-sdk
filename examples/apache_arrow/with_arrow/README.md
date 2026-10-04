@@ -127,6 +127,8 @@ direct `Session.QueryArrow` column access, and `Session.Query` + `WithArrow` +
 `Scan` using the same session, SQL, checksum and 32 KiB response-part limit.
 Each variant has ten warmup queries. All returned columns participate in the
 checksum; the row count and checksum must match on every RPC.
+The Value and WithArrow consumers reuse Scan destinations and arguments across
+rows; nullable scans still allocate each non-null destination value.
 
 Reported `ns/op` includes server work and transport; `cpu-ns/op` is client process
 user + system CPU from `getrusage`, including decoding, scans and GC. `B/op` and

@@ -1,4 +1,5 @@
 * Added experimental `query.WithArrow` with an application-provided decoder and `ydb.WithQueryExecuteOptions` defaults, preserving the Query Service row and scan APIs without an Arrow Go dependency
+* Reduced allocations in Query Service rows and optional value construction
 
 ## v3.154.1
 * Fixed `topicoptions.CreateWithPartitionCountLimit` and `topicoptions.AlterWithPartitionCountLimit` to set the supported maximum active partition count instead of ignored protobuf fields
