@@ -5,10 +5,17 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type Option func(*Config)
+
+func WithDefaultExecuteOptions(opts ...options.Execute) Option {
+	return func(c *Config) {
+		c.defaultExecuteOptions = append(c.defaultExecuteOptions, opts...)
+	}
+}
 
 // With applies common configuration params
 func With(config config.Common) Option {

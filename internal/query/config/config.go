@@ -5,6 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -29,10 +30,15 @@ type Config struct {
 
 	allowImplicitSessions bool
 
-	lazyTx            bool
-	defaultIdempotent bool
+	lazyTx                bool
+	defaultIdempotent     bool
+	defaultExecuteOptions []options.Execute
 
 	trace *trace.Query
+}
+
+func (c *Config) DefaultExecuteOptions() []options.Execute {
+	return c.defaultExecuteOptions
 }
 
 func New(opts ...Option) *Config {

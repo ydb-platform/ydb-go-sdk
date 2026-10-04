@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -55,6 +56,7 @@ type (
 		// invoked on demand from nextPart so that a Recv blocked on the wire
 		// can be unblocked when the caller's ctx is cancelled mid-flight.
 		streamCancel context.CancelFunc
+		arrowDecoder arrow.Decoder
 	}
 	resultOption func(s *streamResult)
 )
@@ -98,6 +100,12 @@ func (r *materializedResult) NextResultSet(ctx context.Context) (result.Set, err
 	}()
 
 	return r.resultSets[r.idx], nil
+}
+
+func withArrowDecoder(decoder arrow.Decoder) resultOption {
+	return func(s *streamResult) {
+		s.arrowDecoder = decoder
+	}
 }
 
 func withStreamResultTrace(t *trace.Query) resultOption {
@@ -372,6 +380,7 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishE
 			r.resultSetIndex = resultSetIndex
 			rs := newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart)
 			rs.notifyError = r.notifyNextPartErr
+			rs.arrowDecoder = r.arrowDecoder
 
 			return rs, nil
 		}
@@ -532,8 +541,18 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 			rs.columns = r.lastPart.GetResultSet().GetColumns()
 		}
 
-		for i := range r.lastPart.GetResultSet().GetRows() {
-			rs.rows = append(rs.rows, NewRow(rs.columns, r.lastPart.GetResultSet().GetRows()[i]))
+		if r.lastPart.GetResultSet().GetFormat() == Ydb.ResultSet_FORMAT_ARROW {
+			rows, err := decodeArrowRows(ctx, r.arrowDecoder, rs.columns, r.lastPart.GetResultSet())
+			if err != nil {
+				return nil, xerrors.WithStackTrace(r.notifyNextPartErr(ctx, err))
+			}
+			for _, values := range rows {
+				rs.rows = append(rs.rows, newDecodedRow(rs.columns, values))
+			}
+		} else {
+			for i := range r.lastPart.GetResultSet().GetRows() {
+				rs.rows = append(rs.rows, NewRow(rs.columns, r.lastPart.GetResultSet().GetRows()[i]))
+			}
 		}
 		resultSetByIndex[curIndex] = rs
 

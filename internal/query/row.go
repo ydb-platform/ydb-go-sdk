@@ -33,8 +33,14 @@ func (r Row) Values() []value.Value {
 }
 
 func NewRow(columns []*Ydb.Column, v *Ydb.Value) *Row {
-	data := scanner.NewData(columns, v.GetItems())
+	return newRow(scanner.NewData(columns, v.GetItems()))
+}
 
+func newDecodedRow(columns []*Ydb.Column, values []value.Value) *Row {
+	return newRow(scanner.NewDecodedData(columns, values))
+}
+
+func newRow(data *scanner.Data) *Row {
 	return &Row{
 		data:           data,
 		indexedScanner: scanner.Indexed(data),

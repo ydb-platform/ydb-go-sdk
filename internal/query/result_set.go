@@ -10,8 +10,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -39,6 +41,9 @@ type (
 		ended               atomic.Bool
 		mustBeLastResultSet bool
 		notifyError         func(context.Context, error) error
+		arrowDecoder        arrow.Decoder
+		arrowRows           [][]value.Value
+		arrowDecoded        bool
 	}
 	resultSetWithClose struct {
 		*resultSet
@@ -168,8 +173,12 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 			return nil, xerrors.WithStackTrace(err)
 		}
 
+		rowCount, err := rs.partRowCount(ctx)
+		if err != nil {
+			return nil, err
+		}
 		//nolint:nestif
-		if rs.rowIndex == len(rs.currentPart.GetResultSet().GetRows()) {
+		if rs.rowIndex == rowCount {
 			part, err := rs.recv()
 			if err != nil {
 				if xerrors.Is(err, io.EOF) {
@@ -189,6 +198,8 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 			}
 			rs.rowIndex = 0
 			rs.currentPart = part
+			rs.arrowRows = nil
+			rs.arrowDecoded = false
 			if part == nil {
 				rs.ended.Store(true)
 
@@ -204,10 +215,43 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 			))
 		}
 
-		if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
-			return NewRow(rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex]), nil
+		if row := rs.partRow(); row != nil {
+			return row, nil
 		}
 	}
+}
+
+func (rs *resultSet) partRowCount(ctx context.Context) (int, error) {
+	if rs.currentPart.GetResultSet().GetFormat() != Ydb.ResultSet_FORMAT_ARROW {
+		return len(rs.currentPart.GetResultSet().GetRows()), nil
+	}
+	if !rs.arrowDecoded {
+		var err error
+		rs.arrowRows, err = decodeArrowRows(ctx, rs.arrowDecoder, rs.columns, rs.currentPart.GetResultSet())
+		if err != nil {
+			rs.ended.Store(true)
+			if rs.notifyError != nil {
+				err = rs.notifyError(ctx, err)
+			}
+
+			return 0, xerrors.WithStackTrace(err)
+		}
+		rs.arrowDecoded = true
+	}
+
+	return len(rs.arrowRows), nil
+}
+
+func (rs *resultSet) partRow() *Row {
+	if rs.currentPart.GetResultSet().GetFormat() == Ydb.ResultSet_FORMAT_ARROW {
+		if rs.rowIndex < len(rs.arrowRows) {
+			return newDecodedRow(rs.columns, rs.arrowRows[rs.rowIndex])
+		}
+	} else if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
+		return NewRow(rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex])
+	}
+
+	return nil
 }
 
 func (rs *resultSet) NextRow(ctx context.Context) (_ query.Row, err error) {

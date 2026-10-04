@@ -360,14 +360,16 @@ func (c *Client) withDefaultRetryOptions(opts ...retry.Option) []retry.Option {
 }
 
 func (c *Client) withDefaultExecuteOptions(opts ...options.Execute) []options.Execute {
-	if !c.config.DefaultIdempotent() {
+	if len(c.config.DefaultExecuteOptions()) == 0 && !c.config.DefaultIdempotent() {
 		return opts
 	}
 
-	return append(
-		[]options.Execute{options.WithIdempotent(true)},
-		opts...,
-	)
+	defaults := append([]options.Execute(nil), c.config.DefaultExecuteOptions()...)
+	if c.config.DefaultIdempotent() {
+		defaults = append(defaults, options.WithIdempotent(true))
+	}
+
+	return append(defaults, opts...)
 }
 
 func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) (finalErr error) {
@@ -794,6 +796,7 @@ func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 		}
 
 		s.lazyTx = cfg.LazyTx()
+		s.defaultExecuteOptions = cfg.DefaultExecuteOptions()
 
 		return s, nil
 	})
@@ -853,6 +856,7 @@ func newWithQueryServiceClient(ctx context.Context,
 			}
 
 			s.lazyTx = cfg.LazyTx()
+			s.defaultExecuteOptions = cfg.DefaultExecuteOptions()
 
 			return s, nil
 		}),

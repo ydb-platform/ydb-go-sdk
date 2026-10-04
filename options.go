@@ -26,6 +26,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -532,6 +533,15 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 
 		return nil
 	}
+}
+
+// WithQueryExecuteOptions sets default options for Query Service executions on
+// Client, Session and TxActor. Per-call options override these defaults.
+// It does not affect ExecuteScript or FetchScriptResults.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithQueryExecuteOptions(opts ...query.ExecuteOption) Option {
+	return WithQueryConfigOption(queryConfig.WithDefaultExecuteOptions(opts...))
 }
 
 // WithQueryConfigOption collects additional configuration options for query.Client.
