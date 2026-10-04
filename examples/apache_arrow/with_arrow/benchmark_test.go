@@ -54,7 +54,7 @@ func BenchmarkFormats(b *testing.B) {
 		}
 	}
 	err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
-		for _, size := range []int{1000, 10000} {
+		for _, size := range []int{1, 10, 100, 1000, 10000} {
 			sql := fmt.Sprintf("SELECT id,score,active,amount,name,payload FROM query_arrow_benchmark WHERE id < %d ORDER BY id;", size)
 			count, expected, err := consumeRows(ctx, s, sql, nil)
 			if err != nil {

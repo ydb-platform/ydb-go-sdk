@@ -121,7 +121,7 @@ docker run -d --name ydb-query-with-arrow --hostname localhost \
 ```
 
 Wait until `ydb -e grpc://localhost:2136 -d /local sql -s 'SELECT 1;'` succeeds.
-The benchmark consumes 1,000 and 10,000 ordered table rows with six columns,
+The benchmark consumes 1, 10, 100, 1,000 and 10,000 ordered table rows with six columns,
 nullable values and 64-byte payloads. It compares `Session.Query` + `Scan`,
 direct `Session.QueryArrow` column access, and `Session.Query` + `WithArrow` +
 `Scan` using the same session, SQL, checksum and 32 KiB response-part limit.
