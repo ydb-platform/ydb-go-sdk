@@ -13,10 +13,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -33,7 +33,7 @@ type orchestrator struct {
 	mu             *xsync.Mutex
 
 	partitionChooser PartitionChooser
-	topology         *partition.TopicTopology
+	topology         *topology.Topic
 
 	partitions map[int64]*PartitionInfo
 	initDone   empty.Chan
@@ -53,7 +53,7 @@ type orchestrator struct {
 func newOrchestrator(
 	ctx context.Context,
 	stop context.CancelFunc,
-	topology *partition.TopicTopology,
+	topology *topology.Topic,
 	background *background.Worker,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,

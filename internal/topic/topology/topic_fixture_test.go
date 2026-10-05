@@ -1,4 +1,4 @@
-package partition_test
+package topology_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
@@ -27,23 +27,23 @@ type scriptedTopicDescriber struct {
 }
 
 type partitionsResult struct {
-	partitions *partition.Partitions
+	partitions *topology.Partitions
 	err        error
 }
 
-func newTopicTopologyWithDescriptions(descriptions ...topictypes.TopicDescription) *partition.TopicTopology {
+func newTopicWithDescriptions(descriptions ...topictypes.TopicDescription) *topology.Topic {
 	results := make([]topicDescribeResult, len(descriptions))
 	for i, description := range descriptions {
 		results[i].description = description
 	}
 
-	return newTopicTopologyWithDescribeResults(results...)
+	return newTopicWithDescribeResults(results...)
 }
 
-func newTopicTopologyWithDescribeResults(results ...topicDescribeResult) *partition.TopicTopology {
+func newTopicWithDescribeResults(results ...topicDescribeResult) *topology.Topic {
 	describer := &scriptedTopicDescriber{results: results}
 
-	return partition.NewTopologyRegistry(describer.Describe).Get("test/topic")
+	return topology.NewRegistry(describer.Describe).Get("test/topic")
 }
 
 func topicWithActivePartitions(partitionIDs ...int64) topictypes.TopicDescription {
@@ -79,7 +79,7 @@ func topicAfterMerge(parentIDs []int64, childID int64) topictypes.TopicDescripti
 	return topictypes.TopicDescription{Partitions: partitions}
 }
 
-func startLoadingPartitions(ctx context.Context, topology *partition.TopicTopology) <-chan partitionsResult {
+func startLoadingPartitions(ctx context.Context, topology *topology.Topic) <-chan partitionsResult {
 	result := make(chan partitionsResult, 1)
 	go func() {
 		partitions, err := topology.Partitions(ctx)
@@ -89,7 +89,7 @@ func startLoadingPartitions(ctx context.Context, topology *partition.TopicTopolo
 	return result
 }
 
-func startWaitingForPartitions(t *testing.T, topology *partition.TopicTopology) <-chan partitionsResult {
+func startWaitingForPartitions(t *testing.T, topology *topology.Topic) <-chan partitionsResult {
 	t.Helper()
 
 	waiting := make(chan struct{})

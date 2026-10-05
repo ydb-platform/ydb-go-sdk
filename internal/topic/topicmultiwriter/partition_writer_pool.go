@@ -6,8 +6,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
@@ -24,7 +24,7 @@ type partitionWriterPool struct {
 
 	ackCallback            func(partitionID int64, seqNo int64)
 	partitionSplitCallback func(partitionID int64)
-	topology               *partition.TopicTopology
+	topology               *topology.Topic
 	onWriterInit           func()
 	onError                func(err error)
 }
@@ -36,7 +36,7 @@ func newPartitionWriterPool(
 	bg *background.Worker,
 	ackCallback func(partitionID int64, seqNo int64),
 	partitionSplitCallback func(partitionID int64),
-	topology *partition.TopicTopology,
+	topology *topology.Topic,
 	onWriterInit func(),
 	onError func(err error),
 ) *partitionWriterPool {

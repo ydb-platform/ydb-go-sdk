@@ -15,11 +15,11 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
@@ -32,7 +32,7 @@ func TestMultiWritersSharePartitionDescription(t *testing.T) {
 	ctx := xtest.Context(t)
 	var describes atomic.Int64
 	description := stubs.DefaultStubTopicDescription(t)
-	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := topology.NewRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		describes.Add(1)
 
 		return description, nil
@@ -260,7 +260,7 @@ func newMultiWriterFromDescriber(
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
-	topology := partition.NewTopologyRegistry(partition.TopicDescriber(describer)).Get(writerCfg.Topic())
+	topology := topology.NewRegistry(topology.TopicDescriber(describer)).Get(writerCfg.Topic())
 
 	return NewMultiWriter(topology, writerCfg, multiWriterCfg)
 }
@@ -676,7 +676,7 @@ func TestOrchestratorDescribeTopicWithRetriesCancelsRetrySleep(t *testing.T) {
 	o := newOrchestrator(
 		ctx,
 		cancel,
-		partition.NewTopologyRegistry(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		topology.NewRegistry(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return describeResult, nil
 		}).Get("test/topic"),
 		bg,

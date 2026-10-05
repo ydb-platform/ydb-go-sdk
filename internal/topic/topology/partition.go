@@ -1,9 +1,9 @@
-package partition
+package topology
 
 import "github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 
 // Partition provides read-only access to one partition in a Partitions snapshot.
-// It is not updated when TopicTopology publishes a newer topology.
+// It is not updated when Topic publishes a newer topology.
 type Partition struct {
 	info       topictypes.PartitionInfo
 	partitions *Partitions
