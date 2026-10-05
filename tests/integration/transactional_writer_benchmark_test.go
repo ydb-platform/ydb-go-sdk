@@ -26,6 +26,7 @@ import (
 // UPSERT so Write exercises UnLazyTX. Any failed operation fails the benchmark.
 //
 // Each invocation creates a unique topic and drops it on normal completion.
+// It also removes its rows from the shared state table after measurement.
 // Each operation has a 10-second deadline, shared across DoTx retries.
 // The benchmark has no separate run deadline.
 
@@ -193,6 +194,18 @@ func txWriterRunBenchmark(b *testing.B, cfg txWriterConfig) {
 		b.Fatal(err)
 	}
 	b.Cleanup(func() {
+		deleteQuery := fmt.Sprintf(
+			"DELETE FROM %s WHERE run_id = $run_id;",
+			txWriterQuoteYQLPath(cfg.TablePath),
+		)
+		if err := db.Query().Exec(
+			ctx,
+			deleteQuery,
+			query.WithParameters(ydb.ParamsBuilder().Param("$run_id").Text(cfg.RunID).Build()),
+			query.WithIdempotent(),
+		); err != nil {
+			b.Errorf("delete benchmark state rows for run %q: %v", cfg.RunID, err)
+		}
 		if err := db.Topic().Drop(ctx, cfg.TopicPath); err != nil {
 			b.Errorf("drop benchmark topic %q: %v", cfg.TopicPath, err)
 		}

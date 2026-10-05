@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"flag"
 	"fmt"
 	"os"
 	"path"
@@ -36,6 +37,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+// Pass -args -ydb-integration-debug to go test to show integration setup logs.
+var integrationDebugLogs = flag.Bool("ydb-integration-debug", false, "log integration test setup details")
+
 type scopeT struct {
 	Ctx context.Context
 	fixenv.Env
@@ -64,6 +68,14 @@ func (scope *scopeT) T() testing.TB {
 }
 
 func (scope *scopeT) Logf(format string, args ...interface{}) {
+	scope.t.Helper()
+	scope.t.Logf(format, args...)
+}
+
+func (scope *scopeT) debugLogf(format string, args ...interface{}) {
+	if !*integrationDebugLogs {
+		return
+	}
 	scope.t.Helper()
 	scope.t.Logf(format, args...)
 }
@@ -124,6 +136,8 @@ func (scope *scopeT) DriverWithGRPCLogging() *ydb.Driver {
 
 func (scope *scopeT) driverNamed(name string, opts ...ydb.Option) *ydb.Driver {
 	f := func() (*fixenv.GenericResult[*ydb.Driver], error) {
+		scope.debugLogf("Connect with connection string, driver name %q: %v", name, scope.ConnectionString())
+
 		driver := scope.NonCachingDriver(opts...)
 
 		clean := func() {
@@ -140,17 +154,22 @@ func (scope *scopeT) driverNamed(name string, opts ...ydb.Option) *ydb.Driver {
 
 func (scope *scopeT) NonCachingDriver(opts ...ydb.Option) *ydb.Driver {
 	connectionString := scope.ConnectionString()
+	scope.debugLogf("Connect with connection string: %v", connectionString)
 
 	token := scope.AuthToken()
 	if token == "" {
+		scope.debugLogf("With empty auth token")
 		opts = append(opts, ydb.WithAnonymousCredentials())
 	} else {
+		scope.debugLogf("With auth token")
 		opts = append(opts, ydb.WithAccessTokenCredentials(token))
 	}
 	cert := scope.CertFile()
 	if cert == "" {
+		scope.debugLogf("Without tls")
 		opts = append(opts, ydb.WithTLSSInsecureSkipVerify())
 	} else {
+		scope.debugLogf("With tls")
 		opts = append(opts, ydb.WithCertificatesFromFile(cert))
 	}
 
@@ -166,6 +185,7 @@ func (scope *scopeT) NonCachingDriver(opts ...ydb.Option) *ydb.Driver {
 func (scope *scopeT) SQLDriver(opts ...ydb.ConnectorOption) *sql.DB {
 	f := func() (*fixenv.GenericResult[*sql.DB], error) {
 		driver := scope.Driver()
+		scope.debugLogf("Create database/sql connector for YDB")
 		connector, err := ydb.Connector(driver, opts...)
 		if err != nil {
 			return nil, err
@@ -192,12 +212,14 @@ func (scope *scopeT) Folder() string {
 		folderPath := path.Join(driver.Name(), scope.T().Name())
 		scope.Require.NoError(sugar.RemoveRecursive(scope.Ctx, driver, folderPath))
 
+		scope.debugLogf("Creating folder: %v", folderPath)
 		scope.Require.NoError(driver.Scheme().MakeDirectory(scope.Ctx, folderPath))
 		clean := func() {
 			if !scope.Failed() {
 				scope.Require.NoError(sugar.RemoveRecursive(scope.Ctx, driver, folderPath))
 			}
 		}
+		scope.debugLogf("Creating folder done: %v", folderPath)
 		return fixenv.NewGenericResultWithCleanup(folderPath, clean), nil
 	}
 	return fixenv.CacheResult(scope.Env, f)
@@ -232,10 +254,12 @@ func (scope *scopeT) TopicPath(opts ...topicoptions.CreateOption) string {
 		}
 		cleanup()
 
+		scope.debugLogf("Drop topic if exists: %q", topicPath)
 		if err := client.Drop(scope.Ctx, topicPath); err != nil && !ydb.IsOperationErrorSchemeError(err) {
 			scope.t.Logf("failed drop previous topic %q: %v", topicPath, err)
 		}
 
+		scope.debugLogf("Creating topic %q", topicPath)
 		options := []topicoptions.CreateOption{
 			topicoptions.CreateWithConsumer(
 				topictypes.Consumer{
@@ -246,6 +270,7 @@ func (scope *scopeT) TopicPath(opts ...topicoptions.CreateOption) string {
 		options = append(options, opts...)
 		err := client.Create(scope.Ctx, topicPath, options...)
 
+		scope.debugLogf("Topic created: %q", topicPath)
 		return fixenv.NewGenericResultWithCleanup(topicPath, cleanup), err
 	}
 	return fixenv.CacheResult(scope.Env, f)
