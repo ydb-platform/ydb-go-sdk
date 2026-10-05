@@ -469,16 +469,16 @@ func txWriterNewTransactionRunners(db *ydb.Driver, cfg txWriterConfig, payload [
 
 func (r *txWriterTransactionRunner) executeSingleWriterTransaction(
 	ctx context.Context,
-	transactionNumber uint64,
+	_ uint64,
 ) error {
-	return r.executeTransaction(ctx, transactionNumber, "")
+	return r.executeTransaction(ctx, "")
 }
 
 func (r *txWriterTransactionRunner) executeManyWriterTransaction(
 	ctx context.Context,
 	transactionNumber uint64,
 ) error {
-	return r.executeTransaction(ctx, transactionNumber, r.messageKey(transactionNumber))
+	return r.executeTransaction(ctx, r.messageKey(transactionNumber))
 }
 
 func (r *txWriterTransactionRunner) messageKey(transactionNumber uint64) string {
@@ -487,7 +487,6 @@ func (r *txWriterTransactionRunner) messageKey(transactionNumber uint64) string 
 
 func (r *txWriterTransactionRunner) executeTransaction(
 	ctx context.Context,
-	transactionNumber uint64,
 	messageKey string,
 ) error {
 	txCtx, cancel := context.WithTimeout(ctx, txWriterTransactionTimeout)
@@ -522,14 +521,10 @@ func (r *txWriterTransactionRunner) executeTransaction(
 				return fmt.Errorf("execute benchmark table upsert: %w", err)
 			}
 
-			message := topicwriter.Message{
+			err = writer.Write(ctx, topicwriter.Message{
 				Key:  messageKey,
 				Data: bytes.NewReader(r.payload),
-			}
-			if r.writerConfig.ProducerIDPrefix != "" {
-				message.SeqNo = int64(transactionNumber)
-			}
-			err = writer.Write(ctx, message)
+			})
 			if err != nil {
 				return fmt.Errorf("write transactional topic messages: %w", err)
 			}

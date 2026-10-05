@@ -37,7 +37,6 @@ var (
 	errConnTimeout           = xerrors.Wrap(errors.New("ydb: connection timeout"))
 	errStopWriterReconnector = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
 	ErrNonZeroSeqNo          = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
-	ErrNoSeqNo               = xerrors.Wrap(errors.New("ydb: seqno is required when automatic sequencing is disabled"))
 	errNoAllowedCodecs       = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
 	errLargeMessage          = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
 	ErrPublicQueueIsFull     = xerrors.Wrap(
@@ -68,21 +67,17 @@ var (
 type WriterReconnectorConfig struct {
 	WritersCommonConfig
 
-	MaxMessageSize     int
-	MaxQueueLen        int
-	Common             config.Common
-	AdditionalEncoders map[rawtopiccommon.Codec]topicwritercommon.PublicCreateEncoderFunc
-	Connect            ConnectFunc
-	WaitServerAck      bool
-	AutoSetSeqNo       bool
-	// RequestLastSeqNo lets a multi-writer assign sequence numbers from the
-	// session baseline while its partition writer preserves those numbers.
-	RequestLastSeqNo             bool
+	MaxMessageSize               int
+	MaxQueueLen                  int
+	Common                       config.Common
+	AdditionalEncoders           map[rawtopiccommon.Codec]topicwritercommon.PublicCreateEncoderFunc
+	Connect                      ConnectFunc
+	WaitServerAck                bool
+	AutoSetSeqNo                 bool
 	AutoSetCreatedTime           bool
 	OnWriterInitResponseCallback PublicOnWriterInitResponseCallback
 	OnAckReceivedCallback        func(seqNo int64)
 	MultiMode                    bool
-	Transactional                bool
 
 	// ErrOnQueueFull controls Write behavior when the internal message queue is full.
 	// false (default): Write blocks until queue space becomes available or ctx is cancelled.
@@ -179,9 +174,6 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 	for _, f := range options {
 		f(&cfg)
 	}
-	if cfg.Transactional {
-		cfg.AutoSetSeqNo = false
-	}
 
 	if cfg.LogContext == nil {
 		cfg.LogContext = context.Background()
@@ -195,11 +187,7 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		cfg.connectTimeout = value.InfiniteDuration
 	}
 
-	if cfg.Transactional {
-		cfg.RetrySettings.CheckError = func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
-			return topic.PublicRetryDecisionStop
-		}
-	} else if cfg.producerID == "" {
+	if cfg.producerID == "" {
 		WithProducerID(uuid.NewString())(&cfg)
 	}
 
@@ -262,7 +250,6 @@ func newWriterReconnectorStopped(
 		writerInstanceID:               writerInstanceID.String(),
 		retrySettings:                  cfg.RetrySettings,
 	}
-	res.queue.noDeduplication = cfg.Transactional && cfg.producerID == ""
 
 	res.queue.OnAckReceived = res.onAckReceived
 	res.queue.AckCallback = res.cfg.OnAckReceivedCallback
@@ -330,9 +317,6 @@ func (w *WriterReconnector) WriteInternal(
 
 func (w *WriterReconnector) validateWriteMessages(messages []PublicMessage) error {
 	for i := range messages {
-		if w.cfg.Transactional && w.cfg.producerID != "" && messages[i].SeqNo == 0 {
-			return xerrors.WithStackTrace(ErrNoSeqNo)
-		}
 		if !w.cfg.MultiMode && (messages[i].Key != "" || messages[i].PartitionID != 0) {
 			return xerrors.WithStackTrace(errWritingByKeyNotSupported)
 		}
@@ -637,11 +621,7 @@ func (w *WriterReconnector) handleReconnectRetry(
 			// pass
 		}
 	} else {
-		if w.cfg.Transactional {
-			_ = w.close(ctx, reconnectReason)
-		} else {
-			_ = w.close(ctx, fmt.Errorf("%w, was retried (%v)", stopRetryReason, retryDuration))
-		}
+		_ = w.close(ctx, fmt.Errorf("%w, was retried (%v)", stopRetryReason, retryDuration))
 
 		return true
 	}
@@ -746,9 +726,7 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
-	res := !w.cfg.Transactional &&
-		(w.cfg.AutoSetSeqNo || w.cfg.RequestLastSeqNo || !w.cfg.MultiMode) &&
-		w.cfg.producerID != "" && !w.firstConnectionHandled.Load()
+	res := !w.firstConnectionHandled.Load()
 
 	return res
 }

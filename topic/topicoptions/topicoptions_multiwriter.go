@@ -17,8 +17,6 @@ type (
 )
 
 // WithProducerIDPrefix sets a prefix for producer IDs used by the internal producer.
-// For transactional multi-writers, this enables deduplication and requires an
-// explicit SeqNo on every message.
 func WithProducerIDPrefix(prefix string) MultiWriterOption {
 	return func(cfg *topicmultiwriter.MultiWriterConfig) {
 		topicmultiwriter.WithProducerIDPrefix(prefix)(cfg)

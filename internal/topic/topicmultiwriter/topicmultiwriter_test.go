@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -129,7 +128,7 @@ func (w *orderedSeqWriter) Close(ctx context.Context) error {
 }
 
 func (w *orderedSeqWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
-	return topicwriterinternal.InitialInfo{}, nil
+	return topicwriterinternal.InitialInfo{LastSeqNum: w.lastSeqNo}, nil
 }
 
 func (w *orderedSeqWriter) WriteInternal(
@@ -773,11 +772,13 @@ func TestMultiWriter_Write_WithErrorWritersFactory(t *testing.T) {
 			return stubClient.Describe(ctx, path)
 		},
 		newStubWritersFactory(t, stubs.StubWriterTypeError, "test-producer", nil, 0),
-		topicwriterinternal.WithAutoSetSeqNo(true),
 	)
 
 	require.NoError(t, multiWriter.WaitInit(ctx))
-	err := multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{{Data: bytes.NewReader([]byte("message"))}})
+	require.NoError(t, multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data: bytes.NewReader([]byte("message")), SeqNo: 1,
+	}}))
+	err := multiWriter.Flush(ctx)
 	require.ErrorIs(t, err, errTest)
 }
 
@@ -1151,88 +1152,5 @@ func TestMultiWriter_Write_SmallIdleSessionTimeout(t *testing.T) {
 	}
 
 	require.NoError(t, multiWriter.Write(ctx, messages))
-	require.NoError(t, multiWriter.Close(ctx))
-}
-
-func pendingPartitionSplitCount(r *partitionSplitReceiver) int {
-	r.partitionSplits.mu.Lock()
-	defer r.partitionSplits.mu.Unlock()
-
-	return r.partitionSplits.Len()
-}
-
-func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
-	t.Parallel()
-
-	ctx := xtest.Context(t)
-	releaseDescribe := make(chan struct{})
-	describeStarted := make(chan struct{})
-	var firstDescribe atomic.Bool
-
-	baseDesc := stubs.DefaultStubTopicDescription(t)
-	state := stubs.NewDescribeWithSplitsState(t, baseDesc, 6)
-	stubClient := stubs.NewStubTopicClientWithSplits(t, state)
-
-	multiWriter := newTestMultiWriterWithCustomWritersFactory(
-		t,
-		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-			if !firstDescribe.Swap(true) {
-				close(describeStarted)
-				select {
-				case <-ctx.Done():
-					return topictypes.TopicDescription{}, ctx.Err()
-				case <-releaseDescribe:
-					return baseDesc, nil
-				}
-			}
-
-			return stubClient.Describe(ctx, path)
-		},
-		newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0),
-	)
-	defer func() {
-		select {
-		case <-releaseDescribe:
-		default:
-			close(releaseDescribe)
-		}
-		if !multiWriter.closed.Load() {
-			_ = multiWriter.Close(ctx)
-		}
-	}()
-
-	waitResult := make(chan error, 1)
-	go func() {
-		waitResult <- multiWriter.WaitInit(ctx)
-	}()
-
-	<-describeStarted
-
-	// Simulate a partition split event while topic Describe is still in progress.
-	// The split is queued but must not be processed until init completes and workers start.
-	state.RecordSplit(1)
-	multiWriter.orchestrator.partitionSplitReceiver.push(1)
-
-	select {
-	case err := <-waitResult:
-		require.NoError(t, err, "WaitInit must not finish while Describe is blocked")
-	default:
-	}
-
-	require.Never(t, func() bool {
-		return pendingPartitionSplitCount(multiWriter.orchestrator.partitionSplitReceiver) == 0
-	}, 200*time.Millisecond, time.Millisecond,
-		"split event must stay queued until init completes",
-	)
-
-	close(releaseDescribe)
-
-	select {
-	case err := <-waitResult:
-		require.NoError(t, err)
-	case <-time.After(5 * time.Second):
-		t.Fatal("WaitInit timed out")
-	}
-
 	require.NoError(t, multiWriter.Close(ctx))
 }

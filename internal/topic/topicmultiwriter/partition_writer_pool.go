@@ -3,6 +3,7 @@ package topicmultiwriter
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
@@ -16,6 +17,7 @@ type partitionWriterPool struct {
 	cfg       *MultiWriterConfig
 	writerCfg *topicwriterinternal.WriterReconnectorConfig
 	bg        *background.Worker
+	maxSeqNo  *atomic.Int64
 
 	mu      xsync.Mutex
 	writers map[int64]*writerWrapper
@@ -32,6 +34,7 @@ func newPartitionWriterPool(
 	cfg *MultiWriterConfig,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	bg *background.Worker,
+	maxSeqNo *atomic.Int64,
 	ackCallback func(partitionID int64, seqNo int64),
 	partitionSplitCallback func(partitionID int64),
 	onWriterInit func(),
@@ -42,6 +45,7 @@ func newPartitionWriterPool(
 		writerCfg:              writerCfg,
 		ctx:                    ctx,
 		bg:                     bg,
+		maxSeqNo:               maxSeqNo,
 		ackCallback:            ackCallback,
 		partitionSplitCallback: partitionSplitCallback,
 		onWriterInit:           onWriterInit,
@@ -57,11 +61,16 @@ func newPartitionWriterPool(
 	return p
 }
 
-func (p *partitionWriterPool) getProducerID(partitionID int64) string {
-	if p.cfg.ProducerIDPrefix == "" {
-		return ""
+func advanceMaxSeqNo(counter *atomic.Int64, lastSeqNo int64) {
+	for {
+		current := counter.Load()
+		if lastSeqNo <= current || counter.CompareAndSwap(current, lastSeqNo) {
+			return
+		}
 	}
+}
 
+func (p *partitionWriterPool) getProducerID(partitionID int64) string {
 	return fmt.Sprintf("%s-%d", p.cfg.ProducerIDPrefix, partitionID)
 }
 
@@ -84,9 +93,6 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 				p.ackCallback(partitionID, seqNo)
 			}),
 			withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
-				if p.writerCfg.Transactional {
-					return topic.PublicRetryDecisionStop
-				}
 				if isOperationErrorOverloaded(args.Error) {
 					p.partitionSplitCallback(partitionID)
 
@@ -108,7 +114,6 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 	)
 
 	writerCfg.MultiMode = true
-	writerCfg.RequestLastSeqNo = p.writerCfg.AutoSetSeqNo && p.cfg.ProducerIDPrefix != ""
 	for _, opt := range opts {
 		opt(&writerCfg)
 	}
@@ -194,19 +199,26 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 	if !direct {
 		return wrapper, nil
 	}
-	wrapper.initCh = make(chan struct{})
 
 	p.bg.Start(fmt.Sprintf("writer-init-%d", partitionID), func(ctx context.Context) {
 		info, err := wr.WaitInitInfo(ctx)
-		wrapper.initInfo = info
+		if err == nil {
+			advanceMaxSeqNo(p.maxSeqNo, info.LastSeqNum)
+		}
 		wrapper.setInitErr(err)
 
 		wrapper.initDone.Store(true)
-		close(wrapper.initCh)
 		p.onWriterInit()
 	})
 
 	return wrapper, nil
+}
+
+func (p *partitionWriterPool) forceEvict(partitionID int64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.forceEvictNeedLock(partitionID)
 }
 
 func (p *partitionWriterPool) evict(partitionID int64) {

@@ -77,18 +77,6 @@ type Client interface {
 	StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error)
 
 	// StartTransactionalWriter start writer for write messages within transaction
-	// By default, the writer uses no producer ID. Messages are published atomically
-	// with the transaction, which is the recommended mode for transactional writes.
-	// There is no producer-level deduplication: retrying an idempotent operation
-	// after an uncertain commit may publish the messages again (at-least-once
-	// semantics). A non-idempotent operation is not retried after an uncertain
-	// commit, so the messages may not be published (at-most-once semantics).
-	//
-	// Set [topicoptions.WithWriterProducerID] or [topicoptions.WithProducerIDPrefix]
-	// for producer ID/SeqNo deduplication. Every message must then provide a
-	// nonzero SeqNo. Transactional writers never assign SeqNo, request the last
-	// SeqNo during session initialization, or reconnect after an error. Session
-	// errors are returned for transaction retry.
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	StartTransactionalWriter(

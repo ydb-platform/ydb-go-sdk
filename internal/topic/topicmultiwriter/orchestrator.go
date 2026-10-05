@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -37,7 +38,7 @@ type orchestrator struct {
 	partitions map[int64]*PartitionInfo
 	initDone   empty.Chan
 
-	currentSeqNo int64
+	currentSeqNo atomic.Int64
 
 	background *background.Worker
 
@@ -97,6 +98,7 @@ func newOrchestrator(
 		multiWriterCfg,
 		writerCfg,
 		background,
+		&o.currentSeqNo,
 		o.ackReceiver.push,
 		o.partitionSplitReceiver.push,
 		func() {
@@ -212,10 +214,9 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	}()
 
 	autoSetSeqNo := o.writerCfg.AutoSetSeqNo
-	requireSeqNo := !o.writerCfg.Transactional || o.multiWriterCfg.ProducerIDPrefix != ""
 
 	switch {
-	case !autoSetSeqNo && requireSeqNo && msg.SeqNo == 0:
+	case !autoSetSeqNo && msg.SeqNo == 0:
 		return ErrNoSeqNo
 	case autoSetSeqNo && msg.SeqNo != 0:
 		return topicwriterinternal.ErrNonZeroSeqNo
@@ -245,13 +246,6 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	if err != nil {
 		return err
 	}
-	var lastSeqNo int64
-	if autoSetSeqNo && o.multiWriterCfg.ProducerIDPrefix != "" {
-		lastSeqNo, err = o.lastSeqNoFromWriter(ctx, msg.PartitionID)
-		if err != nil {
-			return err
-		}
-	}
 
 	// saveMessageContent must run after choosePartition: BoundPartitionChooser may
 	// write choose_partition_key into msg.Metadata; CacheMessageData (inside saveMessageContent)
@@ -260,21 +254,23 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	if err := o.saveMessageContent(&msg); err != nil {
 		return err
 	}
-	if err = o.enqueueMessage(msg, lastSeqNo); err != nil {
-		return err
+	if autoSetSeqNo {
+		writer, getErr := o.writerPool.get(msg.PartitionID, true)
+		if getErr != nil {
+			return getErr
+		}
+		if !writer.initDone.Load() {
+			info, initErr := writer.WaitInitInfo(ctx)
+			if initErr != nil {
+				return initErr
+			}
+			advanceMaxSeqNo(&o.currentSeqNo, info.LastSeqNum)
+		}
 	}
-	acquired = false
-
-	return nil
-}
-
-func (o *orchestrator) enqueueMessage(msg message, lastSeqNo int64) (err error) {
 	o.mu.WithLock(func() {
-		if o.writerCfg.AutoSetSeqNo {
-			o.currentSeqNo = max(o.currentSeqNo, lastSeqNo)
-			o.currentSeqNo++
-			msg.SeqNo = o.currentSeqNo
-		} else if !o.writerCfg.Transactional || o.multiWriterCfg.ProducerIDPrefix != "" {
+		if autoSetSeqNo {
+			msg.SeqNo = o.currentSeqNo.Add(1)
+		} else {
 			err = o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo)
 			if err != nil {
 				return
@@ -282,25 +278,10 @@ func (o *orchestrator) enqueueMessage(msg message, lastSeqNo int64) (err error) 
 		}
 		o.buf.pushNeedLock(msg)
 		o.sender.wakeup()
+		acquired = false
 	})
 
 	return err
-}
-
-func (o *orchestrator) lastSeqNoFromWriter(ctx context.Context, partitionID int64) (int64, error) {
-	writer, err := o.writerPool.get(partitionID, true)
-	if err != nil {
-		return 0, err
-	}
-	if writer.initDone.Load() {
-		if err = writer.getInitErr(); err != nil {
-			return 0, err
-		}
-	} else if err = writer.waitInit(ctx); err != nil {
-		return 0, err
-	}
-
-	return writer.initInfo.LastSeqNum, nil
 }
 
 func (o *orchestrator) saveMessageContent(msg *message) error {
@@ -585,9 +566,9 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 
 			o.mu.WithLock(func() {
 				maxSeqNo = max(maxSeqNo, initInfo.LastSeqNum)
-				o.currentSeqNo = max(o.currentSeqNo, initInfo.LastSeqNum)
 				partitionInfo.CachedMaxSeqNo = initInfo.LastSeqNum
 			})
+			advanceMaxSeqNo(&o.currentSeqNo, initInfo.LastSeqNum)
 
 			return nil
 		})
