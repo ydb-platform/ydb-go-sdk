@@ -3,7 +3,9 @@ package witharrow
 import (
 	"bytes"
 	"context"
+	"database/sql/driver"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -39,21 +41,34 @@ func TestDecodeOwnsValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	builder.Release()
+	alloc.AssertSize(t, 0)
 	columns := []query.ArrowColumn{{Name: "id", Type: types.TypeInt32}, {Name: "name", Type: types.Optional(types.TypeText)}, {Name: "payload", Type: types.TypeBytes}}
-	rows, err := Decode(context.Background(), columns, bytes.NewReader(wire.Bytes()))
+	batches, err := Decode(context.Background(), columns, bytes.NewReader(wire.Bytes()))
 	if err != nil {
 		t.Fatal(err)
 	}
-	alloc.AssertSize(t, 0)
 	cancelled, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, err := Decode(cancelled, columns, bytes.NewReader(wire.Bytes())); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled decode: %v", err)
 	}
-	clear(wire.Bytes())
-	if len(rows) != 2 {
-		t.Fatalf("rows=%d", len(rows))
+	if len(batches) != 2 {
+		t.Fatalf("batches=%d", len(batches))
 	}
+	var rows [][]types.Value
+	for _, b := range batches {
+		record := b.(*batch).record
+		if record.NumCols() != 3 {
+			t.Fatal("reader released batch before result Close")
+		}
+		rows = append(rows, []types.Value{b.Value(0, 0), b.Value(0, 1), b.Value(0, 2)})
+		b.Release()
+		if record.NumCols() != 0 {
+			t.Fatal("batch Release did not release retained record")
+		}
+	}
+	alloc.AssertSize(t, 0)
+	clear(wire.Bytes())
 	for i, row := range rows {
 		var id int32
 		var name *string
@@ -161,6 +176,36 @@ func TestColumnReaderScalarTypes(t *testing.T) {
 						t.Fatalf("optional[%d]=%s, want %s", i, got, want)
 					}
 				}
+				direct, err := directColumnReader(nullable, types.Optional(test.want.Type()))
+				if err != nil {
+					t.Fatal(err)
+				}
+				var scalar driver.Value
+				if err := types.CastTo(test.want, &scalar); err != nil {
+					t.Fatal(err)
+				}
+				dst := reflect.New(reflect.PointerTo(reflect.TypeOf(scalar)))
+				for i := 0; i < nullable.Len(); i++ {
+					if err := direct.scan(i, dst.Interface()); err != nil {
+						t.Fatal(err)
+					}
+					got := dst.Elem()
+					if i == 1 {
+						if !got.IsNil() {
+							t.Fatal("direct optional scan lost null")
+						}
+					} else if got.IsNil() || !reflect.DeepEqual(got.Elem().Interface(), scalar) {
+						t.Fatalf("direct scan=%v, want %v", got, scalar)
+					}
+					var expected, actual string
+					if err := types.CastTo(read(i), &expected); err != nil {
+						t.Fatal(err)
+					}
+					if err := direct.scan(i, &actual); err != nil || actual != expected {
+						t.Fatalf("fallback=%q, want %q, err=%v", actual, expected, err)
+					}
+				}
+
 			}
 		})
 	}

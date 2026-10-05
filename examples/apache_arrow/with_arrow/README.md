@@ -8,8 +8,9 @@ The SDK module does not import Apache Arrow Go. Copy [decoder.go](decoder.go)
 into your application and use your own Arrow dependency. This independent example
 module uses `github.com/apache/arrow-go/v18` v18.8.0 (Go 1.25 or newer); it does
 not change the SDK's `go.mod` or `go.sum`. `ipc.NewReader` receives an `io.Reader`.
-The example uses `RecordBatch()` and releases the reader, cloning strings and
-bytes so rows remain valid after the next batch and after result closure.
+The example uses `RecordBatch()`, retains each record once and releases the
+reader. It clones strings and bytes when scanning or creating SDK values so
+the returned data remains valid after batch release.
 
 The example supports Bool, signed/unsigned integers, Float, Double, String,
 Utf8 and a single Optional wrapper. YDB Bool may arrive as Arrow Uint8.
@@ -54,19 +55,25 @@ row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(nil))
 ```
 
 `ArrowDecoder` receives the YDB column names/types and a self-contained IPC
-reader for one response part, including schema. It returns rows of owned
-`types.Value` objects in column order. It must return non-nil values of the
-corresponding YDB types, preserve optionality, and support concurrent calls.
-It owns and releases Arrow buffers. The SDK validates row width and nil values,
-uses the existing scanners, and does not reconstruct `Ydb.Value` objects.
-Decoder errors propagate through the ordinary result error path. The SDK does
-not re-execute a query to fall back to another format.
+reader for one response part, including schema. It returns retained
+`query.ArrowBatch` objects. Each batch preserves column order, reports its
+dimensions, scans cells directly and returns owned `types.Value` objects on
+demand. The
+decoder must validate YDB types and optionality and support concurrent calls.
+The SDK validates batch dimensions, uses the existing column mappings for
+`Scan`, `ScanNamed` and `ScanStruct`, and calls `Release` when the batch is no
+longer needed. Decoder errors propagate through the ordinary result error
+path. The SDK does not re-execute a query to fall back to another format.
 
-`Client.Query` still materializes the full result. Session and transaction
-queries decode one response part at a time. Conversion eagerly processes all
-columns in that part, including columns not subsequently scanned. Keeping the
-row API requires owned values and allocations; direct `Session.QueryArrow`
-can process Arrow columns without that conversion:
+`Client.Query` and `Client.QueryResultSet` materialize their output and retain
+all batches until the returned result is closed. Streaming Session and
+transaction results release the current part before receiving the next one,
+including at EOF, or at `Close`. Rows are valid until that transition; moving
+between rows or batches within one part keeps them alive. Scanned data and
+`Values()` remain valid independently. `QueryRow` returns a detached owned row.
+The decoder reads every column but scans only requested cells; `Values` and
+fallback conversions construct SDK values on demand. Direct `Session.QueryArrow`
+can process Arrow columns without SDK rows or scans:
 
 ```go
 err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {

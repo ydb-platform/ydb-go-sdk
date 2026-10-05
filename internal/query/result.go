@@ -38,6 +38,7 @@ type (
 	materializedResult struct {
 		resultSets []result.Set
 		idx        int
+		closeArrow func()
 	}
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
@@ -55,8 +56,10 @@ type (
 		// is wired up by execute() to point at the executeCtx CancelFunc and
 		// invoked on demand from nextPart so that a Recv blocked on the wire
 		// can be unblocked when the caller's ctx is cancelled mid-flight.
-		streamCancel context.CancelFunc
-		arrowDecoder arrow.Decoder
+		streamCancel       context.CancelFunc
+		arrowDecoder       arrow.Decoder
+		arrowBatches       []arrow.Batch
+		retainArrowBatches bool
 	}
 	resultOption func(s *streamResult)
 )
@@ -87,6 +90,10 @@ func (r *streamResult) ResultSets(ctx context.Context) xiter.Seq2[result.Set, er
 }
 
 func (r *materializedResult) Close(ctx context.Context) error {
+	if r.closeArrow != nil {
+		r.closeArrow()
+	}
+
 	return nil
 }
 
@@ -230,6 +237,7 @@ func newResult(
 	return &r, nil
 }
 
+//nolint:funlen // Keep response-part lifetime and stream error handling in one place.
 func (r *streamResult) nextPart(ctx context.Context) (
 	part *Ydb_Query.ExecuteQueryResponsePart, finishErr error,
 ) {
@@ -271,6 +279,9 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		defer stop()
 	}
 
+	if !r.retainArrowBatches {
+		r.releaseArrowBatches()
+	}
 	part, err := nextPart(r.stream)
 	if part != nil {
 		issues := part.GetIssues()
@@ -318,6 +329,7 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	defer r.onClose()
+	defer r.releaseArrowBatches()
 
 	if r.stream != nil && r.stream.Context().Err() != nil {
 		// Stream already torn down (EOF, per-call ctx cancel, or prior Close).
@@ -380,7 +392,7 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishE
 			r.resultSetIndex = resultSetIndex
 			rs := newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart)
 			rs.notifyError = r.notifyNextPartErr
-			rs.arrowDecoder = r.arrowDecoder
+			rs.decodeArrow = r.decodeArrowBatches
 
 			return rs, nil
 		}
@@ -526,7 +538,9 @@ func exactlyOneResultSetFromResult(ctx context.Context, r result.Result) (rs res
 	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
 }
 
+//nolint:funlen // Group result sets and transfer Arrow batch ownership together.
 func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Result, error) {
+	r.retainArrowBatches = true
 	type resultSet struct {
 		rows    []query.Row
 		columns []*Ydb.Column
@@ -542,12 +556,14 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 		}
 
 		if r.lastPart.GetResultSet().GetFormat() == Ydb.ResultSet_FORMAT_ARROW {
-			rows, err := decodeArrowRows(ctx, r.arrowDecoder, rs.columns, r.lastPart.GetResultSet())
+			batches, err := r.decodeArrowBatches(ctx, rs.columns, r.lastPart.GetResultSet())
 			if err != nil {
 				return nil, xerrors.WithStackTrace(r.notifyNextPartErr(ctx, err))
 			}
-			for _, values := range rows {
-				rs.rows = append(rs.rows, newDecodedRow(rs.columns, values))
+			for _, data := range batches {
+				for i := 0; i < data.batch.NumRows(); i++ {
+					rs.rows = append(rs.rows, &arrowRow{data: data, index: i})
+				}
 			}
 		} else {
 			for i := range r.lastPart.GetResultSet().GetRows() {
@@ -585,5 +601,6 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 
 	return &materializedResult{
 		resultSets: resultSets,
+		closeArrow: r.takeArrowBatches(),
 	}, nil
 }

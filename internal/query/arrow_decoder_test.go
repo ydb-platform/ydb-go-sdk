@@ -39,7 +39,8 @@ func TestArrowResults(t *testing.T) {
 			}
 			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
 			calls := 0
-			decoder := func(ctx context.Context, columns []query.ArrowColumn, ipc io.Reader) ([][]types.Value, error) {
+			var batches []*arrowTestBatch
+			decoder := func(ctx context.Context, columns []query.ArrowColumn, ipc io.Reader) ([]query.ArrowBatch, error) {
 				require.NoError(t, ctx.Err())
 				require.Equal(t, "id", columns[0].Name)
 				require.True(t, types.Equal(types.TypeInt32, columns[0].Type))
@@ -50,7 +51,12 @@ func TestArrowResults(t *testing.T) {
 				require.Equal(t, byte('s'), data[0])
 				calls++
 
-				return [][]types.Value{{types.Int32Value(int32(data[1] - '0')), types.NullValue(types.TypeText)}}, nil
+				batch := &arrowTestBatch{rows: [][]types.Value{
+					{types.Int32Value(int32(data[1] - '0')), types.NullValue(types.TypeText)},
+				}}
+				batches = append(batches, batch)
+
+				return []query.ArrowBatch{batch}, nil
 			}
 			r, err := newResult(ctx, stream, withArrowDecoder(decoder))
 			require.NoError(t, err)
@@ -66,29 +72,29 @@ func TestArrowResults(t *testing.T) {
 				for row, err := range rs.Rows(ctx) {
 					require.NoError(t, err)
 					retained = append(retained, row)
+					if !materialized {
+						verifyArrowTestRow(t, row, int32(len(retained)))
+					}
 				}
+			}
+			require.Equal(t, 3, calls)
+			if materialized {
+				for i, row := range retained {
+					verifyArrowTestRow(t, row, int32(i+1))
+				}
+			}
+			for _, batch := range batches {
+				if materialized {
+					require.Zero(t, batch.releases)
+				} else {
+					require.Equal(t, 1, batch.releases)
+				}
+				require.Zero(t, batch.valueCalls-2)
 			}
 			require.NoError(t, result.Close(ctx))
 			require.NoError(t, r.Close(ctx))
-			require.Equal(t, 3, calls)
-			for i, row := range retained {
-				var id int32
-				var name *string
-				require.NoError(t, row.Scan(&id, &name))
-				require.Equal(t, int32(i+1), id)
-				require.Nil(t, name)
-				require.NoError(t, row.ScanNamed(query.Named("id", &id)))
-				dst := struct {
-					ID   int32   `db:"id"`
-					Name *string `db:"name"`
-				}{}
-				require.NoError(t, row.ScanStruct(&dst, query.WithScanStructTagName("db")))
-				require.Equal(t, id, dst.ID)
-				values := row.Values()
-				require.Len(t, values, 2)
-				values[0] = types.Int32Value(999)
-				require.NoError(t, row.ScanNamed(query.Named("id", &id)))
-				require.Equal(t, int32(i+1), id)
+			for _, batch := range batches {
+				require.Equal(t, 1, batch.releases)
 			}
 		})
 	}
@@ -102,18 +108,18 @@ func TestArrowDecoderErrors(t *testing.T) {
 		want    string
 	}{
 		{name: "missing", want: "without an Arrow decoder"},
-		{name: "decode", decoder: func(context.Context, []query.ArrowColumn, io.Reader) ([][]types.Value, error) {
+		{name: "decode", decoder: func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
 			return nil, decodeErr
 		}, want: "invalid IPC"},
-		{name: "EOF", decoder: func(context.Context, []query.ArrowColumn, io.Reader) ([][]types.Value, error) {
+		{name: "EOF", decoder: func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
 			return nil, io.EOF
 		}, want: "unexpected EOF"},
-		{name: "width", decoder: func(context.Context, []query.ArrowColumn, io.Reader) ([][]types.Value, error) {
-			return [][]types.Value{{types.Int32Value(1)}}, nil
+		{name: "width", decoder: func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+			return arrowTestBatches([][]types.Value{{types.Int32Value(1)}}), nil
 		}, want: "expected 2"},
-		{name: "nil", decoder: func(context.Context, []query.ArrowColumn, io.Reader) ([][]types.Value, error) {
-			return [][]types.Value{{nil, nil}}, nil
-		}, want: "nil value"},
+		{name: "nil", decoder: func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+			return []query.ArrowBatch{nil}, nil
+		}, want: "is nil"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
@@ -158,13 +164,13 @@ func TestArrowQueryRowConstraints(t *testing.T) {
 				stream.EXPECT().Recv().Return(arrowTestPart(1, arrowTestColumns(), "data"), nil)
 			}
 			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
-			decoder := func(context.Context, []query.ArrowColumn, io.Reader) ([][]types.Value, error) {
+			decoder := func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
 				rows := make([][]types.Value, test.rows)
 				for i := range rows {
 					rows[i] = []types.Value{types.Int32Value(1), types.NullValue(types.TypeText)}
 				}
 
-				return rows, nil
+				return arrowTestBatches(rows), nil
 			}
 			r, err := newResult(t.Context(), stream, withArrowDecoder(decoder))
 			require.NoError(t, err)
@@ -193,10 +199,10 @@ func TestArrowSkipAndCancellation(t *testing.T) {
 			}
 			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
 			calls := 0
-			decoder := func(context.Context, []query.ArrowColumn, io.Reader) ([][]types.Value, error) {
+			decoder := func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
 				calls++
 
-				return [][]types.Value{{types.Int32Value(1), types.NullValue(types.TypeText)}}, nil
+				return arrowTestBatches([][]types.Value{{types.Int32Value(1), types.NullValue(types.TypeText)}}), nil
 			}
 			r, err := newResult(ctx, stream, withArrowDecoder(decoder))
 			require.NoError(t, err)
@@ -221,7 +227,7 @@ func TestArrowSkipAndCancellation(t *testing.T) {
 }
 
 func TestArrowExecuteOptionDefaults(t *testing.T) {
-	decoder := query.ArrowDecoder(func(context.Context, []query.ArrowColumn, io.Reader) ([][]types.Value, error) {
+	decoder := query.ArrowDecoder(func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
 		return nil, nil
 	})
 	for _, defaults := range []struct {
@@ -269,6 +275,27 @@ func TestArrowExecuteOptionDefaults(t *testing.T) {
 	}
 }
 
+func verifyArrowTestRow(t *testing.T, row query.Row, expected int32) {
+	t.Helper()
+	var id int32
+	var name *string
+	require.NoError(t, row.Scan(&id, &name))
+	require.Equal(t, expected, id)
+	require.Nil(t, name)
+	require.NoError(t, row.ScanNamed(query.Named("id", &id)))
+	dst := struct {
+		ID   int32   `db:"id"`
+		Name *string `db:"name"`
+	}{}
+	require.NoError(t, row.ScanStruct(&dst, query.WithScanStructTagName("db")))
+	require.Equal(t, id, dst.ID)
+	values := row.Values()
+	require.Len(t, values, 2)
+	values[0] = types.Int32Value(999)
+	require.NoError(t, row.ScanNamed(query.Named("id", &id)))
+	require.Equal(t, expected, id)
+}
+
 func arrowTestColumns() []*Ydb.Column {
 	return []*Ydb.Column{
 		{Name: "id", Type: types.TypeInt32.ToYDB()},
@@ -285,3 +312,32 @@ func arrowTestPart(index int64, columns []*Ydb.Column, data string) *Ydb_Query.E
 		},
 	}
 }
+
+type arrowTestBatch struct {
+	rows       [][]types.Value
+	releases   int
+	valueCalls int
+}
+
+func arrowTestBatches(rows [][]types.Value) []query.ArrowBatch {
+	return []query.ArrowBatch{&arrowTestBatch{rows: rows}}
+}
+func (b *arrowTestBatch) NumRows() int { return len(b.rows) }
+func (b *arrowTestBatch) NumCols() int {
+	if len(b.rows) == 0 {
+		return 2
+	}
+
+	return len(b.rows[0])
+}
+
+func (b *arrowTestBatch) Scan(row, column int, dst any) error {
+	return types.CastTo(b.rows[row][column], dst)
+}
+
+func (b *arrowTestBatch) Value(row, column int) types.Value {
+	b.valueCalls++
+
+	return b.rows[row][column]
+}
+func (b *arrowTestBatch) Release() { b.rows = nil; b.releases++ }

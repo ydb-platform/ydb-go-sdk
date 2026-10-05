@@ -23,15 +23,18 @@ type ArrowResult = arrow.Result
 // ArrowColumn describes a result column using its YDB type, including optionality.
 type ArrowColumn = arrow.Column
 
-// ArrowDecoder decodes one self-contained Arrow IPC part into SDK values.
-// Each returned row must contain one non-nil value per column, in column order,
-// with the corresponding YDB type. Returned slices and value contents must remain
-// valid after the decoder returns and after subsequent calls. The decoder owns
-// and releases any Arrow resources; it must support concurrent calls.
-// The SDK has no dependency on Apache Arrow Go, so applications can choose its version.
-// See examples/apache_arrow/with_arrow for an Apache Arrow Go v18 decoder.
-//
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+// ArrowBatch owns decoded columns until the reader advances to another response
+// part or closes the streaming result. Materialized results retain their batches
+// until Close.
+type ArrowBatch = arrow.Batch
+
+// ArrowDecoder returns retained batches for one response part. Streaming results
+// release them before reading the next part, including at EOF, or at Close.
+// Rows from that part are valid only until that transition or Close; Scan output
+// and Values remain valid independently. Client.Query and Client.QueryResultSet
+// retain all batches until their materialized result is closed. QueryRow detaches
+// its one row before reading ahead and closing the internal result.
+// The decoder must support concurrent calls and validate YDB column types.
 type ArrowDecoder = arrow.Decoder
 
 // WithArrow requests Arrow results for one query while retaining ResultSets,
@@ -41,7 +44,7 @@ type ArrowDecoder = arrow.Decoder
 //
 // The application supplies an ArrowDecoder and chooses its Apache Arrow Go version;
 // the SDK module has no Apache Arrow Go dependency. The decoder converts each IPC
-// response part into owned SDK values. See ArrowDecoder for ownership and concurrency
+// response part into retained column batches. See ArrowDecoder for ownership and concurrency
 // requirements, and examples/apache_arrow/with_arrow for a working decoder.
 //
 // For example (error handling omitted):

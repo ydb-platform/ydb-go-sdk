@@ -204,6 +204,7 @@ func readResultSet(ctx context.Context, r *streamResult) (_ *resultSetWithClose,
 func readMaterializedResultSet(ctx context.Context, r *streamResult) (
 	_ *materializedResultSet, rowsCount int, finalErr error,
 ) {
+	r.retainArrowBatches = true
 	defer func() {
 		_ = r.Close(ctx)
 	}()
@@ -235,5 +236,8 @@ func readMaterializedResultSet(ctx context.Context, r *streamResult) (
 		return nil, 0, xerrors.WithStackTrace(err)
 	}
 
-	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), len(rows), nil
+	materialized := MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows)
+	materialized.closeArrow = r.takeArrowBatches()
+
+	return materialized, len(rows), nil
 }

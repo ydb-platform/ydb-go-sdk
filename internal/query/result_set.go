@@ -10,10 +10,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -31,6 +29,7 @@ type (
 		columnTypes []types.Type
 		rows        []query.Row
 		rowIndex    int
+		closeArrow  func()
 	}
 	resultSet struct {
 		index               int64
@@ -41,8 +40,8 @@ type (
 		ended               atomic.Bool
 		mustBeLastResultSet bool
 		notifyError         func(context.Context, error) error
-		arrowDecoder        arrow.Decoder
-		arrowRows           [][]value.Value
+		decodeArrow         func(context.Context, []*Ydb.Column, *Ydb.ResultSet) ([]*arrowRowData, error)
+		arrowBatches        []*arrowRowData
 		arrowDecoded        bool
 	}
 	resultSetWithClose struct {
@@ -69,7 +68,11 @@ func rangeRows(ctx context.Context, rs result.Set) xiter.Seq2[result.Row, error]
 	}
 }
 
-func (*materializedResultSet) Close(context.Context) error {
+func (rs *materializedResultSet) Close(context.Context) error {
+	if rs.closeArrow != nil {
+		rs.closeArrow()
+	}
+
 	return nil
 }
 
@@ -158,7 +161,7 @@ func newResultSet(
 	}
 }
 
-func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
+func (rs *resultSet) nextRow(ctx context.Context) (query.Row, error) {
 	rs.rowIndex++
 	for {
 		if rs.ended.Load() {
@@ -198,7 +201,7 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 			}
 			rs.rowIndex = 0
 			rs.currentPart = part
-			rs.arrowRows = nil
+			rs.arrowBatches = nil
 			rs.arrowDecoded = false
 			if part == nil {
 				rs.ended.Store(true)
@@ -227,7 +230,7 @@ func (rs *resultSet) partRowCount(ctx context.Context) (int, error) {
 	}
 	if !rs.arrowDecoded {
 		var err error
-		rs.arrowRows, err = decodeArrowRows(ctx, rs.arrowDecoder, rs.columns, rs.currentPart.GetResultSet())
+		rs.arrowBatches, err = rs.decodeArrow(ctx, rs.columns, rs.currentPart.GetResultSet())
 		if err != nil {
 			rs.ended.Store(true)
 			if rs.notifyError != nil {
@@ -239,13 +242,22 @@ func (rs *resultSet) partRowCount(ctx context.Context) (int, error) {
 		rs.arrowDecoded = true
 	}
 
-	return len(rs.arrowRows), nil
+	count := 0
+	for _, data := range rs.arrowBatches {
+		count += data.batch.NumRows()
+	}
+
+	return count, nil
 }
 
-func (rs *resultSet) partRow() *Row {
+func (rs *resultSet) partRow() query.Row {
 	if rs.currentPart.GetResultSet().GetFormat() == Ydb.ResultSet_FORMAT_ARROW {
-		if rs.rowIndex < len(rs.arrowRows) {
-			return newDecodedRow(rs.columns, rs.arrowRows[rs.rowIndex])
+		index := rs.rowIndex
+		for _, data := range rs.arrowBatches {
+			if index < data.batch.NumRows() {
+				return &arrowRow{data: data, index: index}
+			}
+			index -= data.batch.NumRows()
 		}
 	} else if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
 		return NewRow(rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex])

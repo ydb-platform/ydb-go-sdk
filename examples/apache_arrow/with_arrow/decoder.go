@@ -19,43 +19,145 @@ var _ query.ArrowDecoder = Decode
 // Decode supports Bool, integers, Float, Double, String and Utf8, and a single
 // Optional wrapper. Other YDB/Arrow types return an error; extend scalarReader
 // for the types used by your queries.
-func Decode(ctx context.Context, columns []query.ArrowColumn, part io.Reader) ([][]types.Value, error) {
+func Decode(ctx context.Context, columns []query.ArrowColumn, part io.Reader) (batches []query.ArrowBatch, err error) {
+	if err = ctx.Err(); err != nil {
+		return nil, err
+	}
 	reader, err := ipc.NewReader(part)
 	if err != nil {
 		return nil, err
 	}
 	defer reader.Release()
-	var rows [][]types.Value
+	defer func() {
+		if err != nil {
+			for _, b := range batches {
+				b.Release()
+			}
+			batches = nil
+		}
+	}()
 	for reader.Next() {
-		batch := reader.RecordBatch()
-		if int(batch.NumCols()) != len(columns) {
-			return nil, fmt.Errorf("arrow column count differs from YDB metadata")
+		if err = ctx.Err(); err != nil {
+			return batches, err
 		}
-		readers := make([]func(int) types.Value, len(columns))
-		for i, field := range batch.Schema().Fields() {
+		record := reader.RecordBatch()
+		if int(record.NumCols()) != len(columns) {
+			return batches, fmt.Errorf("arrow column count differs from YDB metadata")
+		}
+		readers := make([]directColumn, len(columns))
+		for i, field := range record.Schema().Fields() {
 			if field.Name != columns[i].Name {
-				return nil, fmt.Errorf("arrow column %q differs from YDB column %q", field.Name, columns[i].Name)
+				return batches, fmt.Errorf("arrow column %q differs from YDB column %q", field.Name, columns[i].Name)
 			}
-			readers[i], err = columnReader(batch.Column(i), columns[i].Type)
+			readers[i], err = directColumnReader(record.Column(i), columns[i].Type)
 			if err != nil {
-				return nil, fmt.Errorf("column %q: %w", columns[i].Name, err)
+				return batches, fmt.Errorf("column %q: %w", columns[i].Name, err)
 			}
 		}
-		count := int(batch.NumRows())
-		start := len(rows)
-		rows = append(rows, make([][]types.Value, count)...)
-		for i := 0; i < count; i++ {
-			if err := ctx.Err(); err != nil {
-				return nil, err
+		record.Retain()
+		batches = append(batches, &batch{record: record, columns: readers})
+	}
+	return batches, reader.Err()
+}
+
+type directColumn struct {
+	value func(int) types.Value
+	scan  func(int, any) error
+}
+
+type batch struct {
+	record  arrow.RecordBatch
+	columns []directColumn
+}
+
+func (b *batch) NumRows() int                        { return int(b.record.NumRows()) }
+func (b *batch) NumCols() int                        { return len(b.columns) }
+func (b *batch) Scan(row, column int, dst any) error { return b.columns[column].scan(row, dst) }
+func (b *batch) Value(row, column int) types.Value   { return b.columns[column].value(row) }
+func (b *batch) Release() {
+	if b.record != nil {
+		b.record.Release()
+		b.record = nil
+		b.columns = nil
+	}
+}
+
+func scanScalar[T any](a arrow.Array, optional bool, get func(int) T, clone func(T) T, fallback func(int) types.Value) func(int, any) error {
+	return func(row int, dst any) error {
+		switch ref := dst.(type) {
+		case *T:
+			if optional && a.IsNull(row) {
+				return types.CastTo(fallback(row), dst)
 			}
-			row := make([]types.Value, len(columns))
-			for j, read := range readers {
-				row[j] = read(i)
+			v := get(row)
+			if clone != nil {
+				v = clone(v)
 			}
-			rows[start+i] = row
+			*ref = v
+			return nil
+		case **T:
+			if !optional {
+				return types.CastTo(fallback(row), dst)
+			}
+			if a.IsNull(row) {
+				*ref = nil
+				return nil
+			}
+			v := get(row)
+			if clone != nil {
+				v = clone(v)
+			}
+			*ref = &v
+			return nil
+		default:
+			return types.CastTo(fallback(row), dst)
 		}
 	}
-	return rows, reader.Err()
+}
+
+func directColumnReader(a arrow.Array, t types.Type) (directColumn, error) {
+	read, err := columnReader(a, t)
+	if err != nil {
+		return directColumn{}, err
+	}
+	optional, inner := types.IsOptional(t)
+	if !optional {
+		inner = t
+	}
+	column := directColumn{value: read}
+	switch data := a.(type) {
+	case *array.Boolean:
+		column.scan = scanScalar(data, optional, data.Value, nil, read)
+	case *array.Int8:
+		column.scan = scanScalar(data, optional, data.Value, nil, read)
+	case *array.Int16:
+		column.scan = scanScalar(data, optional, data.Value, nil, read)
+	case *array.Int32:
+		column.scan = scanScalar(data, optional, data.Value, nil, read)
+	case *array.Int64:
+		column.scan = scanScalar(data, optional, data.Value, nil, read)
+	case *array.Uint8:
+		if types.Equal(inner, types.TypeBool) {
+			column.scan = scanScalar(data, optional, func(i int) bool { return data.Value(i) != 0 }, nil, read)
+		} else {
+			column.scan = scanScalar(data, optional, data.Value, nil, read)
+		}
+	case *array.Uint16:
+		column.scan = scanScalar(data, optional, data.Value, nil, read)
+	case *array.Uint32:
+		column.scan = scanScalar(data, optional, data.Value, nil, read)
+	case *array.Uint64:
+		column.scan = scanScalar(data, optional, data.Value, nil, read)
+	case *array.Float32:
+		column.scan = scanScalar(data, optional, data.Value, nil, read)
+	case *array.Float64:
+		column.scan = scanScalar(data, optional, data.Value, nil, read)
+	case *array.String:
+		column.scan = scanScalar(data, optional, data.Value, strings.Clone, read)
+	case *array.Binary:
+		column.scan = scanScalar(data, optional, data.Value, bytes.Clone, read)
+	}
+	return column, nil
 }
 
 func columnReader(a arrow.Array, t types.Type) (func(int) types.Value, error) {

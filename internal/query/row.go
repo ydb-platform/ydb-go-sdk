@@ -70,7 +70,7 @@ func (r *Row) ScanStruct(dst any, opts ...scanner.ScanStructOption) error {
 	return nil
 }
 
-func readRow(ctx context.Context, r *streamResult) (_ *Row, finalErr error) {
+func readRow(ctx context.Context, r *streamResult) (_ query.Row, finalErr error) {
 	defer func() {
 		_ = r.Close(ctx)
 	}()
@@ -87,6 +87,9 @@ func readRow(ctx context.Context, r *streamResult) (_ *Row, finalErr error) {
 		}
 
 		return nil, xerrors.WithStackTrace(err)
+	}
+	if _, ok := row.(*arrowRow); ok {
+		row = newDecodedRow(rs.columns, row.Values())
 	}
 
 	_, err = rs.nextRow(ctx)

@@ -12,14 +12,13 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
 func TestExecutors(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	var calls atomic.Int32
-	decoder := query.ArrowDecoder(func(ctx context.Context, cols []query.ArrowColumn, part io.Reader) ([][]types.Value, error) {
+	decoder := query.ArrowDecoder(func(ctx context.Context, cols []query.ArrowColumn, part io.Reader) ([]query.ArrowBatch, error) {
 		calls.Add(1)
 		return Decode(ctx, cols, part)
 	})
@@ -72,15 +71,15 @@ func verifyExecutor(t *testing.T, ctx context.Context, executor query.Executor) 
 				t.Fatal(err)
 			}
 			rows = append(rows, row)
+			verifyRow(t, row)
 		}
-	}
-	if err := res.Close(ctx); err != nil {
-		t.Fatal(err)
 	}
 	if len(rows) != 1 {
 		t.Fatalf("rows=%d", len(rows))
 	}
-	verifyRow(t, rows[0])
+	if err := res.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
 	row, err := executor.QueryRow(ctx, sql)
 	if err != nil {
 		t.Fatal(err)
@@ -94,10 +93,10 @@ func verifyExecutor(t *testing.T, ctx context.Context, executor query.Executor) 
 	if err != nil {
 		t.Fatal(err)
 	}
+	verifyRow(t, row)
 	if err := rs.Close(ctx); err != nil {
 		t.Fatal(err)
 	}
-	verifyRow(t, row)
 }
 
 func verifyRow(t *testing.T, row query.Row) {

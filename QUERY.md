@@ -26,7 +26,7 @@ account for this when producing application side effects. See the
 | Format and API | Recommended use | Costs and ownership |
 | --- | --- | --- |
 | `Ydb.Value` through the ordinary query methods | Start here for small results, general type support or applications without an Arrow decoder | Default format; the SDK provides rows and scanners. |
-| Arrow through `query.WithArrow(decoder)` | Evaluate for larger results when retaining `Scan`, `ScanNamed`, `ScanStruct` and `Values` is useful | The application decoder converts each response part into owned `types.Value` rows. Conversion processes every column in the part, even if it is not scanned. |
+| Arrow through `query.WithArrow(decoder)` | Evaluate for larger results when retaining `Scan`, `ScanNamed`, `ScanStruct` and `Values` is useful | Rows refer to retained column batches. The decoder scans requested cells directly; `Values` and fallback conversions create owned `types.Value` objects on demand. |
 | Raw Arrow through `Session.QueryArrow` | Column processing that can consume Arrow batches directly | Avoids conversion to SDK rows. The application reads IPC, manages Arrow resources, and keeps borrowed column data within the batch lifetime. |
 
 Arrow requires server support and the `EnableArrowResultSetFormat` feature.
@@ -45,11 +45,25 @@ separate module, not an Arrow dependency of the SDK.
 The example supports Bool, signed/unsigned integers, Float, Double, String, Utf8
 and one level of Optional. Unsupported types return errors; extend your decoder
 for the YDB types used by your queries. A decoder receives column names and YDB
-types plus a self-contained IPC part. It must preserve column order and types,
-return non-nil owned values, release Arrow resources, and support concurrent
-calls. Returned rows must remain valid after subsequent decoding and result
-closure. Decoder errors follow the ordinary result error path; the SDK does not
-re-execute SQL to fall back to another format.
+types plus a self-contained IPC part. It returns retained `query.ArrowBatch`
+objects and must preserve column order and types, validate optionality, and
+support concurrent calls. Each batch provides `NumRows`, `NumCols`, direct
+`Scan(row, column, dst)`, owned `Value(row, column)` and `Release` methods.
+`Scan` destinations and `Value` results must remain valid after batch release.
+The example retains each Arrow record once before releasing its IPC reader;
+the SDK calls `Release` when the result no longer needs the batch. Decoder
+errors follow the ordinary result error path; the SDK does not re-execute SQL
+to fall back to another format.
+
+For streaming `Session.Query` / `TxActor.Query` and their `QueryResultSet`
+methods, rows are views of the current response part. Consume a row before
+advancing to another part, including the read that reaches EOF, skipping a
+result set, or closing the result. Moving between rows or batches within the
+same part keeps its batches alive. `Scan` output and `Values()` are owned and
+remain valid independently; save those when data must outlive the part.
+`Client.Query` and `Client.QueryResultSet` retain all batches until the
+returned result is closed. `QueryRow` detaches its one row before reading
+ahead to validate the row and result-set counts.
 
 ### Selecting the format per query
 
@@ -123,8 +137,10 @@ The benchmark compares full SELECT execution and consumption of all six columns:
 All variants use the same session, SQL, row checksum, disabled response prefetch
 and a 32 KiB response-part limit. Value and WithArrow reuse Scan destinations and
 arguments between rows. Nullable scans still allocate each non-null destination.
-The example decoder selects conversion functions once per batch column and
-reuses immutable Optional Bool and null values within that column.
+The example decoder validates types and selects scan functions once per batch
+column. It scans scalar destinations directly, copying strings and bytes
+when assigning them. SDK values are created only for `Values` and fallback
+conversions.
 The table has 10,000 rows: Uint64 id, Optional Int32/Bool/Double/Utf8/String,
 10% null in score/name, and a 64-byte payload. Queries return 1, 10, 100, 1,000
 or 10,000 ordered rows; the one-row query selects a row with null score/name.
@@ -145,21 +161,21 @@ are the observed min–max across the five runs, not confidence intervals.
 
 | Rows | API | Elapsed ms/RPC (range) | Client CPU ms/RPC | Allocated MiB/RPC | Allocations/RPC |
 | ---: | --- | ---: | ---: | ---: | ---: |
-| 1 | `Value` | 1.307 (1.280–1.505) | 0.409 | 0.021 | 377 |
-| 1 | `QueryArrow` | 1.318 (1.286–1.489) | 0.429 | 0.026 | 372 |
-| 1 | `WithArrow` | 1.358 (1.331–1.451) | 0.466 | 0.029 | 474 |
-| 10 | `Value` | 1.334 (1.298–1.542) | 0.500 | 0.035 | 721 |
-| 10 | `QueryArrow` | 1.328 (1.296–1.366) | 0.445 | 0.029 | 373 |
-| 10 | `WithArrow` | 1.441 (1.408–1.583) | 0.498 | 0.036 | 619 |
-| 100 | `Value` | 2.162 (2.090–2.264) | 1.222 | 0.178 | 4,112 |
-| 100 | `QueryArrow` | 1.591 (1.510–1.704) | 0.520 | 0.059 | 374 |
-| 100 | `WithArrow` | 1.834 (1.756–1.870) | 0.795 | 0.101 | 2,007 |
-| 1,000 | `Value` | 6.343 (5.629–6.614) | 3.475 | 2.138 | 39,524 |
-| 1,000 | `QueryArrow` | 3.904 (3.728–4.735) | 1.056 | 0.374 | 680 |
-| 1,000 | `WithArrow` | 5.064 (4.959–6.035) | 2.784 | 1.029 | 17,654 |
-| 10,000 | `Value` | 27.785 (27.536–33.285) | 23.824 | 18.979 | 394,881 |
-| 10,000 | `QueryArrow` | 19.182 (18.776–22.479) | 7.671 | 4.745 | 4,711 |
-| 10,000 | `WithArrow` | 21.074 (20.368–25.561) | 12.269 | 10.524 | 176,173 |
+| 1 | `Value` | 1.468 (1.391–1.617) | 0.395 | 0.021 | 378 |
+| 1 | `QueryArrow` | 1.511 (1.476–1.539) | 0.425 | 0.026 | 372 |
+| 1 | `WithArrow` | 1.513 (1.459–1.650) | 0.464 | 0.030 | 486 |
+| 10 | `Value` | 1.525 (1.455–1.835) | 0.502 | 0.035 | 722 |
+| 10 | `QueryArrow` | 1.563 (1.489–1.595) | 0.447 | 0.029 | 373 |
+| 10 | `WithArrow` | 1.597 (1.512–1.622) | 0.490 | 0.033 | 559 |
+| 100 | `Value` | 2.458 (2.342–2.729) | 1.011 | 0.179 | 4,112 |
+| 100 | `QueryArrow` | 1.895 (1.806–2.024) | 0.557 | 0.059 | 374 |
+| 100 | `WithArrow` | 1.947 (1.789–1.992) | 0.643 | 0.067 | 1,253 |
+| 1,000 | `Value` | 6.530 (6.163–6.699) | 3.187 | 2.198 | 39,525 |
+| 1,000 | `QueryArrow` | 4.389 (3.932–5.442) | 0.993 | 0.373 | 680 |
+| 1,000 | `WithArrow` | 4.980 (4.536–5.238) | 1.595 | 0.416 | 8,582 |
+| 10,000 | `Value` | 30.454 (28.878–33.341) | 25.619 | 19.211 | 394,874 |
+| 10,000 | `QueryArrow` | 20.553 (19.739–23.566) | 7.677 | 4.774 | 4,721 |
+| 10,000 | `WithArrow` | 21.019 (20.890–21.654) | 9.527 | 5.501 | 83,142 |
 
 Client CPU is user + system CPU of the client process from `getrusage`, including
 decoding, scanning and GC. Elapsed time includes server execution and transport.
@@ -168,16 +184,16 @@ Server CPU and wire payload size were not measured.
 
 ### Interpreting the results
 
-Small responses do not show a consistent elapsed-time benefit from WithArrow:
-for 1/10/100 rows its median changes by +3.8% / +8.0% / −15.2% relative to Value,
-and the observed elapsed ranges overlap for 1/10 rows. Client CPU changes
-by +13.8% / −0.3% / −35.0%. For one row, allocated bytes increase by 36.5% and
-allocation count by 25.7%.
+For 1/10 rows, WithArrow does not show an elapsed-time benefit: its median
+increases by 3.1% / 4.7% relative to Value, and the observed ranges overlap.
+Client CPU changes by +17.5% / −2.3%. For one row, allocated bytes increase
+by 39.2% and allocation count by 28.6%. At 100 rows, WithArrow reduces elapsed
+time by 20.8% and client CPU by 36.4% in this workload.
 
-For 1,000/10,000 rows, WithArrow reduces client CPU by 19.9% / 48.5%, elapsed
-time by 20.2% / 24.2%, allocated bytes by 51.9% / 44.5% and allocation count by
-55.3% / 55.4% relative to Value. Direct QueryArrow reduces client CPU by
-69.6% / 67.8%, but requires a different consumption API and resource ownership.
+For 1,000/10,000 rows, WithArrow reduces client CPU by 50.0% / 62.8%, elapsed
+time by 23.7% / 31.0%, allocated bytes by 81.1% / 71.4% and allocation count
+by 78.3% / 78.9% relative to Value. Direct QueryArrow reduces client CPU by
+68.8% / 70.0%, but requires a different consumption API and resource ownership.
 
 Use these measurements to select candidates for your own benchmark. They do not
 establish universal row-count thresholds: types, row width, nulls, server work,
