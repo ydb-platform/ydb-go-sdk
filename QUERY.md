@@ -35,16 +35,27 @@ does not change materialization: `Client.Query` still keeps the entire result in
 memory with Arrow enabled. Session and transaction queries decode one response
 part at a time.
 
-The SDK module does not depend on Apache Arrow Go. Supply a `query.ArrowDecoder`
-using the Arrow major version already selected by your application. The
-[v18 decoder example](examples/apache_arrow/with_arrow) demonstrates decoding,
-resource release, scans and tests. Copy and adapt its
-[decoder.go](examples/apache_arrow/with_arrow/decoder.go); the example is a
-separate module, not an Arrow dependency of the SDK.
+The SDK module does not depend on Apache Arrow Go. Build a `query.ArrowDecoder`
+using `ipc.NewReader` from the Arrow major version selected by your application:
 
-The example supports Bool, signed/unsigned integers, Float, Double, String
+```go
+import "github.com/apache/arrow-go/v18/arrow/ipc"
+
+myArrowDecoder := query.NewArrowDecoder(ipc.NewReader)
+// Reader options use the same Arrow Go version:
+myArrowDecoder = query.NewArrowDecoder(ipc.NewReader, ipc.WithAllocator(allocator))
+```
+
+Generic reader, record, array and option types are inferred from `ipc.NewReader`;
+no explicit type arguments or adapter are required. The same constructor works
+with `github.com/apache/arrow/go/v17/arrow/ipc`. The
+[v18 example](examples/apache_arrow/with_arrow) is a separate module and
+shows resource release, scans and tests. Run its [command](examples/apache_arrow/with_arrow/cmd/main.go)
+with `go run ./cmd` from that module after starting a local YDB.
+
+`NewArrowDecoder` supports Bool, signed/unsigned integers, Float, Double, String
 (`types.TypeBytes` in the SDK), Utf8 and one level of Optional. Unsupported types
-return errors; extend your decoder for the YDB types used by your queries.
+return errors; supply a custom `ArrowDecoder` for other YDB types used by your queries.
 A decoder receives column names and YDB
 types plus a self-contained IPC part. It returns retained `query.ArrowBatch`
 objects and must preserve all rows and column order, validate YDB types and
@@ -54,7 +65,7 @@ IPC part can contain a zero-row batch even when its payload is non-empty. Each
 batch provides `NumRows`, `NumCols`, direct `Scan(row, column, dst)`, owned
 `Value(row, column)` and `Release` methods.
 `Scan` destinations and `Value` results must remain valid after batch release.
-The example retains each Arrow record once before releasing its IPC reader;
+`NewArrowDecoder` retains each Arrow record once before releasing its IPC reader;
 the SDK calls `Release` when the result no longer needs the batch. Decoder
 errors follow the ordinary result error path; the SDK does not re-execute SQL
 to fall back to another format.
@@ -141,12 +152,12 @@ The benchmark compares full SELECT execution and consumption of all six columns:
 
 - `Value`: `Session.Query` + `Scan`.
 - `QueryArrow`: `Session.QueryArrow` + direct column access.
-- `WithArrow`: `Session.Query` + `query.WithArrow` with the example v18 decoder + `Scan`.
+- `WithArrow`: `Session.Query` + `query.WithArrow` with `query.NewArrowDecoder(ipc.NewReader)` from v18 + `Scan`.
 
 All variants use the same session, SQL, row checksum, disabled response prefetch
 and a 32 KiB response-part limit. Value and WithArrow reuse Scan destinations and
 arguments between rows. Nullable scans still allocate each non-null destination.
-The example decoder validates types and selects scan functions once per batch
+The decoder validates types and selects scan functions once per batch
 column. It scans scalar destinations directly, copying strings and bytes
 when assigning them. SDK values are created only for `Values` and fallback
 conversions.
@@ -169,21 +180,21 @@ are the observed min–max across the five runs, not confidence intervals.
 
 | Rows | API | Elapsed ms/RPC (range) | Client CPU ms/RPC | Allocated MiB/RPC | Allocations/RPC |
 | ---: | --- | ---: | ---: | ---: | ---: |
-| 1 | `Value` | 1.468 (1.391–1.617) | 0.395 | 0.021 | 378 |
-| 1 | `QueryArrow` | 1.511 (1.476–1.539) | 0.425 | 0.026 | 372 |
-| 1 | `WithArrow` | 1.513 (1.459–1.650) | 0.464 | 0.030 | 486 |
-| 10 | `Value` | 1.525 (1.455–1.835) | 0.502 | 0.035 | 722 |
-| 10 | `QueryArrow` | 1.563 (1.489–1.595) | 0.447 | 0.029 | 373 |
-| 10 | `WithArrow` | 1.597 (1.512–1.622) | 0.490 | 0.033 | 559 |
-| 100 | `Value` | 2.458 (2.342–2.729) | 1.011 | 0.179 | 4,112 |
-| 100 | `QueryArrow` | 1.895 (1.806–2.024) | 0.557 | 0.059 | 374 |
-| 100 | `WithArrow` | 1.947 (1.789–1.992) | 0.643 | 0.067 | 1,253 |
-| 1,000 | `Value` | 6.530 (6.163–6.699) | 3.187 | 2.198 | 39,525 |
-| 1,000 | `QueryArrow` | 4.389 (3.932–5.442) | 0.993 | 0.373 | 680 |
-| 1,000 | `WithArrow` | 4.980 (4.536–5.238) | 1.595 | 0.416 | 8,582 |
-| 10,000 | `Value` | 30.454 (28.878–33.341) | 25.619 | 19.211 | 394,874 |
-| 10,000 | `QueryArrow` | 20.553 (19.739–23.566) | 7.677 | 4.774 | 4,721 |
-| 10,000 | `WithArrow` | 21.019 (20.890–21.654) | 9.527 | 5.501 | 83,142 |
+| 1 | `Value` | 1.378 (1.264–1.998) | 0.427 | 0.021 | 378 |
+| 1 | `QueryArrow` | 1.553 (1.377–1.640) | 0.466 | 0.026 | 372 |
+| 1 | `WithArrow` | 1.491 (1.258–2.813) | 0.526 | 0.029 | 485 |
+| 10 | `Value` | 1.520 (1.333–2.149) | 0.603 | 0.035 | 722 |
+| 10 | `QueryArrow` | 1.591 (1.457–2.068) | 0.492 | 0.029 | 373 |
+| 10 | `WithArrow` | 2.030 (1.482–2.166) | 0.507 | 0.033 | 559 |
+| 100 | `Value` | 2.645 (2.406–2.951) | 1.279 | 0.179 | 4,113 |
+| 100 | `QueryArrow` | 1.882 (1.841–1.912) | 0.600 | 0.059 | 374 |
+| 100 | `WithArrow` | 1.841 (1.819–3.311) | 0.723 | 0.066 | 1,252 |
+| 1,000 | `Value` | 6.591 (6.150–8.191) | 3.296 | 2.153 | 39,528 |
+| 1,000 | `QueryArrow` | 3.946 (3.556–4.635) | 1.053 | 0.387 | 680 |
+| 1,000 | `WithArrow` | 4.459 (4.124–4.713) | 1.708 | 0.433 | 8,579 |
+| 10,000 | `Value` | 30.052 (29.283–35.318) | 24.885 | 19.071 | 394,876 |
+| 10,000 | `QueryArrow` | 20.389 (19.775–22.612) | 7.771 | 4.679 | 4,700 |
+| 10,000 | `WithArrow` | 22.803 (20.245–28.619) | 10.328 | 5.475 | 83,093 |
 
 Client CPU is user + system CPU of the client process from `getrusage`, including
 decoding, scanning and GC. Elapsed time includes server execution and transport.
@@ -193,15 +204,16 @@ Server CPU and wire payload size were not measured.
 ### Interpreting the results
 
 For 1/10 rows, WithArrow does not show an elapsed-time benefit: its median
-increases by 3.1% / 4.7% relative to Value, and the observed ranges overlap.
-Client CPU changes by +17.5% / −2.3%. For one row, allocated bytes increase
-by 39.2% and allocation count by 28.6%. At 100 rows, WithArrow reduces elapsed
-time by 20.8% and client CPU by 36.4% in this workload.
+increases by 8.2% / 33.5% relative to Value, and the observed ranges overlap.
+Client CPU changes by +23.2% / -15.9%. For one row, allocated bytes increase
+by 36.9% and allocation count by 28.3%. At 100 rows, WithArrow reduces median
+elapsed time by 30.4% and client CPU by 43.5% in this workload; the observed
+elapsed ranges still overlap.
 
-For 1,000/10,000 rows, WithArrow reduces client CPU by 50.0% / 62.8%, elapsed
-time by 23.7% / 31.0%, allocated bytes by 81.1% / 71.4% and allocation count
-by 78.3% / 78.9% relative to Value. Direct QueryArrow reduces client CPU by
-68.8% / 70.0%, but requires a different consumption API and resource ownership.
+For 1,000/10,000 rows, WithArrow reduces client CPU by 48.2% / 58.5%, elapsed
+time by 32.3% / 24.1%, allocated bytes by 79.9% / 71.3% and allocation count
+by 78.3% / 79.0% relative to Value. Direct QueryArrow reduces client CPU by
+68.1% / 68.8%, but requires a different consumption API and resource ownership.
 
 Use these measurements to select candidates for your own benchmark. They do not
 establish universal row-count thresholds: types, row width, nulls, server work,
@@ -221,9 +233,9 @@ xychart-beta
     title "Client CPU"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
     y-axis "ms/RPC" 0 --> 28
-    line "Value" [0.395, 0.502, 1.011, 3.187, 25.619]
-    line "QueryArrow" [0.425, 0.447, 0.557, 0.993, 7.677]
-    line "WithArrow" [0.464, 0.490, 0.643, 1.595, 9.527]
+    line "Value" [0.427, 0.603, 1.279, 3.296, 24.885]
+    line "QueryArrow" [0.466, 0.492, 0.600, 1.053, 7.771]
+    line "WithArrow" [0.526, 0.507, 0.723, 1.708, 10.328]
 ```
 
 ### Allocated memory
@@ -239,9 +251,9 @@ xychart-beta
     title "Allocated memory"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
     y-axis "MiB/RPC" 0 --> 20
-    line "Value" [0.021, 0.035, 0.179, 2.198, 19.211]
-    line "QueryArrow" [0.026, 0.029, 0.059, 0.373, 4.774]
-    line "WithArrow" [0.030, 0.033, 0.067, 0.416, 5.501]
+    line "Value" [0.021, 0.035, 0.179, 2.153, 19.071]
+    line "QueryArrow" [0.026, 0.029, 0.059, 0.387, 4.679]
+    line "WithArrow" [0.029, 0.033, 0.066, 0.433, 5.475]
 ```
 
 ### Allocation count
@@ -257,9 +269,9 @@ xychart-beta
     title "Allocation count"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
     y-axis "Allocations/RPC" 0 --> 400000
-    line "Value" [378, 722, 4112, 39525, 394874]
-    line "QueryArrow" [372, 373, 374, 680, 4721]
-    line "WithArrow" [486, 559, 1253, 8582, 83142]
+    line "Value" [378, 722, 4113, 39528, 394876]
+    line "QueryArrow" [372, 373, 374, 680, 4700]
+    line "WithArrow" [485, 559, 1252, 8579, 83093]
 ```
 
 The x-axis lists the measured row counts at equal intervals; the y-axis is

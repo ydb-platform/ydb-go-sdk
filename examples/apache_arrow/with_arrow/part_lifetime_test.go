@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/apache/arrow-go/v18/arrow/ipc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
@@ -40,11 +43,19 @@ ORDER BY id;`, strings.Repeat("x", 64))
 		t.Run(test.name, func(t *testing.T) {
 			var active, activeBytes atomic.Int64
 			var parts, peak, peakBytes, largestPart, largestPartBytes, totalBytes int64
-			decode := func(ctx context.Context, columns []query.ArrowColumn, ipc io.Reader) ([]query.ArrowBatch, error) {
+			decode := func(ctx context.Context, columns []query.ArrowColumn, part io.Reader) ([]query.ArrowBatch, error) {
 				if !test.materialized && active.Load() != 0 {
 					return nil, fmt.Errorf("previous part still owns %d batches", active.Load())
 				}
-				batches, err := Decode(ctx, columns, ipc)
+				var sizes []int64
+				decode := query.NewArrowDecoder(func(part io.Reader, opts ...ipc.Option) (*lifetimeReader, error) {
+					reader, err := ipc.NewReader(part, opts...)
+					if err != nil {
+						return nil, err
+					}
+					return &lifetimeReader{Reader: reader, sizes: &sizes}, nil
+				})
+				batches, err := decode(ctx, columns, part)
 				if err != nil {
 					return nil, err
 				}
@@ -54,14 +65,7 @@ ORDER BY id;`, strings.Repeat("x", 64))
 					if b.NumCols() != 6 {
 						t.Fatalf("part %d has %d columns, want 6", parts, b.NumCols())
 					}
-					var size int64
-					for _, column := range b.(*batch).record.Columns() {
-						for _, buffer := range column.Data().Buffers() {
-							if buffer != nil {
-								size += int64(buffer.Len())
-							}
-						}
-					}
+					size := sizes[i]
 					bytesInPart += size
 					active.Add(1)
 					activeBytes.Add(size)
@@ -155,4 +159,26 @@ func (b *lifetimeBatch) Release() {
 	b.ArrowBatch.Release()
 	b.active.Add(-1)
 	b.activeBytes.Add(-b.size)
+}
+
+type lifetimeReader struct {
+	*ipc.Reader
+	sizes *[]int64
+}
+
+func (r *lifetimeReader) Read() (arrow.RecordBatch, error) {
+	record, err := r.Reader.Read()
+	if err != nil {
+		return nil, err
+	}
+	var size int64
+	for _, column := range record.Columns() {
+		for _, buffer := range column.Data().Buffers() {
+			if buffer != nil {
+				size += int64(buffer.Len())
+			}
+		}
+	}
+	*r.sizes = append(*r.sizes, size)
+	return record, nil
 }

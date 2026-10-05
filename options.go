@@ -557,8 +557,9 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 //
 // For example (error handling and result consumption omitted):
 //
+//	decoder := query.NewArrowDecoder(ipc.NewReader)
 //	db, err := ydb.Open(ctx, dsn,
-//		ydb.WithQueryDefaultResultFormatArrow(myArrowDecoder),
+//		ydb.WithQueryDefaultResultFormatArrow(decoder),
 //	)
 //	result, err := db.Query().Query(ctx, sql)
 //	valueResult, err := db.Query().Query(ctx, sql, query.WithArrow(nil))

@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
@@ -47,12 +48,14 @@ type ArrowDecoder = arrow.Decoder
 //
 // The application supplies an ArrowDecoder and chooses its Apache Arrow Go version;
 // the SDK module has no Apache Arrow Go dependency. The decoder converts each IPC
-// response part into retained column batches. See ArrowDecoder for ownership and concurrency
-// requirements, and examples/apache_arrow/with_arrow for a working decoder.
+// response part into retained column batches. NewArrowDecoder builds a decoder
+// from ipc.NewReader without specifying generic type arguments. See ArrowDecoder
+// for ownership and concurrency requirements.
 //
 // For example (error handling omitted):
 //
-//	row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(myArrowDecoder))
+//	decoder := query.NewArrowDecoder(ipc.NewReader)
+//	row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(decoder))
 //	var id int32
 //	err = row.Scan(&id)
 //
@@ -69,4 +72,37 @@ type ArrowDecoder = arrow.Decoder
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithArrow(decoder ArrowDecoder) ExecuteOption {
 	return options.WithArrow(decoder)
+}
+
+// ArrowArray is the column interface required by NewArrowDecoder.
+type ArrowArray = arrow.Array
+
+// ArrowRecord is the record interface required by NewArrowDecoder.
+type ArrowRecord[A ArrowArray] = arrow.Record[A]
+
+// ArrowIPCReader reads borrowed records until io.EOF and releases the IPC reader.
+// A record is valid until the next Read or Release. NewArrowDecoder retains each
+// record before reading ahead and transfers its ownership to the SDK result.
+type ArrowIPCReader[B any] = arrow.IPCReader[B]
+
+// NewArrowDecoder builds an ArrowDecoder from the application's ipc.NewReader.
+// Reader, record, array and option types are inferred from the factory; the SDK
+// has no Apache Arrow Go dependency. It supports Bool, signed/unsigned integers,
+// Float, Double, String and Utf8, with one Optional wrapper. Unsupported types
+// and mismatches with YDB column metadata return decode errors before scanning.
+//
+// For example:
+//
+//	decoder := query.NewArrowDecoder(ipc.NewReader)
+//	row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(decoder))
+//
+// Optional arguments are IPC reader options from the same Arrow Go version.
+// The factory and its options must support concurrent calls. See ArrowDecoder
+// for result ownership and lifetime requirements.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func NewArrowDecoder[A ArrowArray, B ArrowRecord[A], R ArrowIPCReader[B], O any](
+	newReader func(io.Reader, ...O) (R, error), opts ...O,
+) ArrowDecoder {
+	return arrow.NewDecoder(newReader, opts...)
 }

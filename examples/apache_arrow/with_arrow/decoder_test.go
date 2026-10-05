@@ -43,7 +43,8 @@ func TestDecodeOwnsValues(t *testing.T) {
 	builder.Release()
 	alloc.AssertSize(t, 0)
 	columns := []query.ArrowColumn{{Name: "id", Type: types.TypeInt32}, {Name: "name", Type: types.Optional(types.TypeText)}, {Name: "payload", Type: types.TypeBytes}}
-	batches, err := Decode(context.Background(), columns, bytes.NewReader(wire.Bytes()))
+	decode := query.NewArrowDecoder(ipc.NewReader, ipc.WithAllocator(alloc))
+	batches, err := decode(context.Background(), columns, bytes.NewReader(wire.Bytes()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,16 +57,24 @@ func TestDecodeOwnsValues(t *testing.T) {
 		t.Fatalf("batches=%d", len(batches))
 	}
 	var rows [][]types.Value
+	var scannedNames []*string
+	var scannedPayloads [][]byte
 	for _, b := range batches {
-		record := b.(*batch).record
-		if record.NumCols() != 3 {
+		if b.NumCols() != 3 {
 			t.Fatal("reader released batch before result Close")
 		}
+		var name *string
+		var payload []byte
+		if err := b.Scan(0, 1, &name); err != nil {
+			t.Fatal(err)
+		}
+		if err := b.Scan(0, 2, &payload); err != nil {
+			t.Fatal(err)
+		}
+		scannedNames = append(scannedNames, name)
+		scannedPayloads = append(scannedPayloads, payload)
 		rows = append(rows, []types.Value{b.Value(0, 0), b.Value(0, 1), b.Value(0, 2)})
 		b.Release()
-		if record.NumCols() != 0 {
-			t.Fatal("batch Release did not release retained record")
-		}
 	}
 	alloc.AssertSize(t, 0)
 	clear(wire.Bytes())
@@ -91,6 +100,9 @@ func TestDecodeOwnsValues(t *testing.T) {
 		if i == 1 && name != nil {
 			t.Fatalf("lost null: %v", name)
 		}
+		if !reflect.DeepEqual(scannedNames[i], name) || !bytes.Equal(scannedPayloads[i], payload) {
+			t.Fatal("Scan output lost owned data")
+		}
 	}
 }
 
@@ -109,14 +121,15 @@ func TestBoolAndInvalidTypes(t *testing.T) {
 	nonNull := array.NewSlice(data, 0, 2)
 	defer nonNull.Release()
 	for i, want := range []bool{false, true} {
-		read, err := columnReader(nonNull, types.TypeBool)
+		batch, err := decodeColumn(t, nonNull, types.TypeBool)
 		if err != nil {
 			t.Fatal(err)
 		}
 		var got bool
-		if err := types.CastTo(read(i), &got); err != nil || got != want {
+		if err := types.CastTo(batch.Value(i, 0), &got); err != nil || got != want {
 			t.Fatalf("bool=%v want=%v err=%v", got, want, err)
 		}
+		batch.Release()
 	}
 	for _, typ := range []types.Type{
 		types.TypeBool,
@@ -124,7 +137,7 @@ func TestBoolAndInvalidTypes(t *testing.T) {
 		types.TypeDate,
 		types.Optional(types.Optional(types.TypeBool)),
 	} {
-		if _, err := columnReader(data, typ); err == nil {
+		if _, err := decodeColumn(t, data, typ); err == nil {
 			t.Fatalf("expected error for %s", typ)
 		}
 	}
@@ -158,35 +171,38 @@ func TestColumnReaderScalarTypes(t *testing.T) {
 			defer data.Release()
 			nonNull := array.NewSlice(data, 0, 1)
 			defer nonNull.Release()
-			read, err := columnReader(nonNull, test.want.Type())
+			batch, err := decodeColumn(t, nonNull, test.want.Type())
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := read(0); !types.Equal(got.Type(), test.want.Type()) || got.Yql() != test.want.Yql() {
+			if got := batch.Value(0, 0); !types.Equal(got.Type(), test.want.Type()) || got.Yql() != test.want.Yql() {
 				t.Fatalf("scalar=%s, want %s", got, test.want)
 			}
+			batch.Release()
 			for _, nullable := range []arrow.Array{nonNull, data} {
-				read, err = columnReader(nullable, types.Optional(test.want.Type()))
+				batch, err = decodeColumn(t, nullable, types.Optional(test.want.Type()))
 				if err != nil {
 					t.Fatal(err)
 				}
 				wantValues := []types.Value{types.OptionalValue(test.want), types.NullValue(test.want.Type())}
 				for i, want := range wantValues[:nullable.Len()] {
-					if got := read(i); !types.Equal(got.Type(), want.Type()) || got.Yql() != want.Yql() {
+					if got := batch.Value(i, 0); !types.Equal(got.Type(), want.Type()) || got.Yql() != want.Yql() {
 						t.Fatalf("optional[%d]=%s, want %s", i, got, want)
 					}
-				}
-				direct, err := directColumnReader(nullable, types.Optional(test.want.Type()))
-				if err != nil {
-					t.Fatal(err)
 				}
 				var scalar driver.Value
 				if err := types.CastTo(test.want, &scalar); err != nil {
 					t.Fatal(err)
 				}
 				dst := reflect.New(reflect.PointerTo(reflect.TypeOf(scalar)))
+				native := reflect.ValueOf(nullable).MethodByName("Value").Call([]reflect.Value{reflect.ValueOf(0)})[0].Interface()
+				nativeDst := reflect.New(reflect.PointerTo(reflect.TypeOf(native)))
+				directDst := reflect.New(reflect.TypeOf(native))
+				if err := batch.Scan(0, 0, directDst.Interface()); err != nil || !reflect.DeepEqual(directDst.Elem().Interface(), native) {
+					t.Fatalf("native scalar scan: %v", err)
+				}
 				for i := 0; i < nullable.Len(); i++ {
-					if err := direct.scan(i, dst.Interface()); err != nil {
+					if err := batch.Scan(i, 0, dst.Interface()); err != nil {
 						t.Fatal(err)
 					}
 					got := dst.Elem()
@@ -197,15 +213,26 @@ func TestColumnReaderScalarTypes(t *testing.T) {
 					} else if got.IsNil() || !reflect.DeepEqual(got.Elem().Interface(), scalar) {
 						t.Fatalf("direct scan=%v, want %v", got, scalar)
 					}
-					var expected, actual string
-					if err := types.CastTo(read(i), &expected); err != nil {
+					if err := batch.Scan(i, 0, nativeDst.Interface()); err != nil {
 						t.Fatal(err)
 					}
-					if err := direct.scan(i, &actual); err != nil || actual != expected {
+					if i == 1 {
+						if !nativeDst.Elem().IsNil() {
+							t.Fatal("native optional scan lost null")
+						}
+					} else if nativeDst.Elem().IsNil() || !reflect.DeepEqual(nativeDst.Elem().Elem().Interface(), native) {
+						t.Fatal("native optional scan differs")
+					}
+					var expected, actual string
+					if err := types.CastTo(batch.Value(i, 0), &expected); err != nil {
+						t.Fatal(err)
+					}
+					if err := batch.Scan(i, 0, &actual); err != nil || actual != expected {
 						t.Fatalf("fallback=%q, want %q, err=%v", actual, expected, err)
 					}
 				}
 
+				batch.Release()
 			}
 		})
 	}
@@ -224,16 +251,29 @@ func TestOptionalBoolScanDestinations(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			read, err := columnReader(data, types.Optional(types.TypeBool))
+			batch, err := decodeColumn(t, data, types.Optional(types.TypeBool))
 			if err != nil {
 				data.Release()
 				t.Fatal(err)
 			}
 			values := make([]types.Value, data.Len())
 			for i := range values {
-				values[i] = read(i)
+				values[i] = batch.Value(i, 0)
+				var got *bool
+				if err := batch.Scan(i, 0, &got); err != nil {
+					t.Fatal(err)
+				}
+				want := i == 1 || i == 2
+				if i == 3 {
+					if got != nil {
+						t.Fatal("Scan lost bool null")
+					}
+				} else if got == nil || *got != want {
+					t.Fatalf("Scan bool[%d]=%v", i, got)
+				}
 			}
 			data.Release()
+			batch.Release()
 			for i, want := range []bool{false, true, true, false, false} {
 				var got *bool
 				if err := types.CastTo(values[i], &got); err != nil {
@@ -265,7 +305,7 @@ func TestColumnReaderInvalidNullTypes(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, typ := range []types.Type{types.Optional(types.TypeText), types.Optional(types.TypeDate)} {
-			if _, err := columnReader(data, typ); err == nil {
+			if _, err := decodeColumn(t, data, typ); err == nil {
 				t.Errorf("expected error for %s with %s", typ, json)
 			}
 		}
@@ -307,4 +347,27 @@ func TestDecodeEmptyBatch(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), `column "id"`) || len(batches) != 0 {
 		t.Fatalf("type mismatch must fail before returning batches: %v, %v", batches, err)
 	}
+}
+
+func decodeColumn(t testing.TB, data arrow.Array, typ types.Type) (query.ArrowBatch, error) {
+	t.Helper()
+	schema := arrow.NewSchema([]arrow.Field{{Name: "value", Type: data.DataType(), Nullable: true}}, nil)
+	record := array.NewRecordBatch(schema, []arrow.Array{data}, int64(data.Len()))
+	defer record.Release()
+	var wire bytes.Buffer
+	writer := ipc.NewWriter(&wire, ipc.WithSchema(schema))
+	if err := writer.Write(record); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	batches, err := Decode(context.Background(), []query.ArrowColumn{{Name: "value", Type: typ}}, bytes.NewReader(wire.Bytes()))
+	if err != nil {
+		return nil, err
+	}
+	if len(batches) != 1 {
+		t.Fatalf("batches=%d, want 1", len(batches))
+	}
+	return batches[0], nil
 }
