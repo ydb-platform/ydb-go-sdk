@@ -27,6 +27,15 @@ func ReadTopic(path string) ReadSelectors {
 // ReaderOption options for topic reader
 type ReaderOption = topicreaderinternal.PublicReaderOption
 
+// WithReaderName sets the reader.name metric attribute. Empty means "default".
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithReaderName(name string) ReaderOption {
+	return func(cfg *topicreaderinternal.ReaderConfig) {
+		cfg.Metrics.Name = name
+	}
+}
+
 // WithReaderOperationTimeout
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental

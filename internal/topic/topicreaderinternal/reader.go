@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -38,6 +39,7 @@ type Reader struct {
 	defaultBatchConfig ReadMessageBatchOptions
 	tracer             *trace.Topic
 	readerID           int64
+	metricRegistration telemetry.Registration
 }
 
 func (r *Reader) TopicOnReaderStart(consumer string, err error) {
@@ -114,6 +116,17 @@ func NewReader(
 		readerID:           readerID,
 	}
 
+	if cfg.Metrics.Meter != nil {
+		registration, err := topicreadercommon.RegisterPartitionSessionCount(
+			cfg.Metrics, consumer, cfg.ReadSelectors, reader,
+		)
+		if err != nil {
+			return Reader{}, xerrors.WithStackTrace(err)
+		}
+		res.metricRegistration = registration
+	}
+	reader.start()
+
 	return res, nil
 }
 
@@ -138,7 +151,12 @@ func (r *Reader) Tracer() *trace.Topic {
 }
 
 func (r *Reader) Close(ctx context.Context) error {
-	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
+	var metricErr error
+	if r.metricRegistration != nil {
+		metricErr = r.metricRegistration.Close(ctx)
+	}
+
+	return errors.Join(metricErr, r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed)))
 }
 
 func (r *Reader) PopBatchTx(
@@ -261,6 +279,7 @@ type ReaderConfig struct {
 
 	RetrySettings      topic.RetrySettings
 	DefaultBatchConfig ReadMessageBatchOptions
+	Metrics            topicreadercommon.ReaderMetricsConfig
 }
 
 type PublicReaderOption func(cfg *ReaderConfig)

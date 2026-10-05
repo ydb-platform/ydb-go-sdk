@@ -12,8 +12,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 )
 
 var (
@@ -34,10 +36,11 @@ type TopicListenerReconnector struct {
 	connectionIDCounter atomic.Int64
 	closing             atomic.Bool
 
-	m              sync.Mutex
-	streamListener *streamListener
-	streamCloseErr error
-	stopErr        error
+	m                  sync.Mutex
+	streamListener     *streamListener
+	streamCloseErr     error
+	stopErr            error
+	metricRegistration telemetry.Registration
 }
 
 func NewTopicListenerReconnector(
@@ -53,6 +56,15 @@ func NewTopicListenerReconnector(
 		stopped:             make(empty.Chan),
 	}
 
+	if streamConfig.Metrics.Meter != nil {
+		registration, err := topicreadercommon.RegisterPartitionSessionCount(
+			streamConfig.Metrics, streamConfig.Consumer, streamConfig.Selectors, res,
+		)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		res.metricRegistration = registration
+	}
 	res.background.Start("connection", res.run)
 
 	return res, nil
@@ -74,6 +86,9 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 		return errTopicListenerClosed
 	}
 	var closeErrors []error
+	if lr.metricRegistration != nil {
+		closeErrors = append(closeErrors, lr.metricRegistration.Close(ctx))
+	}
 	err := lr.background.Close(ctx, reason)
 	if !errors.Is(err, background.ErrAlreadyClosed) {
 		closeErrors = append(closeErrors, err)

@@ -1,3 +1,5 @@
+* Added experimental backend-independent observable gauges through `ydb.WithMeter` and `telemetry.Collector`, including `ydb.topic.reader.partition_session.count` for topic readers and listeners
+
 ## v3.153.2
 * Added `UncompressedSize` and `CompressedSize` fields to `trace.TopicWriterCompressMessagesDoneInfo` to allow tracking actual bytes written by the topic writer
 * Deprecated `pkg/xtest.SyncedTest`, `MakeSyncedTest`, and their wrapper methods in favor of `testing.T`.

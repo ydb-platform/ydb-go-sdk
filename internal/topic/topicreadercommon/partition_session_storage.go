@@ -71,6 +71,22 @@ func (c *PartitionSessionStorage) GetAll() []*PartitionSession {
 	return res
 }
 
+// ActiveCountsByTopic excludes retained tombstones and terminal
+// sessions. Reading terminal state avoids racing listener context replacement.
+func (c *PartitionSessionStorage) ActiveCountsByTopic() map[string]int64 {
+	c.m.RLock()
+	defer c.m.RUnlock()
+
+	counts := make(map[string]int64)
+	for _, info := range c.sessions {
+		if info.RemoveTime.IsZero() && !info.Session.retired.Load() {
+			counts[info.Session.Topic]++
+		}
+	}
+
+	return counts
+}
+
 func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (*PartitionSession, error) {
 	now := time.Now()
 	c.m.Lock()

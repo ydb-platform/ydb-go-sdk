@@ -19,6 +19,7 @@ type StreamListenerConfig struct {
 	Consumer               string
 	ConnectWithoutConsumer bool
 	Tracer                 *trace.Topic
+	Metrics                topicreadercommon.ReaderMetricsConfig
 
 	retryOptions []retry.Option
 	readerID     int64

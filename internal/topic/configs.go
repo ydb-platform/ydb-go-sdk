@@ -5,6 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -13,6 +14,13 @@ type Config struct {
 
 	Trace              *trace.Topic
 	MaxGrpcMessageSize int
+	Metrics            topicreadercommon.ReaderMetricsConfig
+}
+
+func WithMetrics(metrics topicreadercommon.ReaderMetricsConfig) Option {
+	return func(c *Config) {
+		c.Metrics = metrics
+	}
 }
 
 type Option func(c *Config)
