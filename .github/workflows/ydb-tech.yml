@@ -1,0 +1,32 @@
+name: ydb.tech examples
+
+on:
+  pull_request:
+  push:
+    branches: [master, docs/topic-snippets]
+
+concurrency:
+  group: ydb-tech-examples-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  examples:
+    name: Examples (ydb_tech)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      ydb:
+        image: ydbplatform/local-ydb:trunk
+        ports: ["2136:2136", "8765:8765"]
+        env:
+          YDB_USE_IN_MEMORY_PDISKS: true
+        options: '-h localhost'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: bash ydb_tech/run.sh
