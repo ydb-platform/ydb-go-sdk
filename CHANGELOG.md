@@ -1,4 +1,4 @@
-* Added experimental `query.WithArrow` with an application-provided decoder and `ydb.WithQueryExecuteOptions` defaults, preserving the Query Service row and scan APIs without an Arrow Go dependency
+* Added experimental `query.WithArrow` with an application-provided decoder and `ydb.WithQueryDefaultResultFormatArrow` driver defaults, preserving the Query Service row and scan APIs without an Arrow Go dependency
 * Reduced allocations in Query Service rows and optional value construction
 
 ## v3.154.1

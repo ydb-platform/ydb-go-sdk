@@ -360,11 +360,14 @@ func (c *Client) withDefaultRetryOptions(opts ...retry.Option) []retry.Option {
 }
 
 func (c *Client) withDefaultExecuteOptions(opts ...options.Execute) []options.Execute {
-	if len(c.config.DefaultExecuteOptions()) == 0 && !c.config.DefaultIdempotent() {
+	if c.config.DefaultArrowDecoder() == nil && !c.config.DefaultIdempotent() {
 		return opts
 	}
 
-	defaults := append([]options.Execute(nil), c.config.DefaultExecuteOptions()...)
+	var defaults []options.Execute
+	if decoder := c.config.DefaultArrowDecoder(); decoder != nil {
+		defaults = append(defaults, options.WithArrow(decoder))
+	}
 	if c.config.DefaultIdempotent() {
 		defaults = append(defaults, options.WithIdempotent(true))
 	}
@@ -796,7 +799,7 @@ func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 		}
 
 		s.lazyTx = cfg.LazyTx()
-		s.defaultExecuteOptions = cfg.DefaultExecuteOptions()
+		s.defaultArrowDecoder = cfg.DefaultArrowDecoder()
 
 		return s, nil
 	})
@@ -856,7 +859,7 @@ func newWithQueryServiceClient(ctx context.Context,
 			}
 
 			s.lazyTx = cfg.LazyTx()
-			s.defaultExecuteOptions = cfg.DefaultExecuteOptions()
+			s.defaultArrowDecoder = cfg.DefaultArrowDecoder()
 
 			return s, nil
 		}),

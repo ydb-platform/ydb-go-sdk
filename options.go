@@ -535,13 +535,34 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 	}
 }
 
-// WithQueryExecuteOptions sets default options for Query Service executions on
-// Client, Session and TxActor. Per-call options override these defaults.
-// It does not affect ExecuteScript or FetchScriptResults.
+// WithQueryDefaultResultFormatArrow selects Arrow as the default Query Service
+// result format while preserving the ordinary row and scan APIs. It applies to
+// Query, QueryRow and QueryResultSet on query.Client, query.Session and query.TxActor,
+// including queries inside Do and DoTx. It does not affect ExecuteScript or
+// FetchScriptResults. The server must support and enable Arrow results.
+//
+// The application supplies the decoder and chooses its Apache Arrow Go version;
+// the SDK module has no Apache Arrow Go dependency. See query.ArrowDecoder for
+// ownership and concurrency requirements.
+//
+// A nil decoder selects the default YDB value format. Per-call query.WithArrow
+// overrides this setting: query.WithArrow(nil) selects YDB values for one query,
+// and query.WithArrow(otherDecoder) replaces the decoder for one query. Subsequent
+// queries without an override use the driver default again.
+//
+// For example (error handling and result consumption omitted):
+//
+//	db, err := ydb.Open(ctx, dsn,
+//		ydb.WithQueryDefaultResultFormatArrow(myArrowDecoder),
+//	)
+//	result, err := db.Query().Query(ctx, sql)
+//	valueResult, err := db.Query().Query(ctx, sql, query.WithArrow(nil))
+//
+// Close each result after consuming it, and close the driver when it is no longer needed.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func WithQueryExecuteOptions(opts ...query.ExecuteOption) Option {
-	return WithQueryConfigOption(queryConfig.WithDefaultExecuteOptions(opts...))
+func WithQueryDefaultResultFormatArrow(decoder query.ArrowDecoder) Option {
+	return WithQueryConfigOption(queryConfig.WithDefaultResultFormatArrow(decoder))
 }
 
 // WithQueryConfigOption collects additional configuration options for query.Client.

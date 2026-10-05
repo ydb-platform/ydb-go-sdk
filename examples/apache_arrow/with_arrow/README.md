@@ -47,7 +47,7 @@ The same option can be passed to `s.Query(...)` inside `db.Query().Do` or to
 
 ```go
 db, err := ydb.Open(ctx, dsn,
-    ydb.WithQueryExecuteOptions(query.WithArrow(witharrow.Decode)),
+    ydb.WithQueryDefaultResultFormatArrow(witharrow.Decode),
 )
 // Per-call options override driver defaults:
 row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(nil))

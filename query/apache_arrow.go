@@ -34,11 +34,31 @@ type ArrowColumn = arrow.Column
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type ArrowDecoder = arrow.Decoder
 
-// WithArrow requests Arrow results while retaining the ordinary row and scan APIs.
-// It applies to Query, QueryRow and QueryResultSet on Client, Session and TxActor.
-// A nil decoder selects the default YDB value format, overriding a driver default.
-// Decode errors are returned when results are consumed; no query is re-executed
-// to fall back to another format.
+// WithArrow requests Arrow results for one query while retaining ResultSets,
+// Rows, Scan, ScanNamed, ScanStruct and Values. It applies to Query, QueryRow and
+// QueryResultSet on Client, Session and TxActor, including queries inside Do and DoTx.
+// The server must support and enable Arrow results.
+//
+// The application supplies an ArrowDecoder and chooses its Apache Arrow Go version;
+// the SDK module has no Apache Arrow Go dependency. The decoder converts each IPC
+// response part into owned SDK values. See ArrowDecoder for ownership and concurrency
+// requirements, and examples/apache_arrow/with_arrow for a working decoder.
+//
+// For example (error handling omitted):
+//
+//	row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(myArrowDecoder))
+//	var id int32
+//	err = row.Scan(&id)
+//
+// To enable Arrow by default, use ydb.WithQueryDefaultResultFormatArrow(decoder).
+// A nil decoder overrides that driver default for one query:
+//
+//	row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(nil))
+//
+// Client.Query still materializes the entire result; Session and TxActor queries
+// decode one response part at a time. Decoding includes every column in the part,
+// even if the application does not scan it. Decode errors are returned through the
+// ordinary result error path; no query is re-executed to fall back to another format.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithArrow(decoder ArrowDecoder) ExecuteOption {

@@ -29,17 +29,17 @@ type (
 		client                   Ydb_Query_V1.QueryServiceClient
 		trace                    *trace.Query
 		lazyTx                   bool
-		defaultExecuteOptions    []options.Execute
+		defaultArrowDecoder      arrow.Decoder
 		streamResultCloseTimeout time.Duration
 	}
 )
 
 func (s *Session) withDefaultExecuteOptions(opts ...options.Execute) []options.Execute {
-	if len(s.defaultExecuteOptions) == 0 {
+	if s.defaultArrowDecoder == nil {
 		return opts
 	}
 
-	return append(append([]options.Execute(nil), s.defaultExecuteOptions...), opts...)
+	return append([]options.Execute{options.WithArrow(s.defaultArrowDecoder)}, opts...)
 }
 
 func (s *Session) QueryResultSet(

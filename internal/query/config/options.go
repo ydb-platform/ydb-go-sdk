@@ -4,16 +4,16 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type Option func(*Config)
 
-func WithDefaultExecuteOptions(opts ...options.Execute) Option {
+func WithDefaultResultFormatArrow(decoder arrow.Decoder) Option {
 	return func(c *Config) {
-		c.defaultExecuteOptions = append(c.defaultExecuteOptions, opts...)
+		c.defaultArrowDecoder = decoder
 	}
 }
 

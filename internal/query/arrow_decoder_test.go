@@ -224,24 +224,48 @@ func TestArrowExecuteOptionDefaults(t *testing.T) {
 	decoder := query.ArrowDecoder(func(context.Context, []query.ArrowColumn, io.Reader) ([][]types.Value, error) {
 		return nil, nil
 	})
-	cfg := config.New(config.WithDefaultExecuteOptions(query.WithArrow(decoder)))
-	c := Client{config: cfg}
-	s := Session{defaultExecuteOptions: cfg.DefaultExecuteOptions()}
-	tx := Transaction{s: &s}
-	for _, opts := range [][]query.ExecuteOption{nil, {query.WithArrow(nil)}} {
-		expected := Ydb.ResultSet_FORMAT_ARROW
-		if len(opts) > 0 {
-			expected = Ydb.ResultSet_FORMAT_UNSPECIFIED
-		}
-		clientSettings := options.ExecuteSettings(c.withDefaultExecuteOptions(opts...)...)
-		sessionSettings := options.ExecuteSettings(s.withDefaultExecuteOptions(opts...)...)
-		txSettings, err := tx.executeSettings(opts...)
-		require.NoError(t, err)
-		for _, settings := range []executeSettings{clientSettings, sessionSettings, txSettings} {
-			request, _, err := executeQueryRequest("session", "SELECT 1", settings, options.ResultSetsTypeOrdered)
-			require.NoError(t, err)
-			require.Equal(t, expected, request.GetResultSetFormat())
-		}
+	for _, defaults := range []struct {
+		name  string
+		opts  []config.Option
+		arrow bool
+	}{
+		{name: "unset"},
+		{name: "Arrow", opts: []config.Option{config.WithDefaultResultFormatArrow(decoder)}, arrow: true},
+		{name: "reset", opts: []config.Option{
+			config.WithDefaultResultFormatArrow(decoder), config.WithDefaultResultFormatArrow(nil),
+		}},
+	} {
+		t.Run(defaults.name, func(t *testing.T) {
+			cfg := config.New(defaults.opts...)
+			c := Client{config: cfg}
+			s := Session{defaultArrowDecoder: cfg.DefaultArrowDecoder()}
+			tx := Transaction{s: &s}
+			for _, call := range []struct {
+				name  string
+				opts  []query.ExecuteOption
+				arrow bool
+			}{
+				{name: "default", arrow: defaults.arrow},
+				{name: "Ydb.Value", opts: []query.ExecuteOption{query.WithArrow(nil)}},
+				{name: "Arrow", opts: []query.ExecuteOption{query.WithArrow(decoder)}, arrow: true},
+			} {
+				t.Run(call.name, func(t *testing.T) {
+					expected := Ydb.ResultSet_FORMAT_UNSPECIFIED
+					if call.arrow {
+						expected = Ydb.ResultSet_FORMAT_ARROW
+					}
+					clientSettings := options.ExecuteSettings(c.withDefaultExecuteOptions(call.opts...)...)
+					sessionSettings := options.ExecuteSettings(s.withDefaultExecuteOptions(call.opts...)...)
+					txSettings, err := tx.executeSettings(call.opts...)
+					require.NoError(t, err)
+					for _, settings := range []executeSettings{clientSettings, sessionSettings, txSettings} {
+						request, _, err := executeQueryRequest("session", "SELECT 1", settings, options.ResultSetsTypeOrdered)
+						require.NoError(t, err)
+						require.Equal(t, expected, request.GetResultSetFormat())
+					}
+				})
+			}
+		})
 	}
 }
 

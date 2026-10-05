@@ -23,7 +23,7 @@ func TestExecutors(t *testing.T) {
 		calls.Add(1)
 		return Decode(ctx, cols, part)
 	})
-	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials(), ydb.WithQueryExecuteOptions(query.WithArrow(decoder)))
+	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials(), ydb.WithQueryDefaultResultFormatArrow(decoder))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,6 +48,10 @@ func TestExecutors(t *testing.T) {
 	}
 	if calls.Load() != 9 {
 		t.Fatal("nil override called decoder")
+	}
+	verifyExecutor(t, ctx, db.Query())
+	if calls.Load() != 12 {
+		t.Fatalf("decode calls=%d after override, want 12", calls.Load())
 	}
 }
 
