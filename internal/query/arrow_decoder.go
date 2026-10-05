@@ -75,7 +75,10 @@ func (r *streamResult) decodeArrowBatches(
 	r.arrowBatches = append(r.arrowBatches, batches...)
 	data := make([]*arrowRowData, len(batches))
 	for i, batch := range batches {
-		data[i] = &arrowRowData{columns: columns, batch: batch}
+		data[i] = &arrowRowData{columns: columns, batch: batch, rows: make([]arrowRow, batch.NumRows())}
+		for j := range data[i].rows {
+			data[i].rows[j] = arrowRow{data: data[i], index: j}
+		}
 	}
 
 	return data, nil

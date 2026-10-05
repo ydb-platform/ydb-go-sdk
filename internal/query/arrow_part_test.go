@@ -116,6 +116,53 @@ func TestArrowPartOwnership(t *testing.T) {
 	}
 }
 
+func TestArrowRowsRemainDistinct(t *testing.T) {
+	for _, materialized := range []bool{false, true} {
+		t.Run(map[bool]string{false: "streaming", true: "materialized"}[materialized], func(t *testing.T) {
+			ctx := t.Context()
+			ctrl := gomock.NewController(t)
+			stream := newExecuteQueryStreamMock(ctrl)
+			stream.EXPECT().Recv().Return(arrowTestPart(0, arrowTestColumns(), "rows"), nil)
+			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
+			batches := arrowTestBatches([][]types.Value{
+				{types.Int32Value(1), types.NullValue(types.TypeText)},
+				{types.Int32Value(2), types.NullValue(types.TypeText)},
+			})
+			batches = append(batches, arrowTestBatches([][]types.Value{
+				{types.Int32Value(3), types.NullValue(types.TypeText)},
+			})...)
+			decoder := func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
+				return batches, nil
+			}
+			r, err := newResult(ctx, stream, withArrowDecoder(decoder))
+			require.NoError(t, err)
+			var result query.Result = r
+			if materialized {
+				result, err = resultToMaterializedResult(ctx, r)
+				require.NoError(t, err)
+			}
+			rs, err := result.NextResultSet(ctx)
+			require.NoError(t, err)
+			var rows []query.Row
+			for range 3 {
+				row, err := rs.NextRow(ctx)
+				require.NoError(t, err)
+				rows = append(rows, row)
+				for i, saved := range rows {
+					var id int32
+					require.NoError(t, saved.ScanNamed(query.Named("id", &id)))
+					require.Equal(t, int32(i+1), id)
+				}
+			}
+			require.NoError(t, result.Close(ctx))
+			require.NoError(t, r.Close(ctx))
+			for _, batch := range batches {
+				require.Equal(t, 1, batch.(*arrowTestBatch).releases)
+			}
+		})
+	}
+}
+
 func TestArrowPartCloseCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()

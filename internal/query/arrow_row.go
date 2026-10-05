@@ -12,6 +12,7 @@ import (
 type arrowRowData struct {
 	columns []*Ydb.Column
 	batch   arrow.Batch
+	rows    []arrowRow
 }
 
 type arrowRow struct {

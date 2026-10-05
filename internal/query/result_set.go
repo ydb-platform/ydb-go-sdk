@@ -255,7 +255,7 @@ func (rs *resultSet) partRow() query.Row {
 		index := rs.rowIndex
 		for _, data := range rs.arrowBatches {
 			if index < data.batch.NumRows() {
-				return &arrowRow{data: data, index: index}
+				return &data.rows[index]
 			}
 			index -= data.batch.NumRows()
 		}

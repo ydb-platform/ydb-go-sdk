@@ -153,6 +153,8 @@ The benchmark compares full SELECT execution and consumption of all six columns:
 All variants use the same session, SQL, row checksum, disabled response prefetch
 and a 32 KiB response-part limit. Value and WithArrow reuse Scan destinations and
 arguments between rows. Nullable scans still allocate each non-null destination.
+Row handles share one slice per decoded batch, allocated for all rows even when
+consumption stops early.
 The decoder validates types and selects scan functions once per batch
 column. It scans scalar destinations directly, copying strings and bytes
 when assigning them. SDK values are created only for `Values` and fallback
@@ -180,17 +182,17 @@ Server CPU and wire payload size were not measured.
 
 ### Interpreting the results
 
-For 1/10 rows, WithArrow does not show an elapsed-time benefit: its median
-increases by 8.2% / 33.5% relative to Value, and the observed ranges overlap.
-Client CPU changes by +23.2% / -15.9%. For one row, allocated bytes increase
-by 36.9% and allocation count by 28.3%. At 100 rows, WithArrow reduces median
-elapsed time by 30.4% and client CPU by 43.5% in this workload; the observed
+For 1/10 rows, WithArrow does not show a consistent elapsed-time benefit: its
+median changes by +11.9% / -7.5% relative to Value, and the observed ranges overlap.
+Client CPU changes by -5.9% / +9.4%. For one row, allocated bytes increase
+by 36.8% and allocation count by 28.3%. At 100 rows, WithArrow reduces median
+elapsed time by 26.4% and client CPU by 43.9% in this workload; the observed
 elapsed ranges still overlap.
 
-For 1,000/10,000 rows, WithArrow reduces client CPU by 48.2% / 58.5%, elapsed
-time by 32.3% / 24.1%, allocated bytes by 79.9% / 71.3% and allocation count
-by 78.3% / 79.0% relative to Value. Direct QueryArrow reduces client CPU by
-68.1% / 68.8%, but requires a different consumption API and resource ownership.
+For 1,000/10,000 rows, WithArrow reduces client CPU by 59.1% / 70.6%, elapsed
+time by 35.7% / 16.1%, allocated bytes by 80.2% / 72.0% and allocation count
+by 80.8% / 81.5% relative to Value. Direct QueryArrow reduces client CPU by
+67.8% / 77.4%, but requires a different consumption API and resource ownership.
 
 Use these measurements to select candidates for your own benchmark. They do not
 establish universal row-count thresholds: types, row width, nulls, server work,
@@ -210,9 +212,9 @@ xychart-beta
     title "Client CPU"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
     y-axis "ms/RPC" 0 --> 28
-    line "Value" [0.427, 0.603, 1.279, 3.296, 24.885]
-    line "QueryArrow" [0.466, 0.492, 0.600, 1.053, 7.771]
-    line "WithArrow" [0.526, 0.507, 0.723, 1.708, 10.328]
+    line "Value" [0.347, 0.374, 0.775, 3.144, 27.422]
+    line "QueryArrow" [0.306, 0.336, 0.380, 1.012, 6.200]
+    line "WithArrow" [0.327, 0.410, 0.435, 1.286, 8.062]
 ```
 
 ### Allocated memory
@@ -228,9 +230,9 @@ xychart-beta
     title "Allocated memory"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
     y-axis "MiB/RPC" 0 --> 20
-    line "Value" [0.021, 0.035, 0.179, 2.153, 19.071]
-    line "QueryArrow" [0.026, 0.029, 0.059, 0.387, 4.679]
-    line "WithArrow" [0.029, 0.033, 0.066, 0.433, 5.475]
+    line "Value" [0.021, 0.035, 0.179, 2.214, 19.149]
+    line "QueryArrow" [0.026, 0.029, 0.059, 0.385, 4.528]
+    line "WithArrow" [0.029, 0.033, 0.066, 0.437, 5.368]
 ```
 
 ### Allocation count
@@ -246,9 +248,9 @@ xychart-beta
     title "Allocation count"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
     y-axis "Allocations/RPC" 0 --> 400000
-    line "Value" [378, 722, 4113, 39528, 394876]
-    line "QueryArrow" [372, 373, 374, 680, 4700]
-    line "WithArrow" [485, 559, 1252, 8579, 83093]
+    line "Value" [378, 722, 4113, 39528, 394883]
+    line "QueryArrow" [372, 373, 374, 681, 4690]
+    line "WithArrow" [485, 549, 1153, 7583, 73092]
 ```
 
 The x-axis lists the measured row counts at equal intervals; the y-axis is

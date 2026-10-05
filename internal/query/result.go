@@ -561,8 +561,8 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 				return nil, xerrors.WithStackTrace(r.notifyNextPartErr(ctx, err))
 			}
 			for _, data := range batches {
-				for i := 0; i < data.batch.NumRows(); i++ {
-					rs.rows = append(rs.rows, &arrowRow{data: data, index: i})
+				for i := range data.rows {
+					rs.rows = append(rs.rows, &data.rows[i])
 				}
 			}
 		} else {
