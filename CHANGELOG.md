@@ -1,5 +1,17 @@
 * Sped up transactional Topic multi-writer initialization
 
+* Fixed Topic multi-writers sharing partition metadata and refreshing it after partition changes
+
+## v3.153.2
+* Added `UncompressedSize` and `CompressedSize` fields to `trace.TopicWriterCompressMessagesDoneInfo` to allow tracking actual bytes written by the topic writer
+* Deprecated `pkg/xtest.SyncedTest`, `MakeSyncedTest`, and their wrapper methods in favor of `testing.T`.
+
+## v3.153.1
+* Fixed `sugar.Embedding` encoding of an empty vector to match `Knn::ToBinaryStringFloat`
+
+## v3.153.0
+* Added `sugar.Embedding` helper to construct `types.Value` with `Bytes` type from slice of numbers
+
 ## v3.152.1
 * Fixed topic reader messages retaining compressed payload bytes after their content had been fully read
 
