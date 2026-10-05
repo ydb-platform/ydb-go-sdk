@@ -52,8 +52,7 @@ func New(
 	var defaultOperationParams rawydb.OperationParams
 	topic.OperationParamsFromConfig(&defaultOperationParams, &cfg.Common)
 
-	var client *Client
-	client = &Client{
+	return &Client{
 		cfg:                    cfg,
 		cred:                   cred,
 		defaultOperationParams: defaultOperationParams,
@@ -61,11 +60,9 @@ func New(
 		topicTopologies: topology.NewRegistry(func(
 			ctx context.Context, path string,
 		) (topictypes.TopicDescription, error) {
-			return client.Describe(ctx, path)
+			return describeTopic(ctx, path, &cfg, &rawClient, defaultOperationParams)
 		}),
 	}
-
-	return client
 }
 
 func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
@@ -155,8 +152,19 @@ func (c *Client) Describe(
 	path string,
 	opts ...topicoptions.DescribeOption,
 ) (res topictypes.TopicDescription, _ error) {
+	return describeTopic(ctx, path, &c.cfg, &c.rawClient, c.defaultOperationParams, opts...)
+}
+
+func describeTopic(
+	ctx context.Context,
+	path string,
+	cfg *topic.Config,
+	rawClient *rawtopic.Client,
+	defaultOperationParams rawydb.OperationParams,
+	opts ...topicoptions.DescribeOption,
+) (res topictypes.TopicDescription, _ error) {
 	req := rawtopic.DescribeTopicRequest{
-		OperationParams: c.defaultOperationParams,
+		OperationParams: defaultOperationParams,
 		Path:            path,
 	}
 
@@ -169,18 +177,18 @@ func (c *Client) Describe(
 	var rawRes rawtopic.DescribeTopicResult
 
 	call := func(ctx context.Context) (describeErr error) {
-		rawRes, describeErr = c.rawClient.DescribeTopic(ctx, req)
+		rawRes, describeErr = rawClient.DescribeTopic(ctx, req)
 
 		return describeErr
 	}
 
 	var err error
 
-	if c.cfg.AutoRetry() {
+	if cfg.AutoRetry() {
 		err = retry.Retry(ctx, call,
 			retry.WithIdempotent(true),
-			retry.WithTrace(c.cfg.TraceRetry()),
-			retry.WithBudget(c.cfg.RetryBudget()),
+			retry.WithTrace(cfg.TraceRetry()),
+			retry.WithBudget(cfg.RetryBudget()),
 		)
 	} else {
 		err = call(ctx)
