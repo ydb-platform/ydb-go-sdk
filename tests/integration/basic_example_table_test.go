@@ -25,7 +25,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -35,8 +34,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
-func TestBasicExampleTable(sourceTest *testing.T) { //nolint:gocyclo
-	t := xtest.MakeSyncedTest(sourceTest)
+func TestBasicExampleTable(t *testing.T) { //nolint:gocyclo
 	folder := t.Name()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)

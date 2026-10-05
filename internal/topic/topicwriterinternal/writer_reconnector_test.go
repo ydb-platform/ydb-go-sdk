@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -1363,4 +1364,52 @@ func testCreateInitRequest(w *WriterReconnector) rawtopicwriter.InitRequest {
 	)
 
 	return newSingleStreamWriterStopped(context.Background(), cfg).createInitRequest()
+}
+
+func TestWriterReconnector_CreateMessagesWithContent(t *testing.T) {
+	t.Run("ReportsSizes", func(t *testing.T) {
+		var done trace.TopicWriterCompressMessagesDoneInfo
+		tracer := &trace.Topic{
+			OnWriterCompressMessages: func(
+				trace.TopicWriterCompressMessagesStartInfo,
+			) func(trace.TopicWriterCompressMessagesDoneInfo) {
+				return func(info trace.TopicWriterCompressMessagesDoneInfo) {
+					done = info
+				}
+			},
+		}
+		w := newWriterReconnectorStopped(NewWriterReconnectorConfig(WithTrace(tracer)))
+
+		const payload = "hello world"
+		res, err := w.createMessagesWithContent([]PublicMessage{{Data: bytes.NewReader([]byte(payload))}})
+		require.NoError(t, err)
+		require.Len(t, res, 1)
+
+		require.NoError(t, done.Error)
+		require.Equal(t, len(payload), done.UncompressedSize)
+		require.Equal(t, len(payload), done.CompressedSize)
+	})
+
+	t.Run("ReportsErrorWithZeroSizes", func(t *testing.T) {
+		var done trace.TopicWriterCompressMessagesDoneInfo
+		tracer := &trace.Topic{
+			OnWriterCompressMessages: func(
+				trace.TopicWriterCompressMessagesStartInfo,
+			) func(trace.TopicWriterCompressMessagesDoneInfo) {
+				return func(info trace.TopicWriterCompressMessagesDoneInfo) {
+					done = info
+				}
+			},
+		}
+		w := newWriterReconnectorStopped(NewWriterReconnectorConfig(WithTrace(tracer)))
+
+		_, err := w.createMessagesWithContent(
+			[]PublicMessage{{Data: iotest.ErrReader(errors.New("read failed"))}},
+		)
+		require.Error(t, err)
+
+		require.Error(t, done.Error)
+		require.Zero(t, done.UncompressedSize)
+		require.Zero(t, done.CompressedSize)
+	})
 }
