@@ -123,6 +123,8 @@ The benchmark compares full SELECT execution and consumption of all six columns:
 All variants use the same session, SQL, row checksum, disabled response prefetch
 and a 32 KiB response-part limit. Value and WithArrow reuse Scan destinations and
 arguments between rows. Nullable scans still allocate each non-null destination.
+The example decoder selects conversion functions once per batch column and
+reuses immutable Optional Bool and null values within that column.
 The table has 10,000 rows: Uint64 id, Optional Int32/Bool/Double/Utf8/String,
 10% null in score/name, and a 64-byte payload. Queries return 1, 10, 100, 1,000
 or 10,000 ordered rows; the one-row query selects a row with null score/name.
@@ -143,21 +145,21 @@ are the observed min–max across the five runs, not confidence intervals.
 
 | Rows | API | Elapsed ms/RPC (range) | Client CPU ms/RPC | Allocated MiB/RPC | Allocations/RPC |
 | ---: | --- | ---: | ---: | ---: | ---: |
-| 1 | `Value` | 1.571 (1.319–1.783) | 0.373 | 0.021 | 377 |
-| 1 | `QueryArrow` | 1.478 (1.296–1.576) | 0.403 | 0.026 | 372 |
-| 1 | `WithArrow` | 1.434 (1.331–1.560) | 0.384 | 0.029 | 459 |
-| 10 | `Value` | 1.378 (1.261–1.795) | 0.434 | 0.035 | 721 |
-| 10 | `QueryArrow` | 1.609 (1.342–2.017) | 0.357 | 0.029 | 373 |
-| 10 | `WithArrow` | 1.433 (1.339–2.188) | 0.453 | 0.036 | 614 |
-| 100 | `Value` | 2.353 (2.212–2.431) | 0.949 | 0.178 | 4,112 |
-| 100 | `QueryArrow` | 1.850 (1.495–1.990) | 0.422 | 0.059 | 374 |
-| 100 | `WithArrow` | 1.998 (1.818–2.713) | 0.643 | 0.104 | 2,109 |
-| 1,000 | `Value` | 6.436 (6.290–6.776) | 3.124 | 2.138 | 39,525 |
-| 1,000 | `QueryArrow` | 4.331 (4.029–4.769) | 0.969 | 0.397 | 681 |
-| 1,000 | `WithArrow` | 5.581 (5.152–5.861) | 2.342 | 0.961 | 18,799 |
-| 10,000 | `Value` | 29.761 (29.330–34.124) | 25.313 | 18.864 | 394,887 |
-| 10,000 | `QueryArrow` | 20.793 (19.985–21.414) | 7.095 | 4.640 | 4,717 |
-| 10,000 | `WithArrow` | 22.367 (21.834–23.025) | 12.888 | 10.877 | 187,651 |
+| 1 | `Value` | 1.307 (1.280–1.505) | 0.409 | 0.021 | 377 |
+| 1 | `QueryArrow` | 1.318 (1.286–1.489) | 0.429 | 0.026 | 372 |
+| 1 | `WithArrow` | 1.358 (1.331–1.451) | 0.466 | 0.029 | 474 |
+| 10 | `Value` | 1.334 (1.298–1.542) | 0.500 | 0.035 | 721 |
+| 10 | `QueryArrow` | 1.328 (1.296–1.366) | 0.445 | 0.029 | 373 |
+| 10 | `WithArrow` | 1.441 (1.408–1.583) | 0.498 | 0.036 | 619 |
+| 100 | `Value` | 2.162 (2.090–2.264) | 1.222 | 0.178 | 4,112 |
+| 100 | `QueryArrow` | 1.591 (1.510–1.704) | 0.520 | 0.059 | 374 |
+| 100 | `WithArrow` | 1.834 (1.756–1.870) | 0.795 | 0.101 | 2,007 |
+| 1,000 | `Value` | 6.343 (5.629–6.614) | 3.475 | 2.138 | 39,524 |
+| 1,000 | `QueryArrow` | 3.904 (3.728–4.735) | 1.056 | 0.374 | 680 |
+| 1,000 | `WithArrow` | 5.064 (4.959–6.035) | 2.784 | 1.029 | 17,654 |
+| 10,000 | `Value` | 27.785 (27.536–33.285) | 23.824 | 18.979 | 394,881 |
+| 10,000 | `QueryArrow` | 19.182 (18.776–22.479) | 7.671 | 4.745 | 4,711 |
+| 10,000 | `WithArrow` | 21.074 (20.368–25.561) | 12.269 | 10.524 | 176,173 |
 
 Client CPU is user + system CPU of the client process from `getrusage`, including
 decoding, scanning and GC. Elapsed time includes server execution and transport.
@@ -167,15 +169,15 @@ Server CPU and wire payload size were not measured.
 ### Interpreting the results
 
 Small responses do not show a consistent elapsed-time benefit from WithArrow:
-for 1/10/100 rows its median changes by −8.7% / +4.0% / −15.1% relative to Value,
-and the observed elapsed ranges overlap at all three sizes. Client CPU changes
-by +2.7% / +4.4% / −32.3%. For one row, allocated bytes increase by 35.5% and
-allocation count by 21.8%.
+for 1/10/100 rows its median changes by +3.8% / +8.0% / −15.2% relative to Value,
+and the observed elapsed ranges overlap for 1/10 rows. Client CPU changes
+by +13.8% / −0.3% / −35.0%. For one row, allocated bytes increase by 36.5% and
+allocation count by 25.7%.
 
-For 1,000/10,000 rows, WithArrow reduces client CPU by 25.0% / 49.1%, elapsed
-time by 13.3% / 24.8%, allocated bytes by 55.1% / 42.3% and allocation count by
-52.4% / 52.5% relative to Value. Direct QueryArrow reduces client CPU by
-69.0% / 72.0%, but requires a different consumption API and resource ownership.
+For 1,000/10,000 rows, WithArrow reduces client CPU by 19.9% / 48.5%, elapsed
+time by 20.2% / 24.2%, allocated bytes by 51.9% / 44.5% and allocation count by
+55.3% / 55.4% relative to Value. Direct QueryArrow reduces client CPU by
+69.6% / 67.8%, but requires a different consumption API and resource ownership.
 
 Use these measurements to select candidates for your own benchmark. They do not
 establish universal row-count thresholds: types, row width, nulls, server work,

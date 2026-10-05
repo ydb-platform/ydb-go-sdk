@@ -3,6 +3,8 @@ package witharrow
 import (
 	"bytes"
 	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -43,6 +45,11 @@ func TestDecodeOwnsValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	alloc.AssertSize(t, 0)
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := Decode(cancelled, columns, bytes.NewReader(wire.Bytes())); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled decode: %v", err)
+	}
 	clear(wire.Bytes())
 	if len(rows) != 2 {
 		t.Fatalf("rows=%d", len(rows))
@@ -84,27 +91,139 @@ func TestBoolAndInvalidTypes(t *testing.T) {
 	data := builder.NewArray()
 	builder.Release()
 	defer data.Release()
+	nonNull := array.NewSlice(data, 0, 2)
+	defer nonNull.Release()
 	for i, want := range []bool{false, true} {
-		v, err := columnValue(data, i, types.TypeBool)
+		read, err := columnReader(nonNull, types.TypeBool)
 		if err != nil {
 			t.Fatal(err)
 		}
 		var got bool
-		if err := types.CastTo(v, &got); err != nil || got != want {
+		if err := types.CastTo(read(i), &got); err != nil || got != want {
 			t.Fatalf("bool=%v want=%v err=%v", got, want, err)
 		}
 	}
-	for _, test := range []struct {
-		row int
-		typ types.Type
-	}{
-		{row: 2, typ: types.TypeBool},
-		{row: 0, typ: types.TypeText},
-		{row: 0, typ: types.TypeDate},
-		{row: 0, typ: types.Optional(types.Optional(types.TypeBool))},
+	for _, typ := range []types.Type{
+		types.TypeBool,
+		types.TypeText,
+		types.TypeDate,
+		types.Optional(types.Optional(types.TypeBool)),
 	} {
-		if _, err := columnValue(data, test.row, test.typ); err == nil {
-			t.Fatalf("expected error for %s row %d", test.typ, test.row)
+		if _, err := columnReader(data, typ); err == nil {
+			t.Fatalf("expected error for %s", typ)
 		}
+	}
+}
+
+func TestColumnReaderScalarTypes(t *testing.T) {
+	for _, test := range []struct {
+		arrowType arrow.DataType
+		json      string
+		want      types.Value
+	}{
+		{arrow.FixedWidthTypes.Boolean, `[true, null]`, types.BoolValue(true)},
+		{arrow.PrimitiveTypes.Int8, `[-7, null]`, types.Int8Value(-7)},
+		{arrow.PrimitiveTypes.Int16, `[-700, null]`, types.Int16Value(-700)},
+		{arrow.PrimitiveTypes.Int32, `[-70000, null]`, types.Int32Value(-70000)},
+		{arrow.PrimitiveTypes.Int64, `[-70000000, null]`, types.Int64Value(-70000000)},
+		{arrow.PrimitiveTypes.Uint8, `[7, null]`, types.Uint8Value(7)},
+		{arrow.PrimitiveTypes.Uint16, `[700, null]`, types.Uint16Value(700)},
+		{arrow.PrimitiveTypes.Uint32, `[70000, null]`, types.Uint32Value(70000)},
+		{arrow.PrimitiveTypes.Uint64, `[70000000, null]`, types.Uint64Value(70000000)},
+		{arrow.PrimitiveTypes.Float32, `[1.25, null]`, types.FloatValue(1.25)},
+		{arrow.PrimitiveTypes.Float64, `[1.25, null]`, types.DoubleValue(1.25)},
+		{arrow.BinaryTypes.String, `["owned text", null]`, types.TextValue("owned text")},
+		{arrow.BinaryTypes.Binary, `["b3duZWQgYnl0ZXM=", null]`, types.BytesValue([]byte("owned bytes"))},
+	} {
+		t.Run(test.arrowType.String(), func(t *testing.T) {
+			data, _, err := array.FromJSON(memory.DefaultAllocator, test.arrowType, strings.NewReader(test.json))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer data.Release()
+			nonNull := array.NewSlice(data, 0, 1)
+			defer nonNull.Release()
+			read, err := columnReader(nonNull, test.want.Type())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := read(0); !types.Equal(got.Type(), test.want.Type()) || got.Yql() != test.want.Yql() {
+				t.Fatalf("scalar=%s, want %s", got, test.want)
+			}
+			for _, nullable := range []arrow.Array{nonNull, data} {
+				read, err = columnReader(nullable, types.Optional(test.want.Type()))
+				if err != nil {
+					t.Fatal(err)
+				}
+				wantValues := []types.Value{types.OptionalValue(test.want), types.NullValue(test.want.Type())}
+				for i, want := range wantValues[:nullable.Len()] {
+					if got := read(i); !types.Equal(got.Type(), want.Type()) || got.Yql() != want.Yql() {
+						t.Fatalf("optional[%d]=%s, want %s", i, got, want)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestOptionalBoolScanDestinations(t *testing.T) {
+	for _, test := range []struct {
+		arrowType arrow.DataType
+		json      string
+	}{
+		{arrow.FixedWidthTypes.Boolean, `[false, true, true, null, false]`},
+		{arrow.PrimitiveTypes.Uint8, `[0, 1, 2, null, 0]`},
+	} {
+		t.Run(test.arrowType.String(), func(t *testing.T) {
+			data, _, err := array.FromJSON(memory.DefaultAllocator, test.arrowType, strings.NewReader(test.json))
+			if err != nil {
+				t.Fatal(err)
+			}
+			read, err := columnReader(data, types.Optional(types.TypeBool))
+			if err != nil {
+				data.Release()
+				t.Fatal(err)
+			}
+			values := make([]types.Value, data.Len())
+			for i := range values {
+				values[i] = read(i)
+			}
+			data.Release()
+			for i, want := range []bool{false, true, true, false, false} {
+				var got *bool
+				if err := types.CastTo(values[i], &got); err != nil {
+					t.Fatal(err)
+				}
+				if i == 3 {
+					if got != nil {
+						t.Fatalf("null=%v", got)
+					}
+					continue
+				}
+				if got == nil || *got != want {
+					t.Fatalf("bool[%d]=%v want=%v", i, got, want)
+				}
+				*got = !want
+				var again *bool
+				if err := types.CastTo(values[i], &again); err != nil || again == nil || *again != want {
+					t.Fatalf("modified shared value: %v err=%v", again, err)
+				}
+			}
+		})
+	}
+}
+
+func TestColumnReaderInvalidNullTypes(t *testing.T) {
+	for _, json := range []string{`[null, null]`, `[]`} {
+		data, _, err := array.FromJSON(memory.DefaultAllocator, arrow.PrimitiveTypes.Int32, strings.NewReader(json))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, typ := range []types.Type{types.Optional(types.TypeText), types.Optional(types.TypeDate)} {
+			if _, err := columnReader(data, typ); err == nil {
+				t.Errorf("expected error for %s with %s", typ, json)
+			}
+		}
+		data.Release()
 	}
 }
