@@ -40,10 +40,10 @@ type scopeT struct {
 	Ctx context.Context
 	fixenv.Env
 	Require *require.Assertions
-	t       *testing.T
+	t       testing.TB
 }
 
-func newScope(t *testing.T) *scopeT {
+func newScope(t testing.TB) *scopeT {
 	at := require.New(t)
 	fEnv := fixenv.New(t)
 	ctx, ctxCancel := context.WithCancel(context.Background())
