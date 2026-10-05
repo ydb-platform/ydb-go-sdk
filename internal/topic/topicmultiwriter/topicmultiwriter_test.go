@@ -131,6 +131,7 @@ func (w *orderedSeqWriter) Close(ctx context.Context) error {
 
 func (w *orderedSeqWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
 	w.initCalls.Add(1)
+
 	return topicwriterinternal.InitialInfo{LastSeqNum: w.lastSeqNo}, nil
 }
 

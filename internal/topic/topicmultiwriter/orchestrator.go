@@ -205,6 +205,7 @@ func (o *orchestrator) choosePartition(msg message) (partitionID int64, err erro
 	return partitionID, nil
 }
 
+//nolint:funlen
 func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error) {
 	acquired := false
 	defer func() {
@@ -259,11 +260,7 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 		if getErr != nil {
 			return getErr
 		}
-		if !writer.initDone.Load() {
-			if initErr := writer.waitInit(ctx); initErr != nil {
-				return initErr
-			}
-		} else if initErr := writer.getInitErr(); initErr != nil {
+		if initErr := writer.waitInit(ctx); initErr != nil {
 			return initErr
 		}
 	}

@@ -51,6 +51,10 @@ type writerWrapper struct {
 }
 
 func (w *writerWrapper) waitInit(ctx context.Context) error {
+	if w.initDone.Load() {
+		return w.getInitErr()
+	}
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
