@@ -1,12 +1,15 @@
 package options
 
 import (
+	"context"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 )
@@ -252,4 +255,20 @@ func TestThisOptionIsNotForExecuteOnTx(t *testing.T) {
 	txCtrl := (*txControlOption)(tx.NewControl(tx.WithTxID("test")))
 	// Should not panic
 	txCtrl.thisOptionIsNotForExecuteOnTx()
+}
+
+func TestWithArrow(t *testing.T) {
+	called := false
+	decoder := arrow.Decoder(func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
+		called = true
+
+		return nil, nil
+	})
+	require.Nil(t, ExecuteSettings().ArrowDecoder())
+	decode := ExecuteSettings(WithArrow(decoder)).ArrowDecoder()
+	require.NotNil(t, decode)
+	_, err := decode(t.Context(), nil, nil)
+	require.NoError(t, err)
+	require.True(t, called)
+	require.Nil(t, ExecuteSettings(WithArrow(decoder), WithArrow(nil)).ArrowDecoder())
 }

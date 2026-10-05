@@ -375,6 +375,28 @@ func TestArrowExec(t *testing.T) {
 	}
 }
 
+func TestArrowMaterializedResultSetClose(t *testing.T) {
+	stream := newExecuteQueryStreamMock(gomock.NewController(t))
+	stream.EXPECT().Recv().Return(arrowTestPart(0, arrowTestColumns(), "data"), nil)
+	stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
+	batch := &arrowTestBatch{rows: [][]types.Value{{types.Int32Value(1), types.NullValue(types.TypeText)}}}
+	decoder := func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+		return []query.ArrowBatch{batch}, nil
+	}
+	r, err := newResult(t.Context(), stream, withArrowDecoder(decoder))
+	require.NoError(t, err)
+	rs, count, err := readMaterializedResultSet(t.Context(), r)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+	require.Zero(t, batch.releases)
+	row, err := rs.NextRow(t.Context())
+	require.NoError(t, err)
+	verifyArrowTestRow(t, row, 1)
+	require.NoError(t, rs.Close(t.Context()))
+	require.NoError(t, rs.Close(t.Context()))
+	require.Equal(t, 1, batch.releases)
+}
+
 func verifyArrowTestRow(t *testing.T, row query.Row, expected int32) {
 	t.Helper()
 	var id int32
