@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"flag"
 	"fmt"
 	"os"
 	"path"
@@ -37,9 +36,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Pass -args -ydb-integration-debug to go test to show scope logs during benchmarks.
-var integrationDebugLogs = flag.Bool("ydb-integration-debug", false, "log integration scope details during benchmarks")
-
 type scopeT struct {
 	Ctx context.Context
 	fixenv.Env
@@ -68,9 +64,6 @@ func (scope *scopeT) T() testing.TB {
 }
 
 func (scope *scopeT) Logf(format string, args ...interface{}) {
-	if _, isBenchmark := scope.t.(*testing.B); isBenchmark && !*integrationDebugLogs {
-		return
-	}
 	scope.t.Helper()
 	scope.t.Logf(format, args...)
 }
