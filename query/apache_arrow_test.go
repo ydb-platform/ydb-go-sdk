@@ -32,5 +32,20 @@ func TestNewArrowDecoder(t *testing.T) {
 
 type mockIPCReader struct{ releases int }
 
-func (r *mockIPCReader) Read() (query.ArrowRecord[query.ArrowArray], error) { return nil, io.EOF }
-func (r *mockIPCReader) Release()                                           { r.releases++ }
+func (r *mockIPCReader) Read() (mockRecord, error) { return nil, io.EOF }
+func (r *mockIPCReader) Release()                  { r.releases++ }
+
+type mockRecord interface {
+	Retain()
+	Release()
+	NumRows() int64
+	NumCols() int64
+	ColumnName(column int) string
+	Column(column int) mockArray
+}
+
+type mockArray interface {
+	Len() int
+	IsNull(row int) bool
+	NullN() int
+}

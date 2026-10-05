@@ -74,17 +74,6 @@ func WithArrow(decoder ArrowDecoder) ExecuteOption {
 	return options.WithArrow(decoder)
 }
 
-// ArrowArray is the column interface required by NewArrowDecoder.
-type ArrowArray = arrow.Array
-
-// ArrowRecord is the record interface required by NewArrowDecoder.
-type ArrowRecord[A ArrowArray] = arrow.Record[A]
-
-// ArrowIPCReader reads borrowed records until io.EOF and releases the IPC reader.
-// A record is valid until the next Read or Release. NewArrowDecoder retains each
-// record before reading ahead and transfers its ownership to the SDK result.
-type ArrowIPCReader[B any] = arrow.IPCReader[B]
-
 // NewArrowDecoder builds an ArrowDecoder from the application's ipc.NewReader.
 // Reader, record, array and option types are inferred from the factory; the SDK
 // has no Apache Arrow Go dependency. It supports Bool, signed/unsigned integers,
@@ -99,11 +88,13 @@ type ArrowIPCReader[B any] = arrow.IPCReader[B]
 //	row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(decoder))
 //
 // Optional arguments are IPC reader options from the same Arrow Go version.
+// The reader returns borrowed records valid until its next Read or Release;
+// the decoder retains each record before reading ahead.
 // The factory and its options must support concurrent calls. See ArrowDecoder
 // for result ownership and lifetime requirements.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func NewArrowDecoder[A ArrowArray, B ArrowRecord[A], R ArrowIPCReader[B], O any](
+func NewArrowDecoder[A arrow.Array, B arrow.Record[A], R arrow.IPCReader[B], O any](
 	newReader func(io.Reader, ...O) (R, error), opts ...O,
 ) ArrowDecoder {
 	return arrow.NewDecoder(newReader, opts...)
