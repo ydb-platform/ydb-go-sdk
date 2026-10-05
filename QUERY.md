@@ -35,7 +35,7 @@ does not change materialization: `Client.Query` still keeps the entire result in
 memory with Arrow enabled. Session and transaction queries decode one response
 part at a time.
 
-The SDK module does not depend on Apache Arrow Go. Build a `query.ArrowDecoder`
+The SDK module does not depend on Apache Arrow Go. Build a decoder
 using `ipc.NewReader` from the Arrow major version selected by your application:
 
 ```go
@@ -55,17 +55,10 @@ with `go run ./cmd` from that module after starting a local YDB.
 
 `NewArrowDecoder` supports Bool, signed/unsigned integers, Float, Double, String
 (`types.TypeBytes` in the SDK), Utf8 and one level of Optional. Unsupported types
-return errors; supply a custom `ArrowDecoder` for other YDB types used by your queries,
-including temporal types such as Date, Datetime, Timestamp and Interval.
-A decoder receives column names and YDB
-types plus a self-contained IPC part. It returns retained `query.ArrowBatch`
-objects and must preserve all rows and column order, validate YDB types and
-optionality before returning batches, and support concurrent calls. The SDK
-checks batch dimensions; cell type validation belongs to the decoder. A valid
-IPC part can contain a zero-row batch even when its payload is non-empty. Each
-batch provides `NumRows`, `NumCols`, direct `Scan(row, column, dst)`, owned
-`Value(row, column)` and `Release` methods.
-`Scan` destinations and `Value` results must remain valid after batch release.
+return errors, including for temporal types such as Date, Datetime, Timestamp and
+Interval. To add support for a missing YDB type, open an
+[issue](https://github.com/ydb-platform/ydb-go-sdk/issues) or submit a
+[pull request](https://github.com/ydb-platform/ydb-go-sdk/pulls).
 `NewArrowDecoder` retains each Arrow record once before releasing its IPC reader;
 the SDK calls `Release` when the result no longer needs the batch. Decoder
 errors follow the ordinary result error path; the SDK does not re-execute SQL
@@ -86,7 +79,7 @@ are released when advancing to another part or closing the internal result.
 ### Selecting the format per query
 
 The examples below assume `db` is an open driver, `ctx` is a context and
-`myArrowDecoder` implements `query.ArrowDecoder`.
+`myArrowDecoder` is created with `query.NewArrowDecoder`.
 
 ```go
 row, err := db.Query().QueryRow(ctx, `SELECT 42 AS id;`,

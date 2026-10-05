@@ -1,4 +1,4 @@
-module github.com/ydb-platform/ydb-go-sdk/examples/apache_arrow/with_arrow
+module github.com/ydb-platform/ydb-go-sdk/v3/examples/apache_arrow/with_arrow
 
 go 1.25.0
 

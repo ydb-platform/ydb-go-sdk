@@ -14,6 +14,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -42,7 +43,7 @@ func TestArrowResults(t *testing.T) {
 			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
 			calls := 0
 			var batches []*arrowTestBatch
-			decoder := func(ctx context.Context, columns []query.ArrowColumn, ipc io.Reader) ([]query.ArrowBatch, error) {
+			decoder := func(ctx context.Context, columns []arrow.Column, ipc io.Reader) ([]arrow.Batch, error) {
 				require.NoError(t, ctx.Err())
 				require.Equal(t, "id", columns[0].Name)
 				require.True(t, types.Equal(types.TypeInt32, columns[0].Type))
@@ -58,7 +59,7 @@ func TestArrowResults(t *testing.T) {
 				}}
 				batches = append(batches, batch)
 
-				return []query.ArrowBatch{batch}, nil
+				return []arrow.Batch{batch}, nil
 			}
 			r, err := newResult(ctx, stream, withArrowDecoder(decoder))
 			require.NoError(t, err)
@@ -106,21 +107,21 @@ func TestArrowDecoderErrors(t *testing.T) {
 	decodeErr := errors.New("invalid IPC")
 	for _, test := range []struct {
 		name    string
-		decoder query.ArrowDecoder
+		decoder arrow.Decoder
 		want    string
 	}{
 		{name: "missing", want: "without an Arrow decoder"},
-		{name: "decode", decoder: func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+		{name: "decode", decoder: func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
 			return nil, decodeErr
 		}, want: "invalid IPC"},
-		{name: "EOF", decoder: func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+		{name: "EOF", decoder: func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
 			return nil, io.EOF
 		}, want: "unexpected EOF"},
-		{name: "width", decoder: func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+		{name: "width", decoder: func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
 			return arrowTestBatches([][]types.Value{{types.Int32Value(1)}}), nil
 		}, want: "expected 2"},
-		{name: "nil", decoder: func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
-			return []query.ArrowBatch{nil}, nil
+		{name: "nil", decoder: func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
+			return []arrow.Batch{nil}, nil
 		}, want: "is nil"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -158,7 +159,7 @@ func TestArrowDecoderErrorContext(t *testing.T) {
 			}, nil)
 			stream.EXPECT().Recv().Return(arrowTestPart(1, arrowTestColumns(), "data"), nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
-			decoder := func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+			decoder := func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
 				return nil, decodeErr
 			}
 			var notified error
@@ -207,7 +208,7 @@ func TestArrowQueryRowConstraints(t *testing.T) {
 				stream.EXPECT().Recv().Return(arrowTestPart(1, arrowTestColumns(), "data"), nil)
 			}
 			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
-			decoder := func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+			decoder := func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
 				rows := make([][]types.Value, test.rows)
 				for i := range rows {
 					rows[i] = []types.Value{types.Int32Value(1), types.NullValue(types.TypeText)}
@@ -241,11 +242,11 @@ func TestArrowQueryRowReadAhead(t *testing.T) {
 				batches[1].rows = rows
 			}
 			calls := 0
-			decoder := func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+			decoder := func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
 				batch := batches[calls]
 				calls++
 
-				return []query.ArrowBatch{batch}, nil
+				return []arrow.Batch{batch}, nil
 			}
 			r, err := newResult(t.Context(), stream, withArrowDecoder(decoder))
 			require.NoError(t, err)
@@ -278,7 +279,7 @@ func TestArrowSkipAndCancellation(t *testing.T) {
 			}
 			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
 			calls := 0
-			decoder := func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+			decoder := func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
 				calls++
 
 				return arrowTestBatches([][]types.Value{{types.Int32Value(1), types.NullValue(types.TypeText)}}), nil
@@ -306,7 +307,7 @@ func TestArrowSkipAndCancellation(t *testing.T) {
 }
 
 func TestArrowExecuteOptionDefaults(t *testing.T) {
-	decoder := query.ArrowDecoder(func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+	decoder := arrow.Decoder(func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
 		return nil, nil
 	})
 	for _, defaults := range []struct {
@@ -355,7 +356,7 @@ func TestArrowExecuteOptionDefaults(t *testing.T) {
 }
 
 func TestArrowExec(t *testing.T) {
-	decoder := query.ArrowDecoder(func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+	decoder := arrow.Decoder(func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
 		return nil, errors.New("Exec must not invoke the decoder")
 	})
 	for _, executor := range []string{"Client", "Session", "TxActor"} {
@@ -416,8 +417,8 @@ func TestArrowMaterializedResultSetClose(t *testing.T) {
 	stream.EXPECT().Recv().Return(arrowTestPart(0, arrowTestColumns(), "data"), nil)
 	stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
 	batch := &arrowTestBatch{rows: [][]types.Value{{types.Int32Value(1), types.NullValue(types.TypeText)}}}
-	decoder := func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
-		return []query.ArrowBatch{batch}, nil
+	decoder := func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
+		return []arrow.Batch{batch}, nil
 	}
 	r, err := newResult(t.Context(), stream, withArrowDecoder(decoder))
 	require.NoError(t, err)
@@ -477,8 +478,8 @@ type arrowTestBatch struct {
 	valueCalls int
 }
 
-func arrowTestBatches(rows [][]types.Value) []query.ArrowBatch {
-	return []query.ArrowBatch{&arrowTestBatch{rows: rows}}
+func arrowTestBatches(rows [][]types.Value) []arrow.Batch {
+	return []arrow.Batch{&arrowTestBatch{rows: rows}}
 }
 func (b *arrowTestBatch) NumRows() int { return len(b.rows) }
 func (b *arrowTestBatch) NumCols() int {

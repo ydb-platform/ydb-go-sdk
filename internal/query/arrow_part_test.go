@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
@@ -32,13 +33,13 @@ func TestArrowPartOwnership(t *testing.T) {
 			}
 			second := &arrowTestBatch{rows: [][]types.Value{{types.Int32Value(4), types.OptionalValue(types.TextValue("four"))}}}
 			decoderCalls := 0
-			decoder := func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+			decoder := func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
 				decoderCalls++
 				if decoderCalls == 1 {
-					return []query.ArrowBatch{first[0], first[1]}, nil
+					return []arrow.Batch{first[0], first[1]}, nil
 				}
 
-				return []query.ArrowBatch{second}, nil
+				return []arrow.Batch{second}, nil
 			}
 			stream.EXPECT().Recv().DoAndReturn(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 				for _, batch := range first {
@@ -125,7 +126,7 @@ func TestArrowPartCloseCancellation(t *testing.T) {
 	closed := make(chan struct{})
 	var releases atomic.Int32
 	batch := &cancelArrowBatch{
-		ArrowBatch: arrowTestBatches([][]types.Value{{types.Int32Value(1), types.NullValue(types.TypeText)}})[0],
+		Batch: arrowTestBatches([][]types.Value{{types.Int32Value(1), types.NullValue(types.TypeText)}})[0],
 		onRelease: func() {
 			if releases.Add(1) == 1 {
 				cancel()
@@ -133,8 +134,8 @@ func TestArrowPartCloseCancellation(t *testing.T) {
 			}
 		},
 	}
-	decoder := func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
-		return []query.ArrowBatch{batch}, nil
+	decoder := func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
+		return []arrow.Batch{batch}, nil
 	}
 	r, err := newResult(ctx, stream, withArrowDecoder(decoder), withStreamResultOnClose(func() { close(closed) }))
 	require.NoError(t, err)
@@ -147,12 +148,12 @@ func TestArrowPartCloseCancellation(t *testing.T) {
 }
 
 type cancelArrowBatch struct {
-	query.ArrowBatch
+	arrow.Batch
 
 	onRelease func()
 }
 
 func (b *cancelArrowBatch) Release() {
 	b.onRelease()
-	b.ArrowBatch.Release()
+	b.Batch.Release()
 }

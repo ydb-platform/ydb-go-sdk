@@ -17,6 +17,7 @@ import (
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	queryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
@@ -26,7 +27,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -546,9 +546,9 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 // The decoder must support the result types of every query through those connectors.
 // Connectors using Table Service are unaffected.
 //
-// The application supplies the decoder and chooses its Apache Arrow Go version;
-// the SDK module has no Apache Arrow Go dependency. See query.ArrowDecoder for
-// ownership and concurrency requirements.
+// The application creates the decoder with query.NewArrowDecoder using its
+// Apache Arrow Go version; the SDK module has no Apache Arrow Go dependency.
+// See query.WithArrow for result ownership and lifetime requirements.
 //
 // A nil decoder selects the default YDB value format. Per-call query.WithArrow
 // overrides this setting: query.WithArrow(nil) selects YDB values for one query,
@@ -567,7 +567,7 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 // Close each result after consuming it, and close the driver when it is no longer needed.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func WithQueryDefaultResultFormatArrow(decoder query.ArrowDecoder) Option {
+func WithQueryDefaultResultFormatArrow(decoder arrow.Decoder) Option {
 	return WithQueryConfigOption(queryConfig.WithDefaultResultFormatArrow(decoder))
 }
 

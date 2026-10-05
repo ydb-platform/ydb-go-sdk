@@ -7,13 +7,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	queryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 func TestWithQueryDefaultResultFormatArrow(t *testing.T) {
 	called := false
-	decoder := query.ArrowDecoder(func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+	decoder := arrow.Decoder(func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
 		called = true
 
 		return nil, nil

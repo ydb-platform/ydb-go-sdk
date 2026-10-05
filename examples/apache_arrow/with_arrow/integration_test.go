@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	arrowinternal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
@@ -19,7 +20,7 @@ func TestExecutors(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	var calls atomic.Int32
-	decoder := query.ArrowDecoder(func(ctx context.Context, cols []query.ArrowColumn, part io.Reader) ([]query.ArrowBatch, error) {
+	decoder := arrowinternal.Decoder(func(ctx context.Context, cols []arrowinternal.Column, part io.Reader) ([]arrowinternal.Batch, error) {
 		calls.Add(1)
 		return Decode(ctx, cols, part)
 	})
@@ -59,7 +60,7 @@ func TestDatabaseSQLDriverDefault(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	var calls atomic.Int32
-	decoder := query.ArrowDecoder(func(ctx context.Context, cols []query.ArrowColumn, part io.Reader) ([]query.ArrowBatch, error) {
+	decoder := arrowinternal.Decoder(func(ctx context.Context, cols []arrowinternal.Column, part io.Reader) ([]arrowinternal.Batch, error) {
 		calls.Add(1)
 		return Decode(ctx, cols, part)
 	})

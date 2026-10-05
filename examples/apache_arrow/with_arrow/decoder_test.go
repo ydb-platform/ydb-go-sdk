@@ -13,6 +13,7 @@ import (
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
 	"github.com/apache/arrow-go/v18/arrow/memory"
+	arrowinternal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
@@ -42,7 +43,7 @@ func TestDecodeOwnsValues(t *testing.T) {
 	}
 	builder.Release()
 	alloc.AssertSize(t, 0)
-	columns := []query.ArrowColumn{{Name: "id", Type: types.TypeInt32}, {Name: "name", Type: types.Optional(types.TypeText)}, {Name: "payload", Type: types.TypeBytes}}
+	columns := []arrowinternal.Column{{Name: "id", Type: types.TypeInt32}, {Name: "name", Type: types.Optional(types.TypeText)}, {Name: "payload", Type: types.TypeBytes}}
 	decode := query.NewArrowDecoder(ipc.NewReader, ipc.WithAllocator(alloc))
 	batches, err := decode(context.Background(), columns, bytes.NewReader(wire.Bytes()))
 	if err != nil {
@@ -330,7 +331,7 @@ func TestDecodeEmptyBatch(t *testing.T) {
 	if wire.Len() == 0 {
 		t.Fatal("empty batch must have an IPC payload")
 	}
-	columns := []query.ArrowColumn{{Name: "id", Type: types.TypeInt32}}
+	columns := []arrowinternal.Column{{Name: "id", Type: types.TypeInt32}}
 	batches, err := Decode(t.Context(), columns, bytes.NewReader(wire.Bytes()))
 	if err != nil {
 		t.Fatal(err)
@@ -349,7 +350,7 @@ func TestDecodeEmptyBatch(t *testing.T) {
 	}
 }
 
-func decodeColumn(t testing.TB, data arrow.Array, typ types.Type) (query.ArrowBatch, error) {
+func decodeColumn(t testing.TB, data arrow.Array, typ types.Type) (arrowinternal.Batch, error) {
 	t.Helper()
 	schema := arrow.NewSchema([]arrow.Field{{Name: "value", Type: data.DataType(), Nullable: true}}, nil)
 	record := array.NewRecordBatch(schema, []arrow.Array{data}, int64(data.Len()))
@@ -362,7 +363,7 @@ func decodeColumn(t testing.TB, data arrow.Array, typ types.Type) (query.ArrowBa
 	if err := writer.Close(); err != nil {
 		t.Fatal(err)
 	}
-	batches, err := Decode(context.Background(), []query.ArrowColumn{{Name: "value", Type: typ}}, bytes.NewReader(wire.Bytes()))
+	batches, err := Decode(context.Background(), []arrowinternal.Column{{Name: "value", Type: typ}}, bytes.NewReader(wire.Bytes()))
 	if err != nil {
 		return nil, err
 	}

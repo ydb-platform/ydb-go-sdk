@@ -14,6 +14,7 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	arrowinternal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
@@ -42,7 +43,7 @@ ORDER BY id;`, strings.Repeat("x", 64))
 		t.Run(test.name, func(t *testing.T) {
 			var active, activeBytes atomic.Int64
 			var parts, peak, peakBytes, largestPart, largestPartBytes, totalBytes int64
-			decode := func(ctx context.Context, columns []query.ArrowColumn, part io.Reader) ([]query.ArrowBatch, error) {
+			decode := func(ctx context.Context, columns []arrowinternal.Column, part io.Reader) ([]arrowinternal.Batch, error) {
 				if !test.materialized && active.Load() != 0 {
 					return nil, fmt.Errorf("previous part still owns %d batches", active.Load())
 				}
@@ -68,7 +69,7 @@ ORDER BY id;`, strings.Repeat("x", 64))
 					bytesInPart += size
 					active.Add(1)
 					activeBytes.Add(size)
-					batches[i] = &lifetimeBatch{ArrowBatch: b, active: &active, activeBytes: &activeBytes, size: size}
+					batches[i] = &lifetimeBatch{Batch: b, active: &active, activeBytes: &activeBytes, size: size}
 				}
 				largestPart = max(largestPart, int64(len(batches)))
 				largestPartBytes = max(largestPartBytes, bytesInPart)
@@ -148,14 +149,14 @@ ORDER BY id;`, strings.Repeat("x", 64))
 }
 
 type lifetimeBatch struct {
-	query.ArrowBatch
+	arrowinternal.Batch
 	active      *atomic.Int64
 	activeBytes *atomic.Int64
 	size        int64
 }
 
 func (b *lifetimeBatch) Release() {
-	b.ArrowBatch.Release()
+	b.Batch.Release()
 	b.active.Add(-1)
 	b.activeBytes.Add(-b.size)
 }

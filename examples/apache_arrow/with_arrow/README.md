@@ -1,4 +1,4 @@
-# Query results with an application-provided Arrow decoder
+# Query results with Apache Arrow
 
 `query.WithArrow` is experimental. It works with `Query`, `QueryRow` and
 `QueryResultSet` on `query.Client`, `query.Session` and `query.TxActor`.
@@ -16,7 +16,9 @@ so the returned data remains valid after batch release.
 The example supports Bool, signed/unsigned integers, Float, Double, String,
 Utf8 and a single Optional wrapper. YDB Bool may arrive as Arrow Uint8.
 Unsupported types, including nested Optional and complex types, return errors;
-supply a custom `ArrowDecoder` for those types.
+to add support for a missing YDB type, open an
+[issue](https://github.com/ydb-platform/ydb-go-sdk/issues) or submit a
+[pull request](https://github.com/ydb-platform/ydb-go-sdk/pulls).
 
 ## The same row API with either format
 
@@ -56,12 +58,12 @@ db, err := ydb.Open(ctx, dsn,
 row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(nil))
 ```
 
-`ArrowDecoder` receives the YDB column names/types and a self-contained IPC
+The decoder receives the YDB column names/types and a self-contained IPC
 reader for one response part, including schema. It returns retained
-`query.ArrowBatch` objects. Each batch preserves column order, reports its
+column batches. Each batch preserves column order, reports its
 dimensions, scans cells directly and returns owned `types.Value` objects on
 demand. The
-decoder must validate YDB types and optionality and support concurrent calls.
+decoder validates YDB types and optionality before returning batches.
 The SDK validates batch dimensions, uses the existing column mappings for
 `Scan`, `ScanNamed` and `ScanStruct`, and calls `Release` when the batch is no
 longer needed. Decoder errors propagate through the ordinary result error
