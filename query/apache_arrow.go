@@ -90,6 +90,8 @@ type ArrowIPCReader[B any] = arrow.IPCReader[B]
 // has no Apache Arrow Go dependency. It supports Bool, signed/unsigned integers,
 // Float, Double, String and Utf8, with one Optional wrapper. Unsupported types
 // and mismatches with YDB column metadata return decode errors before scanning.
+// YDB temporal types, including Date, Datetime, Timestamp and Interval, require
+// a custom ArrowDecoder even when represented by integer arrays in Arrow.
 //
 // For example:
 //

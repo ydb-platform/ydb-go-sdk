@@ -55,7 +55,8 @@ with `go run ./cmd` from that module after starting a local YDB.
 
 `NewArrowDecoder` supports Bool, signed/unsigned integers, Float, Double, String
 (`types.TypeBytes` in the SDK), Utf8 and one level of Optional. Unsupported types
-return errors; supply a custom `ArrowDecoder` for other YDB types used by your queries.
+return errors; supply a custom `ArrowDecoder` for other YDB types used by your queries,
+including temporal types such as Date, Datetime, Timestamp and Interval.
 A decoder receives column names and YDB
 types plus a self-contained IPC part. It returns retained `query.ArrowBatch`
 objects and must preserve all rows and column order, validate YDB types and
@@ -77,8 +78,10 @@ result set, or closing the result. Moving between rows or batches within the
 same part keeps its batches alive. `Scan` output and `Values()` are owned and
 remain valid independently; save those when data must outlive the part.
 `Client.Query` and `Client.QueryResultSet` retain all batches until the
-returned result is closed. `QueryRow` detaches its one row before reading
-ahead to validate the row and result-set counts.
+returned result is closed. `QueryRow` detaches its one row, then reads ahead
+to check that there are no further rows or result sets. With Arrow, checking for
+another row can decode subsequent parts of the same result set. Their batches
+are released when advancing to another part or closing the internal result.
 
 ### Selecting the format per query
 

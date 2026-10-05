@@ -19,27 +19,31 @@ import (
 func TestRowScan(t *testing.T) {
 	row := newDecodedRow([]*Ydb.Column{{Name: "id"}}, []value.Value{value.Int32Value(42)})
 	for _, tt := range []struct {
-		name   string
-		method string
-		scan   func() error
+		name    string
+		method  string
+		context string
+		scan    func() error
 	}{
 		{
-			name:   "indexed scan",
-			method: "Scan",
+			name:    "indexed scan",
+			method:  "Scan",
+			context: "scan error on column index 0",
 			scan: func() error {
 				return row.Scan(new(bool))
 			},
 		},
 		{
-			name:   "named scan",
-			method: "ScanNamed",
+			name:    "named scan",
+			method:  "ScanNamed",
+			context: "scan error on column name 'id'",
 			scan: func() error {
 				return row.ScanNamed(scanner.NamedRef("id", new(bool)))
 			},
 		},
 		{
-			name:   "struct scan",
-			method: "ScanStruct",
+			name:    "struct scan",
+			method:  "ScanStruct",
+			context: "scan error on struct field name 'id'",
 			scan: func() error {
 				return row.ScanStruct(&struct {
 					ID bool `sql:"id"`
@@ -51,8 +55,10 @@ func TestRowScan(t *testing.T) {
 			err := tt.scan()
 			require.Error(t, err)
 			require.ErrorIs(t, err, value.ErrCannotCast)
-			require.ErrorContains(t, err, "scan error on")
+			require.ErrorContains(t, err, tt.context)
+			require.ErrorContains(t, err, "cast failed 'Int32(42)' to '*bool' destination")
 			require.ErrorContains(t, err, "github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Row)."+tt.method+"(")
+			require.ErrorContains(t, err, "github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func")
 		})
 	}
 }

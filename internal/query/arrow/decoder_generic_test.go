@@ -295,6 +295,10 @@ func TestNewColumnBoolAndInvalidTypes(t *testing.T) {
 	}{
 		{&scalarTestArray[int32]{values: []int32{0}, nulls: []bool{true}}, types.Int32, "null in non-optional"},
 		{&scalarTestArray[int32]{values: []int32{0}}, types.Text, "does not match YDB"},
+		{&scalarTestArray[uint32]{values: []uint32{0}}, types.Date, "does not match YDB"},
+		{&scalarTestArray[uint32]{values: []uint32{0}}, types.Datetime, "does not match YDB"},
+		{&scalarTestArray[uint64]{values: []uint64{0}}, types.Timestamp, "does not match YDB"},
+		{&scalarTestArray[int64]{values: []int64{0}}, types.Interval, "does not match YDB"},
 		{
 			&scalarTestArray[int32]{values: []int32{0}},
 			types.NewOptional(types.NewOptional(types.Int32)), "does not match YDB",

@@ -228,6 +228,42 @@ func TestArrowQueryRowConstraints(t *testing.T) {
 	}
 }
 
+func TestArrowQueryRowReadAhead(t *testing.T) {
+	for _, extraRow := range []bool{false, true} {
+		t.Run(map[bool]string{false: "empty next part", true: "row in next part"}[extraRow], func(t *testing.T) {
+			stream := newExecuteQueryStreamMock(gomock.NewController(t))
+			stream.EXPECT().Recv().Return(arrowTestPart(0, arrowTestColumns(), "first"), nil)
+			stream.EXPECT().Recv().Return(arrowTestPart(0, nil, "second"), nil)
+			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
+			rows := [][]types.Value{{types.Int32Value(1), types.NullValue(types.TypeText)}}
+			batches := []*arrowTestBatch{{rows: rows}, {}}
+			if extraRow {
+				batches[1].rows = rows
+			}
+			calls := 0
+			decoder := func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+				batch := batches[calls]
+				calls++
+
+				return []query.ArrowBatch{batch}, nil
+			}
+			r, err := newResult(t.Context(), stream, withArrowDecoder(decoder))
+			require.NoError(t, err)
+			row, err := readRow(t.Context(), r)
+			if extraRow {
+				require.ErrorIs(t, err, ErrMoreThanOneRow)
+			} else {
+				require.NoError(t, err)
+				verifyArrowTestRow(t, row, 1)
+			}
+			require.Equal(t, 2, calls)
+			for _, batch := range batches {
+				require.Equal(t, 1, batch.releases)
+			}
+		})
+	}
+}
+
 func TestArrowSkipAndCancellation(t *testing.T) {
 	for _, cancelled := range []bool{false, true} {
 		t.Run(map[bool]string{false: "skip", true: "cancel"}[cancelled], func(t *testing.T) {
