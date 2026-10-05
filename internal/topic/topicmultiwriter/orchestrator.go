@@ -323,7 +323,18 @@ func (o *orchestrator) saveMessageContent(msg *message) error {
 	// This keeps multiwriter-owned messages resendable even if a downstream writer
 	// reads the original reader and fails before enqueueing to its own buffer.
 	err := msg.CacheMessageData(rawtopiccommon.CodecRaw)
-	onCompressDone(err)
+
+	traceErr := err
+	var uncompressedSize, compressedSize int
+	if traceErr == nil && tracer.OnWriterCompressMessages != nil {
+		var content []byte
+		content, traceErr = msg.GetEncodedBytes(rawtopiccommon.CodecRaw)
+		if traceErr == nil {
+			compressedSize = len(content)
+			uncompressedSize = msg.BufUncompressedSize
+		}
+	}
+	onCompressDone(traceErr, uncompressedSize, compressedSize)
 	if err != nil {
 		return err
 	}

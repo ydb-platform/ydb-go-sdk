@@ -1,6 +1,10 @@
 * Improved topic multi-writer performance for topics with many partitions
 * Changed transactional topic writers to use transaction-level retries and require explicit SeqNo for deduplication
 
+## v3.153.2
+* Added `UncompressedSize` and `CompressedSize` fields to `trace.TopicWriterCompressMessagesDoneInfo` to allow tracking actual bytes written by the topic writer
+* Deprecated `pkg/xtest.SyncedTest`, `MakeSyncedTest`, and their wrapper methods in favor of `testing.T`.
+
 ## v3.153.1
 * Fixed `sugar.Embedding` encoding of an empty vector to match `Knn::ToBinaryStringFloat`
 

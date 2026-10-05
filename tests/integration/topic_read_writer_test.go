@@ -219,14 +219,13 @@ func TestMessageMetadata(t *testing.T) {
 	})
 }
 
-func TestManyConcurentReadersWriters(sourceTest *testing.T) {
+func TestManyConcurentReadersWriters(t *testing.T) {
 	const partitionCount = 3
 	const writersCount = 5
 	const readersCount = 10
 	const sendMessageCount = 100
 	const totalMessageCount = sendMessageCount * writersCount
 
-	t := xtest.MakeSyncedTest(sourceTest)
 	ctx := xtest.Context(t)
 	db := connect(t, ydb.WithLogger(
 		newLogger(t),

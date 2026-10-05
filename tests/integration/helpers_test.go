@@ -40,22 +40,21 @@ type scopeT struct {
 	Ctx context.Context
 	fixenv.Env
 	Require *require.Assertions
-	t       *xtest.SyncedTest
+	t       testing.TB
 }
 
-func newScope(t *testing.T) *scopeT {
-	st := xtest.MakeSyncedTest(t)
-	at := require.New(st)
-	fEnv := fixenv.New(st)
+func newScope(t testing.TB) *scopeT {
+	at := require.New(t)
+	fEnv := fixenv.New(t)
 	ctx, ctxCancel := context.WithCancel(context.Background())
-	st.Cleanup(func() {
+	t.Cleanup(func() {
 		ctxCancel()
 	})
 	res := &scopeT{
 		Ctx:     ctx,
 		Env:     fEnv,
 		Require: at,
-		t:       st,
+		t:       t,
 	}
 	return res
 }
@@ -529,7 +528,7 @@ func (scope *scopeT) TablePath(opts ...func(t *tableNameParams)) string {
 
 // logger for tests
 type testLogger struct {
-	test     *xtest.SyncedTest
+	test     testing.TB
 	testName string
 	minLevel log.Level
 
@@ -538,11 +537,11 @@ type testLogger struct {
 	messages []string
 }
 
-func newLogger(t *xtest.SyncedTest) *testLogger {
+func newLogger(t testing.TB) *testLogger {
 	return newLoggerWithMinLevel(t, 0)
 }
 
-func newLoggerWithMinLevel(t *xtest.SyncedTest, level log.Level) *testLogger {
+func newLoggerWithMinLevel(t testing.TB, level log.Level) *testLogger {
 	logger := &testLogger{
 		test:     t,
 		testName: t.Name(),
