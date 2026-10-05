@@ -310,7 +310,7 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 //
 // [Apache Arrow]: https://arrow.apache.org/
 func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Execute) (_ arrow.Result, finalErr error) {
-	settings := options.ExecuteSettings(s.withDefaultExecuteOptions(opts...)...)
+	settings := options.ExecuteSettings(opts...)
 
 	defer func() {
 		if finalErr != nil {

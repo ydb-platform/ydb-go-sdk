@@ -19,23 +19,27 @@ import (
 func TestRowScan(t *testing.T) {
 	row := newDecodedRow([]*Ydb.Column{{Name: "id"}}, []value.Value{value.Int32Value(42)})
 	for _, tt := range []struct {
-		name string
-		scan func() error
+		name   string
+		method string
+		scan   func() error
 	}{
 		{
-			name: "indexed scan",
+			name:   "indexed scan",
+			method: "Scan",
 			scan: func() error {
 				return row.Scan(new(bool))
 			},
 		},
 		{
-			name: "named scan",
+			name:   "named scan",
+			method: "ScanNamed",
 			scan: func() error {
 				return row.ScanNamed(scanner.NamedRef("id", new(bool)))
 			},
 		},
 		{
-			name: "struct scan",
+			name:   "struct scan",
+			method: "ScanStruct",
 			scan: func() error {
 				return row.ScanStruct(&struct {
 					ID bool `sql:"id"`
@@ -46,8 +50,9 @@ func TestRowScan(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.scan()
 			require.Error(t, err)
+			require.ErrorIs(t, err, value.ErrCannotCast)
 			require.ErrorContains(t, err, "scan error on")
-			require.ErrorContains(t, err, "github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Row).Scan")
+			require.ErrorContains(t, err, "github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Row)."+tt.method+"(")
 		})
 	}
 }
