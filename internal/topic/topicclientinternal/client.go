@@ -52,17 +52,18 @@ func New(
 	var defaultOperationParams rawydb.OperationParams
 	topic.OperationParamsFromConfig(&defaultOperationParams, &cfg.Common)
 
-	client := &Client{
+	var client *Client
+	client = &Client{
 		cfg:                    cfg,
 		cred:                   cred,
 		defaultOperationParams: defaultOperationParams,
 		rawClient:              rawClient,
+		partitionSources: partition.NewSources(func(
+			ctx context.Context, path string,
+		) (topictypes.TopicDescription, error) {
+			return client.Describe(ctx, path)
+		}),
 	}
-	client.partitionSources = partition.NewSources(func(
-		ctx context.Context, path string,
-	) (topictypes.TopicDescription, error) {
-		return client.Describe(ctx, path)
-	})
 
 	return client
 }
