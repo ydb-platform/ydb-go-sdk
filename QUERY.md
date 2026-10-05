@@ -155,9 +155,8 @@ in-memory PDisks and anonymous authentication.
 Each size was measured in five separate processes, with ten warmup RPCs per
 variant. Each process ran 1,000 RPCs per variant for 1/10/100 rows, or 100 RPCs
 for 1,000/10,000 rows. Measurements ran without race instrumentation or concurrent
-tests/builds. The table contains medians; elapsed ranges and graph error bars
+tests/builds. The table and charts contain medians; elapsed ranges in the table
 are the observed min–max across the five runs, not confidence intervals.
-[CSV measurements](assets/query-results-benchmark.csv) contain all five runs.
 
 | Rows | API | Elapsed ms/RPC (range) | Client CPU ms/RPC | Allocated MiB/RPC | Allocations/RPC |
 | ---: | --- | ---: | ---: | ---: | ---: |
@@ -202,17 +201,60 @@ coverage is separate; the performance measurements above use Session.
 
 ### Client CPU
 
-![Client CPU per RPC for Value, QueryArrow and WithArrow](assets/query-results-cpu.svg)
+```mermaid
+---
+config:
+  themeVariables:
+    xyChart:
+      plotColorPalette: "#596579, #158073, #dc7127"
+---
+xychart-beta
+    title "Client CPU"
+    x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
+    y-axis "ms/RPC" 0 --> 28
+    line "Value" [0.395, 0.502, 1.011, 3.187, 25.619]
+    line "QueryArrow" [0.425, 0.447, 0.557, 0.993, 7.677]
+    line "WithArrow" [0.464, 0.490, 0.643, 1.595, 9.527]
+```
 
 ### Allocated memory
 
-![Allocated MiB per RPC for Value, QueryArrow and WithArrow](assets/query-results-memory.svg)
+```mermaid
+---
+config:
+  themeVariables:
+    xyChart:
+      plotColorPalette: "#596579, #158073, #dc7127"
+---
+xychart-beta
+    title "Allocated memory"
+    x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
+    y-axis "MiB/RPC" 0 --> 20
+    line "Value" [0.021, 0.035, 0.179, 2.198, 19.211]
+    line "QueryArrow" [0.026, 0.029, 0.059, 0.373, 4.774]
+    line "WithArrow" [0.030, 0.033, 0.067, 0.416, 5.501]
+```
 
 ### Allocation count
 
-![Allocations per RPC for Value, QueryArrow and WithArrow](assets/query-results-allocations.svg)
+```mermaid
+---
+config:
+  themeVariables:
+    xyChart:
+      plotColorPalette: "#596579, #158073, #dc7127"
+---
+xychart-beta
+    title "Allocation count"
+    x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
+    y-axis "Allocations/RPC" 0 --> 400000
+    line "Value" [378, 722, 4112, 39525, 394874]
+    line "QueryArrow" [372, 373, 374, 680, 4721]
+    line "WithArrow" [486, 559, 1253, 8582, 83142]
+```
 
-Both axes are logarithmic.
+The x-axis lists the measured row counts at equal intervals; the y-axis is
+linear. The charts show medians without error bars.
 
 ### Reproducing the benchmark
 
