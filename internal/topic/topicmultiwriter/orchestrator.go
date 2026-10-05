@@ -260,11 +260,11 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 			return getErr
 		}
 		if !writer.initDone.Load() {
-			info, initErr := writer.WaitInitInfo(ctx)
-			if initErr != nil {
+			if initErr := writer.waitInit(ctx); initErr != nil {
 				return initErr
 			}
-			advanceMaxSeqNo(&o.currentSeqNo, info.LastSeqNum)
+		} else if initErr := writer.getInitErr(); initErr != nil {
+			return initErr
 		}
 	}
 	o.mu.WithLock(func() {
@@ -568,7 +568,9 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 				maxSeqNo = max(maxSeqNo, initInfo.LastSeqNum)
 				partitionInfo.CachedMaxSeqNo = initInfo.LastSeqNum
 			})
-			advanceMaxSeqNo(&o.currentSeqNo, initInfo.LastSeqNum)
+			if splitted {
+				advanceMaxSeqNo(&o.currentSeqNo, initInfo.LastSeqNum)
+			}
 
 			return nil
 		})

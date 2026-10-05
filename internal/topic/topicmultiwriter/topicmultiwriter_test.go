@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -119,6 +120,7 @@ func (f *choosePartitionKeyCheckWritersFactory) Create(
 
 type orderedSeqWriter struct {
 	lastSeqNo             int64
+	initCalls             atomic.Int32
 	writes                chan int64
 	onAckReceivedCallback func(seqNo int64)
 }
@@ -128,6 +130,7 @@ func (w *orderedSeqWriter) Close(ctx context.Context) error {
 }
 
 func (w *orderedSeqWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+	w.initCalls.Add(1)
 	return topicwriterinternal.InitialInfo{LastSeqNum: w.lastSeqNo}, nil
 }
 

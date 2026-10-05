@@ -69,6 +69,8 @@ func TestMultiWriterAutoSeqNoUsesOpenedSessionBaseline(t *testing.T) {
 		}}))
 		require.Equal(t, tc.wantSeqNo, <-factory.writers[tc.partitionID].writes)
 	}
+	require.EqualValues(t, 1, factory.writers[1].initCalls.Load())
+	require.EqualValues(t, 1, factory.writers[2].initCalls.Load())
 
 	require.NoError(t, w.Close(ctx))
 }

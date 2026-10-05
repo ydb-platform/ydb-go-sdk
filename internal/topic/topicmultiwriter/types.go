@@ -44,9 +44,19 @@ type ack struct {
 type writerWrapper struct {
 	writer
 
-	initDone atomic.Bool
-	initErr  atomic.Value
-	direct   bool
+	initDone   atomic.Bool
+	initDoneCh chan struct{}
+	initErr    atomic.Value
+	direct     bool
+}
+
+func (w *writerWrapper) waitInit(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-w.initDoneCh:
+		return w.getInitErr()
+	}
 }
 
 func (w *writerWrapper) setInitErr(err error) {

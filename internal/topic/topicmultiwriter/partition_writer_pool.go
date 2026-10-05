@@ -192,8 +192,9 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 	}
 
 	wrapper := &writerWrapper{
-		writer: wr,
-		direct: direct,
+		writer:     wr,
+		direct:     direct,
+		initDoneCh: make(chan struct{}),
 	}
 	p.writers[partitionID] = wrapper
 	if !direct {
@@ -208,6 +209,7 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 		wrapper.setInitErr(err)
 
 		wrapper.initDone.Store(true)
+		close(wrapper.initDoneCh)
 		p.onWriterInit()
 	})
 
