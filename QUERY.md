@@ -171,26 +171,7 @@ in-memory PDisks and anonymous authentication.
 Each size was measured in five separate processes, with ten warmup RPCs per
 variant. Each process ran 1,000 RPCs per variant for 1/10/100 rows, or 100 RPCs
 for 1,000/10,000 rows. Measurements ran without race instrumentation or concurrent
-tests/builds. The table and charts contain medians; elapsed ranges in the table
-are the observed min–max across the five runs, not confidence intervals.
-
-| Rows | API | Elapsed ms/RPC (range) | Client CPU ms/RPC | Allocated MiB/RPC | Allocations/RPC |
-| ---: | --- | ---: | ---: | ---: | ---: |
-| 1 | `Value` | 1.378 (1.264–1.998) | 0.427 | 0.021 | 378 |
-| 1 | `QueryArrow` | 1.553 (1.377–1.640) | 0.466 | 0.026 | 372 |
-| 1 | `WithArrow` | 1.491 (1.258–2.813) | 0.526 | 0.029 | 485 |
-| 10 | `Value` | 1.520 (1.333–2.149) | 0.603 | 0.035 | 722 |
-| 10 | `QueryArrow` | 1.591 (1.457–2.068) | 0.492 | 0.029 | 373 |
-| 10 | `WithArrow` | 2.030 (1.482–2.166) | 0.507 | 0.033 | 559 |
-| 100 | `Value` | 2.645 (2.406–2.951) | 1.279 | 0.179 | 4,113 |
-| 100 | `QueryArrow` | 1.882 (1.841–1.912) | 0.600 | 0.059 | 374 |
-| 100 | `WithArrow` | 1.841 (1.819–3.311) | 0.723 | 0.066 | 1,252 |
-| 1,000 | `Value` | 6.591 (6.150–8.191) | 3.296 | 2.153 | 39,528 |
-| 1,000 | `QueryArrow` | 3.946 (3.556–4.635) | 1.053 | 0.387 | 680 |
-| 1,000 | `WithArrow` | 4.459 (4.124–4.713) | 1.708 | 0.433 | 8,579 |
-| 10,000 | `Value` | 30.052 (29.283–35.318) | 24.885 | 19.071 | 394,876 |
-| 10,000 | `QueryArrow` | 20.389 (19.775–22.612) | 7.771 | 4.679 | 4,700 |
-| 10,000 | `WithArrow` | 22.803 (20.245–28.619) | 10.328 | 5.475 | 83,093 |
+tests/builds. The charts contain medians.
 
 Client CPU is user + system CPU of the client process from `getrusage`, including
 decoding, scanning and GC. Elapsed time includes server execution and transport.
