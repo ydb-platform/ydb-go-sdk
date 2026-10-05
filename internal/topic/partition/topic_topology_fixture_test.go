@@ -31,19 +31,19 @@ type partitionsResult struct {
 	err        error
 }
 
-func newSourceWithDescriptions(descriptions ...topictypes.TopicDescription) *partition.Source {
+func newTopicTopologyWithDescriptions(descriptions ...topictypes.TopicDescription) *partition.TopicTopology {
 	results := make([]topicDescribeResult, len(descriptions))
 	for i, description := range descriptions {
 		results[i].description = description
 	}
 
-	return newSourceWithDescribeResults(results...)
+	return newTopicTopologyWithDescribeResults(results...)
 }
 
-func newSourceWithDescribeResults(results ...topicDescribeResult) *partition.Source {
+func newTopicTopologyWithDescribeResults(results ...topicDescribeResult) *partition.TopicTopology {
 	describer := &scriptedTopicDescriber{results: results}
 
-	return partition.NewSources(describer.Describe).Get("test/topic")
+	return partition.NewTopologyRegistry(describer.Describe).Get("test/topic")
 }
 
 func topicWithActivePartitions(partitionIDs ...int64) topictypes.TopicDescription {
@@ -79,22 +79,22 @@ func topicAfterMerge(parentIDs []int64, childID int64) topictypes.TopicDescripti
 	return topictypes.TopicDescription{Partitions: partitions}
 }
 
-func startLoadingPartitions(ctx context.Context, source *partition.Source) <-chan partitionsResult {
+func startLoadingPartitions(ctx context.Context, topology *partition.TopicTopology) <-chan partitionsResult {
 	result := make(chan partitionsResult, 1)
 	go func() {
-		partitions, err := source.Partitions(ctx)
+		partitions, err := topology.Partitions(ctx)
 		result <- partitionsResult{partitions: partitions, err: err}
 	}()
 
 	return result
 }
 
-func startWaitingForPartitions(t *testing.T, source *partition.Source) <-chan partitionsResult {
+func startWaitingForPartitions(t *testing.T, topology *partition.TopicTopology) <-chan partitionsResult {
 	t.Helper()
 
 	waiting := make(chan struct{})
 	waitCtx := newDoneObservedContext(t.Context(), waiting)
-	result := startLoadingPartitions(waitCtx, source)
+	result := startLoadingPartitions(waitCtx, topology)
 	<-waiting
 
 	return result

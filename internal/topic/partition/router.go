@@ -24,7 +24,7 @@ type Chooser interface {
 }
 
 // Router binds a writer's chooser to an explicitly supplied topology snapshot.
-// It is independent from Source and changes only when its owner calls Apply.
+// It is independent from TopicTopology and changes only when its owner calls Apply.
 // If a topology update fails, Router stops choosing partitions because the chooser
 // may contain a stale or partially updated partition set.
 // Its methods are safe for concurrent use and require no external locking.

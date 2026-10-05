@@ -40,8 +40,8 @@ func (o *orchestrator) getWritersCount() int {
 	return o.writerPool.getWritersCount()
 }
 
-func newTestPartitionSource(describer TopicDescriber) *partition.Source {
-	return partition.NewSources(describer).Get("test/topic")
+func newTestTopicTopology(describer TopicDescriber) *partition.TopicTopology {
+	return partition.NewTopologyRegistry(describer).Get("test/topic")
 }
 
 type stubWritersFactory struct {
@@ -276,7 +276,7 @@ func newTestMultiWriter(t testing.TB, describer TopicDescriber) *MultiWriter {
 	WithProducerIDPrefix("test-producer")(&cfg)
 	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
 
-	writer, err := NewMultiWriter(newTestPartitionSource(describer), &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
+	writer, err := NewMultiWriter(newTestTopicTopology(describer), &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -293,12 +293,12 @@ func newTestMultiWriterWithInitDelay(
 	WithProducerIDPrefix("test-producer")(&cfg)
 	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
 
-	source := newTestPartitionSource(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+	topology := newTestTopicTopology(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 		time.Sleep(initDelay)
 
 		return describer(ctx, path)
 	})
-	writer, err := NewMultiWriter(source, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
+	writer, err := NewMultiWriter(topology, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -324,7 +324,7 @@ func newTestMultiWriterWithBasicWriter(
 		opt(writerCfg)
 	}
 
-	writer, err := NewMultiWriter(newTestPartitionSource(describer), writerCfg, &cfg)
+	writer, err := NewMultiWriter(newTestTopicTopology(describer), writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -359,7 +359,7 @@ func newTestMultiWriterWithAutopartitioningWriter(
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(newTestPartitionSource(describer), writerCfg, &cfg)
+	writer, err := NewMultiWriter(newTestTopicTopology(describer), writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -378,7 +378,7 @@ func newTestMultiWriterWithSmallIdleSessionTimeout(t testing.TB, describer Topic
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(newTestPartitionSource(describer), writerCfg, &cfg)
+	writer, err := NewMultiWriter(newTestTopicTopology(describer), writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -405,7 +405,7 @@ func newTestMultiWriterWithAckDelay(
 		opt(writerCfg)
 	}
 
-	writer, err := NewMultiWriter(newTestPartitionSource(describer), writerCfg, &cfg)
+	writer, err := NewMultiWriter(newTestTopicTopology(describer), writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -432,7 +432,7 @@ func newTestMultiWriterWithCustomWritersFactory(
 		opt(writerCfg)
 	}
 
-	writer, err := NewMultiWriter(newTestPartitionSource(describer), writerCfg, &cfg)
+	writer, err := NewMultiWriter(newTestTopicTopology(describer), writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -493,7 +493,7 @@ func newTestMultiWriterWithPartitionChooser(
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(newTestPartitionSource(describer), writerCfg, &cfg)
+	writer, err := NewMultiWriter(newTestTopicTopology(describer), writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -625,7 +625,7 @@ func TestMultiWriter_OnPartitionSplitReturnsAddPartitionsError(t *testing.T) {
 
 	require.NoError(t, multiWriter.WaitInit(ctx))
 	state.RecordSplit(1)
-	multiWriter.orchestrator.source.Invalidate()
+	multiWriter.orchestrator.topology.Invalidate()
 
 	err := multiWriter.orchestrator.onPartitionSplit(1)
 	require.ErrorIs(t, err, addPartitionsErr)
@@ -649,10 +649,10 @@ func TestMultiWriter_OnPartitionSplitLeavesUnrelatedReplacementsUnlocked(t *test
 	require.NoError(t, multiWriter.WaitInit(ctx))
 	state.RecordSplit(1)
 	state.RecordSplit(2)
-	multiWriter.orchestrator.source.Invalidate()
+	multiWriter.orchestrator.topology.Invalidate()
 
 	require.NoError(t, multiWriter.orchestrator.onPartitionSplit(1))
-	partitions, err := multiWriter.orchestrator.source.Partitions(ctx)
+	partitions, err := multiWriter.orchestrator.topology.Partitions(ctx)
 	require.NoError(t, err)
 
 	multiWriter.orchestrator.mu.WithLock(func() {
@@ -1044,7 +1044,7 @@ func TestMultiWriter_Write_ErrUnorderedSeqNo(t *testing.T) {
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
 	multiWriter, err := NewMultiWriter(
-		newTestPartitionSource(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		newTestTopicTopology(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return stubClient.Describe(ctx, path)
 		}),
 		writerCfg,
@@ -1101,7 +1101,7 @@ func TestMultiWriter_Write_AutoSeqNoFollowsQueueOrder(t *testing.T) {
 	topicwriterinternal.WithAutoSetSeqNo(true)(writerCfg)
 
 	multiWriter, err := NewMultiWriter(
-		newTestPartitionSource(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		newTestTopicTopology(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return stubClient.Describe(ctx, path)
 		}),
 		writerCfg,

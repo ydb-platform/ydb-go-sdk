@@ -104,11 +104,11 @@ func TestTransactionalMultiWriter_DoesNotInitializeServerSeqNo(t *testing.T) {
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	topicwriterinternal.WithTopic("test/topic")(writerCfg)
 	topicwriterinternal.WithAutoSetSeqNo(true)(writerCfg)
-	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		return stubs.DefaultStubTopicDescription(t), nil
 	}).Get(writerCfg.Topic())
 
-	multiWriter, err := NewTransactionalMultiWriter(source, writerCfg, multiWriterCfg)
+	multiWriter, err := NewTransactionalMultiWriter(topology, writerCfg, multiWriterCfg)
 	require.NoError(t, err)
 	require.NoError(t, multiWriter.WaitInit(ctx))
 	require.Zero(t, factory.createCalls, "transaction initialization must not open seqNo sessions")
@@ -121,11 +121,11 @@ func TestTransactionalMultiWriterRejectsProducerIDPrefix(t *testing.T) {
 	multiWriterCfg := &MultiWriterConfig{ProducerIDPrefix: "custom-prefix"}
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	topicwriterinternal.WithTopic("test/topic")(writerCfg)
-	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		return stubs.DefaultStubTopicDescription(t), nil
 	}).Get(writerCfg.Topic())
 
-	multiWriter, err := NewTransactionalMultiWriter(source, writerCfg, multiWriterCfg)
+	multiWriter, err := NewTransactionalMultiWriter(topology, writerCfg, multiWriterCfg)
 
 	require.Nil(t, multiWriter)
 	require.ErrorIs(t, err, ErrInvalidConfiguration)
@@ -146,11 +146,11 @@ func TestTransactionalMultiWriter_SynchronousWriteReturnsSessionError(t *testing
 	topicwriterinternal.WithAutoSetSeqNo(true)(writerCfg)
 	topicwriterinternal.WithWaitAckOnWrite(true)(writerCfg)
 	topicwriterinternal.WithMaxQueueLen(10)(writerCfg)
-	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		return stubs.DefaultStubTopicDescription(t), nil
 	}).Get(writerCfg.Topic())
 
-	multiWriter, err := NewTransactionalMultiWriter(source, writerCfg, multiWriterCfg)
+	multiWriter, err := NewTransactionalMultiWriter(topology, writerCfg, multiWriterCfg)
 	require.NoError(t, err)
 	writer := NewTopicMultiWriterTransaction(multiWriter, newStubTopicTransaction("test-txn"), nil)
 
@@ -176,14 +176,14 @@ func TestTransactionalMultiWriter_AssignsIncreasingSessionSeqNo(t *testing.T) {
 	topicwriterinternal.WithAutoSetSeqNo(true)(writerCfg)
 	topicwriterinternal.WithWaitAckOnWrite(true)(writerCfg)
 	topicwriterinternal.WithMaxQueueLen(10)(writerCfg)
-	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{
 			PartitionID: 1,
 			Active:      true,
 		}}}, nil
 	}).Get(writerCfg.Topic())
 
-	multiWriter, err := NewTransactionalMultiWriter(source, writerCfg, multiWriterCfg)
+	multiWriter, err := NewTransactionalMultiWriter(topology, writerCfg, multiWriterCfg)
 	require.NoError(t, err)
 	writer := NewTopicMultiWriterTransaction(multiWriter, newStubTopicTransaction("test-txn"), nil)
 	require.NoError(t, writer.Write(ctx, []topicwriterinternal.PublicMessage{

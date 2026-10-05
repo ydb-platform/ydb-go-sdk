@@ -36,7 +36,7 @@ type Client struct {
 	cred                   credentials.Credentials
 	defaultOperationParams rawydb.OperationParams
 	rawClient              rawtopic.Client
-	partitionSources       *partition.Sources
+	topicTopologies        *partition.TopologyRegistry
 }
 
 func New(
@@ -58,7 +58,7 @@ func New(
 		cred:                   cred,
 		defaultOperationParams: defaultOperationParams,
 		rawClient:              rawClient,
-		partitionSources: partition.NewSources(func(
+		topicTopologies: partition.NewTopologyRegistry(func(
 			ctx context.Context, path string,
 		) (topictypes.TopicDescription, error) {
 			return client.Describe(ctx, path)
@@ -395,7 +395,7 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 		cfg.MultiMode = true
 
 		internal, err := internalmultiwriter.NewMultiWriter(
-			c.partitionSources.Get(cfg.Topic()),
+			c.topicTopologies.Get(cfg.Topic()),
 			&cfg,
 			mwCfg,
 		)
@@ -435,7 +435,7 @@ func (c *Client) StartTransactionalWriter(
 		cfg.MultiMode = true
 
 		multiwriter, err := internalmultiwriter.NewTransactionalMultiWriter(
-			c.partitionSources.Get(cfg.Topic()),
+			c.topicTopologies.Get(cfg.Topic()),
 			&cfg,
 			mwCfg,
 		)

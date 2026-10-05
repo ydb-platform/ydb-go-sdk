@@ -138,8 +138,8 @@ func TestRouterApplyFailureStopsChoosing(t *testing.T) {
 
 func snapshotFromDescription(t *testing.T, description topictypes.TopicDescription) *partition.Partitions {
 	t.Helper()
-	source := newSourceWithDescriptions(description)
-	snapshot, err := source.Partitions(t.Context())
+	topology := newTopicTopologyWithDescriptions(description)
+	snapshot, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
 
 	return snapshot

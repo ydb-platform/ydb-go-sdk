@@ -24,25 +24,25 @@ type MultiWriter struct {
 }
 
 func NewMultiWriter(
-	source *partition.Source,
+	topology *partition.TopicTopology,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
-	return newMultiWriter(source, false, writerCfg, multiWriterCfg)
+	return newMultiWriter(topology, false, writerCfg, multiWriterCfg)
 }
 
 // NewTransactionalMultiWriter creates a multiwriter whose partition sessions
 // live only for one transaction and never reconnect after a session error.
 func NewTransactionalMultiWriter(
-	source *partition.Source,
+	topology *partition.TopicTopology,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
-	return newMultiWriter(source, true, writerCfg, multiWriterCfg)
+	return newMultiWriter(topology, true, writerCfg, multiWriterCfg)
 }
 
 func newMultiWriter(
-	source *partition.Source,
+	topology *partition.TopicTopology,
 	transactional bool,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
@@ -73,7 +73,7 @@ func newMultiWriter(
 		writerCfg: writerCfg,
 		encoders:  encoders,
 		orchestrator: newOrchestrator(
-			ctx, cancel, source, transactional, background, writerCfg, multiWriterCfg,
+			ctx, cancel, topology, transactional, background, writerCfg, multiWriterCfg,
 		),
 		background: background,
 	}

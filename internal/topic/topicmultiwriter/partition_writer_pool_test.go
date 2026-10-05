@@ -288,7 +288,7 @@ func TestPartitionWriterPool_TransactionalInactivePartitionInvalidatesSource(t *
 	t.Parallel()
 
 	var describeCalls atomic.Int64
-	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		if describeCalls.Add(1) == 1 {
 			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{
 				PartitionID: 7,
@@ -301,14 +301,14 @@ func TestPartitionWriterPool_TransactionalInactivePartitionInvalidatesSource(t *
 			{PartitionID: 8, Active: true, ParentPartitionIDs: []int64{7}},
 		}}, nil
 	}).Get("test/topic")
-	_, err := source.Partitions(t.Context())
+	_, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
 
 	factory := &poolMockFactory{}
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 	pool.transactional = true
-	pool.source = source
+	pool.topology = topology
 	_, err = pool.get(7, true)
 	require.NoError(t, err)
 	partitionInactive := xerrors.Operation(
@@ -317,7 +317,7 @@ func TestPartitionWriterPool_TransactionalInactivePartitionInvalidatesSource(t *
 	)
 
 	decision := factory.lastCfg.RetrySettings.CheckError(topic.PublicCheckErrorRetryArgs{Error: partitionInactive})
-	partitions, err := source.Partitions(t.Context())
+	partitions, err := topology.Partitions(t.Context())
 
 	require.NoError(t, err)
 	require.Equal(t, topic.PublicRetryDecisionStop, decision)
@@ -329,7 +329,7 @@ func TestPartitionWriterPool_NonTransactionalSessionPolicy(t *testing.T) {
 	t.Parallel()
 
 	var describeCalls atomic.Int64
-	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		if describeCalls.Add(1) == 1 {
 			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{
 				PartitionID: 7,
@@ -342,13 +342,13 @@ func TestPartitionWriterPool_NonTransactionalSessionPolicy(t *testing.T) {
 			{PartitionID: 8, Active: true, ParentPartitionIDs: []int64{7}},
 		}}, nil
 	}).Get("test/topic")
-	_, err := source.Partitions(t.Context())
+	_, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
 
 	factory := &poolMockFactory{}
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
-	pool.source = source
+	pool.topology = topology
 
 	var splitPartition atomic.Int64
 	pool.partitionSplitCallback = func(partitionID int64) {
@@ -372,7 +372,7 @@ func TestPartitionWriterPool_NonTransactionalSessionPolicy(t *testing.T) {
 	require.Equal(t, topic.PublicRetryDecisionStop,
 		factory.lastCfg.RetrySettings.CheckError(topic.PublicCheckErrorRetryArgs{Error: partitionInactive}))
 	require.EqualValues(t, 7, splitPartition.Load())
-	partitions, err := source.Partitions(t.Context())
+	partitions, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
 	require.True(t, partitions.ByPartitionID(8).IsActive())
 	require.Equal(t, int64(2), describeCalls.Load())

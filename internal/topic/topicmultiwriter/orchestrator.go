@@ -30,7 +30,7 @@ type orchestrator struct {
 	writerCfg      *topicwriterinternal.WriterReconnectorConfig
 	mu             *xsync.Mutex
 
-	source        *partition.Source
+	topology      *partition.TopicTopology
 	router        *partition.Router
 	transactional bool
 
@@ -52,7 +52,7 @@ type orchestrator struct {
 func newOrchestrator(
 	ctx context.Context,
 	cancel context.CancelFunc,
-	source *partition.Source,
+	topology *partition.TopicTopology,
 	transactional bool,
 	background *background.Worker,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
@@ -74,7 +74,7 @@ func newOrchestrator(
 		writerCfg:      writerCfg,
 		multiWriterCfg: multiWriterCfg,
 		mu:             &xsync.Mutex{},
-		source:         source,
+		topology:       topology,
 		transactional:  transactional,
 		ctx:            ctx,
 		stop:           cancel,
@@ -100,7 +100,7 @@ func newOrchestrator(
 		background,
 		o.ackReceiver.push,
 		o.partitionSplitReceiver.push,
-		source,
+		topology,
 		func() {
 			o.sender.wakeup()
 		},
@@ -153,7 +153,7 @@ func (o *orchestrator) sleepOrDone(delay time.Duration) error {
 
 func (o *orchestrator) init() (err error) {
 	defer close(o.initDone)
-	partitions, err := o.source.Partitions(o.ctx)
+	partitions, err := o.topology.Partitions(o.ctx)
 	if err != nil {
 		o.stopWithError(err)
 
@@ -499,7 +499,7 @@ func (o *orchestrator) initSeqNo() error {
 }
 
 func (o *orchestrator) refreshPartitionsForInit() (partitionIDs []int64, err error) {
-	refreshedPartitions, err := o.source.Partitions(o.ctx)
+	refreshedPartitions, err := o.topology.Partitions(o.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -599,7 +599,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		replacementPartitionIDs []int64
 	)
 
-	partitions, err := o.source.Partitions(o.ctx)
+	partitions, err := o.topology.Partitions(o.ctx)
 	if err != nil {
 		return err
 	}
