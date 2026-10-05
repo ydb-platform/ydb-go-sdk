@@ -34,12 +34,15 @@ type ArrowBatch = arrow.Batch
 // and Values remain valid independently. Client.Query and Client.QueryResultSet
 // retain all batches until their materialized result is closed. QueryRow detaches
 // its one row before reading ahead and closing the internal result.
-// The decoder must support concurrent calls and validate YDB column types.
+// The decoder must support concurrent calls and preserve all rows and column order.
+// Before returning batches, it must validate their YDB column types and optionality.
+// The SDK checks batch dimensions; cell type validation belongs to the decoder.
 type ArrowDecoder = arrow.Decoder
 
 // WithArrow requests Arrow results for one query while retaining ResultSets,
 // Rows, Scan, ScanNamed, ScanStruct and Values. It applies to Query, QueryRow and
 // QueryResultSet on Client, Session and TxActor, including queries inside Do and DoTx.
+// Exec also requests Arrow, but discards results without invoking the decoder.
 // The server must support and enable Arrow results.
 //
 // The application supplies an ArrowDecoder and chooses its Apache Arrow Go version;

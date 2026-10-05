@@ -4,6 +4,7 @@ package witharrow
 
 import (
 	"context"
+	"database/sql"
 	"io"
 	"os"
 	"sync/atomic"
@@ -51,6 +52,59 @@ func TestExecutors(t *testing.T) {
 	verifyExecutor(t, ctx, db.Query())
 	if calls.Load() != 12 {
 		t.Fatalf("decode calls=%d after override, want 12", calls.Load())
+	}
+}
+
+func TestDatabaseSQLDriverDefault(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	var calls atomic.Int32
+	decoder := query.ArrowDecoder(func(ctx context.Context, cols []query.ArrowColumn, part io.Reader) ([]query.ArrowBatch, error) {
+		calls.Add(1)
+		return Decode(ctx, cols, part)
+	})
+	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials(), ydb.WithQueryDefaultResultFormatArrow(decoder))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close(ctx)
+	connector, err := ydb.Connector(db, ydb.WithQueryService(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connector.Close()
+	sqlDB := sql.OpenDB(connector)
+	defer sqlDB.Close()
+	const statement = `SELECT CAST(42 AS Uint64) AS id, "owned"u AS name, CAST(NULL AS Int32?) AS score, "bytes" AS payload;`
+	rows, err := sqlDB.QueryContext(ctx, statement)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		t.Fatalf("expected row: %v", rows.Err())
+	}
+	var id uint64
+	var name string
+	var score *int32
+	var payload []byte
+	if err := rows.Scan(&id, &name, &score, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if rows.Next() || rows.Err() != nil {
+		t.Fatalf("unexpected next row: %v", rows.Err())
+	}
+	if id != 42 || name != "owned" || score != nil || string(payload) != "bytes" {
+		t.Fatalf("values after EOF: %d %q %v %q", id, name, score, payload)
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("decode calls=%d, want 1", calls.Load())
+	}
+	if _, err := sqlDB.ExecContext(ctx, statement); err != nil {
+		t.Fatal(err)
+	}
+	if calls.Load() != 1 {
+		t.Fatal("ExecContext called decoder")
 	}
 }
 

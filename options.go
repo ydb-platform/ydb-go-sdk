@@ -538,8 +538,13 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 // WithQueryDefaultResultFormatArrow selects Arrow as the default Query Service
 // result format while preserving the ordinary row and scan APIs. It applies to
 // Query, QueryRow and QueryResultSet on query.Client, query.Session and query.TxActor,
-// including queries inside Do and DoTx. It does not affect ExecuteScript or
+// including queries inside Do and DoTx. Exec also requests Arrow, but discards
+// results without invoking the decoder. It does not affect ExecuteScript or
 // FetchScriptResults. The server must support and enable Arrow results.
+//
+// database/sql connectors using Query Service inherit this default from the driver.
+// The decoder must support the result types of every query through those connectors.
+// Connectors using Table Service are unaffected.
 //
 // The application supplies the decoder and chooses its Apache Arrow Go version;
 // the SDK module has no Apache Arrow Go dependency. See query.ArrowDecoder for

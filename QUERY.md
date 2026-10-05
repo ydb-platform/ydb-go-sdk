@@ -42,13 +42,17 @@ resource release, scans and tests. Copy and adapt its
 [decoder.go](examples/apache_arrow/with_arrow/decoder.go); the example is a
 separate module, not an Arrow dependency of the SDK.
 
-The example supports Bool, signed/unsigned integers, Float, Double, String, Utf8
-and one level of Optional. Unsupported types return errors; extend your decoder
-for the YDB types used by your queries. A decoder receives column names and YDB
+The example supports Bool, signed/unsigned integers, Float, Double, String
+(`types.TypeBytes` in the SDK), Utf8 and one level of Optional. Unsupported types
+return errors; extend your decoder for the YDB types used by your queries.
+A decoder receives column names and YDB
 types plus a self-contained IPC part. It returns retained `query.ArrowBatch`
-objects and must preserve column order and types, validate optionality, and
-support concurrent calls. Each batch provides `NumRows`, `NumCols`, direct
-`Scan(row, column, dst)`, owned `Value(row, column)` and `Release` methods.
+objects and must preserve all rows and column order, validate YDB types and
+optionality before returning batches, and support concurrent calls. The SDK
+checks batch dimensions; cell type validation belongs to the decoder. A valid
+IPC part can contain a zero-row batch even when its payload is non-empty. Each
+batch provides `NumRows`, `NumCols`, direct `Scan(row, column, dst)`, owned
+`Value(row, column)` and `Release` methods.
 `Scan` destinations and `Value` results must remain valid after batch release.
 The example retains each Arrow record once before releasing its IPC reader;
 the SDK calls `Release` when the result no longer needs the batch. Decoder
@@ -84,7 +88,8 @@ if err := row.Scan(&id); err != nil {
 ```
 
 The same option applies to `Query`, `QueryRow` and `QueryResultSet` on Client,
-Session and TxActor, including calls inside `Do` and `DoTx`.
+Session and TxActor, including calls inside `Do` and `DoTx`. `Exec` also requests
+the selected wire format, but discards results without invoking the decoder.
 
 ### Selecting the driver default
 
@@ -122,6 +127,10 @@ Subsequent queries without an override use the driver default again. Passing
 `nil` to `WithQueryDefaultResultFormatArrow` selects the ordinary YDB value
 format as the driver default. These defaults do not apply to `ExecuteScript` or
 `FetchScriptResults`. Raw `Session.QueryArrow` always requests Arrow IPC.
+
+`database/sql` connectors using Query Service inherit the driver default, including
+queries and transactions. The decoder must support the result types of every
+query through those connectors. Connectors using Table Service are unaffected.
 
 For raw IPC consumption with `ipc.NewReader(part)`, see the
 [example](examples/apache_arrow/with_arrow/README.md#the-same-row-api-with-either-format).

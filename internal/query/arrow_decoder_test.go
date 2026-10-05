@@ -7,10 +7,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Formats"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
@@ -144,6 +146,47 @@ func TestArrowDecoderErrors(t *testing.T) {
 	}
 }
 
+func TestArrowDecoderErrorContext(t *testing.T) {
+	decodeErr := errors.New("invalid IPC")
+	for _, materialized := range []bool{false, true} {
+		t.Run(map[bool]string{false: "streaming", true: "materialized"}[materialized], func(t *testing.T) {
+			ctx := t.Context()
+			ctrl := gomock.NewController(t)
+			stream := newExecuteQueryStreamMock(ctrl)
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status: Ydb.StatusIds_SUCCESS, ResultSet: &Ydb.ResultSet{Columns: arrowTestColumns()},
+			}, nil)
+			stream.EXPECT().Recv().Return(arrowTestPart(1, arrowTestColumns(), "data"), nil)
+			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
+			decoder := func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+				return nil, decodeErr
+			}
+			var notified error
+			r, err := newResult(ctx, stream,
+				withArrowDecoder(decoder), onNextPartErr(func(err error) { notified = err }),
+			)
+			require.NoError(t, err)
+			if materialized {
+				_, err = resultToMaterializedResult(ctx, r)
+			} else {
+				var rs query.ResultSet
+				rs, err = r.NextResultSet(ctx)
+				require.NoError(t, err)
+				_, err = rs.NextRow(ctx)
+				require.ErrorIs(t, err, io.EOF)
+				rs, err = r.NextResultSet(ctx)
+				require.NoError(t, err)
+				_, err = rs.NextRow(ctx)
+			}
+			require.ErrorContains(t, err, "arrow result set 1")
+			require.ErrorIs(t, err, decodeErr)
+			require.ErrorContains(t, notified, "arrow result set 1")
+			require.ErrorIs(t, notified, decodeErr)
+			require.NoError(t, r.Close(ctx))
+		})
+	}
+}
+
 func TestArrowQueryRowConstraints(t *testing.T) {
 	for _, test := range []struct {
 		name       string
@@ -269,6 +312,63 @@ func TestArrowExecuteOptionDefaults(t *testing.T) {
 						require.NoError(t, err)
 						require.Equal(t, expected, request.GetResultSetFormat())
 					}
+				})
+			}
+		})
+	}
+}
+
+func TestArrowExec(t *testing.T) {
+	decoder := query.ArrowDecoder(func(context.Context, []query.ArrowColumn, io.Reader) ([]query.ArrowBatch, error) {
+		return nil, errors.New("Exec must not invoke the decoder")
+	})
+	for _, executor := range []string{"Client", "Session", "TxActor"} {
+		t.Run(executor, func(t *testing.T) {
+			for _, override := range []bool{false, true} {
+				t.Run(map[bool]string{false: "default", true: "Ydb.Value"}[override], func(t *testing.T) {
+					ctrl := gomock.NewController(t)
+					stream := newExecuteQueryStreamMock(ctrl)
+					format := Ydb.ResultSet_FORMAT_ARROW
+					part := arrowTestPart(0, arrowTestColumns(), "discarded IPC")
+					var opts []query.ExecuteOption
+					if override {
+						format = Ydb.ResultSet_FORMAT_UNSPECIFIED
+						part.ResultSet = &Ydb.ResultSet{Columns: arrowTestColumns()}
+						opts = append(opts, query.WithArrow(nil))
+					}
+					stream.EXPECT().Recv().Return(part, nil)
+					stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
+					client := NewMockQueryServiceClient(ctrl)
+					client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).DoAndReturn(
+						func(_ context.Context, req *Ydb_Query.ExecuteQueryRequest, _ ...grpc.CallOption) (
+							Ydb_Query_V1.QueryService_ExecuteQueryClient, error,
+						) {
+							require.Equal(t, format, req.GetResultSetFormat())
+
+							return stream, nil
+						},
+					)
+					s := newTestSessionWithClient("session", client, false)
+					s.defaultArrowDecoder = decoder
+					var e query.Executor
+					switch executor {
+					case "Client":
+						c := testClient(t, client)
+						c.config = config.New(config.WithDefaultResultFormatArrow(decoder))
+						p := &mockSessionPool{withFunc: func(ctx context.Context, f func(context.Context, *Session) error) error {
+							return f(ctx, s)
+						}}
+						c.explicitSessionPool, c.implicitSessionPool = p, p
+						defer c.Close(t.Context())
+						e = c
+					case "Session":
+						e = s
+					case "TxActor":
+						tx := &Transaction{s: s}
+						tx.SetTxID("transaction")
+						e = tx
+					}
+					require.NoError(t, e.Exec(t.Context(), "SELECT 1", opts...))
 				})
 			}
 		})

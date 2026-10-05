@@ -70,7 +70,7 @@ func (r *streamResult) decodeArrowBatches(
 ) ([]*arrowRowData, error) {
 	batches, err := decodeArrowBatches(ctx, r.arrowDecoder, columns, part)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("arrow result set %d: %w", r.lastPart.GetResultSetIndex(), err)
 	}
 	r.arrowBatches = append(r.arrowBatches, batches...)
 	data := make([]*arrowRowData, len(batches))

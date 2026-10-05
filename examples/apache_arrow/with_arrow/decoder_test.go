@@ -272,3 +272,39 @@ func TestColumnReaderInvalidNullTypes(t *testing.T) {
 		data.Release()
 	}
 }
+
+func TestDecodeEmptyBatch(t *testing.T) {
+	schema := arrow.NewSchema([]arrow.Field{{Name: "id", Type: arrow.PrimitiveTypes.Int32}}, nil)
+	builder := array.NewRecordBuilder(memory.DefaultAllocator, schema)
+	defer builder.Release()
+	record := builder.NewRecordBatch()
+	defer record.Release()
+	var wire bytes.Buffer
+	writer := ipc.NewWriter(&wire, ipc.WithSchema(schema))
+	if err := writer.Write(record); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if wire.Len() == 0 {
+		t.Fatal("empty batch must have an IPC payload")
+	}
+	columns := []query.ArrowColumn{{Name: "id", Type: types.TypeInt32}}
+	batches, err := Decode(t.Context(), columns, bytes.NewReader(wire.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(batches) != 1 {
+		t.Fatalf("batches=%d, want 1", len(batches))
+	}
+	if batches[0].NumRows() != 0 || batches[0].NumCols() != 1 {
+		t.Fatal("empty batch dimensions differ")
+	}
+	batches[0].Release()
+	columns[0].Type = types.TypeText
+	batches, err = Decode(t.Context(), columns, bytes.NewReader(wire.Bytes()))
+	if err == nil || !strings.Contains(err.Error(), `column "id"`) || len(batches) != 0 {
+		t.Fatalf("type mismatch must fail before returning batches: %v, %v", batches, err)
+	}
+}
