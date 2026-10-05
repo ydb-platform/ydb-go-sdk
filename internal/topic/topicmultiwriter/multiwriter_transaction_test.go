@@ -62,17 +62,12 @@ func TestMultiWriterWithTransaction_Write_SetsTx(t *testing.T) {
 
 func TestTransactionalMultiWriterDeduplication(t *testing.T) {
 	for _, tc := range []struct {
-		name              string
-		prefix            string
-		wantProducerID    string
-		wantExplicitSeqNo bool
+		name           string
+		prefix         string
+		wantProducerID string
 	}{
 		{name: "without producer ID"},
 		{name: "with producer ID prefix", prefix: "producer", wantProducerID: "producer-1"},
-		{
-			name: "explicit sequence numbers", prefix: "producer",
-			wantProducerID: "producer-1", wantExplicitSeqNo: true,
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := xtest.Context(t)
@@ -81,9 +76,6 @@ func TestTransactionalMultiWriterDeduplication(t *testing.T) {
 				topicwriterinternal.WithTransactionMode(),
 				topicwriterinternal.WithTopic("test/topic"),
 				topicwriterinternal.WithAutosetCreatedTime(false),
-			}
-			if tc.wantExplicitSeqNo {
-				options = append(options, topicwriterinternal.WithAutoSetSeqNo(false))
 			}
 			cfg := topicwriterinternal.NewWriterReconnectorConfig(options...)
 			mwCfg := MultiWriterConfig{ProducerIDPrefix: tc.prefix}
@@ -97,12 +89,12 @@ func TestTransactionalMultiWriterDeduplication(t *testing.T) {
 			require.NoError(t, writer.WaitInit(ctx))
 			require.Equal(t, tc.prefix, mwCfg.ProducerIDPrefix)
 			require.Equal(t, tc.wantProducerID, writer.orchestrator.writerPool.getProducerID(1))
-			require.Equal(t, !tc.wantExplicitSeqNo, cfg.AutoSetSeqNo)
+			require.False(t, cfg.AutoSetSeqNo)
 
 			err = writer.Write(ctx, []topicwriterinternal.PublicMessage{{
 				Data: bytes.NewReader([]byte("message")), PartitionID: 1,
 			}})
-			if tc.wantExplicitSeqNo {
+			if tc.prefix != "" {
 				require.ErrorIs(t, err, ErrNoSeqNo)
 				err = writer.Write(ctx, []topicwriterinternal.PublicMessage{{
 					Data: bytes.NewReader([]byte("message")), PartitionID: 1, SeqNo: 1,
@@ -110,13 +102,16 @@ func TestTransactionalMultiWriterDeduplication(t *testing.T) {
 				require.NoError(t, err)
 			} else {
 				require.NoError(t, err)
+				require.NoError(t, writer.Write(ctx, []topicwriterinternal.PublicMessage{{
+					Data: bytes.NewReader([]byte("second message")), PartitionID: 1,
+				}}))
 			}
 			require.NoError(t, writer.Close(ctx))
 			select {
 			case directCfg := <-factory.created:
 				require.Equal(t, tc.wantProducerID, directCfg.ProducerID())
 				require.False(t, directCfg.AutoSetSeqNo)
-				require.Equal(t, cfg.AutoSetSeqNo && tc.prefix != "", directCfg.RequestLastSeqNo)
+				require.False(t, directCfg.RequestLastSeqNo)
 				require.Equal(t, topic.PublicRetryDecisionStop, directCfg.RetrySettings.CheckError(
 					topic.PublicCheckErrorRetryArgs{Error: errors.New("session failed")},
 				))
@@ -128,32 +123,43 @@ func TestTransactionalMultiWriterDeduplication(t *testing.T) {
 }
 
 func TestTransactionalMultiWriterDoesNotOpenSessionForSeqNo(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	bg := background.NewWorker(ctx, "test multiwriter")
-	defer func() {
-		cancel()
-		_ = bg.Close(context.Background(), nil)
-	}()
+	for _, tc := range []struct {
+		name   string
+		prefix string
+		seqNo  int64
+	}{
+		{name: "without producer ID"},
+		{name: "with producer ID prefix", prefix: "producer", seqNo: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			bg := background.NewWorker(ctx, "test multiwriter")
+			defer func() {
+				cancel()
+				_ = bg.Close(context.Background(), nil)
+			}()
 
-	cfg := topicwriterinternal.NewWriterReconnectorConfig(
-		topicwriterinternal.WithTransactionMode(),
-		topicwriterinternal.WithTopic("test/topic"),
-	)
-	mwCfg := MultiWriterConfig{}
-	withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "", nil, 0))(&mwCfg)
-	orchestrator := newOrchestrator(ctx, cancel, nil, bg, &cfg, &mwCfg)
-	chooser := partitionchooser.NewByPartitionIDPartitionChooser()
-	partition := topictypes.PartitionInfo{PartitionID: 1, Active: true}
-	require.NoError(t, chooser.AddNewPartitions(partition))
-	orchestrator.partitionChooser = chooser
-	orchestrator.partitions[1] = &PartitionInfo{PartitionInfo: partition}
+			cfg := topicwriterinternal.NewWriterReconnectorConfig(
+				topicwriterinternal.WithTransactionMode(),
+				topicwriterinternal.WithTopic("test/topic"),
+			)
+			mwCfg := MultiWriterConfig{ProducerIDPrefix: tc.prefix}
+			withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, tc.prefix, nil, 0))(&mwCfg)
+			orchestrator := newOrchestrator(ctx, cancel, nil, bg, &cfg, &mwCfg)
+			chooser := partitionchooser.NewByPartitionIDPartitionChooser()
+			partition := topictypes.PartitionInfo{PartitionID: 1, Active: true}
+			require.NoError(t, chooser.AddNewPartitions(partition))
+			orchestrator.partitionChooser = chooser
+			orchestrator.partitions[1] = &PartitionInfo{PartitionInfo: partition}
 
-	err := orchestrator.pushMessage(ctx, message{MessageWithDataContent: topicwritercommon.NewMessageDataWithContent(
-		topicwriterinternal.PublicMessage{Data: bytes.NewReader([]byte("message")), PartitionID: 1},
-		topicwritercommon.NewMultiEncoder(),
-	)})
-	require.NoError(t, err)
-	require.Zero(t, orchestrator.getWritersCount())
+			err := orchestrator.pushMessage(ctx, message{MessageWithDataContent: topicwritercommon.NewMessageDataWithContent(
+				topicwriterinternal.PublicMessage{Data: bytes.NewReader([]byte("message")), PartitionID: 1, SeqNo: tc.seqNo},
+				topicwritercommon.NewMultiEncoder(),
+			)})
+			require.NoError(t, err)
+			require.Zero(t, orchestrator.getWritersCount())
+		})
+	}
 }
 
 // stubTopicTransaction is a minimal [tx.Transaction] for MultiWriterWithTransaction tests.

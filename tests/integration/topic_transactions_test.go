@@ -232,8 +232,9 @@ func TestTopicTransactionalMultiWriterWithLazyTx(t *testing.T) {
 		}
 
 		err = writer.Write(ctx, topicwriter.Message{
-			Data: strings.NewReader(payload),
-			Key:  "abc",
+			Data:  strings.NewReader(payload),
+			Key:   "abc",
+			SeqNo: 1,
 		})
 		if err != nil {
 			return fmt.Errorf("write message: %w", err)
@@ -360,7 +361,7 @@ func TestWriteInTransactionMultiWriter(t *testing.T) {
 				writer, err := driver.Topic().StartTransactionalWriter(
 					tx,
 					scope.TopicPath(),
-					topicoptions.WithWriterSetAutoSeqNo(true),
+					topicoptions.WithWriterSetAutoSeqNo(false),
 					topicoptions.WithWriteToManyPartitions(
 						topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
 						topicoptions.WithProducerIDPrefix("tx-multiwriter-ok"),
@@ -371,8 +372,9 @@ func TestWriteInTransactionMultiWriter(t *testing.T) {
 				}
 
 				return writer.Write(ctx, topicwriter.Message{
-					Data: strings.NewReader(strconv.Itoa(transactionsCount)),
-					Key:  stablePartitionKey,
+					Data:  strings.NewReader(strconv.Itoa(transactionsCount)),
+					Key:   stablePartitionKey,
+					SeqNo: int64(transactionsCount + 1),
 				})
 			})
 			require.NoError(t, err)
@@ -411,10 +413,8 @@ func TestWriteInTransactionMultiWriter(t *testing.T) {
 				writer, err := driver.Topic().StartTransactionalWriter(
 					tx,
 					scope.TopicPath(),
-					topicoptions.WithWriterSetAutoSeqNo(true),
 					topicoptions.WithWriteToManyPartitions(
 						topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
-						topicoptions.WithProducerIDPrefix("tx-multiwriter-rollback"),
 					),
 				)
 				if err != nil {

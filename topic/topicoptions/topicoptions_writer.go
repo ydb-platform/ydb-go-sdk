@@ -117,8 +117,8 @@ func WithProducerID(producerID string) WriterOption {
 }
 
 // WithWriterProducerID sets the producer for a write session. For transactional
-// writers, this enables deduplication. SeqNo is assigned automatically unless
-// WithWriterSetAutoSeqNo(false) is used.
+// writers, this enables deduplication and requires an explicit SeqNo on every
+// message.
 func WithWriterProducerID(producerID string) WriterOption {
 	return topicwriterinternal.WithProducerID(producerID)
 }
@@ -259,11 +259,10 @@ func WithWriterCodecAutoSelect() WriterOption {
 	return topicwriterinternal.WithAutoCodec()
 }
 
-// WithWriterSetAutoSeqNo set messages SeqNo by SDK
-// enabled by default
-// if enabled - Message.SeqNo field must be zero
-// Transactional writers use this setting too. When disabled, every message
-// must have a nonzero SeqNo.
+// WithWriterSetAutoSeqNo sets message SeqNo values in non-transactional writers.
+// It is enabled by default; when enabled, Message.SeqNo must be zero.
+// Transactional writers never assign SeqNo, regardless of this option. They
+// require a nonzero SeqNo when a producer ID is configured.
 func WithWriterSetAutoSeqNo(val bool) WriterOption {
 	return topicwriterinternal.WithAutoSetSeqNo(val)
 }

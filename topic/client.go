@@ -85,11 +85,10 @@ type Client interface {
 	// commit, so the messages may not be published (at-most-once semantics).
 	//
 	// Set [topicoptions.WithWriterProducerID] or [topicoptions.WithProducerIDPrefix]
-	// for producer ID/SeqNo deduplication. To deduplicate a replayed message,
-	// reuse its producer ID and SeqNo across transaction attempts; set
-	// [topicoptions.WithWriterSetAutoSeqNo] to false to supply that SeqNo.
-	// Otherwise, SeqNo is assigned automatically. Session errors are returned
-	// for transaction retry.
+	// for producer ID/SeqNo deduplication. Every message must then provide a
+	// nonzero SeqNo. Transactional writers never assign SeqNo, request the last
+	// SeqNo during session initialization, or reconnect after an error. Session
+	// errors are returned for transaction retry.
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	StartTransactionalWriter(

@@ -179,6 +179,9 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 	for _, f := range options {
 		f(&cfg)
 	}
+	if cfg.Transactional {
+		cfg.AutoSetSeqNo = false
+	}
 
 	if cfg.LogContext == nil {
 		cfg.LogContext = context.Background()
@@ -259,9 +262,7 @@ func newWriterReconnectorStopped(
 		writerInstanceID:               writerInstanceID.String(),
 		retrySettings:                  cfg.RetrySettings,
 	}
-	if cfg.Transactional && cfg.producerID == "" {
-		res.lastSeqNo = 0
-	}
+	res.queue.noDeduplication = cfg.Transactional && cfg.producerID == ""
 
 	res.queue.OnAckReceived = res.onAckReceived
 	res.queue.AckCallback = res.cfg.OnAckReceivedCallback
@@ -329,7 +330,7 @@ func (w *WriterReconnector) WriteInternal(
 
 func (w *WriterReconnector) validateWriteMessages(messages []PublicMessage) error {
 	for i := range messages {
-		if w.cfg.Transactional && !w.cfg.AutoSetSeqNo && messages[i].SeqNo == 0 {
+		if w.cfg.Transactional && w.cfg.producerID != "" && messages[i].SeqNo == 0 {
 			return xerrors.WithStackTrace(ErrNoSeqNo)
 		}
 		if !w.cfg.MultiMode && (messages[i].Key != "" || messages[i].PartitionID != 0) {
@@ -736,7 +737,8 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
-	res := (w.cfg.AutoSetSeqNo || w.cfg.RequestLastSeqNo || (!w.cfg.MultiMode && !w.cfg.Transactional)) &&
+	res := !w.cfg.Transactional &&
+		(w.cfg.AutoSetSeqNo || w.cfg.RequestLastSeqNo || !w.cfg.MultiMode) &&
 		w.cfg.producerID != "" && !w.firstConnectionHandled.Load()
 
 	return res

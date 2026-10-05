@@ -212,9 +212,10 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	}()
 
 	autoSetSeqNo := o.writerCfg.AutoSetSeqNo
+	requireSeqNo := !o.writerCfg.Transactional || o.multiWriterCfg.ProducerIDPrefix != ""
 
 	switch {
-	case !autoSetSeqNo && msg.SeqNo == 0:
+	case !autoSetSeqNo && requireSeqNo && msg.SeqNo == 0:
 		return ErrNoSeqNo
 	case autoSetSeqNo && msg.SeqNo != 0:
 		return topicwriterinternal.ErrNonZeroSeqNo
@@ -273,8 +274,11 @@ func (o *orchestrator) enqueueMessage(msg message, lastSeqNo int64) (err error) 
 			o.currentSeqNo = max(o.currentSeqNo, lastSeqNo)
 			o.currentSeqNo++
 			msg.SeqNo = o.currentSeqNo
-		} else if err = o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo); err != nil {
-			return
+		} else if !o.writerCfg.Transactional || o.multiWriterCfg.ProducerIDPrefix != "" {
+			err = o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo)
+			if err != nil {
+				return
+			}
 		}
 		o.buf.pushNeedLock(msg)
 		o.sender.wakeup()

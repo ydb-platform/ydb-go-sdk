@@ -43,6 +43,8 @@ type messageQueue struct {
 	lastWrittenIndex          int
 	lastSentIndex             int
 	lastSeqNo                 int64
+	nextAckOrderID            int
+	noDeduplication           bool
 
 	messagesByOrder map[int]*queuedMessage
 	seqNoToOrderID  map[int64]int
@@ -62,6 +64,7 @@ func newMessageQueue() messageQueue {
 		hasNewMessages:  make(empty.Chan, 1),
 		closedChan:      make(empty.Chan),
 		lastSeqNo:       -1,
+		nextAckOrderID:  1,
 	}
 }
 
@@ -117,7 +120,7 @@ func (q *messageQueue) notifyNewMessages() {
 }
 
 func (q *messageQueue) checkNewMessagesBeforeAddNeedLock(messages []messageWithDataContent) error {
-	if len(messages) == 0 {
+	if len(messages) == 0 || q.noDeduplication {
 		return nil
 	}
 
@@ -147,8 +150,10 @@ func (q *messageQueue) addMessageNeedLock(
 	}
 
 	q.messagesByOrder[messageIndex] = &queuedMessage{messageWithDataContent: mess}
-	q.seqNoToOrderID[mess.SeqNo] = messageIndex
-	q.lastSeqNo = mess.SeqNo
+	if !q.noDeduplication {
+		q.seqNoToOrderID[mess.SeqNo] = messageIndex
+		q.lastSeqNo = mess.SeqNo
+	}
 
 	return messageIndex
 }
@@ -182,7 +187,16 @@ func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
 }
 
 func (q *messageQueue) ackReceivedNeedLock(seqNo int64) error {
-	orderID, ok := q.seqNoToOrderID[seqNo]
+	var (
+		orderID int
+		ok      bool
+	)
+	if q.noDeduplication {
+		orderID = q.nextAckOrderID
+		_, ok = q.messagesByOrder[orderID]
+	} else {
+		orderID, ok = q.seqNoToOrderID[seqNo]
+	}
 	if !ok {
 		return xerrors.WithStackTrace(errAckUnexpectedMessage)
 	}
@@ -190,7 +204,11 @@ func (q *messageQueue) ackReceivedNeedLock(seqNo int64) error {
 	if acked := q.messagesByOrder[orderID].acked; acked != nil {
 		close(acked)
 	}
-	delete(q.seqNoToOrderID, seqNo)
+	if q.noDeduplication {
+		q.nextAckOrderID++
+	} else {
+		delete(q.seqNoToOrderID, seqNo)
+	}
 	delete(q.messagesByOrder, orderID)
 
 	return nil
@@ -213,12 +231,12 @@ func (q *messageQueue) Close(err error) error {
 	isFirstTimeClosed := false
 	q.m.Lock()
 	defer func() {
-		seqNoToOrderIDLen := len(q.seqNoToOrderID)
+		pendingCount := len(q.messagesByOrder)
 		q.m.Unlock()
 
 		// release all
 		if isFirstTimeClosed && q.OnAckReceived != nil {
-			q.OnAckReceived(seqNoToOrderIDLen)
+			q.OnAckReceived(pendingCount)
 		}
 	}()
 

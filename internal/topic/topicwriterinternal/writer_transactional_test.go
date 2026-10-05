@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -34,21 +35,9 @@ func TestTransactionalWriterReturnsConnectErrorWithoutRetry(t *testing.T) {
 	require.EqualValues(t, 1, connects.Load())
 }
 
-func TestTransactionalProducerIDUsesAutomaticSeqNoByDefault(t *testing.T) {
-	cfg := NewWriterReconnectorConfig(WithTransactionMode(), WithProducerID("producer"))
+func TestTransactionalProducerIDRequiresExplicitSeqNo(t *testing.T) {
+	cfg := NewWriterReconnectorConfig(WithTransactionMode(), WithProducerID("producer"), WithAutoSetSeqNo(true))
 	require.Equal(t, "producer", cfg.ProducerID())
-	require.True(t, cfg.AutoSetSeqNo)
-	require.True(t, newWriterReconnectorStopped(cfg).needReceiveLastSeqNo())
-
-	writer := newWriterReconnectorStopped(cfg)
-	writer.onWriterChange(&SingleStreamWriter{LastSeqNumRequested: true, ReceivedLastSeqNum: 9})
-	err := writer.Write(context.Background(), []PublicMessage{{Data: bytes.NewReader([]byte("message"))}})
-	require.NoError(t, err)
-	require.EqualValues(t, 10, writer.queue.messagesByOrder[1].SeqNo)
-}
-
-func TestTransactionalWriterRequiresSeqNoWhenAutomaticSeqNoDisabled(t *testing.T) {
-	cfg := NewWriterReconnectorConfig(WithTransactionMode(), WithProducerID("producer"), WithAutoSetSeqNo(false))
 	require.False(t, cfg.AutoSetSeqNo)
 	require.False(t, newWriterReconnectorStopped(cfg).needReceiveLastSeqNo())
 
@@ -56,6 +45,9 @@ func TestTransactionalWriterRequiresSeqNoWhenAutomaticSeqNoDisabled(t *testing.T
 	writer.firstConnectionHandled.Store(true)
 	err := writer.Write(context.Background(), []PublicMessage{{Data: bytes.NewReader([]byte("message"))}})
 	require.ErrorIs(t, err, ErrNoSeqNo)
+	err = writer.Write(context.Background(), []PublicMessage{{Data: bytes.NewReader([]byte("message")), SeqNo: 10}})
+	require.NoError(t, err)
+	require.EqualValues(t, 10, writer.queue.messagesByOrder[1].SeqNo)
 }
 
 func TestPartitionWriterRequestsLastSeqNoForExternalAutomaticSequencing(t *testing.T) {
@@ -66,18 +58,20 @@ func TestPartitionWriterRequestsLastSeqNoForExternalAutomaticSequencing(t *testi
 	require.True(t, testCreateInitRequest(writer).GetLastSeqNo)
 }
 
-func TestTransactionalWriterWithoutProducerIDAssignsLocalSeqNo(t *testing.T) {
+func TestTransactionalWriterWithoutProducerIDPreservesZeroSeqNo(t *testing.T) {
 	cfg := NewWriterReconnectorConfig(WithTransactionMode())
 	writer := newWriterReconnectorStopped(cfg)
 	writer.firstConnectionHandled.Store(true)
 	require.Empty(t, cfg.ProducerID())
-	require.True(t, cfg.AutoSetSeqNo)
+	require.False(t, cfg.AutoSetSeqNo)
 	require.False(t, writer.needReceiveLastSeqNo())
 
 	for range 2 {
 		err := writer.Write(context.Background(), []PublicMessage{{Data: bytes.NewReader([]byte("message"))}})
 		require.NoError(t, err)
 	}
-	require.EqualValues(t, 1, writer.queue.messagesByOrder[1].SeqNo)
-	require.EqualValues(t, 2, writer.queue.messagesByOrder[2].SeqNo)
+	require.Zero(t, writer.queue.messagesByOrder[1].SeqNo)
+	require.Zero(t, writer.queue.messagesByOrder[2].SeqNo)
+	require.NoError(t, writer.queue.AcksReceived([]rawtopicwriter.WriteAck{{SeqNo: 0}, {SeqNo: 0}}))
+	require.Empty(t, writer.queue.messagesByOrder)
 }
