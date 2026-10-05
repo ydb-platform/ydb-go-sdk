@@ -16,6 +16,9 @@ import (
 func NewDecoder[A Array, B Record[A], R IPCReader[B], O any](
 	newReader func(io.Reader, ...O) (R, error), opts ...O,
 ) Decoder {
+	if newReader == nil {
+		return nil
+	}
 	opts = slices.Clone(opts)
 
 	return func(ctx context.Context, columns []Column, part io.Reader) (batches []Batch, err error) {

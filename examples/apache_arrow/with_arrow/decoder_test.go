@@ -14,7 +14,6 @@ import (
 	"github.com/apache/arrow-go/v18/arrow/ipc"
 	"github.com/apache/arrow-go/v18/arrow/memory"
 	arrowinternal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
@@ -44,7 +43,7 @@ func TestDecodeOwnsValues(t *testing.T) {
 	builder.Release()
 	alloc.AssertSize(t, 0)
 	columns := []arrowinternal.Column{{Name: "id", Type: types.TypeInt32}, {Name: "name", Type: types.Optional(types.TypeText)}, {Name: "payload", Type: types.TypeBytes}}
-	decode := query.NewArrowDecoder(ipc.NewReader, ipc.WithAllocator(alloc))
+	decode := arrowinternal.NewDecoder(ipc.NewReader, ipc.WithAllocator(alloc))
 	batches, err := decode(context.Background(), columns, bytes.NewReader(wire.Bytes()))
 	if err != nil {
 		t.Fatal(err)
@@ -349,6 +348,8 @@ func TestDecodeEmptyBatch(t *testing.T) {
 		t.Fatalf("type mismatch must fail before returning batches: %v, %v", batches, err)
 	}
 }
+
+var Decode = arrowinternal.NewDecoder(ipc.NewReader)
 
 func decodeColumn(t testing.TB, data arrow.Array, typ types.Type) (arrowinternal.Batch, error) {
 	t.Helper()

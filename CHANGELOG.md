@@ -1,4 +1,4 @@
-* Added experimental `query.WithArrow` with an application-provided decoder, `query.NewArrowDecoder(ipc.NewReader)` with inferred generic types and `ydb.WithQueryDefaultResultFormatArrow` driver defaults, preserving the Query Service row and scan APIs without an Arrow Go dependency
+* Added experimental `query.WithArrow(ipc.NewReader, opts...)`, `ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader, opts...)` and `query.WithYdbValue`, preserving the Query Service row and scan APIs without an Arrow Go dependency
 * Reduced allocations in Query Service rows and optional value construction
 
 ## v3.154.1

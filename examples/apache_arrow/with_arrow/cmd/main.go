@@ -22,10 +22,9 @@ func main() {
 	}
 	defer db.Close(ctx)
 
-	decoder := query.NewArrowDecoder(ipc.NewReader)
 	err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
 		result, err := s.Query(ctx, `SELECT 42 AS id, "my string"u AS name;
-SELECT 24 AS id, "WOW"u AS name;`, query.WithArrow(decoder))
+SELECT 24 AS id, "WOW"u AS name;`, query.WithArrow(ipc.NewReader))
 		if err != nil {
 			return err
 		}

@@ -15,6 +15,7 @@ import (
 	"github.com/apache/arrow-go/v18/arrow/ipc"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	arrowinternal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
@@ -48,7 +49,7 @@ ORDER BY id;`, strings.Repeat("x", 64))
 					return nil, fmt.Errorf("previous part still owns %d batches", active.Load())
 				}
 				var sizes []int64
-				decode := query.NewArrowDecoder(func(part io.Reader, opts ...ipc.Option) (*lifetimeReader, error) {
+				decode := arrowinternal.NewDecoder(func(part io.Reader, opts ...ipc.Option) (*lifetimeReader, error) {
 					reader, err := ipc.NewReader(part, opts...)
 					if err != nil {
 						return nil, err
@@ -80,7 +81,7 @@ ORDER BY id;`, strings.Repeat("x", 64))
 				return batches, nil
 			}
 			read := func(executor query.Executor) error {
-				res, err := executor.Query(ctx, sql, query.WithArrow(decode),
+				res, err := executor.Query(ctx, sql, options.WithArrow(decode),
 					query.WithResponsePartLimitSizeBytes(4<<10), query.WithResponsePartPrefetch(test.prefetch))
 				if err != nil {
 					return err

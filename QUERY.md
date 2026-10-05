@@ -26,7 +26,7 @@ account for this when producing application side effects. See the
 | Format and API | Recommended use | Costs and ownership |
 | --- | --- | --- |
 | `Ydb.Value` through the ordinary query methods | Start here for small results, general type support or applications without an Arrow decoder | Default format; the SDK provides rows and scanners. |
-| Arrow through `query.WithArrow(decoder)` | Evaluate for larger results when retaining `Scan`, `ScanNamed`, `ScanStruct` and `Values` is useful | Rows refer to retained column batches. The decoder scans requested cells directly; `Values` and fallback conversions create owned `types.Value` objects on demand. |
+| Arrow through `query.WithArrow(ipc.NewReader)` | Evaluate for larger results when retaining `Scan`, `ScanNamed`, `ScanStruct` and `Values` is useful | Rows refer to retained column batches. The decoder scans requested cells directly; `Values` and fallback conversions create owned `types.Value` objects on demand. |
 | Raw Arrow through `Session.QueryArrow` | Column processing that can consume Arrow batches directly | Avoids conversion to SDK rows. The application reads IPC, manages Arrow resources, and keeps borrowed column data within the batch lifetime. |
 
 Arrow requires server support and the `EnableArrowResultSetFormat` feature.
@@ -35,31 +35,31 @@ does not change materialization: `Client.Query` still keeps the entire result in
 memory with Arrow enabled. Session and transaction queries decode one response
 part at a time.
 
-The SDK module does not depend on Apache Arrow Go. Build a decoder
-using `ipc.NewReader` from the Arrow major version selected by your application:
+The SDK module does not depend on Apache Arrow Go. Pass `ipc.NewReader`
+from the Arrow major version selected by your application:
 
 ```go
 import "github.com/apache/arrow-go/v18/arrow/ipc"
 
-myArrowDecoder := query.NewArrowDecoder(ipc.NewReader)
+arrowOption := query.WithArrow(ipc.NewReader)
 // Reader options use the same Arrow Go version:
-myArrowDecoder = query.NewArrowDecoder(ipc.NewReader, ipc.WithAllocator(allocator))
+arrowOption = query.WithArrow(ipc.NewReader, ipc.WithAllocator(allocator))
 ```
 
 Generic reader, record, array and option types are inferred from `ipc.NewReader`;
-no explicit type arguments or adapter are required. The same constructor works
+no explicit type arguments or adapter are required. The same options work
 with `github.com/apache/arrow/go/v17/arrow/ipc`. The
 [v18 example](examples/apache_arrow/with_arrow) is a separate module and
 shows resource release, scans and tests. Run its [command](examples/apache_arrow/with_arrow/cmd/main.go)
 with `go run ./cmd` from that module after starting a local YDB.
 
-`NewArrowDecoder` supports Bool, signed/unsigned integers, Float, Double, String
+The Arrow decoder supports Bool, signed/unsigned integers, Float, Double, String
 (`types.TypeBytes` in the SDK), Utf8 and one level of Optional. Unsupported types
 return errors, including for temporal types such as Date, Datetime, Timestamp and
 Interval. To add support for a missing YDB type, open an
 [issue](https://github.com/ydb-platform/ydb-go-sdk/issues) or submit a
 [pull request](https://github.com/ydb-platform/ydb-go-sdk/pulls).
-`NewArrowDecoder` retains each Arrow record once before releasing its IPC reader;
+The Arrow decoder retains each Arrow record once before releasing its IPC reader;
 the SDK calls `Release` when the result no longer needs the batch. Decoder
 errors follow the ordinary result error path; the SDK does not re-execute SQL
 to fall back to another format.
@@ -79,11 +79,11 @@ are released when advancing to another part or closing the internal result.
 ### Selecting the format per query
 
 The examples below assume `db` is an open driver, `ctx` is a context and
-`myArrowDecoder` is created with `query.NewArrowDecoder`.
+`ipc` is imported from the application's Arrow Go version.
 
 ```go
 row, err := db.Query().QueryRow(ctx, `SELECT 42 AS id;`,
-    query.WithArrow(myArrowDecoder),
+    query.WithArrow(ipc.NewReader),
 )
 if err != nil {
     return err
@@ -102,14 +102,14 @@ the selected wire format, but discards results without invoking the decoder.
 
 ```go
 db, err := ydb.Open(ctx, dsn,
-    ydb.WithQueryDefaultResultFormatArrow(myArrowDecoder),
+    ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader),
 )
 if err != nil {
     return err
 }
 defer db.Close(ctx)
 
-// This query uses myArrowDecoder and the ordinary row API.
+// This query uses Arrow and the ordinary row API.
 row, err := db.Query().QueryRow(ctx, `SELECT 42 AS id;`)
 if err != nil {
     return err
@@ -120,7 +120,7 @@ if err := row.Scan(&id); err != nil {
 }
 
 // Override the driver default for this query only.
-row, err = db.Query().QueryRow(ctx, `SELECT 42 AS id;`, query.WithArrow(nil))
+row, err = db.Query().QueryRow(ctx, `SELECT 42 AS id;`, query.WithYdbValue())
 if err != nil {
     return err
 }
@@ -129,10 +129,11 @@ if err := row.Scan(&id); err != nil {
 }
 ```
 
-`query.WithArrow(otherDecoder)` selects another decoder for one query.
-Subsequent queries without an override use the driver default again. Passing
-`nil` to `WithQueryDefaultResultFormatArrow` selects the ordinary YDB value
-format as the driver default. These defaults do not apply to `ExecuteScript` or
+`query.WithArrow(ipc.NewReader, opts...)` selects a reader factory and its options
+for one query; `query.WithYdbValue()` selects the ordinary YDB value format.
+Subsequent queries without an override use the driver default again.
+`ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader, opts...)` accepts the same
+reader factory and options. These defaults do not apply to `ExecuteScript` or
 `FetchScriptResults`. Raw `Session.QueryArrow` always requests Arrow IPC.
 
 `database/sql` connectors using Query Service inherit the driver default, including
@@ -148,11 +149,12 @@ The benchmark compares full SELECT execution and consumption of all six columns:
 
 - `Value`: `Session.Query` + `Scan`.
 - `QueryArrow`: `Session.QueryArrow` + direct column access.
-- `WithArrow`: `Session.Query` + `query.WithArrow` with `query.NewArrowDecoder(ipc.NewReader)` from v18 + `Scan`.
+- `WithArrow`: `Session.Query` + `query.WithArrow(ipc.NewReader)` from v18 + `Scan`.
 
 All variants use the same session, SQL, row checksum, disabled response prefetch
 and a 32 KiB response-part limit. Value and WithArrow reuse Scan destinations and
-arguments between rows. Nullable scans still allocate each non-null destination.
+arguments between rows. The WithArrow option is created once and reused across
+queries. Nullable scans still allocate each non-null destination.
 Row handles share one slice per decoded batch, allocated for all rows even when
 consumption stops early.
 The decoder validates types and selects scan functions once per batch

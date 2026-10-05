@@ -332,8 +332,8 @@ func TestArrowExecuteOptionDefaults(t *testing.T) {
 				arrow bool
 			}{
 				{name: "default", arrow: defaults.arrow},
-				{name: "Ydb.Value", opts: []query.ExecuteOption{query.WithArrow(nil)}},
-				{name: "Arrow", opts: []query.ExecuteOption{query.WithArrow(decoder)}, arrow: true},
+				{name: "Ydb.Value", opts: []query.ExecuteOption{query.WithYdbValue()}},
+				{name: "Arrow", opts: []query.ExecuteOption{options.WithArrow(decoder)}, arrow: true},
 			} {
 				t.Run(call.name, func(t *testing.T) {
 					expected := Ydb.ResultSet_FORMAT_UNSPECIFIED
@@ -371,7 +371,7 @@ func TestArrowExec(t *testing.T) {
 					if override {
 						format = Ydb.ResultSet_FORMAT_UNSPECIFIED
 						part.ResultSet = &Ydb.ResultSet{Columns: arrowTestColumns()}
-						opts = append(opts, query.WithArrow(nil))
+						opts = append(opts, query.WithYdbValue())
 					}
 					stream.EXPECT().Recv().Return(part, nil)
 					stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()

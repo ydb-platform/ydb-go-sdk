@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apache/arrow-go/v18/arrow/ipc"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	arrowinternal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
@@ -20,11 +20,11 @@ func TestExecutors(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	var calls atomic.Int32
-	decoder := arrowinternal.Decoder(func(ctx context.Context, cols []arrowinternal.Column, part io.Reader) ([]arrowinternal.Batch, error) {
+	newReader := func(part io.Reader, opts ...ipc.Option) (*ipc.Reader, error) {
 		calls.Add(1)
-		return Decode(ctx, cols, part)
-	})
-	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials(), ydb.WithQueryDefaultResultFormatArrow(decoder))
+		return ipc.NewReader(part, opts...)
+	}
+	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials(), ydb.WithQueryDefaultResultFormatArrow(newReader))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestExecutors(t *testing.T) {
 	if calls.Load() != 9 {
 		t.Fatalf("decode calls=%d, want 9", calls.Load())
 	}
-	row, err := db.Query().QueryRow(ctx, "SELECT 7 AS id", query.WithArrow(nil))
+	row, err := db.Query().QueryRow(ctx, "SELECT 7 AS id", query.WithYdbValue())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,11 +60,11 @@ func TestDatabaseSQLDriverDefault(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	var calls atomic.Int32
-	decoder := arrowinternal.Decoder(func(ctx context.Context, cols []arrowinternal.Column, part io.Reader) ([]arrowinternal.Batch, error) {
+	newReader := func(part io.Reader, opts ...ipc.Option) (*ipc.Reader, error) {
 		calls.Add(1)
-		return Decode(ctx, cols, part)
-	})
-	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials(), ydb.WithQueryDefaultResultFormatArrow(decoder))
+		return ipc.NewReader(part, opts...)
+	}
+	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials(), ydb.WithQueryDefaultResultFormatArrow(newReader))
 	if err != nil {
 		t.Fatal(err)
 	}

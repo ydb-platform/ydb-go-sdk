@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -539,36 +540,39 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 // result format while preserving the ordinary row and scan APIs. It applies to
 // Query, QueryRow and QueryResultSet on query.Client, query.Session and query.TxActor,
 // including queries inside Do and DoTx. Exec also requests Arrow, but discards
-// results without invoking the decoder. It does not affect ExecuteScript or
+// results without invoking the reader. It does not affect ExecuteScript or
 // FetchScriptResults. The server must support and enable Arrow results.
 //
 // database/sql connectors using Query Service inherit this default from the driver.
 // The decoder must support the result types of every query through those connectors.
 // Connectors using Table Service are unaffected.
 //
-// The application creates the decoder with query.NewArrowDecoder using its
+// Pass ipc.NewReader and optional IPC reader options from the application's
 // Apache Arrow Go version; the SDK module has no Apache Arrow Go dependency.
-// See query.WithArrow for result ownership and lifetime requirements.
+// Reader, record, array and option types are inferred from the factory.
+// The factory and its options must support concurrent calls. See query.WithArrow
+// for supported types and result ownership and lifetime requirements.
 //
-// A nil decoder selects the default YDB value format. Per-call query.WithArrow
-// overrides this setting: query.WithArrow(nil) selects YDB values for one query,
-// and query.WithArrow(otherDecoder) replaces the decoder for one query. Subsequent
-// queries without an override use the driver default again.
+// Per-call query.WithArrow overrides the reader factory and its options, while
+// query.WithYdbValue selects YDB values for one query. Subsequent queries without
+// an override use the driver default again. A typed nil reader factory selects
+// the default YDB value format; an untyped nil cannot supply generic type arguments.
 //
 // For example (error handling and result consumption omitted):
 //
-//	decoder := query.NewArrowDecoder(ipc.NewReader)
 //	db, err := ydb.Open(ctx, dsn,
-//		ydb.WithQueryDefaultResultFormatArrow(decoder),
+//		ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader),
 //	)
 //	result, err := db.Query().Query(ctx, sql)
-//	valueResult, err := db.Query().Query(ctx, sql, query.WithArrow(nil))
+//	valueResult, err := db.Query().Query(ctx, sql, query.WithYdbValue())
 //
 // Close each result after consuming it, and close the driver when it is no longer needed.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func WithQueryDefaultResultFormatArrow(decoder arrow.Decoder) Option {
-	return WithQueryConfigOption(queryConfig.WithDefaultResultFormatArrow(decoder))
+func WithQueryDefaultResultFormatArrow[A arrow.Array, B arrow.Record[A], R arrow.IPCReader[B], O any](
+	newReader func(io.Reader, ...O) (R, error), opts ...O,
+) Option {
+	return WithQueryConfigOption(queryConfig.WithDefaultResultFormatArrow(arrow.NewDecoder(newReader, opts...)))
 }
 
 // WithQueryConfigOption collects additional configuration options for query.Client.

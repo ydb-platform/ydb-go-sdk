@@ -11,23 +11,25 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
-func TestNewArrowDecoder(t *testing.T) {
+func TestWithArrow(t *testing.T) {
 	reader := &mockIPCReader{}
-	decode := query.NewArrowDecoder(func(part io.Reader, opts ...string) (*mockIPCReader, error) {
+	readerOptions := []string{"reader option"}
+	opt := query.WithArrow(func(part io.Reader, opts ...string) (*mockIPCReader, error) {
 		payload, err := io.ReadAll(part)
 		require.NoError(t, err)
 		require.Equal(t, "IPC part", string(payload))
 		require.Equal(t, []string{"reader option"}, opts)
 
 		return reader, nil
-	}, "reader option")
-	settings := options.ExecuteSettings(query.WithArrow(decode))
+	}, readerOptions...)
+	readerOptions[0] = "changed"
+	settings := options.ExecuteSettings(opt)
 	require.NotNil(t, settings.ArrowDecoder())
 	batches, err := settings.ArrowDecoder()(t.Context(), nil, strings.NewReader("IPC part"))
 	require.NoError(t, err)
 	require.Empty(t, batches)
 	require.Equal(t, 1, reader.releases)
-	require.Nil(t, options.ExecuteSettings(query.WithArrow(decode), query.WithArrow(nil)).ArrowDecoder())
+	require.Nil(t, options.ExecuteSettings(opt, query.WithYdbValue()).ArrowDecoder())
 }
 
 type mockIPCReader struct{ releases int }

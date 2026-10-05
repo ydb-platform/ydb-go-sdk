@@ -119,11 +119,11 @@ result set, and `Query` for multiple result sets. For large results, iterate
 `s.Query` inside `db.Query().Do`, or `tx.Query` inside `DoTx`: `Client.Query` and
 `Client.QueryResultSet` materialize their results in memory.
 
-Query Service uses `Ydb.Value` by default. Build a decoder with
-`query.NewArrowDecoder(ipc.NewReader)` from your application's Arrow Go version.
-Experimental `query.WithArrow(decoder)`
-selects Arrow while preserving the row and scan APIs;
-`ydb.WithQueryDefaultResultFormatArrow(decoder)` sets the driver default.
+Query Service uses `Ydb.Value` by default. Experimental
+`query.WithArrow(ipc.NewReader, opts...)` uses your application's Arrow Go version
+while preserving the row and scan APIs;
+`ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader, opts...)` sets the driver default.
+`query.WithYdbValue()` selects YDB values for one query.
 `Session.QueryArrow` exposes raw Arrow IPC for applications that process columns
 and manage Arrow resources themselves. See [Query methods and result formats](QUERY.md)
 for recommendations, decoder requirements, benchmark results and graphs.

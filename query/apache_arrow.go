@@ -24,24 +24,36 @@ type ArrowResult = arrow.Result
 // WithArrow requests Arrow results for one query while retaining ResultSets,
 // Rows, Scan, ScanNamed, ScanStruct and Values. It applies to Query, QueryRow and
 // QueryResultSet on Client, Session and TxActor, including queries inside Do and DoTx.
-// Exec also requests Arrow, but discards results without invoking the decoder.
+// Exec also requests Arrow, but discards results without invoking the reader.
 // The server must support and enable Arrow results.
 //
-// Create the decoder with NewArrowDecoder using the application's Apache Arrow Go
-// version; the SDK module has no Apache Arrow Go dependency. The decoder converts
-// each IPC response part into retained column batches.
+// Pass ipc.NewReader from the application's Apache Arrow Go version. Reader,
+// record, array and option types are inferred from the factory; the SDK module
+// has no Apache Arrow Go dependency. Optional arguments are IPC reader options
+// from the same Arrow Go version. The factory and its options must support
+// concurrent calls. The resulting ExecuteOption can be reused across queries.
 //
 // For example (error handling omitted):
 //
-//	decoder := query.NewArrowDecoder(ipc.NewReader)
-//	row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(decoder))
+//	row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(ipc.NewReader))
 //	var id int32
 //	err = row.Scan(&id)
 //
-// To enable Arrow by default, use ydb.WithQueryDefaultResultFormatArrow(decoder).
-// A nil decoder overrides that driver default for one query:
+// Reader options can be passed directly:
 //
-//	row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(nil))
+//	option := query.WithArrow(ipc.NewReader, ipc.WithAllocator(allocator))
+//
+// To enable Arrow by default, use ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader).
+// WithYdbValue overrides that driver default for one query:
+//
+//	row, err := db.Query().QueryRow(ctx, sql, query.WithYdbValue())
+//
+// The decoder supports Bool, signed/unsigned integers, Float, Double, String and
+// Utf8, with one Optional wrapper. Unsupported types and mismatches with YDB
+// column metadata return decode errors before scanning. YDB temporal types,
+// including Date, Datetime, Timestamp and Interval, are unsupported even when
+// represented by integer arrays in Arrow. To add support for a missing YDB type,
+// open an issue or submit a pull request to https://github.com/ydb-platform/ydb-go-sdk.
 //
 // Client.Query and Client.QueryResultSet materialize the entire result and retain
 // batches until Close. Session and TxActor queries decode one response part at a
@@ -53,34 +65,18 @@ type ArrowResult = arrow.Result
 // fall back to another format.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func WithArrow(decoder arrow.Decoder) ExecuteOption {
-	return options.WithArrow(decoder)
+func WithArrow[A arrow.Array, B arrow.Record[A], R arrow.IPCReader[B], O any](
+	newReader func(io.Reader, ...O) (R, error), opts ...O,
+) ExecuteOption {
+	return options.WithArrow(arrow.NewDecoder(newReader, opts...))
 }
 
-// NewArrowDecoder builds a decoder from the application's ipc.NewReader.
-// Reader, record, array and option types are inferred from the factory; the SDK
-// has no Apache Arrow Go dependency. It supports Bool, signed/unsigned integers,
-// Float, Double, String and Utf8, with one Optional wrapper. Unsupported types
-// and mismatches with YDB column metadata return decode errors before scanning.
-// YDB temporal types, including Date, Datetime, Timestamp and Interval, are
-// unsupported even when represented by integer arrays in Arrow. To add support
-// for a missing YDB type, open an issue or submit a pull request to
-// https://github.com/ydb-platform/ydb-go-sdk.
-//
-// For example:
-//
-//	decoder := query.NewArrowDecoder(ipc.NewReader)
-//	row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(decoder))
-//
-// Optional arguments are IPC reader options from the same Arrow Go version.
-// The reader returns borrowed records valid until its next Read or Release;
-// the decoder retains each record before reading ahead.
-// The factory and its options must support concurrent calls. See WithArrow for
-// result ownership and lifetime requirements.
+// WithYdbValue selects the ordinary YDB value result format for one query,
+// overriding ydb.WithQueryDefaultResultFormatArrow. It applies to Query,
+// QueryRow, QueryResultSet and Exec on Client, Session and TxActor.
+// Subsequent queries without an override use the driver default again.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func NewArrowDecoder[A arrow.Array, B arrow.Record[A], R arrow.IPCReader[B], O any](
-	newReader func(io.Reader, ...O) (R, error), opts ...O,
-) arrow.Decoder {
-	return arrow.NewDecoder(newReader, opts...)
+func WithYdbValue() ExecuteOption {
+	return options.WithArrow(nil)
 }

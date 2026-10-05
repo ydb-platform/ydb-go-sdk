@@ -4,10 +4,11 @@
 `QueryResultSet` on `query.Client`, `query.Session` and `query.TxActor`.
 The server must support Arrow results and enable `EnableArrowResultSetFormat`.
 
-The SDK module does not import Apache Arrow Go. Construct the decoder using
-`query.NewArrowDecoder(ipc.NewReader)` and your own Arrow dependency. Reader,
-record, array and option types are inferred automatically; the same constructor
-works with v17 and v18. This independent example module uses
+The SDK module does not import Apache Arrow Go. Pass
+`ipc.NewReader` and optional IPC reader options from your own Arrow dependency
+to `query.WithArrow` or `ydb.WithQueryDefaultResultFormatArrow`. Reader,
+record, array and option types are inferred automatically; both options
+work with v17 and v18. This independent example module uses
 `github.com/apache/arrow-go/v18` v18.8.0 (Go 1.25 or newer); it does not change
 the SDK's `go.mod` or `go.sum`. The decoder retains each record once and releases
 the IPC reader. It clones strings and bytes when scanning or creating SDK values
@@ -35,9 +36,8 @@ if err := row.Scan(&id, &name); err != nil {
 }
 
 // With Arrow IPC on the wire and the same SDK scans:
-decoder := query.NewArrowDecoder(ipc.NewReader)
 row, err = db.Query().QueryRow(ctx, `SELECT 42 AS id, "hello"u AS name;`,
-    query.WithArrow(decoder),
+    query.WithArrow(ipc.NewReader),
 )
 if err != nil {
     return err
@@ -52,10 +52,10 @@ The same option can be passed to `s.Query(...)` inside `db.Query().Do` or to
 
 ```go
 db, err := ydb.Open(ctx, dsn,
-    ydb.WithQueryDefaultResultFormatArrow(decoder),
+    ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader),
 )
 // Per-call options override driver defaults:
-row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(nil))
+row, err := db.Query().QueryRow(ctx, sql, query.WithYdbValue())
 ```
 
 The decoder receives the YDB column names/types and a self-contained IPC
@@ -112,7 +112,7 @@ err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
 ## Running the example
 
 The [command](cmd/main.go) reads two result sets with `Session.Query`,
-`query.NewArrowDecoder(ipc.NewReader)` and `ScanNamed`. With a local YDB running:
+`query.WithArrow(ipc.NewReader)` and `ScanNamed`. With a local YDB running:
 
 ```sh
 go run ./cmd
