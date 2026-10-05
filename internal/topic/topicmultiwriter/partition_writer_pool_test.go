@@ -9,10 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 var errCreate = errors.New("create error")
@@ -87,6 +89,9 @@ func newPoolForTest(t *testing.T, factory *poolMockFactory) (*partitionWriterPoo
 		bg,
 		func(partitionID, seqNo int64) {},
 		func(partitionID int64) {},
+		partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+			return topictypes.TopicDescription{}, nil
+		}).Get("test/topic"),
 		func() {},
 		func(err error) {},
 	)

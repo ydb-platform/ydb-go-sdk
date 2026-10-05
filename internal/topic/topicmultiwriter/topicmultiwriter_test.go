@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
@@ -25,6 +27,31 @@ import (
 )
 
 var errTest = errors.New("test error")
+
+func TestMultiWritersSharePartitionDescription(t *testing.T) {
+	ctx := xtest.Context(t)
+	var describes atomic.Int64
+	description := stubs.DefaultStubTopicDescription(t)
+	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+		describes.Add(1)
+
+		return description, nil
+	}).Get("test/topic")
+
+	for range 2 {
+		cfg := MultiWriterConfig{}
+		withWritersFactory(newStubWritersFactory(t, stubs.StubWriterTypeBasic, "test-producer", nil, 0))(&cfg)
+		WithWriterPartitionByPartitionID()(&cfg)
+		writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+		topicwriterinternal.WithTopic("test/topic")(writerCfg)
+		writer, err := NewMultiWriter(source, writerCfg, &cfg)
+		require.NoError(t, err)
+		require.NoError(t, writer.WaitInit(ctx))
+		require.NoError(t, writer.Close(ctx))
+	}
+
+	require.Equal(t, int64(1), describes.Load())
+}
 
 func (p *MultiWriter) getWritersCount() int {
 	return p.orchestrator.getWritersCount()
@@ -222,10 +249,20 @@ func newTestMultiWriter(t testing.TB, describer TopicDescriber) *MultiWriter {
 	WithProducerIDPrefix("test-producer")(&cfg)
 	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
 
-	writer, err := NewMultiWriter(describer, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
+	writer, err := newMultiWriterFromDescriber(describer, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
 	require.NoError(t, err)
 
 	return writer
+}
+
+func newMultiWriterFromDescriber(
+	describer TopicDescriber,
+	writerCfg *topicwriterinternal.WriterReconnectorConfig,
+	multiWriterCfg *MultiWriterConfig,
+) (*MultiWriter, error) {
+	source := partition.NewSources(partition.TopicDescriber(describer)).Get(writerCfg.Topic())
+
+	return NewMultiWriter(source, writerCfg, multiWriterCfg)
 }
 
 func newTestMultiWriterWithInitDelay(
@@ -239,11 +276,12 @@ func newTestMultiWriterWithInitDelay(
 	WithProducerIDPrefix("test-producer")(&cfg)
 	WithWriterPartitionByKey(partitionchooser.NewBoundPartitionChooser())(&cfg)
 
-	writer, err := NewMultiWriter(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+	delayedDescriber := func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 		time.Sleep(initDelay)
 
 		return describer(ctx, path)
-	}, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
+	}
+	writer, err := newMultiWriterFromDescriber(delayedDescriber, &topicwriterinternal.WriterReconnectorConfig{}, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -269,7 +307,7 @@ func newTestMultiWriterWithBasicWriter(
 		opt(writerCfg)
 	}
 
-	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
+	writer, err := newMultiWriterFromDescriber(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -304,7 +342,7 @@ func newTestMultiWriterWithAutopartitioningWriter(
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
+	writer, err := newMultiWriterFromDescriber(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -323,7 +361,7 @@ func newTestMultiWriterWithSmallIdleSessionTimeout(t testing.TB, describer Topic
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
+	writer, err := newMultiWriterFromDescriber(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -350,7 +388,7 @@ func newTestMultiWriterWithAckDelay(
 		opt(writerCfg)
 	}
 
-	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
+	writer, err := newMultiWriterFromDescriber(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -377,7 +415,7 @@ func newTestMultiWriterWithCustomWritersFactory(
 		opt(writerCfg)
 	}
 
-	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
+	writer, err := newMultiWriterFromDescriber(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -438,7 +476,7 @@ func newTestMultiWriterWithPartitionChooser(
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	writer, err := NewMultiWriter(describer, writerCfg, &cfg)
+	writer, err := newMultiWriterFromDescriber(describer, writerCfg, &cfg)
 	require.NoError(t, err)
 
 	return writer
@@ -638,9 +676,9 @@ func TestOrchestratorDescribeTopicWithRetriesCancelsRetrySleep(t *testing.T) {
 	o := newOrchestrator(
 		ctx,
 		cancel,
-		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		partition.NewSources(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return describeResult, nil
-		},
+		}).Get("test/topic"),
 		bg,
 		&topicwriterinternal.WriterReconnectorConfig{},
 		&MultiWriterConfig{},
@@ -948,7 +986,7 @@ func TestMultiWriter_Write_ErrUnorderedSeqNo(t *testing.T) {
 	topicwriterinternal.WithMaxQueueLen(100)(writerCfg)
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 
-	multiWriter, err := NewMultiWriter(
+	multiWriter, err := newMultiWriterFromDescriber(
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return stubClient.Describe(ctx, path)
 		},
@@ -1005,7 +1043,7 @@ func TestMultiWriter_Write_AutoSeqNoFollowsQueueOrder(t *testing.T) {
 	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
 	topicwriterinternal.WithAutoSetSeqNo(true)(writerCfg)
 
-	multiWriter, err := NewMultiWriter(
+	multiWriter, err := newMultiWriterFromDescriber(
 		func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return stubClient.Describe(ctx, path)
 		},

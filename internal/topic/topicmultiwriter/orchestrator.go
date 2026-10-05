@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
@@ -32,7 +33,7 @@ type orchestrator struct {
 	mu             *xsync.Mutex
 
 	partitionChooser PartitionChooser
-	topicDescriber   TopicDescriber
+	source           *partition.Source
 
 	partitions map[int64]*PartitionInfo
 	initDone   empty.Chan
@@ -52,7 +53,7 @@ type orchestrator struct {
 func newOrchestrator(
 	ctx context.Context,
 	stop context.CancelFunc,
-	topicDescriber TopicDescriber,
+	source *partition.Source,
 	background *background.Worker,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
@@ -73,7 +74,7 @@ func newOrchestrator(
 		writerCfg:        writerCfg,
 		multiWriterCfg:   multiWriterCfg,
 		mu:               &xsync.Mutex{},
-		topicDescriber:   topicDescriber,
+		source:           source,
 		ctx:              ctx,
 		stop:             stop,
 		partitions:       make(map[int64]*PartitionInfo),
@@ -99,6 +100,7 @@ func newOrchestrator(
 		background,
 		o.ackReceiver.push,
 		o.partitionSplitReceiver.push,
+		source,
 		func() {
 			o.sender.wakeup()
 		},
@@ -148,7 +150,7 @@ func (o *orchestrator) sleepOrDone(delay time.Duration) error {
 func (o *orchestrator) init() (err error) {
 	defer close(o.initDone)
 
-	describeResult, err := o.topicDescriber(o.ctx, o.writerCfg.Topic())
+	describeResult, err := o.source.TopicDescription(o.ctx)
 	if err != nil {
 		o.stopWithError(err)
 
@@ -624,7 +626,8 @@ func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topicty
 	)
 
 	for range maxRetries {
-		describeResult, err := o.topicDescriber(o.ctx, o.writerCfg.Topic())
+		o.source.Invalidate()
+		describeResult, err := o.source.TopicDescription(o.ctx)
 		if err == nil {
 			var needRetry bool
 			for _, partition := range describeResult.Partitions {
