@@ -5,8 +5,8 @@ import "github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 // Partitions is a read-only snapshot of one topic's partition topology.
 // Its methods are safe for concurrent use.
 // Values returned by its methods must not be modified.
-// A snapshot is not updated when Source loads a newer topology;
-// call Source.Partitions again to obtain the current snapshot.
+// A snapshot is not updated when TopicTopology loads a newer topology;
+// call TopicTopology.Partitions again to obtain the current snapshot.
 type Partitions struct {
 	all  List
 	byID map[int64]Partition

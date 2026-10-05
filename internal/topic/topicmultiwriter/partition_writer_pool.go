@@ -24,7 +24,7 @@ type partitionWriterPool struct {
 
 	ackCallback            func(partitionID int64, seqNo int64)
 	partitionSplitCallback func(partitionID int64)
-	source                 *partition.Source
+	topology               *partition.TopicTopology
 	onWriterInit           func()
 	onError                func(err error)
 }
@@ -36,7 +36,7 @@ func newPartitionWriterPool(
 	bg *background.Worker,
 	ackCallback func(partitionID int64, seqNo int64),
 	partitionSplitCallback func(partitionID int64),
-	source *partition.Source,
+	topology *partition.TopicTopology,
 	onWriterInit func(),
 	onError func(err error),
 ) *partitionWriterPool {
@@ -47,7 +47,7 @@ func newPartitionWriterPool(
 		bg:                     bg,
 		ackCallback:            ackCallback,
 		partitionSplitCallback: partitionSplitCallback,
-		source:                 source,
+		topology:               topology,
 		onWriterInit:           onWriterInit,
 		onError:                onError,
 		writers:                make(map[int64]*writerWrapper),
@@ -84,7 +84,7 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 				p.ackCallback(partitionID, seqNo)
 			}),
 			withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
-				if p.source.NotifySessionError(partitionID, args.Error) {
+				if p.topology.NotifySessionError(partitionID, args.Error) {
 					p.partitionSplitCallback(partitionID)
 
 					return topic.PublicRetryDecisionStop

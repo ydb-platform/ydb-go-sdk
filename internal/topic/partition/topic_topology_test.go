@@ -15,97 +15,97 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
-func TestSourcePartitionsReturnsPartitions(t *testing.T) {
+func TestTopicTopologyPartitionsReturnsPartitions(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	source := partition.NewSources(describer.Describe).Get("test/topic")
+	topology := partition.NewTopologyRegistry(describer.Describe).Get("test/topic")
 
-	partitions, err := source.Partitions(t.Context())
+	partitions, err := topology.Partitions(t.Context())
 
 	require.NoError(t, err)
 	assert.NotNil(t, partitions)
 }
 
-func TestSourcePartitionsReturnsDescribeError(t *testing.T) {
+func TestTopicTopologyPartitionsReturnsDescribeError(t *testing.T) {
 	describeErr := errors.New("describe topic failed")
-	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		return topictypes.TopicDescription{}, describeErr
 	}).Get("test/topic")
 
-	_, err := source.Partitions(t.Context())
+	_, err := topology.Partitions(t.Context())
 
 	assert.ErrorIs(t, err, describeErr)
 }
 
-func TestSourcePartitionsRetriesRetryableDescribeError(t *testing.T) {
+func TestTopicTopologyPartitionsRetriesRetryableDescribeError(t *testing.T) {
 	describeErr := retry.RetryableError(
 		errors.New("describe topic failed"),
 		retry.WithBackoff(retry.TypeNoBackoff),
 	)
-	source := newSourceWithDescribeResults(
+	topology := newTopicTopologyWithDescribeResults(
 		topicDescribeResult{err: describeErr},
 		topicDescribeResult{description: topicWithActivePartitions(42)},
 	)
 
-	partitions, err := source.Partitions(t.Context())
+	partitions, err := topology.Partitions(t.Context())
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{42}, partitions.All().IDs())
 }
 
-func TestSourcePartitionsDescribesRequestedTopic(t *testing.T) {
+func TestTopicTopologyPartitionsDescribesRequestedTopic(t *testing.T) {
 	topicName := "test/topic"
 	describer := &mockTopicDescriber{}
-	source := partition.NewSources(describer.Describe).Get(topicName)
+	topology := partition.NewTopologyRegistry(describer.Describe).Get(topicName)
 
-	_, _ = source.Partitions(t.Context())
+	_, _ = topology.Partitions(t.Context())
 
 	assert.Equal(t, topicName, describer.Calls()[0].Path)
 }
 
-func TestSourcePartitionsReturnsDescribedPartitionIDs(t *testing.T) {
+func TestTopicTopologyPartitionsReturnsDescribedPartitionIDs(t *testing.T) {
 	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
 		Partitions: []topictypes.PartitionInfo{{PartitionID: 42, Active: true}},
 	}}
-	source := partition.NewSources(describer.Describe).Get("test/topic")
+	topology := partition.NewTopologyRegistry(describer.Describe).Get("test/topic")
 
-	partitions, err := source.Partitions(t.Context())
+	partitions, err := topology.Partitions(t.Context())
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{42}, partitions.All().IDs())
 }
 
-func TestSourcePartitionsDescribesTopicOnce(t *testing.T) {
+func TestTopicTopologyPartitionsDescribesTopicOnce(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	source := partition.NewSources(describer.Describe).Get("test/topic")
+	topology := partition.NewTopologyRegistry(describer.Describe).Get("test/topic")
 
-	_, _ = source.Partitions(t.Context())
-	_, _ = source.Partitions(t.Context())
+	_, _ = topology.Partitions(t.Context())
+	_, _ = topology.Partitions(t.Context())
 
 	assert.Len(t, describer.Calls(), 1)
 }
 
-func TestSourceTopicDescriptionUsesCachedPartitions(t *testing.T) {
+func TestTopicTopologyTopicDescriptionUsesCachedPartitions(t *testing.T) {
 	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
 		Partitions: []topictypes.PartitionInfo{{
 			PartitionID: 1, Active: true, ChildPartitionIDs: []int64{2},
 		}},
 	}}
-	source := partition.NewSources(describer.Describe).Get("test/topic")
+	topology := partition.NewTopologyRegistry(describer.Describe).Get("test/topic")
 
-	first, err := source.TopicDescription(t.Context())
+	first, err := topology.TopicDescription(t.Context())
 	require.NoError(t, err)
 	first.Partitions[0].ChildPartitionIDs[0] = 99
-	second, err := source.TopicDescription(t.Context())
+	second, err := topology.TopicDescription(t.Context())
 	require.NoError(t, err)
 
 	assert.Equal(t, []int64{2}, second.Partitions[0].ChildPartitionIDs)
 	assert.Len(t, describer.Calls(), 1)
 }
 
-func TestSourcePartitionsDescribesTopicOnceConcurrently(t *testing.T) {
+func TestTopicTopologyPartitionsDescribesTopicOnceConcurrently(t *testing.T) {
 	ctx := t.Context()
 	describer := &mockTopicDescriber{}
-	source := partition.NewSources(describer.Describe).Get("test/topic")
+	topology := partition.NewTopologyRegistry(describer.Describe).Get("test/topic")
 	start := make(chan struct{})
 
 	var wg sync.WaitGroup
@@ -114,7 +114,7 @@ func TestSourcePartitionsDescribesTopicOnceConcurrently(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			_, _ = source.Partitions(ctx)
+			_, _ = topology.Partitions(ctx)
 		}()
 	}
 	close(start)
@@ -123,10 +123,10 @@ func TestSourcePartitionsDescribesTopicOnceConcurrently(t *testing.T) {
 	assert.Len(t, describer.Calls(), 1)
 }
 
-func TestSourcePartitionsRetriesWhenConcurrentLoadContextIsCanceled(t *testing.T) {
+func TestTopicTopologyPartitionsRetriesWhenConcurrentLoadContextIsCanceled(t *testing.T) {
 	var calls atomic.Int64
 	describeStarted := make(chan struct{})
-	source := partition.NewSources(func(ctx context.Context, _ string) (topictypes.TopicDescription, error) {
+	topology := partition.NewTopologyRegistry(func(ctx context.Context, _ string) (topictypes.TopicDescription, error) {
 		if calls.Add(1) == 1 {
 			close(describeStarted)
 			<-ctx.Done()
@@ -137,9 +137,9 @@ func TestSourcePartitionsRetriesWhenConcurrentLoadContextIsCanceled(t *testing.T
 		return topicWithActivePartitions(42), nil
 	}).Get("test/topic")
 	loadCtx, cancelLoad := context.WithCancel(t.Context())
-	loadResult := startLoadingPartitions(loadCtx, source)
+	loadResult := startLoadingPartitions(loadCtx, topology)
 	<-describeStarted
-	waitResult := startWaitingForPartitions(t, source)
+	waitResult := startWaitingForPartitions(t, topology)
 	cancelLoad()
 	require.ErrorIs(t, (<-loadResult).err, context.Canceled)
 
@@ -149,19 +149,19 @@ func TestSourcePartitionsRetriesWhenConcurrentLoadContextIsCanceled(t *testing.T
 	assert.Equal(t, []int64{42}, result.partitions.All().IDs())
 }
 
-func TestSourcePartitionsReturnsConcurrentDescribeError(t *testing.T) {
+func TestTopicTopologyPartitionsReturnsConcurrentDescribeError(t *testing.T) {
 	describeErr := errors.New("describe topic failed")
 	describeStarted := make(chan struct{})
 	releaseDescribe := make(chan struct{})
-	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		close(describeStarted)
 		<-releaseDescribe
 
 		return topictypes.TopicDescription{}, describeErr
 	}).Get("test/topic")
-	firstResult := startLoadingPartitions(t.Context(), source)
+	firstResult := startLoadingPartitions(t.Context(), topology)
 	<-describeStarted
-	secondResult := startWaitingForPartitions(t, source)
+	secondResult := startWaitingForPartitions(t, topology)
 
 	close(releaseDescribe)
 
@@ -169,11 +169,11 @@ func TestSourcePartitionsReturnsConcurrentDescribeError(t *testing.T) {
 	assert.ErrorIs(t, (<-secondResult).err, describeErr)
 }
 
-func TestSourcePartitionsReloadsWhenInvalidatedDuringDescribe(t *testing.T) {
+func TestTopicTopologyPartitionsReloadsWhenInvalidatedDuringDescribe(t *testing.T) {
 	var calls atomic.Int64
 	describeStarted := make(chan struct{})
 	releaseDescribe := make(chan struct{})
-	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		partitionID := calls.Add(1)
 		if partitionID == 1 {
 			close(describeStarted)
@@ -182,10 +182,10 @@ func TestSourcePartitionsReloadsWhenInvalidatedDuringDescribe(t *testing.T) {
 
 		return topicWithActivePartitions(partitionID), nil
 	}).Get("test/topic")
-	result := startLoadingPartitions(t.Context(), source)
+	result := startLoadingPartitions(t.Context(), topology)
 	<-describeStarted
 
-	source.Invalidate()
+	topology.Invalidate()
 	close(releaseDescribe)
 
 	loaded := <-result
@@ -193,46 +193,46 @@ func TestSourcePartitionsReloadsWhenInvalidatedDuringDescribe(t *testing.T) {
 	assert.Equal(t, []int64{2}, loaded.partitions.All().IDs())
 }
 
-func TestSourcePartitionsReloadsAfterInvalidate(t *testing.T) {
-	source := newSourceWithDescriptions(
+func TestTopicTopologyPartitionsReloadsAfterInvalidate(t *testing.T) {
+	topology := newTopicTopologyWithDescriptions(
 		topicWithActivePartitions(1),
 		topicWithActivePartitions(2),
 	)
-	_, _ = source.Partitions(t.Context())
+	_, _ = topology.Partitions(t.Context())
 
-	source.Invalidate()
-	partitions, err := source.Partitions(t.Context())
+	topology.Invalidate()
+	partitions, err := topology.Partitions(t.Context())
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{2}, partitions.All().IDs())
 }
 
-func TestSourceNotifySessionErrorRejectsOverloadedWithoutPartitionInactiveIssue(t *testing.T) {
-	source := partition.NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
+func TestTopicTopologyNotifySessionErrorRejectsOverloadedWithoutPartitionInactiveIssue(t *testing.T) {
+	topology := partition.NewTopologyRegistry((&mockTopicDescriber{}).Describe).Get("test/topic")
 
-	assert.False(t, source.NotifySessionError(1, overloadedError()))
+	assert.False(t, topology.NotifySessionError(1, overloadedError()))
 }
 
-func TestSourceNotifySessionErrorRejectsOverloadedWithOtherIssue(t *testing.T) {
-	source := partition.NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
+func TestTopicTopologyNotifySessionErrorRejectsOverloadedWithOtherIssue(t *testing.T) {
+	topology := partition.NewTopologyRegistry((&mockTopicDescriber{}).Describe).Get("test/topic")
 
-	assert.False(t, source.NotifySessionError(1, overloadedErrorWithIssue(42)))
+	assert.False(t, topology.NotifySessionError(1, overloadedErrorWithIssue(42)))
 }
 
-func TestSourceNotifySessionErrorRejectsUnrelatedError(t *testing.T) {
-	source := partition.NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
+func TestTopicTopologyNotifySessionErrorRejectsUnrelatedError(t *testing.T) {
+	topology := partition.NewTopologyRegistry((&mockTopicDescriber{}).Describe).Get("test/topic")
 
-	assert.False(t, source.NotifySessionError(1, errors.New("session failed")))
+	assert.False(t, topology.NotifySessionError(1, errors.New("session failed")))
 }
 
-func TestSourceNotifySessionErrorAcceptsPartitionInactiveIssue(t *testing.T) {
-	source := partition.NewSources((&mockTopicDescriber{}).Describe).Get("test/topic")
+func TestTopicTopologyNotifySessionErrorAcceptsPartitionInactiveIssue(t *testing.T) {
+	topology := partition.NewTopologyRegistry((&mockTopicDescriber{}).Describe).Get("test/topic")
 
-	assert.True(t, source.NotifySessionError(1, partitionInactiveError()))
+	assert.True(t, topology.NotifySessionError(1, partitionInactiveError()))
 }
 
-func TestSourcePartitionsWaitsForPublishedReplacement(t *testing.T) {
-	source := newSourceWithDescriptions(
+func TestTopicTopologyPartitionsWaitsForPublishedReplacement(t *testing.T) {
+	topology := newTopicTopologyWithDescriptions(
 		topicWithActivePartitions(1),
 		topicWithActivePartitions(1),
 		topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
@@ -240,48 +240,48 @@ func TestSourcePartitionsWaitsForPublishedReplacement(t *testing.T) {
 		}},
 		topicAfterReplacement(1, 2),
 	)
-	_, err := source.Partitions(t.Context())
+	_, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
-	require.True(t, source.NotifySessionError(1, partitionInactiveError()))
+	require.True(t, topology.NotifySessionError(1, partitionInactiveError()))
 
-	partitions, err := source.Partitions(t.Context())
+	partitions, err := topology.Partitions(t.Context())
 
 	require.NoError(t, err)
 	assert.False(t, partitions.ByPartitionID(1).IsActive())
 	assert.True(t, partitions.ByPartitionID(2).IsActive())
 }
 
-func TestSourcePartitionsPublishesReplacementReportedInactiveDuringDescribe(t *testing.T) {
+func TestTopicTopologyPartitionsPublishesReplacementReportedInactiveDuringDescribe(t *testing.T) {
 	unexpectedDescribe := errors.New("unexpected extra describe")
 	var (
-		source *partition.Source
-		calls  atomic.Int64
+		topology *partition.TopicTopology
+		calls    atomic.Int64
 	)
-	source = partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology = partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		switch calls.Add(1) {
 		case 1:
 			return topicWithActivePartitions(1), nil
 		case 2:
-			source.NotifySessionError(1, partitionInactiveError())
+			topology.NotifySessionError(1, partitionInactiveError())
 
 			return topicAfterReplacement(1, 2), nil
 		default:
 			return topictypes.TopicDescription{}, unexpectedDescribe
 		}
 	}).Get("test/topic")
-	_, err := source.Partitions(t.Context())
+	_, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
-	require.True(t, source.NotifySessionError(1, partitionInactiveError()))
+	require.True(t, topology.NotifySessionError(1, partitionInactiveError()))
 
-	partitions, err := source.Partitions(t.Context())
+	partitions, err := topology.Partitions(t.Context())
 
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), calls.Load())
 	assert.True(t, partitions.ByPartitionID(2).IsActive())
 }
 
-func TestSourcePartitionsWaitsForReplacementThroughInactiveDescendants(t *testing.T) {
-	source := newSourceWithDescriptions(
+func TestTopicTopologyPartitionsWaitsForReplacementThroughInactiveDescendants(t *testing.T) {
+	topology := newTopicTopologyWithDescriptions(
 		topicWithActivePartitions(1),
 		topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
 			{PartitionID: 1, ChildPartitionIDs: []int64{2, 3}},
@@ -293,21 +293,21 @@ func TestSourcePartitionsWaitsForReplacementThroughInactiveDescendants(t *testin
 			{PartitionID: 7, Active: true, ParentPartitionIDs: []int64{3}},
 		}},
 	)
-	_, err := source.Partitions(t.Context())
+	_, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
-	require.True(t, source.NotifySessionError(1, partitionInactiveError()))
+	require.True(t, topology.NotifySessionError(1, partitionInactiveError()))
 
-	partitions, err := source.Partitions(t.Context())
+	partitions, err := topology.Partitions(t.Context())
 
 	require.NoError(t, err)
 	assert.True(t, partitions.ByPartitionID(4).IsActive())
 	assert.True(t, partitions.ByPartitionID(7).IsActive())
 }
 
-func TestSourcePartitionsReturnsContextErrorWhileWaitingForReplacement(t *testing.T) {
+func TestTopicTopologyPartitionsReturnsContextErrorWhileWaitingForReplacement(t *testing.T) {
 	var calls atomic.Int64
 	refreshStarted := make(chan struct{})
-	source := partition.NewSources(func(ctx context.Context, _ string) (topictypes.TopicDescription, error) {
+	topology := partition.NewTopologyRegistry(func(ctx context.Context, _ string) (topictypes.TopicDescription, error) {
 		if calls.Add(1) == 1 {
 			return topicWithActivePartitions(1), nil
 		}
@@ -316,11 +316,11 @@ func TestSourcePartitionsReturnsContextErrorWhileWaitingForReplacement(t *testin
 
 		return topictypes.TopicDescription{}, ctx.Err()
 	}).Get("test/topic")
-	_, err := source.Partitions(t.Context())
+	_, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
-	require.True(t, source.NotifySessionError(1, partitionInactiveError()))
+	require.True(t, topology.NotifySessionError(1, partitionInactiveError()))
 	refreshCtx, cancelRefresh := context.WithCancel(t.Context())
-	result := startLoadingPartitions(refreshCtx, source)
+	result := startLoadingPartitions(refreshCtx, topology)
 	<-refreshStarted
 
 	cancelRefresh()
@@ -328,30 +328,30 @@ func TestSourcePartitionsReturnsContextErrorWhileWaitingForReplacement(t *testin
 	assert.ErrorIs(t, (<-result).err, context.Canceled)
 }
 
-func TestSourcePartitionsContinuesReplacementRefreshAfterDescribeError(t *testing.T) {
+func TestTopicTopologyPartitionsContinuesReplacementRefreshAfterDescribeError(t *testing.T) {
 	describeErr := errors.New("describe topic failed")
-	source := newSourceWithDescribeResults(
+	topology := newTopicTopologyWithDescribeResults(
 		topicDescribeResult{description: topicWithActivePartitions(1)},
 		topicDescribeResult{err: describeErr},
 		topicDescribeResult{description: topicAfterReplacement(1, 2)},
 	)
-	_, err := source.Partitions(t.Context())
+	_, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
-	require.True(t, source.NotifySessionError(1, partitionInactiveError()))
+	require.True(t, topology.NotifySessionError(1, partitionInactiveError()))
 
-	_, err = source.Partitions(t.Context())
+	_, err = topology.Partitions(t.Context())
 	require.ErrorIs(t, err, describeErr)
-	partitions, err := source.Partitions(t.Context())
+	partitions, err := topology.Partitions(t.Context())
 
 	require.NoError(t, err)
 	assert.True(t, partitions.ByPartitionID(2).IsActive())
 }
 
-func TestSourcePartitionsSharesReplacementRefresh(t *testing.T) {
+func TestTopicTopologyPartitionsSharesReplacementRefresh(t *testing.T) {
 	var calls atomic.Int64
 	releaseRefresh := make(chan struct{})
 	refreshStarted := make(chan struct{})
-	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		if calls.Add(1) == 1 {
 			return topicWithActivePartitions(1), nil
 		}
@@ -360,12 +360,12 @@ func TestSourcePartitionsSharesReplacementRefresh(t *testing.T) {
 
 		return topicAfterReplacement(1, 2), nil
 	}).Get("test/topic")
-	_, err := source.Partitions(t.Context())
+	_, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
-	require.True(t, source.NotifySessionError(1, partitionInactiveError()))
-	first := startLoadingPartitions(t.Context(), source)
+	require.True(t, topology.NotifySessionError(1, partitionInactiveError()))
+	first := startLoadingPartitions(t.Context(), topology)
 	<-refreshStarted
-	second := startWaitingForPartitions(t, source)
+	second := startWaitingForPartitions(t, topology)
 
 	close(releaseRefresh)
 

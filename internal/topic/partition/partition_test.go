@@ -14,7 +14,7 @@ func TestPartitionIsActiveReturnsDescribedState(t *testing.T) {
 	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
 		Partitions: []topictypes.PartitionInfo{{PartitionID: 42, Active: true}},
 	}}
-	partitions, _ := partition.NewSources(describer.Describe).Get("test/topic").Partitions(t.Context())
+	partitions, _ := partition.NewTopologyRegistry(describer.Describe).Get("test/topic").Partitions(t.Context())
 
 	assert.True(t, partitions.ByPartitionID(42).IsActive())
 }
@@ -23,7 +23,7 @@ func TestPartitionIDReturnsDescribedID(t *testing.T) {
 	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
 		Partitions: []topictypes.PartitionInfo{{PartitionID: 42}},
 	}}
-	partitions, _ := partition.NewSources(describer.Describe).Get("test/topic").Partitions(t.Context())
+	partitions, _ := partition.NewTopologyRegistry(describer.Describe).Get("test/topic").Partitions(t.Context())
 
 	assert.Equal(t, int64(42), partitions.All()[0].ID())
 }
@@ -33,7 +33,7 @@ func TestPartitionHasChildrenReturnsDescribedState(t *testing.T) {
 		{PartitionID: 1, ChildPartitionIDs: []int64{2}},
 		{PartitionID: 2},
 	}}}
-	partitions, _ := partition.NewSources(describer.Describe).Get("test/topic").Partitions(t.Context())
+	partitions, _ := partition.NewTopologyRegistry(describer.Describe).Get("test/topic").Partitions(t.Context())
 
 	assert.True(t, partitions.ByPartitionID(1).HasChildren())
 	assert.False(t, partitions.ByPartitionID(2).HasChildren())
@@ -117,7 +117,7 @@ func TestPartitionParents(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			describer := &mockTopicDescriber{description: topictypes.TopicDescription{Partitions: tt.partitions}}
-			partitions, _ := partition.NewSources(describer.Describe).Get("test/topic").Partitions(t.Context())
+			partitions, _ := partition.NewTopologyRegistry(describer.Describe).Get("test/topic").Partitions(t.Context())
 
 			assert.ElementsMatch(t, tt.want, partitions.ByPartitionID(tt.partition).Parents().IDs())
 		})
@@ -128,7 +128,7 @@ func TestPartitionParentsReturnsMissingParentAsInactive(t *testing.T) {
 	describer := &mockTopicDescriber{description: topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
 		{PartitionID: 2, ParentPartitionIDs: []int64{99}},
 	}}}
-	partitions, _ := partition.NewSources(describer.Describe).Get("test/topic").Partitions(t.Context())
+	partitions, _ := partition.NewTopologyRegistry(describer.Describe).Get("test/topic").Partitions(t.Context())
 
 	parents := partitions.ByPartitionID(2).Parents()
 
@@ -145,7 +145,7 @@ func TestPartitionChildrenReturnsReplacementTree(t *testing.T) {
 		{PartitionID: 3, Active: true},
 		{PartitionID: 4, Active: true},
 	}}}
-	partitions, _ := partition.NewSources(describer.Describe).Get("test/topic").Partitions(t.Context())
+	partitions, _ := partition.NewTopologyRegistry(describer.Describe).Get("test/topic").Partitions(t.Context())
 
 	assert.ElementsMatch(t, []int64{2, 3, 4}, partitions.ByPartitionID(1).Children().IDs())
 }

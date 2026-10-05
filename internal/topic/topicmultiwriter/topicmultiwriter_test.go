@@ -32,7 +32,7 @@ func TestMultiWritersSharePartitionDescription(t *testing.T) {
 	ctx := xtest.Context(t)
 	var describes atomic.Int64
 	description := stubs.DefaultStubTopicDescription(t)
-	source := partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		describes.Add(1)
 
 		return description, nil
@@ -44,7 +44,7 @@ func TestMultiWritersSharePartitionDescription(t *testing.T) {
 		WithWriterPartitionByPartitionID()(&cfg)
 		writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 		topicwriterinternal.WithTopic("test/topic")(writerCfg)
-		writer, err := NewMultiWriter(source, writerCfg, &cfg)
+		writer, err := NewMultiWriter(topology, writerCfg, &cfg)
 		require.NoError(t, err)
 		require.NoError(t, writer.WaitInit(ctx))
 		require.NoError(t, writer.Close(ctx))
@@ -260,9 +260,9 @@ func newMultiWriterFromDescriber(
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
-	source := partition.NewSources(partition.TopicDescriber(describer)).Get(writerCfg.Topic())
+	topology := partition.NewTopologyRegistry(partition.TopicDescriber(describer)).Get(writerCfg.Topic())
 
-	return NewMultiWriter(source, writerCfg, multiWriterCfg)
+	return NewMultiWriter(topology, writerCfg, multiWriterCfg)
 }
 
 func newTestMultiWriterWithInitDelay(
@@ -676,7 +676,7 @@ func TestOrchestratorDescribeTopicWithRetriesCancelsRetrySleep(t *testing.T) {
 	o := newOrchestrator(
 		ctx,
 		cancel,
-		partition.NewSources(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
+		partition.NewTopologyRegistry(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 			return describeResult, nil
 		}).Get("test/topic"),
 		bg,

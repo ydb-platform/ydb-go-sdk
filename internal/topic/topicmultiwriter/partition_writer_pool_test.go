@@ -89,7 +89,7 @@ func newPoolForTest(t *testing.T, factory *poolMockFactory) (*partitionWriterPoo
 		bg,
 		func(partitionID, seqNo int64) {},
 		func(partitionID int64) {},
-		partition.NewSources(func(context.Context, string) (topictypes.TopicDescription, error) {
+		partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 			return topictypes.TopicDescription{}, nil
 		}).Get("test/topic"),
 		func() {},

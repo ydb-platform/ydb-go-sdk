@@ -33,7 +33,7 @@ type orchestrator struct {
 	mu             *xsync.Mutex
 
 	partitionChooser PartitionChooser
-	source           *partition.Source
+	topology         *partition.TopicTopology
 
 	partitions map[int64]*PartitionInfo
 	initDone   empty.Chan
@@ -53,7 +53,7 @@ type orchestrator struct {
 func newOrchestrator(
 	ctx context.Context,
 	stop context.CancelFunc,
-	source *partition.Source,
+	topology *partition.TopicTopology,
 	background *background.Worker,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
@@ -74,7 +74,7 @@ func newOrchestrator(
 		writerCfg:        writerCfg,
 		multiWriterCfg:   multiWriterCfg,
 		mu:               &xsync.Mutex{},
-		source:           source,
+		topology:         topology,
 		ctx:              ctx,
 		stop:             stop,
 		partitions:       make(map[int64]*PartitionInfo),
@@ -100,7 +100,7 @@ func newOrchestrator(
 		background,
 		o.ackReceiver.push,
 		o.partitionSplitReceiver.push,
-		source,
+		topology,
 		func() {
 			o.sender.wakeup()
 		},
@@ -150,7 +150,7 @@ func (o *orchestrator) sleepOrDone(delay time.Duration) error {
 func (o *orchestrator) init() (err error) {
 	defer close(o.initDone)
 
-	describeResult, err := o.source.TopicDescription(o.ctx)
+	describeResult, err := o.topology.TopicDescription(o.ctx)
 	if err != nil {
 		o.stopWithError(err)
 
@@ -626,8 +626,8 @@ func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topicty
 	)
 
 	for range maxRetries {
-		o.source.Invalidate()
-		describeResult, err := o.source.TopicDescription(o.ctx)
+		o.topology.Invalidate()
+		describeResult, err := o.topology.TopicDescription(o.ctx)
 		if err == nil {
 			var needRetry bool
 			for _, partition := range describeResult.Partitions {

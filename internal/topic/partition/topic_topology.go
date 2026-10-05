@@ -16,11 +16,11 @@ import (
 // TopicDescriber loads topic metadata without depending on client or writer options.
 type TopicDescriber func(ctx context.Context, path string) (topictypes.TopicDescription, error)
 
-// Source caches metadata for one topic and is shared by that topic's writers in one client.
-// Obtain a Source through Sources.Get; its zero value is not usable.
+// TopicTopology caches metadata for one topic and is shared by that topic's writers in one client.
+// Obtain a TopicTopology through TopologyRegistry.Get; its zero value is not usable.
 // Cached metadata has no time-based expiration or periodic refresh.
 // Reloads are triggered by explicit invalidation or a reported inactive partition.
-type Source struct {
+type TopicTopology struct {
 	topicPath  string
 	describe   TopicDescriber
 	partitions *Partitions
@@ -42,7 +42,7 @@ type Source struct {
 // A previously returned snapshot is not updated when a newer topology is loaded.
 // After NotifySessionError accepts an inactive-partition error, Partitions waits until
 // the replacement of every reported partition is present in topic metadata.
-func (s *Source) Partitions(ctx context.Context) (*Partitions, error) {
+func (s *TopicTopology) Partitions(ctx context.Context) (*Partitions, error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -86,7 +86,7 @@ func (s *Source) Partitions(ctx context.Context) (*Partitions, error) {
 
 // TopicDescription returns the partition metadata needed by the existing
 // multi-writer describer interface. Its partition slices do not alias the cache.
-func (s *Source) TopicDescription(ctx context.Context) (topictypes.TopicDescription, error) {
+func (s *TopicTopology) TopicDescription(ctx context.Context) (topictypes.TopicDescription, error) {
 	partitions, err := s.Partitions(ctx)
 	if err != nil {
 		return topictypes.TopicDescription{}, err
@@ -110,7 +110,7 @@ func (s *Source) TopicDescription(ctx context.Context) (topictypes.TopicDescript
 // NotifySessionError invalidates cached metadata when err reports that partitionID became inactive.
 // It returns whether the error was accepted as a topology change. The next Partitions call waits
 // until metadata contains the complete replacement of partitionID.
-func (s *Source) NotifySessionError(partitionID int64, err error) bool {
+func (s *TopicTopology) NotifySessionError(partitionID int64, err error) bool {
 	if !xerrors.IsOperationErrorTopicPartitionInactive(err) {
 		return false
 	}
@@ -134,7 +134,7 @@ func (s *Source) NotifySessionError(partitionID int64, err error) bool {
 }
 
 // Invalidate marks this topic's cached metadata for reload without doing network I/O.
-func (s *Source) Invalidate() {
+func (s *TopicTopology) Invalidate() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -142,7 +142,7 @@ func (s *Source) Invalidate() {
 	s.reloadRequested = true
 }
 
-func (s *Source) updatePartitions(ctx context.Context) (*Partitions, error) {
+func (s *TopicTopology) updatePartitions(ctx context.Context) (*Partitions, error) {
 	for {
 		s.mu.Lock()
 		s.reloadRequested = false
@@ -180,7 +180,7 @@ func (s *Source) updatePartitions(ctx context.Context) (*Partitions, error) {
 	}
 }
 
-func (s *Source) partitionReplacementRetryErrorNeedLock(partitions *Partitions) error {
+func (s *TopicTopology) partitionReplacementRetryErrorNeedLock(partitions *Partitions) error {
 	// Several writers may report different inactive partitions before metadata catches up.
 	// Publish the snapshot only after it contains a complete replacement for all of them.
 	for partitionID := range s.pendingReplacements {

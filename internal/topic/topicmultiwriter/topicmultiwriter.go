@@ -24,7 +24,7 @@ type MultiWriter struct {
 }
 
 func NewMultiWriter(
-	source *partition.Source,
+	topology *partition.TopicTopology,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
@@ -47,7 +47,7 @@ func NewMultiWriter(
 		cfg:          multiWriterCfg,
 		writerCfg:    writerCfg,
 		encoders:     encoders,
-		orchestrator: newOrchestrator(ctx, cancel, source, background, writerCfg, multiWriterCfg),
+		orchestrator: newOrchestrator(ctx, cancel, topology, background, writerCfg, multiWriterCfg),
 		background:   background,
 	}
 
