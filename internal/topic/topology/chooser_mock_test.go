@@ -1,4 +1,4 @@
-package partition_test
+package topology_test
 
 import (
 	"slices"

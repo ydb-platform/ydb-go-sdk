@@ -12,10 +12,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -30,8 +30,8 @@ type orchestrator struct {
 	writerCfg      *topicwriterinternal.WriterReconnectorConfig
 	mu             *xsync.Mutex
 
-	topology      *partition.TopicTopology
-	router        *partition.Router
+	topology      *topology.Topic
+	router        *topology.Router
 	transactional bool
 
 	partitions map[int64]*partitionState
@@ -52,7 +52,7 @@ type orchestrator struct {
 func newOrchestrator(
 	ctx context.Context,
 	cancel context.CancelFunc,
-	topology *partition.TopicTopology,
+	topology *topology.Topic,
 	transactional bool,
 	background *background.Worker,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
@@ -163,7 +163,7 @@ func (o *orchestrator) init() (err error) {
 	if chooser == nil && !o.transactional {
 		chooser = partitionchooser.NewByPartitionIDPartitionChooser()
 	}
-	o.router, err = partition.NewRouter(partitions, chooser)
+	o.router, err = topology.NewRouter(partitions, chooser)
 	if err != nil {
 		o.stopWithError(err)
 

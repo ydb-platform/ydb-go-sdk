@@ -8,10 +8,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -104,7 +104,7 @@ func TestTransactionalMultiWriter_DoesNotInitializeServerSeqNo(t *testing.T) {
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	topicwriterinternal.WithTopic("test/topic")(writerCfg)
 	topicwriterinternal.WithAutoSetSeqNo(true)(writerCfg)
-	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := topology.NewRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		return stubs.DefaultStubTopicDescription(t), nil
 	}).Get(writerCfg.Topic())
 
@@ -121,7 +121,7 @@ func TestTransactionalMultiWriterRejectsProducerIDPrefix(t *testing.T) {
 	multiWriterCfg := &MultiWriterConfig{ProducerIDPrefix: "custom-prefix"}
 	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
 	topicwriterinternal.WithTopic("test/topic")(writerCfg)
-	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := topology.NewRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		return stubs.DefaultStubTopicDescription(t), nil
 	}).Get(writerCfg.Topic())
 
@@ -146,7 +146,7 @@ func TestTransactionalMultiWriter_SynchronousWriteReturnsSessionError(t *testing
 	topicwriterinternal.WithAutoSetSeqNo(true)(writerCfg)
 	topicwriterinternal.WithWaitAckOnWrite(true)(writerCfg)
 	topicwriterinternal.WithMaxQueueLen(10)(writerCfg)
-	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := topology.NewRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		return stubs.DefaultStubTopicDescription(t), nil
 	}).Get(writerCfg.Topic())
 
@@ -176,7 +176,7 @@ func TestTransactionalMultiWriter_AssignsIncreasingSessionSeqNo(t *testing.T) {
 	topicwriterinternal.WithAutoSetSeqNo(true)(writerCfg)
 	topicwriterinternal.WithWaitAckOnWrite(true)(writerCfg)
 	topicwriterinternal.WithMaxQueueLen(10)(writerCfg)
-	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := topology.NewRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{
 			PartitionID: 1,
 			Active:      true,

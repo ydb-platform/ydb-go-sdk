@@ -13,9 +13,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
@@ -288,7 +288,7 @@ func TestPartitionWriterPool_TransactionalInactivePartitionInvalidatesSource(t *
 	t.Parallel()
 
 	var describeCalls atomic.Int64
-	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := topology.NewRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		if describeCalls.Add(1) == 1 {
 			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{
 				PartitionID: 7,
@@ -329,7 +329,7 @@ func TestPartitionWriterPool_NonTransactionalSessionPolicy(t *testing.T) {
 	t.Parallel()
 
 	var describeCalls atomic.Int64
-	topology := partition.NewTopologyRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
+	topology := topology.NewRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
 		if describeCalls.Add(1) == 1 {
 			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{
 				PartitionID: 7,

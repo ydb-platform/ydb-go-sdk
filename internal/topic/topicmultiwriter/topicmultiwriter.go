@@ -8,9 +8,9 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
 )
 
 type MultiWriter struct {
@@ -24,7 +24,7 @@ type MultiWriter struct {
 }
 
 func NewMultiWriter(
-	topology *partition.TopicTopology,
+	topology *topology.Topic,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
@@ -34,7 +34,7 @@ func NewMultiWriter(
 // NewTransactionalMultiWriter creates a multiwriter whose partition sessions
 // live only for one transaction and never reconnect after a session error.
 func NewTransactionalMultiWriter(
-	topology *partition.TopicTopology,
+	topology *topology.Topic,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
@@ -42,7 +42,7 @@ func NewTransactionalMultiWriter(
 }
 
 func newMultiWriter(
-	topology *partition.TopicTopology,
+	topology *topology.Topic,
 	transactional bool,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,

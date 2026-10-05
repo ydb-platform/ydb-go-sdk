@@ -1,4 +1,4 @@
-package partition_test
+package topology_test
 
 import (
 	"sync"
@@ -7,35 +7,35 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
 )
 
-func TestNewTopologyRegistryReturnsRegistry(t *testing.T) {
+func TestNewRegistryReturnsRegistry(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	registry := partition.NewTopologyRegistry(describer.Describe)
+	registry := topology.NewRegistry(describer.Describe)
 
 	assert.NotNil(t, registry)
 }
 
-func TestTopologyRegistryGetReturnsTopology(t *testing.T) {
+func TestRegistryGetReturnsTopology(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	registry := partition.NewTopologyRegistry(describer.Describe)
+	registry := topology.NewRegistry(describer.Describe)
 
 	assert.NotNil(t, registry.Get("test/topic"))
 }
 
-func TestTopologyRegistryGetDoesNotDescribeTopic(t *testing.T) {
+func TestRegistryGetDoesNotDescribeTopic(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	registry := partition.NewTopologyRegistry(describer.Describe)
+	registry := topology.NewRegistry(describer.Describe)
 
 	_ = registry.Get("test/topic")
 
 	assert.Empty(t, describer.Calls())
 }
 
-func TestTopologyRegistryGetKeepsTopicCachesIndependent(t *testing.T) {
+func TestRegistryGetKeepsTopicCachesIndependent(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	registry := partition.NewTopologyRegistry(describer.Describe)
+	registry := topology.NewRegistry(describer.Describe)
 
 	_, _ = registry.Get("test/topic-1").Partitions(t.Context())
 	_, _ = registry.Get("test/topic-2").Partitions(t.Context())
@@ -46,9 +46,9 @@ func TestTopologyRegistryGetKeepsTopicCachesIndependent(t *testing.T) {
 	assert.Equal(t, "test/topic-2", calls[1].Path)
 }
 
-func TestTopologyRegistryGetSharesTopicCache(t *testing.T) {
+func TestRegistryGetSharesTopicCache(t *testing.T) {
 	describer := &mockTopicDescriber{}
-	registry := partition.NewTopologyRegistry(describer.Describe)
+	registry := topology.NewRegistry(describer.Describe)
 
 	_, _ = registry.Get("test/topic").Partitions(t.Context())
 	_, _ = registry.Get("test/topic").Partitions(t.Context())
@@ -56,10 +56,10 @@ func TestTopologyRegistryGetSharesTopicCache(t *testing.T) {
 	assert.Len(t, describer.Calls(), 1)
 }
 
-func TestTopologyRegistryGetDescribesTopicOnceForConcurrentSnapshots(t *testing.T) {
+func TestRegistryGetDescribesTopicOnceForConcurrentSnapshots(t *testing.T) {
 	ctx := t.Context()
 	describer := &mockTopicDescriber{}
-	registry := partition.NewTopologyRegistry(describer.Describe)
+	registry := topology.NewRegistry(describer.Describe)
 
 	start := make(chan struct{})
 

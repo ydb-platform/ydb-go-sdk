@@ -12,12 +12,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
 	internalmultiwriter "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -36,7 +36,7 @@ type Client struct {
 	cred                   credentials.Credentials
 	defaultOperationParams rawydb.OperationParams
 	rawClient              rawtopic.Client
-	topicTopologies        *partition.TopologyRegistry
+	topicTopologies        *topology.Registry
 }
 
 func New(
@@ -58,7 +58,7 @@ func New(
 		cred:                   cred,
 		defaultOperationParams: defaultOperationParams,
 		rawClient:              rawClient,
-		topicTopologies: partition.NewTopologyRegistry(func(
+		topicTopologies: topology.NewRegistry(func(
 			ctx context.Context, path string,
 		) (topictypes.TopicDescription, error) {
 			return client.Describe(ctx, path)

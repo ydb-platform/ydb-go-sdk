@@ -1,4 +1,4 @@
-package partition_test
+package topology_test
 
 import (
 	"errors"
@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/partition"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -19,7 +19,7 @@ func TestNewRouterAddsActivePartitionsToChooser(t *testing.T) {
 		{PartitionID: 2},
 	}})
 
-	router, err := partition.NewRouter(snapshot, chooser)
+	router, err := topology.NewRouter(snapshot, chooser)
 
 	require.NoError(t, err)
 	assert.NotNil(t, router)
@@ -32,7 +32,7 @@ func TestNewRouterDoesNotNotifyChooserWithoutActivePartitions(t *testing.T) {
 		{PartitionID: 1},
 	}})
 
-	router, err := partition.NewRouter(snapshot, &emptyAddErrorChooser{err: unexpectedCallErr})
+	router, err := topology.NewRouter(snapshot, &emptyAddErrorChooser{err: unexpectedCallErr})
 
 	require.NoError(t, err)
 	assert.NotNil(t, router)
@@ -42,19 +42,19 @@ func TestNewRouterReturnsChooserInitializationError(t *testing.T) {
 	initializeErr := errors.New("initialize chooser")
 	snapshot := snapshotFromDescription(t, topicWithActivePartitions(1))
 
-	_, err := partition.NewRouter(snapshot, &errorChooser{addErr: initializeErr})
+	_, err := topology.NewRouter(snapshot, &errorChooser{addErr: initializeErr})
 
 	assert.ErrorIs(t, err, initializeErr)
 }
 
 func TestNewRouterRejectsNilSnapshot(t *testing.T) {
-	_, err := partition.NewRouter(nil, nil)
+	_, err := topology.NewRouter(nil, nil)
 
 	assert.EqualError(t, err, "partitions snapshot is nil")
 }
 
 func TestRouterChoosePartitionRejectsMissingPartition(t *testing.T) {
-	router, _ := partition.NewRouter(
+	router, _ := topology.NewRouter(
 		snapshotFromDescription(t, topicWithActivePartitions(1)),
 		&fixedChooser{partitionID: 2},
 	)
@@ -68,7 +68,7 @@ func TestRouterChoosePartitionRejectsInactivePartition(t *testing.T) {
 	snapshot := snapshotFromDescription(t, topictypes.TopicDescription{
 		Partitions: []topictypes.PartitionInfo{{PartitionID: 2}},
 	})
-	router, _ := partition.NewRouter(snapshot, &fixedChooser{partitionID: 2})
+	router, _ := topology.NewRouter(snapshot, &fixedChooser{partitionID: 2})
 
 	_, err := router.ChoosePartition(topicwriterinternal.PublicMessage{})
 
@@ -77,7 +77,7 @@ func TestRouterChoosePartitionRejectsInactivePartition(t *testing.T) {
 
 func TestRouterChoosePartitionReturnsChooserError(t *testing.T) {
 	chooseErr := errors.New("choose partition")
-	router, _ := partition.NewRouter(
+	router, _ := topology.NewRouter(
 		snapshotFromDescription(t, topicWithActivePartitions(1)),
 		&errorChooser{chooseErr: chooseErr},
 	)
@@ -88,7 +88,7 @@ func TestRouterChoosePartitionReturnsChooserError(t *testing.T) {
 }
 
 func TestRouterChoosePartitionUsesMessagePartitionWithoutChooser(t *testing.T) {
-	router, _ := partition.NewRouter(snapshotFromDescription(t, topicWithActivePartitions(42)), nil)
+	router, _ := topology.NewRouter(snapshotFromDescription(t, topicWithActivePartitions(42)), nil)
 
 	partitionID, err := router.ChoosePartition(topicwriterinternal.PublicMessage{PartitionID: 42})
 
@@ -98,7 +98,7 @@ func TestRouterChoosePartitionUsesMessagePartitionWithoutChooser(t *testing.T) {
 
 func TestRouterApplyUpdatesChooserAndSnapshot(t *testing.T) {
 	chooser := &fixedChooser{partitionID: 2}
-	router, err := partition.NewRouter(snapshotFromDescription(t, topicWithActivePartitions(1)), chooser)
+	router, err := topology.NewRouter(snapshotFromDescription(t, topicWithActivePartitions(1)), chooser)
 	require.NoError(t, err)
 
 	err = router.Apply(snapshotFromDescription(t, topicAfterReplacement(1, 2)))
@@ -113,7 +113,7 @@ func TestRouterApplyUpdatesChooserAndSnapshot(t *testing.T) {
 func TestRouterApplyDoesNotNotifyChooserWithoutNewPartitions(t *testing.T) {
 	unexpectedCallErr := errors.New("empty partition update")
 	snapshot := snapshotFromDescription(t, topicWithActivePartitions(1))
-	router, err := partition.NewRouter(snapshot, &emptyAddErrorChooser{err: unexpectedCallErr})
+	router, err := topology.NewRouter(snapshot, &emptyAddErrorChooser{err: unexpectedCallErr})
 	require.NoError(t, err)
 
 	err = router.Apply(snapshot)
@@ -123,7 +123,7 @@ func TestRouterApplyDoesNotNotifyChooserWithoutNewPartitions(t *testing.T) {
 
 func TestRouterApplyFailureStopsChoosing(t *testing.T) {
 	updateErr := errors.New("update chooser")
-	router, err := partition.NewRouter(
+	router, err := topology.NewRouter(
 		snapshotFromDescription(t, topicWithActivePartitions(1)),
 		&updateErrorChooser{err: updateErr},
 	)
@@ -136,9 +136,9 @@ func TestRouterApplyFailureStopsChoosing(t *testing.T) {
 	assert.ErrorIs(t, err, updateErr)
 }
 
-func snapshotFromDescription(t *testing.T, description topictypes.TopicDescription) *partition.Partitions {
+func snapshotFromDescription(t *testing.T, description topictypes.TopicDescription) *topology.Partitions {
 	t.Helper()
-	topology := newTopicTopologyWithDescriptions(description)
+	topology := newTopicWithDescriptions(description)
 	snapshot, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
 
