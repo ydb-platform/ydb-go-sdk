@@ -555,8 +555,10 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 //
 // Compatible Arrow Go modules are github.com/apache/arrow/go/v6 through v17
 // and github.com/apache/arrow-go/v18, using each module's arrow/ipc package.
-// The legacy github.com/apache/arrow/go/arrow module is also compile-tested at
-// v0.0.0-20211112161151-bc219186db40, using its ipc package.
+// Apache Arrow releases 0.14.0 through 5.0.0 use the legacy IPC package
+// github.com/apache/arrow/go/arrow/ipc and are also compile-compatible.
+// The legacy module was also tested at v0.0.0-20211112161151-bc219186db40.
+// Earlier Apache Arrow releases do not provide ipc.NewReader.
 // With v6-v13 or the legacy module, google.golang.org/genproto may need an upgrade
 // to avoid ambiguous imports with the SDK's googleapis/rpc dependency.
 //
