@@ -475,30 +475,36 @@ func projectionColumn(literal, name string) (*Ydb.Column, *Ydb.Value) {
 }
 
 func int32Column(name string, value int32) (*Ydb.Column, *Ydb.Value) {
-	return &Ydb.Column{
-			Name: name,
-			Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32}},
-		}, &Ydb.Value{
-			Value: &Ydb.Value_Int32Value{Int32Value: value},
-		}
+	column := &Ydb.Column{
+		Name: name,
+		Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32}},
+	}
+
+	return column, &Ydb.Value{
+		Value: &Ydb.Value_Int32Value{Int32Value: value},
+	}
 }
 
 func utf8Column(name, value string) (*Ydb.Column, *Ydb.Value) {
-	return &Ydb.Column{
-			Name: name,
-			Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}},
-		}, &Ydb.Value{
-			Value: &Ydb.Value_TextValue{TextValue: value},
-		}
+	column := &Ydb.Column{
+		Name: name,
+		Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}},
+	}
+
+	return column, &Ydb.Value{
+		Value: &Ydb.Value_TextValue{TextValue: value},
+	}
 }
 
 func bytesColumn(name string, value []byte) (*Ydb.Column, *Ydb.Value) {
-	return &Ydb.Column{
-			Name: name,
-			Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING}},
-		}, &Ydb.Value{
-			Value: &Ydb.Value_BytesValue{BytesValue: value},
-		}
+	column := &Ydb.Column{
+		Name: name,
+		Type: &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING}},
+	}
+
+	return column, &Ydb.Value{
+		Value: &Ydb.Value_BytesValue{BytesValue: value},
+	}
 }
 
 func select42ResultSet() *Ydb.ResultSet {
