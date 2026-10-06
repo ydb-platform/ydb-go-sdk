@@ -1,0 +1,25 @@
+{
+  "base": "70bac0b118eb66d95704490e9ed03bc17769c308",
+  "platform": "linux/arm64",
+  "image": "ubuntu:24.04",
+  "execution": "native Colima VM; separate server subprocess; container CPU limit 2",
+  "go": "go1.26.0",
+  "gomaxprocs": 2,
+  "workersPerNode": 4,
+  "fastServiceMs": 8,
+  "slowServiceMs": 40,
+  "repeats": 5,
+  "duration": "4s",
+  "controlRepeats": 3,
+  "controlDuration": "20s",
+  "controlCases": [[1, "equal", 250], [3, "equal", 750], [9, "equal", 3600], [3, "pinned", 180]],
+  "randomBinarySha256": "14ddd13a796d2752158888f9c20918f4306351ae7e7ae4f2df74bddbd2c71864",
+  "p2cBinarySha256": "a0fc63b47fe28d503add0f66988e6c7239f170ca1b3d74626115a82e5aac03fd",
+  "p2cSourcesSha256": {
+    "internal/conn/conn.go": "5cdc9f04d0c5d9141b70097d3eb1b692d36f5c4a852a926bdbb8ad9ede409cd7",
+    "internal/balancer/elector.go": "61167090d79d2751432da9fdbb773f125f2a62cedae74d541512440df20f89f3",
+    "internal/mock/conn.go": "fb09edee92a62c8486f24d175cc8f1822ce9d8b321f28415c84e8aa4cd57aac9",
+    "tests/benchmarks/p2c/main.go": "05df8b87884b479061fb2c6ce7f988cf07a92ed4494b4bf678c3c4c59d6eeed7",
+    "tests/benchmarks/p2c/server.go": "42bd50439729d23b5d59bdc3ea5bb4a70e9bfbd53463cdc7c25de8e59968dfab"
+  }
+}

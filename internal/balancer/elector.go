@@ -52,7 +52,19 @@ func (e *endpointElector) Next() (connection conn.Conn, allowBanned bool, ok boo
 		return nil, false, false
 	}
 
-	connection = snapshot.connections[e.rand.Int(len(snapshot.connections))]
+	connectionCount := len(snapshot.connections)
+	if connectionCount == 1 {
+		return snapshot.connections[0], snapshot.allowBanned, true
+	}
+	first := e.rand.Int(connectionCount)
+	second := e.rand.Int(connectionCount - 1)
+	if second >= first {
+		second++
+	}
+	connection = snapshot.connections[first]
+	if other := snapshot.connections[second]; other.InFlight() < connection.InFlight() {
+		connection = other
+	}
 
 	return connection, snapshot.allowBanned, true
 }

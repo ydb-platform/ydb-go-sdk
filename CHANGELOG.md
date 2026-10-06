@@ -1,3 +1,5 @@
+* Changed endpoint selection to compare two random candidates by unfinished RPC count within the best available priority bucket, preserving existing balancer configuration and node affinity
+
 ## v3.154.0
 * Fixed decoding and scanning Tagged query results while preserving tags in column metadata and values
 * Fixed decoding of `EmptyList` and `EmptyDict` query results and preservation of explicitly typed empty lists and dictionaries
