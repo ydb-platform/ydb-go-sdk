@@ -1,3 +1,5 @@
+* Fixed `TzDate32`, `TzDatetime64` and `TzTimestamp64` query result decoding and scans, preserving wide type identity, timezone and microsecond precision
+
 ## v3.153.2
 * Added `UncompressedSize` and `CompressedSize` fields to `trace.TopicWriterCompressMessagesDoneInfo` to allow tracking actual bytes written by the topic writer
 * Deprecated `pkg/xtest.SyncedTest`, `MakeSyncedTest`, and their wrapper methods in favor of `testing.T`.
