@@ -163,6 +163,7 @@ func TestMultiWriterRechoosesPartitionSplitWhileMessageContentIsRead(t *testing.
 
 type splitInitWriter struct {
 	poolTestWriter
+
 	started chan struct{}
 	closed  chan struct{}
 	once    sync.Once
