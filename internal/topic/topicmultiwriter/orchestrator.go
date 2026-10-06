@@ -150,7 +150,7 @@ func (o *orchestrator) sleepOrDone(delay time.Duration) error {
 func (o *orchestrator) init() (err error) {
 	defer close(o.initDone)
 
-	describeResult, err := o.topology.TopicDescription(o.ctx)
+	partitions, err := o.topology.Partitions(o.ctx)
 	if err != nil {
 		o.stopWithError(err)
 
@@ -158,7 +158,7 @@ func (o *orchestrator) init() (err error) {
 	}
 
 	o.mu.WithLock(func() {
-		for _, partition := range describeResult.Partitions {
+		for _, partition := range partitions.Infos() {
 			o.partitions[partition.PartitionID] = &PartitionInfo{
 				PartitionInfo: partition,
 			}
@@ -627,10 +627,11 @@ func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topicty
 
 	for range maxRetries {
 		o.topology.Invalidate()
-		describeResult, err := o.topology.TopicDescription(o.ctx)
+		partitions, err := o.topology.Partitions(o.ctx)
 		if err == nil {
+			infos := partitions.Infos()
 			var needRetry bool
-			for _, partition := range describeResult.Partitions {
+			for _, partition := range infos {
 				if partition.PartitionID == splitPartitionID {
 					needRetry = len(partition.ChildPartitionIDs) == 0
 
@@ -639,7 +640,7 @@ func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topicty
 			}
 
 			if !needRetry {
-				return describeResult, nil
+				return topictypes.TopicDescription{Partitions: infos}, nil
 			}
 		}
 

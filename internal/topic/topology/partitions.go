@@ -21,6 +21,30 @@ func (p *Partitions) All() List {
 	return p.all
 }
 
+// Infos returns independent copies of all [topictypes.PartitionInfo] values in server order.
+// The caller may modify the returned values without changing this snapshot.
+func (p *Partitions) Infos() []topictypes.PartitionInfo {
+	infos := make([]topictypes.PartitionInfo, 0, len(p.all))
+	for _, partition := range p.all {
+		info := partition.info
+		info.ChildPartitionIDs = append([]int64(nil), info.ChildPartitionIDs...)
+		info.ParentPartitionIDs = append([]int64(nil), info.ParentPartitionIDs...)
+		info.FromBound = append([]byte(nil), info.FromBound...)
+		info.ToBound = append([]byte(nil), info.ToBound...)
+		if info.PartitionStats.LastWriteTime != nil {
+			lastWriteTime := *info.PartitionStats.LastWriteTime
+			info.PartitionStats.LastWriteTime = &lastWriteTime
+		}
+		if info.PartitionStats.MaxWriteTimeLag != nil {
+			maxWriteTimeLag := *info.PartitionStats.MaxWriteTimeLag
+			info.PartitionStats.MaxWriteTimeLag = &maxWriteTimeLag
+		}
+		infos = append(infos, info)
+	}
+
+	return infos
+}
+
 // IDs returns the partition IDs in list order.
 func (p List) IDs() []int64 {
 	ids := make([]int64, 0, len(p))

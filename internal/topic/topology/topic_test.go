@@ -84,24 +84,6 @@ func TestTopicPartitionsDescribesTopicOnce(t *testing.T) {
 	assert.Len(t, describer.Calls(), 1)
 }
 
-func TestTopicTopicDescriptionUsesCachedPartitions(t *testing.T) {
-	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
-		Partitions: []topictypes.PartitionInfo{{
-			PartitionID: 1, Active: true, ChildPartitionIDs: []int64{2},
-		}},
-	}}
-	topology := topology.NewRegistry(describer.Describe).Get("test/topic")
-
-	first, err := topology.TopicDescription(t.Context())
-	require.NoError(t, err)
-	first.Partitions[0].ChildPartitionIDs[0] = 99
-	second, err := topology.TopicDescription(t.Context())
-	require.NoError(t, err)
-
-	assert.Equal(t, []int64{2}, second.Partitions[0].ChildPartitionIDs)
-	assert.Len(t, describer.Calls(), 1)
-}
-
 func TestTopicPartitionsDescribesTopicOnceConcurrently(t *testing.T) {
 	ctx := t.Context()
 	describer := &mockTopicDescriber{}

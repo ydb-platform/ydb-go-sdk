@@ -80,29 +80,6 @@ func (s *Topic) Partitions(ctx context.Context) (*Partitions, error) {
 	}
 }
 
-// TopicDescription returns the partition metadata needed by the existing
-// multi-writer describer interface. Its partition slices do not alias the cache.
-func (s *Topic) TopicDescription(ctx context.Context) (topictypes.TopicDescription, error) {
-	partitions, err := s.Partitions(ctx)
-	if err != nil {
-		return topictypes.TopicDescription{}, err
-	}
-
-	description := topictypes.TopicDescription{
-		Partitions: make([]topictypes.PartitionInfo, 0, len(partitions.all)),
-	}
-	for _, partition := range partitions.all {
-		info := partition.info
-		info.ChildPartitionIDs = append([]int64(nil), info.ChildPartitionIDs...)
-		info.ParentPartitionIDs = append([]int64(nil), info.ParentPartitionIDs...)
-		info.FromBound = append([]byte(nil), info.FromBound...)
-		info.ToBound = append([]byte(nil), info.ToBound...)
-		description.Partitions = append(description.Partitions, info)
-	}
-
-	return description, nil
-}
-
 // ReportInactivePartition invalidates cached metadata after partitionID becomes inactive.
 // The next Partitions call waits until metadata contains its complete replacement.
 func (s *Topic) ReportInactivePartition(partitionID int64) {
