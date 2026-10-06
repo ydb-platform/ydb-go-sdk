@@ -4,12 +4,10 @@ package integration
 
 import (
 	"io"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
@@ -50,7 +48,75 @@ func TestQueryEmptyCollections(t *testing.T) {
 				require.Equal(t, tt.typeYql, rs.ColumnTypes()[0].Yql())
 				row, err := rs.NextRow(scope.Ctx)
 				require.NoError(t, err)
-				requireEmptyCollectionRow(t, row, tt.typeYql, tt.valueYql)
+				values := row.Values()
+				require.Len(t, values, 1)
+				require.Equal(t, tt.typeYql, values[0].Type().Yql())
+				require.Equal(t, tt.valueYql, values[0].Yql())
+
+				var scanned types.Value
+				require.NoError(t, row.Scan(&scanned))
+				require.Equal(t, values[0], scanned)
+				var named types.Value
+				require.NoError(t, row.ScanNamed(query.Named("value", &named)))
+				require.Equal(t, values[0], named)
+				var dst struct {
+					Value types.Value `sql:"value"`
+				}
+				require.NoError(t, row.ScanStruct(&dst))
+				require.Equal(t, values[0], dst.Value)
+
+				switch tt.name {
+				case "EmptyList", "TypedList", "OptionalList":
+					items, err := types.ListItems(types.Unwrap(scanned))
+					require.NoError(t, err)
+					require.Empty(t, items)
+				case "EmptyDict", "TypedDict", "OptionalDict":
+					items, err := types.DictValues(types.Unwrap(scanned))
+					require.NoError(t, err)
+					require.Empty(t, items)
+				case "TypedSet":
+					var items []string
+					require.NoError(t, row.Scan(&items))
+					require.Empty(t, items)
+					var named []string
+					require.NoError(t, row.ScanNamed(query.Named("value", &named)))
+					require.Empty(t, named)
+					var dst struct {
+						Value []string `sql:"value"`
+					}
+					require.NoError(t, row.ScanStruct(&dst))
+					require.Empty(t, dst.Value)
+				case "NestedList":
+					items, err := types.ListItems(scanned)
+					require.NoError(t, err)
+					require.Len(t, items, 1)
+					inner, err := types.ListItems(items[0])
+					require.NoError(t, err)
+					require.Empty(t, inner)
+				case "NestedDict":
+					items, err := types.ListItems(scanned)
+					require.NoError(t, err)
+					require.Len(t, items, 1)
+					inner, err := types.DictValues(items[0])
+					require.NoError(t, err)
+					require.Empty(t, inner)
+				case "Tuple":
+					items, err := types.TupleItems(scanned)
+					require.NoError(t, err)
+					require.Len(t, items, 2)
+					list, err := types.ListItems(items[0])
+					require.NoError(t, err)
+					require.Empty(t, list)
+					dict, err := types.DictValues(items[1])
+					require.NoError(t, err)
+					require.Empty(t, dict)
+				case "NullList", "NullDict":
+					require.True(t, types.IsNull(scanned))
+				}
+				if !types.IsNull(scanned) {
+					var incompatible int
+					require.Error(t, row.Scan(&incompatible))
+				}
 				_, err = rs.NextRow(scope.Ctx)
 				require.ErrorIs(t, err, io.EOF)
 				_, err = res.NextResultSet(scope.Ctx)
@@ -59,7 +125,75 @@ func TestQueryEmptyCollections(t *testing.T) {
 			t.Run("QueryRow", func(t *testing.T) {
 				row, err := client.QueryRow(scope.Ctx, q)
 				require.NoError(t, err)
-				requireEmptyCollectionRow(t, row, tt.typeYql, tt.valueYql)
+				values := row.Values()
+				require.Len(t, values, 1)
+				require.Equal(t, tt.typeYql, values[0].Type().Yql())
+				require.Equal(t, tt.valueYql, values[0].Yql())
+
+				var scanned types.Value
+				require.NoError(t, row.Scan(&scanned))
+				require.Equal(t, values[0], scanned)
+				var named types.Value
+				require.NoError(t, row.ScanNamed(query.Named("value", &named)))
+				require.Equal(t, values[0], named)
+				var dst struct {
+					Value types.Value `sql:"value"`
+				}
+				require.NoError(t, row.ScanStruct(&dst))
+				require.Equal(t, values[0], dst.Value)
+
+				switch tt.name {
+				case "EmptyList", "TypedList", "OptionalList":
+					items, err := types.ListItems(types.Unwrap(scanned))
+					require.NoError(t, err)
+					require.Empty(t, items)
+				case "EmptyDict", "TypedDict", "OptionalDict":
+					items, err := types.DictValues(types.Unwrap(scanned))
+					require.NoError(t, err)
+					require.Empty(t, items)
+				case "TypedSet":
+					var items []string
+					require.NoError(t, row.Scan(&items))
+					require.Empty(t, items)
+					var named []string
+					require.NoError(t, row.ScanNamed(query.Named("value", &named)))
+					require.Empty(t, named)
+					var dst struct {
+						Value []string `sql:"value"`
+					}
+					require.NoError(t, row.ScanStruct(&dst))
+					require.Empty(t, dst.Value)
+				case "NestedList":
+					items, err := types.ListItems(scanned)
+					require.NoError(t, err)
+					require.Len(t, items, 1)
+					inner, err := types.ListItems(items[0])
+					require.NoError(t, err)
+					require.Empty(t, inner)
+				case "NestedDict":
+					items, err := types.ListItems(scanned)
+					require.NoError(t, err)
+					require.Len(t, items, 1)
+					inner, err := types.DictValues(items[0])
+					require.NoError(t, err)
+					require.Empty(t, inner)
+				case "Tuple":
+					items, err := types.TupleItems(scanned)
+					require.NoError(t, err)
+					require.Len(t, items, 2)
+					list, err := types.ListItems(items[0])
+					require.NoError(t, err)
+					require.Empty(t, list)
+					dict, err := types.DictValues(items[1])
+					require.NoError(t, err)
+					require.Empty(t, dict)
+				case "NullList", "NullDict":
+					require.True(t, types.IsNull(scanned))
+				}
+				if !types.IsNull(scanned) {
+					var incompatible int
+					require.Error(t, row.Scan(&incompatible))
+				}
 			})
 			t.Run("QueryResultSet", func(t *testing.T) {
 				rs, err := client.QueryResultSet(scope.Ctx, q)
@@ -69,69 +203,78 @@ func TestQueryEmptyCollections(t *testing.T) {
 				require.Equal(t, tt.typeYql, rs.ColumnTypes()[0].Yql())
 				row, err := rs.NextRow(scope.Ctx)
 				require.NoError(t, err)
-				requireEmptyCollectionRow(t, row, tt.typeYql, tt.valueYql)
+				values := row.Values()
+				require.Len(t, values, 1)
+				require.Equal(t, tt.typeYql, values[0].Type().Yql())
+				require.Equal(t, tt.valueYql, values[0].Yql())
+
+				var scanned types.Value
+				require.NoError(t, row.Scan(&scanned))
+				require.Equal(t, values[0], scanned)
+				var named types.Value
+				require.NoError(t, row.ScanNamed(query.Named("value", &named)))
+				require.Equal(t, values[0], named)
+				var dst struct {
+					Value types.Value `sql:"value"`
+				}
+				require.NoError(t, row.ScanStruct(&dst))
+				require.Equal(t, values[0], dst.Value)
+
+				switch tt.name {
+				case "EmptyList", "TypedList", "OptionalList":
+					items, err := types.ListItems(types.Unwrap(scanned))
+					require.NoError(t, err)
+					require.Empty(t, items)
+				case "EmptyDict", "TypedDict", "OptionalDict":
+					items, err := types.DictValues(types.Unwrap(scanned))
+					require.NoError(t, err)
+					require.Empty(t, items)
+				case "TypedSet":
+					var items []string
+					require.NoError(t, row.Scan(&items))
+					require.Empty(t, items)
+					var named []string
+					require.NoError(t, row.ScanNamed(query.Named("value", &named)))
+					require.Empty(t, named)
+					var dst struct {
+						Value []string `sql:"value"`
+					}
+					require.NoError(t, row.ScanStruct(&dst))
+					require.Empty(t, dst.Value)
+				case "NestedList":
+					items, err := types.ListItems(scanned)
+					require.NoError(t, err)
+					require.Len(t, items, 1)
+					inner, err := types.ListItems(items[0])
+					require.NoError(t, err)
+					require.Empty(t, inner)
+				case "NestedDict":
+					items, err := types.ListItems(scanned)
+					require.NoError(t, err)
+					require.Len(t, items, 1)
+					inner, err := types.DictValues(items[0])
+					require.NoError(t, err)
+					require.Empty(t, inner)
+				case "Tuple":
+					items, err := types.TupleItems(scanned)
+					require.NoError(t, err)
+					require.Len(t, items, 2)
+					list, err := types.ListItems(items[0])
+					require.NoError(t, err)
+					require.Empty(t, list)
+					dict, err := types.DictValues(items[1])
+					require.NoError(t, err)
+					require.Empty(t, dict)
+				case "NullList", "NullDict":
+					require.True(t, types.IsNull(scanned))
+				}
+				if !types.IsNull(scanned) {
+					var incompatible int
+					require.Error(t, row.Scan(&incompatible))
+				}
 				_, err = rs.NextRow(scope.Ctx)
 				require.ErrorIs(t, err, io.EOF)
 			})
 		})
-	}
-}
-
-func requireEmptyCollectionRow(t *testing.T, row query.Row, typeYql, valueYql string) {
-	t.Helper()
-	values := row.Values()
-	require.Len(t, values, 1)
-	require.Equal(t, typeYql, values[0].Type().Yql())
-	require.Equal(t, valueYql, values[0].Yql())
-	requireEmptyCollectionItems(t, values[0])
-
-	var scanned types.Value
-	require.NoError(t, row.Scan(&scanned))
-	require.True(t, types.Equal(values[0].Type(), scanned.Type()))
-	require.Equal(t, valueYql, scanned.Yql())
-	requireEmptyCollectionItems(t, scanned)
-
-	if !types.IsNull(scanned) {
-		var incompatible int
-		require.ErrorIs(t, row.Scan(&incompatible), value.ErrCannotCast)
-	}
-}
-
-func requireEmptyCollectionItems(t *testing.T, v types.Value) {
-	t.Helper()
-	if types.IsNull(v) {
-		return
-	}
-	v = types.Unwrap(v)
-	typeYql := v.Type().Yql()
-	switch {
-	case typeYql == "EmptyList" || strings.HasPrefix(typeYql, "List<"):
-		items, err := types.ListItems(v)
-		require.NoError(t, err)
-		if typeYql == "EmptyList" || typeYql == "List<Int32>" {
-			require.Empty(t, items)
-		} else {
-			require.Len(t, items, 1)
-			for _, item := range items {
-				requireEmptyCollectionItems(t, item)
-			}
-		}
-	case typeYql == "EmptyDict" || strings.HasPrefix(typeYql, "Dict<"):
-		items, err := types.DictValues(v)
-		require.NoError(t, err)
-		require.Empty(t, items)
-	case strings.HasPrefix(typeYql, "Set<"):
-		var items []string
-		require.NoError(t, types.CastTo(v, &items))
-		require.Empty(t, items)
-	case strings.HasPrefix(typeYql, "Tuple<"):
-		items, err := types.TupleItems(v)
-		require.NoError(t, err)
-		require.Len(t, items, 2)
-		for _, item := range items {
-			requireEmptyCollectionItems(t, item)
-		}
-	default:
-		t.Fatalf("unexpected collection type: %s", typeYql)
 	}
 }
