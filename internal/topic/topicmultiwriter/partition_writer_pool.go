@@ -24,7 +24,7 @@ type partitionWriterPool struct {
 	idle    *idleWriterManager
 
 	ackCallback            func(partitionID int64, seqNo int64)
-	schedulePartitionSplit func(partitionID int64)
+	partitionSplitCallback func(partitionID int64)
 	topology               *topology.Topic
 	onWriterInit           func()
 	onError                func(err error)
@@ -36,7 +36,7 @@ func newPartitionWriterPool(
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	bg *background.Worker,
 	ackCallback func(partitionID int64, seqNo int64),
-	schedulePartitionSplit func(partitionID int64),
+	partitionSplitCallback func(partitionID int64),
 	topology *topology.Topic,
 	onWriterInit func(),
 	onError func(err error),
@@ -47,7 +47,7 @@ func newPartitionWriterPool(
 		ctx:                    ctx,
 		bg:                     bg,
 		ackCallback:            ackCallback,
-		schedulePartitionSplit: schedulePartitionSplit,
+		partitionSplitCallback: partitionSplitCallback,
 		topology:               topology,
 		onWriterInit:           onWriterInit,
 		onError:                onError,
@@ -87,7 +87,7 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 			withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
 				if xerrors.IsOperationErrorTopicPartitionInactive(args.Error) {
 					p.topology.ReportInactivePartition(partitionID)
-					p.schedulePartitionSplit(partitionID)
+					p.partitionSplitCallback(partitionID)
 
 					return topic.PublicRetryDecisionStop
 				}

@@ -121,7 +121,7 @@ func TestPartitionWriterPoolReportsOnlyInactivePartitionErrors(t *testing.T) {
 		}}, nil
 	}).Get("test/topic")
 	var scheduled []int64
-	pool.schedulePartitionSplit = func(partitionID int64) {
+	pool.partitionSplitCallback = func(partitionID int64) {
 		scheduled = append(scheduled, partitionID)
 	}
 	pool.writerCfg.RetrySettings.CheckError = func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
