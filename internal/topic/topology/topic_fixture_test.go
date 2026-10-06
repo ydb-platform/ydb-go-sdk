@@ -5,11 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -117,19 +113,4 @@ func (d *scriptedTopicDescriber) Describe(
 	}
 
 	return result.description, result.err
-}
-
-func overloadedError() error {
-	return xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
-}
-
-func partitionInactiveError() error {
-	return overloadedErrorWithIssue(xerrors.IssueCodeTopicPartitionInactive)
-}
-
-func overloadedErrorWithIssue(issueCode uint32) error {
-	return xerrors.Operation(
-		xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
-		xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: issueCode}}),
-	)
 }

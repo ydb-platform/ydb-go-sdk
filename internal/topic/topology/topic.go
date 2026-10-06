@@ -8,7 +8,6 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
@@ -28,19 +27,16 @@ type Topic struct {
 	// It tracks every concurrently reported partition until one snapshot contains a complete active replacement
 	// subtree for each of them.
 	pendingReplacements map[int64]struct{}
-	// partitionInactiveErr preserves the latest server error for retry diagnostics while replacements are pending.
-	// It is converted to a fast-backoff retryable error only when Describe returns an incomplete topology.
-	partitionInactiveErr error
-	updates              singleflight.Group
+	updates             singleflight.Group
 	// reloadRequested prevents an explicit Invalidate from being lost while Describe is in flight.
-	// Session errors do not set it: pendingReplacements are checked atomically when publishing a snapshot.
+	// Inactive partition reports do not set it: pendingReplacements are checked atomically when publishing a snapshot.
 	reloadRequested bool
 	mu              sync.Mutex
 }
 
 // Partitions returns a current read-only topology snapshot.
 // A previously returned snapshot is not updated when a newer topology is loaded.
-// After NotifySessionError accepts an inactive-partition error, Partitions waits until
+// After ReportInactivePartition, Partitions waits until
 // the replacement of every reported partition is present in topic metadata.
 func (s *Topic) Partitions(ctx context.Context) (*Partitions, error) {
 	for {
@@ -107,19 +103,14 @@ func (s *Topic) TopicDescription(ctx context.Context) (topictypes.TopicDescripti
 	return description, nil
 }
 
-// NotifySessionError invalidates cached metadata when err reports that partitionID became inactive.
-// It returns whether the error was accepted as a topology change. The next Partitions call waits
-// until metadata contains the complete replacement of partitionID.
-func (s *Topic) NotifySessionError(partitionID int64, err error) bool {
-	if !xerrors.IsOperationErrorTopicPartitionInactive(err) {
-		return false
-	}
-
+// ReportInactivePartition invalidates cached metadata after partitionID becomes inactive.
+// The next Partitions call waits until metadata contains its complete replacement.
+func (s *Topic) ReportInactivePartition(partitionID int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if replacementPublished(s.partitions, partitionID) {
-		return true
+		return
 	}
 	if s.pendingReplacements == nil {
 		s.pendingReplacements = make(map[int64]struct{})
@@ -127,10 +118,7 @@ func (s *Topic) NotifySessionError(partitionID int64, err error) bool {
 	// Describe may keep returning the old topology for a while after a partition becomes inactive.
 	// Keep the partition pending so such a snapshot cannot be cached and used by a new Router.
 	s.pendingReplacements[partitionID] = struct{}{}
-	s.partitionInactiveErr = err
 	s.partitions = nil
-
-	return true
 }
 
 // Invalidate marks this topic's cached metadata for reload without doing network I/O.
@@ -166,7 +154,6 @@ func (s *Topic) updatePartitions(ctx context.Context) (*Partitions, error) {
 			}
 			s.partitions = partitions
 			clear(s.pendingReplacements)
-			s.partitionInactiveErr = nil
 			published = true
 
 			return partitions, nil
@@ -186,7 +173,7 @@ func (s *Topic) partitionReplacementRetryErrorNeedLock(partitions *Partitions) e
 	for partitionID := range s.pendingReplacements {
 		if !replacementPublished(partitions, partitionID) {
 			return retry.RetryableError(
-				s.partitionInactiveErr,
+				fmt.Errorf("replacement for partition %d is not visible yet", partitionID),
 				retry.WithBackoff(retry.TypeFastBackoff),
 			)
 		}

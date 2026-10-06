@@ -207,28 +207,19 @@ func TestTopicPartitionsReloadsAfterInvalidate(t *testing.T) {
 	assert.Equal(t, []int64{2}, partitions.All().IDs())
 }
 
-func TestTopicNotifySessionErrorRejectsOverloadedWithoutPartitionInactiveIssue(t *testing.T) {
-	topology := topology.NewRegistry((&mockTopicDescriber{}).Describe).Get("test/topic")
+func TestTopicReportInactivePartitionReloads(t *testing.T) {
+	topic := newTopicWithDescriptions(
+		topicWithActivePartitions(1),
+		topicAfterReplacement(1, 2),
+	)
+	_, err := topic.Partitions(t.Context())
+	require.NoError(t, err)
 
-	assert.False(t, topology.NotifySessionError(1, overloadedError()))
-}
+	topic.ReportInactivePartition(1)
+	partitions, err := topic.Partitions(t.Context())
 
-func TestTopicNotifySessionErrorRejectsOverloadedWithOtherIssue(t *testing.T) {
-	topology := topology.NewRegistry((&mockTopicDescriber{}).Describe).Get("test/topic")
-
-	assert.False(t, topology.NotifySessionError(1, overloadedErrorWithIssue(42)))
-}
-
-func TestTopicNotifySessionErrorRejectsUnrelatedError(t *testing.T) {
-	topology := topology.NewRegistry((&mockTopicDescriber{}).Describe).Get("test/topic")
-
-	assert.False(t, topology.NotifySessionError(1, errors.New("session failed")))
-}
-
-func TestTopicNotifySessionErrorAcceptsPartitionInactiveIssue(t *testing.T) {
-	topology := topology.NewRegistry((&mockTopicDescriber{}).Describe).Get("test/topic")
-
-	assert.True(t, topology.NotifySessionError(1, partitionInactiveError()))
+	require.NoError(t, err)
+	assert.True(t, partitions.ByPartitionID(2).IsActive())
 }
 
 func TestTopicPartitionsWaitsForPublishedReplacement(t *testing.T) {
@@ -242,7 +233,7 @@ func TestTopicPartitionsWaitsForPublishedReplacement(t *testing.T) {
 	)
 	_, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
-	require.True(t, topology.NotifySessionError(1, partitionInactiveError()))
+	topology.ReportInactivePartition(1)
 
 	partitions, err := topology.Partitions(t.Context())
 
@@ -262,7 +253,7 @@ func TestTopicPartitionsPublishesReplacementReportedInactiveDuringDescribe(t *te
 		case 1:
 			return topicWithActivePartitions(1), nil
 		case 2:
-			topic.NotifySessionError(1, partitionInactiveError())
+			topic.ReportInactivePartition(1)
 
 			return topicAfterReplacement(1, 2), nil
 		default:
@@ -271,7 +262,7 @@ func TestTopicPartitionsPublishesReplacementReportedInactiveDuringDescribe(t *te
 	}).Get("test/topic")
 	_, err := topic.Partitions(t.Context())
 	require.NoError(t, err)
-	require.True(t, topic.NotifySessionError(1, partitionInactiveError()))
+	topic.ReportInactivePartition(1)
 
 	partitions, err := topic.Partitions(t.Context())
 
@@ -295,7 +286,7 @@ func TestTopicPartitionsWaitsForReplacementThroughInactiveDescendants(t *testing
 	)
 	_, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
-	require.True(t, topology.NotifySessionError(1, partitionInactiveError()))
+	topology.ReportInactivePartition(1)
 
 	partitions, err := topology.Partitions(t.Context())
 
@@ -318,7 +309,7 @@ func TestTopicPartitionsReturnsContextErrorWhileWaitingForReplacement(t *testing
 	}).Get("test/topic")
 	_, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
-	require.True(t, topology.NotifySessionError(1, partitionInactiveError()))
+	topology.ReportInactivePartition(1)
 	refreshCtx, cancelRefresh := context.WithCancel(t.Context())
 	result := startLoadingPartitions(refreshCtx, topology)
 	<-refreshStarted
@@ -337,7 +328,7 @@ func TestTopicPartitionsContinuesReplacementRefreshAfterDescribeError(t *testing
 	)
 	_, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
-	require.True(t, topology.NotifySessionError(1, partitionInactiveError()))
+	topology.ReportInactivePartition(1)
 
 	_, err = topology.Partitions(t.Context())
 	require.ErrorIs(t, err, describeErr)
@@ -362,7 +353,7 @@ func TestTopicPartitionsSharesReplacementRefresh(t *testing.T) {
 	}).Get("test/topic")
 	_, err := topology.Partitions(t.Context())
 	require.NoError(t, err)
-	require.True(t, topology.NotifySessionError(1, partitionInactiveError()))
+	topology.ReportInactivePartition(1)
 	first := startLoadingPartitions(t.Context(), topology)
 	<-refreshStarted
 	second := startWaitingForPartitions(t, topology)

@@ -7,11 +7,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -97,6 +101,58 @@ func newPoolForTest(t *testing.T, factory *poolMockFactory) (*partitionWriterPoo
 	)
 
 	return pool, cancel
+}
+
+func TestPartitionWriterPoolReportsOnlyInactivePartitionErrors(t *testing.T) {
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+
+	var describes int
+	pool.topology = topology.NewRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
+		describes++
+		if describes == 1 {
+			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{PartitionID: 1, Active: true}}}, nil
+		}
+
+		return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+			{PartitionID: 1, ChildPartitionIDs: []int64{2}},
+			{PartitionID: 2, Active: true, ParentPartitionIDs: []int64{1}},
+		}}, nil
+	}).Get("test/topic")
+	var scheduled []int64
+	pool.schedulePartitionSplit = func(partitionID int64) {
+		scheduled = append(scheduled, partitionID)
+	}
+	pool.writerCfg.RetrySettings.CheckError = func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+		return topic.PublicRetryDecisionRetry
+	}
+
+	initial, err := pool.topology.Partitions(t.Context())
+	require.NoError(t, err)
+	_, err = pool.get(1, true)
+	require.NoError(t, err)
+	checkError := factory.lastCfg.RetrySettings.CheckError
+
+	decision := checkError(topic.NewCheckRetryArgs(errors.New("other writer error")))
+	require.Equal(t, topic.PublicRetryDecisionRetry, decision)
+	require.Empty(t, scheduled)
+	unchanged, err := pool.topology.Partitions(t.Context())
+	require.NoError(t, err)
+	require.Same(t, initial, unchanged)
+	require.Equal(t, 1, describes)
+
+	inactiveErr := xerrors.Operation(
+		xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
+		xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: xerrors.IssueCodeTopicPartitionInactive}}),
+	)
+	decision = checkError(topic.NewCheckRetryArgs(inactiveErr))
+	require.Equal(t, topic.PublicRetryDecisionStop, decision)
+	require.Equal(t, []int64{1}, scheduled)
+	updated, err := pool.topology.Partitions(t.Context())
+	require.NoError(t, err)
+	require.True(t, updated.ByPartitionID(2).IsActive())
+	require.Equal(t, 2, describes)
 }
 
 func TestSenderStepReturnsNonOverloadedWriterInitError(t *testing.T) {
