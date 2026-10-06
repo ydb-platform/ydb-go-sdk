@@ -32,9 +32,11 @@ jobs:
           - language: go
             build-mode: autobuild
             config: .github/codeql/sdk.yml
+            category: .github/workflows/codeql-analysis.yml:analyze/language:go
           - language: actions
             build-mode: none
             config: .github/codeql/actions.yml
+            category: /language:actions
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -60,4 +62,4 @@ jobs:
       - name: Analyze and upload results
         uses: github/codeql-action/analyze@v4
         with:
-          category: /language:${{ matrix.language }}
+          category: ${{ matrix.category }}
