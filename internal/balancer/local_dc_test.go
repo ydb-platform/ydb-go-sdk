@@ -138,6 +138,7 @@ func TestLocalDCDiscovery(t *testing.T) {
 		driverConfig: cfg,
 		policy:       cfg.Balancer(),
 		pool:         conn.NewPool(context.Background(), cfg),
+		random:       noShuffleRand{},
 		discover: func(ctx context.Context, _ *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
 			return []endpoint.Endpoint{
 				&mock.Endpoint{AddrField: "a:123", LocationField: "a"},

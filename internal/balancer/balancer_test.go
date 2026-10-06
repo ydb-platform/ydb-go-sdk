@@ -166,6 +166,61 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	require.Equal(t, e3.NodeID(), all[1].Endpoint().NodeID())
 }
 
+func TestApplyDiscoveredEndpointsDefaultMaxConnections(t *testing.T) {
+	tests := []struct {
+		name      string
+		option    config.Option
+		nodeCount int
+		wantCount int
+	}{
+		{name: "default", nodeCount: 10, wantCount: 9},
+		{name: "small cluster", nodeCount: 3, wantCount: 3},
+		{
+			name:      "unlimited",
+			option:    config.WithBalancer(userBalancers.WithMaxConnections(userBalancers.Default(), 0)),
+			nodeCount: 10,
+			wantCount: 10,
+		},
+		{
+			name:      "custom limit",
+			option:    config.WithBalancer(userBalancers.WithMaxConnections(userBalancers.Default(), 2)),
+			nodeCount: 10,
+			wantCount: 2,
+		},
+		{
+			name:      "explicit random choice",
+			option:    config.WithBalancer(userBalancers.RandomChoice()),
+			nodeCount: 10,
+			wantCount: 10,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+			cfg := config.New(test.option)
+			pool := conn.NewPool(ctx, cfg)
+			b := &Balancer{
+				driverConfig: cfg,
+				policy:       cfg.Balancer(),
+				pool:         pool,
+				random:       noShuffleRand{},
+			}
+			t.Cleanup(func() {
+				require.NoError(t, b.Close(ctx))
+				require.NoError(t, pool.RemoveRef(ctx))
+			})
+			endpoints := make([]endpoint.Endpoint, test.nodeCount)
+			for i := range endpoints {
+				endpoints[i] = endpoint.New("node-"+strconv.Itoa(i), endpoint.WithID(uint32(i+1)))
+			}
+			b.applyDiscoveredEndpoints(ctx, endpoints, "")
+
+			require.Len(t, b.connections().All(), test.wantCount)
+		})
+	}
+}
+
 func TestApplyDiscoveredEndpointsMaxConnections(t *testing.T) {
 	ctx := t.Context()
 	balancerPolicy := userBalancers.WithMaxConnections(userBalancers.RandomChoice(), 2)
@@ -783,13 +838,14 @@ func TestNew(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 		assert.Regexp(t, "^context canceled at", err.Error())
 	})
-	t.Run("default policy", func(t *testing.T) {
+	t.Run("unlimited policy", func(t *testing.T) {
 		ctx := t.Context()
 		srv := startDynamicDiscoveryServer(t, []uint32{1})
 		cfg := config.New(
 			config.WithEndpoint(srv.endpoint()),
 			config.WithDatabase("/local"),
 			config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+			config.WithBalancer(userBalancers.WithMaxConnections(userBalancers.Default(), 0)),
 		)
 		pool := conn.NewPool(ctx, cfg)
 		defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
@@ -1652,6 +1708,7 @@ func TestDiscoveryReuseIPAndHostName(t *testing.T) {
 		driverConfig: cfg,
 		policy:       cfg.Balancer(),
 		pool:         conn.NewPool(ctx, cfg),
+		random:       noShuffleRand{},
 		discover: func(context.Context, *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
 			copy := discovered
 

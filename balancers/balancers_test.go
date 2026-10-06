@@ -198,7 +198,7 @@ func TestCustomPrefer(t *testing.T) {
 
 func TestBasicPolicies(t *testing.T) {
 	require.Equal(t, RandomChoice(), RoundRobin())
-	require.Equal(t, RandomChoice(), Default())
+	require.Equal(t, WithMaxConnections(RandomChoice(), 9), Default())
 	require.True(t, SingleConn().SingleConnection())
 }
 
