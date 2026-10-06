@@ -1,4 +1,4 @@
-# Query results with Apache Arrow
+# Writing and reading rows with Apache Arrow
 
 `query.WithArrow` is experimental. It works with `Query`, `QueryRow` and
 `QueryResultSet` on `query.Client`, `query.Session` and `query.TxActor`.
@@ -8,7 +8,7 @@ The SDK module does not import Apache Arrow Go. Pass
 `ipc.NewReader` and optional IPC reader options from your own Arrow dependency
 to `query.WithArrow` or `ydb.WithQueryDefaultResultFormatArrow`. Reader,
 record, array and option types are inferred automatically; both options
-work with v17 and v18. This independent example module uses
+work with v17 and v18. The examples module uses
 `github.com/apache/arrow-go/v18` v18.8.0 (Go 1.25 or newer); it does not change
 the SDK's `go.mod` or `go.sum`. The decoder retains each record once and releases
 the IPC reader. It clones strings and bytes when scanning or creating SDK values
@@ -111,22 +111,26 @@ err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
 
 ## Running the example
 
-The [command](cmd/main.go) reads two result sets with `Session.Query`,
-`query.WithArrow(ipc.NewReader)` and `ScanNamed`. With a local YDB running:
+The [command](main.go) creates a table, inserts two rows with Arrow
+`BulkUpsert`, reads them with `Session.QueryArrow` and with
+`Session.Query`, `query.WithArrow(ipc.NewReader)` and `ScanNamed`, then drops
+the table. With a local YDB running, execute from the `examples` directory:
 
 ```sh
-go run ./cmd
+go run ./apache_arrow
 ```
 
 Set `YDB_CONNECTION_STRING` if it differs from `grpc://localhost:2136/local`.
 The command uses anonymous authentication and prints:
 
 ```text
-id=42 name="my string"
-id=24 name="WOW"
+QueryArrow: id=24 name="WOW"
+QueryArrow: id=42 name="my string"
+WithArrow: id=24 name="WOW"
+WithArrow: id=42 name="my string"
 ```
 
 ## Tests and benchmarks
 
-The [Arrow test module](../../../tests/integration/arrow) contains unit and
+The [Arrow test module](../../tests/integration/arrow) contains unit and
 integration tests, SDK coverage collection and local benchmarks.

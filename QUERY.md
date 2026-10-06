@@ -49,10 +49,10 @@ arrowOption = query.WithArrow(ipc.NewReader, ipc.WithAllocator(allocator))
 Generic reader, record, array and option types are inferred from `ipc.NewReader`;
 no explicit type arguments or adapter are required. The same options work
 with `github.com/apache/arrow/go/v17/arrow/ipc`. The
-[v18 example](examples/apache_arrow/with_arrow) is a separate module and
-shows resource release and scans. Variant columns require Arrow Go v9
-or newer; earlier IPC readers cannot read union arrays. Run its [command](examples/apache_arrow/with_arrow/cmd/main.go)
-with `go run ./cmd` from that module after starting a local YDB.
+[v18 example](examples/apache_arrow) belongs to the examples module and
+shows Arrow BulkUpsert, QueryArrow, resource release and scans. Variant columns require Arrow Go v9
+or newer; earlier IPC readers cannot read union arrays. Run its [command](examples/apache_arrow/main.go)
+with `go run ./apache_arrow` from the `examples` directory after starting a local YDB.
 
 The Arrow decoder supports YDB scalars, including temporal types and all six
 time-zone types, Decimal, Pg, Tagged, Null, Void, lists, tuples, structs,
@@ -161,7 +161,7 @@ queries and transactions. The decoder must support the result types of every
 query through those connectors. Connectors using Table Service are unaffected.
 
 For raw IPC consumption with `ipc.NewReader(part)`, see the
-[example](examples/apache_arrow/with_arrow/README.md#the-same-row-api-with-either-format).
+[example](examples/apache_arrow/README.md#the-same-row-api-with-either-format).
 
 ## Local benchmark
 
