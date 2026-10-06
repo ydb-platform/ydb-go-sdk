@@ -29,4 +29,4 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: bash ydb_tech/run.sh
+      - run: bash examples/ydb_tech/run.sh

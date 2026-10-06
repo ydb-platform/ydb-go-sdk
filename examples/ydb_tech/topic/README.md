@@ -7,7 +7,7 @@ metadata, commits, transactional reads and writes, and autoscaling settings.
 From the repository root, with a local YDB instance:
 
 ```sh
-go run ./ydb_tech/topic
+go run ./examples/ydb_tech/topic
 ```
 
 `YDB_CONNECTION_STRING` defaults to `grpc://localhost:2136/local`.

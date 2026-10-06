@@ -16,7 +16,6 @@ coverage:
 ignore:
   - testutil
   - examples
-  - ydb_tech
   - internal/mock
   - internal/cmd
   - pkg/xtest

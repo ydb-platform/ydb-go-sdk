@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 examples_root="$(cd "$(dirname "$0")" && pwd)"
-repo_root="$(dirname "$examples_root")"
+repo_root="$(git -C "$examples_root" rev-parse --show-toplevel)"
 cd "$repo_root"
 example_count=0
 for entry in "$examples_root"/*/run.sh; do

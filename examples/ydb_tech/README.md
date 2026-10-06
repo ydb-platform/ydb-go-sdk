@@ -7,7 +7,7 @@ this checkout and a local YDB instance.
 Run all examples from the repository root:
 
 ```sh
-bash ydb_tech/run.sh
+bash examples/ydb_tech/run.sh
 ```
 
 Each example has its own directory and a `run.sh` entry point. The common runner
