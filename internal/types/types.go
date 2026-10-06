@@ -30,6 +30,9 @@ func TypeFromYDB(x *Ydb.Type) Type {
 	case *Ydb.Type_OptionalType:
 		return NewOptional(TypeFromYDB(v.OptionalType.GetItem()))
 
+	case *Ydb.Type_TaggedType:
+		return NewTagged(TypeFromYDB(v.TaggedType.GetType()), v.TaggedType.GetTag())
+
 	case *Ydb.Type_ListType:
 		return NewList(TypeFromYDB(v.ListType.GetItem()))
 
@@ -475,6 +478,51 @@ func (v Optional) ToYDB() *Ydb.Type {
 func NewOptional(t Type) Optional {
 	return Optional{
 		innerType: t,
+	}
+}
+
+type Tagged struct {
+	innerType Type
+	tag       string
+}
+
+func (v *Tagged) InnerType() Type {
+	return v.innerType
+}
+
+func (v *Tagged) Tag() string {
+	return v.tag
+}
+
+func (v *Tagged) String() string {
+	return v.Yql()
+}
+
+func (v *Tagged) Yql() string {
+	return fmt.Sprintf("Tagged<%s,%q>", v.innerType.Yql(), v.tag)
+}
+
+func (v *Tagged) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(*Tagged)
+
+	return ok && v.tag == vv.tag && v.innerType.equalsTo(vv.innerType)
+}
+
+func (v *Tagged) ToYDB() *Ydb.Type {
+	return &Ydb.Type{
+		Type: &Ydb.Type_TaggedType{
+			TaggedType: &Ydb.TaggedType{
+				Tag:  v.tag,
+				Type: v.innerType.ToYDB(),
+			},
+		},
+	}
+}
+
+func NewTagged(t Type, tag string) *Tagged {
+	return &Tagged{
+		innerType: t,
+		tag:       tag,
 	}
 }
 
