@@ -102,6 +102,44 @@ jobs:
           name: integration
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+  arrow-integration:
+    if: (!contains(github.event.pull_request.labels.*.name, 'no tests') && !contains(github.event.pull_request.labels.*.name, 'no integration tests'))
+    concurrency:
+      group: arrow-integration-${{ github.event_name }}-${{ github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    services:
+      ydb:
+        image: ydbplatform/local-ydb:26.3.1.17
+        ports:
+          - 2136:2136
+        env:
+          YDB_USE_IN_MEMORY_PDISKS: true
+        options: '-h localhost'
+    env:
+      YDB_CONNECTION_STRING: grpc://localhost:2136/local
+    defaults:
+      run:
+        working-directory: examples/apache_arrow/with_arrow
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.26.x
+          cache-dependency-path: examples/apache_arrow/with_arrow/go.sum
+      - name: Run Arrow integration tests
+        run: go test -mod=readonly -race -tags integration -coverpkg=github.com/ydb-platform/ydb-go-sdk/v3/... -coverprofile arrow.txt -covermode atomic ./...
+      - name: Upload Arrow integration-tests coverage report to Codecov
+        if: github.event_name != 'schedule'
+        uses: codecov/codecov-action@v4
+        with:
+          file: examples/apache_arrow/with_arrow/arrow.txt
+          flags: integration,arrow
+          name: arrow-integration
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   experiment:
     if: (!contains(github.event.pull_request.labels.*.name, 'no tests') && !contains(github.event.pull_request.labels.*.name, 'no integration tests'))
     concurrency:

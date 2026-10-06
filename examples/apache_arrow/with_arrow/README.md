@@ -137,7 +137,12 @@ go test -tags integration -run '^$' -bench BenchmarkFormats -benchtime=100x -cou
 ```
 
 Set `YDB_CONNECTION_STRING` if it differs from `grpc://localhost:2136/local`.
-Tests use anonymous credentials. The benchmark database must be `/local`.
+Tests use anonymous credentials. The [YQL type tests](types_integration_test.go)
+use self-contained `SELECT` expressions without creating tables. They compare
+all supported scalar types and Optional values with protobuf and distinguish
+raw Arrow support from the types accepted by `WithArrow`; see
+[the compatibility notes](../../../QUERY.md#type-compatibility-tests).
+The benchmark database must be `/local`.
 The benchmark requires permission to create,
 load and drop `/local/query_arrow_benchmark`; use a disposable local database.
 For example:

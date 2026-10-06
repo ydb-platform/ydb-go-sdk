@@ -76,6 +76,24 @@ to check that there are no further rows or result sets. With Arrow, checking for
 another row can decode subsequent parts of the same result set. Their batches
 are released when advancing to another part or closing the internal result.
 
+### Type compatibility tests
+
+The [integration tests](examples/apache_arrow/with_arrow/types_integration_test.go)
+use table-free `SELECT` expressions. They compare protobuf and `WithArrow` for
+all supported scalar types, numeric boundaries, special floating-point values,
+binary/text data, mixed nullable rows, all-null columns and empty results.
+They exercise `Scan`, `ScanNamed`, `ScanStruct` and `Values`, require actual IPC
+for non-empty Arrow results and check that Arrow allocations are released.
+
+The same suite verifies that raw `QueryArrow` can read temporal types, Decimal,
+UUID, JSON/YSON, DyNumber, Pg values and containers which `WithArrow` currently
+rejects. Raw Arrow is also tested for Tagged, EmptyList, EmptyDict and the wide
+time-zone types TzDate32, TzDatetime64 and TzTimestamp64; the SDK's `Ydb.Value`
+type conversion does not currently support those types. Resource results are
+rejected by YDB as non-persistable with either format. These tests cover result
+serialization and decoding; they do not establish which types row or column
+tables can store. CI runs the suite against YDB 26.3.1.17.
+
 ### Selecting the format per query
 
 The examples below assume `db` is an open driver, `ctx` is a context and
