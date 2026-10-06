@@ -54,7 +54,7 @@ func (p preference) String() string {
 }
 
 func SingleConn() Policy {
-	return Policy{singleConnection: true}
+	return WithMaxConnections(Policy{singleConnection: true}, 0)
 }
 
 // WithMaxConnections returns a policy with a soft limit on its active connection set.
@@ -189,10 +189,7 @@ func (p Policy) MaxConnections() int {
 }
 
 func (p Policy) String() string {
-	maxConnections := 0
-	if p.maxConnections != nil {
-		maxConnections = *p.maxConnections
-	}
+	maxConnections := p.MaxConnections()
 	mode := "Priority"
 	if p.singleConnection {
 		mode = "SingleConn"

@@ -88,7 +88,7 @@ func TestPreferLocations(t *testing.T) {
 	require.Equal(t, 1, priorityGroupCount(priorities))
 	require.True(t, priorities[1].Excluded)
 	require.Equal(t, []conn.Conn{connections[0], connections[2]}, bestConnections(priorities, connections))
-	require.Equal(t, "Priority{Preferences=[Locations{TWO,ZERO}]}", p.String())
+	require.Equal(t, "Priority{MaxConnections=9,Preferences=[Locations{TWO,ZERO}]}", p.String())
 }
 
 func TestNestedPreferencesPreservePublicConstructorOrder(t *testing.T) {

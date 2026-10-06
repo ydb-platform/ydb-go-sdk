@@ -162,7 +162,7 @@ func PreferWithFallback(p policy.Policy, filter func(endpoint Endpoint) bool) po
 	})
 }
 
-// Default balancer used by default
+// Default balancer used by default, with a soft limit of nine active connections.
 func Default() policy.Policy {
 	return RandomChoice()
 }

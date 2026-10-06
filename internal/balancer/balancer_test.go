@@ -902,6 +902,25 @@ func TestNew(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 		assert.Regexp(t, "^context canceled at", err.Error())
 	})
+	t.Run("default policy", func(t *testing.T) {
+		ctx := t.Context()
+		srv := startDynamicDiscoveryServer(t, []uint32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+		cfg := config.New(
+			config.WithEndpoint(srv.endpoint()),
+			config.WithDatabase("/local"),
+			config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		)
+		pool := conn.NewPool(ctx, cfg)
+		defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
+
+		b, err := New(ctx, cfg, pool)
+		require.NoError(t, err)
+		defer func() { require.NoError(t, b.Close(ctx)) }()
+		require.Equal(t, "Priority{MaxConnections=9}", b.policy.String())
+		require.Len(t, b.connections().All(), 9)
+		require.Len(t, b.lastDiscovered, 10)
+		require.NotNil(t, b.random)
+	})
 	t.Run("unlimited policy", func(t *testing.T) {
 		ctx := t.Context()
 		srv := startDynamicDiscoveryServer(t, []uint32{1})
@@ -954,6 +973,8 @@ func TestNew(t *testing.T) {
 		require.Len(t, b.connections().All(), 1)
 		require.Equal(t, "bootstrap:2135", b.connections().All()[0].Endpoint().Address())
 		require.Nil(t, b.discoveryRepeater)
+		require.Empty(t, b.lastDiscovered)
+		require.Nil(t, b.random)
 		require.NoError(t, b.Close(ctx))
 	})
 	t.Run("non-single policy requires periodic discovery", func(t *testing.T) {

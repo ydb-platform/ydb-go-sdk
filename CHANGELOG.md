@@ -1,4 +1,4 @@
-* Changed the default active connection limit to nine for all balancer policies; `balancers.WithMaxConnections(policy, 0)` restores an unlimited active connection set
+* Changed the default active connection limit to nine for discovery-based balancer policies; `balancers.WithMaxConnections(policy, 0)` restores an unlimited active connection set
 
 ## v3.153.2
 * Added `UncompressedSize` and `CompressedSize` fields to `trace.TopicWriterCompressMessagesDoneInfo` to allow tracking actual bytes written by the topic writer
