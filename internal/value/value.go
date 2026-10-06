@@ -113,22 +113,18 @@ func FromYDB(t *Ydb.Type, v *Ydb.Value) Value {
 }
 
 func nullValueFromYDB(x *Ydb.Value, t types.Type) (_ Value, ok bool) {
-	for {
-		switch xx := x.GetValue().(type) {
-		case *Ydb.Value_NestedValue:
-			x = xx.NestedValue
-		case *Ydb.Value_NullFlagValue:
-			switch tt := t.(type) {
-			case types.Optional:
-				return NullValue(tt.InnerType()), true
-			case types.Void:
-				return VoidValue(), true
-			default:
-				return nil, false
-			}
+	switch x.GetValue().(type) {
+	case *Ydb.Value_NullFlagValue:
+		switch tt := t.(type) {
+		case types.Optional:
+			return NullValue(tt.InnerType()), true
+		case types.Void:
+			return VoidValue(), true
 		default:
 			return nil, false
 		}
+	default:
+		return nil, false
 	}
 }
 
@@ -265,6 +261,12 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		}
 
 		return OptionalValue(FromYDB(t, v)), nil
+
+	case *types.Tagged:
+		return &taggedValue{
+			t:     ttt,
+			value: FromYDB(ttt.InnerType().ToYDB(), v),
+		}, nil
 
 	case *types.List:
 		return ListValue(func() []Value {
@@ -1840,7 +1842,11 @@ func (v *optionalValue) Type() types.Type {
 }
 
 func (v *optionalValue) toYDB() *Ydb.Value {
-	if _, opt := v.value.(*optionalValue); opt {
+	inner := v.value
+	for tagged, ok := inner.(*taggedValue); ok; tagged, ok = inner.(*taggedValue) {
+		inner = tagged.value
+	}
+	if _, opt := inner.(*optionalValue); opt {
 		return &Ydb.Value{
 			Value: &Ydb.Value_NestedValue{
 				NestedValue: v.value.toYDB(),
