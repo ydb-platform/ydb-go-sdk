@@ -97,13 +97,86 @@ func TestWideTimezoneCastErrors(t *testing.T) {
 			require.ErrorIs(t, CastTo(v, &n), ErrCannotCast)
 		})
 	}
-	for _, text := range []string{
-		"-144169-01-01T00:00:00,UTC", "148107-12-31T23:59:59.999999,UTC",
+}
+
+func TestWideTimezoneTime(t *testing.T) {
+	for _, tt := range []struct {
+		id    Ydb.Type_PrimitiveTypeId
+		clock string
+		hour  int
+		min   int
+		sec   int
+		nanos int
+	}{
+		{68, "", 0, 0, 0, 0},
+		{69, "T12:34:56", 12, 34, 56, 0},
+		{70, "T12:34:56.123456", 12, 34, 56, 123456000},
 	} {
-		var tm time.Time
-		var sqlValue driver.Value
-		v := tzTimestamp64Value(text)
-		require.Error(t, CastTo(v, &tm))
-		require.Error(t, CastTo(v, &sqlValue))
+		wireType := &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: tt.id}}
+		for _, date := range []struct {
+			text  string
+			year  int
+			month time.Month
+			day   int
+		}{
+			{"-144169-01-01", -144168, time.January, 1},
+			{"-0401-02-29", -400, time.February, 29},
+			{"-0001-02-29", 0, time.February, 29},
+			{"0001-01-01", 1, time.January, 1},
+			{"1969-12-31", 1969, time.December, 31},
+			{"2024-07-01", 2024, time.July, 1},
+			{"10000-02-29", 10000, time.February, 29},
+			{"148107-12-31", 148107, time.December, 31},
+		} {
+			for _, zone := range []string{"UTC", "Europe/Berlin"} {
+				text := date.text + tt.clock + "," + zone
+				t.Run(types.TypeFromYDB(wireType).Yql()+"/"+text, func(t *testing.T) {
+					location, err := time.LoadLocation(zone)
+					require.NoError(t, err)
+					expected := time.Date(date.year, date.month, date.day, tt.hour, tt.min, tt.sec, tt.nanos, location)
+					v := FromYDB(wireType, &Ydb.Value{Value: &Ydb.Value_TextValue{TextValue: text}})
+					var tm time.Time
+					require.NoError(t, CastTo(v, &tm))
+					require.Equal(t, expected, tm)
+					var sqlValue driver.Value
+					require.NoError(t, CastTo(v, &sqlValue))
+					require.Equal(t, expected, sqlValue)
+					var optional *time.Time
+					require.NoError(t, CastTo(OptionalValue(v), &optional))
+					require.NotNil(t, optional)
+					require.Equal(t, expected, *optional)
+					require.NoError(t, CastTo(NullValue(v.Type()), &optional))
+					require.Nil(t, optional)
+				})
+			}
+		}
+	}
+}
+
+func TestWideTimezoneTimeErrors(t *testing.T) {
+	for _, tt := range []struct {
+		id     Ydb.Type_PrimitiveTypeId
+		values []string
+	}{
+		{68, []string{
+			"", "1969-12-31", "1969,UTC", "year-01-01,UTC", "0000-01-01,UTC",
+			"10000-02-30,UTC", "-0002-02-29,UTC", "1969-12-31,Invalid/Zone", "1969-12-31,UTC,UTC",
+		}},
+		{69, []string{"1969-12-31T24:00:00,UTC", "1969-12-31T12:60:00,UTC", "1969-12-31T12:34:60,UTC"}},
+		{70, []string{"1969-12-31T12:34:56.invalid,UTC", "148107-02-29T12:34:56,UTC"}},
+	} {
+		wireType := &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: tt.id}}
+		for _, text := range tt.values {
+			t.Run(text, func(t *testing.T) {
+				v := FromYDB(wireType, &Ydb.Value{Value: &Ydb.Value_TextValue{TextValue: text}})
+				tm := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
+				previous := tm
+				require.Error(t, CastTo(v, &tm))
+				require.Equal(t, previous, tm)
+				var sqlValue driver.Value = "previous value"
+				require.Error(t, CastTo(v, &sqlValue))
+				require.Equal(t, "previous value", sqlValue)
+			})
+		}
 	}
 }
