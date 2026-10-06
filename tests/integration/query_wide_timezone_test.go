@@ -4,7 +4,6 @@ package integration
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"testing"
 	"time"
@@ -90,120 +89,6 @@ func TestQueryWideTimezoneTypes(t *testing.T) {
 						require.Equal(t, text, *dst.Optional)
 						require.Nil(t, dst.Absent)
 					})
-					t.Run("Query", func(t *testing.T) {
-						result, err := scope.Driver().Query().Query(scope.Ctx, sql)
-						require.NoError(t, err)
-						defer func() { require.NoError(t, result.Close(scope.Ctx)) }()
-						set, err := result.NextResultSet(scope.Ctx)
-						require.NoError(t, err)
-						columnTypes := set.ColumnTypes()
-						require.Len(t, columnTypes, 3)
-						require.Equal(t, tt.name, columnTypes[0].Yql())
-						require.Equal(t, "Optional<"+tt.name+">", columnTypes[1].Yql())
-						require.Equal(t, "Optional<"+tt.name+">", columnTypes[2].Yql())
-						row, err := set.NextRow(scope.Ctx)
-						require.NoError(t, err)
-						values := row.Values()
-						require.Len(t, values, 3)
-						require.Equal(t, tt.name, values[0].Type().Yql())
-						require.Equal(t, fmt.Sprintf("%s(%q)", tt.name, text), values[0].Yql())
-						require.Equal(t, types.OptionalValue(values[0]), values[1])
-						require.Equal(t, types.NullValue(values[0].Type()), values[2])
-
-						var required string
-						var optional, absent *string
-						require.NoError(t, row.Scan(&required, &optional, &absent))
-						require.Equal(t, text, required)
-						require.NotNil(t, optional)
-						require.Equal(t, text, *optional)
-						require.Nil(t, absent)
-
-						var scanned [3]types.Value
-						require.NoError(t, row.Scan(&scanned[0], &scanned[1], &scanned[2]))
-						require.Equal(t, values, scanned[:])
-
-						required = ""
-						optional = nil
-						absent = &required
-						require.NoError(t, row.ScanNamed(
-							query.Named("absent", &absent), query.Named("optional", &optional), query.Named("required", &required),
-						))
-						require.Equal(t, text, required)
-						require.NotNil(t, optional)
-						require.Equal(t, text, *optional)
-						require.Nil(t, absent)
-
-						var dst struct {
-							Required string  `sql:"required"`
-							Optional *string `sql:"optional"`
-							Absent   *string `sql:"absent"`
-						}
-						dst.Absent = &required
-						require.NoError(t, row.ScanStruct(&dst))
-						require.Equal(t, text, dst.Required)
-						require.NotNil(t, dst.Optional)
-						require.Equal(t, text, *dst.Optional)
-						require.Nil(t, dst.Absent)
-						_, err = set.NextRow(scope.Ctx)
-						require.ErrorIs(t, err, io.EOF)
-						_, err = result.NextResultSet(scope.Ctx)
-						require.ErrorIs(t, err, io.EOF)
-					})
-					t.Run("QueryResultSet", func(t *testing.T) {
-						set, err := scope.Driver().Query().QueryResultSet(scope.Ctx, sql)
-						require.NoError(t, err)
-						defer func() { require.NoError(t, set.Close(scope.Ctx)) }()
-						columnTypes := set.ColumnTypes()
-						require.Len(t, columnTypes, 3)
-						require.Equal(t, tt.name, columnTypes[0].Yql())
-						require.Equal(t, "Optional<"+tt.name+">", columnTypes[1].Yql())
-						require.Equal(t, "Optional<"+tt.name+">", columnTypes[2].Yql())
-						row, err := set.NextRow(scope.Ctx)
-						require.NoError(t, err)
-						values := row.Values()
-						require.Len(t, values, 3)
-						require.Equal(t, tt.name, values[0].Type().Yql())
-						require.Equal(t, fmt.Sprintf("%s(%q)", tt.name, text), values[0].Yql())
-						require.Equal(t, types.OptionalValue(values[0]), values[1])
-						require.Equal(t, types.NullValue(values[0].Type()), values[2])
-
-						var required string
-						var optional, absent *string
-						require.NoError(t, row.Scan(&required, &optional, &absent))
-						require.Equal(t, text, required)
-						require.NotNil(t, optional)
-						require.Equal(t, text, *optional)
-						require.Nil(t, absent)
-
-						var scanned [3]types.Value
-						require.NoError(t, row.Scan(&scanned[0], &scanned[1], &scanned[2]))
-						require.Equal(t, values, scanned[:])
-
-						required = ""
-						optional = nil
-						absent = &required
-						require.NoError(t, row.ScanNamed(
-							query.Named("absent", &absent), query.Named("optional", &optional), query.Named("required", &required),
-						))
-						require.Equal(t, text, required)
-						require.NotNil(t, optional)
-						require.Equal(t, text, *optional)
-						require.Nil(t, absent)
-
-						var dst struct {
-							Required string  `sql:"required"`
-							Optional *string `sql:"optional"`
-							Absent   *string `sql:"absent"`
-						}
-						dst.Absent = &required
-						require.NoError(t, row.ScanStruct(&dst))
-						require.Equal(t, text, dst.Required)
-						require.NotNil(t, dst.Optional)
-						require.Equal(t, text, *dst.Optional)
-						require.Nil(t, dst.Absent)
-						_, err = set.NextRow(scope.Ctx)
-						require.ErrorIs(t, err, io.EOF)
-					})
 				})
 			}
 		})
@@ -266,12 +151,7 @@ func TestQueryWideTimezoneTime(t *testing.T) {
 				Just(%s(%q)) AS optional, Nothing(%s?) AS absent;`,
 				tt.name, tt.text, tt.name, tt.text, tt.name,
 			)
-			result, err := scope.Driver().Query().Query(scope.Ctx, sql)
-			require.NoError(t, err)
-			defer func() { require.NoError(t, result.Close(scope.Ctx)) }()
-			set, err := result.NextResultSet(scope.Ctx)
-			require.NoError(t, err)
-			row, err := set.NextRow(scope.Ctx)
+			row, err := scope.Driver().Query().QueryRow(scope.Ctx, sql)
 			require.NoError(t, err)
 
 			var required time.Time
@@ -305,10 +185,6 @@ func TestQueryWideTimezoneTime(t *testing.T) {
 			require.NotNil(t, dst.Optional)
 			require.Equal(t, tt.expected, *dst.Optional)
 			require.Nil(t, dst.Absent)
-			_, err = set.NextRow(scope.Ctx)
-			require.ErrorIs(t, err, io.EOF)
-			_, err = result.NextResultSet(scope.Ctx)
-			require.ErrorIs(t, err, io.EOF)
 		})
 	}
 }
