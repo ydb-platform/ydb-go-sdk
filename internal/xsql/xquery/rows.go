@@ -176,7 +176,7 @@ func (r *rows) Next(ctx context.Context, dst []driver.Value) (finalErr error) {
 	for i := range values {
 		if !r.next.discarded[i] {
 			if v := values[i]; v != nil {
-				dst[dstI], err = value.Any(*(v.(*value.Value))) //nolint:forcetypeassert
+				dst[dstI], err = value.Any(*v.(*value.Value)) //nolint:forcetypeassert
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}

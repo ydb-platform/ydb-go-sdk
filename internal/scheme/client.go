@@ -300,6 +300,6 @@ func (c *Client) modifyPermissions(ctx context.Context, path string, desc permis
 
 func putEntry(dst []scheme.Entry, src []*Ydb_Scheme.Entry) {
 	for i, e := range src {
-		(dst[i]).From(e)
+		dst[i].From(e)
 	}
 }
