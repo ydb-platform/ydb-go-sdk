@@ -1,81 +1,57 @@
 # Observable gauges
 
-This experimental package separates observable metrics from diagnostic tracing.
-The initial increment provides one int64 gauge:
-`ydb.topic.reader.partition_session.count`, with unit `{session}` and sum
-reduction. Existing `metrics.Registry`, counters, histograms and traces are
-unchanged.
+This experimental package provides backend-independent observable int64 gauges.
+It is independent of diagnostic tracing and does not register SDK metrics.
+Existing `metrics.Registry`, counters, histograms and traces are unchanged.
+
+An application implements `Int64GaugeSource` and registers it with a `Meter`.
+`Collector` is an in-memory pull backend; a native backend can implement `Meter`
+directly. The application owns collection and export.
+
+```go
+type source struct {
+    value atomic.Int64
+}
+
+func (s *source) Snapshot(ctx context.Context) ([]telemetry.Int64Point, error) {
+    return []telemetry.Int64Point{{Value: s.value.Load()}}, ctx.Err()
+}
+```
 
 ```go
 meter := telemetry.NewCollector()
-db, err := ydb.Open(ctx, connectionString, ydb.WithMeter(meter))
+state := new(source)
+state.value.Store(3)
+reg, err := meter.RegisterInt64Gauge(telemetry.Int64GaugeDescriptor{
+    Descriptor: telemetry.Descriptor{Name: "application.workers", Unit: "{worker}"},
+    Reduction: telemetry.GaugeSum,
+}, state)
 if err != nil {
     return err
 }
-defer db.Close(ctx)
-
-reader, err := db.Topic().StartReader(
-    "consumer",
-    topicoptions.ReadTopic("topic"),
-    topicoptions.WithReaderName("ingestion"),
-)
-if err != nil {
-    return err
-}
-defer reader.Close(ctx)
-
-// Call from an application collection/export cycle, not a read callback.
-metrics, err := meter.Collect(ctx)
+metrics, collectErr := meter.Collect(ctx)
+closeErr := reg.Close(ctx)
+return errors.Join(collectErr, closeErr)
 ```
 
-Imports in this example are `github.com/ydb-platform/ydb-go-sdk/v3`,
-its `telemetry` package and its `topic/topicoptions` package. The application
-owns the export cycle and exporter. `Collector` is a functional in-memory pull
-backend; it does not run a timer or export to a monitoring service. A native
-backend can implement `Meter` directly.
+Imports are `context`, `errors`, `sync/atomic` and
+`github.com/ydb-platform/ydb-go-sdk/v3/telemetry`. Use `metrics` in the
+application's export cycle before returning. `GaugeSum` adds values for equal
+descriptor and attribute sets; `GaugeMax` selects their maximum. Attribute order
+does not change series identity. A failed source suppresses its entire descriptor
+for that collection and returns an error; unrelated descriptors remain available.
+A native backend must preserve these reduction and failure rules.
 
-Listeners use the same metric and `topicoptions.WithListenerName`. Empty names
-use `default`. Attributes are configured endpoint authority, normalized database,
-absolute normalized topic path, consumer and reader.name. No partition, session,
-connection or reconnect IDs are exposed. Selected topics have zero observations
-before admission and after all their sessions retire. A closed resource has no
-source or observations.
+`Snapshot` returns owned data without I/O or SDK mutation, honors cancellation
+and supports concurrent calls. Registration failure must not retain a source.
+`Registration.Close` is idempotent and detaches the source even if its context
+expires. A later close can wait for quiescence. Successful close waits for
+collections already using the source; those collections may return earlier
+observations. Collections begun after detach cannot use it.
 
-The count reads SDK-owned admitted sessions, including sessions awaiting start
-confirmation or graceful retirement. Retired or explicitly closed sessions and
-retained storage tombstones are excluded. Listener retirement preserves the
-callback context for a subsequent forced-stop notification. This describes SDK
-ownership, not an atomic view of server assignments. Reconnects read only the current stream and keep one
-registration per logical reader/listener.
+Registration tracking and an in-flight count are required to detach sources
+safely while collection is running; an Add/Set gauge alone cannot provide those
+lifetime guarantees. Source calls happen outside the registry lock. There is no
+sampling goroutine, timer, exporter dependency or event ledger.
 
-Sources with equal descriptor and attribute sets are reduced before export.
-Attribute order does not change series identity. A failed source suppresses
-that descriptor for the collection and returns an error; unrelated descriptors
-can still be collected. A backend must preserve these rules rather than emit
-several observations for one series.
-
-`Snapshot` must return owned data without I/O or SDK mutation, honor cancellation,
-and support concurrent collections. `Registration.Close` detaches a source even
-if its context expires, and a subsequent call can await quiescence. Successful
-close waits for collections already using that source. Such collections may
-return their earlier observations; collections begun after detach cannot use it.
-No backend or source call occurs while the collector registry lock is held.
-
-Registration failures return before a reader/listener starts its connection.
-Resource close unregisters its source. Driver close unregisters any remaining
-sources in its own scope and its child drivers' scopes; it does not take ownership
-of readers or an application exporter. A shared meter therefore survives closing
-one resource or driver. `WithMeter(nil)` disables this path, including on a child
-driver. Metrics do not depend on trace detail settings.
-
-## Runtime complexity
-
-The existing Add/Set gauge contract cannot collect current state on demand or
-remove a source safely during collection. Registration tracking and an in-flight
-collection count are required to provide those lifetime guarantees; using only a
-trace callback would require a second event ledger and could miss current state.
-The SDK snapshot reads the actual session storage. One atomic terminal flag is
-necessary because listeners replace partition contexts while starting workers;
-reading that mutable context from a collector would race. No event bus, sampling
-goroutine, per-message metric update, exporter dependency or generated trace
-change is introduced.
+For SDK-owned topic sources, see [the topic partition-session gauge](topic.md).
