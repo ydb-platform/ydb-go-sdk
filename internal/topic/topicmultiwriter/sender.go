@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xlist"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
@@ -96,7 +97,7 @@ func (s *sender) iterateThroughMessagesIndex(
 			}
 
 			if err := wr.getInitErr(); err != nil {
-				if isOperationErrorOverloaded(err) {
+				if xerrors.IsOperationErrorTopicPartitionInactive(err) {
 					s.partitionSplitReceiver.push(partitionID)
 
 					break
@@ -109,7 +110,7 @@ func (s *sender) iterateThroughMessagesIndex(
 				s.ctx,
 				[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
 			); err != nil {
-				if isOperationErrorOverloaded(err) {
+				if xerrors.IsOperationErrorTopicPartitionInactive(err) {
 					s.partitionSplitReceiver.push(partitionID)
 
 					break

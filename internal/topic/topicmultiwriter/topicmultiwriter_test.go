@@ -1189,6 +1189,33 @@ func TestMultiWriter_Write_WithAutopartitioningWriter(t *testing.T) {
 	require.NoError(t, multiWriter.Close(ctx))
 }
 
+func TestMultiWriter_OrdinaryOverloadedDoesNotStartSplit(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+
+	baseDesc := topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{PartitionID: 1, Active: true}}}
+	state := stubs.NewDescribeWithSplitsState(t, baseDesc, 2)
+	writer := newTestMultiWriterWithCustomWritersFactory(
+		t,
+		func(context.Context, string) (topictypes.TopicDescription, error) {
+			return state.GetDescription(), nil
+		},
+		overloadedThenSplitWritersFactory{state: state},
+	)
+	defer func() { _ = writer.Close(ctx) }()
+	require.NoError(t, writer.WaitInit(ctx))
+
+	require.NoError(t, writer.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data:  bytes.NewReader([]byte("message")),
+		Key:   "key",
+		SeqNo: 1,
+	}}))
+	err := writer.Flush(ctx)
+	require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED), "got %v", err)
+	require.Len(t, state.GetDescription().Partitions, 3, "the partition must split after the ordinary overload")
+}
+
 func TestMultiWriter_Write_SmallIdleSessionTimeout(t *testing.T) {
 	t.Parallel()
 
@@ -1352,4 +1379,49 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 	}
 
 	require.NoError(t, multiWriter.Close(ctx))
+}
+
+type overloadedThenSplitWritersFactory struct {
+	state *stubs.DescribeWithSplitsState
+}
+
+func (f overloadedThenSplitWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	partitionID, _ := cfg.PartitionID()
+
+	return &overloadedThenSplitWriter{
+		partitionID: partitionID,
+		state:       f.state,
+		ack:         cfg.OnAckReceivedCallback,
+	}, nil
+}
+
+type overloadedThenSplitWriter struct {
+	partitionID int64
+	state       *stubs.DescribeWithSplitsState
+	ack         func(int64)
+}
+
+func (w *overloadedThenSplitWriter) WaitInitInfo(context.Context) (topicwriterinternal.InitialInfo, error) {
+	return topicwriterinternal.InitialInfo{}, nil
+}
+
+func (w *overloadedThenSplitWriter) WriteInternal(
+	_ context.Context,
+	messages []topicwritercommon.MessageWithDataContent,
+) error {
+	if w.partitionID == 1 {
+		w.state.RecordSplit(1)
+
+		return xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
+	}
+
+	for _, message := range messages {
+		w.ack(message.SeqNo)
+	}
+
+	return nil
+}
+
+func (w *overloadedThenSplitWriter) Close(context.Context) error {
+	return nil
 }
