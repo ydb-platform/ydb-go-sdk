@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow/ipc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
@@ -22,18 +23,28 @@ func TestExecutors(t *testing.T) {
 	var calls atomic.Int32
 	newReader := func(part io.Reader, opts ...ipc.Option) (*ipc.Reader, error) {
 		calls.Add(1)
+
 		return ipc.NewReader(part, opts...)
 	}
-	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials(), ydb.WithQueryDefaultResultFormatArrow(newReader))
+	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials(),
+		ydb.WithQueryDefaultResultFormatArrow(newReader))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close(ctx)
-	verifyExecutor(t, ctx, db.Query())
-	if err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error { verifyExecutor(t, ctx, s); return nil }); err != nil {
+	verifyExecutor(ctx, t, db.Query())
+	if err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
+		verifyExecutor(ctx, t, s)
+
+		return nil
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error { verifyExecutor(t, ctx, tx); return nil }); err != nil {
+	if err := db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
+		verifyExecutor(ctx, t, tx)
+
+		return nil
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if calls.Load() != 9 {
@@ -50,7 +61,7 @@ func TestExecutors(t *testing.T) {
 	if calls.Load() != 9 {
 		t.Fatal("nil override called decoder")
 	}
-	verifyExecutor(t, ctx, db.Query())
+	verifyExecutor(ctx, t, db.Query())
 	if calls.Load() != 12 {
 		t.Fatalf("decode calls=%d after override, want 12", calls.Load())
 	}
@@ -62,9 +73,11 @@ func TestDatabaseSQLDriverDefault(t *testing.T) {
 	var calls atomic.Int32
 	newReader := func(part io.Reader, opts ...ipc.Option) (*ipc.Reader, error) {
 		calls.Add(1)
+
 		return ipc.NewReader(part, opts...)
 	}
-	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials(), ydb.WithQueryDefaultResultFormatArrow(newReader))
+	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials(),
+		ydb.WithQueryDefaultResultFormatArrow(newReader))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +89,8 @@ func TestDatabaseSQLDriverDefault(t *testing.T) {
 	defer connector.Close()
 	sqlDB := sql.OpenDB(connector)
 	defer sqlDB.Close()
-	const statement = `SELECT CAST(42 AS Uint64) AS id, "owned"u AS name, CAST(NULL AS Int32?) AS score, "bytes" AS payload;`
+	const statement = `SELECT CAST(42 AS Uint64) AS id, "owned"u AS name,
+CAST(NULL AS Int32?) AS score, "bytes" AS payload;`
 	rows, err := sqlDB.QueryContext(ctx, statement)
 	if err != nil {
 		t.Fatal(err)
@@ -109,7 +123,7 @@ func TestDatabaseSQLDriverDefault(t *testing.T) {
 	}
 }
 
-func verifyExecutor(t *testing.T, ctx context.Context, executor query.Executor) {
+func verifyExecutor(ctx context.Context, t *testing.T, executor query.Executor) {
 	t.Helper()
 	const sql = `SELECT CAST(42 AS Uint64) AS id, "owned"u AS name, CAST(NULL AS Int32?) AS score;`
 	res, err := executor.Query(ctx, sql)
@@ -188,5 +202,6 @@ func connectionString() string {
 	if s := os.Getenv("YDB_CONNECTION_STRING"); s != "" {
 		return s
 	}
+
 	return "grpc://localhost:2136/local"
 }

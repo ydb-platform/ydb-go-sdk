@@ -50,13 +50,14 @@ Generic reader, record, array and option types are inferred from `ipc.NewReader`
 no explicit type arguments or adapter are required. The same options work
 with `github.com/apache/arrow/go/v17/arrow/ipc`. The
 [v18 example](examples/apache_arrow/with_arrow) is a separate module and
-shows resource release, scans and tests. Run its [command](examples/apache_arrow/with_arrow/cmd/main.go)
+shows resource release and scans. Variant columns require Arrow Go v9
+or newer; earlier IPC readers cannot read union arrays. Run its [command](examples/apache_arrow/with_arrow/cmd/main.go)
 with `go run ./cmd` from that module after starting a local YDB.
 
-The Arrow decoder supports Bool, signed/unsigned integers, Float, Double, String
-(`types.TypeBytes` in the SDK), Utf8 and one level of Optional. Unsupported types
-return errors, including for temporal types such as Date, Datetime, Timestamp and
-Interval. To add support for a missing YDB type, open an
+The Arrow decoder supports YDB scalars, including temporal types and all six
+time-zone types, Decimal, Pg, Tagged, Null, Void, lists, tuples, structs,
+dictionaries, sets, variants and nested Optional values. To add support for a
+missing YDB type, open an
 [issue](https://github.com/ydb-platform/ydb-go-sdk/issues) or submit a
 [pull request](https://github.com/ydb-platform/ydb-go-sdk/pulls).
 The Arrow decoder retains each Arrow record once before releasing its IPC reader;
@@ -78,20 +79,21 @@ are released when advancing to another part or closing the internal result.
 
 ### Type compatibility tests
 
-The [integration tests](examples/apache_arrow/with_arrow/types_integration_test.go)
+The [integration tests](tests/integration/arrow/types_integration_test.go)
 use table-free `SELECT` expressions. They compare protobuf and `WithArrow` for
 all supported scalar types, numeric boundaries, special floating-point values,
 binary/text data, mixed nullable rows, all-null columns and empty results.
 They exercise `Scan`, `ScanNamed`, `ScanStruct` and `Values`, require actual IPC
 for non-empty Arrow results and check that Arrow allocations are released.
 
-The same suite verifies that raw `QueryArrow` can read temporal types, Decimal,
-UUID, JSON/YSON, DyNumber, Pg values and containers which `WithArrow` currently
-rejects. Raw Arrow is also tested for Tagged, EmptyList, EmptyDict and the wide
-time-zone types TzDate32, TzDatetime64 and TzTimestamp64; the SDK's `Ydb.Value`
-type conversion does not currently support those types. Resource results are
-rejected by YDB as non-persistable with either format. These tests cover result
-serialization and decoding; they do not establish which types row or column
+The same suite compares raw `QueryArrow`, `WithArrow` and protobuf for temporal
+types, Decimal, UUID, JSON/YSON, DyNumber, Pg values and containers, including
+Tagged, EmptyList, EmptyDict and the wide time-zone types TzDate32, TzDatetime64
+and TzTimestamp64. It checks nested NULLs, both Variant alternatives, calendar
+boundaries and time zones, all three query methods on Client, Session and
+TxActor, and multiple response parts/result sets with early Close and prefetch.
+Resource results are rejected by YDB as non-persistable with either format.
+These tests cover result serialization and decoding; they do not establish which types row or column
 tables can store. CI runs the suite against YDB 26.3.1.17.
 
 ### Selecting the format per query
@@ -279,12 +281,12 @@ linear. The charts show medians without error bars.
 ### Reproducing the benchmark
 
 Start a disposable local YDB using the Docker command in the
-[example README](examples/apache_arrow/with_arrow/README.md#checks-and-local-benchmark).
+[test module README](tests/integration/arrow/README.md).
 The benchmark creates, loads and drops `/local/query_arrow_benchmark`; it requires
 that database and table permissions. Run from the SDK checkout:
 
 ```sh
-cd examples/apache_arrow/with_arrow
+cd tests/integration/arrow
 for sample in 1 2 3 4 5; do
   go test -tags integration -run '^$' -bench '^BenchmarkFormats$/(1|10|100)$' -benchtime=1000x -count=1 -cpu=4 -v
   go test -tags integration -run '^$' -bench '^BenchmarkFormats$/(1000|10000)$' -benchtime=100x -count=1 -cpu=4 -v
@@ -292,4 +294,4 @@ done
 ```
 
 Set `YDB_CONNECTION_STRING` if it differs from `grpc://localhost:2136/local`.
-The example uses Arrow Go v18.8.0 and requires Go 1.25 or newer.
+The test module uses Arrow Go v18.8.0 and requires Go 1.25 or newer.

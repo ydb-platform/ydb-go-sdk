@@ -559,6 +559,7 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 // github.com/apache/arrow/go/arrow/ipc and are also compile-compatible.
 // The legacy module was also tested at v0.0.0-20211112161151-bc219186db40.
 // Earlier Apache Arrow releases do not provide ipc.NewReader.
+// Reading Variant columns requires v9 or newer; earlier IPC readers do not support unions.
 // With v6-v13 or the legacy module, google.golang.org/genproto may need an upgrade
 // to avoid ambiguous imports with the SDK's googleapis/rpc dependency.
 //

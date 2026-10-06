@@ -13,6 +13,7 @@ import (
 
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -27,10 +28,16 @@ func BenchmarkFormats(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer db.Close(ctx)
-	if err := db.Query().Exec(ctx, `CREATE TABLE query_arrow_benchmark (id Uint64 NOT NULL, score Int32, active Bool, amount Double, name Utf8, payload String, PRIMARY KEY(id));`); err != nil {
+	if err := db.Query().Exec(ctx, `CREATE TABLE query_arrow_benchmark (
+  id Uint64 NOT NULL, score Int32, active Bool, amount Double, name Utf8, payload String, PRIMARY KEY(id)
+);`); err != nil {
 		b.Fatal(err)
 	}
-	defer db.Query().Exec(ctx, "DROP TABLE query_arrow_benchmark;")
+	defer func() {
+		if err := db.Query().Exec(ctx, "DROP TABLE query_arrow_benchmark;"); err != nil {
+			b.Error(err)
+		}
+	}()
 	fixture := make([]types.Value, 10000)
 	for i := range fixture {
 		score := types.OptionalValue(types.Int32Value(int32(i % 1000)))
@@ -49,14 +56,17 @@ func BenchmarkFormats(b *testing.B) {
 		)
 	}
 	for i := 0; i < len(fixture); i += 1000 {
-		if err := db.Table().BulkUpsert(ctx, "/local/query_arrow_benchmark", table.BulkUpsertDataRows(types.ListValue(fixture[i:i+1000]...))); err != nil {
+		if err := db.Table().BulkUpsert(ctx, "/local/query_arrow_benchmark",
+			table.BulkUpsertDataRows(types.ListValue(fixture[i:i+1000]...))); err != nil {
 			b.Fatal(err)
 		}
 	}
 	arrowOption := query.WithArrow(ipc.NewReader)
 	err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
 		for _, size := range []int{1, 10, 100, 1000, 10000} {
-			sql := fmt.Sprintf("SELECT id,score,active,amount,name,payload FROM query_arrow_benchmark WHERE id < %d ORDER BY id;", size)
+			sql := fmt.Sprintf(
+				"SELECT id,score,active,amount,name,payload FROM query_arrow_benchmark WHERE id < %d ORDER BY id;", size,
+			)
 			count, expected, err := consumeRows(ctx, s, sql, nil)
 			if err != nil {
 				return err
@@ -75,9 +85,10 @@ func BenchmarkFormats(b *testing.B) {
 						if variant == "WithArrow" {
 							opts = append(opts, arrowOption)
 						}
+
 						return consumeRows(ctx, s, sql, opts)
 					}
-					for i := 0; i < 10; i++ {
+					for range 10 {
 						n, h, err := run()
 						if err != nil || n != size || h != expected {
 							b.Fatalf("warmup: rows=%d checksum=%016x err=%v", n, h, err)
@@ -98,6 +109,7 @@ func BenchmarkFormats(b *testing.B) {
 				})
 			}
 		}
+
 		return nil
 	})
 	if err != nil {
@@ -135,6 +147,7 @@ func consumeRows(ctx context.Context, s query.Session, sql string, opts []query.
 			n++
 		}
 	}
+
 	return n, hash, res.Close(ctx)
 }
 
@@ -198,6 +211,7 @@ func consumeArrow(ctx context.Context, s query.Session, sql string) (int, uint64
 			return 0, 0, err
 		}
 	}
+
 	return n, hash, res.Close(ctx)
 }
 
@@ -242,6 +256,7 @@ func checksum(h, id uint64, score *int32, active *bool, amount *float64, name *s
 			mix(uint64(c))
 		}
 	}
+
 	return h
 }
 
@@ -250,5 +265,7 @@ func processCPU(b *testing.B) time.Duration {
 	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &usage); err != nil {
 		b.Fatal(err)
 	}
-	return time.Duration(usage.Utime.Sec+usage.Stime.Sec)*time.Second + time.Duration(usage.Utime.Usec+usage.Stime.Usec)*time.Microsecond
+
+	return time.Duration(usage.Utime.Sec+usage.Stime.Sec)*time.Second +
+		time.Duration(usage.Utime.Usec+usage.Stime.Usec)*time.Microsecond
 }

@@ -120,7 +120,7 @@ jobs:
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
     defaults:
       run:
-        working-directory: examples/apache_arrow/with_arrow
+        working-directory: tests/integration/arrow
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -128,14 +128,14 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.26.x
-          cache-dependency-path: examples/apache_arrow/with_arrow/go.sum
+          cache-dependency-path: tests/integration/arrow/go.sum
       - name: Run Arrow integration tests
         run: go test -mod=readonly -race -tags integration -coverpkg=github.com/ydb-platform/ydb-go-sdk/v3/... -coverprofile arrow.txt -covermode atomic ./...
       - name: Upload Arrow integration-tests coverage report to Codecov
         if: github.event_name != 'schedule'
         uses: codecov/codecov-action@v4
         with:
-          file: examples/apache_arrow/with_arrow/arrow.txt
+          file: tests/integration/arrow/arrow.txt
           flags: integration,arrow
           name: arrow-integration
         env:

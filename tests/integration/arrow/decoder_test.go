@@ -13,17 +13,22 @@ import (
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
 	"github.com/apache/arrow-go/v18/arrow/memory"
+
 	arrowinternal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
 func TestDecodeOwnsValues(t *testing.T) {
 	alloc := memory.NewCheckedAllocator(memory.DefaultAllocator)
-	schema := arrow.NewSchema([]arrow.Field{{Name: "id", Type: arrow.PrimitiveTypes.Int32}, {Name: "name", Type: arrow.BinaryTypes.String, Nullable: true}, {Name: "payload", Type: arrow.BinaryTypes.Binary}}, nil)
+	schema := arrow.NewSchema([]arrow.Field{
+		{Name: "id", Type: arrow.PrimitiveTypes.Int32},
+		{Name: "name", Type: arrow.BinaryTypes.String, Nullable: true},
+		{Name: "payload", Type: arrow.BinaryTypes.Binary},
+	}, nil)
 	builder := array.NewRecordBuilder(alloc, schema)
 	var wire bytes.Buffer
 	writer := ipc.NewWriter(&wire, ipc.WithSchema(schema), ipc.WithAllocator(alloc))
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		builder.Field(0).(*array.Int32Builder).Append(int32(i + 1))
 		if i == 0 {
 			builder.Field(1).(*array.StringBuilder).Append("owned text")
@@ -42,7 +47,11 @@ func TestDecodeOwnsValues(t *testing.T) {
 	}
 	builder.Release()
 	alloc.AssertSize(t, 0)
-	columns := []arrowinternal.Column{{Name: "id", Type: types.TypeInt32}, {Name: "name", Type: types.Optional(types.TypeText)}, {Name: "payload", Type: types.TypeBytes}}
+	columns := []arrowinternal.Column{
+		{Name: "id", Type: types.TypeInt32},
+		{Name: "name", Type: types.Optional(types.TypeText)},
+		{Name: "payload", Type: types.TypeBytes},
+	}
 	decode := arrowinternal.NewDecoder(ipc.NewReader, ipc.WithAllocator(alloc))
 	batches, err := decode(context.Background(), columns, bytes.NewReader(wire.Bytes()))
 	if err != nil {
@@ -198,7 +207,8 @@ func TestColumnReaderScalarTypes(t *testing.T) {
 				native := reflect.ValueOf(nullable).MethodByName("Value").Call([]reflect.Value{reflect.ValueOf(0)})[0].Interface()
 				nativeDst := reflect.New(reflect.PointerTo(reflect.TypeOf(native)))
 				directDst := reflect.New(reflect.TypeOf(native))
-				if err := batch.Scan(0, 0, directDst.Interface()); err != nil || !reflect.DeepEqual(directDst.Elem().Interface(), native) {
+				if err := batch.Scan(0, 0, directDst.Interface()); err != nil ||
+					!reflect.DeepEqual(directDst.Elem().Interface(), native) {
 					t.Fatalf("native scalar scan: %v", err)
 				}
 				for i := 0; i < nullable.Len(); i++ {
@@ -243,6 +253,7 @@ func TestOptionalBoolScanDestinations(t *testing.T) {
 		arrowType arrow.DataType
 		json      string
 	}{
+		//nolint:dupword // Repeated values test independent scan destinations.
 		{arrow.FixedWidthTypes.Boolean, `[false, true, true, null, false]`},
 		{arrow.PrimitiveTypes.Uint8, `[0, 1, 2, null, 0]`},
 	} {
@@ -283,6 +294,7 @@ func TestOptionalBoolScanDestinations(t *testing.T) {
 					if got != nil {
 						t.Fatalf("null=%v", got)
 					}
+
 					continue
 				}
 				if got == nil || *got != want {
@@ -364,12 +376,14 @@ func decodeColumn(t testing.TB, data arrow.Array, typ types.Type) (arrowinternal
 	if err := writer.Close(); err != nil {
 		t.Fatal(err)
 	}
-	batches, err := Decode(context.Background(), []arrowinternal.Column{{Name: "value", Type: typ}}, bytes.NewReader(wire.Bytes()))
+	batches, err := Decode(context.Background(),
+		[]arrowinternal.Column{{Name: "value", Type: typ}}, bytes.NewReader(wire.Bytes()))
 	if err != nil {
 		return nil, err
 	}
 	if len(batches) != 1 {
 		t.Fatalf("batches=%d, want 1", len(batches))
 	}
+
 	return batches[0], nil
 }

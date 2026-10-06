@@ -39,6 +39,7 @@ type ArrowResult = arrow.Result
 // github.com/apache/arrow/go/arrow/ipc and are also compile-compatible.
 // The legacy module was also tested at v0.0.0-20211112161151-bc219186db40.
 // Earlier Apache Arrow releases do not provide ipc.NewReader.
+// Reading Variant columns requires v9 or newer; earlier IPC readers do not support unions.
 // With v6-v13 or the legacy module, google.golang.org/genproto may need an upgrade
 // to avoid ambiguous imports with the SDK's googleapis/rpc dependency.
 //
@@ -57,11 +58,10 @@ type ArrowResult = arrow.Result
 //
 //	row, err := db.Query().QueryRow(ctx, sql, query.WithYdbValue())
 //
-// The decoder supports Bool, signed/unsigned integers, Float, Double, String and
-// Utf8, with one Optional wrapper. Unsupported types and mismatches with YDB
-// column metadata return decode errors before scanning. YDB temporal types,
-// including Date, Datetime, Timestamp and Interval, are unsupported even when
-// represented by integer arrays in Arrow. To add support for a missing YDB type,
+// The decoder supports YDB scalars (including temporal types), Decimal, Pg,
+// Tagged, Null, Void, lists, tuples, structs, dictionaries, sets, variants and
+// nested Optional values. Mismatches with YDB column metadata return decode
+// errors before scanning. To add support for a missing YDB type,
 // open an issue or submit a pull request to https://github.com/ydb-platform/ydb-go-sdk.
 //
 // Client.Query and Client.QueryResultSet materialize the entire result and retain

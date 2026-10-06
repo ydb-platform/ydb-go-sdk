@@ -101,20 +101,31 @@ type scalar[T any] interface {
 	Value(row int) T
 }
 
-//nolint:funlen // Scalar dispatch covers all supported Go types in one switch.
-func newColumn(a Array, t types.Type) (decodedColumn, error) {
+func newColumn[A Array](a A, t types.Type) (decodedColumn, error) {
+	return newColumnActive(a, t, nil)
+}
+
+//nolint:funlen,gocyclo // Scalar dispatch and type validation cover all supported Go types.
+func newColumnActive[A Array](a A, t types.Type, active func(int) bool) (decodedColumn, error) {
 	inner := t
 	optional := false
 	if opt, ok := t.(types.Optional); ok {
 		inner, optional = opt.InnerType(), true
 	}
-	if !optional && a.NullN() != 0 {
-		return decodedColumn{}, fmt.Errorf("null in non-optional %s", t)
+	if !optional && !nullableColumn(inner) && a.NullN() != 0 {
+		for row := 0; row < a.Len(); row++ {
+			if a.IsNull(row) && (active == nil || active(row)) {
+				return decodedColumn{}, fmt.Errorf("null in non-optional %s", t)
+			}
+		}
+	}
+	if column, handled, err := newComplexColumn(a, inner, optional, active); handled {
+		return column, err
 	}
 
 	var column decodedColumn
 	var scalarType types.Type
-	switch data := a.(type) {
+	switch data := any(a).(type) {
 	case scalar[bool]:
 		scalarType = types.Bool
 		column = newScalarColumn(a, inner, optional, data.Value, value.BoolValue, nil)
@@ -162,7 +173,21 @@ func newColumn(a Array, t types.Type) (decodedColumn, error) {
 	default:
 		return decodedColumn{}, fmt.Errorf("unsupported Arrow array %T for YDB %s", a, t)
 	}
+	_, decimalType := inner.(*types.Decimal)
+	if types.Equal(inner, types.UUID) || decimalType {
+		if data, ok := any(a).(scalar[[]byte]); ok {
+			for row := 0; row < a.Len(); row++ {
+				if !a.IsNull(row) && (active == nil || active(row)) && len(data.Value(row)) != 16 {
+					return decodedColumn{}, fmt.Errorf("expected 16 Arrow bytes for YDB %s", inner)
+				}
+			}
+		}
+	}
 	if !types.Equal(scalarType, inner) {
+		if read, ok := logicalScalar(a, inner); ok {
+			return computedColumn(a, inner, optional, read), nil
+		}
+
 		return decodedColumn{}, fmt.Errorf("arrow array %T does not match YDB %s", a, inner)
 	}
 

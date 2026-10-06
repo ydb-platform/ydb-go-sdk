@@ -13,6 +13,7 @@ import (
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	arrowinternal "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
@@ -54,6 +55,7 @@ ORDER BY id;`, strings.Repeat("x", 64))
 					if err != nil {
 						return nil, err
 					}
+
 					return &lifetimeReader{Reader: reader, sizes: &sizes}, nil
 				})
 				batches, err := decode(ctx, columns, part)
@@ -87,32 +89,9 @@ ORDER BY id;`, strings.Repeat("x", 64))
 					return err
 				}
 				defer res.Close(ctx)
-				var count int32
-				var savedName *string
-				var savedPayload *[]byte
-				for rs, err := range res.ResultSets(ctx) {
-					if err != nil {
-						return err
-					}
-					for row, err := range rs.Rows(ctx) {
-						if err != nil {
-							return err
-						}
-						var id int32
-						var score *int32
-						var active *bool
-						var amount *float64
-						if err := row.Scan(&id, &score, &active, &amount, &savedName, &savedPayload); err != nil {
-							return err
-						}
-						if id != count || *score != id%1000 || *active != (id%2 == 0) || *amount != float64(id)/4 {
-							return fmt.Errorf("invalid numeric values at row %d", count)
-						}
-						if *savedName != "owned" || string(*savedPayload) != strings.Repeat("x", 64) {
-							return fmt.Errorf("invalid strings at row %d", count)
-						}
-						count++
-					}
+				count, savedName, savedPayload, err := readLifetimeRows(ctx, res)
+				if err != nil {
+					return err
 				}
 				if count != 10000 || parts <= 1 {
 					return fmt.Errorf("rows=%d, parts=%d", count, parts)
@@ -149,8 +128,41 @@ ORDER BY id;`, strings.Repeat("x", 64))
 	}
 }
 
+func readLifetimeRows(ctx context.Context, res query.Result) (int32, *string, *[]byte, error) {
+	var count int32
+	var savedName *string
+	var savedPayload *[]byte
+	for rs, err := range res.ResultSets(ctx) {
+		if err != nil {
+			return 0, nil, nil, err
+		}
+		for row, err := range rs.Rows(ctx) {
+			if err != nil {
+				return 0, nil, nil, err
+			}
+			var id int32
+			var score *int32
+			var active *bool
+			var amount *float64
+			if err := row.Scan(&id, &score, &active, &amount, &savedName, &savedPayload); err != nil {
+				return 0, nil, nil, err
+			}
+			if id != count || *score != id%1000 || *active != (id%2 == 0) || *amount != float64(id)/4 {
+				return 0, nil, nil, fmt.Errorf("invalid numeric values at row %d", count)
+			}
+			if *savedName != "owned" || string(*savedPayload) != strings.Repeat("x", 64) {
+				return 0, nil, nil, fmt.Errorf("invalid strings at row %d", count)
+			}
+			count++
+		}
+	}
+
+	return count, savedName, savedPayload, nil
+}
+
 type lifetimeBatch struct {
 	arrowinternal.Batch
+
 	active      *atomic.Int64
 	activeBytes *atomic.Int64
 	size        int64
@@ -164,6 +176,7 @@ func (b *lifetimeBatch) Release() {
 
 type lifetimeReader struct {
 	*ipc.Reader
+
 	sizes *[]int64
 }
 
@@ -181,5 +194,6 @@ func (r *lifetimeReader) Read() (arrow.RecordBatch, error) {
 		}
 	}
 	*r.sizes = append(*r.sizes, size)
+
 	return record, nil
 }
