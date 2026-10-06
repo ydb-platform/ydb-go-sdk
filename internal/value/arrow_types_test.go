@@ -39,6 +39,12 @@ func TestNullableWireValues(t *testing.T) {
 			OptionalValue(OptionalValue(VariantValueTuple(OptionalValue(Int32Value(42)), 0, variant))),
 			nested(number),
 		},
+		{
+			"present tagged variant",
+			OptionalValue(TaggedValue(types.NewTagged(variant, "tag"),
+				VariantValueTuple(OptionalValue(Int32Value(42)), 0, variant))),
+			nested(number),
+		},
 		{"pg null", PgNullValue(23), null},
 		{"present pg null", OptionalValue(PgNullValue(23)), nested(null)},
 		{"tagged null", TaggedValue(types.NewTagged(types.NewOptional(types.Int32), "tag"), NullValue(types.Int32)), null},
@@ -80,4 +86,17 @@ func TestAdditionalYQLValues(t *testing.T) {
 	require.NoError(t, CastTo(LiteralNullValue(), &target))
 	require.Nil(t, target)
 	require.False(t, proto.Equal(ToYDB(PgValue(25, "")), ToYDB(PgNullValue(25))))
+}
+
+func TestLiteralNullScan(t *testing.T) {
+	integer := int32(42)
+	text := "old"
+	number := &integer
+	for _, dst := range []any{&integer, &text, &number} {
+		require.NoError(t, CastTo(LiteralNullValue(), dst))
+	}
+	require.Zero(t, integer)
+	require.Empty(t, text)
+	require.Nil(t, number)
+	require.ErrorIs(t, CastTo(LiteralNullValue(), 42), errDestinationTypeIsNotAPointer)
 }

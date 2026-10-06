@@ -132,6 +132,11 @@ func TestNewDecoderOptions(t *testing.T) {
 	}
 }
 
+func TestNewDecoderNilFactory(t *testing.T) {
+	var newReader func(io.Reader, ...int) (*testReader, error)
+	require.Nil(t, NewDecoder(newReader))
+}
+
 func TestNewDecoderFactoryError(t *testing.T) {
 	expected := errors.New("factory error")
 	decode := NewDecoder(func(io.Reader, ...int) (*testReader, error) { return nil, expected })
