@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="780" viewBox="0 0 1200 780">
+<rect width="1200" height="780" fill="white"/>
+<style>text{font-family:Arial,sans-serif;fill:#243447;font-size:16px}</style>
+<text x="600" y="30" text-anchor="middle" style="font-size:23px">P2C: less queuing on slow nodes; measurable selection overhead</text>
+<text x="600" y="56" text-anchor="middle" style="font-size:15px">Linux/arm64, 5 alternating repeats of 4 s. Whiskers = min/max, not confidence intervals.</text>
+<rect x="420" y="72" width="18" height="16" fill="#697a8c"/>
+<text x="447" y="86" text-anchor="start" style="font-size:16px">Random</text>
+<rect x="580" y="72" width="18" height="16" fill="#197f85"/>
+<text x="607" y="86" text-anchor="start" style="font-size:16px">P2C</text>
+<text x="315" y="126" text-anchor="middle" style="font-size:18px">Slow nodes, lower load: successful RPC p95 (ms)</text>
+<path d="M80,350.0 L530,350.0" stroke="#dbe3eb" stroke-width="1"/>
+<text x="70" y="355.0" text-anchor="end" style="font-size:14px">0</text>
+<path d="M80,302.5 L530,302.5" stroke="#dbe3eb" stroke-width="1"/>
+<text x="70" y="307.5" text-anchor="end" style="font-size:14px">25</text>
+<path d="M80,255.0 L530,255.0" stroke="#dbe3eb" stroke-width="1"/>
+<text x="70" y="260.0" text-anchor="end" style="font-size:14px">50</text>
+<path d="M80,207.5 L530,207.5" stroke="#dbe3eb" stroke-width="1"/>
+<text x="70" y="212.5" text-anchor="end" style="font-size:14px">75</text>
+<path d="M80,160.0 L530,160.0" stroke="#dbe3eb" stroke-width="1"/>
+<text x="70" y="165.0" text-anchor="end" style="font-size:14px">100</text>
+<path d="M80,160 L80,350" stroke="#8091a3" stroke-width="1"/>
+<rect x="163" y="234.8070736" width="36" height="115.1929264" fill="#697a8c"/>
+<path d="M181,242.4604769 L181,222.0516972" stroke="#243447" stroke-width="2"/>
+<path d="M175,242.4604769 L187,242.4604769" stroke="#243447" stroke-width="2"/>
+<path d="M175,222.0516972 L187,222.0516972" stroke="#243447" stroke-width="2"/>
+<text x="181" y="214.0516972" text-anchor="middle" style="font-size:14px">60.6</text>
+<rect x="211" y="269.08074799999997" width="36" height="80.91925200000003" fill="#197f85"/>
+<path d="M229,270.7588128 L229,267.5288812" stroke="#243447" stroke-width="2"/>
+<path d="M223,270.7588128 L235,270.7588128" stroke="#243447" stroke-width="2"/>
+<path d="M223,267.5288812 L235,267.5288812" stroke="#243447" stroke-width="2"/>
+<text x="229" y="259.5288812" text-anchor="middle" style="font-size:14px">42.6</text>
+<text x="205" y="377" text-anchor="middle" style="font-size:15px">3 nodes / 240 RPC/s</text>
+<rect x="363" y="238.63788590000001" width="36" height="111.36211409999999" fill="#697a8c"/>
+<path d="M381,243.8305156 L381,186.53569829999998" stroke="#243447" stroke-width="2"/>
+<path d="M375,243.8305156 L387,243.8305156" stroke="#243447" stroke-width="2"/>
+<path d="M375,186.53569829999998 L387,186.53569829999998" stroke="#243447" stroke-width="2"/>
+<text x="381" y="178.53569829999998" text-anchor="middle" style="font-size:14px">58.6</text>
+<rect x="411" y="271.7145983" width="36" height="78.28540170000002" fill="#197f85"/>
+<path d="M429,271.7452491 L429,269.1998001" stroke="#243447" stroke-width="2"/>
+<path d="M423,271.7452491 L435,271.7452491" stroke="#243447" stroke-width="2"/>
+<path d="M423,269.1998001 L435,269.1998001" stroke="#243447" stroke-width="2"/>
+<text x="429" y="261.1998001" text-anchor="middle" style="font-size:14px">41.2</text>
+<text x="405" y="377" text-anchor="middle" style="font-size:15px">9 nodes / 720 RPC/s</text>
+<text x="315" y="406" text-anchor="middle" style="font-size:14px">No errors in either revision</text>
+<text x="910" y="126" text-anchor="middle" style="font-size:18px">Slow nodes, higher load: errors per 4 s</text>
+<path d="M675,350.0 L1125,350.0" stroke="#dbe3eb" stroke-width="1"/>
+<text x="665" y="355.0" text-anchor="end" style="font-size:14px">0</text>
+<path d="M675,286.6666666666667 L1125,286.6666666666667" stroke="#dbe3eb" stroke-width="1"/>
+<text x="665" y="291.6666666666667" text-anchor="end" style="font-size:14px">200</text>
+<path d="M675,223.33333333333334 L1125,223.33333333333334" stroke="#dbe3eb" stroke-width="1"/>
+<text x="665" y="228.33333333333334" text-anchor="end" style="font-size:14px">400</text>
+<path d="M675,160.0 L1125,160.0" stroke="#dbe3eb" stroke-width="1"/>
+<text x="665" y="165.0" text-anchor="end" style="font-size:14px">600</text>
+<path d="M675,160 L675,350" stroke="#8091a3" stroke-width="1"/>
+<rect x="758" y="272.1" width="36" height="77.89999999999998" fill="#697a8c"/>
+<path d="M776,274.6333333333333 L776,270.2" stroke="#243447" stroke-width="2"/>
+<path d="M770,274.6333333333333 L782,274.6333333333333" stroke="#243447" stroke-width="2"/>
+<path d="M770,270.2 L782,270.2" stroke="#243447" stroke-width="2"/>
+<text x="776" y="262.2" text-anchor="middle" style="font-size:14px">246.0</text>
+<rect x="806" y="350.0" width="36" height="0.0" fill="#197f85"/>
+<path d="M824,350.0 L824,350.0" stroke="#243447" stroke-width="2"/>
+<path d="M818,350.0 L830,350.0" stroke="#243447" stroke-width="2"/>
+<path d="M818,350.0 L830,350.0" stroke="#243447" stroke-width="2"/>
+<text x="824" y="342.0" text-anchor="middle" style="font-size:14px">0.0</text>
+<text x="800" y="377" text-anchor="middle" style="font-size:15px">3 nodes / 750 RPC/s</text>
+<rect x="958" y="184.06666666666666" width="36" height="165.93333333333334" fill="#697a8c"/>
+<path d="M976,193.25 L976,176.15" stroke="#243447" stroke-width="2"/>
+<path d="M970,193.25 L982,193.25" stroke="#243447" stroke-width="2"/>
+<path d="M970,176.15 L982,176.15" stroke="#243447" stroke-width="2"/>
+<text x="976" y="168.15" text-anchor="middle" style="font-size:14px">524.0</text>
+<rect x="1006" y="350.0" width="36" height="0.0" fill="#197f85"/>
+<path d="M1024,350.0 L1024,350.0" stroke="#243447" stroke-width="2"/>
+<path d="M1018,350.0 L1030,350.0" stroke="#243447" stroke-width="2"/>
+<path d="M1018,350.0 L1030,350.0" stroke="#243447" stroke-width="2"/>
+<text x="1024" y="342.0" text-anchor="middle" style="font-size:14px">0.0</text>
+<text x="1000" y="377" text-anchor="middle" style="font-size:15px">9 nodes / 2250 RPC/s</text>
+<text x="910" y="406" text-anchor="middle" style="font-size:14px">P2C: zero errors in all five repeats</text>
+<text x="600" y="458" text-anchor="middle" style="font-size:18px">Homogeneous load: client CPU ratio (P2C / random)</text>
+<path d="M85,680.0 L1115,680.0" stroke="#dbe3eb" stroke-width="1"/>
+<text x="75" y="685.0" text-anchor="end" style="font-size:14px">0.4</text>
+<path d="M85,652.8571428571429 L1115,652.8571428571429" stroke="#dbe3eb" stroke-width="1"/>
+<text x="75" y="657.8571428571429" text-anchor="end" style="font-size:14px">0.6</text>
+<path d="M85,625.7142857142858 L1115,625.7142857142858" stroke="#dbe3eb" stroke-width="1"/>
+<text x="75" y="630.7142857142858" text-anchor="end" style="font-size:14px">0.8</text>
+<path d="M85,598.5714285714286 L1115,598.5714285714286" stroke="#dbe3eb" stroke-width="1"/>
+<text x="75" y="603.5714285714286" text-anchor="end" style="font-size:14px">1</text>
+<path d="M85,571.4285714285714 L1115,571.4285714285714" stroke="#dbe3eb" stroke-width="1"/>
+<text x="75" y="576.4285714285714" text-anchor="end" style="font-size:14px">1.2</text>
+<path d="M85,544.2857142857143 L1115,544.2857142857143" stroke="#dbe3eb" stroke-width="1"/>
+<text x="75" y="549.2857142857143" text-anchor="end" style="font-size:14px">1.4</text>
+<path d="M85,517.1428571428571 L1115,517.1428571428571" stroke="#dbe3eb" stroke-width="1"/>
+<text x="75" y="522.1428571428571" text-anchor="end" style="font-size:14px">1.6</text>
+<path d="M85,490.0 L1115,490.0" stroke="#dbe3eb" stroke-width="1"/>
+<text x="75" y="495.0" text-anchor="end" style="font-size:14px">1.8</text>
+<path d="M85,490 L85,680" stroke="#8091a3" stroke-width="1"/>
+<path d="M85,598.5714285714286 L1115,598.5714285714286" stroke="#8091a3" stroke-width="2"/>
+<path d="M85,591.7857142857143 L1115,591.7857142857143" stroke="#bd3c4e" stroke-width="2"/>
+<path d="M135,615.910498761905 L135,514.5662359618403" stroke="#197f85" stroke-width="2"/>
+<path d="M128,615.910498761905 L142,615.910498761905" stroke="#197f85" stroke-width="2"/>
+<path d="M128,514.5662359618403 L142,514.5662359618403" stroke="#197f85" stroke-width="2"/>
+<circle cx="135" cy="607.2480752492197" r="5" fill="#197f85"/>
+<text x="135" y="707" text-anchor="middle" style="font-size:14px">1 nodes</text>
+<text x="135" y="729" text-anchor="middle" style="font-size:14px">250 RPC/s</text>
+<path d="M285,636.0838855437223 L285,571.4204497444701" stroke="#197f85" stroke-width="2"/>
+<path d="M278,636.0838855437223 L292,636.0838855437223" stroke="#197f85" stroke-width="2"/>
+<path d="M278,571.4204497444701 L292,571.4204497444701" stroke="#197f85" stroke-width="2"/>
+<circle cx="285" cy="603.5008373126409" r="5" fill="#197f85"/>
+<text x="285" y="707" text-anchor="middle" style="font-size:14px">3 nodes</text>
+<text x="285" y="729" text-anchor="middle" style="font-size:14px">240 RPC/s</text>
+<path d="M435,597.651007638438 L435,590.3115872710949" stroke="#197f85" stroke-width="2"/>
+<path d="M428,597.651007638438 L442,597.651007638438" stroke="#197f85" stroke-width="2"/>
+<path d="M428,590.3115872710949 L442,590.3115872710949" stroke="#197f85" stroke-width="2"/>
+<circle cx="435" cy="593.0881218169659" r="5" fill="#197f85"/>
+<text x="435" y="707" text-anchor="middle" style="font-size:14px">3 nodes</text>
+<text x="435" y="729" text-anchor="middle" style="font-size:14px">750 RPC/s</text>
+<path d="M585,669.6012181396991 L585,583.0046948356808" stroke="#197f85" stroke-width="2"/>
+<path d="M578,669.6012181396991 L592,669.6012181396991" stroke="#197f85" stroke-width="2"/>
+<path d="M578,583.0046948356808 L592,583.0046948356808" stroke="#197f85" stroke-width="2"/>
+<circle cx="585" cy="598.3740827596982" r="5" fill="#197f85"/>
+<text x="585" y="707" text-anchor="middle" style="font-size:14px">3 nodes</text>
+<text x="585" y="729" text-anchor="middle" style="font-size:14px">1200 RPC/s</text>
+<path d="M735,605.2415008050559 L735,578.526377234867" stroke="#197f85" stroke-width="2"/>
+<path d="M728,605.2415008050559 L742,605.2415008050559" stroke="#197f85" stroke-width="2"/>
+<path d="M728,578.526377234867 L742,578.526377234867" stroke="#197f85" stroke-width="2"/>
+<circle cx="735" cy="596.935980710487" r="5" fill="#197f85"/>
+<text x="735" y="707" text-anchor="middle" style="font-size:14px">9 nodes</text>
+<text x="735" y="729" text-anchor="middle" style="font-size:14px">720 RPC/s</text>
+<path d="M885,602.6707671440826 L885,581.6118753013017" stroke="#197f85" stroke-width="2"/>
+<path d="M878,602.6707671440826 L892,602.6707671440826" stroke="#197f85" stroke-width="2"/>
+<path d="M878,581.6118753013017 L892,581.6118753013017" stroke="#197f85" stroke-width="2"/>
+<circle cx="885" cy="597.9731551945939" r="5" fill="#197f85"/>
+<text x="885" y="707" text-anchor="middle" style="font-size:14px">9 nodes</text>
+<text x="885" y="729" text-anchor="middle" style="font-size:14px">2250 RPC/s</text>
+<path d="M1035,615.3523956259924 L1035,578.454475159482" stroke="#197f85" stroke-width="2"/>
+<path d="M1028,615.3523956259924 L1042,615.3523956259924" stroke="#197f85" stroke-width="2"/>
+<path d="M1028,578.454475159482 L1042,578.454475159482" stroke="#197f85" stroke-width="2"/>
+<circle cx="1035" cy="592.3390014404794" r="5" fill="#197f85"/>
+<text x="1035" y="707" text-anchor="middle" style="font-size:14px">9 nodes</text>
+<text x="1035" y="729" text-anchor="middle" style="font-size:14px">3600 RPC/s</text>
+<text x="600" y="767" text-anchor="middle" style="font-size:15px">Dots = median paired ratio. Red line = +5% budget; individual runs can exceed it.</text>
+</svg>

@@ -1,0 +1,102 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer
+cpu: Apple M3 Pro
+BenchmarkEndpointElector/Equal/1/Serial-4         	209720546	         1.147 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1/Serial-4         	208690962	         1.154 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1/Serial-4         	209784555	         1.142 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1/Serial-4         	212907597	         1.141 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1/Serial-4         	208423568	         1.144 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1/Parallel-4       	463899594	         0.5115 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1/Parallel-4       	465145196	         0.4996 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1/Parallel-4       	484443958	         0.4932 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1/Parallel-4       	504011977	         0.4878 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1/Parallel-4       	487767283	         0.4896 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1/Serial-4        	206408406	         1.144 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1/Serial-4        	210149259	         1.188 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1/Serial-4        	206084059	         1.154 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1/Serial-4        	208217805	         1.153 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1/Serial-4        	211126822	         1.147 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1/Parallel-4      	499930572	         0.4970 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1/Parallel-4      	490971162	         0.5194 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1/Parallel-4      	466780767	         0.5141 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1/Parallel-4      	482618203	         0.4923 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1/Parallel-4      	566281477	         0.4888 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/2/Serial-4         	13731319	        18.22 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/2/Serial-4         	13055362	        18.12 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/2/Serial-4         	12972475	        18.63 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/2/Serial-4         	13101270	        18.71 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/2/Serial-4         	11948719	        18.37 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/2/Parallel-4       	 1000000	       225.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/2/Parallel-4       	 1000000	       228.6 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/2/Parallel-4       	 1000000	       233.6 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/2/Parallel-4       	 1000000	       230.9 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/2/Parallel-4       	 1000000	       247.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/2/Serial-4        	13363989	        18.13 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/2/Serial-4        	13113529	        17.96 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/2/Serial-4        	13608237	        17.72 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/2/Serial-4        	13585802	        18.10 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/2/Serial-4        	12947136	        17.93 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/2/Parallel-4      	 1000000	       241.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/2/Parallel-4      	 1000000	       246.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/2/Parallel-4      	 1000000	       244.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/2/Parallel-4      	 1000000	       242.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/2/Parallel-4      	 1000000	       239.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/9/Serial-4         	12880718	        19.25 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/9/Serial-4         	12618820	        18.89 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/9/Serial-4         	12456504	        19.15 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/9/Serial-4         	12636649	        19.03 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/9/Serial-4         	12531355	        19.18 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/9/Parallel-4       	 1000000	       226.3 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/9/Parallel-4       	 1000000	       232.6 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/9/Parallel-4       	 1000000	       229.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/9/Parallel-4       	 1000000	       239.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/9/Parallel-4       	 1000000	       239.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/9/Serial-4        	12844125	        19.17 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/9/Serial-4        	11459904	        19.49 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/9/Serial-4        	12232285	        19.25 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/9/Serial-4        	12553969	        20.16 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/9/Serial-4        	12711302	        19.60 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/9/Parallel-4      	 1000000	       231.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/9/Parallel-4      	 1000000	       222.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/9/Parallel-4      	 1000000	       228.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/9/Parallel-4      	 1000000	       222.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/9/Parallel-4      	 1000000	       218.3 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1000/Serial-4      	11570563	        20.80 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1000/Serial-4      	11449971	        20.85 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1000/Serial-4      	11539408	        22.04 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1000/Serial-4      	11523295	        21.07 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1000/Serial-4      	11283452	        20.98 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1000/Parallel-4    	 1000000	       234.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1000/Parallel-4    	 1000000	       236.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1000/Parallel-4    	 1000000	       239.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1000/Parallel-4    	 1000000	       238.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Equal/1000/Parallel-4    	 1000000	       237.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1000/Serial-4     	11445330	        20.79 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1000/Serial-4     	11770041	        21.18 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1000/Serial-4     	11436898	        21.06 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1000/Serial-4     	11272456	        20.89 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1000/Serial-4     	11471383	        21.08 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1000/Parallel-4   	 1000000	       230.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1000/Parallel-4   	 1000000	       224.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1000/Parallel-4   	 1000000	       230.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1000/Parallel-4   	 1000000	       235.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkEndpointElector/Skewed/1000/Parallel-4   	 1000000	       230.9 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer	22.066s
+goos: darwin
+goarch: arm64
+pkg: github.com/ydb-platform/ydb-go-sdk/v3/internal/conn
+cpu: Apple M3 Pro
+BenchmarkConnInvoke/Serial-4         	  419852	       540.9 ns/op	    1204 B/op	      20 allocs/op
+BenchmarkConnInvoke/Serial-4         	  441530	       532.3 ns/op	    1204 B/op	      20 allocs/op
+BenchmarkConnInvoke/Serial-4         	  467391	       533.4 ns/op	    1204 B/op	      20 allocs/op
+BenchmarkConnInvoke/Serial-4         	  454738	       532.2 ns/op	    1204 B/op	      20 allocs/op
+BenchmarkConnInvoke/Serial-4         	  449922	       532.4 ns/op	    1204 B/op	      20 allocs/op
+BenchmarkConnInvoke/Parallel-4       	  463167	       532.2 ns/op	    1204 B/op	      20 allocs/op
+BenchmarkConnInvoke/Parallel-4       	  443175	       527.4 ns/op	    1204 B/op	      20 allocs/op
+BenchmarkConnInvoke/Parallel-4       	  449262	       535.1 ns/op	    1204 B/op	      20 allocs/op
+BenchmarkConnInvoke/Parallel-4       	  446517	       542.1 ns/op	    1204 B/op	      20 allocs/op
+BenchmarkConnInvoke/Parallel-4       	  427045	       595.6 ns/op	    1204 B/op	      20 allocs/op
+PASS
+ok  	github.com/ydb-platform/ydb-go-sdk/v3/internal/conn	2.939s
