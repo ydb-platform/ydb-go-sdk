@@ -33,6 +33,13 @@ type ArrowResult = arrow.Result
 // from the same Arrow Go version. The factory and its options must support
 // concurrent calls. The resulting ExecuteOption can be reused across queries.
 //
+// Compatible Arrow Go modules are github.com/apache/arrow/go/v6 through v17
+// and github.com/apache/arrow-go/v18, using each module's arrow/ipc package.
+// The legacy github.com/apache/arrow/go/arrow module is also compile-tested at
+// v0.0.0-20211112161151-bc219186db40, using its ipc package.
+// With v6-v13 or the legacy module, google.golang.org/genproto may need an upgrade
+// to avoid ambiguous imports with the SDK's googleapis/rpc dependency.
+//
 // For example (error handling omitted):
 //
 //	row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(ipc.NewReader))

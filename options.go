@@ -553,6 +553,13 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 // The factory and its options must support concurrent calls. See query.WithArrow
 // for supported types and result ownership and lifetime requirements.
 //
+// Compatible Arrow Go modules are github.com/apache/arrow/go/v6 through v17
+// and github.com/apache/arrow-go/v18, using each module's arrow/ipc package.
+// The legacy github.com/apache/arrow/go/arrow module is also compile-tested at
+// v0.0.0-20211112161151-bc219186db40, using its ipc package.
+// With v6-v13 or the legacy module, google.golang.org/genproto may need an upgrade
+// to avoid ambiguous imports with the SDK's googleapis/rpc dependency.
+//
 // Per-call query.WithArrow overrides the reader factory and its options, while
 // query.WithYdbValue selects YDB values for one query. Subsequent queries without
 // an override use the driver default again. A typed nil reader factory selects
