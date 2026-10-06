@@ -223,6 +223,15 @@ func primitiveValueFromYDB(t types.Primitive, v *Ydb.Value) (Value, error) {
 	case types.TzTimestamp:
 		return TzTimestampValue(v.GetTextValue()), nil
 
+	case types.TzDate32:
+		return tzDate32Value(v.GetTextValue()), nil
+
+	case types.TzDatetime64:
+		return tzDatetime64Value(v.GetTextValue()), nil
+
+	case types.TzTimestamp64:
+		return tzTimestamp64Value(v.GetTextValue()), nil
+
 	case types.Bytes:
 		return BytesValue(v.GetBytesValue()), nil
 
@@ -3134,6 +3143,15 @@ func zeroPrimitiveValue(t types.Primitive) Value {
 
 	case types.TzTimestamp:
 		return TzTimestampValue("")
+
+	case types.TzDate32:
+		return tzDate32Value("")
+
+	case types.TzDatetime64:
+		return tzDatetime64Value("")
+
+	case types.TzTimestamp64:
+		return tzTimestamp64Value("")
 
 	case types.Bytes:
 		return BytesValue([]byte{})
