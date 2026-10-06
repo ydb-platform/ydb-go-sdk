@@ -42,7 +42,7 @@ type Policy struct {
 	preferences      []preference
 	singleConnection bool
 	detectNearestDC  bool
-	maxConnections   int
+	maxConnections   *int
 }
 
 func (p preference) String() string {
@@ -59,7 +59,8 @@ func SingleConn() Policy {
 
 // WithMaxConnections returns a policy with a soft limit on its active connection set.
 func WithMaxConnections(policy Policy, maxConnections int) Policy {
-	policy.maxConnections = max(maxConnections, 0)
+	maxConnections = max(maxConnections, 0)
+	policy.maxConnections = &maxConnections
 
 	return policy
 }
@@ -178,23 +179,31 @@ func (p Policy) DetectsNearestDC() bool {
 	return p.detectNearestDC
 }
 
-// MaxConnections returns the active connection limit. Zero means unlimited.
+// MaxConnections returns the active connection limit (nine by default). Zero means unlimited.
 func (p Policy) MaxConnections() int {
-	return p.maxConnections
+	if p.maxConnections == nil {
+		return 9
+	}
+
+	return *p.maxConnections
 }
 
 func (p Policy) String() string {
+	maxConnections := 0
+	if p.maxConnections != nil {
+		maxConnections = *p.maxConnections
+	}
 	mode := "Priority"
 	if p.singleConnection {
 		mode = "SingleConn"
 	}
-	if p.maxConnections == 0 && len(p.preferences) == 0 {
+	if maxConnections == 0 && len(p.preferences) == 0 {
 		return mode
 	}
 
 	settings := make([]string, 0, 2)
-	if p.maxConnections > 0 {
-		settings = append(settings, fmt.Sprintf("MaxConnections=%d", p.maxConnections))
+	if maxConnections > 0 {
+		settings = append(settings, fmt.Sprintf("MaxConnections=%d", maxConnections))
 	}
 	if len(p.preferences) > 0 {
 		names := make([]string, len(p.preferences))

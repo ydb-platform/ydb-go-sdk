@@ -16,6 +16,7 @@ func TestPolicy(t *testing.T) {
 		policy := Policy{}
 
 		require.Equal(t, "Priority", policy.String())
+		require.Equal(t, 9, policy.MaxConnections())
 		require.False(t, policy.SingleConnection())
 		require.False(t, policy.DetectsNearestDC())
 		require.Equal(t, []EndpointPriority{
@@ -30,7 +31,7 @@ func TestPolicy(t *testing.T) {
 		require.Equal(t, "SingleConn", policy.String())
 		require.True(t, policy.SingleConnection())
 		require.False(t, policy.DetectsNearestDC())
-		require.Zero(t, policy.MaxConnections())
+		require.Equal(t, 9, policy.MaxConnections())
 	})
 
 	t.Run("max connections", func(t *testing.T) {
@@ -71,20 +72,46 @@ func TestPolicy(t *testing.T) {
 
 func TestPolicyIsImmutable(t *testing.T) {
 	base := Prefer(Policy{}, "LocalDC", locationMatch("local"))
-	limited := WithMaxConnections(base, 9)
+	limited := WithMaxConnections(base, 3)
 	composed := Prefer(limited, "RemoteDC", locationMatch("remote"))
 
 	require.Equal(t, "Priority{Preferences=[LocalDC]}", base.String())
-	require.Zero(t, base.MaxConnections())
-	require.Equal(t, "Priority{MaxConnections=9,Preferences=[LocalDC]}", limited.String())
-	require.Equal(t, 9, limited.MaxConnections())
-	require.Equal(t, "Priority{MaxConnections=9,Preferences=[RemoteDC,LocalDC]}", composed.String())
+	require.Equal(t, 9, base.MaxConnections())
+	require.Equal(t, "Priority{MaxConnections=3,Preferences=[LocalDC]}", limited.String())
+	require.Equal(t, 3, limited.MaxConnections())
+	require.Equal(t, "Priority{MaxConnections=3,Preferences=[RemoteDC,LocalDC]}", composed.String())
 }
 
 func TestPolicyMaxConnectionsNormalizesNonPositiveValues(t *testing.T) {
 	require.Zero(t, WithMaxConnections(Policy{}, 0).MaxConnections())
 	require.Zero(t, WithMaxConnections(Policy{}, -1).MaxConnections())
 	require.Equal(t, "SingleConn{MaxConnections=1}", WithMaxConnections(SingleConn(), 1).String())
+}
+
+func TestPolicyMaxConnectionsSurvivesComposition(t *testing.T) {
+	base := Policy{}
+	unlimited := WithMaxConnections(base, 0)
+	limited := WithMaxConnections(unlimited, 3)
+
+	for _, test := range []struct {
+		name   string
+		policy Policy
+		want   int
+	}{
+		{name: "default", policy: base, want: 9},
+		{name: "unlimited", policy: unlimited, want: 0},
+		{name: "custom", policy: limited, want: 3},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			composed := PreferNearestDCWithFallback(test.policy, "LocalDC", locationMatch("local"))
+			require.Equal(t, test.want, composed.MaxConnections())
+			require.Equal(t, test.want, test.policy.MaxConnections())
+		})
+	}
+
+	require.Equal(t, 9, base.MaxConnections())
+	require.Equal(t, 0, unlimited.MaxConnections())
+	require.Equal(t, 3, limited.MaxConnections())
 }
 
 func TestApplyPreference(t *testing.T) {

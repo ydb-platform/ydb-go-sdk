@@ -131,6 +131,7 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	b := &Balancer{
 		driverConfig: cfg,
 		pool:         pool,
+		random:       noShuffleRand{},
 	}
 
 	initial := newConnectionsState(nil, nil, policy.Info{}, nil)
@@ -191,6 +192,64 @@ func TestApplyDiscoveredEndpointsDefaultMaxConnections(t *testing.T) {
 			name:      "explicit random choice",
 			option:    config.WithBalancer(userBalancers.RandomChoice()),
 			nodeCount: 10,
+			wantCount: 9,
+		},
+		{
+			name:      "prefer nearest DC",
+			option:    config.WithBalancer(userBalancers.PreferNearestDC(userBalancers.RandomChoice())),
+			nodeCount: 10,
+			wantCount: 9,
+		},
+		{
+			name: "prefer locations",
+			option: config.WithBalancer(userBalancers.PreferLocations(
+				userBalancers.RandomChoice(), "local",
+			)),
+			nodeCount: 10,
+			wantCount: 9,
+		},
+		{
+			name: "custom preference",
+			option: config.WithBalancer(userBalancers.Prefer(userBalancers.RandomChoice(), func(e userBalancers.Endpoint) bool {
+				return e.NodeID() > 0
+			})),
+			nodeCount: 10,
+			wantCount: 9,
+		},
+		{
+			name:      "prefer primary pile",
+			option:    config.WithBalancer(userBalancers.PreferPrimaryPile(userBalancers.RandomChoice())),
+			nodeCount: 10,
+			wantCount: 9,
+		},
+		{
+			name: "nested preferences",
+			option: config.WithBalancer(userBalancers.PreferNearestDCWithFallBack(
+				userBalancers.PreferPrimaryPileWithFallback(userBalancers.RandomChoice()),
+			)),
+			nodeCount: 10,
+			wantCount: 9,
+		},
+		{
+			name: "serialized policy",
+			option: config.WithBalancer(userBalancers.FromConfig(
+				`{"type":"random_choice","prefer":"nearest_dc","fallback":true}`,
+			)),
+			nodeCount: 10,
+			wantCount: 9,
+		},
+		{
+			name: "nested unlimited",
+			option: config.WithBalancer(userBalancers.PreferNearestDC(
+				userBalancers.WithMaxConnections(userBalancers.RandomChoice(), 0),
+			)),
+			nodeCount: 10,
+			wantCount: 10,
+		},
+		{
+			name:      "negative limit",
+			option:    config.WithBalancer(userBalancers.WithMaxConnections(userBalancers.RandomChoice(), -1)),
+			nodeCount: 10,
 			wantCount: 10,
 		},
 	}
@@ -212,9 +271,12 @@ func TestApplyDiscoveredEndpointsDefaultMaxConnections(t *testing.T) {
 			})
 			endpoints := make([]endpoint.Endpoint, test.nodeCount)
 			for i := range endpoints {
-				endpoints[i] = endpoint.New("node-"+strconv.Itoa(i), endpoint.WithID(uint32(i+1)))
+				endpoints[i] = endpoint.New("node-"+strconv.Itoa(i),
+					endpoint.WithID(uint32(i+1)), endpoint.WithLocation("local"),
+					endpoint.WithMetadata(endpoint.Metadata{BridgePileState: endpoint.PileStatePrimary}),
+				)
 			}
-			b.applyDiscoveredEndpoints(ctx, endpoints, "")
+			b.applyDiscoveredEndpoints(ctx, endpoints, "local")
 
 			require.Len(t, b.connections().All(), test.wantCount)
 		})
@@ -368,7 +430,7 @@ func TestTryAddPinnedConnectionDefensivePaths(t *testing.T) {
 	})
 }
 
-func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem(t *testing.T) {
+func TestApplyDiscoveredEndpointsUnlimitedKeepsFilteredConnectionsUntilDiscoveryDropsThem(t *testing.T) {
 	ctx := context.Background()
 
 	cfg := config.New()
@@ -377,6 +439,7 @@ func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem
 
 	b := &Balancer{
 		driverConfig: cfg,
+		policy:       policy.WithMaxConnections(policy.Policy{}, 0),
 		pool:         pool,
 	}
 
@@ -391,7 +454,7 @@ func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem
 	}, b.connections().elector.priorities)
 
 	b.policy = policy.Prefer(
-		policy.Policy{}, "NodeID(1)",
+		policy.WithMaxConnections(policy.Policy{}, 0), "NodeID(1)",
 		func(_ policy.Info, candidate endpoint.Info) bool {
 			return candidate.NodeID() == 1
 		},
@@ -421,6 +484,7 @@ func TestApplyDiscoveredEndpointsClosedPool(t *testing.T) {
 	b := &Balancer{
 		driverConfig: config.New(),
 		pool:         pool,
+		random:       noShuffleRand{},
 	}
 
 	require.NotPanics(t, func() {
@@ -937,7 +1001,7 @@ func TestBalancerForcesDiscoveryWhenMostConnectionsAreBanned(t *testing.T) {
 		AddrField: "second-fallback", NodeIDField: 3, LocationField: "fallback", StateField: state.Online,
 	}
 	p := policy.PreferWithFallback(
-		policy.Policy{}, "preferred",
+		policy.WithMaxConnections(policy.Policy{}, 0), "preferred",
 		func(_ policy.Info, candidate endpoint.Info) bool {
 			return candidate.Location() == "preferred"
 		},
@@ -947,6 +1011,7 @@ func TestBalancerForcesDiscoveryWhenMostConnectionsAreBanned(t *testing.T) {
 	defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
 	balancer := &Balancer{
 		driverConfig: config.New(), pool: pool,
+		policy: p,
 		discoveryRepeater: &stubRepeater{forceFn: func() {
 			forceCalls++
 		}},
@@ -1666,7 +1731,7 @@ func TestPolicyUsesFreshDiscoveryEndpointBeforePoolGet(t *testing.T) {
 	cfg := config.New()
 	pool := conn.NewPool(ctx, cfg)
 	p := policy.Prefer(
-		policy.Policy{}, "PreferredLocation",
+		policy.WithMaxConnections(policy.Policy{}, 0), "PreferredLocation",
 		func(_ policy.Info, candidate endpoint.Info) bool {
 			return candidate.Location() == "preferred"
 		},

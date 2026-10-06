@@ -31,7 +31,7 @@ func SingleConn() policy.Policy {
 //
 // [WithNodeID] may create an additional connection outside the active set to
 // preserve node-affinity contracts, so the limit is intentionally soft.
-// Zero disables the limit. Negative values are treated as zero.
+// The default limit is nine. Zero disables the limit. Negative values are treated as zero.
 func WithMaxConnections(p policy.Policy, maxConnections int) policy.Policy {
 	return policy.WithMaxConnections(p, maxConnections)
 }
@@ -162,7 +162,7 @@ func PreferWithFallback(p policy.Policy, filter func(endpoint Endpoint) bool) po
 	})
 }
 
-// Default returns a random-choice policy with a soft limit of nine active connections.
+// Default balancer used by default
 func Default() policy.Policy {
-	return WithMaxConnections(RandomChoice(), 9)
+	return RandomChoice()
 }

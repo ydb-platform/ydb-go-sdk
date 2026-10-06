@@ -198,18 +198,18 @@ func TestCustomPrefer(t *testing.T) {
 
 func TestBasicPolicies(t *testing.T) {
 	require.Equal(t, RandomChoice(), RoundRobin())
-	require.Equal(t, WithMaxConnections(RandomChoice(), 9), Default())
+	require.Equal(t, RandomChoice(), Default())
 	require.True(t, SingleConn().SingleConnection())
 }
 
 func TestWithMaxConnections(t *testing.T) {
 	base := PreferNearestDCWithFallBack(RandomChoice())
-	limited := WithMaxConnections(base, 9)
+	limited := WithMaxConnections(base, 3)
 
-	require.Zero(t, base.MaxConnections())
-	require.Equal(t, 9, limited.MaxConnections())
+	require.Equal(t, 9, base.MaxConnections())
+	require.Equal(t, 3, limited.MaxConnections())
 	require.Equal(t,
-		"Priority{MaxConnections=9,Preferences=[LocalDC(AllowFallback)]}",
+		"Priority{MaxConnections=3,Preferences=[LocalDC(AllowFallback)]}",
 		limited.String(),
 	)
 	require.Equal(t, base.Prioritize(policy.Info{SelfLocation: "local"}, []endpoint.Endpoint{
