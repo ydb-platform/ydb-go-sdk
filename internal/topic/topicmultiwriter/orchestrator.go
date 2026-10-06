@@ -255,30 +255,70 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	if err := o.saveMessageContent(&msg); err != nil {
 		return err
 	}
-	if autoSetSeqNo {
-		writer, getErr := o.writerPool.get(msg.PartitionID, true)
-		if getErr != nil {
-			return getErr
-		}
-		if initErr := writer.waitInit(ctx); initErr != nil {
-			return initErr
-		}
-	}
-	o.mu.WithLock(func() {
+	for {
 		if autoSetSeqNo {
-			msg.SeqNo = o.currentSeqNo.Add(1)
-		} else {
-			err = o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo)
-			if err != nil {
-				return
+			if err = o.waitAutoSeqNoWriter(ctx, &msg); err != nil {
+				return err
 			}
 		}
-		o.buf.pushNeedLock(msg)
-		o.sender.wakeup()
-		acquired = false
-	})
 
-	return err
+		retry := false
+		o.mu.WithLock(func() {
+			if autoSetSeqNo {
+				if partition := o.partitions[msg.PartitionID]; partition != nil && partition.Splitted() {
+					retry = true
+
+					return
+				}
+				msg.SeqNo = o.currentSeqNo.Add(1)
+			} else {
+				err = o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo)
+				if err != nil {
+					return
+				}
+			}
+			o.buf.pushNeedLock(msg)
+			o.sender.wakeup()
+			acquired = false
+		})
+		if !retry {
+			return err
+		}
+	}
+}
+
+func (o *orchestrator) waitAutoSeqNoWriter(ctx context.Context, msg *message) error {
+	for {
+		var (
+			writer *writerWrapper
+			err    error
+		)
+		// A split uses a non-direct writer for the old partition. Do not replace it
+		// with a direct writer while it is reading the last SeqNo.
+		o.mu.WithLock(func() {
+			if partition := o.partitions[msg.PartitionID]; partition != nil && partition.Splitted() {
+				err = o.rechoosePartition(msg)
+			}
+			if err == nil {
+				writer, err = o.writerPool.get(msg.PartitionID, true)
+			}
+		})
+		if err != nil {
+			return err
+		}
+		if err = writer.waitInit(ctx); err == nil {
+			return nil
+		}
+
+		var splitted bool
+		o.mu.WithLock(func() {
+			partition := o.partitions[msg.PartitionID]
+			splitted = partition != nil && partition.Splitted()
+		})
+		if !splitted || o.ctx.Err() != nil || ctx.Err() != nil {
+			return err
+		}
+	}
 }
 
 func (o *orchestrator) saveMessageContent(msg *message) error {

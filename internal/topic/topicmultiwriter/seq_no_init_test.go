@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
@@ -73,4 +74,65 @@ func TestMultiWriterAutoSeqNoUsesOpenedSessionBaseline(t *testing.T) {
 	require.EqualValues(t, 1, factory.writers[2].initCalls.Load())
 
 	require.NoError(t, w.Close(ctx))
+}
+
+func TestMultiWriterRechoosesPartitionSplitWhileMessageContentIsRead(t *testing.T) {
+	ctx := xtest.Context(t)
+	factory := &poolMockFactory{}
+	chooser := partitionchooser.NewBoundPartitionChooser(partitionchooser.WithKeyHasher(func(key string) string {
+		return key
+	}))
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+	topicwriterinternal.WithTopic("test/topic")(writerCfg)
+	topicwriterinternal.WithMaxQueueLen(10)(writerCfg)
+	topicwriterinternal.WithAutosetCreatedTime(false)(writerCfg)
+	topicwriterinternal.WithAutoSetSeqNo(true)(writerCfg)
+	multiCfg := MultiWriterConfig{}
+	withWritersFactory(factory)(&multiCfg)
+	WithProducerIDPrefix("test-producer")(&multiCfg)
+	WithWriterPartitionByKey(chooser)(&multiCfg)
+
+	w, err := NewMultiWriter(func(context.Context, string) (topictypes.TopicDescription, error) {
+		return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+			{PartitionID: 0, Active: true, ToBound: []byte("m")},
+			{PartitionID: 1, Active: true, FromBound: []byte("m")},
+		}}, nil
+	}, writerCfg, &multiCfg)
+	require.NoError(t, err)
+	require.NoError(t, w.WaitInit(ctx))
+	t.Cleanup(func() {
+		w.orchestrator.stop()
+		_ = w.background.Close(context.Background(), nil)
+	})
+
+	reader := &blockingReader{started: make(chan struct{}), release: make(chan struct{}), data: []byte("message")}
+	writeDone := make(chan error, 1)
+	go func() {
+		writeDone <- w.Write(ctx, []topicwriterinternal.PublicMessage{{Data: reader, Key: "a"}})
+	}()
+	<-reader.started
+
+	w.orchestrator.mu.WithLock(func() {
+		parent := w.orchestrator.partitions[0]
+		parent.ChildPartitionIDs = []int64{2, 3}
+		children := []topictypes.PartitionInfo{
+			{PartitionID: 2, Active: true, ToBound: []byte("g"), ParentPartitionIDs: []int64{0}},
+			{PartitionID: 3, Active: true, FromBound: []byte("g"), ToBound: []byte("m"), ParentPartitionIDs: []int64{0}},
+		}
+		for _, child := range children {
+			w.orchestrator.partitions[child.PartitionID] = &PartitionInfo{PartitionInfo: child}
+		}
+		require.NoError(t, chooser.AddNewPartitions(children...))
+		chooser.RemovePartition(0)
+	})
+	probe, err := w.orchestrator.writerPool.get(0, false)
+	require.NoError(t, err)
+	close(reader.release)
+	require.NoError(t, <-writeDone)
+	require.False(t, probe.writer.(*poolTestWriter).closed.Load(), "the seqNo probe must stay open")
+	w.orchestrator.mu.WithLock(func() {
+		front := w.orchestrator.buf.inFlightMessages.Front()
+		require.NotNil(t, front)
+		require.Equal(t, int64(2), front.Value.PartitionID)
+	})
 }
