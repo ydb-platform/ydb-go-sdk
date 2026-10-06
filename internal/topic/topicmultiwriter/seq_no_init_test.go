@@ -3,6 +3,7 @@ package topicmultiwriter
 import (
 	"bytes"
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -76,9 +77,13 @@ func TestMultiWriterAutoSeqNoUsesOpenedSessionBaseline(t *testing.T) {
 	require.NoError(t, w.Close(ctx))
 }
 
-func TestMultiWriterRechoosesPartitionSplitWhileMessageContentIsRead(t *testing.T) {
+func newMultiWriterForSplitRace(
+	t *testing.T,
+	factory writersFactory,
+) (*MultiWriter, *partitionchooser.BoundPartitionChooser, context.Context) {
+	t.Helper()
+
 	ctx := xtest.Context(t)
-	factory := &poolMockFactory{}
 	chooser := partitionchooser.NewBoundPartitionChooser(partitionchooser.WithKeyHasher(func(key string) string {
 		return key
 	}))
@@ -105,12 +110,11 @@ func TestMultiWriterRechoosesPartitionSplitWhileMessageContentIsRead(t *testing.
 		_ = w.background.Close(context.Background(), nil)
 	})
 
-	reader := &blockingReader{started: make(chan struct{}), release: make(chan struct{}), data: []byte("message")}
-	writeDone := make(chan error, 1)
-	go func() {
-		writeDone <- w.Write(ctx, []topicwriterinternal.PublicMessage{{Data: reader, Key: "a"}})
-	}()
-	<-reader.started
+	return w, chooser, ctx
+}
+
+func splitPartitionZero(t *testing.T, w *MultiWriter, chooser *partitionchooser.BoundPartitionChooser) {
+	t.Helper()
 
 	w.orchestrator.mu.WithLock(func() {
 		parent := w.orchestrator.partitions[0]
@@ -125,14 +129,91 @@ func TestMultiWriterRechoosesPartitionSplitWhileMessageContentIsRead(t *testing.
 		require.NoError(t, chooser.AddNewPartitions(children...))
 		chooser.RemovePartition(0)
 	})
-	probe, err := w.orchestrator.writerPool.get(0, false)
-	require.NoError(t, err)
-	close(reader.release)
-	require.NoError(t, <-writeDone)
-	require.False(t, probe.writer.(*poolTestWriter).closed.Load(), "the seqNo probe must stay open")
+}
+
+func requireMessageOnPartitionTwo(t *testing.T, w *MultiWriter) {
+	t.Helper()
+
 	w.orchestrator.mu.WithLock(func() {
 		front := w.orchestrator.buf.inFlightMessages.Front()
 		require.NotNil(t, front)
 		require.Equal(t, int64(2), front.Value.PartitionID)
 	})
+}
+
+func TestMultiWriterRechoosesPartitionSplitWhileMessageContentIsRead(t *testing.T) {
+	factory := &poolMockFactory{}
+	w, chooser, ctx := newMultiWriterForSplitRace(t, factory)
+
+	reader := &blockingReader{started: make(chan struct{}), release: make(chan struct{}), data: []byte("message")}
+	writeDone := make(chan error, 1)
+	go func() {
+		writeDone <- w.Write(ctx, []topicwriterinternal.PublicMessage{{Data: reader, Key: "a"}})
+	}()
+	<-reader.started
+
+	splitPartitionZero(t, w, chooser)
+	probe, err := w.orchestrator.writerPool.get(0, false)
+	require.NoError(t, err)
+	close(reader.release)
+	require.NoError(t, <-writeDone)
+	require.False(t, probe.writer.(*poolTestWriter).closed.Load(), "the seqNo probe must stay open")
+	requireMessageOnPartitionTwo(t, w)
+}
+
+type splitInitWriter struct {
+	poolTestWriter
+	started chan struct{}
+	closed  chan struct{}
+	once    sync.Once
+}
+
+func (w *splitInitWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+	close(w.started)
+	select {
+	case <-ctx.Done():
+		return topicwriterinternal.InitialInfo{}, ctx.Err()
+	case <-w.closed:
+		return topicwriterinternal.InitialInfo{}, context.Canceled
+	}
+}
+
+func (w *splitInitWriter) Close(ctx context.Context) error {
+	w.once.Do(func() { close(w.closed) })
+
+	return w.poolTestWriter.Close(ctx)
+}
+
+type splitInitFactory struct {
+	old *splitInitWriter
+}
+
+func (f *splitInitFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	if partitionID, direct := cfg.PartitionID(); direct && partitionID == 0 {
+		return f.old, nil
+	}
+
+	return &poolTestWriter{}, nil
+}
+
+func TestMultiWriterRechoosesPartitionWhenOldSessionInitIsInterruptedBySplit(t *testing.T) {
+	factory := &splitInitFactory{old: &splitInitWriter{
+		started: make(chan struct{}),
+		closed:  make(chan struct{}),
+	}}
+	w, chooser, ctx := newMultiWriterForSplitRace(t, factory)
+	writeDone := make(chan error, 1)
+	go func() {
+		writeDone <- w.Write(ctx, []topicwriterinternal.PublicMessage{{
+			Data: bytes.NewReader([]byte("message")), Key: "a",
+		}})
+	}()
+	<-factory.old.started
+
+	splitPartitionZero(t, w, chooser)
+	probe, err := w.orchestrator.writerPool.get(0, false)
+	require.NoError(t, err)
+	require.NoError(t, <-writeDone)
+	require.False(t, probe.writer.(*poolTestWriter).closed.Load(), "the seqNo probe must stay open")
+	requireMessageOnPartitionTwo(t, w)
 }
