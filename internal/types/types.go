@@ -21,6 +21,7 @@ func TypeToYDB(t Type) *Ydb.Type {
 	return t.ToYDB()
 }
 
+//nolint:funlen
 func TypeFromYDB(x *Ydb.Type) Type {
 	switch v := x.GetType().(type) {
 	case *Ydb.Type_TypeId:
@@ -31,6 +32,12 @@ func TypeFromYDB(x *Ydb.Type) Type {
 
 	case *Ydb.Type_ListType:
 		return NewList(TypeFromYDB(v.ListType.GetItem()))
+
+	case *Ydb.Type_EmptyListType:
+		return NewEmptyList()
+
+	case *Ydb.Type_EmptyDictType:
+		return NewEmptyDict()
 
 	case *Ydb.Type_DecimalType:
 		d := v.DecimalType
