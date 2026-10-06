@@ -275,15 +275,24 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 		return OptionalValue(FromYDB(t, v)), nil
 
+	case types.EmptyList:
+		return ListValue(), nil
+
+	case types.EmptyDict:
+		return DictValue(), nil
+
 	case *types.List:
-		return ListValue(func() []Value {
+		vv := ListValue(func() []Value {
 			vv := make([]Value, len(v.GetItems()))
 			for i, vvv := range v.GetItems() {
 				vv[i] = FromYDB(ttt.ItemType().ToYDB(), vvv)
 			}
 
 			return vv
-		}()...), nil
+		}()...)
+		vv.t = ttt
+
+		return vv, nil
 
 	case *types.Tuple:
 		return TupleValue(func() []Value {
@@ -309,7 +318,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		}()...), nil
 
 	case *types.Dict:
-		return DictValue(func() []DictValueField {
+		vv := DictValue(func() []DictValueField {
 			vv := make([]DictValueField, len(v.GetPairs()))
 			for i, vvv := range v.GetPairs() {
 				vv[i] = DictValueField{
@@ -319,17 +328,23 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 			}
 
 			return vv
-		}()...), nil
+		}()...)
+		vv.t = ttt
+
+		return vv, nil
 
 	case *types.Set:
-		return SetValue(func() []Value {
+		vv := SetValue(func() []Value {
 			vv := make([]Value, len(v.GetPairs()))
 			for i, vvv := range v.GetPairs() {
 				vv[i] = FromYDB(ttt.ItemType().ToYDB(), vvv.GetKey())
 			}
 
 			return vv
-		}()...), nil
+		}()...)
+		vv.t = ttt
+
+		return vv, nil
 
 	case *types.VariantStruct:
 
