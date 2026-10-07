@@ -29,7 +29,7 @@ defer reader.Close(ctx)
 `telemetryotel.Meter` is defined in [the adapter example](../examples/telemetryotel/otel.go).
 The application owns the OTel provider, collection and export. The SDK does not
 import OTel or maintain a collector. Other backends implement the same function
-contract; see [observable gauges](README.md).
+contract; see [the callback API](telemetry.go).
 
 Listeners use the same metric and `topicoptions.WithListenerName`. Empty names
 use `default`. Attributes are configured endpoint authority, normalized database,
