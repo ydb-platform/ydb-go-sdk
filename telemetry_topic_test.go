@@ -29,26 +29,40 @@ func TestTopicPartitionSessionMetricPublicSurface(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			address, service := newMetricTopicServer(ctx, t)
-			meter := telemetry.NewCollector()
+			meter, collect := newMetricMeter()
 			db, err := ydb.Open(ctx, "grpc://"+address+"/local",
 				ydb.WithAnonymousCredentials(), ydb.WithBalancer(balancers.SingleConn()), ydb.WithMeter(meter))
 			require.NoError(t, err)
-			t.Cleanup(func() { _ = db.Close(context.Background()) })
+			t.Cleanup(func() {
+				cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cleanupCancel()
+				require.NoError(t, db.Close(cleanupCtx))
+			})
 			child, err := db.With(ctx)
 			require.NoError(t, err)
 
 			var closeResources []func(context.Context) error
-			for _, driver := range []*ydb.Driver{db, child} {
+			t.Cleanup(func() {
+				cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cleanupCancel()
+				for _, closeResource := range closeResources {
+					if closeResource != nil {
+						require.NoError(t, closeResource(cleanupCtx))
+					}
+				}
+			})
+			for i, driver := range []*ydb.Driver{db, child} {
+				name := []string{"parent", "child"}[i]
 				if listener {
 					resource, startErr := driver.Topic().StartListener(
 						"consumer", topiclistener.BaseHandler{}, topicoptions.ReadTopic("topic"),
-						topicoptions.WithListenerName("shared"),
+						topicoptions.WithListenerName(name),
 					)
 					require.NoError(t, startErr)
 					closeResources = append(closeResources, resource.Close)
 				} else {
 					resource, startErr := driver.Topic().StartReader(
-						"consumer", topicoptions.ReadTopic("topic"), topicoptions.WithReaderName("shared"),
+						"consumer", topicoptions.ReadTopic("topic"), topicoptions.WithReaderName(name),
 					)
 					require.NoError(t, startErr)
 					readDone := make(chan struct{})
@@ -69,15 +83,8 @@ func TestTopicPartitionSessionMetricPublicSurface(t *testing.T) {
 					})
 				}
 			}
-			t.Cleanup(func() {
-				cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cleanupCancel()
-				for _, closeResource := range closeResources {
-					_ = closeResource(cleanupCtx)
-				}
-			})
-			// Both scopes register zero before a partition is admitted.
-			assertPartitionSessionMetric(ctx, t, meter, address, 0)
+			// Independent native gauge series register before admission.
+			assertPartitionSessionMetric(ctx, t, collect, address, map[string]int64{"parent": 0, "child": 0})
 			for range 2 {
 				var session *metricReadSession
 				select {
@@ -96,13 +103,16 @@ func TestTopicPartitionSessionMetricPublicSurface(t *testing.T) {
 					t.Fatal(ctx.Err())
 				}
 			}
-			assertPartitionSessionMetric(ctx, t, meter, address, 2)
-			// Child teardown unregisters its source, not the shared backend.
+			assertPartitionSessionMetric(ctx, t, collect, address, map[string]int64{"parent": 1, "child": 1})
+			// Resources own callbacks; driver close does not maintain a registry.
+			require.NoError(t, closeResources[1](ctx))
+			closeResources[1] = nil
 			require.NoError(t, child.Close(ctx))
-			assertPartitionSessionMetric(ctx, t, meter, address, 1)
+			assertPartitionSessionMetric(ctx, t, collect, address, map[string]int64{"parent": 1})
 			// Resource close unregisters independently of driver teardown.
 			require.NoError(t, closeResources[0](ctx))
-			data, err := meter.Collect(ctx)
+			closeResources[0] = nil
+			data, err := collect(ctx)
 			require.NoError(t, err)
 			require.Empty(t, data)
 			require.NoError(t, db.Close(ctx))
@@ -111,24 +121,79 @@ func TestTopicPartitionSessionMetricPublicSurface(t *testing.T) {
 }
 
 func assertPartitionSessionMetric(
-	ctx context.Context, t *testing.T, meter *telemetry.Collector, endpoint string, value int64,
+	ctx context.Context, t *testing.T, collect func(context.Context) ([]observedMetric, error),
+	endpoint string, want map[string]int64,
 ) {
 	t.Helper()
-	data, err := meter.Collect(ctx)
+	data, err := collect(ctx)
 	require.NoError(t, err)
-	require.Len(t, data, 1)
-	require.Equal(t, "ydb.topic.reader.partition_session.count", data[0].Descriptor.Name)
-	require.Equal(t, "{session}", data[0].Descriptor.Unit)
-	require.Len(t, data[0].Points, 1)
-	require.Equal(t, value, data[0].Points[0].Value)
-	attributes := make(map[string]string)
-	for _, attribute := range data[0].Points[0].Attributes {
-		attributes[attribute.Key] = attribute.Value
+	values := make(map[string]int64)
+	for _, metric := range data {
+		require.Equal(t, "ydb.topic.reader.partition_session.count", metric.Descriptor.Name)
+		require.Equal(t, "{session}", metric.Descriptor.Unit)
+		for _, point := range metric.Points {
+			attributes := make(map[string]string)
+			for _, attribute := range point.Attributes {
+				attributes[attribute.Key] = attribute.Value
+			}
+			name := attributes["reader.name"]
+			require.Equal(t, map[string]string{
+				"endpoint": endpoint, "database": "/local", "topic": "/local/topic",
+				"consumer": "consumer", "reader.name": name,
+			}, attributes)
+			values[name] = point.Value
+		}
 	}
-	require.Equal(t, map[string]string{
-		"endpoint": endpoint, "database": "/local", "topic": "/local/topic",
-		"consumer": "consumer", "reader.name": "shared",
-	}, attributes)
+	require.Equal(t, want, values)
+}
+
+type observedMetric struct {
+	Descriptor telemetry.Descriptor
+	Points     []observedPoint
+}
+
+type observedPoint struct {
+	Value      int64
+	Attributes []telemetry.Attribute
+}
+
+func newMetricMeter() (telemetry.Meter, func(context.Context) ([]observedMetric, error)) {
+	type registration struct {
+		descriptor telemetry.Descriptor
+		callback   telemetry.Int64GaugeCallback
+	}
+	registrations := make(map[int]registration)
+	next := 0
+	meter := func(desc telemetry.Descriptor, callback telemetry.Int64GaugeCallback) (func() error, error) {
+		next++
+		id := next
+		registrations[id] = registration{descriptor: desc, callback: callback}
+
+		return func() error {
+			delete(registrations, id)
+
+			return nil
+		}, nil
+	}
+	collect := func(ctx context.Context) ([]observedMetric, error) {
+		var metrics []observedMetric
+		for _, reg := range registrations {
+			data := observedMetric{Descriptor: reg.descriptor}
+			err := reg.callback(ctx, func(value int64, attrs ...telemetry.Attribute) {
+				data.Points = append(data.Points, observedPoint{
+					Value: value, Attributes: append([]telemetry.Attribute(nil), attrs...),
+				})
+			})
+			if err != nil {
+				return nil, err
+			}
+			metrics = append(metrics, data)
+		}
+
+		return metrics, nil
+	}
+
+	return meter, collect
 }
 
 func newMetricTopicServer(ctx context.Context, t *testing.T) (string, *metricTopicServer) {

@@ -31,45 +31,45 @@ func TestPartitionSessionActiveCounts(t *testing.T) {
 
 func TestPartitionSessionCountSource(t *testing.T) {
 	ctx := context.Background()
-	meter := telemetry.NewCollector()
+	var callback telemetry.Int64GaugeCallback
+	meter := func(desc telemetry.Descriptor, cb telemetry.Int64GaugeCallback) (func() error, error) {
+		require.Equal(t, "ydb.topic.reader.partition_session.count", desc.Name)
+		require.Equal(t, "{session}", desc.Unit)
+		callback = cb
+
+		return func() error {
+			callback = nil
+
+			return nil
+		}, nil
+	}
 	storage := &PartitionSessionStorage{}
 	selectors := []*PublicReadSelector{{Path: "topic"}, {Path: "/Root/db/topic"}, {Path: "empty"}}
 	first, err := RegisterPartitionSessionCount(
 		ReaderMetricsConfig{Meter: meter, Endpoint: "localhost:2135", Database: "//Root/db/"},
-		"consumer", selectors, storageCounter{storage},
-	)
-	require.NoError(t, err)
-	second, err := RegisterPartitionSessionCount(
-		ReaderMetricsConfig{Meter: meter, Endpoint: "localhost:2135", Database: "/Root/db"},
-		"consumer", selectors, storageCounter{storage},
+		"consumer", selectors, func() (map[string]int64, error) {
+			return storage.ActiveCountsByTopic(), nil
+		},
 	)
 	require.NoError(t, err)
 	session := NewPartitionSession(ctx, "/Root/db/topic", 1, 1, "", 1, 1, 0)
 	t.Cleanup(session.Close)
 	require.NoError(t, storage.Add(session))
-	data, err := meter.Collect(ctx)
-	require.NoError(t, err)
-	require.Len(t, data, 1)
-	require.Equal(t, "{session}", data[0].Descriptor.Unit)
-	require.Len(t, data[0].Points, 2)
 	values := make(map[string]int64)
-	for _, point := range data[0].Points {
+	require.NoError(t, callback(ctx, func(value int64, attributes ...telemetry.Attribute) {
 		attrs := make(map[string]string)
-		for _, attr := range point.Attributes {
+		for _, attr := range attributes {
 			attrs[attr.Key] = attr.Value
 		}
 		require.Equal(t, map[string]string{
 			"endpoint": "localhost:2135", "database": "/Root/db", "consumer": "consumer",
 			"reader.name": "default", "topic": attrs["topic"],
 		}, attrs)
-		values[attrs["topic"]] = point.Value
-	}
-	require.Equal(t, map[string]int64{"/Root/db/topic": 2, "/Root/db/empty": 0}, values)
-	require.NoError(t, first.Close(ctx))
-	require.NoError(t, second.Close(ctx))
-	data, err = meter.Collect(ctx)
-	require.NoError(t, err)
-	require.Empty(t, data)
+		values[attrs["topic"]] = value
+	}))
+	require.Equal(t, map[string]int64{"/Root/db/topic": 1, "/Root/db/empty": 0}, values)
+	require.NoError(t, first())
+	require.Nil(t, callback)
 }
 
 func TestPartitionSessionCountDuringContextReplacement(t *testing.T) {
@@ -95,12 +95,4 @@ func TestPartitionSessionCountDuringContextReplacement(t *testing.T) {
 	}
 	session.Close()
 	require.Empty(t, storage.ActiveCountsByTopic())
-}
-
-type storageCounter struct {
-	storage *PartitionSessionStorage
-}
-
-func (c storageCounter) PartitionSessionCounts() (map[string]int64, error) {
-	return c.storage.ActiveCountsByTopic(), nil
 }

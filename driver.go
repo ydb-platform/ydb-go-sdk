@@ -100,7 +100,6 @@ type (
 		topic        *xsync.Once[*topicclientinternal.Client]
 		topicOptions []topicoptions.TopicOption
 		meter        telemetry.Meter
-		meterScope   *meterScope
 
 		databaseSQLOptions []xsql.Option
 
@@ -179,9 +178,6 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 	d.ctxCancel()
 
 	var issues []error
-	if err := d.meterScope.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
 	d.mtx.Lock()
 	defer d.mtx.Unlock()
 
@@ -465,10 +461,6 @@ func (d *Driver) connect(ctx context.Context) error {
 		return xerrors.WithStackTrace(ctx.Err())
 	}
 
-	if d.meter != nil {
-		d.meterScope = &meterScope{meter: d.meter, drained: make(chan struct{})}
-	}
-
 	if d.userInfo != nil {
 		d.config = d.config.With(config.WithCredentials(
 			credentials.NewStaticCredentials(
@@ -627,11 +619,9 @@ func (d *Driver) connect(ctx context.Context) error {
 
 	d.topic = xsync.OnceValue(func() (*topicclientinternal.Client, error) {
 		metrics := topicreadercommon.ReaderMetricsConfig{
+			Meter:    d.meter,
 			Endpoint: d.Endpoint(),
 			Database: d.Name(),
-		}
-		if d.meterScope != nil {
-			metrics.Meter = d.meterScope
 		}
 
 		return topicclientinternal.New(xcontext.ValueOnly(ctx),

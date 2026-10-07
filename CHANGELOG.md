@@ -1,5 +1,5 @@
-* Added experimental `ydb.WithMeter` with driver-scoped source cleanup and `ydb.topic.reader.partition_session.count` for topic readers and listeners
-* Added experimental backend-independent observable int64 gauges with sum/max reduction and source registration through `telemetry.Collector`
+* Added experimental `ydb.WithMeter` with direct backend callback registration and `ydb.topic.reader.partition_session.count` for topic readers and listeners
+* Added experimental callback-based observable int64 gauge registration with a backend-independent `telemetry.Meter` function
 
 ## v3.153.2
 * Added `UncompressedSize` and `CompressedSize` fields to `trace.TopicWriterCompressMessagesDoneInfo` to allow tracking actual bytes written by the topic writer

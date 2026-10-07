@@ -65,19 +65,11 @@ func TestReaderMetricRegistrationFailure(t *testing.T) {
 			return nil, errors.New("unexpected connection")
 		}, "consumer", []topicreadercommon.PublicReadSelector{{Path: "topic"}},
 		func(cfg *ReaderConfig) {
-			cfg.Metrics.Meter = failingReaderMeter{failure}
+			cfg.Metrics.Meter = func(telemetry.Descriptor, telemetry.Int64GaugeCallback) (func() error, error) {
+				return nil, failure
+			}
 		},
 	)
 	require.ErrorIs(t, err, failure)
 	require.Nil(t, reader.reader)
-}
-
-type failingReaderMeter struct {
-	err error
-}
-
-func (m failingReaderMeter) RegisterInt64Gauge(
-	telemetry.Int64GaugeDescriptor, telemetry.Int64GaugeSource,
-) (telemetry.Registration, error) {
-	return nil, m.err
 }

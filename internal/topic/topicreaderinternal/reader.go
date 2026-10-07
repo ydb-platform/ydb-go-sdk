@@ -13,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -39,7 +38,7 @@ type Reader struct {
 	defaultBatchConfig ReadMessageBatchOptions
 	tracer             *trace.Topic
 	readerID           int64
-	metricRegistration telemetry.Registration
+	unregisterMetric   func() error
 }
 
 func (r *Reader) TopicOnReaderStart(consumer string, err error) {
@@ -118,12 +117,12 @@ func NewReader(
 
 	if cfg.Metrics.Meter != nil {
 		registration, err := topicreadercommon.RegisterPartitionSessionCount(
-			cfg.Metrics, consumer, cfg.ReadSelectors, reader,
+			cfg.Metrics, consumer, cfg.ReadSelectors, reader.PartitionSessionCounts,
 		)
 		if err != nil {
 			return Reader{}, xerrors.WithStackTrace(err)
 		}
-		res.metricRegistration = registration
+		res.unregisterMetric = registration
 	}
 	reader.start()
 
@@ -152,8 +151,8 @@ func (r *Reader) Tracer() *trace.Topic {
 
 func (r *Reader) Close(ctx context.Context) error {
 	var metricErr error
-	if r.metricRegistration != nil {
-		metricErr = r.metricRegistration.Close(ctx)
+	if r.unregisterMetric != nil {
+		metricErr = r.unregisterMetric()
 	}
 
 	return errors.Join(metricErr, r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed)))
