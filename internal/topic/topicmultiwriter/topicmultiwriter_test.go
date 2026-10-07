@@ -12,9 +12,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
@@ -608,6 +608,7 @@ func TestMultiWriter_OnPartitionSplitReturnsAddPartitionsError(t *testing.T) {
 
 	require.NoError(t, multiWriter.WaitInit(ctx))
 	state.RecordSplit(1)
+	multiWriter.orchestrator.topology.ReportInactivePartition(1)
 
 	err := multiWriter.orchestrator.onPartitionSplit(1)
 	require.ErrorIs(t, err, addPartitionsErr)
@@ -664,33 +665,6 @@ func TestMultiWriter_CloseCancelsInitSeqNoRetrySleep(t *testing.T) {
 
 	startedAt := time.Now()
 	require.NoError(t, multiWriter.Close(closeCtx))
-	require.Less(t, time.Since(startedAt), 100*time.Millisecond)
-}
-
-func TestOrchestratorDescribeTopicWithRetriesCancelsRetrySleep(t *testing.T) {
-	t.Parallel()
-
-	ctx, cancel := context.WithCancel(xtest.Context(t))
-	bg := background.NewWorker(ctx, "describe-retry-test")
-	describeResult := stubs.DefaultStubTopicDescription(t)
-	o := newOrchestrator(
-		ctx,
-		cancel,
-		topology.NewRegistry(func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-			return describeResult, nil
-		}).Get("test/topic"),
-		bg,
-		&topicwriterinternal.WriterReconnectorConfig{},
-		&MultiWriterConfig{},
-	)
-	cancel()
-	defer func() {
-		_ = bg.Close(xtest.Context(t), nil)
-	}()
-
-	startedAt := time.Now()
-	_, err := o.describeTopicWithRetries(describeResult.Partitions[0].PartitionID)
-	require.ErrorIs(t, err, context.Canceled)
 	require.Less(t, time.Since(startedAt), 100*time.Millisecond)
 }
 
@@ -1201,7 +1175,10 @@ func TestMultiWriter_OrdinaryOverloadedDoesNotStartSplit(t *testing.T) {
 		func(context.Context, string) (topictypes.TopicDescription, error) {
 			return state.GetDescription(), nil
 		},
-		overloadedThenSplitWritersFactory{state: state},
+		overloadedThenSplitWritersFactory{
+			state: state,
+			err:   xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED)),
+		},
 	)
 	defer func() { _ = writer.Close(ctx) }()
 	require.NoError(t, writer.WaitInit(ctx))
@@ -1214,6 +1191,42 @@ func TestMultiWriter_OrdinaryOverloadedDoesNotStartSplit(t *testing.T) {
 	err := writer.Flush(ctx)
 	require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED), "got %v", err)
 	require.Len(t, state.GetDescription().Partitions, 3, "the partition must split after the ordinary overload")
+}
+
+func TestMultiWriter_WaitsForSplitMetadataBeyondFiveDescribes(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	baseDesc := topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{PartitionID: 1, Active: true}}}
+	state := stubs.NewDescribeWithSplitsState(t, baseDesc, 2)
+	var describes atomic.Int64
+	writer := newTestMultiWriterWithCustomWritersFactory(
+		t,
+		func(context.Context, string) (topictypes.TopicDescription, error) {
+			if describes.Add(1) <= 7 {
+				return baseDesc, nil
+			}
+
+			return state.GetDescription(), nil
+		},
+		overloadedThenSplitWritersFactory{
+			state: state,
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
+				xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: xerrors.IssueCodeTopicPartitionInactive}}),
+			),
+		},
+	)
+	defer func() { _ = writer.Close(ctx) }()
+	require.NoError(t, writer.WaitInit(ctx))
+
+	require.NoError(t, writer.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data:  bytes.NewReader([]byte("message")),
+		Key:   "key",
+		SeqNo: 1,
+	}}))
+	require.NoError(t, writer.Flush(ctx))
+	require.GreaterOrEqual(t, describes.Load(), int64(8))
 }
 
 func TestMultiWriter_Write_SmallIdleSessionTimeout(t *testing.T) {
@@ -1355,6 +1368,7 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 	// Simulate a partition split event while initSeqNo is still waiting for writer init.
 	// The split is queued but must not be processed until init completes and workers start.
 	state.RecordSplit(1)
+	multiWriter.orchestrator.topology.ReportInactivePartition(1)
 	multiWriter.orchestrator.partitionSplitReceiver.push(1)
 
 	select {
@@ -1383,6 +1397,7 @@ func TestMultiWriter_WaitInit_PartitionSplitQueuedDuringInit(t *testing.T) {
 
 type overloadedThenSplitWritersFactory struct {
 	state *stubs.DescribeWithSplitsState
+	err   error
 }
 
 func (f overloadedThenSplitWritersFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
@@ -1392,6 +1407,7 @@ func (f overloadedThenSplitWritersFactory) Create(cfg topicwriterinternal.Writer
 		partitionID: partitionID,
 		state:       f.state,
 		ack:         cfg.OnAckReceivedCallback,
+		err:         f.err,
 	}, nil
 }
 
@@ -1399,6 +1415,7 @@ type overloadedThenSplitWriter struct {
 	partitionID int64
 	state       *stubs.DescribeWithSplitsState
 	ack         func(int64)
+	err         error
 }
 
 func (w *overloadedThenSplitWriter) WaitInitInfo(context.Context) (topicwriterinternal.InitialInfo, error) {
@@ -1412,7 +1429,7 @@ func (w *overloadedThenSplitWriter) WriteInternal(
 	if w.partitionID == 1 {
 		w.state.RecordSplit(1)
 
-		return xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
+		return w.err
 	}
 
 	for _, message := range messages {

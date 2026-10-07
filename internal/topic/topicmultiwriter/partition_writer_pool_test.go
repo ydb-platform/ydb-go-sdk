@@ -160,15 +160,24 @@ func TestPartitionWriterPoolReportsOnlyInactivePartitionErrors(t *testing.T) {
 	require.Equal(t, 2, describes)
 }
 
-func TestSenderStepReturnsWriterInitErrorWithoutInactivePartition(t *testing.T) {
+func TestSenderStepHandlesWriterInitError(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
-		name    string
-		initErr error
+		name      string
+		initErr   error
+		wantSplit bool
 	}{
 		{name: "other error", initErr: errors.New("writer init failed")},
 		{name: "ordinary overload", initErr: xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))},
+		{
+			name: "inactive partition",
+			initErr: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
+				xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: xerrors.IssueCodeTopicPartitionInactive}}),
+			),
+			wantSplit: true,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -198,21 +207,47 @@ func TestSenderStepReturnsWriterInitErrorWithoutInactivePartition(t *testing.T) 
 				})
 			})
 
+			var describes int
+			topology := topology.NewRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
+				describes++
+				if describes == 1 {
+					return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{PartitionID: 1, Active: true}}}, nil
+				}
+
+				return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+					{PartitionID: 1, ChildPartitionIDs: []int64{2}},
+					{PartitionID: 2, Active: true, ParentPartitionIDs: []int64{1}},
+				}}, nil
+			}).Get("test/topic")
+			initial, err := topology.Partitions(ctx)
+			require.NoError(t, err)
+
 			splits := newPartitionSplitReceiver(func(partitionID int64) error { return nil }, func(err error) {})
 			s := newSender(
 				ctx,
 				partitions,
 				mu,
 				buf,
-				&partitionWriterPool{writers: map[int64]*writerWrapper{1: wrapper}},
+				&partitionWriterPool{writers: map[int64]*writerWrapper{1: wrapper}, topology: topology},
 				splits,
 				func(err error) {},
 			)
 
-			err := s.step()
-			require.ErrorIs(t, err, tc.initErr)
+			err = s.step()
 			require.Equal(t, int64(0), testWriter.writeCalled.Load())
-			require.Equal(t, 0, splits.partitionSplits.Len())
+			if tc.wantSplit {
+				require.NoError(t, err)
+				require.Equal(t, 1, splits.partitionSplits.Len())
+				updated, err := topology.Partitions(ctx)
+				require.NoError(t, err)
+				require.True(t, updated.ByPartitionID(2).IsActive())
+			} else {
+				require.ErrorIs(t, err, tc.initErr)
+				require.Equal(t, 0, splits.partitionSplits.Len())
+				unchanged, err := topology.Partitions(ctx)
+				require.NoError(t, err)
+				require.Same(t, initial, unchanged)
+			}
 		})
 	}
 }

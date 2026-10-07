@@ -151,44 +151,6 @@ func TestTopicPartitionsReturnsConcurrentDescribeError(t *testing.T) {
 	assert.ErrorIs(t, (<-secondResult).err, describeErr)
 }
 
-func TestTopicPartitionsReloadsWhenInvalidatedDuringDescribe(t *testing.T) {
-	var calls atomic.Int64
-	describeStarted := make(chan struct{})
-	releaseDescribe := make(chan struct{})
-	topology := topology.NewRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
-		partitionID := calls.Add(1)
-		if partitionID == 1 {
-			close(describeStarted)
-			<-releaseDescribe
-		}
-
-		return topicWithActivePartitions(partitionID), nil
-	}).Get("test/topic")
-	result := startLoadingPartitions(t.Context(), topology)
-	<-describeStarted
-
-	topology.Invalidate()
-	close(releaseDescribe)
-
-	loaded := <-result
-	require.NoError(t, loaded.err)
-	assert.Equal(t, []int64{2}, loaded.partitions.All().IDs())
-}
-
-func TestTopicPartitionsReloadsAfterInvalidate(t *testing.T) {
-	topology := newTopicWithDescriptions(
-		topicWithActivePartitions(1),
-		topicWithActivePartitions(2),
-	)
-	_, _ = topology.Partitions(t.Context())
-
-	topology.Invalidate()
-	partitions, err := topology.Partitions(t.Context())
-
-	require.NoError(t, err)
-	assert.Equal(t, []int64{2}, partitions.All().IDs())
-}
-
 func TestTopicReportInactivePartitionReloads(t *testing.T) {
 	topic := newTopicWithDescriptions(
 		topicWithActivePartitions(1),

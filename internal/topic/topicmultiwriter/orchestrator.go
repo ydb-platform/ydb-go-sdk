@@ -2,7 +2,6 @@ package topicmultiwriter
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -619,47 +618,15 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 	return maxSeqNo, nil
 }
 
-func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topictypes.TopicDescription, error) {
-	const (
-		maxRetries = 5
-		retryDelay = 100 * time.Millisecond
-	)
-
-	for range maxRetries {
-		o.topology.Invalidate()
-		partitions, err := o.topology.Partitions(o.ctx)
-		if err == nil {
-			infos := partitions.Infos()
-			var needRetry bool
-			for _, partition := range infos {
-				if partition.PartitionID == splitPartitionID {
-					needRetry = len(partition.ChildPartitionIDs) == 0
-
-					break
-				}
-			}
-
-			if !needRetry {
-				return topictypes.TopicDescription{Partitions: infos}, nil
-			}
-		}
-
-		if err := o.sleepOrDone(retryDelay); err != nil {
-			return topictypes.TopicDescription{}, err
-		}
-	}
-
-	return topictypes.TopicDescription{}, errors.New("failed to describe topic")
-}
-
 //nolint:funlen
 func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	var isAlreadySplitted bool
 
-	describeResult, err := o.describeTopicWithRetries(partitionID)
+	partitions, err := o.topology.Partitions(o.ctx)
 	if err != nil {
 		return err
 	}
+	describeResult := topictypes.TopicDescription{Partitions: partitions.Infos()}
 
 	o.mu.WithLock(func() {
 		partition := o.partitions[partitionID]

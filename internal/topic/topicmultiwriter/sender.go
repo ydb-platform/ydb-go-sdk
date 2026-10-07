@@ -98,6 +98,7 @@ func (s *sender) iterateThroughMessagesIndex(
 
 			if err := wr.getInitErr(); err != nil {
 				if xerrors.IsOperationErrorTopicPartitionInactive(err) {
+					s.writerPool.topology.ReportInactivePartition(partitionID)
 					s.partitionSplitReceiver.push(partitionID)
 
 					break
@@ -111,6 +112,7 @@ func (s *sender) iterateThroughMessagesIndex(
 				[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
 			); err != nil {
 				if xerrors.IsOperationErrorTopicPartitionInactive(err) {
+					s.writerPool.topology.ReportInactivePartition(partitionID)
 					s.partitionSplitReceiver.push(partitionID)
 
 					break

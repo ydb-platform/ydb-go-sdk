@@ -18,7 +18,7 @@ type TopicDescriber func(ctx context.Context, path string) (topictypes.TopicDesc
 // Topic caches metadata for one topic and is shared by that topic's writers in one client.
 // Obtain a Topic through Registry.Get; its zero value is not usable.
 // Cached metadata has no time-based expiration or periodic refresh.
-// Reloads are triggered by explicit invalidation or a reported inactive partition.
+// Reloads are triggered by a reported inactive partition.
 type Topic struct {
 	topicPath  string
 	describe   TopicDescriber
@@ -28,10 +28,7 @@ type Topic struct {
 	// subtree for each of them.
 	pendingReplacements map[int64]struct{}
 	updates             singleflight.Group
-	// reloadRequested prevents an explicit Invalidate from being lost while Describe is in flight.
-	// Inactive partition reports do not set it: pendingReplacements are checked atomically when publishing a snapshot.
-	reloadRequested bool
-	mu              sync.Mutex
+	mu                  sync.Mutex
 }
 
 // Partitions returns a current read-only topology snapshot.
@@ -98,50 +95,24 @@ func (s *Topic) ReportInactivePartition(partitionID int64) {
 	s.partitions = nil
 }
 
-// Invalidate marks this topic's cached metadata for reload without doing network I/O.
-func (s *Topic) Invalidate() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.partitions = nil
-	s.reloadRequested = true
-}
-
 func (s *Topic) updatePartitions(ctx context.Context) (*Partitions, error) {
-	for {
-		s.mu.Lock()
-		s.reloadRequested = false
-		s.mu.Unlock()
-
-		published := false
-		partitions, err := retry.RetryWithResult(ctx, func(ctx context.Context) (*Partitions, error) {
-			description, err := s.describe(ctx, s.topicPath)
-			if err != nil {
-				return nil, err
-			}
-			partitions := partitionsFromDescription(description)
-
-			s.mu.Lock()
-			defer s.mu.Unlock()
-			if s.reloadRequested {
-				return partitions, nil
-			}
-			if err = s.partitionReplacementRetryErrorNeedLock(partitions); err != nil {
-				return nil, err
-			}
-			s.partitions = partitions
-			clear(s.pendingReplacements)
-			published = true
-
-			return partitions, nil
-		}, retry.WithIdempotent(true))
+	return retry.RetryWithResult(ctx, func(ctx context.Context) (*Partitions, error) {
+		description, err := s.describe(ctx, s.topicPath)
 		if err != nil {
 			return nil, err
 		}
-		if published {
-			return partitions, nil
+		partitions := partitionsFromDescription(description)
+
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if err = s.partitionReplacementRetryErrorNeedLock(partitions); err != nil {
+			return nil, err
 		}
-	}
+		s.partitions = partitions
+		clear(s.pendingReplacements)
+
+		return partitions, nil
+	}, retry.WithIdempotent(true))
 }
 
 func (s *Topic) partitionReplacementRetryErrorNeedLock(partitions *Partitions) error {
