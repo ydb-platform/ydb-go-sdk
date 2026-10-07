@@ -3,29 +3,12 @@ package topicmultiwriter
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
-
-type seqNoCounter atomic.Int64
-
-func (counter *seqNoCounter) nextSeqNo() int64 {
-	return (*atomic.Int64)(counter).Add(1)
-}
-
-func (counter *seqNoCounter) advanceMaxSeqNo(lastSeqNo int64) {
-	value := (*atomic.Int64)(counter)
-	for {
-		current := value.Load()
-		if lastSeqNo <= current || value.CompareAndSwap(current, lastSeqNo) {
-			return
-		}
-	}
-}
 
 type partitionWriterPool struct {
 	ctx context.Context //nolint:containedctx
@@ -211,7 +194,7 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 	p.bg.Start(fmt.Sprintf("writer-init-%d", partitionID), func(ctx context.Context) {
 		info, err := wr.WaitInitInfo(ctx)
 		if err == nil {
-			p.maxSeqNo.advanceMaxSeqNo(info.LastSeqNum)
+			p.maxSeqNo.advance(info.LastSeqNum)
 		}
 		wrapper.setInitErr(err)
 

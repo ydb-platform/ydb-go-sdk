@@ -278,7 +278,7 @@ func (o *orchestrator) assignSeqNoAndEnqueue(ctx context.Context, msg message, a
 
 					return
 				}
-				msg.SeqNo = o.currentSeqNo.nextSeqNo()
+				msg.SeqNo = o.currentSeqNo.next()
 			} else {
 				err = o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo)
 				if err != nil {
@@ -613,7 +613,7 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 				partitionInfo.CachedMaxSeqNo = initInfo.LastSeqNum
 			})
 			if splitted {
-				o.currentSeqNo.advanceMaxSeqNo(initInfo.LastSeqNum)
+				o.currentSeqNo.advance(initInfo.LastSeqNum)
 			}
 
 			return nil
