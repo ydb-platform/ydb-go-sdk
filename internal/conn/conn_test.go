@@ -423,3 +423,44 @@ func TestIsAvailable(t *testing.T) {
 		require.False(t, isAvailable(nil))
 	})
 }
+
+// cpu: Apple M3 Pro; go1.27.0 darwin/arm64; GOMAXPROCS=4.
+// Baseline: master 9cd397464; median of five runs, one second per case.
+//
+//	GOTOOLCHAIN=go1.27.0 go test -run '^$' -bench '^BenchmarkConnInvoke$' \
+//	  -benchmem -benchtime=1s -count=5 -cpu=4 ./internal/conn
+//
+// BenchmarkConnInvoke/Serial-4                    512.600 ns/op  1204 B/op  20 allocs/op
+// BenchmarkConnInvoke/Parallel-4                  426.000 ns/op  1204 B/op  20 allocs/op
+//
+// Mock transport measures SDK wrapper cost, not network RPC latency.
+func BenchmarkConnInvoke(b *testing.B) {
+	for _, parallel := range []bool{false, true} {
+		name := "Serial"
+		if parallel {
+			name = "Parallel"
+		}
+		b.Run(name, func(b *testing.B) {
+			ctx := WithoutWrapping(b.Context())
+			c := newConn(endpoint.New("test"), &mockConfig{})
+			c.grpcConn = &mockGrpcConn{}
+			b.ReportAllocs()
+			b.ResetTimer()
+			if parallel {
+				b.RunParallel(func(pb *testing.PB) {
+					for pb.Next() {
+						if err := c.Invoke(ctx, "/test", nil, nil); err != nil {
+							b.Error(err)
+						}
+					}
+				})
+			} else {
+				for range b.N {
+					if err := c.Invoke(ctx, "/test", nil, nil); err != nil {
+						b.Fatal(err)
+					}
+				}
+			}
+		})
+	}
+}

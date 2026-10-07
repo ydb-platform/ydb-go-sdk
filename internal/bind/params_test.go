@@ -1360,7 +1360,7 @@ func asUUIDUsingReflect(v any) (value.Value, bool) {
 			return value.NullValue(types.UUID), false
 		}
 
-		return value.OptionalValue(value.Uuid(*(v.(*uuid.UUID)))), true
+		return value.OptionalValue(value.Uuid(*v.(*uuid.UUID))), true
 	}
 
 	return nil, false
