@@ -31,30 +31,14 @@ import (
 // The benchmark has no separate run deadline.
 
 // Set the integration scope connection and credentials before running.
-// Baseline: 2026-10-05, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
-// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
+// Results: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
+// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
+// Server version and resources were not recorded for this run.
 // Run:
 //
 //	go test -tags integration ./tests/integration -run '^$' \
 //	  -bench '^BenchmarkTransactionalWriterSingle$' -count=3 -cpu=4
 
-/*
-BenchmarkTransactionalWriterSingle/p64-4       	      48	  23889453 ns/op	   78291 B/op	    1242 allocs/op
-BenchmarkTransactionalWriterSingle/p64-4       	      50	  23411710 ns/op	   77808 B/op	    1241 allocs/op
-BenchmarkTransactionalWriterSingle/p64-4       	      49	  23004689 ns/op	   77906 B/op	    1241 allocs/op
-BenchmarkTransactionalWriterSingle/p128-4      	      46	  23238680 ns/op	   78458 B/op	    1242 allocs/op
-BenchmarkTransactionalWriterSingle/p128-4      	      43	  23386471 ns/op	   77757 B/op	    1242 allocs/op
-BenchmarkTransactionalWriterSingle/p128-4      	      52	  22377686 ns/op	   77755 B/op	    1241 allocs/op
-BenchmarkTransactionalWriterSingle/p256-4      	      46	  23632148 ns/op	   77797 B/op	    1241 allocs/op
-BenchmarkTransactionalWriterSingle/p256-4      	      46	  23219518 ns/op	   77593 B/op	    1241 allocs/op
-BenchmarkTransactionalWriterSingle/p256-4      	      46	  23649817 ns/op	   77598 B/op	    1241 allocs/op
-BenchmarkTransactionalWriterSingle/p512-4      	      45	  23628352 ns/op	   77491 B/op	    1240 allocs/op
-BenchmarkTransactionalWriterSingle/p512-4      	      46	  24408697 ns/op	   78076 B/op	    1242 allocs/op
-BenchmarkTransactionalWriterSingle/p512-4      	      48	  22490911 ns/op	   77705 B/op	    1242 allocs/op
-*/
-// PR #2335 run: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
-// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
-// Server version and resources were not recorded for this run.
 /*
 BenchmarkTransactionalWriterSingle/p64-4         	      51	  22695962 ns/op	   78133 B/op	    1248 allocs/op
 BenchmarkTransactionalWriterSingle/p64-4         	      49	  22007500 ns/op	   78086 B/op	    1247 allocs/op
@@ -77,30 +61,14 @@ func BenchmarkTransactionalWriterSingle(b *testing.B) {
 }
 
 // Set the integration scope connection and credentials before running.
-// Baseline: 2026-10-05, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
-// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
+// Results: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
+// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
+// Server version and resources were not recorded for this run.
 // Run:
 //
 //	go test -tags integration ./tests/integration -run '^$' \
 //	  -bench '^BenchmarkTransactionalWriterManyKey$' -count=3 -cpu=4
 
-/*
-BenchmarkTransactionalWriterManyKey/p64-4      	       8	 130323490 ns/op	 2233584 B/op	   33196 allocs/op
-BenchmarkTransactionalWriterManyKey/p64-4      	       9	 132717532 ns/op	 2236381 B/op	   33224 allocs/op
-BenchmarkTransactionalWriterManyKey/p64-4      	       9	 126536292 ns/op	 2244664 B/op	   33292 allocs/op
-BenchmarkTransactionalWriterManyKey/p128-4     	       6	 245919139 ns/op	 4463174 B/op	   65800 allocs/op
-BenchmarkTransactionalWriterManyKey/p128-4     	       6	 409303215 ns/op	 4421866 B/op	   65428 allocs/op
-BenchmarkTransactionalWriterManyKey/p128-4     	       3	 378757222 ns/op	 4465864 B/op	   65794 allocs/op
-BenchmarkTransactionalWriterManyKey/p256-4     	       2	 535159021 ns/op	 8843192 B/op	  130468 allocs/op
-BenchmarkTransactionalWriterManyKey/p256-4     	       2	 610078833 ns/op	 8844652 B/op	  130510 allocs/op
-BenchmarkTransactionalWriterManyKey/p256-4     	       2	 619463146 ns/op	 8846828 B/op	  130533 allocs/op
-BenchmarkTransactionalWriterManyKey/p512-4     	       1	1727684750 ns/op	17649552 B/op	  260649 allocs/op
-BenchmarkTransactionalWriterManyKey/p512-4     	       1	1897948625 ns/op	17612872 B/op	  260454 allocs/op
-BenchmarkTransactionalWriterManyKey/p512-4     	       1	2380674708 ns/op	17639000 B/op	  260815 allocs/op
-*/
-// PR #2335 run: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
-// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
-// Server version and resources were not recorded for this run.
 /*
 BenchmarkTransactionalWriterManyKey/p64-4         	       8	 148425594 ns/op	 2201030 B/op	   33026 allocs/op
 BenchmarkTransactionalWriterManyKey/p64-4         	       9	 130229069 ns/op	 2189392 B/op	   32944 allocs/op
@@ -123,30 +91,14 @@ func BenchmarkTransactionalWriterManyKey(b *testing.B) {
 }
 
 // Set the integration scope connection and credentials before running.
-// Baseline: 2026-10-05, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
-// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
+// Results: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
+// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
+// Server version and resources were not recorded for this run.
 // Run:
 //
 //	go test -tags integration ./tests/integration -run '^$' \
 //	  -bench '^BenchmarkTransactionalWriterManyBoundedKey$' -count=3 -cpu=4
 
-/*
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       7	 163805839 ns/op	 2298929 B/op	   33897 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       7	 161294512 ns/op	 2272589 B/op	   33612 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       8	 132987354 ns/op	 2282266 B/op	   33663 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       5	 310225292 ns/op	 4487283 B/op	   66202 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       4	 430267188 ns/op	 4518120 B/op	   66512 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       4	 293932323 ns/op	 4520344 B/op	   66440 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       1	1236404000 ns/op	 8909776 B/op	  131741 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       1	1160582833 ns/op	 8926152 B/op	  131869 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       1	1185910250 ns/op	 8939096 B/op	  131973 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1990103750 ns/op	17839800 B/op	  262958 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1979818792 ns/op	17823408 B/op	  263171 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1944340333 ns/op	17819568 B/op	  263172 allocs/op
-*/
-// PR #2335 run: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
-// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
-// Server version and resources were not recorded for this run.
 /*
 BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       8	 135958151 ns/op	 2251727 B/op	   33452 allocs/op
 BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       8	 126586354 ns/op	 2208601 B/op	   33286 allocs/op
@@ -169,22 +121,15 @@ func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
 }
 
 // Set the integration scope connection and credentials before running.
-// Baseline: 2026-10-05, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
-// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
+// Results: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
+// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
+// Server version and resources were not recorded for this run.
 // Run:
 //
 //	go test -tags integration ./tests/integration -run '^$' \
 //	  -bench '^BenchmarkTransactionalWriterAutoSplit$' \
 //	  -benchtime=300x -count=3 -cpu=4
 
-/*
-BenchmarkTransactionalWriterAutoSplit/tx-4         	     300	  30704545 ns/op	  160715 B/op	    2501 allocs/op
-BenchmarkTransactionalWriterAutoSplit/tx-4         	     300	  28699257 ns/op	  173742 B/op	    2709 allocs/op
-BenchmarkTransactionalWriterAutoSplit/tx-4         	     300	  28877437 ns/op	  173551 B/op	    2708 allocs/op
-*/
-// PR #2335 run: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
-// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
-// Server version and resources were not recorded for this run.
 /*
 BenchmarkTransactionalWriterAutoSplit/tx-4         	     300	  29408551 ns/op	  148551 B/op	    2308 allocs/op
 BenchmarkTransactionalWriterAutoSplit/tx-4         	     300	  26454153 ns/op	  151586 B/op	    2368 allocs/op
