@@ -29,7 +29,9 @@ func (c codec) Unmarshal(data mem.BufferSlice, v any) error {
 			return err
 		}
 		*part = *decoded
+
 		return nil
 	}
+
 	return c.protobuf.Unmarshal(data, v)
 }

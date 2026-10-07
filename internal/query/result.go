@@ -18,6 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/wirevalue"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -45,6 +46,7 @@ type (
 		lastErr        error
 		onClose        func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
+		lastWirePart   *wirevalue.Part
 		resultSetIndex int64
 		trace          *trace.Query
 		statsCallback  func(queryStats stats.QueryStats)
@@ -282,7 +284,9 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	if !r.retainArrowBatches {
 		r.releaseArrowBatches()
 	}
-	part, err := nextPart(r.stream)
+	var wire *wirevalue.Part
+	part, wire, err := recvQueryPart(r.stream)
+	r.lastWirePart = wire
 	if part != nil {
 		issues := part.GetIssues()
 		if r.issuesCallback != nil && len(issues) > 0 {
@@ -315,7 +319,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 	part *Ydb_Query.ExecuteQueryResponsePart, err error,
 ) {
-	part, err = stream.Recv()
+	part, _, err = recvQueryPart(stream)
 	if err != nil {
 		if xerrors.Is(err, io.EOF) {
 			return nil, io.EOF
@@ -393,6 +397,8 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishE
 			rs := newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart)
 			rs.notifyError = r.notifyNextPartErr
 			rs.decodeArrow = r.decodeArrowBatches
+			rs.wirePart = r.lastWirePart
+			rs.nextWirePart = func() *wirevalue.Part { return r.lastWirePart }
 
 			return rs, nil
 		}
@@ -563,6 +569,13 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 			for _, data := range batches {
 				for i := range data.rows {
 					rs.rows = append(rs.rows, &data.rows[i])
+				}
+			}
+		} else if r.lastWirePart != nil {
+			if resultSet := r.lastWirePart.Meta().GetResultSet(); resultSet != nil {
+				resultSet.Columns = rs.columns
+				for i := 0; i < r.lastWirePart.RowCount(); i++ {
+					rs.rows = append(rs.rows, r.lastWirePart.Row(i))
 				}
 			}
 		} else {

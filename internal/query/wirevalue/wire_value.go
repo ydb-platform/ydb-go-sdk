@@ -6,10 +6,12 @@ import (
 	"math"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
@@ -21,6 +23,8 @@ type Part struct {
 	frame []byte
 	rows  []rowSpan
 }
+
+var _ operation.Status = (*Part)(nil)
 
 type rowSpan struct {
 	start uint32
@@ -36,12 +40,35 @@ type Row struct {
 // Meta returns the standard response metadata without materializing Rows.
 func (p *Part) Meta() *Ydb_Query.ExecuteQueryResponsePart { return p.meta }
 
+// GetStatus exposes the response status to the SDK transport.
+func (p *Part) GetStatus() Ydb.StatusIds_StatusCode { return p.meta.GetStatus() }
+
+// GetIssues exposes response issues to the SDK transport.
+func (p *Part) GetIssues() []*Ydb_Issue.IssueMessage { return p.meta.GetIssues() }
+
 // RowCount returns the number of rows in this response part.
 func (p *Part) RowCount() int { return len(p.rows) }
 
 // Row returns a view of one row. It remains valid while the Part is retained.
 func (p *Part) Row(index int) Row {
 	return Row{part: p, span: p.rows[index]}
+}
+
+// MaterializeRows builds protobuf rows for consumers of the typed Recv API.
+func (p *Part) MaterializeRows() error {
+	if len(p.rows) == 0 {
+		return nil
+	}
+	resultSet := p.meta.GetResultSet()
+	for _, span := range p.rows {
+		row := new(Ydb.Value)
+		if err := proto.Unmarshal(p.frame[span.start:span.end], row); err != nil {
+			return err
+		}
+		resultSet.Rows = append(resultSet.Rows, row)
+	}
+
+	return nil
 }
 
 func (r Row) raw() []byte {
@@ -96,6 +123,7 @@ func decodeOwnedPart(frame []byte) (*Part, error) {
 		resultSet.GetFormat() != Ydb.ResultSet_FORMAT_UNSPECIFIED {
 		return nil, fmt.Errorf("wire value decoder: unsupported result set format %v", resultSet.GetFormat())
 	}
+
 	return part, nil
 }
 
@@ -124,6 +152,7 @@ func stripWireValueRows(data []byte, part *Part, base int) ([]byte, error) {
 		offset += tagLen + valueLen
 		data = data[tagLen+valueLen:]
 	}
+
 	return metadata, nil
 }
 
@@ -160,6 +189,7 @@ func (r Row) Scan(dst ...any) error {
 	if index < len(dst) {
 		return fmt.Errorf("wire value decoder: row has %d cells, want %d", index, len(dst))
 	}
+
 	return nil
 }
 
@@ -184,6 +214,7 @@ func (r Row) ColumnValue(column int) value.Value {
 	if err := proto.Unmarshal(cell, &v); err != nil {
 		return nil
 	}
+
 	return value.FromYDB(r.part.Meta().GetResultSet().GetColumns()[column].GetType(), &v)
 }
 
@@ -192,6 +223,7 @@ func (r Row) ScanColumn(column int, dst any) error {
 	if err != nil {
 		return err
 	}
+
 	return scanWireValueDestination(r.part.Meta().GetResultSet().GetColumns()[column].GetType(), cell, dst)
 }
 
@@ -203,6 +235,7 @@ func scanWireValueDestination(columnType *Ydb.Type, cell []byte, dst any) error 
 	if err := proto.Unmarshal(cell, &v); err != nil {
 		return err
 	}
+
 	return value.CastTo(value.FromYDB(columnType, &v), dst)
 }
 
@@ -233,9 +266,11 @@ func (r Row) cell(column int) ([]byte, error) {
 		}
 		data = data[tagLen+valueLen:]
 	}
+
 	return nil, fmt.Errorf("wire value decoder: missing column %d", column)
 }
 
+//nolint:gocyclo,funlen // Keep scalar wire parsing and destination assignment in one allocation-free path.
 func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error) {
 	primitive, optional := wireValuePrimitive(columnType)
 	var kind protowire.Number
@@ -275,6 +310,7 @@ func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error)
 		}
 		cell = cell[tagLen+valueLen:]
 	}
+	//nolint:nestif // A null optional must clear each supported destination type.
 	if kind == 10 && optional {
 		switch p := dst.(type) {
 		case **int32:
@@ -305,6 +341,7 @@ func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error)
 		default:
 			return false, nil
 		}
+
 		return true, nil
 	}
 	switch primitive {
@@ -312,6 +349,7 @@ func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error)
 		if kind == 5 {
 			if p, ok := dst.(*uint64); ok && p != nil {
 				*p = numeric
+
 				return true, nil
 			}
 		}
@@ -322,6 +360,7 @@ func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error)
 					*p = new(int32)
 				}
 				**p = int32(numeric)
+
 				return true, nil
 			}
 		}
@@ -332,6 +371,7 @@ func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error)
 					*p = new(bool)
 				}
 				**p = numeric != 0
+
 				return true, nil
 			}
 		}
@@ -342,6 +382,7 @@ func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error)
 					*p = new(float64)
 				}
 				**p = math.Float64frombits(numeric)
+
 				return true, nil
 			}
 		}
@@ -352,6 +393,7 @@ func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error)
 					*p = new(string)
 				}
 				**p = string(payload)
+
 				return true, nil
 			}
 		}
@@ -362,10 +404,12 @@ func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error)
 					*p = new([]byte)
 				}
 				**p = bytes.Clone(payload)
+
 				return true, nil
 			}
 		}
 	}
+
 	return false, nil
 }
 
@@ -373,5 +417,6 @@ func wireValuePrimitive(t *Ydb.Type) (Ydb.Type_PrimitiveTypeId, bool) {
 	if optional := t.GetOptionalType(); optional != nil {
 		return optional.GetItem().GetTypeId(), true
 	}
+
 	return t.GetTypeId(), false
 }

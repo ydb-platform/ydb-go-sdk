@@ -94,7 +94,7 @@ func BenchmarkFormats(b *testing.B) {
 				return fmt.Errorf("fixture rows=%d, want %d", count, size)
 			}
 			b.Logf("rows=%d checksum=%016x", size, expected)
-			for _, variant := range []string{"Value", "QueryArrow", "WithResultFormatArrow", "RawProto", "WireValue"} {
+			for _, variant := range []string{"Query", "QueryArrow", "WithResultFormatArrow", "RawProto", "WireValue"} {
 				b.Run(fmt.Sprintf("%d/%s", size, variant), func(b *testing.B) {
 					run := func() (int, uint64, error) {
 						if variant == "QueryArrow" {

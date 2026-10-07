@@ -1,3 +1,5 @@
+* Changed Query Service `FORMAT_VALUE` result decoding to scan rows directly from protobuf wire data, reducing allocations in `Query`, `QueryRow`, `QueryResultSet`, and `database/sql` queries
+
 ## v3.155.1
 * Fixed resource leaks after failed driver initialization and in nested `Driver.With` calls
 

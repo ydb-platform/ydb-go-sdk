@@ -1,6 +1,7 @@
 package wirevalue
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -29,7 +30,8 @@ func BenchmarkWireValueDecodeScan(b *testing.B) {
 			var payload *[]byte
 			dst := []any{&id, &score, &active, &amount, &name, &payload}
 			for _, row := range part.GetResultSet().GetRows() {
-				if err := scanner.Indexed(scanner.NewData(part.GetResultSet().GetColumns(), row.GetItems())).Scan(dst...); err != nil {
+				data := scanner.NewData(part.GetResultSet().GetColumns(), row.GetItems())
+				if err := scanner.Indexed(data).Scan(dst...); err != nil {
 					b.Fatal(err)
 				}
 				hash = wireBenchChecksum(hash, id, score, active, amount, name, payload)
@@ -65,7 +67,9 @@ func BenchmarkWireValueDecodeScan(b *testing.B) {
 
 var benchmarkWireValueHash uint64
 
-func wireBenchChecksum(h, id uint64, score *int32, active *bool, amount *float64, name *string, payload *[]byte) uint64 {
+func wireBenchChecksum(h, id uint64, score *int32, active *bool, amount *float64,
+	name *string, payload *[]byte,
+) uint64 {
 	h += id
 	if score != nil {
 		h += uint64(*score)
@@ -82,6 +86,7 @@ func wireBenchChecksum(h, id uint64, score *int32, active *bool, amount *float64
 	if payload != nil {
 		h += uint64(len(*payload))
 	}
+
 	return h
 }
 
@@ -103,7 +108,7 @@ func wireValueBenchmarkFrame(b *testing.B, count int) []byte {
 			{Value: &Ydb.Value_BoolValue{BoolValue: i%2 == 0}},
 			{Value: &Ydb.Value_DoubleValue{DoubleValue: float64(i) / 4}},
 			{Value: &Ydb.Value_TextValue{TextValue: fmt.Sprintf("customer-%05d", i)}},
-			{Value: &Ydb.Value_BytesValue{BytesValue: []byte("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")}},
+			{Value: &Ydb.Value_BytesValue{BytesValue: bytes.Repeat([]byte("x"), 64)}},
 		}}
 	}
 	frame, err := proto.Marshal(&Ydb_Query.ExecuteQueryResponsePart{
@@ -113,5 +118,6 @@ func wireValueBenchmarkFrame(b *testing.B, count int) []byte {
 	if err != nil {
 		b.Fatal(err)
 	}
+
 	return frame
 }

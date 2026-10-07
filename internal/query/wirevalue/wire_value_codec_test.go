@@ -21,9 +21,11 @@ func TestWireValueCodecReceivesQueryPart(t *testing.T) {
 	go func() { _ = server.Serve(listener) }()
 	defer server.Stop()
 
-	conn, err := grpc.NewClient("passthrough:///bufnet", grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+	dialer := func(context.Context, string) (net.Conn, error) {
 		return listener.Dial()
-	}), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+	conn, err := grpc.NewClient("passthrough:///bufnet", grpc.WithContextDialer(dialer),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err)
 	defer conn.Close()
 
