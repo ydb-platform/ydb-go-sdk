@@ -7,8 +7,8 @@ on:
   pull_request:
   workflow_dispatch:
 env:
-  GOLANGCI_LINT_VERSION: v2.11.4
-  GO_VERSION: '1.26'
+  GOLANGCI_LINT_VERSION: v2.13.1
+  GO_VERSION: '1.27'
 jobs:
   golangci:
     if: (!contains(github.event.pull_request.labels.*.name, 'no lint'))
@@ -78,7 +78,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.26.x"
+          go-version: "1.27.x"
       - name: Install utilities
         run: |
           go install mvdan.cc/gofumpt@v0.7.0
