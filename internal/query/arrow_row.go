@@ -25,8 +25,11 @@ var _ query.Row = (*arrowRow)(nil)
 func (r *arrowRow) ScanColumn(column int, dst any) error {
 	return r.data.batch.Scan(r.index, column, dst)
 }
+
 func (r *arrowRow) ColumnValue(column int) value.Value { return r.data.batch.Value(r.index, column) }
-func (r *arrowRow) Values() []value.Value              { return scanner.NewDirectData(r.data.columns, r).Values() }
+
+func (r *arrowRow) Values() []value.Value { return scanner.NewDirectData(r.data.columns, r).Values() }
+
 func (r *arrowRow) Scan(dst ...any) error {
 	return scanner.Indexed(scanner.NewDirectData(r.data.columns, r)).Scan(dst...)
 }
