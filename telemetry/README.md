@@ -1,55 +1,43 @@
 # Observable gauges
 
-This experimental package provides backend-independent observable int64 gauges.
-It is independent of diagnostic tracing and does not register SDK metrics.
-Existing `metrics.Registry`, counters, histograms and traces are unchanged.
-
-An application implements `Int64GaugeSource` and registers it with a `Meter`.
-`Collector` is an in-memory pull backend; a native backend can implement `Meter`
-directly. The application owns collection and export.
+This experimental package is a registration contract, not a metrics backend.
+`Meter` is a function that immediately registers an observable gauge callback
+with the application's backend and returns that backend's unregister function.
+No interfaces or source implementation structs are required.
 
 ```go
-type source struct {
-    value atomic.Int64
-}
-
-func (s *source) Snapshot(ctx context.Context) ([]telemetry.Int64Point, error) {
-    return []telemetry.Int64Point{{Value: s.value.Load()}}, ctx.Err()
-}
-```
-
-```go
-meter := telemetry.NewCollector()
-state := new(source)
-state.value.Store(3)
-reg, err := meter.RegisterInt64Gauge(telemetry.Int64GaugeDescriptor{
-    Descriptor: telemetry.Descriptor{Name: "application.workers", Unit: "{worker}"},
-    Reduction: telemetry.GaugeSum,
-}, state)
+unregister, err := meter(telemetry.Descriptor{
+    Name: "application.workers", Unit: "{worker}",
+}, func(ctx context.Context, observe func(int64, ...telemetry.Attribute)) error {
+    if err := ctx.Err(); err != nil {
+        return err
+    }
+    observe(workers.Load())
+    return nil
+})
 if err != nil {
     return err
 }
-metrics, collectErr := meter.Collect(ctx)
-closeErr := reg.Close(ctx)
-return errors.Join(collectErr, closeErr)
+// The backend invokes the callback in its own collection cycle.
+// Unregister before releasing the resource read by the callback.
+return unregister()
 ```
 
-Imports are `context`, `errors`, `sync/atomic` and
-`github.com/ydb-platform/ydb-go-sdk/v3/telemetry`. Use `metrics` in the
-application's export cycle before returning. `GaugeSum` adds values for equal
-descriptor and attribute sets; `GaugeMax` selects their maximum. Attribute order
-does not change series identity. A failed source suppresses its entire descriptor
-for that collection and returns an error; unrelated descriptors remain available.
-A native backend must preserve these reduction and failure rules.
+`workers` can be an application-owned `atomic.Int64`. The callback reads current
+state and calls `observe`; it must not perform I/O, mutate SDK state or retain the
+observer. Concurrent collections must be safe.
 
-`Snapshot` returns owned data without I/O or SDK mutation, honors cancellation
-and supports concurrent calls. Registration failure must not retain a source.
-`Registration.Close` is idempotent and detaches the source even if its context
-expires. A later close can wait for quiescence. Successful close waits for
-collections already using the source; those collections may return earlier
-observations. Collections begun after detach cannot use it.
+The backend owns instruments, collection, aggregation and unregister
+synchronization. A successful registration returns a non-nil, idempotent
+unregister function; failed registration must not retain the callback. The SDK
+does not maintain a collector, registration registry, in-flight counters, sample
+cache, timer or exporter. Existing `metrics.Registry` and tracing are unchanged.
 
-Registration tracking and an in-flight count are required to detach sources
-safely while collection is running; an Add/Set gauge alone cannot provide those
-lifetime guarantees. Source calls happen outside the registry lock. There is no
-sampling goroutine, timer, exporter dependency or event ledger.
+Gauges are non-additive: equal labels do not imply sum or max. Use distinct
+attributes for independent resources, or configure aggregation in the backend.
+
+See [the OTel adapter](../examples/telemetryotel/otel.go): it directly creates
+an `Int64ObservableGauge`, registers the callback and returns native
+`Registration.Unregister`. It uses the examples module's existing dependencies;
+the core SDK does not import OTel. An adapter for Monium or another backend follows
+the same function contract and translates attributes to that backend's API.
