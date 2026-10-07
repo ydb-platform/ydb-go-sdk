@@ -16,13 +16,13 @@ import (
 func driver(config Config) (t trace.Driver) {
 	config.GaugeVec("info", "version").With(map[string]string{"version": version.Version}).Set(1)
 	config = config.WithSystem("driver")
-	endpoints := config.WithSystem("balancer").GaugeVec("endpoints", "az")
-	balancersDiscoveries := config.WithSystem("balancer").CounterVec("discoveries", "status", "cause")
-	balancerUpdates := config.WithSystem("balancer").CounterVec("updates", "cause")
-	conns := config.GaugeVec("conns", "endpoint", "node_id", "state")
-	banned := config.WithSystem("conn").CounterVec("banned", "endpoint", "node_id", "cause")
-	requestStatuses := config.WithSystem("conn").CounterVec("request_statuses", "status", "endpoint", "node_id")
-	requestMethods := config.WithSystem("conn").CounterVec("request_methods", "method", "endpoint", "node_id")
+	endpoints := config.WithSystem("balancer").GaugeVec("endpoints", azLabel)
+	balancersDiscoveries := config.WithSystem("balancer").CounterVec("discoveries", statusLabel, causeLabel)
+	balancerUpdates := config.WithSystem("balancer").CounterVec("updates", causeLabel)
+	conns := config.GaugeVec("conns", endpointLabel, nodeIDLabel, "state")
+	banned := config.WithSystem("conn").CounterVec("banned", endpointLabel, nodeIDLabel, causeLabel)
+	requestStatuses := config.WithSystem("conn").CounterVec("request_statuses", statusLabel, endpointLabel, nodeIDLabel)
+	requestMethods := config.WithSystem("conn").CounterVec("request_methods", methodLabel, endpointLabel, nodeIDLabel)
 	tli := config.CounterVec("transaction_locks_invalidated")
 
 	type endpointKey struct {
@@ -56,14 +56,14 @@ func driver(config Config) (t trace.Driver) {
 			}
 
 			requestStatuses.With(map[string]string{
-				"status":   errorBrief(info.Error),
-				"endpoint": endpoint,
-				"node_id":  strconv.FormatUint(uint64(nodeID), 10),
+				statusLabel:   errorBrief(info.Error),
+				endpointLabel: endpoint,
+				nodeIDLabel:   strconv.FormatUint(uint64(nodeID), 10),
 			}).Inc()
 			requestMethods.With(map[string]string{
-				"method":   string(method),
-				"endpoint": endpoint,
-				"node_id":  strconv.FormatUint(uint64(nodeID), 10),
+				methodLabel:   string(method),
+				endpointLabel: endpoint,
+				nodeIDLabel:   strconv.FormatUint(uint64(nodeID), 10),
 			}).Inc()
 			if xerrors.IsOperationErrorTransactionLocksInvalidated(info.Error) {
 				tli.With(nil).Inc()
@@ -85,14 +85,14 @@ func driver(config Config) (t trace.Driver) {
 			}
 
 			requestStatuses.With(map[string]string{
-				"status":   errorBrief(info.Error),
-				"endpoint": endpoint,
-				"node_id":  strconv.FormatUint(uint64(nodeID), 10),
+				statusLabel:   errorBrief(info.Error),
+				endpointLabel: endpoint,
+				nodeIDLabel:   strconv.FormatUint(uint64(nodeID), 10),
 			}).Inc()
 			requestMethods.With(map[string]string{
-				"method":   string(method),
-				"endpoint": endpoint,
-				"node_id":  strconv.FormatUint(uint64(nodeID), 10),
+				methodLabel:   string(method),
+				endpointLabel: endpoint,
+				nodeIDLabel:   strconv.FormatUint(uint64(nodeID), 10),
 			}).Inc()
 		}
 	}
@@ -102,9 +102,9 @@ func driver(config Config) (t trace.Driver) {
 		}
 
 		banned.With(map[string]string{
-			"endpoint": safeEndpointAddress(info.Endpoint),
-			"node_id":  idToString(safeEndpointNodeID(info.Endpoint)),
-			"cause":    errorBrief(info.Cause),
+			endpointLabel: safeEndpointAddress(info.Endpoint),
+			nodeIDLabel:   idToString(safeEndpointNodeID(info.Endpoint)),
+			causeLabel:    errorBrief(info.Cause),
 		}).Inc()
 
 		return nil
@@ -120,8 +120,8 @@ func driver(config Config) (t trace.Driver) {
 			}
 
 			balancersDiscoveries.With(map[string]string{
-				"status": errorBrief(info.Error),
-				"cause":  eventType,
+				statusLabel: errorBrief(info.Error),
+				causeLabel:  eventType,
 			}).Inc()
 		}
 	}
@@ -136,7 +136,7 @@ func driver(config Config) (t trace.Driver) {
 			endpointsMu.Lock()
 			defer endpointsMu.Unlock()
 			balancerUpdates.With(map[string]string{
-				"cause": eventType,
+				causeLabel: eventType,
 			}).Inc()
 			newEndpoints := make(map[endpointKey]int, len(info.Endpoints))
 			for _, e := range info.Endpoints {
@@ -152,14 +152,14 @@ func driver(config Config) (t trace.Driver) {
 				if _, has := newEndpoints[e]; !has {
 					delete(knownEndpoints, e)
 					endpoints.With(map[string]string{
-						"az": e.az,
+						azLabel: e.az,
 					}).Set(0)
 				}
 			}
 			for e, count := range newEndpoints {
 				knownEndpoints[e] = struct{}{}
 				endpoints.With(map[string]string{
-					"az": e.az,
+					azLabel: e.az,
 				}).Set(float64(count))
 			}
 		}
@@ -174,8 +174,8 @@ func updateConnStateGauge(gauge GaugeVec, endpoint trace.EndpointInfo, state tra
 	}
 
 	gauge.With(map[string]string{
-		"endpoint": safeEndpointAddress(endpoint),
-		"node_id":  idToString(safeEndpointNodeID(endpoint)),
-		"state":    state.String(),
+		endpointLabel: safeEndpointAddress(endpoint),
+		nodeIDLabel:   idToString(safeEndpointNodeID(endpoint)),
+		"state":       state.String(),
 	}).Add(delta)
 }

@@ -168,7 +168,7 @@ func defaultExecuteSettings() executeSettings {
 		statsMode: StatsModeNone,
 		txControl: tx.DefaultTxControl(),
 		params:    &params.Params{},
-		label:     "undefined",
+		label:     defaultLabel,
 	}
 }
 
