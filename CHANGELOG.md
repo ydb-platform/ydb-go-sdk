@@ -1,5 +1,10 @@
 * Improved topic multi-writer performance for topics with many partitions
 
+## v3.154.0
+* Fixed decoding and scanning Tagged query results while preserving tags in column metadata and values
+* Fixed decoding of `EmptyList` and `EmptyDict` query results and preservation of explicitly typed empty lists and dictionaries
+* Fixed `TzDate32`, `TzDatetime64` and `TzTimestamp64` query result decoding and scans into `time.Time` and other supported destinations, preserving wide type identity, timezone and microsecond precision
+
 ## v3.153.2
 * Added `UncompressedSize` and `CompressedSize` fields to `trace.TopicWriterCompressMessagesDoneInfo` to allow tracking actual bytes written by the topic writer
 * Deprecated `pkg/xtest.SyncedTest`, `MakeSyncedTest`, and their wrapper methods in favor of `testing.T`.

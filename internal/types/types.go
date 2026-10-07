@@ -21,6 +21,7 @@ func TypeToYDB(t Type) *Ydb.Type {
 	return t.ToYDB()
 }
 
+//nolint:funlen
 func TypeFromYDB(x *Ydb.Type) Type {
 	switch v := x.GetType().(type) {
 	case *Ydb.Type_TypeId:
@@ -29,8 +30,17 @@ func TypeFromYDB(x *Ydb.Type) Type {
 	case *Ydb.Type_OptionalType:
 		return NewOptional(TypeFromYDB(v.OptionalType.GetItem()))
 
+	case *Ydb.Type_TaggedType:
+		return NewTagged(TypeFromYDB(v.TaggedType.GetType()), v.TaggedType.GetTag())
+
 	case *Ydb.Type_ListType:
 		return NewList(TypeFromYDB(v.ListType.GetItem()))
+
+	case *Ydb.Type_EmptyListType:
+		return NewEmptyList()
+
+	case *Ydb.Type_EmptyDictType:
+		return NewEmptyDict()
 
 	case *Ydb.Type_DecimalType:
 		d := v.DecimalType
@@ -82,7 +92,7 @@ func TypeFromYDB(x *Ydb.Type) Type {
 	}
 }
 
-//nolint:funlen
+//nolint:funlen,gocyclo
 func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) Type {
 	switch t {
 	case Ydb.Type_BOOL:
@@ -129,6 +139,12 @@ func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) Type {
 		return TzDatetime
 	case Ydb.Type_TZ_TIMESTAMP:
 		return TzTimestamp
+	case tzDate32TypeID:
+		return TzDate32
+	case tzDatetime64TypeID:
+		return TzDatetime64
+	case tzTimestamp64TypeID:
+		return TzTimestamp64
 	case Ydb.Type_STRING:
 		return Bytes
 	case Ydb.Type_UTF8:
@@ -465,6 +481,51 @@ func NewOptional(t Type) Optional {
 	}
 }
 
+type Tagged struct {
+	innerType Type
+	tag       string
+}
+
+func (v *Tagged) InnerType() Type {
+	return v.innerType
+}
+
+func (v *Tagged) Tag() string {
+	return v.tag
+}
+
+func (v *Tagged) String() string {
+	return v.Yql()
+}
+
+func (v *Tagged) Yql() string {
+	return fmt.Sprintf("Tagged<%s,%q>", v.innerType.Yql(), v.tag)
+}
+
+func (v *Tagged) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(*Tagged)
+
+	return ok && v.tag == vv.tag && v.innerType.equalsTo(vv.innerType)
+}
+
+func (v *Tagged) ToYDB() *Ydb.Type {
+	return &Ydb.Type{
+		Type: &Ydb.Type_TaggedType{
+			TaggedType: &Ydb.TaggedType{
+				Tag:  v.tag,
+				Type: v.innerType.ToYDB(),
+			},
+		},
+	}
+}
+
+func NewTagged(t Type, tag string) *Tagged {
+	return &Tagged{
+		innerType: t,
+		tag:       tag,
+	}
+}
+
 type PgType struct {
 	OID uint32
 }
@@ -497,6 +558,12 @@ func (v PgType) equalsTo(rhs Type) bool {
 }
 
 type Primitive uint
+
+const (
+	tzDate32TypeID      Ydb.Type_PrimitiveTypeId = 0x0044
+	tzDatetime64TypeID  Ydb.Type_PrimitiveTypeId = 0x0045
+	tzTimestamp64TypeID Ydb.Type_PrimitiveTypeId = 0x0046
+)
 
 func (v Primitive) String() string {
 	return v.Yql()
@@ -537,6 +604,9 @@ const (
 	UUID
 	JSONDocument
 	DyNumber
+	TzDate32
+	TzDatetime64
+	TzTimestamp64
 )
 
 var primitive = [...]*Ydb.Type{
@@ -569,6 +639,10 @@ var primitive = [...]*Ydb.Type{
 	UUID:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID}},
 	JSONDocument: {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON_DOCUMENT}},
 	DyNumber:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DYNUMBER}},
+
+	TzDate32:      {Type: &Ydb.Type_TypeId{TypeId: tzDate32TypeID}},
+	TzDatetime64:  {Type: &Ydb.Type_TypeId{TypeId: tzDatetime64TypeID}},
+	TzTimestamp64: {Type: &Ydb.Type_TypeId{TypeId: tzTimestamp64TypeID}},
 }
 
 var primitiveString = [...]string{
@@ -602,6 +676,10 @@ var primitiveString = [...]string{
 	UUID:         "Uuid",
 	JSONDocument: "JsonDocument",
 	DyNumber:     "DyNumber",
+
+	TzDate32:      "TzDate32",
+	TzDatetime64:  "TzDatetime64",
+	TzTimestamp64: "TzTimestamp64",
 }
 
 func (v Primitive) equalsTo(rhs Type) bool {
