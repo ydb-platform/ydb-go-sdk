@@ -278,7 +278,7 @@ func (o *orchestrator) assignSeqNoAndEnqueue(ctx context.Context, msg message, a
 
 					return
 				}
-				msg.SeqNo = o.currentSeqNo.Add(1)
+				msg.SeqNo = o.currentSeqNo.nextSeqNo()
 			} else {
 				err = o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo)
 				if err != nil {

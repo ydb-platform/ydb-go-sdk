@@ -11,14 +11,17 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
-type seqNoCounter struct {
-	atomic.Int64
+type seqNoCounter atomic.Int64
+
+func (counter *seqNoCounter) nextSeqNo() int64 {
+	return (*atomic.Int64)(counter).Add(1)
 }
 
 func (counter *seqNoCounter) advanceMaxSeqNo(lastSeqNo int64) {
+	value := (*atomic.Int64)(counter)
 	for {
-		current := counter.Load()
-		if lastSeqNo <= current || counter.CompareAndSwap(current, lastSeqNo) {
+		current := value.Load()
+		if lastSeqNo <= current || value.CompareAndSwap(current, lastSeqNo) {
 			return
 		}
 	}
