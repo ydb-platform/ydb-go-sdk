@@ -32,7 +32,7 @@ jobs:
             const sha = /^[0-9a-f]{40}$/;
             if (!Number.isSafeInteger(metadata.pr) || metadata.pr <= 0 ||
                 !sha.test(metadata.master_sha) || !sha.test(metadata.head_sha) ||
-                metadata.merge_sha !== run.head_sha) {
+                metadata.head_sha !== run.head_sha) {
               throw new Error('Invalid benchmark artifact metadata');
             }
             if (run.pull_requests?.length &&

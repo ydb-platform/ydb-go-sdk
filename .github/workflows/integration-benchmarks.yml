@@ -83,13 +83,12 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           MASTER_SHA: ${{ github.event.pull_request.base.sha }}
           PR_SHA: ${{ github.event.pull_request.head.sha }}
-          MERGE_SHA: ${{ github.sha }}
         shell: bash
         run: |
           "$(go env GOPATH)/bin/benchstat" master=benchmark-results/master.txt pr=benchmark-results/pr.txt > benchmark-results/benchstat.txt
           test -s benchmark-results/benchstat.txt
-          jq -n --argjson pr "$PR_NUMBER" --arg master "$MASTER_SHA" --arg head "$PR_SHA" --arg merge "$MERGE_SHA" \
-            '{pr: $pr, master_sha: $master, head_sha: $head, merge_sha: $merge}' > benchmark-results/metadata.json
+          jq -n --argjson pr "$PR_NUMBER" --arg master "$MASTER_SHA" --arg head "$PR_SHA" \
+            '{pr: $pr, master_sha: $master, head_sha: $head}' > benchmark-results/metadata.json
           cat benchmark-results/benchstat.txt >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload benchmark results
