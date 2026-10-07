@@ -61,7 +61,7 @@ func TestArrowYQLScalars(t *testing.T) {
 						want = nil
 					}
 					if err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
-						for _, format := range []string{"Ydb.Value", "WithArrow"} {
+						for _, format := range []string{"Ydb.Value", "WithResultFormatArrow"} {
 							t.Run(format, func(t *testing.T) {
 								alloc := memory.NewCheckedAllocator(memory.DefaultAllocator)
 								defer alloc.AssertSize(t, 0)
@@ -72,11 +72,11 @@ func TestArrowYQLScalars(t *testing.T) {
 									return ipc.NewReader(part, opts...)
 								}
 								option := query.WithYdbValue()
-								if format == "WithArrow" {
-									option = query.WithArrow(factory, ipc.WithAllocator(alloc))
+								if format == "WithResultFormatArrow" {
+									option = query.WithResultFormatArrow(factory, ipc.WithAllocator(alloc))
 								}
 								assertScalarRows(ctx, t, s, statement, option, logicalType, goType, want)
-								if format == "WithArrow" && len(want) > 0 && calls.Load() == 0 {
+								if format == "WithResultFormatArrow" && len(want) > 0 && calls.Load() == 0 {
 									t.Fatal("server did not return Arrow IPC")
 								}
 							})
@@ -111,7 +111,7 @@ func TestArrowYQLAliases(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
-				for _, option := range []query.ExecuteOption{query.WithYdbValue(), query.WithArrow(ipc.NewReader)} {
+				for _, option := range []query.ExecuteOption{query.WithYdbValue(), query.WithResultFormatArrow(ipc.NewReader)} {
 					assertScalarRows(ctx, t, s, "SELECT "+test.expression+" AS value;", option,
 						test.want.Type(), test.goType, []types.Value{test.want})
 				}
@@ -210,6 +210,62 @@ func TestArrowYQLTimezones(t *testing.T) {
 	}
 }
 
+func TestArrowWideTimezoneScans(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close(ctx)
+	for _, test := range []struct{ kind, text string }{
+		{"TzDate32", "-0001-02-29,UTC"},
+		{"TzDate32", "-144169-01-01,UTC"},
+		{"TzDatetime64", "10000-02-29T12:34:56,UTC"},
+		{"TzDatetime64", "148107-12-31T23:59:59,UTC"},
+		{"TzTimestamp64", "1969-12-31T12:34:56.123456,Europe/Moscow"},
+		{"TzTimestamp64", "148107-12-31T23:59:59.999999,UTC"},
+	} {
+		t.Run(test.kind+"/"+test.text, func(t *testing.T) {
+			statement := fmt.Sprintf("SELECT %s(%q) AS required, Just(%s(%q)) AS optional, Nothing(%s?) AS absent;",
+				test.kind, test.text, test.kind, test.text, test.kind)
+			baseline, err := db.Query().QueryRow(ctx, statement, query.WithYdbValue())
+			if err != nil {
+				t.Fatal(err)
+			}
+			type nativeTimes struct {
+				Required time.Time  `sql:"required"`
+				Optional *time.Time `sql:"optional"`
+				Absent   *time.Time `sql:"absent"`
+			}
+			var want nativeTimes
+			if err := baseline.ScanStruct(&want); err != nil {
+				t.Fatal(err)
+			}
+			row, err := db.Query().QueryRow(ctx, statement, query.WithResultFormatArrow(ipc.NewReader))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, mode := range []string{"Scan", "ScanNamed", "ScanStruct"} {
+				var got nativeTimes
+				got.Absent = &got.Required
+				switch mode {
+				case "Scan":
+					err = row.Scan(&got.Required, &got.Optional, &got.Absent)
+				case "ScanNamed":
+					err = row.ScanNamed(query.Named("absent", &got.Absent),
+						query.Named("optional", &got.Optional), query.Named("required", &got.Required))
+				case "ScanStruct":
+					err = row.ScanStruct(&got)
+				}
+				if err != nil || !reflect.DeepEqual(got, want) {
+					t.Fatalf("%s: got %+v (%v), want %+v", mode, got, err, want)
+				}
+			}
+		})
+	}
+}
+
 func TestArrowYQLExecutors(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
@@ -233,7 +289,7 @@ func TestArrowYQLExecutors(t *testing.T) {
 			t.Run(method, func(t *testing.T) {
 				alloc := memory.NewCheckedAllocator(memory.DefaultAllocator)
 				defer alloc.AssertSize(t, 0)
-				option := query.WithArrow(ipc.NewReader, ipc.WithAllocator(alloc))
+				option := query.WithResultFormatArrow(ipc.NewReader, ipc.WithAllocator(alloc))
 				var saved []types.Value
 				switch method {
 				case "QueryRow":
@@ -325,7 +381,7 @@ func TestArrowYQLNonPersistableResult(t *testing.T) {
 		option query.ExecuteOption
 	}{
 		{"Ydb.Value", query.WithYdbValue()},
-		{"WithArrow", query.WithArrow(ipc.NewReader)},
+		{"WithResultFormatArrow", query.WithResultFormatArrow(ipc.NewReader)},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := db.Query().QueryRow(ctx, `SELECT ParseTypeHandle("Int32") AS value;`, test.option)
@@ -383,7 +439,7 @@ func TestArrowYQLParts(t *testing.T) {
 						return ipc.NewReader(part, opts...)
 					}
 					read := func(executor query.Executor) error {
-						result, err := executor.Query(ctx, statement, query.WithArrow(factory, ipc.WithAllocator(alloc)),
+						result, err := executor.Query(ctx, statement, query.WithResultFormatArrow(factory, ipc.WithAllocator(alloc)),
 							query.WithResponsePartLimitSizeBytes(4<<10), query.WithResponsePartPrefetch(prefetch))
 						if err != nil {
 							return err
@@ -705,10 +761,10 @@ func fullTypeFixtures() []fullTypeFixture {
 			"VariantNullPayload", `Variant(Nothing(Int32?),"0",Variant<Int32?,Utf8>)`,
 			"Variant<Optional<Int32>,Utf8>", arrow.DENSE_UNION,
 		},
-		{"TaggedNull", `AsTagged(Nothing(Int32?),"tag")`, "Tagged<Optional<Int32>,'tag'>", arrow.INT32},
+		{"TaggedNull", `AsTagged(Nothing(Int32?),"tag")`, `Tagged<Optional<Int32>,"tag">`, arrow.INT32},
 		{
 			"TaggedNestedOptional", `AsTagged(Just(Nothing(Int32?)),"tag")`,
-			"Tagged<Optional<Optional<Int32>>,'tag'>", arrow.STRUCT,
+			`Tagged<Optional<Optional<Int32>>,"tag">`, arrow.STRUCT,
 		},
 		{"NegativeDecimal", `Decimal("-1.23",31,9)`, "Decimal(31,9)", arrow.FIXED_SIZE_BINARY},
 		{"DecimalNaN", `Decimal("NaN",35,0)`, "Decimal(35,0)", arrow.FIXED_SIZE_BINARY},
@@ -717,7 +773,8 @@ func fullTypeFixtures() []fullTypeFixture {
 		{"PgNull", `PgCast(NULL,PgInt4)`, "PgType(23)", arrow.STRING},
 		{"EmptyList", `[]`, "EmptyList", arrow.STRUCT},
 		{"EmptyDict", `AsDict()`, "EmptyDict", arrow.STRUCT},
-		{"Tagged", `AsTagged(42,"tag")`, "Tagged<Int32,'tag'>", arrow.INT32},
+		{"Tagged", `AsTagged(42,"tag")`, `Tagged<Int32,"tag">`, arrow.INT32},
+		{"EscapedTagged", `AsTagged(42,"a'b\\c")`, `Tagged<Int32,"a'b\\c">`, arrow.INT32},
 		{"TzDate32", `TzDate32("1969-12-31,Europe/Moscow")`, "TzDate32", arrow.STRUCT},
 		{"TzDatetime64", `TzDatetime64("1969-12-31T12:34:56,Europe/Moscow")`, "TzDatetime64", arrow.STRUCT},
 		{"TzTimestamp64", `TzTimestamp64("1969-12-31T12:34:56.123456,Europe/Moscow")`, "TzTimestamp64", arrow.STRUCT},
@@ -757,7 +814,7 @@ func assertValueRows(ctx context.Context, t *testing.T, executor query.Executor,
 
 		return ipc.NewReader(part, opts...)
 	}
-	result, err := executor.QueryResultSet(ctx, statement, query.WithArrow(factory, ipc.WithAllocator(alloc)))
+	result, err := executor.QueryResultSet(ctx, statement, query.WithResultFormatArrow(factory, ipc.WithAllocator(alloc)))
 	if err != nil {
 		t.Fatal(err)
 	}

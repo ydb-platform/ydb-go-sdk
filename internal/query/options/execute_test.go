@@ -257,7 +257,7 @@ func TestThisOptionIsNotForExecuteOnTx(t *testing.T) {
 	txCtrl.thisOptionIsNotForExecuteOnTx()
 }
 
-func TestWithArrow(t *testing.T) {
+func TestWithResultFormatArrow(t *testing.T) {
 	called := false
 	decoder := arrow.Decoder(func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
 		called = true
@@ -265,10 +265,10 @@ func TestWithArrow(t *testing.T) {
 		return nil, nil
 	})
 	require.Nil(t, ExecuteSettings().ArrowDecoder())
-	decode := ExecuteSettings(WithArrow(decoder)).ArrowDecoder()
+	decode := ExecuteSettings(WithResultFormatArrow(decoder)).ArrowDecoder()
 	require.NotNil(t, decode)
 	_, err := decode(t.Context(), nil, nil)
 	require.NoError(t, err)
 	require.True(t, called)
-	require.Nil(t, ExecuteSettings(WithArrow(decoder), WithArrow(nil)).ArrowDecoder())
+	require.Nil(t, ExecuteSettings(WithResultFormatArrow(decoder), WithResultFormatArrow(nil)).ArrowDecoder())
 }

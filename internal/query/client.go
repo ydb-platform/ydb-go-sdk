@@ -366,7 +366,7 @@ func (c *Client) withDefaultExecuteOptions(opts ...options.Execute) []options.Ex
 
 	var defaults []options.Execute
 	if decoder := c.config.DefaultArrowDecoder(); decoder != nil {
-		defaults = append(defaults, options.WithArrow(decoder))
+		defaults = append(defaults, options.WithResultFormatArrow(decoder))
 	}
 	if c.config.DefaultIdempotent() {
 		defaults = append(defaults, options.WithIdempotent(true))

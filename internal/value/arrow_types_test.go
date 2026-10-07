@@ -68,9 +68,9 @@ func TestAdditionalYQLValues(t *testing.T) {
 		DictValueWithType(types.NewDict(types.Bytes, types.Int32), nil),
 		SetValueWithType(types.NewSet(types.Bytes), nil),
 		TaggedValue(types.NewTagged(types.Int32, "tag"), Int32Value(42)),
-		TzDate32Value( "1969-12-31,Europe/Moscow"),
-		TzDatetime64Value( "1969-12-31T12:34:56,Europe/Moscow"),
-		TzTimestamp64Value( "1969-12-31T12:34:56.123456,Europe/Moscow"),
+		TzDate32Value("1969-12-31,Europe/Moscow"),
+		TzDatetime64Value("1969-12-31T12:34:56,Europe/Moscow"),
+		TzTimestamp64Value("1969-12-31T12:34:56.123456,Europe/Moscow"),
 		PgValue(25, ""), PgNullValue(25),
 	} {
 		t.Run(v.Type().Yql()+"/"+v.Yql(), func(t *testing.T) {

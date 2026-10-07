@@ -26,11 +26,11 @@ account for this when producing application side effects. See the
 | Format and API | Recommended use | Costs and ownership |
 | --- | --- | --- |
 | `Ydb.Value` through the ordinary query methods | Start here for small results, general type support or applications without an Arrow decoder | Default format; the SDK provides rows and scanners. |
-| Arrow through `query.WithArrow(ipc.NewReader)` | Evaluate for larger results when retaining `Scan`, `ScanNamed`, `ScanStruct` and `Values` is useful | Rows refer to retained column batches. The decoder scans requested cells directly; `Values` and fallback conversions create owned `types.Value` objects on demand. |
+| Arrow through `query.WithResultFormatArrow(ipc.NewReader)` | Evaluate for larger results when retaining `Scan`, `ScanNamed`, `ScanStruct` and `Values` is useful | Rows refer to retained column batches. The decoder scans requested cells directly; `Values` and fallback conversions create owned `types.Value` objects on demand. |
 | Raw Arrow through `Session.QueryArrow` | Column processing that can consume Arrow batches directly | Avoids conversion to SDK rows. The application reads IPC, manages Arrow resources, and keeps borrowed column data within the batch lifetime. |
 
 Arrow requires server support and the `EnableArrowResultSetFormat` feature.
-`query.WithArrow` and the driver default option are experimental. Format selection
+`query.WithResultFormatArrow` and the driver default option are experimental. Format selection
 does not change materialization: `Client.Query` still keeps the entire result in
 memory with Arrow enabled. Session and transaction queries decode one response
 part at a time.
@@ -41,9 +41,9 @@ from the Arrow major version selected by your application:
 ```go
 import "github.com/apache/arrow-go/v18/arrow/ipc"
 
-arrowOption := query.WithArrow(ipc.NewReader)
+arrowOption := query.WithResultFormatArrow(ipc.NewReader)
 // Reader options use the same Arrow Go version:
-arrowOption = query.WithArrow(ipc.NewReader, ipc.WithAllocator(allocator))
+arrowOption = query.WithResultFormatArrow(ipc.NewReader, ipc.WithAllocator(allocator))
 ```
 
 Generic reader, record, array and option types are inferred from `ipc.NewReader`;
@@ -80,13 +80,13 @@ are released when advancing to another part or closing the internal result.
 ### Type compatibility tests
 
 The [integration tests](tests/integration/arrow/types_integration_test.go)
-use table-free `SELECT` expressions. They compare protobuf and `WithArrow` for
+use table-free `SELECT` expressions. They compare protobuf and `WithResultFormatArrow` for
 all supported scalar types, numeric boundaries, special floating-point values,
 binary/text data, mixed nullable rows, all-null columns and empty results.
 They exercise `Scan`, `ScanNamed`, `ScanStruct` and `Values`, require actual IPC
 for non-empty Arrow results and check that Arrow allocations are released.
 
-The same suite compares raw `QueryArrow`, `WithArrow` and protobuf for temporal
+The same suite compares raw `QueryArrow`, `WithResultFormatArrow` and protobuf for temporal
 types, Decimal, UUID, JSON/YSON, DyNumber, Pg values and containers, including
 Tagged, EmptyList, EmptyDict and the wide time-zone types TzDate32, TzDatetime64
 and TzTimestamp64. It checks nested NULLs, both Variant alternatives, calendar
@@ -103,7 +103,7 @@ The examples below assume `db` is an open driver, `ctx` is a context and
 
 ```go
 row, err := db.Query().QueryRow(ctx, `SELECT 42 AS id;`,
-    query.WithArrow(ipc.NewReader),
+    query.WithResultFormatArrow(ipc.NewReader),
 )
 if err != nil {
     return err
@@ -149,7 +149,7 @@ if err := row.Scan(&id); err != nil {
 }
 ```
 
-`query.WithArrow(ipc.NewReader, opts...)` selects a reader factory and its options
+`query.WithResultFormatArrow(ipc.NewReader, opts...)` selects a reader factory and its options
 for one query; `query.WithYdbValue()` selects the ordinary YDB value format.
 Subsequent queries without an override use the driver default again.
 `ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader, opts...)` accepts the same
@@ -169,11 +169,11 @@ The benchmark compares full SELECT execution and consumption of all six columns:
 
 - `Value`: `Session.Query` + `Scan`.
 - `QueryArrow`: `Session.QueryArrow` + direct column access.
-- `WithArrow`: `Session.Query` + `query.WithArrow(ipc.NewReader)` from v18 + `Scan`.
+- `WithResultFormatArrow`: `Session.Query` + `query.WithResultFormatArrow(ipc.NewReader)` from v18 + `Scan`.
 
 All variants use the same session, SQL, row checksum, disabled response prefetch
-and a 32 KiB response-part limit. Value and WithArrow reuse Scan destinations and
-arguments between rows. The WithArrow option is created once and reused across
+and a 32 KiB response-part limit. Value and WithResultFormatArrow reuse Scan destinations and
+arguments between rows. The WithResultFormatArrow option is created once and reused across
 queries. Nullable scans still allocate each non-null destination.
 Row handles share one slice per decoded batch, allocated for all rows even when
 consumption stops early.
@@ -204,14 +204,14 @@ Server CPU and wire payload size were not measured.
 
 ### Interpreting the results
 
-For 1/10 rows, WithArrow does not show a consistent elapsed-time benefit: its
+For 1/10 rows, WithResultFormatArrow does not show a consistent elapsed-time benefit: its
 median changes by -0.2% / -2.9% relative to Value, and the observed ranges overlap.
 Client CPU changes by +6.9% / +1.3%. For one row, allocated bytes increase
-by 38.1% and allocation count by 28.3%. At 100 rows, WithArrow reduces median
+by 38.1% and allocation count by 28.3%. At 100 rows, WithResultFormatArrow reduces median
 client CPU by 36.0% in this workload, while median elapsed time increases by
 4.4%; the observed elapsed ranges still overlap.
 
-For 1,000/10,000 rows, WithArrow reduces client CPU by 72.4% / 68.0%, elapsed
+For 1,000/10,000 rows, WithResultFormatArrow reduces client CPU by 72.4% / 68.0%, elapsed
 time by 41.3% / 14.0%, allocated bytes by 80.7% / 72.1% and allocation count
 by 80.8% / 81.5% relative to Value. Direct QueryArrow reduces client CPU by
 74.5% / 78.5%, but requires a different consumption API and resource ownership.
@@ -236,7 +236,7 @@ xychart-beta
     y-axis "ms/RPC" 0 --> 28
     line "Value" [0.271, 0.327, 0.591, 3.293, 27.634]
     line "QueryArrow" [0.265, 0.316, 0.321, 0.839, 5.954]
-    line "WithArrow" [0.290, 0.331, 0.378, 0.908, 8.833]
+    line "WithResultFormatArrow" [0.290, 0.331, 0.378, 0.908, 8.833]
 ```
 
 ### Allocated memory
@@ -254,7 +254,7 @@ xychart-beta
     y-axis "MiB/RPC" 0 --> 20
     line "Value" [0.021, 0.035, 0.179, 2.220, 19.184]
     line "QueryArrow" [0.026, 0.029, 0.059, 0.394, 4.504]
-    line "WithArrow" [0.029, 0.033, 0.066, 0.428, 5.358]
+    line "WithResultFormatArrow" [0.029, 0.033, 0.066, 0.428, 5.358]
 ```
 
 ### Allocation count
@@ -272,7 +272,7 @@ xychart-beta
     y-axis "Allocations/RPC" 0 --> 400000
     line "Value" [378, 722, 4112, 39528, 394870]
     line "QueryArrow" [372, 373, 374, 680, 4698]
-    line "WithArrow" [485, 549, 1153, 7582, 73114]
+    line "WithResultFormatArrow" [485, 549, 1153, 7582, 73114]
 ```
 
 The x-axis lists the measured row counts at equal intervals; the y-axis is

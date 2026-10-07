@@ -39,7 +39,7 @@ func (s *Session) withDefaultExecuteOptions(opts ...options.Execute) []options.E
 		return opts
 	}
 
-	return append([]options.Execute{options.WithArrow(s.defaultArrowDecoder)}, opts...)
+	return append([]options.Execute{options.WithResultFormatArrow(s.defaultArrowDecoder)}, opts...)
 }
 
 func (s *Session) QueryResultSet(

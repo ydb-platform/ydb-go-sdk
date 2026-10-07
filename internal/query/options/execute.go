@@ -238,7 +238,7 @@ func (opt arrowOption) applyExecuteOption(s *executeSettings) {
 	s.arrowDecoder = opt.decoder
 }
 
-func WithArrow(decoder arrow.Decoder) Execute {
+func WithResultFormatArrow(decoder arrow.Decoder) Execute {
 	return arrowOption{decoder: decoder}
 }
 

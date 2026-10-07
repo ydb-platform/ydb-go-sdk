@@ -333,7 +333,7 @@ func TestArrowExecuteOptionDefaults(t *testing.T) {
 			}{
 				{name: "default", arrow: defaults.arrow},
 				{name: "Ydb.Value", opts: []query.ExecuteOption{query.WithYdbValue()}},
-				{name: "Arrow", opts: []query.ExecuteOption{options.WithArrow(decoder)}, arrow: true},
+				{name: "Arrow", opts: []query.ExecuteOption{options.WithResultFormatArrow(decoder)}, arrow: true},
 			} {
 				t.Run(call.name, func(t *testing.T) {
 					expected := Ydb.ResultSet_FORMAT_UNSPECIFIED

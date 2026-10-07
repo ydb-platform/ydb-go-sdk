@@ -550,7 +550,7 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 // Pass ipc.NewReader and optional IPC reader options from the application's
 // Apache Arrow Go version; the SDK module has no Apache Arrow Go dependency.
 // Reader, record, array and option types are inferred from the factory.
-// The factory and its options must support concurrent calls. See query.WithArrow
+// The factory and its options must support concurrent calls. See query.WithResultFormatArrow
 // for supported types and result ownership and lifetime requirements.
 //
 // Compatible Arrow Go modules are github.com/apache/arrow/go/v6 through v17
@@ -563,7 +563,7 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 // With v6-v13 or the legacy module, google.golang.org/genproto may need an upgrade
 // to avoid ambiguous imports with the SDK's googleapis/rpc dependency.
 //
-// Per-call query.WithArrow overrides the reader factory and its options, while
+// Per-call query.WithResultFormatArrow overrides the reader factory and its options, while
 // query.WithYdbValue selects YDB values for one query. Subsequent queries without
 // an override use the driver default again. A typed nil reader factory selects
 // the default YDB value format; an untyped nil cannot supply generic type arguments.

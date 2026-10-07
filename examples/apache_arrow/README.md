@@ -1,12 +1,12 @@
 # Writing and reading rows with Apache Arrow
 
-`query.WithArrow` is experimental. It works with `Query`, `QueryRow` and
+`query.WithResultFormatArrow` is experimental. It works with `Query`, `QueryRow` and
 `QueryResultSet` on `query.Client`, `query.Session` and `query.TxActor`.
 The server must support Arrow results and enable `EnableArrowResultSetFormat`.
 
 The SDK module does not import Apache Arrow Go. Pass
 `ipc.NewReader` and optional IPC reader options from your own Arrow dependency
-to `query.WithArrow` or `ydb.WithQueryDefaultResultFormatArrow`. Reader,
+to `query.WithResultFormatArrow` or `ydb.WithQueryDefaultResultFormatArrow`. Reader,
 record, array and option types are inferred automatically; both options
 work with v17 and v18. The examples module uses
 `github.com/apache/arrow-go/v18` v18.8.0 (Go 1.25 or newer); it does not change
@@ -37,7 +37,7 @@ if err := row.Scan(&id, &name); err != nil {
 
 // With Arrow IPC on the wire and the same SDK scans:
 row, err = db.Query().QueryRow(ctx, `SELECT 42 AS id, "hello"u AS name;`,
-    query.WithArrow(ipc.NewReader),
+    query.WithResultFormatArrow(ipc.NewReader),
 )
 if err != nil {
     return err
@@ -113,7 +113,7 @@ err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
 
 The [command](main.go) creates a table, inserts two rows with Arrow
 `BulkUpsert`, reads them with `Session.QueryArrow` and with
-`Session.Query`, `query.WithArrow(ipc.NewReader)` and `ScanNamed`, then drops
+`Session.Query`, `query.WithResultFormatArrow(ipc.NewReader)` and `ScanNamed`, then drops
 the table. With a local YDB running, execute from the `examples` directory:
 
 ```sh
@@ -126,8 +126,8 @@ The command uses anonymous authentication and prints:
 ```text
 QueryArrow: id=24 name="WOW"
 QueryArrow: id=42 name="my string"
-WithArrow: id=24 name="WOW"
-WithArrow: id=42 name="my string"
+WithResultFormatArrow: id=24 name="WOW"
+WithResultFormatArrow: id=42 name="my string"
 ```
 
 ## Tests and benchmarks

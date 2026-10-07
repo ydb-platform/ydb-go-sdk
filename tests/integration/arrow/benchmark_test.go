@@ -61,7 +61,7 @@ func BenchmarkFormats(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
-	arrowOption := query.WithArrow(ipc.NewReader)
+	arrowOption := query.WithResultFormatArrow(ipc.NewReader)
 	err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
 		for _, size := range []int{1, 10, 100, 1000, 10000} {
 			sql := fmt.Sprintf(
@@ -75,14 +75,14 @@ func BenchmarkFormats(b *testing.B) {
 				return fmt.Errorf("fixture rows=%d, want %d", count, size)
 			}
 			b.Logf("rows=%d checksum=%016x", size, expected)
-			for _, variant := range []string{"Value", "QueryArrow", "WithArrow"} {
+			for _, variant := range []string{"Value", "QueryArrow", "WithResultFormatArrow"} {
 				b.Run(fmt.Sprintf("%d/%s", size, variant), func(b *testing.B) {
 					run := func() (int, uint64, error) {
 						if variant == "QueryArrow" {
 							return consumeArrow(ctx, s, sql)
 						}
 						var opts []query.ExecuteOption
-						if variant == "WithArrow" {
+						if variant == "WithResultFormatArrow" {
 							opts = append(opts, arrowOption)
 						}
 

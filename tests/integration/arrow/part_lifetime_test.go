@@ -83,7 +83,7 @@ ORDER BY id;`, strings.Repeat("x", 64))
 				return batches, nil
 			}
 			read := func(executor query.Executor) error {
-				res, err := executor.Query(ctx, sql, options.WithArrow(decode),
+				res, err := executor.Query(ctx, sql, options.WithResultFormatArrow(decode),
 					query.WithResponsePartLimitSizeBytes(4<<10), query.WithResponsePartPrefetch(test.prefetch))
 				if err != nil {
 					return err

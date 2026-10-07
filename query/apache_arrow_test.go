@@ -11,10 +11,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
-func TestWithArrow(t *testing.T) {
+func TestWithResultFormatArrow(t *testing.T) {
 	reader := &mockIPCReader{}
 	readerOptions := []string{"reader option"}
-	opt := query.WithArrow(func(part io.Reader, opts ...string) (*mockIPCReader, error) {
+	opt := query.WithResultFormatArrow(func(part io.Reader, opts ...string) (*mockIPCReader, error) {
 		payload, err := io.ReadAll(part)
 		require.NoError(t, err)
 		require.Equal(t, "IPC part", string(payload))

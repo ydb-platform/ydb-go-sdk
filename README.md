@@ -120,7 +120,7 @@ result set, and `Query` for multiple result sets. For large results, iterate
 `Client.QueryResultSet` materialize their results in memory.
 
 Query Service uses `Ydb.Value` by default. Experimental
-`query.WithArrow(ipc.NewReader, opts...)` uses your application's Arrow Go version
+`query.WithResultFormatArrow(ipc.NewReader, opts...)` uses your application's Arrow Go version
 while preserving the row and scan APIs;
 `ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader, opts...)` sets the driver default.
 `query.WithYdbValue()` selects YDB values for one query.

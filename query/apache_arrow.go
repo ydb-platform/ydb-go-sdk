@@ -21,7 +21,7 @@ type ArrowExecutor interface {
 
 type ArrowResult = arrow.Result
 
-// WithArrow requests Arrow results for one query while retaining ResultSets,
+// WithResultFormatArrow requests Arrow results for one query while retaining ResultSets,
 // Rows, Scan, ScanNamed, ScanStruct and Values. It applies to Query, QueryRow and
 // QueryResultSet on Client, Session and TxActor, including queries inside Do and DoTx.
 // Exec also requests Arrow, but discards results without invoking the reader.
@@ -45,13 +45,13 @@ type ArrowResult = arrow.Result
 //
 // For example (error handling omitted):
 //
-//	row, err := db.Query().QueryRow(ctx, sql, query.WithArrow(ipc.NewReader))
+//	row, err := db.Query().QueryRow(ctx, sql, query.WithResultFormatArrow(ipc.NewReader))
 //	var id int32
 //	err = row.Scan(&id)
 //
 // Reader options can be passed directly:
 //
-//	option := query.WithArrow(ipc.NewReader, ipc.WithAllocator(allocator))
+//	option := query.WithResultFormatArrow(ipc.NewReader, ipc.WithAllocator(allocator))
 //
 // To enable Arrow by default, use ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader).
 // WithYdbValue overrides that driver default for one query:
@@ -74,10 +74,10 @@ type ArrowResult = arrow.Result
 // fall back to another format.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func WithArrow[A arrow.Array, B arrow.Record[A], R arrow.IPCReader[B], O any](
+func WithResultFormatArrow[A arrow.Array, B arrow.Record[A], R arrow.IPCReader[B], O any](
 	newReader func(io.Reader, ...O) (R, error), opts ...O,
 ) ExecuteOption {
-	return options.WithArrow(arrow.NewDecoder(newReader, opts...))
+	return options.WithResultFormatArrow(arrow.NewDecoder(newReader, opts...))
 }
 
 // WithYdbValue selects the ordinary YDB value result format for one query,
@@ -87,5 +87,5 @@ func WithArrow[A arrow.Array, B arrow.Record[A], R arrow.IPCReader[B], O any](
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithYdbValue() ExecuteOption {
-	return options.WithArrow(nil)
+	return options.WithResultFormatArrow(nil)
 }

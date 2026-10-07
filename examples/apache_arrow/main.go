@@ -130,7 +130,7 @@ func main() {
 	}
 
 	err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
-		result, err := s.Query(ctx, sql, query.WithArrow(ipc.NewReader))
+		result, err := s.Query(ctx, sql, query.WithResultFormatArrow(ipc.NewReader))
 		if err != nil {
 			return err
 		}
@@ -148,7 +148,7 @@ func main() {
 				if err := row.ScanNamed(query.Named("id", &id), query.Named("name", &name)); err != nil {
 					return err
 				}
-				fmt.Printf("WithArrow: id=%d name=%q\n", id, name)
+				fmt.Printf("WithResultFormatArrow: id=%d name=%q\n", id, name)
 			}
 		}
 
