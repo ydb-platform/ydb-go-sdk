@@ -2,6 +2,8 @@ package sugar
 
 import "net/url"
 
+const insecureScheme = "grpc"
+
 type dsnOption func(dsn *url.URL)
 
 // Usage of this package
@@ -15,7 +17,7 @@ func DSN(endpoint, database string, opts ...dsnOption) (s string) {
 	qp := url.Values{}
 
 	dsn := url.URL{
-		Scheme:   "grpc",
+		Scheme:   insecureScheme,
 		Host:     endpoint,
 		Path:     database,
 		RawQuery: qp.Encode(),
@@ -33,7 +35,7 @@ func WithSecure(secure bool) dsnOption {
 		if secure {
 			dsn.Scheme = "grpcs"
 		} else {
-			dsn.Scheme = "grpc"
+			dsn.Scheme = insecureScheme
 		}
 	}
 }

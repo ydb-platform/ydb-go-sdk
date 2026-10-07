@@ -25,6 +25,7 @@ func AlterWithMinActivePartitions(minActivePartitions int64) AlterOption {
 }
 
 // AlterWithPartitionCountLimit change partition count limit of the topic
+// Deprecated: Use AlterWithMaxActivePartitions instead.
 func AlterWithPartitionCountLimit(partitionCountLimit int64) AlterOption {
 	return withPartitionCountLimit(partitionCountLimit)
 }

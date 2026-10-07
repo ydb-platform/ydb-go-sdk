@@ -191,7 +191,7 @@ func (f KeyValue) String() string {
 		if f.vany == nil {
 			return nilPtr
 		}
-		if v := reflect.ValueOf(f.vany); v.Type().Kind() == reflect.Ptr {
+		if v := reflect.ValueOf(f.vany); v.Type().Kind() == reflect.Pointer {
 			if v.IsNil() {
 				return nilPtr
 			}
