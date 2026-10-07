@@ -333,27 +333,27 @@ func TestEndpointElectorSingleCandidateNeedsNoRandomDraw(t *testing.T) {
 }
 
 // cpu: Apple M3 Pro; go1.27.0 darwin/arm64; GOMAXPROCS=4.
-// Baseline: master 9cd397464; median of five runs, one second per case.
+// P2C on master 6b54e06b2; median of five runs, one second per case.
 //
 //	GOTOOLCHAIN=go1.27.0 go test -run '^$' -bench '^BenchmarkEndpointElector$' \
 //	  -benchmem -benchtime=1s -count=5 -cpu=4 ./internal/balancer
 //
-// BenchmarkEndpointElector/Equal/1/Serial-4              6.986 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Equal/1/Parallel-4          133.100 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/1/Serial-4             6.975 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/1/Parallel-4         133.000 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Equal/2/Serial-4              6.876 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Equal/2/Parallel-4          133.000 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/2/Serial-4             6.867 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/2/Parallel-4         121.100 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Equal/9/Serial-4              7.455 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Equal/9/Parallel-4          130.200 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/9/Serial-4             7.411 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/9/Parallel-4         109.700 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Equal/1000/Serial-4           7.357 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Equal/1000/Parallel-4       133.800 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/1000/Serial-4          7.359 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/1000/Parallel-4      133.800 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/1/Serial-4              1.138 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/1/Parallel-4            0.498 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/1/Serial-4             1.142 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/1/Parallel-4           0.506 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/2/Serial-4             19.150 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/2/Parallel-4          240.300 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/2/Serial-4            19.180 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/2/Parallel-4         245.100 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/9/Serial-4             20.650 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/9/Parallel-4          247.700 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/9/Serial-4            20.690 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/9/Parallel-4         242.900 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/1000/Serial-4          22.120 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/1000/Parallel-4       250.000 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/1000/Serial-4         22.060 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/1000/Parallel-4      250.900 ns/op     0 B/op   0 allocs/op
 //
 // Fixed loads measure selection cost, not RPC latency.
 func BenchmarkEndpointElector(b *testing.B) {
