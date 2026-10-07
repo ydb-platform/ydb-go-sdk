@@ -20,12 +20,50 @@ func TestComplexColumns(t *testing.T) {
 	tuple := types.NewTuple(types.Int32)
 	variant := types.NewVariantTuple(types.Int32, types.Text)
 	nested := types.NewOptional(types.NewOptional(types.Int32))
+	tagged := types.NewTagged(types.Int32, "tag")
+	variantStruct := types.NewVariantStruct(
+		types.StructField{Name: "number", T: types.Int32}, types.StructField{Name: "text", T: types.Text},
+	)
 	for _, test := range []struct {
 		name  string
 		array Array
 		typ   types.Type
 		want  []value.Value
 	}{
+		{
+			"tagged", &scalarTestArray[int32]{values: []int32{42}}, tagged,
+			[]value.Value{value.TaggedValue(tagged, value.Int32Value(42))},
+		},
+		{
+			"optional tagged", ints, types.NewOptional(tagged),
+			[]value.Value{value.OptionalValue(value.TaggedValue(tagged, value.Int32Value(42))), value.NullValue(tagged)},
+		},
+		{
+			"empty dict", &structTestArray{present, nil}, types.NewEmptyDict(),
+			[]value.Value{value.DictValue(), value.DictValue()},
+		},
+		{
+			"struct", &structTestArray{present, []Array{ints}},
+			types.NewStruct(types.StructField{Name: "number", T: types.NewOptional(types.Int32)}),
+			[]value.Value{
+				value.StructValue(value.StructValueField{Name: "number", V: value.OptionalValue(value.Int32Value(42))}),
+				value.StructValue(value.StructValueField{Name: "number", V: value.NullValue(types.Int32)}),
+			},
+		},
+		{
+			"list value offsets", &listValueOffsetsTestArray{listTestArray{present, ints, []int32{0, 1, 2}}},
+			types.NewList(types.NewOptional(types.Int32)),
+			[]value.Value{
+				value.ListValue(value.OptionalValue(value.Int32Value(42))), value.ListValue(value.NullValue(types.Int32)),
+			},
+		},
+		{
+			"variant struct", &unionTestArray{present, []Array{ints, text}, []int{0, 1}}, variantStruct,
+			[]value.Value{
+				value.VariantValueStruct(value.Int32Value(42), "number", variantStruct),
+				value.VariantValueStruct(value.TextValue("text"), "text", variantStruct),
+			},
+		},
 		{
 			"nullable tuple", &structTestArray{shape, []Array{ints}}, types.NewOptional(tuple),
 			[]value.Value{value.OptionalValue(value.TupleValue(value.Int32Value(42))), value.NullValue(tuple)},
@@ -127,6 +165,35 @@ func TestVariantColumnUnsupportedType(t *testing.T) {
 	require.ErrorContains(t, err, "unsupported YDB variant type")
 }
 
+func TestTimezoneColumns(t *testing.T) {
+	for _, test := range []struct {
+		physical Array
+		want     value.Value
+	}{
+		{&scalarTestArray[uint16]{values: []uint16{1}}, value.TzDateValue("1970-01-02,UTC")},
+		{&scalarTestArray[uint32]{values: []uint32{86401}}, value.TzDatetimeValue("1970-01-02T00:00:01,UTC")},
+		{&scalarTestArray[uint64]{values: []uint64{86401123456}}, value.TzTimestampValue("1970-01-02T00:00:01.123456,UTC")},
+		{&scalarTestArray[int32]{values: []int32{-1}}, value.TzDate32Value("1969-12-31,UTC")},
+		{&scalarTestArray[int64]{values: []int64{-1}}, value.TzDatetime64Value("1969-12-31T23:59:59,UTC")},
+		{&scalarTestArray[int64]{values: []int64{-1}}, value.TzTimestamp64Value("1969-12-31T23:59:59.999999,UTC")},
+	} {
+		t.Run(test.want.Type().Yql(), func(t *testing.T) {
+			data := &structTestArray{
+				scalarTestArray: scalarTestArray[struct{}]{values: make([]struct{}, 1)},
+				fields: []Array{
+					test.physical, &scalarTestArray[string]{values: []string{"UTC"}},
+				},
+			}
+			column, err := newColumn[Array](data, test.want.Type())
+			require.NoError(t, err)
+			require.Equal(t, test.want.Yql(), column.value(0).Yql())
+			var scanned value.Value
+			require.NoError(t, column.scan(0, &scanned))
+			require.True(t, proto.Equal(value.ToYDB(test.want), value.ToYDB(scanned)))
+		})
+	}
+}
+
 func TestTimezoneColumnErrors(t *testing.T) {
 	shape := scalarTestArray[struct{}]{values: make([]struct{}, 1)}
 	ints := &scalarTestArray[int32]{values: []int32{0}}
@@ -194,6 +261,14 @@ type listTestArray struct {
 
 func (a *listTestArray) ListValues() Array { return a.values }
 func (a *listTestArray) Offsets() []int32  { return a.offsets }
+
+type listValueOffsetsTestArray struct {
+	listTestArray
+}
+
+func (a *listValueOffsetsTestArray) ValueOffsets(row int) (int64, int64) {
+	return int64(a.offsets[row]), int64(a.offsets[row+1])
+}
 
 type unionTestArray struct {
 	scalarTestArray[struct{}]
