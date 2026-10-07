@@ -1,3 +1,7 @@
+* Fixed `topicoptions.CreateWithPartitionCountLimit` and `topicoptions.AlterWithPartitionCountLimit` to set the supported maximum active partition count instead of ignored protobuf fields
+* Deprecated `topicoptions.AlterWithPartitionCountLimit` in favor of `topicoptions.AlterWithMaxActivePartitions`
+* Deprecated `topictypes.PartitionSettings.PartitionCountLimit`, which is ignored by YDB and remains zero in topic descriptions
+
 ## v3.154.0
 * Fixed decoding and scanning Tagged query results while preserving tags in column metadata and values
 * Fixed decoding of `EmptyList` and `EmptyDict` query results and preservation of explicitly typed empty lists and dictionaries
