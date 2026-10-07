@@ -206,7 +206,6 @@ func (o *orchestrator) choosePartition(msg message) (partitionID int64, err erro
 	return partitionID, nil
 }
 
-//nolint:funlen
 func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error) {
 	acquired := false
 	defer func() {
@@ -256,6 +255,15 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	if err := o.saveMessageContent(&msg); err != nil {
 		return err
 	}
+	if err := o.assignSeqNoAndEnqueue(ctx, msg, autoSetSeqNo); err != nil {
+		return err
+	}
+	acquired = false
+
+	return nil
+}
+
+func (o *orchestrator) assignSeqNoAndEnqueue(ctx context.Context, msg message, autoSetSeqNo bool) (err error) {
 	for {
 		if autoSetSeqNo {
 			if err = o.waitAutoSeqNoWriter(ctx, &msg); err != nil {
@@ -280,7 +288,6 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 			}
 			o.buf.pushNeedLock(msg)
 			o.sender.wakeup()
-			acquired = false
 		})
 		if !retry {
 			return err
