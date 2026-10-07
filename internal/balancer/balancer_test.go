@@ -263,7 +263,7 @@ func TestMaxConnectionsWithNodeIDSoftLimit(t *testing.T) {
 	require.Equal(t, state.Banned, pinned.State(), "a quarantined connection must not be revived either")
 }
 
-func TestWithNodeIDCountsRPC(t *testing.T) {
+func TestWithNodeIDBypassesP2CAndCountsRPC(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	entered := make(chan struct{})
@@ -296,6 +296,7 @@ func TestWithNodeIDCountsRPC(t *testing.T) {
 		endpoint.New("127.0.0.1:2", endpoint.WithID(2), endpoint.WithLocation("local")),
 		endpoint.New("127.0.0.1:3", endpoint.WithID(3), endpoint.WithLocation("remote")),
 	}, "")
+	b.connections().elector.rand = &electorDrawsRand{t: t}
 	pinnedCtx := userBalancers.WithNodeID(conn.WithoutWrapping(ctx), 3)
 	target, err := b.nextConn(pinnedCtx)
 	require.NoError(t, err)

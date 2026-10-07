@@ -34,7 +34,8 @@ func TestEndpointElectorSelectsRandomEndpointFromBestPriority(t *testing.T) {
 
 func TestEndpointElectorUsesBestHealthyPriority(t *testing.T) {
 	first := electorConnection("first", 1, state.Online)
-	second := electorConnection("second", 2, state.Online)
+	second := &busyElectorConn{Conn: electorConnection("second", 2, state.Online)}
+	second.load.Store(100)
 	elector := newEndpointElector([]policy.EndpointPriority{
 		{Key: first.Endpoint().Key(), Priority: 2},
 		{Key: second.Endpoint().Key(), Priority: 1},
@@ -47,12 +48,16 @@ func TestEndpointElectorUsesBestHealthyPriority(t *testing.T) {
 }
 
 func TestEndpointElectorPessimizationPromotesNextPriority(t *testing.T) {
-	local := electorConnection("local", 1, state.Online)
+	local := &busyElectorConn{Conn: electorConnection("local", 1, state.Online)}
 	remote := electorConnection("remote", 2, state.Online)
+	local.load.Store(100)
 	elector := newEndpointElector([]policy.EndpointPriority{
 		{Key: local.Endpoint().Key()},
 		{Key: remote.Endpoint().Key(), Priority: 1},
 	}, connectionMap(local, remote), &electorRand{})
+	selected, _, ok := elector.Next()
+	require.True(t, ok)
+	require.Same(t, local, selected)
 
 	local.Ban(t.Context())
 	elector.Refresh()
@@ -64,8 +69,9 @@ func TestEndpointElectorPessimizationPromotesNextPriority(t *testing.T) {
 }
 
 func TestEndpointElectorNeverSelectsExcludedEndpoint(t *testing.T) {
-	preferred := electorConnection("preferred", 1, state.Banned)
+	preferred := &busyElectorConn{Conn: electorConnection("preferred", 1, state.Banned)}
 	excluded := electorConnection("excluded", 2, state.Online)
+	preferred.load.Store(100)
 	elector := newEndpointElector([]policy.EndpointPriority{
 		{Key: preferred.Endpoint().Key()},
 		{Key: excluded.Endpoint().Key(), Excluded: true},
@@ -262,28 +268,92 @@ func TestIsConnectionStateUsable(t *testing.T) {
 	require.False(t, isConnectionStateUsable(state.Destroyed, true))
 }
 
+func TestEndpointElectorChoosesLessBusyConnection(t *testing.T) {
+	tests := []struct {
+		name   string
+		first  int
+		second int
+		loads  [3]int64
+		want   int
+	}{
+		{"second wins", 0, 0, [3]int64{10, 2, 5}, 1},
+		{"first wins", 1, 0, [3]int64{10, 2, 5}, 1},
+		{"skip first index", 0, 1, [3]int64{10, 20, 1}, 2},
+		{"last first index", 2, 1, [3]int64{10, 1, 5}, 1},
+		{"tie keeps first zero", 0, 0, [3]int64{5, 5, 5}, 0},
+		{"tie keeps first middle", 1, 0, [3]int64{5, 5, 5}, 1},
+		{"tie keeps first last", 2, 0, [3]int64{5, 5, 5}, 2},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			connections := make([]conn.Conn, 3)
+			priorities := make([]policy.EndpointPriority, 3)
+			for i := range connections {
+				c := &busyElectorConn{Conn: electorConnection("node", uint32(i+1), state.Online)}
+				c.load.Store(test.loads[i])
+				connections[i] = c
+				priorities[i] = policy.EndpointPriority{Key: c.Endpoint().Key()}
+			}
+			rand := &electorDrawsRand{t: t, draws: []int{test.first, test.second}, limits: []int{3, 2}}
+			elector := newEndpointElector(priorities, connectionMap(connections...), rand)
+			selected, allowBanned, ok := elector.Next()
+			require.True(t, ok)
+			require.False(t, allowBanned)
+			require.Same(t, connections[test.want], selected)
+			require.Equal(t, 2, rand.calls)
+		})
+	}
+}
+
+func TestEndpointElectorReadsCurrentLoadWithoutRefresh(t *testing.T) {
+	first := &busyElectorConn{Conn: electorConnection("first", 1, state.Online)}
+	second := &busyElectorConn{Conn: electorConnection("second", 2, state.Online)}
+	first.load.Store(10)
+	elector := newEndpointElector([]policy.EndpointPriority{
+		{Key: first.Endpoint().Key()}, {Key: second.Endpoint().Key()},
+	}, connectionMap(first, second), &electorRand{})
+	selected, _, ok := elector.Next()
+	require.True(t, ok)
+	require.Same(t, second, selected)
+	first.load.Store(0)
+	second.load.Store(10)
+	selected, _, ok = elector.Next()
+	require.True(t, ok)
+	require.Same(t, first, selected)
+}
+
+func TestEndpointElectorSingleCandidateNeedsNoRandomDraw(t *testing.T) {
+	connection := electorConnection("single", 1, state.Online)
+	rand := &electorDrawsRand{t: t}
+	elector := newEndpointElector([]policy.EndpointPriority{{Key: connection.Endpoint().Key()}},
+		connectionMap(connection), rand)
+	selected, _, ok := elector.Next()
+	require.True(t, ok)
+	require.Same(t, connection, selected)
+}
+
 // cpu: Apple M3 Pro; go1.27.0 darwin/arm64; GOMAXPROCS=4.
-// Baseline: master 9cd397464; median of five runs, one second per case.
+// P2C on master 6b54e06b2; median of five runs, one second per case.
 //
 //	GOTOOLCHAIN=go1.27.0 go test -run '^$' -bench '^BenchmarkEndpointElector$' \
 //	  -benchmem -benchtime=1s -count=5 -cpu=4 ./internal/balancer
 //
-// BenchmarkEndpointElector/Equal/1/Serial-4              6.986 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Equal/1/Parallel-4          133.100 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/1/Serial-4             6.975 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/1/Parallel-4         133.000 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Equal/2/Serial-4              6.876 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Equal/2/Parallel-4          133.000 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/2/Serial-4             6.867 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/2/Parallel-4         121.100 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Equal/9/Serial-4              7.455 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Equal/9/Parallel-4          130.200 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/9/Serial-4             7.411 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/9/Parallel-4         109.700 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Equal/1000/Serial-4           7.357 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Equal/1000/Parallel-4       133.800 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/1000/Serial-4          7.359 ns/op     0 B/op   0 allocs/op
-// BenchmarkEndpointElector/Skewed/1000/Parallel-4      133.800 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/1/Serial-4              1.138 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/1/Parallel-4            0.498 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/1/Serial-4             1.142 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/1/Parallel-4           0.506 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/2/Serial-4             19.150 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/2/Parallel-4          240.300 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/2/Serial-4            19.180 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/2/Parallel-4         245.100 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/9/Serial-4             20.650 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/9/Parallel-4          247.700 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/9/Serial-4            20.690 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/9/Parallel-4         242.900 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/1000/Serial-4          22.120 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/1000/Parallel-4       250.000 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/1000/Serial-4         22.060 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/1000/Parallel-4      250.900 ns/op     0 B/op   0 allocs/op
 //
 // Fixed loads measure selection cost, not RPC latency.
 func BenchmarkEndpointElector(b *testing.B) {
@@ -340,6 +410,24 @@ type busyElectorConn struct {
 }
 
 func (c *busyElectorConn) InFlight() int64 { return c.load.Load() }
+
+type electorDrawsRand struct {
+	electorRand
+
+	t      *testing.T
+	draws  []int
+	limits []int
+	calls  int
+}
+
+func (r *electorDrawsRand) Int(maximum int) int {
+	require.Less(r.t, r.calls, len(r.draws), "unexpected random draw")
+	require.Equal(r.t, r.limits[r.calls], maximum)
+	result := r.draws[r.calls]
+	r.calls++
+
+	return result
+}
 
 func electorConnection(address string, nodeID uint32, connectionState state.State) conn.Conn {
 	return &mock.Conn{AddrField: address, NodeIDField: nodeID, StateField: connectionState}
