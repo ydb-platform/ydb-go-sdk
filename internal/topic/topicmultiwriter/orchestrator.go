@@ -254,7 +254,7 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	if err := o.saveMessageContent(&msg); err != nil {
 		return err
 	}
-	if err := o.assignSeqNoAndEnqueue(ctx, msg, autoSetSeqNo); err != nil {
+	if err := o.enqueueMessage(ctx, msg, autoSetSeqNo); err != nil {
 		return err
 	}
 	acquired = false
@@ -262,7 +262,19 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	return nil
 }
 
-func (o *orchestrator) assignSeqNoAndEnqueue(ctx context.Context, msg message, autoSetSeqNo bool) (err error) {
+func (o *orchestrator) assignSeqNoNeedLock(msg *message, autoSetSeqNo bool) (retry bool, err error) {
+	if !autoSetSeqNo {
+		return false, o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo)
+	}
+	if partition := o.partitions[msg.PartitionID]; partition != nil && partition.Splitted() {
+		return true, nil
+	}
+	msg.SeqNo = o.currentSeqNo.next()
+
+	return false, nil
+}
+
+func (o *orchestrator) enqueueMessage(ctx context.Context, msg message, autoSetSeqNo bool) (err error) {
 	for {
 		if autoSetSeqNo {
 			if err = o.waitAutoSeqNoWriter(ctx, &msg); err != nil {
@@ -272,18 +284,9 @@ func (o *orchestrator) assignSeqNoAndEnqueue(ctx context.Context, msg message, a
 
 		retry := false
 		o.mu.WithLock(func() {
-			if autoSetSeqNo {
-				if partition := o.partitions[msg.PartitionID]; partition != nil && partition.Splitted() {
-					retry = true
-
-					return
-				}
-				msg.SeqNo = o.currentSeqNo.next()
-			} else {
-				err = o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo)
-				if err != nil {
-					return
-				}
+			retry, err = o.assignSeqNoNeedLock(&msg, autoSetSeqNo)
+			if retry || err != nil {
+				return
 			}
 			o.buf.pushNeedLock(msg)
 			o.sender.wakeup()
