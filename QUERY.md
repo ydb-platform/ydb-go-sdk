@@ -186,7 +186,7 @@ The table has 10,000 rows: Uint64 id, Optional Int32/Bool/Double/Utf8/String,
 or 10,000 ordered rows; the one-row query selects a row with null score/name.
 Every RPC checks both row count and checksum.
 
-Environment: Apple M3 Pro, native darwin/arm64 Go 1.26.0, Arrow Go v18.8.0,
+Environment: Apple M3 Pro, native darwin/arm64 Go 1.27.0, Arrow Go v18.8.0,
 GOMAXPROCS=4. The server is `ydbplatform/local-ydb:26.3.1.17`, image digest
 `sha256:dec57994cbc96d706aa320443c7d97c8dc6dd580320370d5482f7d61bb22c785`,
 linux/amd64 under emulation in an aarch64 Colima VM with 2 vCPU and 15.6 GiB RAM,
@@ -205,16 +205,16 @@ Server CPU and wire payload size were not measured.
 ### Interpreting the results
 
 For 1/10 rows, WithArrow does not show a consistent elapsed-time benefit: its
-median changes by +11.9% / -7.5% relative to Value, and the observed ranges overlap.
-Client CPU changes by -5.9% / +9.4%. For one row, allocated bytes increase
-by 36.8% and allocation count by 28.3%. At 100 rows, WithArrow reduces median
-elapsed time by 26.4% and client CPU by 43.9% in this workload; the observed
-elapsed ranges still overlap.
+median changes by -0.2% / -2.9% relative to Value, and the observed ranges overlap.
+Client CPU changes by +6.9% / +1.3%. For one row, allocated bytes increase
+by 38.1% and allocation count by 28.3%. At 100 rows, WithArrow reduces median
+client CPU by 36.0% in this workload, while median elapsed time increases by
+4.4%; the observed elapsed ranges still overlap.
 
-For 1,000/10,000 rows, WithArrow reduces client CPU by 59.1% / 70.6%, elapsed
-time by 35.7% / 16.1%, allocated bytes by 80.2% / 72.0% and allocation count
+For 1,000/10,000 rows, WithArrow reduces client CPU by 72.4% / 68.0%, elapsed
+time by 41.3% / 14.0%, allocated bytes by 80.7% / 72.1% and allocation count
 by 80.8% / 81.5% relative to Value. Direct QueryArrow reduces client CPU by
-67.8% / 77.4%, but requires a different consumption API and resource ownership.
+74.5% / 78.5%, but requires a different consumption API and resource ownership.
 
 Use these measurements to select candidates for your own benchmark. They do not
 establish universal row-count thresholds: types, row width, nulls, server work,
@@ -234,9 +234,9 @@ xychart-beta
     title "Client CPU"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
     y-axis "ms/RPC" 0 --> 28
-    line "Value" [0.347, 0.374, 0.775, 3.144, 27.422]
-    line "QueryArrow" [0.306, 0.336, 0.380, 1.012, 6.200]
-    line "WithArrow" [0.327, 0.410, 0.435, 1.286, 8.062]
+    line "Value" [0.271, 0.327, 0.591, 3.293, 27.634]
+    line "QueryArrow" [0.265, 0.316, 0.321, 0.839, 5.954]
+    line "WithArrow" [0.290, 0.331, 0.378, 0.908, 8.833]
 ```
 
 ### Allocated memory
@@ -252,9 +252,9 @@ xychart-beta
     title "Allocated memory"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
     y-axis "MiB/RPC" 0 --> 20
-    line "Value" [0.021, 0.035, 0.179, 2.214, 19.149]
-    line "QueryArrow" [0.026, 0.029, 0.059, 0.385, 4.528]
-    line "WithArrow" [0.029, 0.033, 0.066, 0.437, 5.368]
+    line "Value" [0.021, 0.035, 0.179, 2.220, 19.184]
+    line "QueryArrow" [0.026, 0.029, 0.059, 0.394, 4.504]
+    line "WithArrow" [0.029, 0.033, 0.066, 0.428, 5.358]
 ```
 
 ### Allocation count
@@ -270,9 +270,9 @@ xychart-beta
     title "Allocation count"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
     y-axis "Allocations/RPC" 0 --> 400000
-    line "Value" [378, 722, 4113, 39528, 394883]
-    line "QueryArrow" [372, 373, 374, 681, 4690]
-    line "WithArrow" [485, 549, 1153, 7583, 73092]
+    line "Value" [378, 722, 4112, 39528, 394870]
+    line "QueryArrow" [372, 373, 374, 680, 4698]
+    line "WithArrow" [485, 549, 1153, 7582, 73114]
 ```
 
 The x-axis lists the measured row counts at equal intervals; the y-axis is
@@ -287,6 +287,7 @@ that database and table permissions. Run from the SDK checkout:
 
 ```sh
 cd tests/integration/arrow
+export GOTOOLCHAIN=go1.27.0
 for sample in 1 2 3 4 5; do
   go test -tags integration -run '^$' -bench '^BenchmarkFormats$/(1|10|100)$' -benchtime=1000x -count=1 -cpu=4 -v
   go test -tags integration -run '^$' -bench '^BenchmarkFormats$/(1000|10000)$' -benchtime=100x -count=1 -cpu=4 -v

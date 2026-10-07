@@ -127,7 +127,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.26.x
+          go-version: 1.27.x
           cache-dependency-path: tests/integration/arrow/go.sum
       - name: Run Arrow integration tests
         run: go test -mod=readonly -race -tags integration -coverpkg=github.com/ydb-platform/ydb-go-sdk/v3/... -coverprofile arrow.txt -covermode atomic ./...
