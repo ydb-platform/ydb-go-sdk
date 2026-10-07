@@ -11,7 +11,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/wirevalue"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
@@ -37,8 +36,8 @@ type (
 		recv                func() (*Ydb_Query.ExecuteQueryResponsePart, error)
 		columns             []*Ydb.Column
 		currentPart         *Ydb_Query.ExecuteQueryResponsePart
-		wirePart            *wirevalue.Part
-		nextWirePart        func() *wirevalue.Part
+		wirePart            *wirePart
+		nextWirePart        func() *wirePart
 		rowIndex            int
 		ended               atomic.Bool
 		mustBeLastResultSet bool

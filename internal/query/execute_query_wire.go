@@ -7,8 +7,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/wirevalue"
 )
 
 type wireQueryClient struct {
@@ -38,8 +36,8 @@ type wireQueryStream struct {
 	Ydb_Query_V1.QueryService_ExecuteQueryClient
 }
 
-func (s wireQueryStream) RecvPart() (*Ydb_Query.ExecuteQueryResponsePart, *wirevalue.Part, error) {
-	var part wirevalue.Part
+func (s wireQueryStream) RecvPart() (*Ydb_Query.ExecuteQueryResponsePart, *wirePart, error) {
+	var part wirePart
 	if err := s.QueryService_ExecuteQueryClient.RecvMsg(&part); err != nil {
 		return nil, nil, err
 	}
@@ -57,10 +55,10 @@ func (s wireQueryStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 }
 
 func recvQueryPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
-	*Ydb_Query.ExecuteQueryResponsePart, *wirevalue.Part, error,
+	*Ydb_Query.ExecuteQueryResponsePart, *wirePart, error,
 ) {
 	if s, ok := stream.(interface {
-		RecvPart() (*Ydb_Query.ExecuteQueryResponsePart, *wirevalue.Part, error)
+		RecvPart() (*Ydb_Query.ExecuteQueryResponsePart, *wirePart, error)
 	}); ok {
 		return s.RecvPart()
 	}
@@ -70,5 +68,5 @@ func recvQueryPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 }
 
 func wireQueryCodecOption() grpc.CallOption {
-	return grpc.ForceCodecV2(wirevalue.NewCodec())
+	return grpc.ForceCodecV2(newWireCodec())
 }

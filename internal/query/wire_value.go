@@ -1,4 +1,4 @@
-package wirevalue
+package query
 
 import (
 	"bytes"
@@ -16,46 +16,46 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
-// Part holds the original response bytes while exposing rows without
+// wirePart holds the original response bytes while exposing rows without
 // constructing a protobuf Value tree. Only FORMAT_VALUE is supported.
-type Part struct {
+type wirePart struct {
 	meta  *Ydb_Query.ExecuteQueryResponsePart
 	frame []byte
 	rows  []rowSpan
 }
 
-var _ operation.Status = (*Part)(nil)
+var _ operation.Status = (*wirePart)(nil)
 
 type rowSpan struct {
 	start uint32
 	end   uint32
 }
 
-// Row exposes one row of a decoded result part.
-type Row struct {
-	part *Part
+// wireRow exposes one row of a decoded result part.
+type wireRow struct {
+	part *wirePart
 	span rowSpan
 }
 
 // Meta returns the standard response metadata without materializing Rows.
-func (p *Part) Meta() *Ydb_Query.ExecuteQueryResponsePart { return p.meta }
+func (p *wirePart) Meta() *Ydb_Query.ExecuteQueryResponsePart { return p.meta }
 
 // GetStatus exposes the response status to the SDK transport.
-func (p *Part) GetStatus() Ydb.StatusIds_StatusCode { return p.meta.GetStatus() }
+func (p *wirePart) GetStatus() Ydb.StatusIds_StatusCode { return p.meta.GetStatus() }
 
 // GetIssues exposes response issues to the SDK transport.
-func (p *Part) GetIssues() []*Ydb_Issue.IssueMessage { return p.meta.GetIssues() }
+func (p *wirePart) GetIssues() []*Ydb_Issue.IssueMessage { return p.meta.GetIssues() }
 
 // RowCount returns the number of rows in this response part.
-func (p *Part) RowCount() int { return len(p.rows) }
+func (p *wirePart) RowCount() int { return len(p.rows) }
 
-// Row returns a view of one row. It remains valid while the Part is retained.
-func (p *Part) Row(index int) Row {
-	return Row{part: p, span: p.rows[index]}
+// Row returns a view of one row. It remains valid while the wirePart is retained.
+func (p *wirePart) Row(index int) wireRow {
+	return wireRow{part: p, span: p.rows[index]}
 }
 
 // MaterializeRows builds protobuf rows for consumers of the typed Recv API.
-func (p *Part) MaterializeRows() error {
+func (p *wirePart) MaterializeRows() error {
 	if len(p.rows) == 0 {
 		return nil
 	}
@@ -71,21 +71,21 @@ func (p *Part) MaterializeRows() error {
 	return nil
 }
 
-func (r Row) raw() []byte {
+func (r wireRow) raw() []byte {
 	return r.part.frame[r.span.start:r.span.end]
 }
 
-// DecodePart copies and decodes a FORMAT_VALUE response part.
-func DecodePart(data []byte) (*Part, error) {
+// decodeWirePart copies and decodes a FORMAT_VALUE response part.
+func decodeWirePart(data []byte) (*wirePart, error) {
 	// A row may outlive the next RecvMsg, so the part must own its wire bytes.
 	return decodeOwnedPart(bytes.Clone(data))
 }
 
-func decodeOwnedPart(frame []byte) (*Part, error) {
+func decodeOwnedPart(frame []byte) (*wirePart, error) {
 	if len(frame) > math.MaxUint32 {
 		return nil, fmt.Errorf("wire value decoder: response part exceeds 4 GiB")
 	}
-	part := &Part{meta: new(Ydb_Query.ExecuteQueryResponsePart), frame: frame}
+	part := &wirePart{meta: new(Ydb_Query.ExecuteQueryResponsePart), frame: frame}
 	metadata := make([]byte, 0, 256)
 	offset := 0
 	for len(frame) > 0 {
@@ -127,7 +127,7 @@ func decodeOwnedPart(frame []byte) (*Part, error) {
 	return part, nil
 }
 
-func stripWireValueRows(data []byte, part *Part, base int) ([]byte, error) {
+func stripWireValueRows(data []byte, part *wirePart, base int) ([]byte, error) {
 	metadata := make([]byte, 0, 128)
 	offset := 0
 	for len(data) > 0 {
@@ -156,7 +156,7 @@ func stripWireValueRows(data []byte, part *Part, base int) ([]byte, error) {
 	return metadata, nil
 }
 
-func (r Row) Scan(dst ...any) error {
+func (r wireRow) Scan(dst ...any) error {
 	columns := r.part.Meta().GetResultSet().GetColumns()
 	if len(dst) != len(columns) {
 		return scanner.Indexed(scanner.NewDirectData(columns, r)).Scan(dst...)
@@ -193,19 +193,19 @@ func (r Row) Scan(dst ...any) error {
 	return nil
 }
 
-func (r Row) ScanNamed(dst ...scanner.NamedDestination) error {
+func (r wireRow) ScanNamed(dst ...scanner.NamedDestination) error {
 	return scanner.Named(scanner.NewDirectData(r.part.Meta().GetResultSet().GetColumns(), r)).ScanNamed(dst...)
 }
 
-func (r Row) ScanStruct(dst any, opts ...scanner.ScanStructOption) error {
+func (r wireRow) ScanStruct(dst any, opts ...scanner.ScanStructOption) error {
 	return scanner.Struct(scanner.NewDirectData(r.part.Meta().GetResultSet().GetColumns(), r)).ScanStruct(dst, opts...)
 }
 
-func (r Row) Values() []value.Value {
+func (r wireRow) Values() []value.Value {
 	return scanner.NewDirectData(r.part.Meta().GetResultSet().GetColumns(), r).Values()
 }
 
-func (r Row) ColumnValue(column int) value.Value {
+func (r wireRow) ColumnValue(column int) value.Value {
 	cell, err := r.cell(column)
 	if err != nil {
 		return nil
@@ -218,7 +218,7 @@ func (r Row) ColumnValue(column int) value.Value {
 	return value.FromYDB(r.part.Meta().GetResultSet().GetColumns()[column].GetType(), &v)
 }
 
-func (r Row) ScanColumn(column int, dst any) error {
+func (r wireRow) ScanColumn(column int, dst any) error {
 	cell, err := r.cell(column)
 	if err != nil {
 		return err
@@ -239,7 +239,7 @@ func scanWireValueDestination(columnType *Ydb.Type, cell []byte, dst any) error 
 	return value.CastTo(value.FromYDB(columnType, &v), dst)
 }
 
-func (r Row) cell(column int) ([]byte, error) {
+func (r wireRow) cell(column int) ([]byte, error) {
 	if column < 0 || column >= len(r.part.Meta().GetResultSet().GetColumns()) {
 		return nil, fmt.Errorf("wire value decoder: column %d out of range", column)
 	}

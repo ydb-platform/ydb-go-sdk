@@ -5,9 +5,7 @@ package witharrow
 import (
 	"context"
 	"fmt"
-	"io"
 	"math"
-	"net/url"
 	"strings"
 	"syscall"
 	"testing"
@@ -15,15 +13,8 @@ import (
 
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
-	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/wirevalue"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
@@ -70,15 +61,6 @@ func BenchmarkFormats(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
-	endpoint, err := url.Parse(connectionString())
-	if err != nil {
-		b.Fatal(err)
-	}
-	conn, err := grpc.NewClient(endpoint.Host, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer conn.Close()
 	arrowOption := query.WithResultFormatArrow(ipc.NewReader)
 	err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
 		for _, size := range []int{1, 10, 100, 1000, 10000} {
@@ -93,14 +75,11 @@ func BenchmarkFormats(b *testing.B) {
 				return fmt.Errorf("fixture rows=%d, want %d", count, size)
 			}
 			b.Logf("rows=%d checksum=%016x", size, expected)
-			for _, variant := range []string{"Query", "QueryArrow", "WithResultFormatArrow", "WireValue"} {
+			for _, variant := range []string{"Query", "QueryArrow", "WithResultFormatArrow"} {
 				b.Run(fmt.Sprintf("%d/%s", size, variant), func(b *testing.B) {
 					run := func() (int, uint64, error) {
 						if variant == "QueryArrow" {
 							return consumeArrow(ctx, s, sql)
-						}
-						if variant == "WireValue" {
-							return consumeWireValue(ctx, conn, endpoint.Path, s.ID(), sql)
 						}
 						var opts []query.ExecuteOption
 						if variant == "WithResultFormatArrow" {
@@ -135,64 +114,6 @@ func BenchmarkFormats(b *testing.B) {
 	})
 	if err != nil {
 		b.Fatal(err)
-	}
-}
-
-func wireQueryRequest(sessionID, sql string) *Ydb_Query.ExecuteQueryRequest {
-	return &Ydb_Query.ExecuteQueryRequest{
-		SessionId: sessionID,
-		ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
-		Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{QueryContent: &Ydb_Query.QueryContent{
-			Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
-			Text:   sql,
-		}},
-		ResponsePartLimitBytes: 32 << 10,
-	}
-}
-
-func consumeWireValue(ctx context.Context, conn *grpc.ClientConn, database, sessionID, sql string) (int, uint64, error) {
-	ctx = metadata.AppendToOutgoingContext(ctx, "x-ydb-database", database)
-	stream, err := Ydb_Query_V1.NewQueryServiceClient(conn).ExecuteQuery(ctx,
-		wireQueryRequest(sessionID, sql), grpc.ForceCodecV2(wirevalue.NewCodec()))
-	if err != nil {
-		return 0, 0, err
-	}
-	defer stream.CloseSend()
-	var columns []*Ydb.Column
-	n := 0
-	hash := uint64(14695981039346656037)
-	var id uint64
-	var score *int32
-	var active *bool
-	var amount *float64
-	var name *string
-	var payload *[]byte
-	dst := []any{&id, &score, &active, &amount, &name, &payload}
-	for {
-		var part wirevalue.Part
-		if err := stream.RecvMsg(&part); err != nil {
-			if err == io.EOF {
-				return n, hash, nil
-			}
-			return 0, 0, err
-		}
-		if part.Meta().GetStatus() != Ydb.StatusIds_SUCCESS {
-			return 0, 0, fmt.Errorf("query part status: %v (%v)", part.Meta().GetStatus(), part.Meta().GetIssues())
-		}
-		if resultSet := part.Meta().GetResultSet(); resultSet != nil {
-			if len(resultSet.GetColumns()) != 0 {
-				columns = resultSet.GetColumns()
-			} else {
-				resultSet.Columns = columns
-			}
-		}
-		for i := 0; i < part.RowCount(); i++ {
-			if err := part.Row(i).Scan(dst...); err != nil {
-				return 0, 0, err
-			}
-			hash = checksum(hash, id, score, active, amount, name, payload)
-			n++
-		}
 	}
 }
 

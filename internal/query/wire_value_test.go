@@ -1,4 +1,4 @@
-package wirevalue
+package query
 
 import (
 	"testing"
@@ -45,7 +45,7 @@ func TestDecodeWireValuePartScansBenchmarkRows(t *testing.T) {
 	frame, err := proto.Marshal(original)
 	require.NoError(t, err)
 
-	part, err := DecodePart(frame)
+	part, err := decodeWirePart(frame)
 	require.NoError(t, err)
 	require.Equal(t, original.GetStatus(), part.Meta().GetStatus())
 	for i, column := range columns {
@@ -93,7 +93,7 @@ func TestDecodePartPreservesMetadataAndUnknownFields(t *testing.T) {
 	unknown := protowire.AppendTag(nil, 200, protowire.VarintType)
 	unknown = protowire.AppendVarint(unknown, 9)
 	frame = append(frame, unknown...)
-	part, err := DecodePart(frame)
+	part, err := decodeWirePart(frame)
 	require.NoError(t, err)
 	require.Equal(t, int64(2), part.Meta().GetResultSetIndex())
 	require.True(t, part.Meta().GetResultSet().GetTruncated())
@@ -113,7 +113,7 @@ func TestDecodePartRejectsTruncatedResponse(t *testing.T) {
 	frame := protowire.AppendTag(nil, 4, protowire.BytesType)
 	frame = protowire.AppendVarint(frame, 10)
 	frame = append(frame, 1)
-	_, err := DecodePart(frame)
+	_, err := decodeWirePart(frame)
 	require.Error(t, err)
 }
 
@@ -130,7 +130,7 @@ func TestWireValueRowOtherScannersAndFallback(t *testing.T) {
 	}}
 	frame, err := proto.Marshal(original)
 	require.NoError(t, err)
-	part, err := DecodePart(frame)
+	part, err := decodeWirePart(frame)
 	require.NoError(t, err)
 	row := part.Row(0)
 

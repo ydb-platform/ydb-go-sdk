@@ -17,7 +17,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/wirevalue"
 )
 
 func TestExecuteQueryUsesWireRowsAcrossParts(t *testing.T) {
@@ -38,8 +37,8 @@ func TestExecuteQueryUsesWireRowsAcrossParts(t *testing.T) {
 	for _, prefetch := range []int{0, 2} {
 		t.Run(fmt.Sprintf("prefetch=%d", prefetch), func(t *testing.T) {
 			ctx := t.Context()
-			r, err := execute(ctx, "session", WireQueryClient(Ydb_Query_V1.NewQueryServiceClient(conn)), "SELECT id FROM test",
-				options.ExecuteSettings(options.WithResponsePartPrefetch(prefetch)), options.ResultSetsTypeOrdered)
+			session := newTestSessionWithClient("session", WireQueryClient(Ydb_Query_V1.NewQueryServiceClient(conn)), false)
+			r, err := session.Query(ctx, "SELECT id FROM test", options.WithResponsePartPrefetch(prefetch))
 			require.NoError(t, err)
 			defer r.Close(ctx)
 
@@ -48,7 +47,7 @@ func TestExecuteQueryUsesWireRowsAcrossParts(t *testing.T) {
 			for _, want := range []uint64{42, 43} {
 				row, err := rs.NextRow(ctx)
 				require.NoError(t, err)
-				require.IsType(t, wirevalue.Row{}, row)
+				require.IsType(t, wireRow{}, row)
 				var got uint64
 				require.NoError(t, row.Scan(&got))
 				require.Equal(t, want, got)

@@ -8,14 +8,13 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/wirevalue"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 // executeQueryPartRecv is one logical item from ExecuteQuery stream (typed Recv).
 type executeQueryPartRecv struct {
 	part *Ydb_Query.ExecuteQueryResponsePart
-	wire *wirevalue.Part
+	wire *wirePart
 	err  error
 }
 
@@ -68,7 +67,7 @@ func (p *asyncPrefetchExecuteQueryStream) Recv() (*Ydb_Query.ExecuteQueryRespons
 }
 
 func (p *asyncPrefetchExecuteQueryStream) RecvPart() (
-	*Ydb_Query.ExecuteQueryResponsePart, *wirevalue.Part, error,
+	*Ydb_Query.ExecuteQueryResponsePart, *wirePart, error,
 ) {
 	item, ok := <-p.ch
 	if !ok {

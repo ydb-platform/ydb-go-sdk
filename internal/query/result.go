@@ -18,7 +18,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/wirevalue"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -46,7 +45,7 @@ type (
 		lastErr        error
 		onClose        func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
-		lastWirePart   *wirevalue.Part
+		lastWirePart   *wirePart
 		resultSetIndex int64
 		trace          *trace.Query
 		statsCallback  func(queryStats stats.QueryStats)
@@ -284,7 +283,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	if !r.retainArrowBatches {
 		r.releaseArrowBatches()
 	}
-	var wire *wirevalue.Part
+	var wire *wirePart
 	part, wire, err := recvQueryPart(r.stream)
 	r.lastWirePart = wire
 	if part != nil {
@@ -398,7 +397,7 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishE
 			rs.notifyError = r.notifyNextPartErr
 			rs.decodeArrow = r.decodeArrowBatches
 			rs.wirePart = r.lastWirePart
-			rs.nextWirePart = func() *wirevalue.Part { return r.lastWirePart }
+			rs.nextWirePart = func() *wirePart { return r.lastWirePart }
 
 			return rs, nil
 		}

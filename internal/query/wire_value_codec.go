@@ -1,4 +1,4 @@
-package wirevalue
+package query
 
 import (
 	"google.golang.org/grpc/encoding"
@@ -9,8 +9,8 @@ type codec struct {
 	protobuf encoding.CodecV2
 }
 
-// NewCodec returns a per-call protobuf codec that decodes responses into Part.
-func NewCodec() encoding.CodecV2 {
+// newWireCodec returns a per-call protobuf codec that decodes responses into wirePart.
+func newWireCodec() encoding.CodecV2 {
 	return codec{protobuf: encoding.GetCodecV2("proto")}
 }
 
@@ -21,7 +21,7 @@ func (c codec) Marshal(v any) (mem.BufferSlice, error) {
 }
 
 func (c codec) Unmarshal(data mem.BufferSlice, v any) error {
-	if part, ok := v.(*Part); ok {
+	if part, ok := v.(*wirePart); ok {
 		frame := make([]byte, data.Len())
 		data.CopyTo(frame)
 		decoded, err := decodeOwnedPart(frame)
