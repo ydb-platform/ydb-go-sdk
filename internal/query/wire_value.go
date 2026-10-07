@@ -19,9 +19,11 @@ import (
 // wirePart holds the original response bytes while exposing rows without
 // constructing a protobuf Value tree. Only FORMAT_VALUE is supported.
 type wirePart struct {
-	meta  *Ydb_Query.ExecuteQueryResponsePart
-	frame []byte
-	rows  []rowSpan
+	meta       *Ydb_Query.ExecuteQueryResponsePart
+	frame      []byte
+	rows       []rowSpan
+	rowObjects []Row
+	columns    []*Ydb.Column
 }
 
 var _ operation.Status = (*wirePart)(nil)
@@ -29,12 +31,6 @@ var _ operation.Status = (*wirePart)(nil)
 type rowSpan struct {
 	start uint32
 	end   uint32
-}
-
-// wireRow exposes one row of a decoded result part.
-type wireRow struct {
-	part *wirePart
-	span rowSpan
 }
 
 // Meta returns the standard response metadata without materializing Rows.
@@ -49,9 +45,22 @@ func (p *wirePart) GetIssues() []*Ydb_Issue.IssueMessage { return p.meta.GetIssu
 // RowCount returns the number of rows in this response part.
 func (p *wirePart) RowCount() int { return len(p.rows) }
 
-// Row returns a view of one row. It remains valid while the wirePart is retained.
-func (p *wirePart) Row(index int) wireRow {
-	return wireRow{part: p, span: p.rows[index]}
+func (p *wirePart) rowBytes(index int) []byte {
+	span := p.rows[index]
+
+	return p.frame[span.start:span.end]
+}
+
+func (p *wirePart) row(index int, columns []*Ydb.Column) *Row {
+	if p.rowObjects == nil {
+		p.columns = columns
+		p.rowObjects = make([]Row, len(p.rows))
+		for i := range p.rowObjects {
+			p.rowObjects[i] = Row{part: p, index: i}
+		}
+	}
+
+	return &p.rowObjects[index]
 }
 
 // MaterializeRows builds protobuf rows for consumers of the typed Recv API.
@@ -69,10 +78,6 @@ func (p *wirePart) MaterializeRows() error {
 	}
 
 	return nil
-}
-
-func (r wireRow) raw() []byte {
-	return r.part.frame[r.span.start:r.span.end]
 }
 
 // decodeWirePart copies and decodes a FORMAT_VALUE response part.
@@ -156,12 +161,12 @@ func stripWireValueRows(data []byte, part *wirePart, base int) ([]byte, error) {
 	return metadata, nil
 }
 
-func (r wireRow) Scan(dst ...any) error {
-	columns := r.part.Meta().GetResultSet().GetColumns()
+func scanRowBytes(r *Row, dst []any) error {
+	columns := r.part.columns
 	if len(dst) != len(columns) {
-		return scanner.Indexed(scanner.NewDirectData(columns, r)).Scan(dst...)
+		return scanner.Indexed(r.scannerData()).Scan(dst...)
 	}
-	data := r.raw()
+	data := r.part.rowBytes(r.index)
 	index := 0
 	for len(data) > 0 {
 		field, wireType, tagLen := protowire.ConsumeTag(data)
@@ -193,19 +198,7 @@ func (r wireRow) Scan(dst ...any) error {
 	return nil
 }
 
-func (r wireRow) ScanNamed(dst ...scanner.NamedDestination) error {
-	return scanner.Named(scanner.NewDirectData(r.part.Meta().GetResultSet().GetColumns(), r)).ScanNamed(dst...)
-}
-
-func (r wireRow) ScanStruct(dst any, opts ...scanner.ScanStructOption) error {
-	return scanner.Struct(scanner.NewDirectData(r.part.Meta().GetResultSet().GetColumns(), r)).ScanStruct(dst, opts...)
-}
-
-func (r wireRow) Values() []value.Value {
-	return scanner.NewDirectData(r.part.Meta().GetResultSet().GetColumns(), r).Values()
-}
-
-func (r wireRow) ColumnValue(column int) value.Value {
+func (r *Row) ColumnValue(column int) value.Value {
 	cell, err := r.cell(column)
 	if err != nil {
 		return nil
@@ -215,16 +208,16 @@ func (r wireRow) ColumnValue(column int) value.Value {
 		return nil
 	}
 
-	return value.FromYDB(r.part.Meta().GetResultSet().GetColumns()[column].GetType(), &v)
+	return value.FromYDB(r.part.columns[column].GetType(), &v)
 }
 
-func (r wireRow) ScanColumn(column int, dst any) error {
+func (r *Row) ScanColumn(column int, dst any) error {
 	cell, err := r.cell(column)
 	if err != nil {
 		return err
 	}
 
-	return scanWireValueDestination(r.part.Meta().GetResultSet().GetColumns()[column].GetType(), cell, dst)
+	return scanWireValueDestination(r.part.columns[column].GetType(), cell, dst)
 }
 
 func scanWireValueDestination(columnType *Ydb.Type, cell []byte, dst any) error {
@@ -239,11 +232,11 @@ func scanWireValueDestination(columnType *Ydb.Type, cell []byte, dst any) error 
 	return value.CastTo(value.FromYDB(columnType, &v), dst)
 }
 
-func (r wireRow) cell(column int) ([]byte, error) {
-	if column < 0 || column >= len(r.part.Meta().GetResultSet().GetColumns()) {
+func (r *Row) cell(column int) ([]byte, error) {
+	if column < 0 || column >= len(r.part.columns) {
 		return nil, fmt.Errorf("wire value decoder: column %d out of range", column)
 	}
-	data := r.raw()
+	data := r.part.rowBytes(r.index)
 	index := 0
 	for len(data) > 0 {
 		field, wireType, tagLen := protowire.ConsumeTag(data)

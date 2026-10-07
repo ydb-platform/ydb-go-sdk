@@ -47,7 +47,7 @@ func TestExecuteQueryUsesWireRowsAcrossParts(t *testing.T) {
 			for _, want := range []uint64{42, 43} {
 				row, err := rs.NextRow(ctx)
 				require.NoError(t, err)
-				require.IsType(t, wireRow{}, row)
+				require.IsType(t, &Row{}, row)
 				var got uint64
 				require.NoError(t, row.Scan(&got))
 				require.Equal(t, want, got)

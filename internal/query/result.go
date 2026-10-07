@@ -571,11 +571,8 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 				}
 			}
 		} else if r.lastWirePart != nil {
-			if resultSet := r.lastWirePart.Meta().GetResultSet(); resultSet != nil {
-				resultSet.Columns = rs.columns
-				for i := 0; i < r.lastWirePart.RowCount(); i++ {
-					rs.rows = append(rs.rows, r.lastWirePart.Row(i))
-				}
+			for i := 0; i < r.lastWirePart.RowCount(); i++ {
+				rs.rows = append(rs.rows, r.lastWirePart.row(i, rs.columns))
 			}
 		} else {
 			for i := range r.lastPart.GetResultSet().GetRows() {

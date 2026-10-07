@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
 func TestDecodeWireValuePartScansBenchmarkRows(t *testing.T) {
@@ -60,7 +61,7 @@ func TestDecodeWireValuePartScansBenchmarkRows(t *testing.T) {
 	var name *string
 	var payload *[]byte
 	dst := []any{&id, &score, &active, &amount, &name, &payload}
-	require.NoError(t, part.Row(0).Scan(dst...))
+	require.NoError(t, part.row(0, columns).Scan(dst...))
 	require.Equal(t, uint64(7), id)
 	require.Equal(t, int32(-12), *score)
 	require.True(t, *active)
@@ -68,7 +69,7 @@ func TestDecodeWireValuePartScansBenchmarkRows(t *testing.T) {
 	require.Equal(t, "alice", *name)
 	require.Equal(t, []byte("binary"), *payload)
 
-	require.NoError(t, part.Row(1).Scan(dst...))
+	require.NoError(t, part.row(1, columns).Scan(dst...))
 	require.Equal(t, uint64(8), id)
 	require.Nil(t, score)
 	require.Nil(t, active)
@@ -105,7 +106,7 @@ func TestDecodePartPreservesMetadataAndUnknownFields(t *testing.T) {
 		frame[i] = 0
 	}
 	var id uint64
-	require.NoError(t, part.Row(0).Scan(&id))
+	require.NoError(t, part.row(0, part.Meta().GetResultSet().GetColumns()).Scan(&id))
 	require.Equal(t, uint64(13), id)
 }
 
@@ -132,7 +133,7 @@ func TestWireValueRowOtherScannersAndFallback(t *testing.T) {
 	require.NoError(t, err)
 	part, err := decodeWirePart(frame)
 	require.NoError(t, err)
-	row := part.Row(0)
+	row := part.row(0, part.Meta().GetResultSet().GetColumns())
 
 	var id uint64
 	var count uint32
@@ -147,6 +148,11 @@ func TestWireValueRowOtherScannersAndFallback(t *testing.T) {
 	require.NoError(t, row.ScanStruct(&dst))
 	require.Equal(t, uint64(5), dst.ID)
 	require.Equal(t, uint32(9), dst.Count)
+	values := row.Values()
+	require.Len(t, values, 2)
+	var fromValues uint64
+	require.NoError(t, value.CastTo(values[0], &fromValues))
+	require.Equal(t, uint64(5), fromValues)
 }
 
 func wirePrimitive(id Ydb.Type_PrimitiveTypeId) *Ydb.Type {

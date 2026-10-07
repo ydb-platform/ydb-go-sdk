@@ -276,9 +276,7 @@ func (rs *resultSet) partRow() query.Row {
 			rs.arrowBatchIndex++
 		}
 	} else if rs.wirePart != nil && rs.rowIndex < rs.wirePart.RowCount() {
-		rs.wirePart.Meta().GetResultSet().Columns = rs.columns
-
-		return rs.wirePart.Row(rs.rowIndex)
+		return rs.wirePart.row(rs.rowIndex, rs.columns)
 	} else if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
 		return NewRow(rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex])
 	}
