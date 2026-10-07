@@ -67,9 +67,6 @@ linters:
     goconst:
       min-len: 2
       min-occurrences: 2
-      exclude-types:
-        - Call
-        - CompositeLit
     gocritic:
       disabled-checks:
         - whyNoLint
