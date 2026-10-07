@@ -1,0 +1,377 @@
+package wirevalue
+
+import (
+	"bytes"
+	"fmt"
+	"math"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
+	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+)
+
+// Part holds the original response bytes while exposing rows without
+// constructing a protobuf Value tree. Only FORMAT_VALUE is supported.
+type Part struct {
+	meta  *Ydb_Query.ExecuteQueryResponsePart
+	frame []byte
+	rows  []rowSpan
+}
+
+type rowSpan struct {
+	start uint32
+	end   uint32
+}
+
+// Row exposes one row of a decoded result part.
+type Row struct {
+	part *Part
+	span rowSpan
+}
+
+// Meta returns the standard response metadata without materializing Rows.
+func (p *Part) Meta() *Ydb_Query.ExecuteQueryResponsePart { return p.meta }
+
+// RowCount returns the number of rows in this response part.
+func (p *Part) RowCount() int { return len(p.rows) }
+
+// Row returns a view of one row. It remains valid while the Part is retained.
+func (p *Part) Row(index int) Row {
+	return Row{part: p, span: p.rows[index]}
+}
+
+func (r Row) raw() []byte {
+	return r.part.frame[r.span.start:r.span.end]
+}
+
+// DecodePart copies and decodes a FORMAT_VALUE response part.
+func DecodePart(data []byte) (*Part, error) {
+	// A row may outlive the next RecvMsg, so the part must own its wire bytes.
+	return decodeOwnedPart(bytes.Clone(data))
+}
+
+func decodeOwnedPart(frame []byte) (*Part, error) {
+	if len(frame) > math.MaxUint32 {
+		return nil, fmt.Errorf("wire value decoder: response part exceeds 4 GiB")
+	}
+	part := &Part{meta: new(Ydb_Query.ExecuteQueryResponsePart), frame: frame}
+	metadata := make([]byte, 0, 256)
+	offset := 0
+	for len(frame) > 0 {
+		field, wireType, tagLen := protowire.ConsumeTag(frame)
+		if tagLen < 0 {
+			return nil, protowire.ParseError(tagLen)
+		}
+		valueLen := protowire.ConsumeFieldValue(field, wireType, frame[tagLen:])
+		if valueLen < 0 {
+			return nil, protowire.ParseError(valueLen)
+		}
+		if field == 4 && wireType == protowire.BytesType {
+			resultSetBytes, n := protowire.ConsumeBytes(frame[tagLen:])
+			if n < 0 {
+				return nil, protowire.ParseError(n)
+			}
+			base := offset + tagLen + n - len(resultSetBytes)
+			resultSetMetadata, err := stripWireValueRows(resultSetBytes, part, base)
+			if err != nil {
+				return nil, err
+			}
+			metadata = protowire.AppendTag(metadata, 4, protowire.BytesType)
+			metadata = protowire.AppendBytes(metadata, resultSetMetadata)
+		} else {
+			metadata = append(metadata, frame[:tagLen+valueLen]...)
+		}
+		offset += tagLen + valueLen
+		frame = frame[tagLen+valueLen:]
+	}
+	if err := proto.Unmarshal(metadata, part.Meta()); err != nil {
+		return nil, err
+	}
+	resultSet := part.Meta().GetResultSet()
+	if resultSet != nil && resultSet.GetFormat() != Ydb.ResultSet_FORMAT_VALUE &&
+		resultSet.GetFormat() != Ydb.ResultSet_FORMAT_UNSPECIFIED {
+		return nil, fmt.Errorf("wire value decoder: unsupported result set format %v", resultSet.GetFormat())
+	}
+	return part, nil
+}
+
+func stripWireValueRows(data []byte, part *Part, base int) ([]byte, error) {
+	metadata := make([]byte, 0, 128)
+	offset := 0
+	for len(data) > 0 {
+		field, wireType, tagLen := protowire.ConsumeTag(data)
+		if tagLen < 0 {
+			return nil, protowire.ParseError(tagLen)
+		}
+		valueLen := protowire.ConsumeFieldValue(field, wireType, data[tagLen:])
+		if valueLen < 0 {
+			return nil, protowire.ParseError(valueLen)
+		}
+		if field == 2 && wireType == protowire.BytesType {
+			row, n := protowire.ConsumeBytes(data[tagLen:])
+			if n < 0 {
+				return nil, protowire.ParseError(n)
+			}
+			start := base + offset + tagLen + n - len(row)
+			part.rows = append(part.rows, rowSpan{start: uint32(start), end: uint32(start + len(row))})
+		} else {
+			metadata = append(metadata, data[:tagLen+valueLen]...)
+		}
+		offset += tagLen + valueLen
+		data = data[tagLen+valueLen:]
+	}
+	return metadata, nil
+}
+
+func (r Row) Scan(dst ...any) error {
+	columns := r.part.Meta().GetResultSet().GetColumns()
+	if len(dst) != len(columns) {
+		return scanner.Indexed(scanner.NewDirectData(columns, r)).Scan(dst...)
+	}
+	data := r.raw()
+	index := 0
+	for len(data) > 0 {
+		field, wireType, tagLen := protowire.ConsumeTag(data)
+		if tagLen < 0 {
+			return protowire.ParseError(tagLen)
+		}
+		valueLen := protowire.ConsumeFieldValue(field, wireType, data[tagLen:])
+		if valueLen < 0 {
+			return protowire.ParseError(valueLen)
+		}
+		if field == 12 && wireType == protowire.BytesType {
+			cell, n := protowire.ConsumeBytes(data[tagLen:])
+			if n < 0 {
+				return protowire.ParseError(n)
+			}
+			if index < len(dst) {
+				if err := scanWireValueDestination(columns[index].GetType(), cell, dst[index]); err != nil {
+					return fmt.Errorf("scan error on column index %d: %w", index, err)
+				}
+			}
+			index++
+		}
+		data = data[tagLen+valueLen:]
+	}
+	if index < len(dst) {
+		return fmt.Errorf("wire value decoder: row has %d cells, want %d", index, len(dst))
+	}
+	return nil
+}
+
+func (r Row) ScanNamed(dst ...scanner.NamedDestination) error {
+	return scanner.Named(scanner.NewDirectData(r.part.Meta().GetResultSet().GetColumns(), r)).ScanNamed(dst...)
+}
+
+func (r Row) ScanStruct(dst any, opts ...scanner.ScanStructOption) error {
+	return scanner.Struct(scanner.NewDirectData(r.part.Meta().GetResultSet().GetColumns(), r)).ScanStruct(dst, opts...)
+}
+
+func (r Row) Values() []value.Value {
+	return scanner.NewDirectData(r.part.Meta().GetResultSet().GetColumns(), r).Values()
+}
+
+func (r Row) ColumnValue(column int) value.Value {
+	cell, err := r.cell(column)
+	if err != nil {
+		return nil
+	}
+	var v Ydb.Value
+	if err := proto.Unmarshal(cell, &v); err != nil {
+		return nil
+	}
+	return value.FromYDB(r.part.Meta().GetResultSet().GetColumns()[column].GetType(), &v)
+}
+
+func (r Row) ScanColumn(column int, dst any) error {
+	cell, err := r.cell(column)
+	if err != nil {
+		return err
+	}
+	return scanWireValueDestination(r.part.Meta().GetResultSet().GetColumns()[column].GetType(), cell, dst)
+}
+
+func scanWireValueDestination(columnType *Ydb.Type, cell []byte, dst any) error {
+	if done, err := scanWireValueCell(columnType, cell, dst); done || err != nil {
+		return err
+	}
+	var v Ydb.Value
+	if err := proto.Unmarshal(cell, &v); err != nil {
+		return err
+	}
+	return value.CastTo(value.FromYDB(columnType, &v), dst)
+}
+
+func (r Row) cell(column int) ([]byte, error) {
+	if column < 0 || column >= len(r.part.Meta().GetResultSet().GetColumns()) {
+		return nil, fmt.Errorf("wire value decoder: column %d out of range", column)
+	}
+	data := r.raw()
+	index := 0
+	for len(data) > 0 {
+		field, wireType, tagLen := protowire.ConsumeTag(data)
+		if tagLen < 0 {
+			return nil, protowire.ParseError(tagLen)
+		}
+		valueLen := protowire.ConsumeFieldValue(field, wireType, data[tagLen:])
+		if valueLen < 0 {
+			return nil, protowire.ParseError(valueLen)
+		}
+		if field == 12 && wireType == protowire.BytesType {
+			cell, n := protowire.ConsumeBytes(data[tagLen:])
+			if n < 0 {
+				return nil, protowire.ParseError(n)
+			}
+			if index == column {
+				return cell, nil
+			}
+			index++
+		}
+		data = data[tagLen+valueLen:]
+	}
+	return nil, fmt.Errorf("wire value decoder: missing column %d", column)
+}
+
+func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error) {
+	primitive, optional := wireValuePrimitive(columnType)
+	var kind protowire.Number
+	var numeric uint64
+	var payload []byte
+	for len(cell) > 0 {
+		field, wireType, tagLen := protowire.ConsumeTag(cell)
+		if tagLen < 0 {
+			return true, protowire.ParseError(tagLen)
+		}
+		data := cell[tagLen:]
+		valueLen := protowire.ConsumeFieldValue(field, wireType, data)
+		if valueLen < 0 {
+			return true, protowire.ParseError(valueLen)
+		}
+		switch wireType {
+		case protowire.VarintType:
+			if field == 1 || field == 10 {
+				numeric, _ = protowire.ConsumeVarint(data)
+				kind = field
+			}
+		case protowire.Fixed32Type:
+			if field == 2 || field == 3 || field == 6 {
+				v, _ := protowire.ConsumeFixed32(data)
+				numeric, kind = uint64(v), field
+			}
+		case protowire.Fixed64Type:
+			if field == 4 || field == 5 || field == 7 || field == 15 {
+				numeric, _ = protowire.ConsumeFixed64(data)
+				kind = field
+			}
+		case protowire.BytesType:
+			if field == 8 || field == 9 || field == 11 {
+				payload, _ = protowire.ConsumeBytes(data)
+				kind = field
+			}
+		}
+		cell = cell[tagLen+valueLen:]
+	}
+	if kind == 10 && optional {
+		switch p := dst.(type) {
+		case **int32:
+			if p == nil {
+				return false, nil
+			}
+			*p = nil
+		case **bool:
+			if p == nil {
+				return false, nil
+			}
+			*p = nil
+		case **float64:
+			if p == nil {
+				return false, nil
+			}
+			*p = nil
+		case **string:
+			if p == nil {
+				return false, nil
+			}
+			*p = nil
+		case **[]byte:
+			if p == nil {
+				return false, nil
+			}
+			*p = nil
+		default:
+			return false, nil
+		}
+		return true, nil
+	}
+	switch primitive {
+	case Ydb.Type_UINT64:
+		if kind == 5 {
+			if p, ok := dst.(*uint64); ok && p != nil {
+				*p = numeric
+				return true, nil
+			}
+		}
+	case Ydb.Type_INT32:
+		if kind == 2 {
+			if p, ok := dst.(**int32); ok && optional && p != nil {
+				if *p == nil {
+					*p = new(int32)
+				}
+				**p = int32(numeric)
+				return true, nil
+			}
+		}
+	case Ydb.Type_BOOL:
+		if kind == 1 {
+			if p, ok := dst.(**bool); ok && optional && p != nil {
+				if *p == nil {
+					*p = new(bool)
+				}
+				**p = numeric != 0
+				return true, nil
+			}
+		}
+	case Ydb.Type_DOUBLE:
+		if kind == 7 {
+			if p, ok := dst.(**float64); ok && optional && p != nil {
+				if *p == nil {
+					*p = new(float64)
+				}
+				**p = math.Float64frombits(numeric)
+				return true, nil
+			}
+		}
+	case Ydb.Type_UTF8:
+		if kind == 9 {
+			if p, ok := dst.(**string); ok && optional && p != nil {
+				if *p == nil {
+					*p = new(string)
+				}
+				**p = string(payload)
+				return true, nil
+			}
+		}
+	case Ydb.Type_STRING:
+		if kind == 8 {
+			if p, ok := dst.(**[]byte); ok && optional && p != nil {
+				if *p == nil {
+					*p = new([]byte)
+				}
+				**p = bytes.Clone(payload)
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+func wireValuePrimitive(t *Ydb.Type) (Ydb.Type_PrimitiveTypeId, bool) {
+	if optional := t.GetOptionalType(); optional != nil {
+		return optional.GetItem().GetTypeId(), true
+	}
+	return t.GetTypeId(), false
+}

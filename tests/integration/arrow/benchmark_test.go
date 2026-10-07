@@ -5,14 +5,26 @@ package witharrow
 import (
 	"context"
 	"fmt"
+	"io"
+	"math"
+	"net/url"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	internalquery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/wirevalue"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
@@ -59,33 +71,66 @@ func BenchmarkFormats(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+	endpoint, err := url.Parse(connectionString())
+	if err != nil {
+		b.Fatal(err)
+	}
+	conn, err := grpc.NewClient(endpoint.Host, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer conn.Close()
 	arrowOption := query.WithResultFormatArrow(ipc.NewReader)
 	err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
 		for _, size := range []int{1, 10, 100, 1000, 10000} {
 			sql := fmt.Sprintf(
 				"SELECT id,score,active,amount,name,payload FROM query_arrow_benchmark WHERE id < %d ORDER BY id;", size,
 			)
-			for _, variant := range []string{"Value", "QueryArrow", "WithResultFormatArrow"} {
+			count, expected, err := consumeRows(ctx, s, sql, nil)
+			if err != nil {
+				return err
+			}
+			if count != size {
+				return fmt.Errorf("fixture rows=%d, want %d", count, size)
+			}
+			b.Logf("rows=%d checksum=%016x", size, expected)
+			for _, variant := range []string{"Value", "QueryArrow", "WithResultFormatArrow", "RawProto", "WireValue"} {
 				b.Run(fmt.Sprintf("%d/%s", size, variant), func(b *testing.B) {
-					opts := []query.ExecuteOption{query.WithResponsePartLimitSizeBytes(32 << 10)}
-					if variant == "WithResultFormatArrow" {
-						opts = append(opts, arrowOption)
-					}
-					run := func() error { return consumeRows(ctx, s, sql, opts) }
-					if variant == "QueryArrow" {
-						run = func() error { return consumeArrow(ctx, s, sql, opts) }
+					run := func() (int, uint64, error) {
+						if variant == "QueryArrow" {
+							return consumeArrow(ctx, s, sql)
+						}
+						if variant == "RawProto" {
+							return consumeRawProto(ctx, conn, endpoint.Path, s.ID(), sql)
+						}
+						if variant == "WireValue" {
+							return consumeWireValue(ctx, conn, endpoint.Path, s.ID(), sql)
+						}
+						var opts []query.ExecuteOption
+						if variant == "WithResultFormatArrow" {
+							opts = append(opts, arrowOption)
+						}
+
+						return consumeRows(ctx, s, sql, opts)
 					}
 					for range 10 {
-						if err := run(); err != nil {
-							b.Fatal(err)
+						n, h, err := run()
+						if err != nil || n != size || h != expected {
+							b.Fatalf("warmup: rows=%d checksum=%016x err=%v", n, h, err)
 						}
 					}
 					b.ReportAllocs()
-					for b.Loop() {
-						if err := run(); err != nil {
-							b.Fatal(err)
+					b.ResetTimer()
+					startCPU := processCPU(b)
+					for i := 0; i < b.N; i++ {
+						n, h, err := run()
+						if err != nil || n != size || h != expected {
+							b.Fatalf("rows=%d checksum=%016x err=%v", n, h, err)
 						}
 					}
+					cpu := processCPU(b) - startCPU
+					b.StopTimer()
+					b.ReportMetric(float64(cpu.Nanoseconds())/float64(b.N), "cpu-ns/op")
 				})
 			}
 		}
@@ -97,12 +142,113 @@ func BenchmarkFormats(b *testing.B) {
 	}
 }
 
-func consumeRows(ctx context.Context, s query.Session, sql string, opts []query.ExecuteOption) error {
-	res, err := s.Query(ctx, sql, opts...)
+func rawQueryRequest(sessionID, sql string) *Ydb_Query.ExecuteQueryRequest {
+	return &Ydb_Query.ExecuteQueryRequest{
+		SessionId: sessionID,
+		ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
+		Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{QueryContent: &Ydb_Query.QueryContent{
+			Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
+			Text:   sql,
+		}},
+		ResponsePartLimitBytes: 32 << 10,
+	}
+}
+
+func consumeRawProto(ctx context.Context, conn *grpc.ClientConn, database, sessionID, sql string) (int, uint64, error) {
+	ctx = metadata.AppendToOutgoingContext(ctx, "x-ydb-database", database)
+	stream, err := Ydb_Query_V1.NewQueryServiceClient(conn).ExecuteQuery(ctx, rawQueryRequest(sessionID, sql))
 	if err != nil {
-		return err
+		return 0, 0, err
+	}
+	defer stream.CloseSend()
+	var columns []*Ydb.Column
+	n := 0
+	hash := uint64(14695981039346656037)
+	var id uint64
+	var score *int32
+	var active *bool
+	var amount *float64
+	var name *string
+	var payload *[]byte
+	dst := []any{&id, &score, &active, &amount, &name, &payload}
+	for {
+		part, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return n, hash, nil
+			}
+			return 0, 0, err
+		}
+		if part.GetStatus() != Ydb.StatusIds_SUCCESS {
+			return 0, 0, fmt.Errorf("query part status: %v (%v)", part.GetStatus(), part.GetIssues())
+		}
+		if resultSet := part.GetResultSet(); resultSet != nil && len(resultSet.GetColumns()) != 0 {
+			columns = resultSet.GetColumns()
+		}
+		for _, row := range part.GetResultSet().GetRows() {
+			if err := internalquery.NewRow(columns, row).Scan(dst...); err != nil {
+				return 0, 0, err
+			}
+			hash = checksum(hash, id, score, active, amount, name, payload)
+			n++
+		}
+	}
+}
+
+func consumeWireValue(ctx context.Context, conn *grpc.ClientConn, database, sessionID, sql string) (int, uint64, error) {
+	ctx = metadata.AppendToOutgoingContext(ctx, "x-ydb-database", database)
+	stream, err := Ydb_Query_V1.NewQueryServiceClient(conn).ExecuteQuery(ctx,
+		rawQueryRequest(sessionID, sql), grpc.ForceCodecV2(wirevalue.NewCodec()))
+	if err != nil {
+		return 0, 0, err
+	}
+	defer stream.CloseSend()
+	var columns []*Ydb.Column
+	n := 0
+	hash := uint64(14695981039346656037)
+	var id uint64
+	var score *int32
+	var active *bool
+	var amount *float64
+	var name *string
+	var payload *[]byte
+	dst := []any{&id, &score, &active, &amount, &name, &payload}
+	for {
+		var part wirevalue.Part
+		if err := stream.RecvMsg(&part); err != nil {
+			if err == io.EOF {
+				return n, hash, nil
+			}
+			return 0, 0, err
+		}
+		if part.Meta().GetStatus() != Ydb.StatusIds_SUCCESS {
+			return 0, 0, fmt.Errorf("query part status: %v (%v)", part.Meta().GetStatus(), part.Meta().GetIssues())
+		}
+		if resultSet := part.Meta().GetResultSet(); resultSet != nil {
+			if len(resultSet.GetColumns()) != 0 {
+				columns = resultSet.GetColumns()
+			} else {
+				resultSet.Columns = columns
+			}
+		}
+		for i := 0; i < part.RowCount(); i++ {
+			if err := part.Row(i).Scan(dst...); err != nil {
+				return 0, 0, err
+			}
+			hash = checksum(hash, id, score, active, amount, name, payload)
+			n++
+		}
+	}
+}
+
+func consumeRows(ctx context.Context, s query.Session, sql string, opts []query.ExecuteOption) (int, uint64, error) {
+	res, err := s.Query(ctx, sql, append(opts, query.WithResponsePartLimitSizeBytes(32<<10))...)
+	if err != nil {
+		return 0, 0, err
 	}
 	defer res.Close(ctx)
+	n := 0
+	hash := uint64(14695981039346656037)
 	var id uint64
 	var score *int32
 	var active *bool
@@ -112,35 +258,38 @@ func consumeRows(ctx context.Context, s query.Session, sql string, opts []query.
 	dst := []any{&id, &score, &active, &amount, &name, &payload}
 	for rs, err := range res.ResultSets(ctx) {
 		if err != nil {
-			return err
+			return 0, 0, err
 		}
 		for row, err := range rs.Rows(ctx) {
 			if err != nil {
-				return err
+				return 0, 0, err
 			}
 			if err := row.Scan(dst...); err != nil {
-				return err
+				return 0, 0, err
 			}
-			consumeValues(id, score, active, amount, name, payload)
+			hash = checksum(hash, id, score, active, amount, name, payload)
+			n++
 		}
 	}
 
-	return res.Close(ctx)
+	return n, hash, res.Close(ctx)
 }
 
-func consumeArrow(ctx context.Context, s query.Session, sql string, opts []query.ExecuteOption) error {
-	res, err := s.QueryArrow(ctx, sql, opts...)
+func consumeArrow(ctx context.Context, s query.Session, sql string) (int, uint64, error) {
+	res, err := s.QueryArrow(ctx, sql, query.WithResponsePartLimitSizeBytes(32<<10))
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	defer res.Close(ctx)
+	n := 0
+	hash := uint64(14695981039346656037)
 	for part, err := range res.Parts(ctx) {
 		if err != nil {
-			return err
+			return 0, 0, err
 		}
 		reader, err := ipc.NewReader(part)
 		if err != nil {
-			return err
+			return 0, 0, err
 		}
 		for reader.Next() {
 			batch := reader.RecordBatch()
@@ -176,45 +325,71 @@ func consumeArrow(ctx context.Context, s query.Session, sql string, opts []query
 					v := payloads.Value(i)
 					payload = &v
 				}
-				consumeValues(ids.Value(i), score, active, amount, name, payload)
+				hash = checksum(hash, ids.Value(i), score, active, amount, name, payload)
+				n++
 			}
 		}
 		err = reader.Err()
 		reader.Release()
 		if err != nil {
-			return err
+			return 0, 0, err
 		}
 	}
 
-	return res.Close(ctx)
+	return n, hash, res.Close(ctx)
 }
 
-type benchmarkRow struct {
-	id      uint64
-	score   int32
-	active  bool
-	amount  float64
-	name    string
-	payload []byte
+func checksum(h, id uint64, score *int32, active *bool, amount *float64, name *string, payload *[]byte) uint64 {
+	mix := func(v uint64) { h = (h ^ v) * 1099511628211 }
+	mix(id)
+	if score == nil {
+		mix(0)
+	} else {
+		mix(1)
+		mix(uint64(*score))
+	}
+	if active == nil {
+		mix(0)
+	} else {
+		mix(1)
+		if *active {
+			mix(1)
+		} else {
+			mix(0)
+		}
+	}
+	if amount == nil {
+		mix(0)
+	} else {
+		mix(1)
+		mix(math.Float64bits(*amount))
+	}
+	if name == nil {
+		mix(0)
+	} else {
+		mix(1)
+		for _, c := range []byte(*name) {
+			mix(uint64(c))
+		}
+	}
+	if payload == nil {
+		mix(0)
+	} else {
+		mix(1)
+		for _, c := range *payload {
+			mix(uint64(c))
+		}
+	}
+
+	return h
 }
 
-var benchmarkSink benchmarkRow
+func processCPU(b *testing.B) time.Duration {
+	var usage syscall.Rusage
+	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &usage); err != nil {
+		b.Fatal(err)
+	}
 
-func consumeValues(id uint64, score *int32, active *bool, amount *float64, name *string, payload *[]byte) {
-	benchmarkSink = benchmarkRow{id: id}
-	if score != nil {
-		benchmarkSink.score = *score
-	}
-	if active != nil {
-		benchmarkSink.active = *active
-	}
-	if amount != nil {
-		benchmarkSink.amount = *amount
-	}
-	if name != nil {
-		benchmarkSink.name = *name
-	}
-	if payload != nil {
-		benchmarkSink.payload = *payload
-	}
+	return time.Duration(usage.Utime.Sec+usage.Stime.Sec)*time.Second +
+		time.Duration(usage.Utime.Usec+usage.Stime.Usec)*time.Microsecond
 }
