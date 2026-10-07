@@ -42,7 +42,7 @@ func Fill(f *Fuzzer, v reflect.Value) {
 		v.SetString(f.String())
 	case reflect.Interface:
 		fillInterface(f, v)
-	case reflect.Ptr:
+	case reflect.Pointer:
 		fillPointer(f, v)
 	case reflect.Slice:
 		fillSlice(f, v)

@@ -76,7 +76,7 @@ func (s *PartitioningSettings) ToProto() *Ydb_Topic.PartitioningSettings {
 	return &Ydb_Topic.PartitioningSettings{
 		MinActivePartitions:      s.MinActivePartitions,
 		MaxActivePartitions:      s.MaxActivePartitions,
-		PartitionCountLimit:      s.PartitionCountLimit,
+		PartitionCountLimit:      s.PartitionCountLimit, //nolint:staticcheck
 		AutoPartitioningSettings: s.AutoPartitioningSettings.ToProto(),
 	}
 }
@@ -163,7 +163,7 @@ func (s *AlterPartitioningSettings) ToProto() *Ydb_Topic.AlterPartitioningSettin
 	return &Ydb_Topic.AlterPartitioningSettings{
 		SetMinActivePartitions:        s.SetMinActivePartitions.ToProto(),
 		SetMaxActivePartitions:        s.SetMaxActivePartitions.ToProto(),
-		SetPartitionCountLimit:        s.SetPartitionCountLimit.ToProto(),
+		SetPartitionCountLimit:        s.SetPartitionCountLimit.ToProto(), //nolint:staticcheck
 		AlterAutoPartitioningSettings: s.AlterAutoPartitioningSettings.ToProto(),
 	}
 }
