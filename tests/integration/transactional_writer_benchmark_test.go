@@ -52,6 +52,23 @@ BenchmarkTransactionalWriterSingle/p512-4      	      45	  23628352 ns/op	   774
 BenchmarkTransactionalWriterSingle/p512-4      	      46	  24408697 ns/op	   78076 B/op	    1242 allocs/op
 BenchmarkTransactionalWriterSingle/p512-4      	      48	  22490911 ns/op	   77705 B/op	    1242 allocs/op
 */
+// PR #2335 run: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
+// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
+// Server version and resources were not recorded for this run.
+/*
+BenchmarkTransactionalWriterSingle/p64-4         	      51	  22695962 ns/op	   78133 B/op	    1248 allocs/op
+BenchmarkTransactionalWriterSingle/p64-4         	      49	  22007500 ns/op	   78086 B/op	    1247 allocs/op
+BenchmarkTransactionalWriterSingle/p64-4         	      50	  22001617 ns/op	   78367 B/op	    1248 allocs/op
+BenchmarkTransactionalWriterSingle/p128-4        	      43	  24840452 ns/op	   78171 B/op	    1247 allocs/op
+BenchmarkTransactionalWriterSingle/p128-4        	      42	  23856760 ns/op	   78044 B/op	    1248 allocs/op
+BenchmarkTransactionalWriterSingle/p128-4        	      46	  23442812 ns/op	   78316 B/op	    1249 allocs/op
+BenchmarkTransactionalWriterSingle/p256-4        	      49	  23375645 ns/op	   78054 B/op	    1248 allocs/op
+BenchmarkTransactionalWriterSingle/p256-4        	      46	  23053465 ns/op	   78359 B/op	    1249 allocs/op
+BenchmarkTransactionalWriterSingle/p256-4        	      46	  25127120 ns/op	   77994 B/op	    1247 allocs/op
+BenchmarkTransactionalWriterSingle/p512-4        	      46	  24225293 ns/op	   78754 B/op	    1249 allocs/op
+BenchmarkTransactionalWriterSingle/p512-4        	      45	  22459359 ns/op	   78118 B/op	    1247 allocs/op
+BenchmarkTransactionalWriterSingle/p512-4        	      48	  22419249 ns/op	   78385 B/op	    1250 allocs/op
+*/
 // BenchmarkTransactionalWriterSingle measures a single-partition writer.
 func BenchmarkTransactionalWriterSingle(b *testing.B) {
 	txWriterRunFixedPartitionBenchmark(b, txWriterStandardBenchmarkCase{
@@ -80,6 +97,23 @@ BenchmarkTransactionalWriterManyKey/p256-4     	       2	 619463146 ns/op	 88468
 BenchmarkTransactionalWriterManyKey/p512-4     	       1	1727684750 ns/op	17649552 B/op	  260649 allocs/op
 BenchmarkTransactionalWriterManyKey/p512-4     	       1	1897948625 ns/op	17612872 B/op	  260454 allocs/op
 BenchmarkTransactionalWriterManyKey/p512-4     	       1	2380674708 ns/op	17639000 B/op	  260815 allocs/op
+*/
+// PR #2335 run: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
+// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
+// Server version and resources were not recorded for this run.
+/*
+BenchmarkTransactionalWriterManyKey/p64-4         	       8	 148425594 ns/op	 2201030 B/op	   33026 allocs/op
+BenchmarkTransactionalWriterManyKey/p64-4         	       9	 130229069 ns/op	 2189392 B/op	   32944 allocs/op
+BenchmarkTransactionalWriterManyKey/p64-4         	       2	 980522146 ns/op	 2224220 B/op	   33251 allocs/op
+BenchmarkTransactionalWriterManyKey/p128-4        	       1	2044986292 ns/op	 4511464 B/op	   66025 allocs/op
+BenchmarkTransactionalWriterManyKey/p128-4        	       5	 248683808 ns/op	 4371052 B/op	   65464 allocs/op
+BenchmarkTransactionalWriterManyKey/p128-4        	       5	 271558292 ns/op	 4365246 B/op	   65418 allocs/op
+BenchmarkTransactionalWriterManyKey/p256-4        	       2	 544516167 ns/op	 8731220 B/op	  130601 allocs/op
+BenchmarkTransactionalWriterManyKey/p256-4        	       2	 560156062 ns/op	 8737684 B/op	  130610 allocs/op
+BenchmarkTransactionalWriterManyKey/p256-4        	       2	 559496500 ns/op	 8732792 B/op	  130597 allocs/op
+BenchmarkTransactionalWriterManyKey/p512-4        	       1	2173319333 ns/op	17878304 B/op	  262060 allocs/op
+BenchmarkTransactionalWriterManyKey/p512-4        	       1	1893252833 ns/op	17411664 B/op	  261079 allocs/op
+BenchmarkTransactionalWriterManyKey/p512-4        	       1	1641541292 ns/op	17414432 B/op	  261119 allocs/op
 */
 // BenchmarkTransactionalWriterManyKey measures keyed multi-partition writing.
 func BenchmarkTransactionalWriterManyKey(b *testing.B) {
@@ -110,6 +144,23 @@ BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1990103750 ns
 BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1979818792 ns/op	17823408 B/op	  263171 allocs/op
 BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1944340333 ns/op	17819568 B/op	  263172 allocs/op
 */
+// PR #2335 run: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
+// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
+// Server version and resources were not recorded for this run.
+/*
+BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       8	 135958151 ns/op	 2251727 B/op	   33452 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       8	 126586354 ns/op	 2208601 B/op	   33286 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       8	 127357099 ns/op	 2214614 B/op	   33334 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       5	 268116500 ns/op	 4419032 B/op	   66154 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       4	 266760917 ns/op	 4428016 B/op	   66256 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       4	 265767979 ns/op	 4430980 B/op	   66297 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       2	 568833146 ns/op	 8792240 B/op	  131742 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       2	 590984375 ns/op	 8802456 B/op	  131792 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       2	 637427729 ns/op	 8784432 B/op	  131667 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	2384530333 ns/op	18104720 B/op	  265578 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1958072750 ns/op	17516256 B/op	  263168 allocs/op
+BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1981069875 ns/op	17520584 B/op	  263256 allocs/op
+*/
 // BenchmarkTransactionalWriterManyBoundedKey measures bounded-key multi-partition writing.
 func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
 	txWriterRunFixedPartitionBenchmark(b, txWriterStandardBenchmarkCase{
@@ -130,6 +181,14 @@ func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
 BenchmarkTransactionalWriterAutoSplit/tx-4         	     300	  30704545 ns/op	  160715 B/op	    2501 allocs/op
 BenchmarkTransactionalWriterAutoSplit/tx-4         	     300	  28699257 ns/op	  173742 B/op	    2709 allocs/op
 BenchmarkTransactionalWriterAutoSplit/tx-4         	     300	  28877437 ns/op	  173551 B/op	    2708 allocs/op
+*/
+// PR #2335 run: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
+// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
+// Server version and resources were not recorded for this run.
+/*
+BenchmarkTransactionalWriterAutoSplit/tx-4         	     300	  29408551 ns/op	  148551 B/op	    2308 allocs/op
+BenchmarkTransactionalWriterAutoSplit/tx-4         	     300	  26454153 ns/op	  151586 B/op	    2368 allocs/op
+BenchmarkTransactionalWriterAutoSplit/tx-4         	     300	  27043750 ns/op	  151582 B/op	    2368 allocs/op
 */
 // BenchmarkTransactionalWriterAutoSplit measures bounded-key writing while YDB may split partitions.
 func BenchmarkTransactionalWriterAutoSplit(b *testing.B) {
