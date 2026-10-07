@@ -12,25 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
-func TestPartitionsByPartitionIDReturnsPartition(t *testing.T) {
-	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
-		Partitions: []topictypes.PartitionInfo{{PartitionID: 42}},
-	}}
-	partitions, _ := topology.NewRegistry(describer.Describe).Get("test/topic").Partitions(t.Context())
-
-	assert.Equal(t, int64(42), partitions.ByPartitionID(42).ID())
-}
-
-func TestPartitionsByPartitionIDReturnsInactiveMissingPartition(t *testing.T) {
-	describer := &mockTopicDescriber{}
-	partitions, _ := topology.NewRegistry(describer.Describe).Get("test/topic").Partitions(t.Context())
-
-	partition := partitions.ByPartitionID(42)
-
-	assert.Equal(t, int64(42), partition.ID())
-	assert.False(t, partition.IsActive())
-}
-
 func TestPartitionsInfosReturnsIndependentCopies(t *testing.T) {
 	wantLastWrite := time.Unix(10, 0)
 	wantMaxLag := time.Second
@@ -73,12 +54,11 @@ func TestPartitionsInfosReturnsIndependentCopies(t *testing.T) {
 }
 
 func TestPartitionsCanBeReadConcurrently(t *testing.T) {
-	describer := &mockTopicDescriber{description: topictypes.TopicDescription{
-		Partitions: []topictypes.PartitionInfo{
-			{PartitionID: 1},
-			{PartitionID: 2, ParentPartitionIDs: []int64{1}},
-		},
-	}}
+	want := []topictypes.PartitionInfo{
+		{PartitionID: 1},
+		{PartitionID: 2, ParentPartitionIDs: []int64{1}},
+	}
+	describer := &mockTopicDescriber{description: topictypes.TopicDescription{Partitions: want}}
 	partitions, _ := topology.NewRegistry(describer.Describe).Get("test/topic").Partitions(t.Context())
 
 	var wg sync.WaitGroup
@@ -86,8 +66,7 @@ func TestPartitionsCanBeReadConcurrently(t *testing.T) {
 	for range 1000 {
 		go func() {
 			defer wg.Done()
-			assert.Equal(t, []int64{1, 2}, partitions.All().IDs())
-			assert.Equal(t, []int64{1}, partitions.ByPartitionID(2).Parents().IDs())
+			assert.Equal(t, want, partitions.Infos())
 		}()
 	}
 	wg.Wait()

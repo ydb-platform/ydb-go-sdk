@@ -49,7 +49,7 @@ func TestTopicPartitionsRetriesRetryableDescribeError(t *testing.T) {
 	partitions, err := topology.Partitions(t.Context())
 
 	require.NoError(t, err)
-	assert.Equal(t, []int64{42}, partitions.All().IDs())
+	assert.Equal(t, topicWithActivePartitions(42).Partitions, partitions.Infos())
 }
 
 func TestTopicPartitionsDescribesRequestedTopic(t *testing.T) {
@@ -71,7 +71,7 @@ func TestTopicPartitionsReturnsDescribedPartitionIDs(t *testing.T) {
 	partitions, err := topology.Partitions(t.Context())
 
 	require.NoError(t, err)
-	assert.Equal(t, []int64{42}, partitions.All().IDs())
+	assert.Equal(t, topicWithActivePartitions(42).Partitions, partitions.Infos())
 }
 
 func TestTopicPartitionsDescribesTopicOnce(t *testing.T) {
@@ -128,7 +128,7 @@ func TestTopicPartitionsRetriesWhenConcurrentLoadContextIsCanceled(t *testing.T)
 	result := <-waitResult
 
 	require.NoError(t, result.err)
-	assert.Equal(t, []int64{42}, result.partitions.All().IDs())
+	assert.Equal(t, topicWithActivePartitions(42).Partitions, result.partitions.Infos())
 }
 
 func TestTopicPartitionsReturnsConcurrentDescribeError(t *testing.T) {
@@ -163,7 +163,7 @@ func TestTopicReportInactivePartitionReloads(t *testing.T) {
 	partitions, err := topic.Partitions(t.Context())
 
 	require.NoError(t, err)
-	assert.True(t, partitions.ByPartitionID(2).IsActive())
+	assert.True(t, partitionInfoByID(t, partitions, 2).Active)
 }
 
 func TestTopicPartitionsWaitsForPublishedReplacement(t *testing.T) {
@@ -182,8 +182,8 @@ func TestTopicPartitionsWaitsForPublishedReplacement(t *testing.T) {
 	partitions, err := topology.Partitions(t.Context())
 
 	require.NoError(t, err)
-	assert.False(t, partitions.ByPartitionID(1).IsActive())
-	assert.True(t, partitions.ByPartitionID(2).IsActive())
+	assert.False(t, partitionInfoByID(t, partitions, 1).Active)
+	assert.True(t, partitionInfoByID(t, partitions, 2).Active)
 }
 
 func TestTopicPartitionsPublishesReplacementReportedInactiveDuringDescribe(t *testing.T) {
@@ -212,7 +212,7 @@ func TestTopicPartitionsPublishesReplacementReportedInactiveDuringDescribe(t *te
 
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), calls.Load())
-	assert.True(t, partitions.ByPartitionID(2).IsActive())
+	assert.True(t, partitionInfoByID(t, partitions, 2).Active)
 }
 
 func TestTopicPartitionsWaitsForReplacementThroughInactiveDescendants(t *testing.T) {
@@ -235,8 +235,8 @@ func TestTopicPartitionsWaitsForReplacementThroughInactiveDescendants(t *testing
 	partitions, err := topology.Partitions(t.Context())
 
 	require.NoError(t, err)
-	assert.True(t, partitions.ByPartitionID(4).IsActive())
-	assert.True(t, partitions.ByPartitionID(7).IsActive())
+	assert.True(t, partitionInfoByID(t, partitions, 4).Active)
+	assert.True(t, partitionInfoByID(t, partitions, 7).Active)
 }
 
 func TestTopicPartitionsReturnsContextErrorWhileWaitingForReplacement(t *testing.T) {
@@ -279,7 +279,7 @@ func TestTopicPartitionsContinuesReplacementRefreshAfterDescribeError(t *testing
 	partitions, err := topology.Partitions(t.Context())
 
 	require.NoError(t, err)
-	assert.True(t, partitions.ByPartitionID(2).IsActive())
+	assert.True(t, partitionInfoByID(t, partitions, 2).Active)
 }
 
 func TestTopicPartitionsSharesReplacementRefresh(t *testing.T) {

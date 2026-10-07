@@ -75,6 +75,19 @@ func topicAfterMerge(parentIDs []int64, childID int64) topictypes.TopicDescripti
 	return topictypes.TopicDescription{Partitions: partitions}
 }
 
+func partitionInfoByID(t *testing.T, partitions *topology.Partitions, partitionID int64) topictypes.PartitionInfo {
+	t.Helper()
+
+	for _, partition := range partitions.Infos() {
+		if partition.PartitionID == partitionID {
+			return partition
+		}
+	}
+	t.Fatalf("partition %d not found", partitionID)
+
+	return topictypes.PartitionInfo{}
+}
+
 func startLoadingPartitions(ctx context.Context, topology *topology.Topic) <-chan partitionsResult {
 	result := make(chan partitionsResult, 1)
 	go func() {

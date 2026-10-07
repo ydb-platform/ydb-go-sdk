@@ -136,16 +136,11 @@ func isContextError(err error) bool {
 
 func partitionsFromDescription(description topictypes.TopicDescription) *Partitions {
 	partitions := &Partitions{
-		all:  make(List, 0, len(description.Partitions)),
-		byID: make(map[int64]Partition, len(description.Partitions)),
+		infos: append([]topictypes.PartitionInfo(nil), description.Partitions...),
+		byID:  make(map[int64]int, len(description.Partitions)),
 	}
-	for _, partition := range description.Partitions {
-		topicPartition := Partition{
-			info:       partition,
-			partitions: partitions,
-		}
-		partitions.all = append(partitions.all, topicPartition)
-		partitions.byID[topicPartition.ID()] = topicPartition
+	for index, partition := range partitions.infos {
+		partitions.byID[partition.PartitionID] = index
 	}
 
 	return partitions
@@ -158,11 +153,11 @@ func replacementPublished(partitions *Partitions, partitionID int64) bool {
 		return false
 	}
 	parent, ok := partitions.find(partitionID)
-	if !ok || parent.IsActive() || len(parent.info.ChildPartitionIDs) == 0 {
+	if !ok || parent.Active || len(parent.ChildPartitionIDs) == 0 {
 		return false
 	}
 	path := map[int64]struct{}{partitionID: {}}
-	for _, childID := range parent.info.ChildPartitionIDs {
+	for _, childID := range parent.ChildPartitionIDs {
 		if !replacementBranchPublished(partitions, childID, path) {
 			return false
 		}
@@ -176,10 +171,10 @@ func replacementBranchPublished(partitions *Partitions, partitionID int64, path 
 	if !ok {
 		return false
 	}
-	if partition.IsActive() {
+	if partition.Active {
 		return true
 	}
-	if len(partition.info.ChildPartitionIDs) == 0 {
+	if len(partition.ChildPartitionIDs) == 0 {
 		return false
 	}
 	if _, ok = path[partitionID]; ok {
@@ -188,7 +183,7 @@ func replacementBranchPublished(partitions *Partitions, partitionID int64, path 
 	path[partitionID] = struct{}{}
 	defer delete(path, partitionID)
 
-	for _, childID := range partition.info.ChildPartitionIDs {
+	for _, childID := range partition.ChildPartitionIDs {
 		if !replacementBranchPublished(partitions, childID, path) {
 			return false
 		}

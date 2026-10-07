@@ -156,7 +156,10 @@ func TestPartitionWriterPoolReportsOnlyInactivePartitionErrors(t *testing.T) {
 	require.Equal(t, []int64{1}, scheduled)
 	updated, err := pool.topology.Partitions(t.Context())
 	require.NoError(t, err)
-	require.True(t, updated.ByPartitionID(2).IsActive())
+	infos := updated.Infos()
+	require.Len(t, infos, 2)
+	require.Equal(t, int64(2), infos[1].PartitionID)
+	require.True(t, infos[1].Active)
 	require.Equal(t, 2, describes)
 }
 
@@ -240,7 +243,10 @@ func TestSenderStepHandlesWriterInitError(t *testing.T) {
 				require.Equal(t, 1, splits.partitionSplits.Len())
 				updated, err := topology.Partitions(ctx)
 				require.NoError(t, err)
-				require.True(t, updated.ByPartitionID(2).IsActive())
+				infos := updated.Infos()
+				require.Len(t, infos, 2)
+				require.Equal(t, int64(2), infos[1].PartitionID)
+				require.True(t, infos[1].Active)
 			} else {
 				require.ErrorIs(t, err, tc.initErr)
 				require.Equal(t, 0, splits.partitionSplits.Len())
