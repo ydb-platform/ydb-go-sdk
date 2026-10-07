@@ -58,7 +58,7 @@ jobs:
               marker,
               '### Integration benchmark comparison',
               `Master: \`${metadata.master_sha}\` · PR: \`${metadata.head_sha}\``,
-              'Go 1.27.x, local YDB 26.3.1.16, five runs per benchmark, 200ms benchmark time.',
+              'Go 1.27.x, local YDB 26.3.1.16, ten runs per benchmark, 100ms benchmark time.',
               'Raw results are attached to the benchmark workflow run.',
               '',
               ...report.trimEnd().split('\n').map(line => `    ${line}`),

@@ -68,14 +68,14 @@ jobs:
         shell: bash
         run: |
           mkdir -p ../benchmark-results
-          go test -tags integration -run '^$' -bench . -benchtime=200ms -count=5 -benchmem -cpu=2 -timeout=90m ./tests/integration/... | tee ../benchmark-results/master.txt
+          go test -tags integration -run '^$' -bench . -benchtime=100ms -count=10 -benchmem -cpu=2 -timeout=90m ./tests/integration/... | tee ../benchmark-results/master.txt
           grep -q '^Benchmark' ../benchmark-results/master.txt
 
       - name: Benchmark PR
         working-directory: pr
         shell: bash
         run: |
-          go test -tags integration -run '^$' -bench . -benchtime=200ms -count=5 -benchmem -cpu=2 -timeout=90m ./tests/integration/... | tee ../benchmark-results/pr.txt
+          go test -tags integration -run '^$' -bench . -benchtime=100ms -count=10 -benchmem -cpu=2 -timeout=90m ./tests/integration/... | tee ../benchmark-results/pr.txt
           grep -q '^Benchmark' ../benchmark-results/pr.txt
 
       - name: Compare results
