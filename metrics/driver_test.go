@@ -79,6 +79,39 @@ func TestDriverConnectionMetricsDisabled(t *testing.T) {
 	require.Nil(t, tracer.OnConnBan(trace.DriverConnBanStartInfo{}))
 }
 
+func TestDriverBalancerEndpointMetrics(t *testing.T) {
+	registry := newRecordingRegistry()
+	tracer := driver(recordingConfig{
+		registry: registry,
+		details:  trace.DriverBalancerEvents,
+	})
+	update := func(endpoints ...trace.EndpointInfo) {
+		done := tracer.OnBalancerUpdate(trace.DriverBalancerUpdateStartInfo{})
+		require.NotNil(t, done)
+		done(trace.DriverBalancerUpdateDoneInfo{Endpoints: endpoints})
+	}
+	zoneA := map[string]string{"az": "zone-a"}
+	zoneB := map[string]string{"az": "zone-b"}
+
+	require.Equal(t, "gauge", registry.kinds["driver.balancer.endpoints"])
+	require.Equal(t, []string{"az"}, registry.labelNames["driver.balancer.endpoints"])
+
+	update(
+		endpoint.New("node1:2135", endpoint.WithLocation("zone-a")),
+		endpoint.New("node2:2135", endpoint.WithLocation("zone-a")),
+		endpoint.New("node3:2135", endpoint.WithLocation("zone-b")),
+	)
+	require.Equal(t, float64(2), registry.value("driver.balancer.endpoints", zoneA))
+	require.Equal(t, float64(1), registry.value("driver.balancer.endpoints", zoneB))
+
+	update(endpoint.New("node1:2135", endpoint.WithLocation("zone-a")))
+	require.Equal(t, float64(1), registry.value("driver.balancer.endpoints", zoneA))
+	require.Zero(t, registry.value("driver.balancer.endpoints", zoneB))
+
+	update()
+	require.Zero(t, registry.value("driver.balancer.endpoints", zoneA))
+}
+
 type recordingRegistry struct {
 	mu         sync.Mutex
 	kinds      map[string]string
