@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -39,7 +38,7 @@ type orchestrator struct {
 	partitions map[int64]*PartitionInfo
 	initDone   empty.Chan
 
-	currentSeqNo atomic.Int64
+	currentSeqNo seqNoCounter
 
 	background *background.Worker
 
@@ -614,7 +613,7 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 				partitionInfo.CachedMaxSeqNo = initInfo.LastSeqNum
 			})
 			if splitted {
-				advanceMaxSeqNo(&o.currentSeqNo, initInfo.LastSeqNum)
+				o.currentSeqNo.advanceMaxSeqNo(initInfo.LastSeqNum)
 			}
 
 			return nil

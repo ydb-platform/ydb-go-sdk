@@ -11,13 +11,26 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
+type seqNoCounter struct {
+	atomic.Int64
+}
+
+func (counter *seqNoCounter) advanceMaxSeqNo(lastSeqNo int64) {
+	for {
+		current := counter.Load()
+		if lastSeqNo <= current || counter.CompareAndSwap(current, lastSeqNo) {
+			return
+		}
+	}
+}
+
 type partitionWriterPool struct {
 	ctx context.Context //nolint:containedctx
 
 	cfg       *MultiWriterConfig
 	writerCfg *topicwriterinternal.WriterReconnectorConfig
 	bg        *background.Worker
-	maxSeqNo  *atomic.Int64
+	maxSeqNo  *seqNoCounter
 
 	mu      xsync.Mutex
 	writers map[int64]*writerWrapper
@@ -34,7 +47,7 @@ func newPartitionWriterPool(
 	cfg *MultiWriterConfig,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	bg *background.Worker,
-	maxSeqNo *atomic.Int64,
+	maxSeqNo *seqNoCounter,
 	ackCallback func(partitionID int64, seqNo int64),
 	partitionSplitCallback func(partitionID int64),
 	onWriterInit func(),
@@ -59,15 +72,6 @@ func newPartitionWriterPool(
 	})
 
 	return p
-}
-
-func advanceMaxSeqNo(counter *atomic.Int64, lastSeqNo int64) {
-	for {
-		current := counter.Load()
-		if lastSeqNo <= current || counter.CompareAndSwap(current, lastSeqNo) {
-			return
-		}
-	}
 }
 
 func (p *partitionWriterPool) getProducerID(partitionID int64) string {
@@ -204,7 +208,7 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 	p.bg.Start(fmt.Sprintf("writer-init-%d", partitionID), func(ctx context.Context) {
 		info, err := wr.WaitInitInfo(ctx)
 		if err == nil {
-			advanceMaxSeqNo(p.maxSeqNo, info.LastSeqNum)
+			p.maxSeqNo.advanceMaxSeqNo(info.LastSeqNum)
 		}
 		wrapper.setInitErr(err)
 

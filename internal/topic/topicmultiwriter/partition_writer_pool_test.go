@@ -85,7 +85,7 @@ func newPoolForTest(t *testing.T, factory *poolMockFactory) (*partitionWriterPoo
 		cfg,
 		writerCfg,
 		bg,
-		&atomic.Int64{},
+		&seqNoCounter{},
 		func(partitionID, seqNo int64) {},
 		func(partitionID int64) {},
 		func() {},
