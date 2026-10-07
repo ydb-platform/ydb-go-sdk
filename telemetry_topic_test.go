@@ -20,7 +20,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 )
+
+// Reader must remain usable as a map key for API compatibility.
+var _ map[topicreader.Reader]struct{}
 
 func TestTopicPartitionSessionMetricPublicSurface(t *testing.T) {
 	for _, listener := range []bool{false, true} {

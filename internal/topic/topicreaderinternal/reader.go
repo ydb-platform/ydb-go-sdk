@@ -38,7 +38,7 @@ type Reader struct {
 	defaultBatchConfig ReadMessageBatchOptions
 	tracer             *trace.Topic
 	readerID           int64
-	unregisterMetric   func() error
+	unregisterMetric   *func() error
 }
 
 func (r *Reader) TopicOnReaderStart(consumer string, err error) {
@@ -122,7 +122,8 @@ func NewReader(
 		if err != nil {
 			return Reader{}, xerrors.WithStackTrace(err)
 		}
-		res.unregisterMetric = registration
+		// Keep the public Reader comparable without wrapping the backend handle.
+		res.unregisterMetric = &registration
 	}
 	reader.start()
 
@@ -152,7 +153,7 @@ func (r *Reader) Tracer() *trace.Topic {
 func (r *Reader) Close(ctx context.Context) error {
 	var metricErr error
 	if r.unregisterMetric != nil {
-		metricErr = r.unregisterMetric()
+		metricErr = (*r.unregisterMetric)()
 	}
 
 	return errors.Join(metricErr, r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed)))

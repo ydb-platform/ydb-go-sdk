@@ -4,10 +4,9 @@ package telemetryotel
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 )
 
 // Meter connects SDK gauge registration directly to an OTel meter.
