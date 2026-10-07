@@ -99,3 +99,62 @@ jobs:
           path: benchmark-results/
           if-no-files-found: ignore
           retention-days: 30
+
+  comment:
+    needs: compare
+    if: needs.compare.result == 'success' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Download benchmark results
+        uses: actions/download-artifact@v4
+        with:
+          name: integration-benchstat
+          path: benchmark-results
+
+      - name: Update PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const metadata = JSON.parse(fs.readFileSync('benchmark-results/metadata.json', 'utf8'));
+            const event = context.payload.pull_request;
+            if (metadata.pr !== event.number || metadata.head_sha !== event.head.sha ||
+                metadata.master_sha !== event.base.sha) {
+              throw new Error('Benchmark artifact does not match this pull request');
+            }
+
+            const { owner, repo } = context.repo;
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: metadata.pr });
+            if (pr.state !== 'open' || pr.head.sha !== metadata.head_sha ||
+                !pr.labels.some(label => label.name === 'run_intergration_benchmarks')) {
+              core.info('Pull request changed or label was removed; skipping stale report');
+              return;
+            }
+
+            const report = fs.readFileSync('benchmark-results/benchstat.txt', 'utf8');
+            if (!report.trim() || report.length > 55000) {
+              throw new Error('Benchmark report is empty or too large for a PR comment');
+            }
+            const marker = '<!-- integration-benchstat -->';
+            const body = [
+              marker,
+              '### Integration benchmark comparison',
+              `Master: \`${metadata.master_sha}\` · PR: \`${metadata.head_sha}\``,
+              'Go 1.27.x, local YDB 26.3.1.16, ten runs per benchmark, 100ms benchmark time.',
+              `[Raw results and benchstat artifact](https://github.com/${owner}/${repo}/actions/runs/${context.runId}).`,
+              '',
+              ...report.trimEnd().split('\n').map(line => `    ${line}`),
+            ].join('\n');
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: metadata.pr, per_page: 100,
+            });
+            const previous = comments.find(comment =>
+              comment.user?.login === 'github-actions[bot]' && comment.body?.startsWith(marker));
+            if (previous) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: previous.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: metadata.pr, body });
+            }

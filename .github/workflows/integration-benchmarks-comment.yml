@@ -43,6 +43,7 @@ jobs:
             const { owner, repo } = context.repo;
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: metadata.pr });
             if (pr.state !== 'open' || pr.base.ref !== 'master' ||
+                pr.head.repo.full_name === `${owner}/${repo}` ||
                 pr.head.sha !== metadata.head_sha ||
                 !pr.labels.some(label => label.name === 'run_intergration_benchmarks')) {
               core.info('Pull request changed or label was removed; skipping stale report');
