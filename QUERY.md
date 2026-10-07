@@ -171,7 +171,7 @@ The benchmark compares full SELECT execution and consumption of all six columns:
 - `QueryArrow`: `Session.QueryArrow` + direct column access.
 - `WithResultFormatArrow`: `Session.Query` + `query.WithResultFormatArrow(ipc.NewReader)` from v18 + `Scan`.
 
-All variants use the same session, SQL, row checksum, disabled response prefetch
+All variants use the same session, SQL, disabled response prefetch
 and a 32 KiB response-part limit. Value and WithResultFormatArrow reuse Scan destinations and
 arguments between rows. The WithResultFormatArrow option is created once and reused across
 queries. Nullable scans still allocate each non-null destination.
@@ -184,7 +184,8 @@ conversions.
 The table has 10,000 rows: Uint64 id, Optional Int32/Bool/Double/Utf8/String,
 10% null in score/name, and a 64-byte payload. Queries return 1, 10, 100, 1,000
 or 10,000 ordered rows; the one-row query selects a row with null score/name.
-Every RPC checks both row count and checksum.
+Correctness is checked by the integration tests. The benchmark consumes all six
+columns without checksums.
 
 Environment: Apple M3 Pro, native darwin/arm64 Go 1.27.0, Arrow Go v18.8.0,
 GOMAXPROCS=4. The server is `ydbplatform/local-ydb:26.3.1.17`, image digest
@@ -197,31 +198,31 @@ variant. Each process ran 1,000 RPCs per variant for 1/10/100 rows, or 100 RPCs
 for 1,000/10,000 rows. Measurements ran without race instrumentation or concurrent
 tests/builds. The charts contain medians.
 
-Client CPU is user + system CPU of the client process from `getrusage`, including
-decoding, scanning and GC. Elapsed time includes server execution and transport.
+Elapsed time is the standard Go benchmark `ns/op` and includes server execution,
+transport, decoding and scanning. `b.Loop()` excludes setup and cleanup from
+measurements automatically.
 Allocated MiB are cumulative Go allocations per RPC, not RSS or peak live memory.
-Server CPU and wire payload size were not measured.
+Client CPU, server CPU and wire payload size were not measured.
 
 ### Interpreting the results
 
 For 1/10 rows, WithResultFormatArrow does not show a consistent elapsed-time benefit: its
-median changes by -0.2% / -2.9% relative to Value, and the observed ranges overlap.
-Client CPU changes by +6.9% / +1.3%. For one row, allocated bytes increase
-by 38.1% and allocation count by 28.3%. At 100 rows, WithResultFormatArrow reduces median
-client CPU by 36.0% in this workload, while median elapsed time increases by
-4.4%; the observed elapsed ranges still overlap.
+median changes by +10.0% / +1.2% relative to Value, and the observed ranges overlap.
+For one row, allocated bytes increase by 36.5% and allocation count by
+28.0%. At 100 rows, WithResultFormatArrow reduces median elapsed time by
+16.1%; the observed elapsed ranges still overlap.
 
-For 1,000/10,000 rows, WithResultFormatArrow reduces client CPU by 72.4% / 68.0%, elapsed
-time by 41.3% / 14.0%, allocated bytes by 80.7% / 72.1% and allocation count
-by 80.8% / 81.5% relative to Value. Direct QueryArrow reduces client CPU by
-74.5% / 78.5%, but requires a different consumption API and resource ownership.
+For 1,000/10,000 rows, WithResultFormatArrow reduces elapsed time by 19.7% / 34.1%,
+allocated bytes by 80.8% / 71.8% and allocation count by 80.8% / 81.5%
+relative to Value. Direct QueryArrow reduces elapsed time by 27.3% / 37.3%,
+but requires a different consumption API and resource ownership.
 
 Use these measurements to select candidates for your own benchmark. They do not
 establish universal row-count thresholds: types, row width, nulls, server work,
 network and application processing affect the result. Functional Client/TxActor
 coverage is separate; the performance measurements above use Session.
 
-### Client CPU
+### Elapsed time
 
 ```mermaid
 ---
@@ -231,12 +232,12 @@ config:
       plotColorPalette: "#596579, #158073, #dc7127"
 ---
 xychart-beta
-    title "Client CPU"
+    title "Elapsed time"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
-    y-axis "ms/RPC" 0 --> 28
-    line "Value" [0.271, 0.327, 0.591, 3.293, 27.634]
-    line "QueryArrow" [0.265, 0.316, 0.321, 0.839, 5.954]
-    line "WithResultFormatArrow" [0.290, 0.331, 0.378, 0.908, 8.833]
+    y-axis "ms/RPC" 0 --> 35
+    line "Value" [1.531, 1.669, 2.534, 6.517, 31.660]
+    line "QueryArrow" [1.741, 1.618, 1.908, 4.738, 19.854]
+    line "WithResultFormatArrow" [1.685, 1.688, 2.125, 5.231, 20.848]
 ```
 
 ### Allocated memory
@@ -252,9 +253,9 @@ xychart-beta
     title "Allocated memory"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
     y-axis "MiB/RPC" 0 --> 20
-    line "Value" [0.021, 0.035, 0.179, 2.220, 19.184]
-    line "QueryArrow" [0.026, 0.029, 0.059, 0.394, 4.504]
-    line "WithResultFormatArrow" [0.029, 0.033, 0.066, 0.428, 5.358]
+    line "Value" [0.021, 0.035, 0.179, 2.215, 19.226]
+    line "QueryArrow" [0.026, 0.029, 0.059, 0.394, 4.361]
+    line "WithResultFormatArrow" [0.029, 0.033, 0.066, 0.425, 5.430]
 ```
 
 ### Allocation count
@@ -270,9 +271,9 @@ xychart-beta
     title "Allocation count"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
     y-axis "Allocations/RPC" 0 --> 400000
-    line "Value" [378, 722, 4112, 39528, 394870]
-    line "QueryArrow" [372, 373, 374, 680, 4698]
-    line "WithResultFormatArrow" [485, 549, 1153, 7582, 73114]
+    line "Value" [378, 723, 4113, 39528, 394876]
+    line "QueryArrow" [372, 373, 374, 683, 4696]
+    line "WithResultFormatArrow" [484, 549, 1152, 7583, 73128]
 ```
 
 The x-axis lists the measured row counts at equal intervals; the y-axis is
@@ -289,8 +290,11 @@ that database and table permissions. Run from the SDK checkout:
 cd tests/integration/arrow
 export GOTOOLCHAIN=go1.27.0
 for sample in 1 2 3 4 5; do
-  go test -tags integration -run '^$' -bench '^BenchmarkFormats$/(1|10|100)$' -benchtime=1000x -count=1 -cpu=4 -v
-  go test -tags integration -run '^$' -bench '^BenchmarkFormats$/(1000|10000)$' -benchtime=100x -count=1 -cpu=4 -v
+  for rows in 1 10 100 1000 10000; do
+    iterations=1000
+    if [ "$rows" -ge 1000 ]; then iterations=100; fi
+    go test -tags integration -run '^$' -bench "^BenchmarkFormats$/${rows}$" -benchtime="${iterations}x" -count=1 -cpu=4 -v
+  done
 done
 ```
 
