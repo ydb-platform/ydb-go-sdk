@@ -31,8 +31,8 @@ import (
 // The benchmark has no separate run deadline.
 
 // Set the integration scope connection and credentials before running.
-// PR #2326 at e064436c8, 2026-10-07, Go 1.27.1 on Apple M3 Pro
-// (darwin/arm64), managed YDB in ru-central1.
+// PR #2326 at e064436c8, 2026-10-07, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
+// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
 // Run:
 //
 //	go test -tags integration ./tests/integration -run '^$' \
@@ -60,8 +60,8 @@ func BenchmarkTransactionalWriterSingle(b *testing.B) {
 }
 
 // Set the integration scope connection and credentials before running.
-// PR #2326 at e064436c8, 2026-10-07, Go 1.27.1 on Apple M3 Pro
-// (darwin/arm64), managed YDB in ru-central1.
+// PR #2326 at e064436c8, 2026-10-07, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
+// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
 // Run:
 //
 //	go test -tags integration ./tests/integration -run '^$' \
@@ -89,8 +89,8 @@ func BenchmarkTransactionalWriterManyKey(b *testing.B) {
 }
 
 // Set the integration scope connection and credentials before running.
-// PR #2326 at e064436c8, 2026-10-07, Go 1.27.1 on Apple M3 Pro
-// (darwin/arm64), managed YDB in ru-central1.
+// PR #2326 at e064436c8, 2026-10-07, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
+// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
 // Run:
 //
 //	go test -tags integration ./tests/integration -run '^$' \
@@ -118,8 +118,8 @@ func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
 }
 
 // Set the integration scope connection and credentials before running.
-// PR #2326 at e064436c8, 2026-10-07, Go 1.27.1 on Apple M3 Pro
-// (darwin/arm64), managed YDB in ru-central1.
+// PR #2326 at e064436c8, 2026-10-07, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
+// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
 // Run:
 //
 //	go test -tags integration ./tests/integration -run '^$' \
