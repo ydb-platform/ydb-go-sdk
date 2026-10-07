@@ -23,7 +23,6 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	internalquery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/wirevalue"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -94,14 +93,11 @@ func BenchmarkFormats(b *testing.B) {
 				return fmt.Errorf("fixture rows=%d, want %d", count, size)
 			}
 			b.Logf("rows=%d checksum=%016x", size, expected)
-			for _, variant := range []string{"Query", "QueryArrow", "WithResultFormatArrow", "RawProto", "WireValue"} {
+			for _, variant := range []string{"Query", "QueryArrow", "WithResultFormatArrow", "WireValue"} {
 				b.Run(fmt.Sprintf("%d/%s", size, variant), func(b *testing.B) {
 					run := func() (int, uint64, error) {
 						if variant == "QueryArrow" {
 							return consumeArrow(ctx, s, sql)
-						}
-						if variant == "RawProto" {
-							return consumeRawProto(ctx, conn, endpoint.Path, s.ID(), sql)
 						}
 						if variant == "WireValue" {
 							return consumeWireValue(ctx, conn, endpoint.Path, s.ID(), sql)
@@ -142,7 +138,7 @@ func BenchmarkFormats(b *testing.B) {
 	}
 }
 
-func rawQueryRequest(sessionID, sql string) *Ydb_Query.ExecuteQueryRequest {
+func wireQueryRequest(sessionID, sql string) *Ydb_Query.ExecuteQueryRequest {
 	return &Ydb_Query.ExecuteQueryRequest{
 		SessionId: sessionID,
 		ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
@@ -154,51 +150,10 @@ func rawQueryRequest(sessionID, sql string) *Ydb_Query.ExecuteQueryRequest {
 	}
 }
 
-func consumeRawProto(ctx context.Context, conn *grpc.ClientConn, database, sessionID, sql string) (int, uint64, error) {
-	ctx = metadata.AppendToOutgoingContext(ctx, "x-ydb-database", database)
-	stream, err := Ydb_Query_V1.NewQueryServiceClient(conn).ExecuteQuery(ctx, rawQueryRequest(sessionID, sql))
-	if err != nil {
-		return 0, 0, err
-	}
-	defer stream.CloseSend()
-	var columns []*Ydb.Column
-	n := 0
-	hash := uint64(14695981039346656037)
-	var id uint64
-	var score *int32
-	var active *bool
-	var amount *float64
-	var name *string
-	var payload *[]byte
-	dst := []any{&id, &score, &active, &amount, &name, &payload}
-	for {
-		part, err := stream.Recv()
-		if err != nil {
-			if err == io.EOF {
-				return n, hash, nil
-			}
-			return 0, 0, err
-		}
-		if part.GetStatus() != Ydb.StatusIds_SUCCESS {
-			return 0, 0, fmt.Errorf("query part status: %v (%v)", part.GetStatus(), part.GetIssues())
-		}
-		if resultSet := part.GetResultSet(); resultSet != nil && len(resultSet.GetColumns()) != 0 {
-			columns = resultSet.GetColumns()
-		}
-		for _, row := range part.GetResultSet().GetRows() {
-			if err := internalquery.NewRow(columns, row).Scan(dst...); err != nil {
-				return 0, 0, err
-			}
-			hash = checksum(hash, id, score, active, amount, name, payload)
-			n++
-		}
-	}
-}
-
 func consumeWireValue(ctx context.Context, conn *grpc.ClientConn, database, sessionID, sql string) (int, uint64, error) {
 	ctx = metadata.AppendToOutgoingContext(ctx, "x-ydb-database", database)
 	stream, err := Ydb_Query_V1.NewQueryServiceClient(conn).ExecuteQuery(ctx,
-		rawQueryRequest(sessionID, sql), grpc.ForceCodecV2(wirevalue.NewCodec()))
+		wireQueryRequest(sessionID, sql), grpc.ForceCodecV2(wirevalue.NewCodec()))
 	if err != nil {
 		return 0, 0, err
 	}
