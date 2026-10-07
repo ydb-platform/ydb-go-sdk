@@ -31,9 +31,8 @@ import (
 // The benchmark has no separate run deadline.
 
 // Set the integration scope connection and credentials before running.
-// Results: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
-// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
-// Server version and resources were not recorded for this run.
+// Baseline: 2026-10-07, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
+// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
 // Run:
 //
 //	go test -tags integration ./tests/integration -run '^$' \
@@ -61,9 +60,8 @@ func BenchmarkTransactionalWriterSingle(b *testing.B) {
 }
 
 // Set the integration scope connection and credentials before running.
-// Results: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
-// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
-// Server version and resources were not recorded for this run.
+// Baseline: 2026-10-07, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
+// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
 // Run:
 //
 //	go test -tags integration ./tests/integration -run '^$' \
@@ -91,9 +89,8 @@ func BenchmarkTransactionalWriterManyKey(b *testing.B) {
 }
 
 // Set the integration scope connection and credentials before running.
-// Results: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
-// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
-// Server version and resources were not recorded for this run.
+// Baseline: 2026-10-07, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
+// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
 // Run:
 //
 //	go test -tags integration ./tests/integration -run '^$' \
@@ -121,9 +118,8 @@ func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
 }
 
 // Set the integration scope connection and credentials before running.
-// Results: 2026-10-07, code base d0b3a3fa6, Go 1.27.1 on Apple M3 Pro
-// (darwin/arm64), remote Yandex Cloud Managed Service for YDB.
-// Server version and resources were not recorded for this run.
+// Baseline: 2026-10-07, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
+// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
 // Run:
 //
 //	go test -tags integration ./tests/integration -run '^$' \
