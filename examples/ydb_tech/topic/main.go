@@ -1,3 +1,4 @@
+//nolint:goconst // Documentation snippets retain their illustrative string literals.
 package main
 
 import (
@@ -18,13 +19,18 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
-var expected = map[string]int{"1": 2, "\x01\x02\x03": 2, "3": 2,
-	"message-data": 1, "compressed": 1}
-var activeProgress *progress
-var offsetDB *ydb.Driver
-var offsetTable string
-var externalStop context.CancelFunc
-var sinkError error
+var expected = map[string]int{
+	"1": 2, "\x01\x02\x03": 2, "3": 2,
+	"message-data": 1, "compressed": 1,
+}
+
+var (
+	activeProgress *progress
+	offsetDB       *ydb.Driver
+	offsetTable    string
+	externalStop   context.CancelFunc
+	errSink        error
+)
 
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
@@ -89,6 +95,7 @@ func run(ctx context.Context) (err error) {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -194,6 +201,7 @@ func write(ctx context.Context, db *ydb.Driver, topicPath string) (err error) {
 			return err
 		}
 	}
+
 	return writer.Flush(ctx)
 }
 
@@ -202,7 +210,7 @@ func writeAcknowledged(ctx context.Context, db *ydb.Driver, topicPath string) (e
 	producerAndGroupID := "group-id"
 	writer, err := db.Topic().StartWriter(topicPath,
 		topicoptions.WithWriterProducerID(producerAndGroupID),
-		topicoptions.WithSyncWrite(true),
+		topicoptions.WithWriterWaitServerAck(true),
 	)
 	if err != nil {
 		return err
@@ -224,7 +232,7 @@ func writeCompressed(ctx context.Context, db *ydb.Driver, topicPath string) (err
 	producerAndGroupID := "group-id"
 	writer, err := db.Topic().StartWriter(topicPath,
 		topicoptions.WithWriterProducerID(producerAndGroupID),
-		topicoptions.WithCodec(topictypes.CodecGzip),
+		topicoptions.WithWriterCodec(topictypes.CodecGzip),
 	)
 	// [END topic_codec]
 	if err != nil {
@@ -234,6 +242,7 @@ func writeCompressed(ctx context.Context, db *ydb.Driver, topicPath string) (err
 	if err = writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("compressed")}); err != nil {
 		return err
 	}
+
 	return writer.Flush(ctx)
 }
 
@@ -289,6 +298,7 @@ func writeManyPartitions(ctx context.Context, db *ydb.Driver, topicPath string) 
 	if string(payload) != "order-created" {
 		return fmt.Errorf("unexpected multiwriter payload: %q", payload)
 	}
+
 	return nil
 }
 
@@ -317,6 +327,7 @@ func read(ctx context.Context, db *ydb.Driver, topicPath, consumer string) (err 
 	if !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("reader stopped unexpectedly: %w", err)
 	}
+
 	return activeProgress.verify()
 }
 
@@ -385,12 +396,14 @@ func metadata(ctx context.Context, db *ydb.Driver, prefix string) (err error) {
 		return err
 	}
 	defer func() { err = errors.Join(err, db.Topic().Drop(context.Background(), topicPath)) }()
-	writer, err := db.Topic().StartWriter(topicPath, topicoptions.WithSyncWrite(true))
+	writer, err := db.Topic().StartWriter(topicPath, topicoptions.WithWriterWaitServerAck(true))
 	if err != nil {
 		return err
 	}
-	err = writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("message-data"),
-		Metadata: map[string][]byte{"meta-key": []byte("meta-value"), "another-key": []byte("value")}})
+	err = writer.Write(ctx, topicwriter.Message{
+		Data:     strings.NewReader("message-data"),
+		Metadata: map[string][]byte{"meta-key": []byte("meta-value"), "another-key": []byte("value")},
+	})
 	err = errors.Join(err, writer.Close(ctx))
 	if err != nil {
 		return err
@@ -439,6 +452,7 @@ func readSelectors(ctx context.Context, db *ydb.Driver, topicPath string) (err e
 	if err != nil {
 		return err
 	}
+
 	return validateMessage(message, make(map[string]int))
 }
 
@@ -461,13 +475,17 @@ func readWithoutConsumer(ctx context.Context, db *ydb.Driver, topicPath string) 
 	if err != nil {
 		return err
 	}
+
 	return validateMessage(message, make(map[string]int))
 }
 
 func readOwnOffsets(ctx context.Context, db *ydb.Driver, topicPath string) (err error) {
 	offsetDB = db
 	offsetTable = topicPath + "_offsets"
-	if err = db.Query().Exec(ctx, fmt.Sprintf("CREATE TABLE `%s` (topic Utf8, partition Int64, `offset` Int64, PRIMARY KEY(topic, partition))", offsetTable)); err != nil {
+	createSQL := fmt.Sprintf(
+		"CREATE TABLE `%s` (topic Utf8, partition Int64, `offset` Int64, PRIMARY KEY(topic, partition))", offsetTable,
+	)
+	if err = db.Query().Exec(ctx, createSQL); err != nil {
 		return err
 	}
 	defer func() {
@@ -498,11 +516,14 @@ func readOwnOffsets(ctx context.Context, db *ydb.Driver, topicPath string) (err 
 	if !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("external offset reader stopped unexpectedly: %w", err)
 	}
+
 	return activeProgress.verify()
 }
 
 // [BEGIN topic_client_offset_storage]
-func ReadWithExplicitPartitionStartStopHandlerAndOwnReadProgressStorage(ctx context.Context, db *ydb.Driver, topicPath, consumerName string) error {
+func ReadWithExplicitPartitionStartStopHandlerAndOwnReadProgressStorage(
+	ctx context.Context, db *ydb.Driver, topicPath, consumerName string,
+) error {
 	readContext, stopReader := context.WithCancel(ctx)
 	defer stopReader()
 
@@ -518,7 +539,7 @@ func ReadWithExplicitPartitionStartStopHandlerAndOwnReadProgressStorage(ctx cont
 	}
 
 	r, err := db.Topic().StartReader(consumerName, topicoptions.ReadTopic(topicPath),
-		topicoptions.WithGetPartitionStartOffset(readStartPosition),
+		topicoptions.WithReaderGetPartitionStartOffset(readStartPosition),
 	)
 	if err != nil {
 		return err
@@ -533,7 +554,9 @@ func ReadWithExplicitPartitionStartStopHandlerAndOwnReadProgressStorage(ctx cont
 		}
 
 		processBatch(batch)
-		if err := externalSystemCommit(batch.Context(), batch.Topic(), batch.PartitionID(), batch.Messages[len(batch.Messages)-1].Offset+1); err != nil {
+		if err := externalSystemCommit(
+			batch.Context(), batch.Topic(), batch.PartitionID(), batch.Messages[len(batch.Messages)-1].Offset+1,
+		); err != nil {
 			return err
 		}
 	}
@@ -542,28 +565,39 @@ func ReadWithExplicitPartitionStartStopHandlerAndOwnReadProgressStorage(ctx cont
 // [END topic_client_offset_storage]
 
 func readLastOffsetFromDB(ctx context.Context, topic string, partition int64) (int64, error) {
-	row, err := offsetDB.Query().QueryRow(ctx, fmt.Sprintf("DECLARE $topic AS Utf8; DECLARE $partition AS Int64; SELECT COALESCE(MAX(`offset`), CAST(0 AS Int64)) AS `offset` FROM `%s` WHERE topic = $topic AND partition = $partition", offsetTable),
+	row, err := offsetDB.Query().QueryRow(ctx, fmt.Sprintf(
+		"DECLARE $topic AS Utf8; DECLARE $partition AS Int64; "+
+			"SELECT COALESCE(MAX(`offset`), CAST(0 AS Int64)) AS `offset` "+
+			"FROM `%s` WHERE topic = $topic AND partition = $partition", offsetTable),
 		query.WithParameters(ydb.ParamsBuilder().Param("$topic").Text(topic).Param("$partition").Int64(partition).Build()))
 	if err != nil {
 		return 0, err
 	}
 	var offset int64
 	err = row.ScanNamed(query.Named("offset", &offset))
+
 	return offset, err
 }
 
 func externalSystemCommit(ctx context.Context, topic string, partition, offset int64) error {
-	err := offsetDB.Query().Exec(ctx, fmt.Sprintf("DECLARE $topic AS Utf8; DECLARE $partition AS Int64; DECLARE $offset AS Int64; UPSERT INTO `%s` (topic, partition, `offset`) VALUES ($topic, $partition, $offset)", offsetTable),
-		query.WithParameters(ydb.ParamsBuilder().Param("$topic").Text(topic).Param("$partition").Int64(partition).Param("$offset").Int64(offset).Build()))
+	err := offsetDB.Query().Exec(ctx, fmt.Sprintf(
+		"DECLARE $topic AS Utf8; DECLARE $partition AS Int64; DECLARE $offset AS Int64; "+
+			"UPSERT INTO `%s` (topic, partition, `offset`) VALUES ($topic, $partition, $offset)", offsetTable),
+		query.WithParameters(ydb.ParamsBuilder().
+			Param("$topic").Text(topic).
+			Param("$partition").Int64(partition).
+			Param("$offset").Int64(offset).Build()))
 	if err == nil && activeProgress.done() {
 		externalStop()
 	}
+
 	return err
 }
 
 func verifyHardStop(ctx context.Context, db *ydb.Driver, topicPath string) (err error) {
 	sinkTable := topicPath + "_sink"
-	if err = db.Query().Exec(ctx, fmt.Sprintf("CREATE TABLE `%s` (id Uint64, data String, PRIMARY KEY(id))", sinkTable)); err != nil {
+	createSQL := fmt.Sprintf("CREATE TABLE `%s` (id Uint64, data String, PRIMARY KEY(id))", sinkTable)
+	if err = db.Query().Exec(ctx, createSQL); err != nil {
 		return err
 	}
 	defer func() {
@@ -580,10 +614,10 @@ func verifyHardStop(ctx context.Context, db *ydb.Driver, topicPath string) (err 
 	if err = reader.Close(ctx); err != nil {
 		return err
 	}
-	sinkError = nil
+	errSink = nil
 	processStoppedBatch(db, sinkTable, batch)
-	if !errors.Is(sinkError, context.Canceled) {
-		return fmt.Errorf("expected an expired batch context, got: %w", sinkError)
+	if !errors.Is(errSink, context.Canceled) {
+		return fmt.Errorf("expected an expired batch context, got: %w", errSink)
 	}
 	row, err := db.Query().QueryRow(ctx, fmt.Sprintf("SELECT COUNT(*) AS count FROM `%s`", sinkTable))
 	if err != nil {
@@ -596,16 +630,19 @@ func verifyHardStop(ctx context.Context, db *ydb.Driver, topicPath string) (err 
 	if count != 0 {
 		return errors.New("expired batch was persisted")
 	}
+
 	return nil
 }
 
 func processStoppedBatch(db *ydb.Driver, sinkTable string, batch *topicreader.Batch) {
 	writeMessagesToDB := func(ctx context.Context, payload []byte) {
 		if len(payload) == 0 {
-			sinkError = errors.New("empty hard-stop payload")
+			errSink = errors.New("empty hard-stop payload")
+
 			return
 		}
-		sinkError = db.Query().Exec(ctx, fmt.Sprintf("DECLARE $data AS String; UPSERT INTO `%s` (id, data) VALUES (1u, $data)", sinkTable),
+		errSink = db.Query().Exec(ctx, fmt.Sprintf(
+			"DECLARE $data AS String; UPSERT INTO `%s` (id, data) VALUES (1u, $data)", sinkTable),
 			query.WithParameters(ydb.ParamsBuilder().Param("$data").Bytes(payload).Build()))
 	}
 	// [BEGIN topic_hard_stop]
@@ -700,6 +737,7 @@ func transactions(ctx context.Context, db *ydb.Driver, prefix string) (err error
 	defer func() { err = errors.Join(err, reader.Close(context.Background())) }()
 	txContext, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
+
 	return readTransactions(txContext, db, reader)
 }
 
@@ -716,6 +754,7 @@ func readTransactions(ctx context.Context, db *ydb.Driver, reader *topicreader.R
 			}
 			received++
 		}
+
 		return nil
 	}
 	handleError := func(failure error) { panic(failure) }
@@ -754,7 +793,7 @@ func softStop(ctx context.Context, db *ydb.Driver, prefix string) (err error) {
 		return err
 	}
 	defer func() { err = errors.Join(err, db.Topic().Drop(context.Background(), topicPath)) }()
-	writer, err := db.Topic().StartWriter(topicPath, topicoptions.WithSyncWrite(true))
+	writer, err := db.Topic().StartWriter(topicPath, topicoptions.WithWriterWaitServerAck(true))
 	if err != nil {
 		return err
 	}
@@ -775,9 +814,11 @@ func softStop(ctx context.Context, db *ydb.Driver, prefix string) (err error) {
 	if !errors.Is(err, context.Canceled) {
 		return err
 	}
+
 	return activeProgress.verify()
 }
 
+//nolint:staticcheck // Keep the minimum batch size option illustrated by the topic reference.
 func readSoft(ctx context.Context, db *ydb.Driver, topicPath string) (err error) {
 	// [BEGIN topic_soft_stop]
 	r, err := db.Topic().StartReader("my-consumer", topicoptions.ReadTopic(topicPath),
@@ -821,7 +862,7 @@ func autoscaling(ctx context.Context, db *ydb.Driver, prefix string) (err error)
 		topicoptions.AlterWithAddConsumers(topictypes.Consumer{Name: "consumer"})); err != nil {
 		return err
 	}
-	writer, err := db.Topic().StartWriter(topicPath, topicoptions.WithSyncWrite(true))
+	writer, err := db.Topic().StartWriter(topicPath, topicoptions.WithWriterWaitServerAck(true))
 	if err != nil {
 		return err
 	}
@@ -833,6 +874,7 @@ func autoscaling(ctx context.Context, db *ydb.Driver, prefix string) (err error)
 	if err = readAutoFull(ctx, db, topicPath); err != nil {
 		return err
 	}
+
 	return readAutoCompat(ctx, db, topicPath)
 }
 
@@ -919,6 +961,7 @@ func readAutoFull(ctx context.Context, db *ydb.Driver, topicPath string) (err er
 	if string(payload) != "auto" {
 		return fmt.Errorf("unexpected autoscaling payload: %q", payload)
 	}
+
 	return nil
 }
 
@@ -945,6 +988,7 @@ func readAutoCompat(ctx context.Context, db *ydb.Driver, topicPath string) (err 
 	if string(payload) != "auto" {
 		return fmt.Errorf("unexpected autoscaling payload: %q", payload)
 	}
+
 	return nil
 }
 
@@ -984,6 +1028,7 @@ func validateMessage(message *topicreader.Message, received map[string]int) erro
 			return errors.New("unexpected message metadata")
 		}
 	}
+
 	return nil
 }
 
@@ -993,6 +1038,7 @@ func (p *progress) done() bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -1005,5 +1051,6 @@ func (p *progress) verify() error {
 			return fmt.Errorf("unexpected count for %q: %d", payload, p.received[payload])
 		}
 	}
+
 	return nil
 }
