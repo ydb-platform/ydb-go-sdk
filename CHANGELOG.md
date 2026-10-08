@@ -1,3 +1,4 @@
+## v3.155.0
 * Fixed query result decoding to preserve nested optional values and Pg NULLs
 * Added experimental `query.WithResultFormatArrow(ipc.NewReader, opts...)`, `ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader, opts...)` and `query.WithYdbValue`, preserving the Query Service row and scan APIs without an Arrow Go dependency
 * Reduced allocations in Query Service rows and optional value construction
