@@ -476,7 +476,8 @@ func TestTopicListenerCustomRetryPolicyRestartsPartition(t *testing.T) {
 	stopper.StopOnce()
 
 	require.ErrorIs(t, xtest.Receive(t, checkedErrors, "the retry policy callback"), streamErr)
-	second := xtest.Receive(t, partitionStarts, "the partition session after the custom retry")
+	// A forced retry of a permanent error uses slow backoff before reconnecting.
+	second := xtest.ReceiveWithTimeout(t, partitionStarts, "the partition session after the custom retry", 5*time.Second)
 	require.Equal(t, first.PartitionSession.TopicPath, second.PartitionSession.TopicPath)
 	require.Equal(t, first.PartitionSession.PartitionID, second.PartitionSession.PartitionID)
 	require.NotEqual(t, first.PartitionSession.PartitionSessionID, second.PartitionSession.PartitionSessionID)
