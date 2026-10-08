@@ -19,7 +19,7 @@ import (
 )
 
 var expected = map[string]int{"1": 2, "\x01\x02\x03": 2, "3": 2,
-	"message-data": 1, "compressed": 1, "order-created": 1}
+	"message-data": 1, "compressed": 1}
 var activeProgress *progress
 var offsetDB *ydb.Driver
 var offsetTable string
@@ -237,7 +237,19 @@ func writeCompressed(ctx context.Context, db *ydb.Driver, topicPath string) (err
 	return writer.Flush(ctx)
 }
 
-func writeManyPartitions(ctx context.Context, db *ydb.Driver, topicPath string) error {
+func writeManyPartitions(ctx context.Context, db *ydb.Driver, topicPath string) (err error) {
+	topicPath += "_multi"
+	err = db.Topic().Create(ctx, topicPath,
+		topicoptions.CreateWithMinActivePartitions(3), topicoptions.CreateWithMaxActivePartitions(4),
+		topicoptions.CreateWithConsumer(topictypes.Consumer{Name: "multi"}),
+		topicoptions.CreateWithAutoPartitioningSettings(topictypes.AutoPartitioningSettings{
+			AutoPartitioningStrategy: topictypes.AutoPartitioningStrategyScaleUp,
+		}),
+	)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, db.Topic().Drop(context.Background(), topicPath)) }()
 	// [BEGIN topic_multiwriter]
 	writer, err := db.Topic().StartWriter(topicPath,
 		topicoptions.WithWriteToManyPartitions(
@@ -258,7 +270,26 @@ func writeManyPartitions(ctx context.Context, db *ydb.Driver, topicPath string) 
 		return err
 	}
 	// [END topic_multiwriter]
-	return writer.Flush(ctx)
+	if err = writer.Flush(ctx); err != nil {
+		return err
+	}
+	reader, err := db.Topic().StartReader("multi", topicoptions.ReadTopic(topicPath))
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, reader.Close(context.Background())) }()
+	message, err := reader.ReadMessage(ctx)
+	if err != nil {
+		return err
+	}
+	payload, err := io.ReadAll(message)
+	if err != nil {
+		return err
+	}
+	if string(payload) != "order-created" {
+		return fmt.Errorf("unexpected multiwriter payload: %q", payload)
+	}
+	return nil
 }
 
 func read(ctx context.Context, db *ydb.Driver, topicPath, consumer string) (err error) {
