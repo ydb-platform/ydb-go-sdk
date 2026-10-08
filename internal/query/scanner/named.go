@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -52,11 +51,11 @@ func Named(data *Data) NamedScanner {
 
 func (s NamedScanner) ScanNamed(dst ...NamedDestination) (err error) {
 	for i := range dst {
-		v, err := s.data.seekByName(dst[i].Name())
+		index, err := s.data.columnIndex(dst[i].Name())
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
-		if err = value.CastTo(v, dst[i].Ref()); err != nil {
+		if err = s.data.scanByIndex(index, dst[i].Ref()); err != nil {
 			return xerrors.WithStackTrace(fmt.Errorf("scan error on column name '%s': %w", dst[i].Name(), err))
 		}
 	}
