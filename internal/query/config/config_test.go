@@ -1,11 +1,14 @@
 package config
 
 import (
+	"context"
+	"io"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -158,4 +161,20 @@ func TestDefaults(t *testing.T) {
 	require.Equal(t, DefaultSessionDeleteTimeout, cfg.sessionDeleteTimeout)
 	require.NotNil(t, cfg.trace)
 	require.Equal(t, 0, cfg.poolWarmUpSize)
+}
+
+func TestWithDefaultResultFormatArrow(t *testing.T) {
+	called := false
+	decoder := arrow.Decoder(func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
+		called = true
+
+		return nil, nil
+	})
+	require.Nil(t, New().DefaultArrowDecoder())
+	decode := New(WithDefaultResultFormatArrow(decoder)).DefaultArrowDecoder()
+	require.NotNil(t, decode)
+	_, err := decode(t.Context(), nil, nil)
+	require.NoError(t, err)
+	require.True(t, called)
+	require.Nil(t, New(WithDefaultResultFormatArrow(decoder), WithDefaultResultFormatArrow(nil)).DefaultArrowDecoder())
 }

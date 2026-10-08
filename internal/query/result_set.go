@@ -29,6 +29,7 @@ type (
 		columnTypes []types.Type
 		rows        []query.Row
 		rowIndex    int
+		closeArrow  func()
 	}
 	resultSet struct {
 		index               int64
@@ -39,6 +40,12 @@ type (
 		ended               atomic.Bool
 		mustBeLastResultSet bool
 		notifyError         func(context.Context, error) error
+		decodeArrow         func(context.Context, []*Ydb.Column, *Ydb.ResultSet) ([]*arrowRowData, error)
+		arrowBatches        []*arrowRowData
+		arrowDecoded        bool
+		arrowRowCount       int
+		arrowBatchIndex     int
+		arrowBatchOffset    int
 	}
 	resultSetWithClose struct {
 		*resultSet
@@ -64,7 +71,11 @@ func rangeRows(ctx context.Context, rs result.Set) xiter.Seq2[result.Row, error]
 	}
 }
 
-func (*materializedResultSet) Close(context.Context) error {
+func (rs *materializedResultSet) Close(context.Context) error {
+	if rs.closeArrow != nil {
+		rs.closeArrow()
+	}
+
 	return nil
 }
 
@@ -153,7 +164,7 @@ func newResultSet(
 	}
 }
 
-func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
+func (rs *resultSet) nextRow(ctx context.Context) (query.Row, error) {
 	rs.rowIndex++
 	for {
 		if rs.ended.Load() {
@@ -168,8 +179,12 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 			return nil, xerrors.WithStackTrace(err)
 		}
 
+		rowCount, err := rs.partRowCount(ctx)
+		if err != nil {
+			return nil, err
+		}
 		//nolint:nestif
-		if rs.rowIndex == len(rs.currentPart.GetResultSet().GetRows()) {
+		if rs.rowIndex == rowCount {
 			part, err := rs.recv()
 			if err != nil {
 				if xerrors.Is(err, io.EOF) {
@@ -189,6 +204,8 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 			}
 			rs.rowIndex = 0
 			rs.currentPart = part
+			rs.arrowBatches = nil
+			rs.arrowDecoded = false
 			if part == nil {
 				rs.ended.Store(true)
 
@@ -204,10 +221,55 @@ func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
 			))
 		}
 
-		if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
-			return NewRow(rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex]), nil
+		if row := rs.partRow(); row != nil {
+			return row, nil
 		}
 	}
+}
+
+func (rs *resultSet) partRowCount(ctx context.Context) (int, error) {
+	if rs.currentPart.GetResultSet().GetFormat() != Ydb.ResultSet_FORMAT_ARROW {
+		return len(rs.currentPart.GetResultSet().GetRows()), nil
+	}
+	if !rs.arrowDecoded {
+		var err error
+		rs.arrowBatches, err = rs.decodeArrow(ctx, rs.columns, rs.currentPart.GetResultSet())
+		if err != nil {
+			rs.ended.Store(true)
+			if rs.notifyError != nil {
+				err = rs.notifyError(ctx, err)
+			}
+
+			return 0, xerrors.WithStackTrace(err)
+		}
+		rs.arrowRowCount = 0
+		rs.arrowBatchIndex = 0
+		rs.arrowBatchOffset = 0
+		for _, data := range rs.arrowBatches {
+			rs.arrowRowCount += len(data.rows)
+		}
+		rs.arrowDecoded = true
+	}
+
+	return rs.arrowRowCount, nil
+}
+
+func (rs *resultSet) partRow() query.Row {
+	if rs.currentPart.GetResultSet().GetFormat() == Ydb.ResultSet_FORMAT_ARROW {
+		for rs.arrowBatchIndex < len(rs.arrowBatches) {
+			data := rs.arrowBatches[rs.arrowBatchIndex]
+			index := rs.rowIndex - rs.arrowBatchOffset
+			if index < len(data.rows) {
+				return &data.rows[index]
+			}
+			rs.arrowBatchOffset += len(data.rows)
+			rs.arrowBatchIndex++
+		}
+	} else if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
+		return NewRow(rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex])
+	}
+
+	return nil
 }
 
 func (rs *resultSet) NextRow(ctx context.Context) (_ query.Row, err error) {
