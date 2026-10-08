@@ -1,4 +1,6 @@
 * Improved topic multi-writer performance for topics with many partitions
+
+## v3.154.1
 * Fixed `topicoptions.CreateWithPartitionCountLimit` and `topicoptions.AlterWithPartitionCountLimit` to set the supported maximum active partition count instead of ignored protobuf fields
 * Deprecated `topicoptions.AlterWithPartitionCountLimit` in favor of `topicoptions.AlterWithMaxActivePartitions`
 * Deprecated `topictypes.PartitionSettings.PartitionCountLimit`, which is ignored by YDB and remains zero in topic descriptions
