@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -52,6 +53,7 @@ type (
 		// responsePartPrefetch is how many stream parts to read ahead of the
 		// consumer (0 disables prefetch and is the default).
 		responsePartPrefetch int
+		arrowDecoder         arrow.Decoder
 	}
 
 	// Execute is an interface for execute method options
@@ -226,6 +228,22 @@ func (s *executeSettings) ResponsePartPrefetch() int {
 
 func (s *executeSettings) UserProvidedTxControl() bool {
 	return s.userProvidedTxControl
+}
+
+type arrowOption struct {
+	decoder arrow.Decoder
+}
+
+func (opt arrowOption) applyExecuteOption(s *executeSettings) {
+	s.arrowDecoder = opt.decoder
+}
+
+func WithResultFormatArrow(decoder arrow.Decoder) Execute {
+	return arrowOption{decoder: decoder}
+}
+
+func (s *executeSettings) ArrowDecoder() arrow.Decoder {
+	return s.arrowDecoder
 }
 
 func WithParameters(params params.Parameters) parametersOption {

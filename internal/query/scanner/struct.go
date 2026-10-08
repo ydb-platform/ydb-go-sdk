@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -60,11 +59,11 @@ func (s StructScanner) ScanStruct(dst any, opts ...ScanStructOption) (err error)
 			continue
 		}
 
-		v, err := s.data.seekByName(name)
+		index, err := s.data.columnIndex(name)
 		if err != nil {
 			missingColumns = append(missingColumns, name)
 		} else {
-			if err = value.CastTo(v, ptr.Elem().Field(i).Addr().Interface()); err != nil {
+			if err = s.data.scanByIndex(index, ptr.Elem().Field(i).Addr().Interface()); err != nil {
 				return xerrors.WithStackTrace(fmt.Errorf("scan error on struct field name '%s': %w", name, err))
 			}
 			existingFields[name] = struct{}{}

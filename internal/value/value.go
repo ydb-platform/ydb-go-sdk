@@ -254,7 +254,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		return VoidValue(), nil
 
 	case types.Null:
-		return NullValue(tt), nil
+		return LiteralNullValue(), nil
 
 	case *types.Decimal:
 		return DecimalValue(BigEndianUint128(v.GetHigh_128(), v.GetLow_128()), ttt.Precision(), ttt.Scale()), nil
@@ -265,7 +265,8 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Type_OptionalType", tt))
 		}
 		t = tt.OptionalType.GetItem()
-		if nestedValue, ok := v.GetValue().(*Ydb.Value_NestedValue); ok {
+		if nestedValue, ok := v.GetValue().(*Ydb.Value_NestedValue); ok &&
+			(terminalNull(v) || !variantPayload(ttt.InnerType())) {
 			return OptionalValue(FromYDB(t, nestedValue.NestedValue)), nil
 		}
 
@@ -381,6 +382,10 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		), nil
 
 	case *types.PgType:
+		if _, null := v.GetValue().(*Ydb.Value_NullFlagValue); null {
+			return PgNullValue(ttt.OID), nil
+		}
+
 		return &pgValue{
 			t: types.PgType{
 				OID: ttt.OID,
@@ -1660,8 +1665,9 @@ func ListValue(items ...Value) *listValue {
 }
 
 type pgValue struct {
-	t   types.PgType
-	val string
+	t    types.PgType
+	val  string
+	null bool
 }
 
 func (v pgValue) castTo(dst any) error {
@@ -1683,6 +1689,10 @@ func (v pgValue) Type() types.Type {
 }
 
 func (v pgValue) toYDB() *Ydb.Value {
+	if v.null {
+		return &Ydb.Value{Value: &Ydb.Value_NullFlagValue{}}
+	}
+
 	return &Ydb.Value{
 		Value: &Ydb.Value_TextValue{
 			TextValue: v.val,
@@ -1691,6 +1701,10 @@ func (v pgValue) toYDB() *Ydb.Value {
 }
 
 func (v pgValue) Yql() string {
+	if v.null {
+		return fmt.Sprintf("PgCast(NULL,PgType(%v))", v.t.OID)
+	}
+
 	return fmt.Sprintf(`PgConst("%v", PgType(%v))`, v.val, v.t.OID)
 }
 
@@ -1774,6 +1788,8 @@ func (v *setValue) toYDB() *Ydb.Value {
 	return result
 }
 
+func PgNullValue(oid uint32) Value { return pgValue{t: types.PgType{OID: oid}, null: true} }
+
 func PgValue(oid uint32, val string) pgValue {
 	return pgValue{
 		t: types.PgType{
@@ -1810,7 +1826,7 @@ func NullValue(t types.Type) *optionalValue {
 }
 
 type optionalValue struct {
-	innerType types.Type
+	innerType types.Optional
 	value     Value
 }
 
@@ -1865,25 +1881,42 @@ func (v *optionalValue) Type() types.Type {
 	return v.innerType
 }
 
-func (v *optionalValue) toYDB() *Ydb.Value {
-	inner := v.value
-	for tagged, ok := inner.(*taggedValue); ok; tagged, ok = inner.(*taggedValue) {
-		inner = tagged.value
-	}
-	if _, opt := inner.(*optionalValue); opt {
-		return &Ydb.Value{
-			Value: &Ydb.Value_NestedValue{
-				NestedValue: v.value.toYDB(),
-			},
+func terminalNull(v *Ydb.Value) bool {
+	for {
+		switch item := v.GetValue().(type) {
+		case *Ydb.Value_NullFlagValue:
+			return true
+		case *Ydb.Value_NestedValue:
+			v = item.NestedValue
+		default:
+			return false
 		}
 	}
-	if v.value != nil {
-		return v.value.toYDB()
+}
+
+func variantPayload(t types.Type) bool {
+	switch t := t.(type) {
+	case *types.VariantTuple, *types.VariantStruct:
+		return true
+	case types.Optional:
+		return variantPayload(t.InnerType())
+	case *types.Tagged:
+		return variantPayload(t.InnerType())
+	default:
+		return false
+	}
+}
+
+func (v *optionalValue) toYDB() *Ydb.Value {
+	if v.value == nil {
+		return &Ydb.Value{Value: &Ydb.Value_NullFlagValue{}}
+	}
+	inner := v.value.toYDB()
+	if terminalNull(inner) {
+		return &Ydb.Value{Value: &Ydb.Value_NestedValue{NestedValue: inner}}
 	}
 
-	return &Ydb.Value{
-		Value: &Ydb.Value_NullFlagValue{},
-	}
+	return inner
 }
 
 func OptionalValue(v Value) *optionalValue {

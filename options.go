@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -17,6 +18,7 @@ import (
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	queryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
@@ -532,6 +534,55 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 
 		return nil
 	}
+}
+
+// WithQueryDefaultResultFormatArrow selects Arrow as the default Query Service
+// result format while preserving the ordinary row and scan APIs. It applies to
+// Query, QueryRow and QueryResultSet on query.Client, query.Session and query.TxActor,
+// including queries inside Do and DoTx. Exec also requests Arrow, but discards
+// results without invoking the reader. It does not affect ExecuteScript or
+// FetchScriptResults. The server must support and enable Arrow results.
+//
+// database/sql connectors using Query Service inherit this default from the driver.
+// The decoder must support the result types of every query through those connectors.
+// Connectors using Table Service are unaffected.
+//
+// Pass ipc.NewReader and optional IPC reader options from the application's
+// Apache Arrow Go version; the SDK module has no Apache Arrow Go dependency.
+// Reader, record, array and option types are inferred from the factory.
+// The factory and its options must support concurrent calls. See query.WithResultFormatArrow
+// for supported types and result ownership and lifetime requirements.
+//
+// Compatible Arrow Go modules are github.com/apache/arrow/go/v6 through v17
+// and github.com/apache/arrow-go/v18, using each module's arrow/ipc package.
+// Apache Arrow releases 0.14.0 through 5.0.0 use the legacy IPC package
+// github.com/apache/arrow/go/arrow/ipc and are also compile-compatible.
+// The legacy module was also tested at v0.0.0-20211112161151-bc219186db40.
+// Earlier Apache Arrow releases do not provide ipc.NewReader.
+// Reading Variant columns requires v9 or newer; earlier IPC readers do not support unions.
+// With v6-v13 or the legacy module, google.golang.org/genproto may need an upgrade
+// to avoid ambiguous imports with the SDK's googleapis/rpc dependency.
+//
+// Per-call query.WithResultFormatArrow overrides the reader factory and its options, while
+// query.WithYdbValue selects YDB values for one query. Subsequent queries without
+// an override use the driver default again. A typed nil reader factory selects
+// the default YDB value format; an untyped nil cannot supply generic type arguments.
+//
+// For example (error handling and result consumption omitted):
+//
+//	db, err := ydb.Open(ctx, dsn,
+//		ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader),
+//	)
+//	result, err := db.Query().Query(ctx, sql)
+//	valueResult, err := db.Query().Query(ctx, sql, query.WithYdbValue())
+//
+// Close each result after consuming it, and close the driver when it is no longer needed.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithQueryDefaultResultFormatArrow[A arrow.Array, B arrow.Record[A], R arrow.IPCReader[B], O any](
+	newReader func(io.Reader, ...O) (R, error), opts ...O,
+) Option {
+	return WithQueryConfigOption(queryConfig.WithDefaultResultFormatArrow(arrow.NewDecoder(newReader, opts...)))
 }
 
 // WithQueryConfigOption collects additional configuration options for query.Client.
