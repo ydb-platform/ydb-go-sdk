@@ -41,6 +41,7 @@ type Conn interface {
 
 	Endpoint() endpoint.Endpoint
 	State() state.State
+	InFlight() int64
 	Unban(ctx context.Context)
 	Ban(ctx context.Context)
 }
@@ -65,6 +66,7 @@ type (
 		endpoint                endpoint.Endpoint // ro access
 		closed                  bool
 		state                   atomic.Uint32
+		inFlight                atomic.Int64
 		lastClusterAnnouncement atomic.Int64
 		childStreams            *xcontext.CancelsGuard
 		usage                   *usageTracker
@@ -144,6 +146,10 @@ func (c *conn) Ban(ctx context.Context) {
 
 func (c *conn) State() (s state.State) {
 	return state.State(c.state.Load())
+}
+
+func (c *conn) InFlight() int64 {
+	return c.inFlight.Load()
 }
 
 func (c *conn) realConn(ctx context.Context) (cc grpcClientConnInterface, err error) {
@@ -396,6 +402,9 @@ func (c *conn) Invoke(
 	res any,
 	opts ...grpc.CallOption,
 ) (err error) {
+	c.inFlight.Add(1)
+	defer c.inFlight.Add(-1)
+
 	stopUsage := c.startUsage()
 	defer stopUsage()
 
@@ -441,6 +450,14 @@ func (c *conn) NewStream(
 	method string,
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, finalErr error) {
+	c.inFlight.Add(1)
+	stopInFlight := sync.OnceFunc(func() { c.inFlight.Add(-1) })
+	defer func() {
+		if finalErr != nil {
+			stopInFlight()
+		}
+	}()
+
 	stopUsage := c.startUsage()
 	defer stopUsage()
 
@@ -485,7 +502,10 @@ func (c *conn) NewStream(
 		sentMark:   sentMark,
 	}
 
-	s.stream, err = cc.NewStream(grpcCtx, desc, method, append(opts, grpc.OnFinish(s.finish))...)
+	s.stream, err = cc.NewStream(grpcCtx, desc, method, append(opts, grpc.OnFinish(func(err error) {
+		stopInFlight()
+		s.finish(err)
+	}))...)
 	if err != nil {
 		if xerrors.IsContextError(err) {
 			return nil, xerrors.WithStackTrace(err)

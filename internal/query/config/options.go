@@ -4,11 +4,18 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type Option func(*Config)
+
+func WithDefaultResultFormatArrow(decoder arrow.Decoder) Option {
+	return func(c *Config) {
+		c.defaultArrowDecoder = decoder
+	}
+}
 
 // With applies common configuration params
 func With(config config.Common) Option {
