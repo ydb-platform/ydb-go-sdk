@@ -355,6 +355,10 @@ func (o *orchestrator) waitAutoSeqNoWriter(ctx context.Context, msg *message) er
 			splitted = partition != nil && partition.Splitted()
 		})
 		if !splitted || o.ctx.Err() != nil || ctx.Err() != nil {
+			if writer.initDone.Load() && writer.getInitErr() != nil {
+				o.writerPool.discard(msg.PartitionID, writer)
+			}
+
 			return err
 		}
 	}
@@ -729,6 +733,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	if err != nil {
 		return err
 	}
+	var writersToClose []writer
 	o.mu.WithLock(func() {
 		partition := o.partitions[partitionID]
 		if partition == nil {
@@ -753,9 +758,14 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		}
 
 		for _, ancestor := range ancestors {
-			o.writerPool.evict(ancestor)
+			if old := o.writerPool.remove(ancestor); old != nil {
+				writersToClose = append(writersToClose, old)
+			}
 		}
 	})
+	for _, old := range writersToClose {
+		_ = old.Close(o.ctx)
+	}
 
 	return resultErr
 }

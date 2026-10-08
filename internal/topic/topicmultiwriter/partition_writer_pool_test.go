@@ -3,8 +3,10 @@ package topicmultiwriter
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -129,7 +131,7 @@ func TestSenderStepReturnsNonOverloadedWriterInitError(t *testing.T) {
 		partitions,
 		mu,
 		buf,
-		&partitionWriterPool{writers: map[int64]*writerWrapper{1: wrapper}},
+		&partitionWriterPool{ctx: ctx, writers: map[int64]*writerWrapper{1: wrapper}},
 		newPartitionSplitReceiver(func(partitionID int64) error { return nil }, func(err error) {}),
 		func(err error) {},
 	)
@@ -259,4 +261,106 @@ func TestPartitionWriterPool_GetReturnsErrorWhenCreateFails(t *testing.T) {
 	require.ErrorIs(t, err, errCreate)
 	require.Nil(t, w)
 	require.Equal(t, 1, factory.createCalls)
+}
+
+func TestPartitionWriterPool_ReplacingWriterDoesNotBlockOtherPartitions(t *testing.T) {
+	old := &blockingCloseWriter{started: make(chan struct{}), release: make(chan struct{})}
+	factory := &blockingCloseFactory{old: old}
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+	bg := background.NewWorker(ctx, "pool-test")
+	pool := newPartitionWriterPool(ctx, &MultiWriterConfig{
+		ProducerIDPrefix: "test-prefix", WriterIdleTimeout: defaultWriterIdleTimeout, writersFactory: factory,
+	}, &topicwriterinternal.WriterReconnectorConfig{}, bg, &seqNoCounter{},
+		func(int64, int64) {}, func(int64) {}, func() {}, func(error) {})
+	_, err := pool.get(1, true)
+	require.NoError(t, err)
+
+	replaced := make(chan error, 1)
+	go func() {
+		_, err := pool.get(1, false)
+		replaced <- err
+	}()
+	<-old.started
+	release := sync.OnceFunc(func() { close(old.release) })
+	defer release()
+
+	other := make(chan error, 1)
+	go func() {
+		_, err := pool.get(2, true)
+		other <- err
+	}()
+	select {
+	case err := <-other:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("closing partition 1 blocked partition 2")
+	}
+	release()
+	require.NoError(t, <-replaced)
+}
+
+func TestPartitionWriterPool_CloseWaitsForWriterReplacement(t *testing.T) {
+	old := &blockingCloseWriter{started: make(chan struct{}), release: make(chan struct{})}
+	replacement := &poolTestWriter{}
+	factory := &blockingCloseFactory{old: old, replacement: replacement}
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+	bg := background.NewWorker(ctx, "pool-test")
+	pool := newPartitionWriterPool(ctx, &MultiWriterConfig{
+		ProducerIDPrefix: "test-prefix", WriterIdleTimeout: defaultWriterIdleTimeout, writersFactory: factory,
+	}, &topicwriterinternal.WriterReconnectorConfig{}, bg, &seqNoCounter{},
+		func(int64, int64) {}, func(int64) {}, func() {}, func(error) {})
+	_, err := pool.get(1, true)
+	require.NoError(t, err)
+
+	replaced := make(chan error, 1)
+	go func() {
+		_, err := pool.get(1, false)
+		replaced <- err
+	}()
+	<-old.started
+	release := sync.OnceFunc(func() { close(old.release) })
+	defer release()
+
+	closed := make(chan error, 1)
+	go func() { closed <- pool.close(ctx) }()
+	select {
+	case err := <-closed:
+		t.Fatalf("pool close returned before replacement completed: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	release()
+	require.NoError(t, <-replaced)
+	require.NoError(t, <-closed)
+	require.True(t, replacement.closed.Load(), "replacement writer must be closed")
+}
+
+type blockingCloseWriter struct {
+	poolTestWriter
+	started chan struct{}
+	release chan struct{}
+}
+
+func (w *blockingCloseWriter) Close(context.Context) error {
+	close(w.started)
+	<-w.release
+
+	return nil
+}
+
+type blockingCloseFactory struct {
+	old         *blockingCloseWriter
+	replacement *poolTestWriter
+}
+
+func (f *blockingCloseFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	if partitionID, direct := cfg.PartitionID(); partitionID == 1 && direct {
+		return f.old, nil
+	} else if !direct && cfg.ProducerID() == "test-prefix-1" && f.replacement != nil {
+		return f.replacement, nil
+	}
+
+	return &poolTestWriter{}, nil
 }

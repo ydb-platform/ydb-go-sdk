@@ -1,3 +1,5 @@
+* Fixed topic multi-writer writes to other partitions blocking while a split session closes
+* Fixed topic multi-writer recovery after a partition session fails to initialize
 * Changed topic multi-writer initialization to improve startup performance for topics with many partitions
 
 ## v3.154.1

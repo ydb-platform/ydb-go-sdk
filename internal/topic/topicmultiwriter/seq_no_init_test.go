@@ -30,6 +30,7 @@ func (f *lastSeqWritersFactory) Create(cfg topicwriterinternal.WriterReconnector
 	w := f.writers[partitionID]
 	if w == nil {
 		w = &orderedSeqWriter{writes: make(chan int64, 1)}
+		f.writers[partitionID] = w
 	}
 	w.onAckReceivedCallback = cfg.OnAckReceivedCallback
 
@@ -132,7 +133,7 @@ func TestOrchestratorDoesNotAssignSeqNoBeforeSplitBaseline(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, retry, "SeqNo assignment must wait for the parent baseline")
 	require.Zero(t, msg.SeqNo)
-	require.Zero(t, o.currentSeqNo.Load())
+	require.Zero(t, o.currentSeqNo.value.Load())
 }
 
 type splitBaselineProbe struct {
@@ -283,6 +284,46 @@ func TestMultiWriterStopsWhenOverloadedSessionHasNoSplit(t *testing.T) {
 	}})
 	require.True(t, isOperationErrorOverloaded(err), "later writes must preserve the session error: %v", err)
 	require.Equal(t, describesAfterFailure, describes.Load(), "later writes must not repeat the failed split probe")
+}
+
+func TestMultiWriterRetriesSessionAfterInitError(t *testing.T) {
+	initErr := errors.New("session init failed")
+	factory := &recoveringInitFactory{
+		initErr: initErr,
+		ready:   &orderedSeqWriter{lastSeqNo: 5, writes: make(chan int64, 1)},
+	}
+	w, _, ctx := newMultiWriterForSplitRace(t, factory)
+
+	err := w.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data: bytes.NewReader([]byte("first")), Key: "a",
+	}})
+	require.ErrorIs(t, err, initErr)
+
+	err = w.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data: bytes.NewReader([]byte("second")), Key: "a",
+	}})
+	require.NoError(t, err)
+	require.Equal(t, int64(6), <-factory.ready.writes)
+	require.EqualValues(t, 2, factory.attempts.Load())
+}
+
+type recoveringInitFactory struct {
+	initErr  error
+	ready    *orderedSeqWriter
+	attempts atomic.Int32
+}
+
+func (f *recoveringInitFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	partitionID, direct := cfg.PartitionID()
+	if !direct || partitionID != 0 {
+		return &poolTestWriter{}, nil
+	}
+	if f.attempts.Add(1) == 1 {
+		return &failedInitWriter{err: f.initErr}, nil
+	}
+	f.ready.onAckReceivedCallback = cfg.OnAckReceivedCallback
+
+	return f.ready, nil
 }
 
 type failedInitWriter struct {
