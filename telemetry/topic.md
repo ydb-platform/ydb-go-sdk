@@ -31,6 +31,28 @@ The application owns the OTel provider, collection and export. The SDK does not
 import OTel or maintain a collector. Other backends implement the same function
 contract; see [the callback API](telemetry.go).
 
+For Prometheus, use [the Prometheus example](../examples/telemetryprometheus/prometheus.go)
+with an application-owned registry:
+
+```go
+registry := prometheus.NewRegistry()
+meter := telemetryprometheus.Meter(ctx, registry)
+db, err := ydb.Open(ctx, connectionString, ydb.WithMeter(meter))
+// Handle err and close readers/listeners before db as above.
+handler := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
+// Serve handler at the application's /metrics endpoint.
+```
+
+This example supports the fixed attribute sets of topic resources. Registration
+reads their labels once, then every scrape reads current counts. Metric and label
+names replace dots with underscores, including
+`ydb_topic_reader_partition_session_count` and `reader_name`. The backend-local
+Collector and lock are needed by Prometheus registration and concurrent
+unregister; no metric values are cached. Neither `ydb-go-sdk-otel` nor
+`ydb-go-sdk-prometheus` is required for these callbacks. Those packages remain
+useful for the existing trace/Registry metrics and can share the application's
+backend with the new adapter.
+
 Listeners use the same metric and `topicoptions.WithListenerName`. Empty names
 use `default`. Attributes are configured endpoint authority, normalized database,
 absolute normalized topic path, consumer and reader.name. No partition, session,
