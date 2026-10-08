@@ -6,6 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
@@ -31,13 +32,37 @@ func (r *arrowRow) ColumnValue(column int) value.Value { return r.data.batch.Val
 func (r *arrowRow) Values() []value.Value { return scanner.NewDirectData(r.data.columns, r).Values() }
 
 func (r *arrowRow) Scan(dst ...any) error {
-	return scanner.Indexed(scanner.NewDirectData(r.data.columns, r)).Scan(dst...)
+	err := scanner.Indexed(scanner.NewDirectData(r.data.columns, r)).Scan(dst...)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			xerrors.WithStackTrace(err),
+			xerrors.WithSkipDepth(1),
+		)
+	}
+
+	return nil
 }
 
 func (r *arrowRow) ScanNamed(dst ...scanner.NamedDestination) error {
-	return scanner.Named(scanner.NewDirectData(r.data.columns, r)).ScanNamed(dst...)
+	err := scanner.Named(scanner.NewDirectData(r.data.columns, r)).ScanNamed(dst...)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			xerrors.WithStackTrace(err),
+			xerrors.WithSkipDepth(1),
+		)
+	}
+
+	return nil
 }
 
 func (r *arrowRow) ScanStruct(dst any, opts ...scanner.ScanStructOption) error {
-	return scanner.Struct(scanner.NewDirectData(r.data.columns, r)).ScanStruct(dst, opts...)
+	err := scanner.Struct(scanner.NewDirectData(r.data.columns, r)).ScanStruct(dst, opts...)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			xerrors.WithStackTrace(err),
+			xerrors.WithSkipDepth(1),
+		)
+	}
+
+	return nil
 }

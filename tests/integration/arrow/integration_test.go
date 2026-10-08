@@ -123,6 +123,54 @@ CAST(NULL AS Int32?) AS score, "bytes" AS payload;`
 	}
 }
 
+func TestDatabaseSQLLiteralNull(t *testing.T) {
+	for _, format := range []string{"YdbValue", "Arrow"} {
+		t.Run(format, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
+			var calls atomic.Int32
+			newReader := func(part io.Reader, opts ...ipc.Option) (*ipc.Reader, error) {
+				calls.Add(1)
+
+				return ipc.NewReader(part, opts...)
+			}
+			opts := []ydb.Option{ydb.WithAnonymousCredentials()}
+			if format == "Arrow" {
+				opts = append(opts, ydb.WithQueryDefaultResultFormatArrow(newReader))
+			}
+			db, err := ydb.Open(ctx, connectionString(), opts...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close(ctx)
+			connector, err := ydb.Connector(db, ydb.WithQueryService(true))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer connector.Close()
+			sqlDB := sql.OpenDB(connector)
+			defer sqlDB.Close()
+			text := sql.NullString{String: "previous", Valid: true}
+			integer := sql.NullInt64{Int64: 42, Valid: true}
+			var generic any = "previous"
+			if err := sqlDB.QueryRowContext(ctx, "SELECT NULL AS text_null, NULL AS int_null, NULL AS value_null;").
+				Scan(&text, &integer, &generic); err != nil {
+				t.Fatal(err)
+			}
+			if text.Valid || text.String != "" || integer.Valid || integer.Int64 != 0 || generic != nil {
+				t.Fatalf("literal NULL: text=%+v integer=%+v generic=%#v", text, integer, generic)
+			}
+			wantCalls := int32(0)
+			if format == "Arrow" {
+				wantCalls = 1
+			}
+			if calls.Load() != wantCalls {
+				t.Fatalf("decode calls=%d, want %d", calls.Load(), wantCalls)
+			}
+		})
+	}
+}
+
 func verifyExecutor(ctx context.Context, t *testing.T, executor query.Executor) {
 	t.Helper()
 	const sql = `SELECT CAST(42 AS Uint64) AS id, "owned"u AS name, CAST(NULL AS Int32?) AS score;`

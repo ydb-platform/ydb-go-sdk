@@ -32,6 +32,7 @@ func TestAny(t *testing.T) {
 		src Value
 		exp any
 	}{
+		{src: LiteralNullValue(), exp: nil},
 		{
 			src: boolValue(true),
 			exp: true,

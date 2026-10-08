@@ -207,14 +207,14 @@ Client CPU, server CPU and wire payload size were not measured.
 ### Interpreting the results
 
 For 1/10 rows, WithResultFormatArrow does not show a consistent elapsed-time benefit: its
-median changes by +10.0% / +1.2% relative to Value, and the observed ranges overlap.
-For one row, allocated bytes increase by 36.5% and allocation count by
+median changes by +1.2% / +5.7% relative to Value, and the observed ranges overlap.
+For one row, allocated bytes increase by 36.6% and allocation count by
 28.0%. At 100 rows, WithResultFormatArrow reduces median elapsed time by
-16.1%; the observed elapsed ranges still overlap.
+27.6%; the observed elapsed ranges do not overlap.
 
-For 1,000/10,000 rows, WithResultFormatArrow reduces elapsed time by 19.7% / 34.1%,
-allocated bytes by 80.8% / 71.8% and allocation count by 80.8% / 81.5%
-relative to Value. Direct QueryArrow reduces elapsed time by 27.3% / 37.3%,
+For 1,000/10,000 rows, WithResultFormatArrow reduces elapsed time by 31.1% / 12.1%,
+allocated bytes by 80.3% / 72.1% and allocation count by 80.8% / 81.5%
+relative to Value. Direct QueryArrow reduces elapsed time by 36.0% / 29.7%,
 but requires a different consumption API and resource ownership.
 
 Use these measurements to select candidates for your own benchmark. They do not
@@ -235,9 +235,9 @@ xychart-beta
     title "Elapsed time"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
     y-axis "ms/RPC" 0 --> 35
-    line "Value" [1.531, 1.669, 2.534, 6.517, 31.660]
-    line "QueryArrow" [1.741, 1.618, 1.908, 4.738, 19.854]
-    line "WithResultFormatArrow" [1.685, 1.688, 2.125, 5.231, 20.848]
+    line "Value" [1.435, 1.446, 2.404, 6.199, 28.099]
+    line "QueryArrow" [1.480, 1.393, 1.778, 3.967, 19.758]
+    line "WithResultFormatArrow" [1.453, 1.529, 1.740, 4.273, 24.689]
 ```
 
 ### Allocated memory
@@ -253,9 +253,9 @@ xychart-beta
     title "Allocated memory"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
     y-axis "MiB/RPC" 0 --> 20
-    line "Value" [0.021, 0.035, 0.179, 2.215, 19.226]
-    line "QueryArrow" [0.026, 0.029, 0.059, 0.394, 4.361]
-    line "WithResultFormatArrow" [0.029, 0.033, 0.066, 0.425, 5.430]
+    line "Value" [0.021, 0.035, 0.179, 2.164, 19.206]
+    line "QueryArrow" [0.026, 0.029, 0.059, 0.385, 4.535]
+    line "WithResultFormatArrow" [0.029, 0.033, 0.066, 0.426, 5.361]
 ```
 
 ### Allocation count
@@ -271,9 +271,9 @@ xychart-beta
     title "Allocation count"
     x-axis "Rows per response" ["1", "10", "100", "1,000", "10,000"]
     y-axis "Allocations/RPC" 0 --> 400000
-    line "Value" [378, 723, 4113, 39528, 394876]
-    line "QueryArrow" [372, 373, 374, 683, 4696]
-    line "WithResultFormatArrow" [484, 549, 1152, 7583, 73128]
+    line "Value" [378, 722, 4113, 39528, 394875]
+    line "QueryArrow" [372, 373, 374, 680, 4714]
+    line "WithResultFormatArrow" [484, 548, 1152, 7581, 73141]
 ```
 
 The x-axis lists the measured row counts at equal intervals; the y-axis is

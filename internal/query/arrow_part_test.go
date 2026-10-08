@@ -194,6 +194,72 @@ func TestArrowPartCloseCancellation(t *testing.T) {
 	require.Equal(t, int32(1), releases.Load())
 }
 
+func TestArrowBatchTraversal(t *testing.T) {
+	manyBatches := make([]int, 64)
+	for i := range manyBatches {
+		manyBatches[i] = 1
+	}
+	for _, tt := range []struct {
+		name       string
+		partitions []int
+	}{
+		{name: "single batch", partitions: []int{64}},
+		{name: "many batches", partitions: manyBatches},
+		{name: "empty batches", partitions: []int{0, 1, 0, 2, 0}},
+		{name: "empty part", partitions: []int{0, 0}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := t.Context()
+			ctrl := gomock.NewController(t)
+			stream := newExecuteQueryStreamMock(ctrl)
+			stream.EXPECT().Recv().Return(arrowTestPart(0, arrowTestColumns(), "first"), nil)
+			stream.EXPECT().Recv().Return(arrowTestPart(0, nil, "second"), nil)
+			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
+			var batches []arrow.Batch
+			var first []*countingArrowBatch
+			var rowCount int32
+			for _, size := range tt.partitions {
+				rows := make([][]types.Value, size)
+				for i := range rows {
+					rowCount++
+					rows[i] = []types.Value{types.Int32Value(rowCount), types.NullValue(types.TypeText)}
+				}
+				batch := &countingArrowBatch{arrowTestBatch: &arrowTestBatch{rows: rows}}
+				first = append(first, batch)
+				batches = append(batches, batch)
+			}
+			calls := 0
+			decoder := func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
+				calls++
+				if calls == 1 {
+					return batches, nil
+				}
+
+				return arrowTestBatches([][]types.Value{{types.Int32Value(rowCount + 1), types.NullValue(types.TypeText)}}), nil
+			}
+			r, err := newResult(ctx, stream, withArrowDecoder(decoder))
+			require.NoError(t, err)
+			defer r.Close(ctx)
+			rs, err := r.NextResultSet(ctx)
+			require.NoError(t, err)
+			for i := int32(1); i <= rowCount+1; i++ {
+				row, err := rs.NextRow(ctx)
+				require.NoError(t, err)
+				var id int32
+				require.NoError(t, row.ScanNamed(query.Named("id", &id)))
+				require.Equal(t, i, id)
+			}
+			_, err = rs.NextRow(ctx)
+			require.ErrorIs(t, err, io.EOF)
+			require.Equal(t, 2, calls)
+			for _, batch := range first {
+				require.LessOrEqual(t, batch.rowCountCalls, 3)
+				require.Equal(t, 1, batch.releases)
+			}
+		})
+	}
+}
+
 type cancelArrowBatch struct {
 	arrow.Batch
 
@@ -203,4 +269,16 @@ type cancelArrowBatch struct {
 func (b *cancelArrowBatch) Release() {
 	b.onRelease()
 	b.Batch.Release()
+}
+
+type countingArrowBatch struct {
+	*arrowTestBatch
+
+	rowCountCalls int
+}
+
+func (b *countingArrowBatch) NumRows() int {
+	b.rowCountCalls++
+
+	return b.arrowTestBatch.NumRows()
 }
