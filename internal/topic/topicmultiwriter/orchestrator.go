@@ -269,6 +269,9 @@ func (o *orchestrator) assignSeqNoNeedLock(msg *message, autoSetSeqNo bool) (ret
 	if partition := o.partitions[msg.PartitionID]; partition != nil && partition.Splitted() {
 		return true, nil
 	}
+	if partition := o.partitions[msg.PartitionID]; partition != nil && partition.seqNoReady != nil {
+		return true, nil
+	}
 	msg.SeqNo = o.currentSeqNo.next()
 
 	return false, nil
@@ -300,8 +303,9 @@ func (o *orchestrator) enqueueMessage(ctx context.Context, msg message, autoSetS
 func (o *orchestrator) waitAutoSeqNoWriter(ctx context.Context, msg *message) error {
 	for {
 		var (
-			writer *writerWrapper
-			err    error
+			writer     *writerWrapper
+			seqNoReady <-chan struct{}
+			err        error
 		)
 		// A split uses a non-direct writer for the old partition. Do not replace it
 		// with a direct writer while it is reading the last SeqNo.
@@ -310,14 +314,36 @@ func (o *orchestrator) waitAutoSeqNoWriter(ctx context.Context, msg *message) er
 				err = o.rechoosePartition(msg)
 			}
 			if err == nil {
-				writer, err = o.writerPool.get(msg.PartitionID, true)
+				if partition := o.partitions[msg.PartitionID]; partition != nil {
+					seqNoReady = partition.seqNoReady
+				}
+				if seqNoReady == nil {
+					writer, err = o.writerPool.get(msg.PartitionID, true)
+				}
 			}
 		})
 		if err != nil {
 			return err
 		}
-		if err = writer.waitInit(ctx); err == nil {
+		if seqNoReady != nil {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-o.ctx.Done():
+				return ErrAlreadyClosed
+			case <-seqNoReady:
+				continue
+			}
+		}
+		if err = writer.waitInit(ctx, o.background.Done()); err == nil {
 			return nil
+		}
+		if isOperationErrorOverloaded(err) {
+			if splitErr := o.onPartitionSplit(msg.PartitionID); splitErr != nil {
+				return splitErr
+			}
+
+			continue
 		}
 
 		var splitted bool
@@ -454,6 +480,7 @@ func (o *orchestrator) addNewPartitions(
 			o.partitions[partition.PartitionID] = &PartitionInfo{
 				PartitionInfo: partition,
 				Locked:        true,
+				seqNoReady:    make(chan struct{}),
 			}
 		}
 	}
@@ -716,7 +743,10 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 
 		partition.Locked = false
 		for _, child := range partition.ChildPartitionIDs {
-			o.partitions[child].Locked = false
+			childPartition := o.partitions[child]
+			childPartition.Locked = false
+			close(childPartition.seqNoReady)
+			childPartition.seqNoReady = nil
 		}
 
 		for _, ancestor := range ancestors {

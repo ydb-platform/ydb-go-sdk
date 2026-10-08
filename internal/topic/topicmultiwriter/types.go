@@ -20,6 +20,7 @@ type PartitionInfo struct {
 	PendingResend   int
 	CachedMaxSeqNo  int64
 	LastQueuedSeqNo int64
+	seqNoReady      chan struct{}
 }
 
 func (p *PartitionInfo) Splitted() bool {
@@ -50,7 +51,12 @@ type writerWrapper struct {
 	direct     bool
 }
 
-func (w *writerWrapper) waitInit(ctx context.Context) error {
+func (w *writerWrapper) waitInit(ctx context.Context, workerDone <-chan struct{}) error {
+	select {
+	case <-workerDone:
+		return ErrAlreadyClosed
+	default:
+	}
 	if w.initDone.Load() {
 		return w.getInitErr()
 	}
@@ -58,6 +64,8 @@ func (w *writerWrapper) waitInit(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-workerDone:
+		return ErrAlreadyClosed
 	case <-w.initDoneCh:
 		return w.getInitErr()
 	}

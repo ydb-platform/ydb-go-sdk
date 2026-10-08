@@ -4,13 +4,18 @@ import (
 	"bytes"
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
@@ -77,9 +82,205 @@ func TestMultiWriterAutoSeqNoUsesOpenedSessionBaseline(t *testing.T) {
 	require.NoError(t, w.Close(ctx))
 }
 
+func TestMultiWriterWaitsForParentSeqNoBeforeWritingToSplitChild(t *testing.T) {
+	probe := &splitBaselineProbe{started: make(chan struct{}), release: make(chan struct{})}
+	child := &orderedSeqWriter{writes: make(chan int64, 1)}
+	factory := &splitBaselineFactory{probe: probe, child: child}
+	describes := 0
+	w, _, ctx := newMultiWriterForSplitRaceWithDescriber(t, factory, func(context.Context, string) (
+		topictypes.TopicDescription, error,
+	) {
+		describes++
+		parent := topictypes.PartitionInfo{PartitionID: 0, Active: true, ToBound: []byte("m")}
+		if describes == 1 {
+			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{parent}}, nil
+		}
+
+		return splitTopicDescription(), nil
+	})
+
+	splitDone := make(chan error, 1)
+	go func() { splitDone <- w.orchestrator.onPartitionSplit(0) }()
+	<-probe.started
+
+	writeDone := make(chan error, 1)
+	go func() {
+		writeDone <- w.Write(ctx, []topicwriterinternal.PublicMessage{{
+			Data: bytes.NewReader([]byte("message")), Key: "a",
+		}})
+	}()
+	close(probe.release)
+	require.NoError(t, <-splitDone)
+	require.NoError(t, <-writeDone)
+	require.Equal(t, int64(101), <-child.writes)
+}
+
+func TestOrchestratorDoesNotAssignSeqNoBeforeSplitBaseline(t *testing.T) {
+	chooser := partitionchooser.NewByPartitionIDPartitionChooser()
+	parent := &PartitionInfo{PartitionInfo: topictypes.PartitionInfo{PartitionID: 0, Active: true}}
+	o := &orchestrator{
+		partitions:       map[int64]*PartitionInfo{0: parent},
+		partitionChooser: chooser,
+	}
+	require.NoError(t, o.addNewPartitions(parent, &topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+		{PartitionID: 2, Active: true, ParentPartitionIDs: []int64{0}},
+	}}, 0))
+	var msg message
+	msg.PartitionID = 2
+	retry, err := o.assignSeqNoNeedLock(&msg, true)
+	require.NoError(t, err)
+	require.True(t, retry, "SeqNo assignment must wait for the parent baseline")
+	require.Zero(t, msg.SeqNo)
+	require.Zero(t, o.currentSeqNo.Load())
+}
+
+type splitBaselineProbe struct {
+	poolTestWriter
+
+	started chan struct{}
+	release chan struct{}
+}
+
+func (w *splitBaselineProbe) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
+	close(w.started)
+	select {
+	case <-w.release:
+		return topicwriterinternal.InitialInfo{LastSeqNum: 100}, nil
+	case <-ctx.Done():
+		return topicwriterinternal.InitialInfo{}, ctx.Err()
+	}
+}
+
+type splitBaselineFactory struct {
+	probe *splitBaselineProbe
+	child *orderedSeqWriter
+}
+
+func (f *splitBaselineFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	partitionID, direct := cfg.PartitionID()
+	if !direct && cfg.ProducerID() == "test-producer-0" {
+		return f.probe, nil
+	}
+	if direct && partitionID == 2 {
+		f.child.onAckReceivedCallback = cfg.OnAckReceivedCallback
+
+		return f.child, nil
+	}
+
+	return &poolTestWriter{}, nil
+}
+
+func TestMultiWriterWriteReturnsWhenBackgroundWorkerStopsBeforeSessionInit(t *testing.T) {
+	ctx := xtest.Context(t)
+	w, _, _ := newMultiWriterForSplitRace(t, &poolMockFactory{})
+	closeCtx, cancelClose := context.WithCancel(ctx)
+	cancelClose()
+	_ = w.background.Close(closeCtx, nil)
+
+	writeCtx, cancelWrite := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancelWrite()
+	err := w.Write(writeCtx, []topicwriterinternal.PublicMessage{{
+		Data: bytes.NewReader([]byte("message")), Key: "a",
+	}})
+	require.ErrorIs(t, err, ErrAlreadyClosed)
+}
+
+func TestMultiWriterRetriesFirstSessionInitAfterSplit(t *testing.T) {
+	var describes atomic.Int32
+	var describeOnce sync.Once
+	describeStarted := make(chan struct{})
+	releaseDescribe := make(chan struct{})
+	child := &orderedSeqWriter{writes: make(chan int64, 1)}
+	factory := &overloadedSplitFactory{child: child}
+	w, _, ctx := newMultiWriterForSplitRaceWithDescriber(t, factory, func(context.Context, string) (
+		topictypes.TopicDescription, error,
+	) {
+		parent := topictypes.PartitionInfo{PartitionID: 0, Active: true, ToBound: []byte("m")}
+		if describes.Add(1) == 1 {
+			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{parent}}, nil
+		}
+		describeOnce.Do(func() { close(describeStarted) })
+		<-releaseDescribe
+
+		return splitTopicDescription(), nil
+	})
+
+	writeDone := make(chan error, 1)
+	go func() {
+		writeDone <- w.Write(ctx, []topicwriterinternal.PublicMessage{{
+			Data: bytes.NewReader([]byte("message")), Key: "a",
+		}})
+	}()
+	<-describeStarted
+	var prematureErr error
+	var premature bool
+	select {
+	case prematureErr = <-writeDone:
+		premature = true
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(releaseDescribe)
+	if premature {
+		t.Fatalf("write returned before the split was processed: %v", prematureErr)
+	}
+	require.NoError(t, <-writeDone)
+	require.Equal(t, int64(101), <-child.writes)
+}
+
+type overloadedSplitWriter struct {
+	poolTestWriter
+
+	checkError topic.PublicCheckErrorRetryFunction
+}
+
+func (w *overloadedSplitWriter) WaitInitInfo(context.Context) (topicwriterinternal.InitialInfo, error) {
+	err := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
+	w.checkError(topic.PublicCheckErrorRetryArgs{Error: err})
+
+	return topicwriterinternal.InitialInfo{}, err
+}
+
+type overloadedSplitFactory struct {
+	child *orderedSeqWriter
+}
+
+func (f *overloadedSplitFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	partitionID, direct := cfg.PartitionID()
+	if direct && partitionID == 0 {
+		return &overloadedSplitWriter{checkError: cfg.RetrySettings.CheckError}, nil
+	}
+	if !direct && cfg.ProducerID() == "test-producer-0" {
+		return &orderedSeqWriter{lastSeqNo: 100, writes: make(chan int64, 1)}, nil
+	}
+	if direct && partitionID == 2 {
+		f.child.onAckReceivedCallback = cfg.OnAckReceivedCallback
+
+		return f.child, nil
+	}
+
+	return &poolTestWriter{}, nil
+}
+
 func newMultiWriterForSplitRace(
 	t *testing.T,
 	factory writersFactory,
+) (*MultiWriter, *partitionchooser.BoundPartitionChooser, context.Context) {
+	t.Helper()
+
+	return newMultiWriterForSplitRaceWithDescriber(t, factory, func(context.Context, string) (
+		topictypes.TopicDescription, error,
+	) {
+		return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+			{PartitionID: 0, Active: true, ToBound: []byte("m")},
+			{PartitionID: 1, Active: true, FromBound: []byte("m")},
+		}}, nil
+	})
+}
+
+func newMultiWriterForSplitRaceWithDescriber(
+	t *testing.T,
+	factory writersFactory,
+	describer TopicDescriber,
 ) (*MultiWriter, *partitionchooser.BoundPartitionChooser, context.Context) {
 	t.Helper()
 
@@ -97,12 +298,7 @@ func newMultiWriterForSplitRace(
 	WithProducerIDPrefix("test-producer")(&multiCfg)
 	WithWriterPartitionByKey(chooser)(&multiCfg)
 
-	w, err := NewMultiWriter(func(context.Context, string) (topictypes.TopicDescription, error) {
-		return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
-			{PartitionID: 0, Active: true, ToBound: []byte("m")},
-			{PartitionID: 1, Active: true, FromBound: []byte("m")},
-		}}, nil
-	}, writerCfg, &multiCfg)
+	w, err := NewMultiWriter(describer, writerCfg, &multiCfg)
 	require.NoError(t, err)
 	require.NoError(t, w.WaitInit(ctx))
 	t.Cleanup(func() {
@@ -111,6 +307,14 @@ func newMultiWriterForSplitRace(
 	})
 
 	return w, chooser, ctx
+}
+
+func splitTopicDescription() topictypes.TopicDescription {
+	return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+		{PartitionID: 0, Active: true, ToBound: []byte("m"), ChildPartitionIDs: []int64{2, 3}},
+		{PartitionID: 2, Active: true, ToBound: []byte("g"), ParentPartitionIDs: []int64{0}},
+		{PartitionID: 3, Active: true, FromBound: []byte("g"), ToBound: []byte("m"), ParentPartitionIDs: []int64{0}},
+	}}
 }
 
 func splitPartitionZero(t *testing.T, w *MultiWriter, chooser *partitionchooser.BoundPartitionChooser) {
