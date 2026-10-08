@@ -78,6 +78,7 @@ func benchmarkDatabaseSQLSelect42(b *testing.B, nativeDriver *ydb.Driver, useQue
 			}()
 		}
 	})
+	b.StopTimer()
 }
 
 // cpu: Apple M3 Pro
