@@ -339,6 +339,7 @@ func TestPartitionWriterPool_CloseWaitsForWriterReplacement(t *testing.T) {
 
 type blockingCloseWriter struct {
 	poolTestWriter
+
 	started chan struct{}
 	release chan struct{}
 }

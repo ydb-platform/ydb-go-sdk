@@ -130,6 +130,7 @@ func (p *partitionWriterPool) createNonDirectWriter(partitionID int64) (writer, 
 	return writer, err
 }
 
+//nolint:funlen
 func (p *partitionWriterPool) get(partitionID int64, direct bool) (*writerWrapper, error) {
 	for {
 		var (
