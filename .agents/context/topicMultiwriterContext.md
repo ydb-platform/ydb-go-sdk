@@ -27,13 +27,13 @@ NewMultiWriter → background goroutine runs orchestrator.init()
   3. startWorkers() → ack receiver, partition splitter, sender
 ```
 
-`WaitInit()` blocks on `initDone` (closed when `init()` returns).
+`WaitInit()` blocks on `initDone` (closed when `init()` returns). It does not open partition sessions; session errors surface on `Write` or `Flush`.
 
 ## Invariant
 
 Message-pipeline workers (splitter / sender / ack) must start only after steps 1–2 succeed.
 
-Direct partition sessions open on first write. Automatic SeqNo assignment waits for the selected session's last SeqNo. After a split, writes to children wait until the parent's SeqNo probe completes.
+Direct partition sessions open on first write. Automatic SeqNo assignment waits for the selected session's last SeqNo. After a split, writes to children wait until the parent's SeqNo probe and resend scheduling complete. A failed split probe stops the writer so waiting and later writes receive an error.
 
 Split events pushed before `startWorkers()` stay queued in `partitionSplitReceiver` and run after init.
 
@@ -43,6 +43,7 @@ Split events pushed before `startWorkers()` stay queued in `partitionSplitReceiv
 |------|---------|------|
 | `TestMultiWriterWaitsForParentSeqNoBeforeWritingToSplitChild` | `internal/topic/topicmultiwriter` | Split baseline before a child write |
 | `TestMultiWriterRetriesFirstSessionInitAfterSplit` | `internal/topic/topicmultiwriter` | First session initialization interrupted by a split |
+| `TestMultiWriterStopsAfterFirstSessionSplitProbeFails` | `internal/topic/topicmultiwriter` | Failed split probe stops subsequent writes |
 | `TestTopicMultiWriter_AutoPartitioning_SplitDuringInFlightBatch` | `tests/integration` | Auto-partitioning stress; was flaky on `ydbplatform/local-ydb:latest` |
 
 Reproduce integration flakiness:

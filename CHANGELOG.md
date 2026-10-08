@@ -1,4 +1,4 @@
-* Changed topic multi-writer initialization to improve startup performance for topics with many partitions
+* Changed topic multi-writer to open partition sessions on first use, reducing startup time for topics with many partitions; `WaitInit` now completes after routing is ready, while the first `Write` to a partition waits for its session and reports connection errors on `Write` or `Flush`
 
 ## v3.154.1
 * Fixed `topicoptions.CreateWithPartitionCountLimit` and `topicoptions.AlterWithPartitionCountLimit` to set the supported maximum active partition count instead of ignored protobuf fields

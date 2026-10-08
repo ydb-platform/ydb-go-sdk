@@ -340,7 +340,10 @@ func (o *orchestrator) waitAutoSeqNoWriter(ctx context.Context, msg *message) er
 		}
 		if isOperationErrorOverloaded(err) {
 			if splitErr := o.onPartitionSplit(msg.PartitionID); splitErr != nil {
-				return splitErr
+				resultErr := fmt.Errorf("handle overloaded partition %d: %w: %w", msg.PartitionID, err, splitErr)
+				o.stopWithError(resultErr)
+
+				return resultErr
 			}
 
 			continue

@@ -3,6 +3,7 @@ package topicmultiwriter
 import (
 	"bytes"
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -227,6 +228,73 @@ func TestMultiWriterRetriesFirstSessionInitAfterSplit(t *testing.T) {
 	require.Equal(t, int64(101), <-child.writes)
 }
 
+func TestMultiWriterStopsAfterFirstSessionSplitProbeFails(t *testing.T) {
+	probeErr := errors.New("parent seq no probe failed")
+	factory := &overloadedSplitFactory{
+		probe:             &failedInitWriter{err: probeErr},
+		skipSplitCallback: true,
+	}
+	var describes atomic.Int32
+	w, _, ctx := newMultiWriterForSplitRaceWithDescriber(t, factory, func(context.Context, string) (
+		topictypes.TopicDescription, error,
+	) {
+		if describes.Add(1) == 1 {
+			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+				{PartitionID: 0, Active: true, ToBound: []byte("m")},
+			}}, nil
+		}
+
+		return splitTopicDescription(), nil
+	})
+
+	err := w.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data: bytes.NewReader([]byte("first")), Key: "a",
+	}})
+	require.ErrorIs(t, err, probeErr)
+
+	writeCtx, cancelWrite := context.WithTimeout(ctx, time.Second)
+	defer cancelWrite()
+	err = w.Write(writeCtx, []topicwriterinternal.PublicMessage{{
+		Data: bytes.NewReader([]byte("second")), Key: "a",
+	}})
+	require.ErrorIs(t, err, probeErr, "later writes must fail instead of waiting on the child's seq no")
+}
+
+func TestMultiWriterStopsWhenOverloadedSessionHasNoSplit(t *testing.T) {
+	var describes atomic.Int32
+	w, _, ctx := newMultiWriterForSplitRaceWithDescriber(t, &overloadedSplitFactory{
+		skipSplitCallback: true,
+	}, func(context.Context, string) (topictypes.TopicDescription, error) {
+		describes.Add(1)
+
+		return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+			{PartitionID: 0, Active: true, ToBound: []byte("m")},
+		}}, nil
+	})
+
+	err := w.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data: bytes.NewReader([]byte("first")), Key: "a",
+	}})
+	require.True(t, isOperationErrorOverloaded(err), "the session error must remain visible: %v", err)
+	describesAfterFailure := describes.Load()
+
+	err = w.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data: bytes.NewReader([]byte("second")), Key: "a",
+	}})
+	require.True(t, isOperationErrorOverloaded(err), "later writes must preserve the session error: %v", err)
+	require.Equal(t, describesAfterFailure, describes.Load(), "later writes must not repeat the failed split probe")
+}
+
+type failedInitWriter struct {
+	poolTestWriter
+
+	err error
+}
+
+func (w *failedInitWriter) WaitInitInfo(context.Context) (topicwriterinternal.InitialInfo, error) {
+	return topicwriterinternal.InitialInfo{}, w.err
+}
+
 type overloadedSplitWriter struct {
 	poolTestWriter
 
@@ -241,15 +309,28 @@ func (w *overloadedSplitWriter) WaitInitInfo(context.Context) (topicwriterintern
 }
 
 type overloadedSplitFactory struct {
-	child *orderedSeqWriter
+	child             *orderedSeqWriter
+	probe             *failedInitWriter
+	skipSplitCallback bool
 }
 
 func (f *overloadedSplitFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
 	partitionID, direct := cfg.PartitionID()
 	if direct && partitionID == 0 {
+		if f.skipSplitCallback {
+			// Exercise the caller's split path without a competing receiver event.
+			return &overloadedSplitWriter{checkError: func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+				return topic.PublicRetryDecisionStop
+			}}, nil
+		}
+
 		return &overloadedSplitWriter{checkError: cfg.RetrySettings.CheckError}, nil
 	}
 	if !direct && cfg.ProducerID() == "test-producer-0" {
+		if f.probe != nil {
+			return f.probe, nil
+		}
+
 		return &orderedSeqWriter{lastSeqNo: 100, writes: make(chan int64, 1)}, nil
 	}
 	if direct && partitionID == 2 {
