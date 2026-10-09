@@ -6,7 +6,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -27,64 +26,88 @@ func BenchmarkQuery_Query(b *testing.B) {
 	benchOverQueryService(context.TODO(), b)
 }
 
+type queryBenchmarkJob struct {
+	iterations int64
+	next       atomic.Int64
+	done       sync.WaitGroup
+	errors     chan error
+}
+
 func benchOverQueryService(ctx context.Context, b *testing.B, driverOpts ...ydb.Option) {
-	b.StopTimer()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local", driverOpts...)
 	require.NoError(b, err)
 	defer db.Close(ctx)
 
 	q := db.Query()
 	const statement = `SELECT 42 as id, "my string" as myStr`
-	parallelismValues := []int{1, 2, 16, 128, 512}
+	workerCounts := []int{1, 2, 16, 128, 512}
 
-	for _, parallelism := range parallelismValues {
-		b.Run(fmt.Sprintf("parallel-%d", parallelism), func(b *testing.B) {
-			b.StopTimer()
-			workers := min(parallelism*runtime.GOMAXPROCS(0), b.N)
-			start := make(chan struct{})
-			var ready, done sync.WaitGroup
-			var next atomic.Int64
-			errors := make(chan error, workers)
+	for _, workers := range workerCounts {
+		b.Run(fmt.Sprintf("workers-%d", workers), func(b *testing.B) {
+			jobs := make([]chan *queryBenchmarkJob, workers)
+			var ready, workerGroup sync.WaitGroup
+			warmupErrors := make(chan error, workers)
 			ready.Add(workers)
-			done.Add(workers)
-			for range workers {
-				go func() {
-					defer done.Done()
+			workerGroup.Add(workers)
+			for i := range jobs {
+				jobs[i] = make(chan *queryBenchmarkJob)
+				go func(jobChannel <-chan *queryBenchmarkJob) {
+					defer workerGroup.Done()
 					result, err := q.Query(ctx, statement)
 					if err == nil {
 						err = result.Close(ctx)
 					}
 					if err != nil {
-						errors <- err
-					}
-					ready.Done()
-					<-start
-					if err != nil {
+						warmupErrors <- err
+						ready.Done()
 						return
 					}
-					for next.Add(1) <= int64(b.N) {
-						result, err := q.Query(ctx, statement)
-						if err == nil {
-							err = result.Close(ctx)
+					ready.Done()
+					for job := range jobChannel {
+						for job.next.Add(1) <= job.iterations {
+							result, err := q.Query(ctx, statement)
+							if err == nil {
+								err = result.Close(ctx)
+							}
+							if err != nil {
+								job.errors <- err
+								break
+							}
 						}
-						if err != nil {
-							errors <- err
-							return
-						}
+						job.done.Done()
 					}
-				}()
+				}(jobs[i])
 			}
 			ready.Wait()
-			b.ReportAllocs()
-			b.ResetTimer()
-			b.StartTimer()
-			close(start)
-			done.Wait()
-			b.StopTimer()
-			close(errors)
-			for err := range errors {
-				b.Fatalf("query benchmark failed: %v", err)
+			close(warmupErrors)
+			for err := range warmupErrors {
+				for _, jobChannel := range jobs {
+					close(jobChannel)
+				}
+				workerGroup.Wait()
+				b.Fatalf("query benchmark warmup failed: %v", err)
 			}
+
+			b.Run("query", func(b *testing.B) {
+				job := &queryBenchmarkJob{
+					iterations: int64(b.N),
+					errors:     make(chan error, workers),
+				}
+				job.done.Add(workers)
+				b.ReportAllocs()
+				for _, jobChannel := range jobs {
+					jobChannel <- job
+				}
+				job.done.Wait()
+				close(job.errors)
+				for err := range job.errors {
+					b.Fatalf("query benchmark failed: %v", err)
+				}
+			})
+			for _, jobChannel := range jobs {
+				close(jobChannel)
+			}
+			workerGroup.Wait()
 		})
 	}
 }

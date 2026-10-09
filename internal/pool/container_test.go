@@ -117,7 +117,8 @@ func TestSliceContainerPopByNodeIDOrOldestIfReturnsOldestFirst(t *testing.T) {
 }
 
 // BenchmarkContainerOperations compares successful container operations with a fixed
-// workload. BenchmarkPoolWith covers the concurrent pool path separately.
+// workload. The node lookup advances with the FIFO order of the list backend.
+// BenchmarkPoolWith covers the concurrent pool path separately.
 func BenchmarkContainerOperations(b *testing.B) {
 	for _, tt := range []struct {
 		name  string
@@ -157,25 +158,25 @@ func BenchmarkContainerOperations(b *testing.B) {
 			}
 
 			require.Equal(b, containerLen, container.Len())
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				info, err := container.Pop()
-				if err != nil {
-					b.Fatal(err)
+			b.Run("PopAndPopByNodeID", func(b *testing.B) {
+				b.ReportAllocs()
+				for i := 0; b.Loop(); i++ {
+					info, err := container.Pop()
+					if err != nil {
+						b.Fatal(err)
+					}
+					if err := container.Put(info); err != nil {
+						b.Fatal(err)
+					}
+					info, err = container.PopByNodeID(uint32((2*i + 1) % containerLen))
+					if err != nil {
+						b.Fatal(err)
+					}
+					if err := container.Put(info); err != nil {
+						b.Fatal(err)
+					}
 				}
-				if err := container.Put(info); err != nil {
-					b.Fatal(err)
-				}
-				info, err = container.PopByNodeID(uint32(i % containerLen))
-				if err != nil {
-					b.Fatal(err)
-				}
-				if err := container.Put(info); err != nil {
-					b.Fatal(err)
-				}
-			}
-			b.StopTimer()
+			})
 
 			require.Equal(b, containerLen, container.Len())
 			data := container.Clear()
