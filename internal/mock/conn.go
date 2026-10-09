@@ -20,6 +20,7 @@ type Conn struct {
 	LocationField string
 	NodeIDField   uint32
 	StateField    state.State
+	InFlightField int64
 	LocalDCField  bool
 	MetadataField endpoint.Metadata
 }
@@ -36,6 +37,10 @@ func (c *Conn) Endpoint() endpoint.Endpoint {
 
 func (c *Conn) State() state.State {
 	return c.StateField
+}
+
+func (c *Conn) InFlight() int64 {
+	return c.InFlightField
 }
 
 func (c *Conn) Unban(ctx context.Context) {

@@ -15,36 +15,27 @@ import (
 var _ query.Row = (*Row)(nil)
 
 type Row struct {
-	data *scanner.Data
-
-	indexedScanner interface {
-		Scan(dst ...any) error
-	}
-	namedScanner interface {
-		ScanNamed(dst ...scanner.NamedDestination) error
-	}
-	structScanner interface {
-		ScanStruct(dst any, opts ...scanner.ScanStructOption) error
-	}
+	data scanner.Data
 }
 
-func (r Row) Values() []value.Value {
+func (r *Row) Values() []value.Value {
 	return r.data.Values()
 }
 
 func NewRow(columns []*Ydb.Column, v *Ydb.Value) *Row {
-	data := scanner.NewData(columns, v.GetItems())
-
-	return &Row{
-		data:           data,
-		indexedScanner: scanner.Indexed(data),
-		namedScanner:   scanner.Named(data),
-		structScanner:  scanner.Struct(data),
-	}
+	return newRow(scanner.NewData(columns, v.GetItems()))
 }
 
-func (r Row) Scan(dst ...any) error {
-	err := r.indexedScanner.Scan(dst...)
+func newDecodedRow(columns []*Ydb.Column, values []value.Value) *Row {
+	return newRow(scanner.NewDecodedData(columns, values))
+}
+
+func newRow(data *scanner.Data) *Row {
+	return &Row{data: *data}
+}
+
+func (r *Row) Scan(dst ...any) error {
+	err := scanner.Indexed(&r.data).Scan(dst...)
 	if err != nil {
 		return xerrors.WithStackTrace(
 			xerrors.WithStackTrace(err),
@@ -55,8 +46,8 @@ func (r Row) Scan(dst ...any) error {
 	return nil
 }
 
-func (r Row) ScanNamed(dst ...scanner.NamedDestination) error {
-	err := r.namedScanner.ScanNamed(dst...)
+func (r *Row) ScanNamed(dst ...scanner.NamedDestination) error {
+	err := scanner.Named(&r.data).ScanNamed(dst...)
 	if err != nil {
 		return xerrors.WithStackTrace(
 			xerrors.WithStackTrace(err),
@@ -67,8 +58,8 @@ func (r Row) ScanNamed(dst ...scanner.NamedDestination) error {
 	return nil
 }
 
-func (r Row) ScanStruct(dst any, opts ...scanner.ScanStructOption) error {
-	err := r.structScanner.ScanStruct(dst, opts...)
+func (r *Row) ScanStruct(dst any, opts ...scanner.ScanStructOption) error {
+	err := scanner.Struct(&r.data).ScanStruct(dst, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(
 			xerrors.WithStackTrace(err),
@@ -79,7 +70,7 @@ func (r Row) ScanStruct(dst any, opts ...scanner.ScanStructOption) error {
 	return nil
 }
 
-func readRow(ctx context.Context, r *streamResult) (_ *Row, finalErr error) {
+func readRow(ctx context.Context, r *streamResult) (_ query.Row, finalErr error) {
 	defer func() {
 		_ = r.Close(ctx)
 	}()
@@ -96,6 +87,9 @@ func readRow(ctx context.Context, r *streamResult) (_ *Row, finalErr error) {
 		}
 
 		return nil, xerrors.WithStackTrace(err)
+	}
+	if _, ok := row.(*arrowRow); ok {
+		row = newDecodedRow(rs.columns, row.Values())
 	}
 
 	_, err = rs.nextRow(ctx)

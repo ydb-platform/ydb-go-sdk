@@ -210,10 +210,47 @@ func (s *EncoderSelector) CompressMessages(messages []MessageWithDataContent) (r
 			trace.TopicWriterCompressMessagesReasonCompressData,
 		)
 		err = CacheMessages(messages, codec, s.parallelCompressors)
-		onCompressDone(err)
+
+		traceErr := err
+		var uncompressedSize, compressedSize int
+		if traceErr == nil && s.tracer.OnWriterCompressMessages != nil {
+			compressedSize, traceErr = CompressedContentSize(messages, codec)
+			if traceErr == nil {
+				uncompressedSize = UncompressedContentSize(messages)
+			}
+		}
+		onCompressDone(traceErr, uncompressedSize, compressedSize)
 	}
 
 	return codec, err
+}
+
+// UncompressedContentSize returns the total uncompressed size in bytes of the messages.
+func UncompressedContentSize(messages []MessageWithDataContent) int {
+	size := 0
+	for i := range messages {
+		size += messages[i].BufUncompressedSize
+	}
+
+	return size
+}
+
+// CompressedContentSize returns the total size in bytes of already cached messages
+// encoded with the given codec.
+func CompressedContentSize(
+	messages []MessageWithDataContent,
+	codec rawtopiccommon.Codec,
+) (int, error) {
+	size := 0
+	for i := range messages {
+		content, err := messages[i].GetEncodedBytes(codec)
+		if err != nil {
+			return 0, err
+		}
+		size += len(content)
+	}
+
+	return size, nil
 }
 
 func (s *EncoderSelector) ResetAllowedCodecs(allowedCodecs rawtopiccommon.SupportedCodecs) {
@@ -282,20 +319,20 @@ func (s *EncoderSelector) measureCodecs(messages []MessageWithDataContent) (rawt
 			trace.TopicWriterCompressMessagesReasonCodecsMeasure,
 		)
 		err := CacheMessages(messages, codec, s.parallelCompressors)
-		onCompressDone(err)
+
+		var uncompressedSize, compressedSize int
+		if err == nil {
+			compressedSize, err = CompressedContentSize(messages, codec)
+			if err == nil {
+				uncompressedSize = UncompressedContentSize(messages)
+			}
+		}
+		onCompressDone(err, uncompressedSize, compressedSize)
 		if err != nil {
 			return codecUnknown, err
 		}
 
-		size := 0
-		for messIndex := range messages {
-			content, err := messages[messIndex].GetEncodedBytes(codec)
-			if err != nil {
-				return codecUnknown, err
-			}
-			size += len(content)
-		}
-		sizes[codecIndex] = size
+		sizes[codecIndex] = compressedSize
 	}
 
 	minSizeIndex := 0
