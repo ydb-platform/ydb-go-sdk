@@ -78,6 +78,10 @@ func TestMaxDelay(t *testing.T) {
 	}
 }
 
+func TestMaxDelayDefaultsSlotToOneSecond(t *testing.T) {
+	require.Equal(t, time.Second, New().MaxDelay(0))
+}
+
 func TestLogBackoff(t *testing.T) {
 	type exp struct {
 		eq  time.Duration

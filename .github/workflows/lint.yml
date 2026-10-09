@@ -8,7 +8,8 @@ on:
   workflow_dispatch:
 env:
   GOLANGCI_LINT_VERSION: v2.13.1
-  GO_VERSION: '1.27'
+  # golangci-lint v2.13.1 cannot decode Go 1.27.2 standard-library export data.
+  GO_VERSION: '1.27.1'
 jobs:
   golangci:
     if: (!contains(github.event.pull_request.labels.*.name, 'no lint'))
