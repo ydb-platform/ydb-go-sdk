@@ -42,27 +42,21 @@ jobs:
       - name: Install benchstat
         run: go install golang.org/x/perf/cmd/benchstat@v0.0.0-20260908200009-22c9c6c9d4da
 
-      - name: Benchmark master SDK packages
-        working-directory: master
+      - name: Run benchmarks
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p ../benchmark-results/sdk
-          go test -run '^$' -bench . -benchtime=100ms -count=10 -benchmem -cpu=2 -timeout=90m ./... | tee ../benchmark-results/sdk/master.txt
-          grep -q '^Benchmark' ../benchmark-results/sdk/master.txt
+          mkdir -p benchmark-results/sdk benchmark-results/integration
+          run_benchmarks() {
+            local revision="$1" suite="$2"
+            shift 2
+            (cd "$revision" && go test "$@") | tee "benchmark-results/$suite/$revision.txt"
+            grep -q '^Benchmark' "benchmark-results/$suite/$revision.txt"
+          }
 
-      - name: Benchmark PR SDK packages
-        working-directory: pr
-        shell: bash
-        run: |
-          set -euo pipefail
-          go test -run '^$' -bench . -benchtime=100ms -count=10 -benchmem -cpu=2 -timeout=90m ./... | tee ../benchmark-results/sdk/pr.txt
-          grep -q '^Benchmark' ../benchmark-results/sdk/pr.txt
+          run_benchmarks master sdk -run '^$' -bench . -benchtime=100ms -count=10 -benchmem -cpu=2 -timeout=90m ./...
+          run_benchmarks pr sdk -run '^$' -bench . -benchtime=100ms -count=10 -benchmem -cpu=2 -timeout=90m ./...
 
-      - name: Start local YDB for integration benchmarks
-        shell: bash
-        run: |
-          set -euo pipefail
           docker run -d --name ydb -h localhost \
             -p 2135:2135 -p 2136:2136 -p 8765:8765 \
             -v /tmp/ydb_certs:/ydb_certs \
@@ -75,43 +69,27 @@ jobs:
           for attempt in {1..120}; do
             status="$(docker inspect --format '{{.State.Health.Status}}' ydb)"
             if [ "$status" = healthy ]; then
-              exit 0
+              break
             fi
             sleep 1
           done
-          docker logs ydb
-          exit 1
+          if [ "$status" != healthy ]; then
+            docker logs ydb
+            exit 1
+          fi
 
-      - name: Benchmark master integration tests
-        working-directory: master
-        shell: bash
-        env:
-          YDB_CONNECTION_STRING: grpc://localhost:2136/local
-          YDB_CONNECTION_STRING_SECURE: grpcs://localhost:2135/local
-          YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
-          YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
-          HIDE_APPLICATION_OUTPUT: 1
-        run: |
-          set -euo pipefail
-          mkdir -p ../benchmark-results/integration
-          go test -tags integration -run '^$' -bench . -count=10 -benchmem -cpu=2 -timeout=90m ./tests/integration/... | tee ../benchmark-results/integration/master.txt
-          grep -q '^Benchmark' ../benchmark-results/integration/master.txt
+          export YDB_CONNECTION_STRING=grpc://localhost:2136/local
+          export YDB_CONNECTION_STRING_SECURE=grpcs://localhost:2135/local
+          export YDB_SSL_ROOT_CERTIFICATES_FILE=/tmp/ydb_certs/ca.pem
+          export YDB_SESSIONS_SHUTDOWN_URLS='http://localhost:8765/actors/kqp_proxy?force_shutdown=all'
+          export HIDE_APPLICATION_OUTPUT=1
+          run_benchmarks master integration -tags integration -run '^$' -bench . -count=10 -benchmem -cpu=2 -timeout=90m ./tests/integration/...
+          run_benchmarks pr integration -tags integration -run '^$' -bench . -count=10 -benchmem -cpu=2 -timeout=90m ./tests/integration/...
+          for revision in master pr; do
+            cat "benchmark-results/sdk/$revision.txt" "benchmark-results/integration/$revision.txt" > "benchmark-results/$revision.txt"
+          done
 
-      - name: Benchmark PR integration tests
-        working-directory: pr
-        shell: bash
-        env:
-          YDB_CONNECTION_STRING: grpc://localhost:2136/local
-          YDB_CONNECTION_STRING_SECURE: grpcs://localhost:2135/local
-          YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
-          YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
-          HIDE_APPLICATION_OUTPUT: 1
-        run: |
-          set -euo pipefail
-          go test -tags integration -run '^$' -bench . -count=10 -benchmem -cpu=2 -timeout=90m ./tests/integration/... | tee ../benchmark-results/integration/pr.txt
-          grep -q '^Benchmark' ../benchmark-results/integration/pr.txt
-
-      - name: Compare both suites
+      - name: Compare benchmarks
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           MASTER_SHA: ${{ github.event.pull_request.base.sha }}
@@ -120,12 +98,10 @@ jobs:
         run: |
           set -euo pipefail
           benchstat="$(go env GOPATH)/bin/benchstat"
-          for suite in sdk integration; do
-            "$benchstat" "master=benchmark-results/$suite/master.txt" "pr=benchmark-results/$suite/pr.txt" > "benchmark-results/$suite/benchstat.txt"
-            "$benchstat" -format csv "master=benchmark-results/$suite/master.txt" "pr=benchmark-results/$suite/pr.txt" > "benchmark-results/$suite/benchstat.csv" 2> "benchmark-results/$suite/benchstat-csv-warnings.txt"
-            test -s "benchmark-results/$suite/benchstat.txt"
-            test -s "benchmark-results/$suite/benchstat.csv"
-          done
+          "$benchstat" master=benchmark-results/master.txt pr=benchmark-results/pr.txt > benchmark-results/benchstat-all.txt
+          "$benchstat" -format csv master=benchmark-results/master.txt pr=benchmark-results/pr.txt > benchmark-results/benchstat.csv 2> benchmark-results/benchstat-csv-warnings.txt
+          test -s benchmark-results/benchstat-all.txt
+          test -s benchmark-results/benchstat.csv
           jq -n --argjson pr "$PR_NUMBER" --argjson run "$GITHUB_RUN_ID" \
             --arg master "$MASTER_SHA" --arg head "$PR_SHA" \
             '{pr: $pr, run_id: $run, master_sha: $master, head_sha: $head}' > benchmark-results/metadata.json
@@ -137,4 +113,12 @@ jobs:
           name: benchmark-results
           path: benchmark-results/
           if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Upload browser-readable benchstat
+        uses: actions/upload-artifact@v7
+        with:
+          path: benchmark-results/benchstat-all.txt
+          archive: false
+          if-no-files-found: error
           retention-days: 30

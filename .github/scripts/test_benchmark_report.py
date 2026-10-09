@@ -36,30 +36,32 @@ WriterSingle/p64-2,0.01,2%,0.013,2%,+30.00%,p=0.001 n=10
 class BenchmarkReportTests(unittest.TestCase):
     def test_combined_report_explains_status_and_keeps_details_under_packages(self):
         artifact_url = "https://github.com/ydb-platform/ydb-go-sdk/actions/runs/42/artifacts/7"
+        preview_url = "https://github.com/ydb-platform/ydb-go-sdk/actions/runs/42/artifacts/8"
         report = render_report(
-            SDK_CSV,
-            INTEGRATION_CSV,
+            SDK_CSV + "\n" + INTEGRATION_CSV,
             artifact_url=artifact_url,
+            preview_url=preview_url,
             master_sha="a" * 40,
             head_sha="b" * 40,
         )
 
         self.assertIn("🔴 Performance regressions reported", report)
-        self.assertIn("### SDK", report)
-        self.assertIn("### Integration", report)
+        self.assertIn("### Changed benchmarks by package", report)
+        self.assertNotIn("### SDK", report)
+        self.assertNotIn("### Integration", report)
         self.assertIn("internal/pool", report)
         self.assertIn("tests/integration", report)
         self.assertIn("WriterMany", report)
         self.assertIn("slower (+20.00% sec/op)", report)
         self.assertIn("allocates more memory (+20.00% B/op)", report)
         self.assertIn("faster (-50.00% sec/op)", report)
-        self.assertIn("+5.9%", report)  # Includes the row marked ~ in the time trend.
-        self.assertIn("-31.2%", report)
+        self.assertIn("-14.7%", report)  # Includes the row marked ~ in the time trend.
         self.assertIn("Master median", report)
         self.assertIn("PR median", report)
         self.assertIn("p &lt; 0.001", report)
         self.assertNotIn("NoChange-2", report)
         self.assertEqual(5, report.count("<details>"))
+        self.assertIn(f"[Open full benchstat in browser]({preview_url})", report)
         self.assertTrue(report.rstrip().endswith(f"[Download full benchstat and raw results]({artifact_url})"))
 
     def test_missing_comparison_is_not_reported_as_an_improvement(self):
@@ -71,9 +73,9 @@ Removed-2,1e-06,2%
 Added-2,,,1e-06,2%
 """
         report = render_report(
-            sdk_csv,
-            INTEGRATION_CSV.replace("-50.00%", "~").replace("+30.00%", "~"),
+            sdk_csv + "\n" + INTEGRATION_CSV.replace("-50.00%", "~").replace("+30.00%", "~"),
             artifact_url="https://github.com/example/repo/actions/runs/1/artifacts/2",
+            preview_url="https://github.com/example/repo/actions/runs/1/artifacts/3",
             master_sha="a" * 40,
             head_sha="b" * 40,
         )
@@ -86,9 +88,9 @@ Added-2,,,1e-06,2%
     def test_benchmark_names_are_escaped_before_rendering_html(self):
         sdk_csv = SDK_CSV.replace("Slow-2", "Slow<script>-2")
         report = render_report(
-            sdk_csv,
-            INTEGRATION_CSV,
+            sdk_csv + "\n" + INTEGRATION_CSV,
             artifact_url="https://github.com/example/repo/actions/runs/1/artifacts/2",
+            preview_url="https://github.com/example/repo/actions/runs/1/artifacts/3",
             master_sha="a" * 40,
             head_sha="b" * 40,
         )
@@ -100,8 +102,8 @@ Added-2,,,1e-06,2%
         with self.assertRaises(ValueError):
             render_report(
                 "not benchstat output",
-                INTEGRATION_CSV,
                 artifact_url="https://github.com/example/repo/actions/runs/1/artifacts/2",
+                preview_url="https://github.com/example/repo/actions/runs/1/artifacts/3",
                 master_sha="a" * 40,
                 head_sha="b" * 40,
             )
@@ -118,9 +120,9 @@ Mixed-2,1e-06,1%,8e-07,1%,-20.00%,p=0.001 n=10
 Mixed-2,100,1%,120,1%,+20.00%,p=0.001 n=10
 """
         report = render_report(
-            sdk_csv,
-            INTEGRATION_CSV.replace("-50.00%", "~").replace("+30.00%", "~"),
+            sdk_csv + "\n" + INTEGRATION_CSV.replace("-50.00%", "~").replace("+30.00%", "~"),
             artifact_url="https://github.com/example/repo/actions/runs/1/artifacts/2",
+            preview_url="https://github.com/example/repo/actions/runs/1/artifacts/3",
             master_sha="a" * 40,
             head_sha="b" * 40,
         )
@@ -139,9 +141,9 @@ pkg: github.com/ydb-platform/ydb-go-sdk/v3
 Custom-2,100,1%,110,1%,+10.00%,p=0.001 n=10
 """
         report = render_report(
-            sdk_csv,
-            INTEGRATION_CSV.replace("-50.00%", "~").replace("+30.00%", "~"),
+            sdk_csv + "\n" + INTEGRATION_CSV.replace("-50.00%", "~").replace("+30.00%", "~"),
             artifact_url="https://github.com/example/repo/actions/runs/1/artifacts/2",
+            preview_url="https://github.com/example/repo/actions/runs/1/artifacts/3",
             master_sha="a" * 40,
             head_sha="b" * 40,
         )

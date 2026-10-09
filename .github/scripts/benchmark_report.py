@@ -239,7 +239,7 @@ def _card_lines(name, measurements):
     return lines + ["", "</details>", ""]
 
 
-def _scope_lines(label, measurements, max_cards=None):
+def _package_lines(measurements, max_cards=None):
     cards = _cards(measurements)
     visible = [(key, value) for key, value in cards.items() if _card_status(value) != "unchanged"]
     packages = defaultdict(list)
@@ -249,7 +249,7 @@ def _scope_lines(label, measurements, max_cards=None):
         packages,
         key=lambda package: (min(_card_priority(card) for _, card in packages[package]), package),
     )
-    lines = [f"### {label}", ""]
+    lines = ["### Changed benchmarks by package", ""]
     shown = 0
     for package in ordered_packages:
         package_cards = sorted(packages[package], key=lambda item: (*_card_priority(item[1]), item[0]))
@@ -265,19 +265,9 @@ def _scope_lines(label, measurements, max_cards=None):
                 n = counts[direction]
                 labels.append(f"{icon} {n} {singular}{'s' if n != 1 and direction != 'incomplete' else ''}")
         lines += [f"#### <code>{html.escape(_package_name(package))}</code> — {' · '.join(labels)}", ""]
-        if label == "Integration":
-            families = defaultdict(list)
-            for name, rows in selected:
-                families[name.split("/", 1)[0]].append((name, rows))
-            for family, family_cards in families.items():
-                lines += [f"##### {html.escape(family)}", ""]
-                for name, rows in family_cards:
-                    lines += _card_lines(name, rows)
-                    shown += 1
-        else:
-            for name, rows in selected:
-                lines += _card_lines(name, rows)
-                shown += 1
+        for name, rows in selected:
+            lines += _card_lines(name, rows)
+            shown += 1
     omitted = len(visible) - shown
     if omitted:
         lines += [f"{omitted} additional changed benchmark(s) are available in the full artifact.", ""]
@@ -286,18 +276,15 @@ def _scope_lines(label, measurements, max_cards=None):
     return lines
 
 
-def render_report(sdk_csv, integration_csv, *, artifact_url, master_sha, head_sha, max_chars=55000):
-    """Render one comment for both benchmark suites, with an overall review signal."""
-    if not re.fullmatch(r"https://github\.com/[^/]+/[^/]+/actions/runs/\d+/artifacts/\d+", artifact_url):
+def render_report(csv_source, *, artifact_url, preview_url, master_sha, head_sha, max_chars=55000):
+    """Render one package-grouped comment with an overall review signal."""
+    artifact_pattern = r"https://github\.com/[^/]+/[^/]+/actions/runs/\d+/artifacts/\d+"
+    if not all(re.fullmatch(artifact_pattern, url) for url in (artifact_url, preview_url)):
         raise ValueError("Invalid GitHub artifact URL")
     if not all(re.fullmatch(r"[0-9a-f]{40}", sha) for sha in (master_sha, head_sha)):
         raise ValueError("Invalid benchmark revision")
-    scopes = {"SDK": parse_benchstat_csv(sdk_csv), "Integration": parse_benchstat_csv(integration_csv)}
-    all_cards = {scope: _cards(rows) for scope, rows in scopes.items()}
-    totals = defaultdict(int)
-    for cards in all_cards.values():
-        for status, count in _scope_counts(cards).items():
-            totals[status] += count
+    measurements = parse_benchstat_csv(csv_source)
+    totals = _scope_counts(_cards(measurements))
     if totals["regression"]:
         outcome = "🔴 Performance regressions reported"
     elif totals["incomplete"]:
@@ -314,11 +301,12 @@ def render_report(sdk_csv, integration_csv, *, artifact_url, master_sha, head_sh
         "Benchstat reports individual changes using unadjusted p-values; `~` means no change was detected, not proof of equality. "
         "The 95% confidence intervals in the details describe each median, not the percentage change.",
         "",
+        f"[Open full benchstat in browser]({preview_url}) · "
         f"[Download full benchstat and raw results]({artifact_url})",
     ]
 
     def build(max_cards):
-        lines = [
+        return "\n".join([
             MARKER,
             f"## Benchmark review: {outcome}",
             "",
@@ -327,19 +315,13 @@ def render_report(sdk_csv, integration_csv, *, artifact_url, master_sha, head_sh
             f"{totals['incomplete']} incomplete · "
             f"{totals['unchanged']} with no detected change.**",
             "",
-            "| Suite | Time trend | Regressions | Improvements only | No detected change | Incomplete |",
-            "|:--|--:|--:|--:|--:|--:|",
-        ]
-        for label, rows in scopes.items():
-            counts = _scope_counts(all_cards[label])
-            lines.append(
-                f"| {label} | {_time_trend(rows)} | 🔴 {counts['regression']} | 🟢 {counts['improvement']} "
-                f"| {counts['unchanged']} | {counts['incomplete']} |"
-            )
-        lines += ["", f"Master: `{master_sha[:12]}` · PR: `{head_sha[:12]}`", ""]
-        for label, rows in scopes.items():
-            lines += _scope_lines(label, rows, max_cards=max_cards)
-        return "\n".join(lines + footer)
+            f"**Time trend across all packages:** {_time_trend(measurements)}",
+            "",
+            f"Master: `{master_sha[:12]}` · PR: `{head_sha[:12]}`",
+            "",
+            *_package_lines(measurements, max_cards=max_cards),
+            *footer,
+        ])
 
     report = build(None)
     if len(report) > max_chars:
@@ -353,17 +335,17 @@ def render_report(sdk_csv, integration_csv, *, artifact_url, master_sha, head_sh
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--sdk-csv", type=Path, required=True)
-    parser.add_argument("--integration-csv", type=Path, required=True)
+    parser.add_argument("--csv", type=Path, required=True)
     parser.add_argument("--artifact-url", required=True)
+    parser.add_argument("--preview-url", required=True)
     parser.add_argument("--master-sha", required=True)
     parser.add_argument("--head-sha", required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     report = render_report(
-        args.sdk_csv.read_text(),
-        args.integration_csv.read_text(),
+        args.csv.read_text(),
         artifact_url=args.artifact_url,
+        preview_url=args.preview_url,
         master_sha=args.master_sha,
         head_sha=args.head_sha,
     )

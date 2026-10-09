@@ -32,13 +32,16 @@ jobs:
               owner, repo, run_id: run.id, per_page: 100,
             });
             const artifact = artifacts.find(item => item.name === 'benchmark-results' && !item.expired);
-            if (!artifact) {
-              core.info('No benchmark artifact; comparison job was skipped');
+            const preview = artifacts.find(item => item.name === 'benchstat-all.txt' && !item.expired);
+            if (!artifact || !preview) {
+              core.info('Benchmark artifacts are missing; comparison job was skipped');
               return;
             }
             core.setOutput('found', 'true');
             core.setOutput('url',
               `https://github.com/${owner}/${repo}/actions/runs/${run.id}/artifacts/${artifact.id}`);
+            core.setOutput('preview_url',
+              `https://github.com/${owner}/${repo}/actions/runs/${run.id}/artifacts/${preview.id}`);
 
       - name: Download benchmark results
         if: steps.artifact.outputs.found == 'true'
@@ -89,13 +92,14 @@ jobs:
         if: steps.validate.outputs.publish == 'true'
         env:
           ARTIFACT_URL: ${{ steps.artifact.outputs.url }}
+          PREVIEW_URL: ${{ steps.artifact.outputs.preview_url }}
           MASTER_SHA: ${{ steps.validate.outputs.master_sha }}
           HEAD_SHA: ${{ steps.validate.outputs.head_sha }}
         run: |
           python3 .github/scripts/benchmark_report.py \
-            --sdk-csv benchmark-results/sdk/benchstat.csv \
-            --integration-csv benchmark-results/integration/benchstat.csv \
+            --csv benchmark-results/benchstat.csv \
             --artifact-url "$ARTIFACT_URL" \
+            --preview-url "$PREVIEW_URL" \
             --master-sha "$MASTER_SHA" \
             --head-sha "$HEAD_SHA" \
             --output benchmark-report.md
