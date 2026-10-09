@@ -112,6 +112,22 @@ log.Printf("id = %d, myStr = \"%s\"", id, myStr)
 
 More examples of usage placed in [examples](./examples) directory.
 
+## Query methods and result formats
+
+Use `QueryRow` when exactly one row is expected, `QueryResultSet` for exactly one
+result set, and `Query` for multiple result sets. For large results, iterate
+`s.Query` inside `db.Query().Do`, or `tx.Query` inside `DoTx`: `Client.Query` and
+`Client.QueryResultSet` materialize their results in memory.
+
+Query Service uses `Ydb.Value` by default. Experimental
+`query.WithResultFormatArrow(ipc.NewReader, opts...)` uses your application's Arrow Go version
+while preserving the row and scan APIs;
+`ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader, opts...)` sets the driver default.
+`query.WithYdbValue()` selects YDB values for one query.
+`Session.QueryArrow` exposes raw Arrow IPC for applications that process columns
+and manage Arrow resources themselves. See [Query methods and result formats](QUERY.md)
+for recommendations, decoder requirements, benchmark results and graphs.
+
 ## Credentials <a name="credentials"></a>
 
 Driver implements several ways for making credentials for `YDB`:
