@@ -439,6 +439,11 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		)...),
 		localDCDetector: detectLocalDC,
 	}
+	defer func(created *Balancer) {
+		if finalErr != nil {
+			_ = created.Close(context.WithoutCancel(ctx))
+		}
+	}(b)
 	if policy.MaxConnections() > 0 {
 		b.random = xrand.New(xrand.WithSeed(time.Now().UnixNano()))
 	}

@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"os"
 	"sync/atomic"
@@ -15,10 +16,14 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestWithConnectionTTL(t *testing.T) {
@@ -159,4 +164,85 @@ func TestWithCertificatesCached(t *testing.T) {
 			require.Equal(t, test.expMiss, missCounter)
 		})
 	}
+}
+
+func TestFailedWithReleasesItsPoolReference(t *testing.T) {
+	for _, depth := range []int{0, 1, 2} {
+		for _, failOption := range []bool{false, true} {
+			name := fmt.Sprintf("depth_%d/%s", depth, map[bool]string{false: "connect", true: "option"}[failOption])
+			t.Run(name, func(t *testing.T) {
+				var releases atomic.Int64
+
+				driver, err := Open(context.Background(), "grpc://localhost:2135/missing",
+					WithAnonymousCredentials(),
+					WithBalancer(balancers.SingleConn()),
+					WithTraceDriver(trace.Driver{
+						OnPoolRelease: func(trace.DriverConnPoolReleaseStartInfo) func(trace.DriverConnPoolReleaseDoneInfo) {
+							releases.Add(1)
+
+							return nil
+						},
+					}),
+				)
+				require.NoError(t, err)
+
+				defer func() { require.NoError(t, driver.Close(context.Background())) }()
+
+				parent := driver
+				for range depth {
+					parent, err = parent.With(context.Background())
+					require.NoError(t, err)
+				}
+
+				var childContext context.Context
+
+				child, err := parent.With(context.Background(),
+					WithBalancer(balancers.RandomChoice()),
+					WithDiscoveryInterval(-1),
+					func(ctx context.Context, child *Driver) error {
+						childContext = ctx
+						if failOption {
+							return status.Error(codes.InvalidArgument, "synthetic option failure")
+						}
+
+						return nil
+					},
+				)
+				require.Error(t, err)
+				require.Nil(t, child)
+				require.ErrorIs(t, childContext.Err(), context.Canceled)
+				require.EqualValues(t, 1, releases.Load())
+
+				require.NoError(t, driver.Close(context.Background()))
+				require.EqualValues(t, depth+2, releases.Load())
+				require.ErrorIs(t, driver.pool.AddRef(context.Background()), conn.ErrClosedPool)
+			})
+		}
+	}
+}
+
+func TestClosingGrandchildKeepsParentRegistered(t *testing.T) {
+	driver, err := Open(t.Context(), "grpc://localhost:2135/missing",
+		WithAnonymousCredentials(), WithBalancer(balancers.SingleConn()),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, driver.Close(context.Background())) })
+
+	var childContext context.Context
+	child, err := driver.With(t.Context(), func(ctx context.Context, _ *Driver) error {
+		childContext = ctx
+
+		return nil
+	})
+	require.NoError(t, err)
+	parentContext := childContext
+
+	grandchild, err := child.With(t.Context())
+	require.NoError(t, err)
+	require.NoError(t, grandchild.Close(t.Context()))
+	require.NoError(t, parentContext.Err())
+
+	require.NoError(t, driver.Close(t.Context()))
+	require.ErrorIs(t, parentContext.Err(), context.Canceled)
+	require.ErrorIs(t, driver.pool.AddRef(t.Context()), conn.ErrClosedPool)
 }

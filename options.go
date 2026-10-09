@@ -859,7 +859,7 @@ func WithTraceDatabaseSQL(t trace.DatabaseSQL) Option { //nolint:gocritic
 
 func withOnClose(onClose func(c *Driver)) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.onClose = append(d.onClose, onClose)
+		d.onClose = []func(c *Driver){onClose}
 
 		return nil
 	}
@@ -867,6 +867,10 @@ func withOnClose(onClose func(c *Driver)) Option {
 
 func withConnPool(pool *conn.Pool) Option {
 	return func(ctx context.Context, d *Driver) error {
+		if d.pool == pool {
+			return nil
+		}
+
 		d.pool = pool
 
 		return pool.AddRef(ctx)
