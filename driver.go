@@ -38,6 +38,7 @@ import (
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	internalTopic "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
@@ -49,6 +50,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -97,6 +99,7 @@ type (
 
 		topic        *xsync.Once[*topicclientinternal.Client]
 		topicOptions []topicoptions.TopicOption
+		meter        telemetry.Meter
 
 		databaseSQLOptions []xsql.Option
 
@@ -174,10 +177,9 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 
 	d.ctxCancel()
 
+	var issues []error
 	d.mtx.Lock()
 	defer d.mtx.Unlock()
-
-	d.ctxCancel()
 
 	defer func() {
 		for _, onClose := range d.onClose {
@@ -208,7 +210,6 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 		d.pool.RemoveRef,
 	)
 
-	var issues []error
 	for _, f := range closes {
 		if err := f(ctx); err != nil {
 			issues = append(issues, err)
@@ -617,6 +618,12 @@ func (d *Driver) connect(ctx context.Context) error {
 	})
 
 	d.topic = xsync.OnceValue(func() (*topicclientinternal.Client, error) {
+		metrics := topicreadercommon.ReaderMetricsConfig{
+			Meter:    d.meter,
+			Endpoint: d.Endpoint(),
+			Database: d.Name(),
+		}
+
 		return topicclientinternal.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
 			d.config.Credentials(),
@@ -626,6 +633,7 @@ func (d *Driver) connect(ctx context.Context) error {
 					topicoptions.WithOperationTimeout(d.config.OperationTimeout()),
 					topicoptions.WithOperationCancelAfter(d.config.OperationCancelAfter()),
 					internalTopic.WithGrpcMessageSize(d.config.GrpcMaxMessageSize()),
+					internalTopic.WithMetrics(metrics),
 				},
 				d.topicOptions...,
 			)...,

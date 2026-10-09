@@ -77,7 +77,6 @@ func newReaderReconnector(
 	}
 
 	res.initChannelsAndClock()
-	res.start()
 
 	return res
 }

@@ -441,6 +441,9 @@ func (w *PartitionWorker) handleStopPartitionRequest(
 	ctx context.Context,
 	m *rawtopicreader.StopPartitionSessionRequest,
 ) error {
+	if !m.Graceful {
+		w.partitionSession.Retire()
+	}
 	event := NewPublicStopPartitionSessionEvent(
 		w.partitionSession.ToPublic(),
 		m.Graceful,
@@ -466,6 +469,7 @@ func (w *PartitionWorker) handleStopPartitionRequest(
 				"ydb: failed to flush commits before stopping partition session: %w", err,
 			))
 		}
+		w.partitionSession.Retire()
 		resp := &rawtopicreader.StopPartitionSessionResponse{
 			PartitionSessionID: w.partitionSession.StreamPartitionSessionID,
 		}

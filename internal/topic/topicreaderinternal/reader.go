@@ -38,6 +38,7 @@ type Reader struct {
 	defaultBatchConfig ReadMessageBatchOptions
 	tracer             *trace.Topic
 	readerID           int64
+	unregisterMetric   *func() error
 }
 
 func (r *Reader) TopicOnReaderStart(consumer string, err error) {
@@ -114,6 +115,18 @@ func NewReader(
 		readerID:           readerID,
 	}
 
+	if cfg.Metrics.Meter != nil {
+		registration, err := topicreadercommon.RegisterPartitionSessionCount(
+			cfg.Metrics, consumer, cfg.ReadSelectors, reader.PartitionSessionCounts,
+		)
+		if err != nil {
+			return Reader{}, xerrors.WithStackTrace(err)
+		}
+		// Keep the public Reader comparable without wrapping the backend handle.
+		res.unregisterMetric = &registration
+	}
+	reader.start()
+
 	return res, nil
 }
 
@@ -138,7 +151,12 @@ func (r *Reader) Tracer() *trace.Topic {
 }
 
 func (r *Reader) Close(ctx context.Context) error {
-	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
+	var metricErr error
+	if r.unregisterMetric != nil {
+		metricErr = (*r.unregisterMetric)()
+	}
+
+	return errors.Join(metricErr, r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed)))
 }
 
 func (r *Reader) PopBatchTx(
@@ -261,6 +279,7 @@ type ReaderConfig struct {
 
 	RetrySettings      topic.RetrySettings
 	DefaultBatchConfig ReadMessageBatchOptions
+	Metrics            topicreadercommon.ReaderMetricsConfig
 }
 
 type PublicReaderOption func(cfg *ReaderConfig)

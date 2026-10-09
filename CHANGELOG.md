@@ -1,3 +1,6 @@
+* Added experimental `ydb.WithMeter` with direct backend callback registration and `ydb.topic.reader.partition_session.count` for topic readers and listeners
+* Added experimental callback-based observable int64 gauge registration with a backend-independent `telemetry.Meter` function
+
 ## v3.155.0
 * Fixed query result decoding to preserve nested optional values and Pg NULLs
 * Added experimental `query.WithResultFormatArrow(ipc.NewReader, opts...)`, `ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader, opts...)` and `query.WithYdbValue`, preserving the Query Service row and scan APIs without an Arrow Go dependency
