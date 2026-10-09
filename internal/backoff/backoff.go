@@ -97,16 +97,22 @@ func New(opts ...option) logBackoff {
 
 // Delay returns mapping of i to Delay.
 func (b logBackoff) Delay(i int) time.Duration {
-	s := b.slotDuration
-	if s <= 0 {
-		s = time.Second
-	}
-	n := 1 << min(uint(i), max(1, b.ceiling))
-	d := s * time.Duration(n)
+	d := b.MaxDelay(i)
 	f := time.Duration(math.Min(1, math.Abs(b.jitterLimit)) * float64(d))
 	if f == d {
 		return f
 	}
 
 	return f + time.Duration(b.r.Int64(int64(d-f)+1))
+}
+
+// MaxDelay returns the maximum possible delay for an attempt, including jitter.
+func (b logBackoff) MaxDelay(i int) time.Duration {
+	s := b.slotDuration
+	if s <= 0 {
+		s = time.Second
+	}
+	n := 1 << min(uint(i), max(1, b.ceiling))
+
+	return s * time.Duration(n)
 }

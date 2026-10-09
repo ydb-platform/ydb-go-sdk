@@ -1,4 +1,4 @@
-FROM golang:1.26 AS build
+FROM golang:1.27 AS build
 
 # Copy dependency manifests first so module download is cached when only source changes.
 COPY go.mod go.sum /src/

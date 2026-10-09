@@ -4,6 +4,7 @@ package conversation
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
@@ -294,9 +295,7 @@ func (c *Controller) sendFront() *Ydb_Coordination.SessionRequest {
 		return nil
 	}
 
-	for i := len(c.queue) - 1; i >= 0; i-- {
-		req := c.queue[i]
-
+	for i, req := range slices.Backward(c.queue) {
 		if req.canceled && req.cancelRequestSent == nil {
 			req.sendCancel()
 			c.notify()
@@ -363,8 +362,7 @@ func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool {
 
 	notify := false
 	handled := false
-	for i := len(c.queue) - 1; i >= 0; i-- {
-		req := c.queue[i]
+	for i, req := range slices.Backward(c.queue) {
 		if req.requestSent == nil {
 			continue
 		}
@@ -433,8 +431,7 @@ func (c *Controller) OnDetach() {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	for i := len(c.queue) - 1; i >= 0; i-- {
-		req := c.queue[i]
+	for i, req := range slices.Backward(c.queue) {
 		if req.resultDelivered && req.notifyFilter != nil {
 			c.abandon(req)
 			c.queue = append(c.queue[:i], c.queue[i+1:]...)
@@ -460,8 +457,7 @@ func (c *Controller) Close(byeConversation *Conversation) {
 
 	c.closed = true
 
-	for i := len(c.queue) - 1; i >= 0; i-- {
-		req := c.queue[i]
+	for i, req := range slices.Backward(c.queue) {
 		if req.resultDelivered {
 			c.abandon(req)
 			// Remove abandoned conversations from the queue, same as OnDetach. Otherwise a late
@@ -515,8 +511,7 @@ func (c *Controller) OnAttach() {
 	defer c.mutex.Unlock()
 
 	notify := false
-	for i := len(c.queue) - 1; i >= 0; i-- {
-		req := c.queue[i]
+	for _, req := range slices.Backward(c.queue) {
 		if req.idempotent && req.requestSent != nil {
 			c.releaseConflict(req)
 
@@ -555,8 +550,7 @@ func (c *Controller) cancel(conversation *Conversation) bool {
 		c.notify()
 	} else {
 		// If the response has not been sent, just remove it from the queue.
-		for i := len(c.queue) - 1; i >= 0; i-- {
-			req := c.queue[i]
+		for i, req := range slices.Backward(c.queue) {
 			if req == conversation {
 				c.queue = append(c.queue[:i], c.queue[i+1:]...)
 

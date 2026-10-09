@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/querytimestamp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -38,6 +40,7 @@ type executeSettings interface {
 	UserProvidedTxControl() bool
 	IssuesOpts() func([]*Ydb_Issue.IssueMessage)
 	ResponsePartPrefetch() int
+	ArrowDecoder() arrow.Decoder
 }
 
 type executeScriptConfig interface {
@@ -103,6 +106,10 @@ func executeQueryRequest(
 		ResponsePartLimitBytes: cfg.ResponsePartLimitSizeBytes(),
 	}
 
+	if cfg.ArrowDecoder() != nil {
+		request.ResultSetFormat = Ydb.ResultSet_FORMAT_ARROW
+	}
+
 	return request, cfg.CallOptions(), nil
 }
 
@@ -153,6 +160,7 @@ func execute(
 	// CancelFunc fires once when the user closes the streamResult.
 	r, err := newResult(executeCtx, stream, append(opts,
 		withStreamResultStatsCallback(settings.StatsCallback()),
+		withArrowDecoder(settings.ArrowDecoder()),
 		withStreamResultOnClose(executeCancel),
 		withStreamCancel(executeCancel),
 	)...)
@@ -198,6 +206,7 @@ func readResultSet(ctx context.Context, r *streamResult) (_ *resultSetWithClose,
 func readMaterializedResultSet(ctx context.Context, r *streamResult) (
 	_ *materializedResultSet, rowsCount int, finalErr error,
 ) {
+	r.retainArrowBatches = true
 	defer func() {
 		_ = r.Close(ctx)
 	}()
@@ -229,5 +238,8 @@ func readMaterializedResultSet(ctx context.Context, r *streamResult) (
 		return nil, 0, xerrors.WithStackTrace(err)
 	}
 
-	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), len(rows), nil
+	materialized := MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows)
+	materialized.closeArrow = r.takeArrowBatches()
+
+	return materialized, len(rows), nil
 }

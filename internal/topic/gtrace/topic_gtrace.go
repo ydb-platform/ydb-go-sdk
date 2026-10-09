@@ -2389,7 +2389,7 @@ func TopicOnWriterAfterFinishTransaction(t *trace.Topic, c *context.Context, e e
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnWriterCompressMessages(t *trace.Topic, c *context.Context, writerInstanceID string, sessionID string, codec int32, firstSeqNo int64, messagesCount int, reason trace.TopicWriterCompressMessagesReason) func(error) {
+func TopicOnWriterCompressMessages(t *trace.Topic, c *context.Context, writerInstanceID string, sessionID string, codec int32, firstSeqNo int64, messagesCount int, reason trace.TopicWriterCompressMessagesReason) func(_ error, uncompressedSize int, compressedSize int) {
 	var p trace.TopicWriterCompressMessagesStartInfo
 	p.Context = c
 	p.WriterInstanceID = writerInstanceID
@@ -2399,9 +2399,11 @@ func TopicOnWriterCompressMessages(t *trace.Topic, c *context.Context, writerIns
 	p.MessagesCount = messagesCount
 	p.Reason = reason
 	res := onWriterCompressMessages(t, p)
-	return func(e error) {
+	return func(e error, uncompressedSize int, compressedSize int) {
 		var p trace.TopicWriterCompressMessagesDoneInfo
 		p.Error = e
+		p.UncompressedSize = uncompressedSize
+		p.CompressedSize = compressedSize
 		res(p)
 	}
 }

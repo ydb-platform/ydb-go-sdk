@@ -39,7 +39,7 @@ type (
 	ExecuteQuery options.MetadataExecuteQuery
 )
 
-func (*ImportFromS3) fromProto(metadata *anypb.Any) *ImportFromS3 { //nolint:unused
+func (*ImportFromS3) fromProto(metadata *anypb.Any) *ImportFromS3 {
 	var pb Ydb_Import.ImportFromS3Metadata
 	if err := metadata.UnmarshalTo(&pb); err != nil {
 		panic(err)
@@ -58,7 +58,7 @@ func (*ImportFromS3) fromProto(metadata *anypb.Any) *ImportFromS3 { //nolint:unu
 	}
 }
 
-func (*ExportToS3) fromProto(metadata *anypb.Any) *ExportToS3 { //nolint:unused
+func (*ExportToS3) fromProto(metadata *anypb.Any) *ExportToS3 {
 	var pb Ydb_Export.ExportToS3Metadata
 	if err := metadata.UnmarshalTo(&pb); err != nil {
 		panic(err)
@@ -77,7 +77,7 @@ func (*ExportToS3) fromProto(metadata *anypb.Any) *ExportToS3 { //nolint:unused
 	}
 }
 
-func (*ExportToYT) fromProto(metadata *anypb.Any) *ExportToYT { //nolint:unused
+func (*ExportToYT) fromProto(metadata *anypb.Any) *ExportToYT {
 	var pb Ydb_Export.ExportToYtMetadata
 	if err := metadata.UnmarshalTo(&pb); err != nil {
 		panic(err)
@@ -96,11 +96,11 @@ func (*ExportToYT) fromProto(metadata *anypb.Any) *ExportToYT { //nolint:unused
 	}
 }
 
-func (*ExecuteQuery) fromProto(metadata *anypb.Any) *ExecuteQuery { //nolint:unused
+func (*ExecuteQuery) fromProto(metadata *anypb.Any) *ExecuteQuery {
 	return (*ExecuteQuery)(options.ToMetadataExecuteQuery(metadata))
 }
 
-func (*BuildIndex) fromProto(metadata *anypb.Any) *BuildIndex { //nolint:unused
+func (*BuildIndex) fromProto(metadata *anypb.Any) *BuildIndex {
 	var pb Ydb_Table.IndexBuildMetadata
 	if err := metadata.UnmarshalTo(&pb); err != nil {
 		panic(err)

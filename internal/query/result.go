@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/querytimestamp"
@@ -39,6 +40,7 @@ type (
 		resultSets      []result.Set
 		idx             int
 		commitTimestamp *query.VirtualTimestamp
+		closeArrow      func()
 	}
 	streamResult struct {
 		stream                   Ydb_Query_V1.QueryService_ExecuteQueryClient
@@ -60,7 +62,10 @@ type (
 		// is wired up by execute() to point at the executeCtx CancelFunc and
 		// invoked on demand from nextPart so that a Recv blocked on the wire
 		// can be unblocked when the caller's ctx is cancelled mid-flight.
-		streamCancel context.CancelFunc
+		streamCancel       context.CancelFunc
+		arrowDecoder       arrow.Decoder
+		arrowBatches       []arrow.Batch
+		retainArrowBatches bool
 	}
 	resultOption func(s *streamResult)
 )
@@ -113,6 +118,10 @@ func (r *streamResult) ResultSets(ctx context.Context) xiter.Seq2[result.Set, er
 }
 
 func (r *materializedResult) Close(ctx context.Context) error {
+	if r.closeArrow != nil {
+		r.closeArrow()
+	}
+
 	return nil
 }
 
@@ -126,6 +135,12 @@ func (r *materializedResult) NextResultSet(ctx context.Context) (result.Set, err
 	}()
 
 	return r.resultSets[r.idx], nil
+}
+
+func withArrowDecoder(decoder arrow.Decoder) resultOption {
+	return func(s *streamResult) {
+		s.arrowDecoder = decoder
+	}
 }
 
 func withStreamResultTrace(t *trace.Query) resultOption {
@@ -250,6 +265,7 @@ func newResult(
 	return &r, nil
 }
 
+//nolint:funlen // Keep response-part lifetime and stream error handling in one place.
 func (r *streamResult) nextPart(ctx context.Context) (
 	part *Ydb_Query.ExecuteQueryResponsePart, finishErr error,
 ) {
@@ -291,6 +307,9 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		defer stop()
 	}
 
+	if !r.retainArrowBatches {
+		r.releaseArrowBatches()
+	}
 	part, err := nextPart(r.stream)
 	if part != nil {
 		issues := part.GetIssues()
@@ -357,6 +376,7 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	defer r.onClose()
+	defer r.releaseArrowBatches()
 
 	if r.stream != nil && r.stream.Context().Err() != nil {
 		// Stream already torn down (EOF, per-call ctx cancel, or prior Close).
@@ -419,6 +439,7 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishE
 			r.resultSetIndex = resultSetIndex
 			rs := newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart)
 			rs.notifyError = r.notifyNextPartErr
+			rs.decodeArrow = r.decodeArrowBatches
 
 			return rs, nil
 		}
@@ -564,7 +585,9 @@ func exactlyOneResultSetFromResult(ctx context.Context, r result.Result) (rs res
 	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
 }
 
+//nolint:funlen // Group result sets and transfer Arrow batch ownership together.
 func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Result, error) {
+	r.retainArrowBatches = true
 	type resultSet struct {
 		rows    []query.Row
 		columns []*Ydb.Column
@@ -579,8 +602,20 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 			rs.columns = r.lastPart.GetResultSet().GetColumns()
 		}
 
-		for i := range r.lastPart.GetResultSet().GetRows() {
-			rs.rows = append(rs.rows, NewRow(rs.columns, r.lastPart.GetResultSet().GetRows()[i]))
+		if r.lastPart.GetResultSet().GetFormat() == Ydb.ResultSet_FORMAT_ARROW {
+			batches, err := r.decodeArrowBatches(ctx, rs.columns, r.lastPart.GetResultSet())
+			if err != nil {
+				return nil, xerrors.WithStackTrace(r.notifyNextPartErr(ctx, err))
+			}
+			for _, data := range batches {
+				for i := range data.rows {
+					rs.rows = append(rs.rows, &data.rows[i])
+				}
+			}
+		} else {
+			for i := range r.lastPart.GetResultSet().GetRows() {
+				rs.rows = append(rs.rows, NewRow(rs.columns, r.lastPart.GetResultSet().GetRows()[i]))
+			}
 		}
 		resultSetByIndex[curIndex] = rs
 
@@ -614,5 +649,6 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 	return &materializedResult{
 		resultSets:      resultSets,
 		commitTimestamp: r.CommitTimestamp(),
+		closeArrow:      r.takeArrowBatches(),
 	}, nil
 }
