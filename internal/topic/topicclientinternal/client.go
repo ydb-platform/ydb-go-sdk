@@ -449,7 +449,7 @@ func (c *Client) StartTransactionalWriter(
 		return topicwriter.NewTxWriterWrapper(multiWriterWithTx), nil
 	}
 
-	if len(opts) == 0 {
+	if cfg.CanPool() {
 		writer, err := c.reconnectorPool.Get(cfg)
 		if err != nil {
 			return nil, err
@@ -474,7 +474,7 @@ func (c *Client) createWriterConfig(
 	topicPath string,
 	opts []topicoptions.WriterOption,
 ) topicwriterinternal.WriterReconnectorConfig {
-	options := make([]topicwriterinternal.PublicWriterOption, 0, len(opts)+5)
+	options := make([]topicwriterinternal.PublicWriterOption, 0, len(opts)+6)
 	options = append(
 		options,
 		topicwriterinternal.WithRawClient(&c.rawClient),
@@ -482,6 +482,7 @@ func (c *Client) createWriterConfig(
 		topicwriterinternal.WithCommonConfig(c.cfg.Common),
 		topicwriterinternal.WithTrace(c.cfg.Trace),
 		topicwriterinternal.WithCredentials(c.cred),
+		topicwriterinternal.WithPoolBaseline(),
 	)
 
 	options = append(options, opts...)

@@ -2,6 +2,7 @@ package topicwriterinternal
 
 import (
 	"context"
+	"slices"
 	"sync"
 )
 
@@ -25,23 +26,30 @@ func (p *ReconnectorPool) Get(cfg WriterReconnectorConfig) (*WriterReconnector, 
 	}
 
 	writers := p.idle[cfg.topic]
-	for len(writers) > 0 {
-		w := writers[len(writers)-1]
-		writers = writers[:len(writers)-1]
-		p.idle[cfg.topic] = writers
+	for i, w := range slices.Backward(writers) {
 		select {
 		case <-w.background.Done():
+			writers = append(writers[:i], writers[i+1:]...)
+
 			continue
 		default:
 		}
+		if !w.cfg.PoolCompatible(cfg) {
+			continue
+		}
+		p.idle[cfg.topic] = append(writers[:i], writers[i+1:]...)
 
 		return w, nil
+	}
+	if p.idle != nil {
+		p.idle[cfg.topic] = writers
 	}
 
 	return p.create(cfg)
 }
 
 func (p *ReconnectorPool) Put(w *WriterReconnector, reusable bool) {
+	reusable = reusable && w.cfg.CanPool()
 	if reusable {
 		select {
 		case <-w.background.Done():

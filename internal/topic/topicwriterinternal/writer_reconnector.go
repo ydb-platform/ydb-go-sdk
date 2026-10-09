@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"reflect"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -91,6 +92,11 @@ type WriterReconnectorConfig struct {
 	directWriteEnabled bool
 
 	connectTimeout time.Duration
+
+	generatedProducerID bool
+	poolBaselineTracer  *trace.Topic
+	customConnect       bool
+	customLogContext    bool
 }
 
 func (cfg *WriterReconnectorConfig) validate() error {
@@ -175,6 +181,7 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		f(&cfg)
 	}
 
+	cfg.customLogContext = cfg.LogContext != nil
 	if cfg.LogContext == nil {
 		cfg.LogContext = context.Background()
 	}
@@ -188,9 +195,11 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 	}
 
 	if cfg.producerID == "" {
+		cfg.generatedProducerID = true
 		WithProducerID(uuid.NewString())(&cfg)
 	}
 
+	cfg.customConnect = cfg.Connect != nil
 	if cfg.Connect == nil {
 		var connector ConnectFunc = func(ctx context.Context, tracer *trace.Topic) (
 			RawTopicWriterStream,
@@ -203,6 +212,46 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 	}
 
 	return cfg
+}
+
+// CanPool reports whether a reconnector can safely retain this configuration
+// across transactional writers. The client records its tracer before user options.
+func (cfg WriterReconnectorConfig) CanPool() bool {
+	if cfg.MultiMode || cfg.MultiWriterConfig != nil || cfg.customConnect || cfg.customLogContext ||
+		cfg.OnWriterInitResponseCallback != nil || cfg.OnAckReceivedCallback != nil ||
+		len(cfg.AdditionalEncoders) != 0 || cfg.RetrySettings.CheckError != nil ||
+		cfg.Common.PanicCallback() != nil || !reflect.DeepEqual(cfg.Common.TraceRetry(), &trace.Retry{}) {
+		return false
+	}
+	if cfg.poolBaselineTracer != nil {
+		return cfg.Tracer == cfg.poolBaselineTracer
+	}
+
+	return reflect.DeepEqual(cfg.Tracer, &trace.Topic{})
+}
+
+// PoolCompatible compares the effective writer configuration. Generated producer
+// IDs are ignored so default writers can reuse the identity of an idle session.
+func (cfg WriterReconnectorConfig) PoolCompatible(other WriterReconnectorConfig) bool {
+	if !cfg.CanPool() || !other.CanPool() {
+		return false
+	}
+	if cfg.generatedProducerID != other.generatedProducerID {
+		return false
+	}
+	if cfg.generatedProducerID {
+		cfg.producerID = ""
+		other.producerID = ""
+		if cfg.partitioning.Type == rawtopicwriter.PartitioningMessageGroupID {
+			cfg.partitioning.MessageGroupID = ""
+			other.partitioning.MessageGroupID = ""
+		}
+	}
+	cfg.Connect, other.Connect = nil, nil
+	cfg.Tracer, other.Tracer = nil, nil
+	cfg.poolBaselineTracer, other.poolBaselineTracer = nil, nil
+
+	return reflect.DeepEqual(cfg, other)
 }
 
 type WriterReconnector struct {

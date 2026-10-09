@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestReconnectorPool_ReusesOnlyCompletedTransactions(t *testing.T) {
@@ -82,6 +83,55 @@ func TestReconnectorPool_WaitInitInfoReflectsPreviousCommittedWrites(t *testing.
 	info, err := writer.WaitInitInfo(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, int64(5), info.LastSeqNum)
+}
+
+func TestReconnectorPool_DoesNotReuseDifferentProducer(t *testing.T) {
+	pool := newStoppedReconnectorPool()
+	firstCfg := NewWriterReconnectorConfig(WithTopic("topic"), WithProducerID("first"))
+	secondCfg := NewWriterReconnectorConfig(WithTopic("topic"), WithProducerID("second"))
+	first := mustGetReconnector(t, pool, firstCfg)
+	pool.Put(first, true)
+
+	second := mustGetReconnector(t, pool, secondCfg)
+	require.NotSame(t, first, second)
+	require.Equal(t, "second", second.cfg.ProducerID())
+}
+
+func TestReconnectorPool_ReusesMatchingWriterOptions(t *testing.T) {
+	pool := newStoppedReconnectorPool()
+	firstCfg := NewWriterReconnectorConfig(WithTopic("topic"), WithProducerID("producer"), WithDirectWrite(false))
+	secondCfg := NewWriterReconnectorConfig(WithTopic("topic"), WithProducerID("producer"), WithDirectWrite(false))
+	first := mustGetReconnector(t, pool, firstCfg)
+	pool.Put(first, true)
+
+	require.Same(t, first, mustGetReconnector(t, pool, secondCfg))
+}
+
+func TestReconnectorPool_DoesNotReuseDifferentWriterOptions(t *testing.T) {
+	pool := newStoppedReconnectorPool()
+	firstCfg := NewWriterReconnectorConfig(WithTopic("topic"), WithProducerID("producer"))
+	secondCfg := NewWriterReconnectorConfig(WithTopic("topic"), WithProducerID("producer"), WithMaxQueueLen(2))
+	first := mustGetReconnector(t, pool, firstCfg)
+	pool.Put(first, true)
+
+	require.NotSame(t, first, mustGetReconnector(t, pool, secondCfg))
+	require.Same(t, first, mustGetReconnector(t, pool, firstCfg), "incompatible idle writer remains in the pool")
+}
+
+func TestReconnectorPool_DoesNotPoolWriterSpecificTrace(t *testing.T) {
+	baseline := WithTrace(&trace.Topic{})
+	tracedCfg := NewWriterReconnectorConfig(WithTopic("topic"), baseline, WithPoolBaseline(), WithTrace(&trace.Topic{}))
+	require.False(t, tracedCfg.CanPool())
+
+	plainCfg := NewWriterReconnectorConfig(WithTopic("topic"), baseline, WithPoolBaseline())
+	require.True(t, plainCfg.CanPool())
+}
+
+func TestReconnectorPool_DoesNotPoolWriterSpecificCallback(t *testing.T) {
+	cfg := NewWriterReconnectorConfig(WithTopic("topic"), func(cfg *WriterReconnectorConfig) {
+		cfg.OnAckReceivedCallback = func(int64) {}
+	})
+	require.False(t, cfg.CanPool())
 }
 
 func newStoppedReconnectorPool() *ReconnectorPool {
