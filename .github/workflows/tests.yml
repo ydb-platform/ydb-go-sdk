@@ -162,3 +162,20 @@ jobs:
           name: experiment
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  strict-serializable-integration:
+    if: >-
+      github.event_name != 'schedule' &&
+      !contains(github.event.pull_request.labels.*.name, 'no tests') &&
+      !contains(github.event.pull_request.labels.*.name, 'no integration tests')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.26.x
+          cache: true
+      - name: Run StrictSerializableRW integration tests
+        run: bash .github/scripts/strict-serializable-integration.sh
