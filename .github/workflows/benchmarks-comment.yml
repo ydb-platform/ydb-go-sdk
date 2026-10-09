@@ -1,0 +1,153 @@
+name: benchmarks-comment
+
+on:
+  workflow_run:
+    workflows: [benchmarks]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+
+jobs:
+  comment:
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout trusted report renderer
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          persist-credentials: false
+
+      - name: Find benchmark artifact
+        id: artifact
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const run = context.payload.workflow_run;
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              owner, repo, run_id: run.id, per_page: 100,
+            });
+            const artifact = artifacts.find(item => item.name === 'benchmark-results' && !item.expired);
+            const preview = artifacts.find(item => item.name === 'benchstat-all.txt' && !item.expired);
+            if (!artifact || !preview) {
+              core.info('Benchmark artifacts are missing; comparison job was skipped');
+              return;
+            }
+            core.setOutput('found', 'true');
+            core.setOutput('url',
+              `https://github.com/${owner}/${repo}/actions/runs/${run.id}/artifacts/${artifact.id}`);
+            core.setOutput('preview_url',
+              `https://github.com/${owner}/${repo}/actions/runs/${run.id}/artifacts/${preview.id}`);
+
+      - name: Download benchmark results
+        if: steps.artifact.outputs.found == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate artifact metadata and pull request
+        id: validate
+        if: steps.artifact.outputs.found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const run = context.payload.workflow_run;
+            const metadata = JSON.parse(fs.readFileSync('benchmark-results/metadata.json', 'utf8'));
+            const sha = /^[0-9a-f]{40}$/;
+            if (!Number.isSafeInteger(metadata.pr) || metadata.pr <= 0 ||
+                !Number.isSafeInteger(metadata.run_id) || metadata.run_id !== run.id ||
+                !sha.test(metadata.master_sha) || !sha.test(metadata.head_sha) ||
+                metadata.head_sha !== run.head_sha) {
+              throw new Error('Invalid benchmark artifact metadata');
+            }
+            if (run.pull_requests?.length &&
+                !run.pull_requests.some(pr => pr.number === metadata.pr)) {
+              throw new Error('Benchmark artifact belongs to another pull request');
+            }
+
+            const { owner, repo } = context.repo;
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: metadata.pr });
+            const labels = new Set(pr.labels.map(label => label.name));
+            if (pr.state !== 'open' || pr.base.ref !== 'master' ||
+                pr.head.sha !== metadata.head_sha ||
+                !(labels.has('run_benchmarks') || labels.has('run_sdk_benchmarks') || labels.has('run_intergration_benchmarks'))) {
+              core.info('Pull request changed or benchmark label was removed; skipping stale report');
+              return;
+            }
+
+            core.setOutput('publish', 'true');
+            core.setOutput('pr_number', metadata.pr);
+            core.setOutput('master_sha', metadata.master_sha);
+            core.setOutput('head_sha', metadata.head_sha);
+
+      - name: Render compact report
+        if: steps.validate.outputs.publish == 'true'
+        env:
+          ARTIFACT_URL: ${{ steps.artifact.outputs.url }}
+          PREVIEW_URL: ${{ steps.artifact.outputs.preview_url }}
+          MASTER_SHA: ${{ steps.validate.outputs.master_sha }}
+          HEAD_SHA: ${{ steps.validate.outputs.head_sha }}
+        run: |
+          python3 .github/scripts/benchmark_report.py \
+            --csv benchmark-results/benchstat.csv \
+            --artifact-url "$ARTIFACT_URL" \
+            --preview-url "$PREVIEW_URL" \
+            --master-sha "$MASTER_SHA" \
+            --head-sha "$HEAD_SHA" \
+            --output benchmark-report.md
+
+      - name: Update one PR comment
+        if: steps.validate.outputs.publish == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const metadata = JSON.parse(fs.readFileSync('benchmark-results/metadata.json', 'utf8'));
+            const { owner, repo } = context.repo;
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: metadata.pr });
+            const labels = new Set(pr.labels.map(label => label.name));
+            if (pr.state !== 'open' || pr.base.ref !== 'master' ||
+                pr.head.sha !== metadata.head_sha ||
+                !(labels.has('run_benchmarks') || labels.has('run_sdk_benchmarks') || labels.has('run_intergration_benchmarks'))) {
+              core.info('Pull request changed while rendering; skipping stale report');
+              return;
+            }
+
+            const report = fs.readFileSync('benchmark-report.md', 'utf8');
+            if (!report.startsWith('<!-- benchmark-report -->') || report.length > 55000) {
+              throw new Error('Invalid or oversized benchmark report');
+            }
+            const runId = context.payload.workflow_run.id;
+            const body = report.replace('<!-- benchmark-report -->',
+              `<!-- benchmark-report -->\n<!-- benchmark-run-id: ${runId} -->`);
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: metadata.pr, per_page: 100,
+            });
+            const markers = ['<!-- benchmark-report -->', '<!-- sdk-benchstat -->', '<!-- integration-benchstat -->'];
+            const managed = comments.filter(comment =>
+              comment.user?.login === 'github-actions[bot]' &&
+              markers.some(marker => comment.body?.startsWith(marker)));
+            const previous = managed.find(comment => comment.body.startsWith(markers[0])) || managed[0];
+            const previousRun = previous?.body.match(/<!-- benchmark-run-id: (\d+) -->/);
+            if (previousRun && Number(previousRun[1]) > runId) {
+              core.info('A newer benchmark run already updated the comment');
+              return;
+            }
+            if (previous) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: previous.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: metadata.pr, body });
+            }
+            for (const stale of managed) {
+              if (stale.id !== previous?.id) {
+                await github.rest.issues.deleteComment({ owner, repo, comment_id: stale.id });
+              }
+            }
