@@ -16,10 +16,12 @@ type partitionWriterPool struct {
 	cfg       *MultiWriterConfig
 	writerCfg *topicwriterinternal.WriterReconnectorConfig
 	bg        *background.Worker
+	maxSeqNo  *seqNoCounter
 
-	mu      xsync.Mutex
-	writers map[int64]*writerWrapper
-	idle    *idleWriterManager
+	mu        xsync.Mutex
+	writers   map[int64]*writerWrapper
+	replacing map[int64]chan struct{}
+	idle      *idleWriterManager
 
 	ackCallback            func(partitionID int64, seqNo int64)
 	partitionSplitCallback func(partitionID int64)
@@ -32,6 +34,7 @@ func newPartitionWriterPool(
 	cfg *MultiWriterConfig,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	bg *background.Worker,
+	maxSeqNo *seqNoCounter,
 	ackCallback func(partitionID int64, seqNo int64),
 	partitionSplitCallback func(partitionID int64),
 	onWriterInit func(),
@@ -42,11 +45,13 @@ func newPartitionWriterPool(
 		writerCfg:              writerCfg,
 		ctx:                    ctx,
 		bg:                     bg,
+		maxSeqNo:               maxSeqNo,
 		ackCallback:            ackCallback,
 		partitionSplitCallback: partitionSplitCallback,
 		onWriterInit:           onWriterInit,
 		onError:                onError,
 		writers:                make(map[int64]*writerWrapper),
+		replacing:              make(map[int64]chan struct{}),
 		idle:                   newIdleWriterManager(ctx, cfg.WriterIdleTimeout),
 	}
 
@@ -125,39 +130,70 @@ func (p *partitionWriterPool) createNonDirectWriter(partitionID int64) (writer, 
 	return writer, err
 }
 
+//nolint:funlen
 func (p *partitionWriterPool) get(partitionID int64, direct bool) (*writerWrapper, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	for {
+		var (
+			result   *writerWrapper
+			err      error
+			old      writer
+			wait     <-chan struct{}
+			finished chan struct{}
+		)
+		p.mu.WithLock(func() {
+			if err = p.ctx.Err(); err != nil {
+				return
+			}
+			if wait = p.replacing[partitionID]; wait != nil {
+				return
+			}
 
-	finish := func() (*writerWrapper, error) {
-		return p.createNewWriter(partitionID, direct)
-	}
+			if existing := p.writers[partitionID]; existing != nil {
+				if existing.direct == direct {
+					result = existing
 
-	existingWriter, ok := p.writers[partitionID]
-	if ok {
-		if existingWriter.direct != direct {
-			p.forceEvictNeedLock(partitionID)
+					return
+				}
+				delete(p.writers, partitionID)
+				old = existing
+			} else if idle, ok := p.idle.getWriterIfExists(partitionID); ok {
+				if idle.direct == direct {
+					p.writers[partitionID] = idle
+					result = idle
 
-			return finish()
+					return
+				}
+				old = idle
+			}
+			if old == nil {
+				result, err = p.createNewWriter(partitionID, direct)
+
+				return
+			}
+			finished = make(chan struct{})
+			p.replacing[partitionID] = finished
+		})
+		if wait != nil {
+			select {
+			case <-wait:
+				continue
+			case <-p.ctx.Done():
+				return nil, p.ctx.Err()
+			}
+		}
+		if old != nil {
+			_ = old.Close(p.ctx)
+			p.mu.WithLock(func() {
+				if err = p.ctx.Err(); err == nil {
+					result, err = p.createNewWriter(partitionID, direct)
+				}
+				delete(p.replacing, partitionID)
+				close(finished)
+			})
 		}
 
-		return existingWriter, nil
+		return result, err
 	}
-
-	idleWriter, ok := p.idle.getWriterIfExists(partitionID)
-	if ok {
-		if idleWriter.direct != direct {
-			_ = idleWriter.Close(p.ctx)
-
-			return finish()
-		}
-
-		p.writers[partitionID] = idleWriter
-
-		return idleWriter, nil
-	}
-
-	return finish()
 }
 
 func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*writerWrapper, error) {
@@ -179,8 +215,9 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 	}
 
 	wrapper := &writerWrapper{
-		writer: wr,
-		direct: direct,
+		writer:     wr,
+		direct:     direct,
+		initDoneCh: make(chan struct{}),
 	}
 	p.writers[partitionID] = wrapper
 	if !direct {
@@ -188,56 +225,79 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 	}
 
 	p.bg.Start(fmt.Sprintf("writer-init-%d", partitionID), func(ctx context.Context) {
-		_, err := wr.WaitInitInfo(ctx)
+		info, err := wr.WaitInitInfo(ctx)
+		if err == nil {
+			p.maxSeqNo.advance(info.LastSeqNum)
+		}
 		wrapper.setInitErr(err)
 
 		wrapper.initDone.Store(true)
+		close(wrapper.initDoneCh)
 		p.onWriterInit()
 	})
 
 	return wrapper, nil
 }
 
-func (p *partitionWriterPool) forceEvict(partitionID int64) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.forceEvictNeedLock(partitionID)
-}
-
 func (p *partitionWriterPool) evict(partitionID int64) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	writer, ok := p.writers[partitionID]
-	if !ok {
-		return
+	if old := p.remove(partitionID); old != nil {
+		_ = old.Close(p.ctx)
 	}
-
-	delete(p.writers, partitionID)
-
-	if !writer.direct {
-		_ = writer.Close(p.ctx)
-
-		return
-	}
-
-	p.idle.addWriter(partitionID, writer)
-	p.idle.wakeup()
 }
 
-func (p *partitionWriterPool) forceEvictNeedLock(partitionID int64) {
-	writer, ok := p.writers[partitionID]
-	if !ok {
-		return
-	}
+func (p *partitionWriterPool) remove(partitionID int64) writer {
+	var toClose writer
+	p.mu.WithLock(func() {
+		w := p.writers[partitionID]
+		if w == nil {
+			return
+		}
+		delete(p.writers, partitionID)
+		if w.direct {
+			p.idle.addWriter(partitionID, w)
+			p.idle.wakeup()
+		} else {
+			toClose = w
+		}
+	})
 
-	delete(p.writers, partitionID)
-	_ = writer.Close(p.ctx)
+	return toClose
+}
+
+func (p *partitionWriterPool) discard(partitionID int64, failed *writerWrapper) {
+	p.mu.WithLock(func() {
+		if p.writers[partitionID] != failed {
+			failed = nil
+
+			return
+		}
+		delete(p.writers, partitionID)
+	})
+	if failed != nil {
+		_ = failed.Close(p.ctx)
+	}
 }
 
 func (p *partitionWriterPool) close(ctx context.Context) error {
 	var writersToClose []writer
+	for {
+		var replacing []<-chan struct{}
+		p.mu.WithLock(func() {
+			for _, ch := range p.replacing {
+				replacing = append(replacing, ch)
+			}
+		})
+		if len(replacing) == 0 {
+			break
+		}
+		for _, ch := range replacing {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-ch:
+			}
+		}
+	}
 
 	p.mu.WithLock(func() {
 		writersToClose = make([]writer, 0, len(p.writers))

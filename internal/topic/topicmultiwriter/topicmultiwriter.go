@@ -68,7 +68,7 @@ func (p *MultiWriter) Write(ctx context.Context, messages []topicwriterinternal.
 	}
 
 	// Same idea as WriterReconnector.waitFirstInitResponse: do not process writes until
-	// orchestrator init() finished (describe topic, seq baseline, partition chooser).
+	// orchestrator init() finished (describe topic and set up partition chooser).
 	if err := p.orchestrator.waitInitDone(ctx); err != nil {
 		return err
 	}
