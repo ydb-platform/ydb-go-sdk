@@ -19,10 +19,12 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/stats"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -833,6 +835,51 @@ type mockResolver struct{}
 
 func (r *mockResolver) ResolveNow(resolver.ResolveNowOptions) {}
 func (r *mockResolver) Close()                                {}
+
+func TestNewClosesConnectionAfterDiscoveryFailure(t *testing.T) {
+	var active, calls atomic.Int64
+
+	listener := bufconn.Listen(1024 * 1024)
+	server := grpc.NewServer(
+		grpc.StatsHandler(&serverConnStats{active: &active}),
+		grpc.UnknownServiceHandler(func(any, grpc.ServerStream) error {
+			calls.Add(1)
+
+			return status.Error(codes.NotFound, "synthetic discovery failure")
+		}),
+	)
+	t.Cleanup(func() {
+		server.Stop()
+		_ = listener.Close()
+	})
+
+	go func() { _ = server.Serve(listener) }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cfg := config.New(
+		config.WithEndpoint("127.0.0.1:2135"),
+		config.WithDatabase("/missing"),
+		config.WithBalancer(userBalancers.RandomChoice()),
+		config.WithGrpcOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithContextDialer(func(ctx context.Context, address string) (net.Conn, error) {
+				return listener.DialContext(ctx)
+			}),
+		),
+	)
+
+	for attempt := int64(1); attempt <= 3; attempt++ {
+		pool := conn.NewPool(ctx, cfg)
+		balancer, err := New(ctx, cfg, pool)
+		require.NoError(t, pool.RemoveRef(context.WithoutCancel(ctx)))
+		require.Error(t, err)
+		require.Nil(t, balancer)
+		require.Equal(t, attempt, calls.Load())
+		require.Eventually(t, func() bool { return active.Load() == 0 }, time.Second, time.Millisecond)
+	}
+}
 
 func TestNew(t *testing.T) {
 	t.Run("context already canceled", func(t *testing.T) {
