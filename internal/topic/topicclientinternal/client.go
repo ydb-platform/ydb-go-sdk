@@ -35,6 +35,7 @@ type Client struct {
 	cred                   credentials.Credentials
 	defaultOperationParams rawydb.OperationParams
 	rawClient              rawtopic.Client
+	reconnectorPool        *topicwriterinternal.ReconnectorPool
 }
 
 func New(
@@ -55,6 +56,7 @@ func New(
 		cred:                   cred,
 		defaultOperationParams: defaultOperationParams,
 		rawClient:              rawClient,
+		reconnectorPool:        topicwriterinternal.NewReconnectorPool(),
 	}
 }
 
@@ -74,8 +76,8 @@ func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
 }
 
 // Close the client
-func (c *Client) Close(_ context.Context) error {
-	return nil
+func (c *Client) Close(ctx context.Context) error {
+	return c.reconnectorPool.Close(ctx)
 }
 
 // Alter topic options
@@ -447,6 +449,17 @@ func (c *Client) StartTransactionalWriter(
 		return topicwriter.NewTxWriterWrapper(multiWriterWithTx), nil
 	}
 
+	if cfg.CanPool() {
+		writer, err := c.reconnectorPool.Get(cfg)
+		if err != nil {
+			return nil, err
+		}
+
+		txWriter := topicwriterinternal.NewPooledTopicWriterTransaction(writer, internalTx, cfg.Tracer, c.reconnectorPool)
+
+		return topicwriter.NewTxWriterInternal(txWriter), nil
+	}
+
 	writer, err := topicwriterinternal.NewWriterReconnector(cfg)
 	if err != nil {
 		return nil, err
@@ -461,7 +474,7 @@ func (c *Client) createWriterConfig(
 	topicPath string,
 	opts []topicoptions.WriterOption,
 ) topicwriterinternal.WriterReconnectorConfig {
-	options := make([]topicwriterinternal.PublicWriterOption, 0, len(opts)+5)
+	options := make([]topicwriterinternal.PublicWriterOption, 0, len(opts)+6)
 	options = append(
 		options,
 		topicwriterinternal.WithRawClient(&c.rawClient),
@@ -469,6 +482,7 @@ func (c *Client) createWriterConfig(
 		topicwriterinternal.WithCommonConfig(c.cfg.Common),
 		topicwriterinternal.WithTrace(c.cfg.Trace),
 		topicwriterinternal.WithCredentials(c.cred),
+		topicwriterinternal.WithPoolBaseline(),
 	)
 
 	options = append(options, opts...)

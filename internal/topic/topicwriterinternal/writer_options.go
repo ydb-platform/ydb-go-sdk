@@ -196,6 +196,13 @@ func WithTrace(tracer *trace.Topic) PublicWriterOption {
 	}
 }
 
+// WithPoolBaseline records the client tracer before writer-specific options.
+func WithPoolBaseline() PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.poolBaselineTracer = cfg.Tracer
+	}
+}
+
 func WithTopic(topic string) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.topic = topic

@@ -11,16 +11,19 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestTopicReadInTransaction(t *testing.T) {
@@ -175,6 +178,65 @@ func TestTopicWriterTLI(t *testing.T) {
 	content, err := io.ReadAll(batch.Messages[0])
 	scope.Require.NoError(err)
 	scope.Require.Equal("test", string(content))
+}
+
+func TestTopicTransactionalWriterReusesReconnector(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	var streamStarts atomic.Int32
+	db := scope.Driver(ydb.WithTraceTopic(trace.Topic{
+		OnWriterInitStream: func(trace.TopicWriterInitStreamStartInfo) func(trace.TopicWriterInitStreamDoneInfo) {
+			streamStarts.Add(1)
+
+			return nil
+		},
+	}))
+	writerOptions := []topicoptions.WriterOption{
+		topicoptions.WithWriterDirectWrite(false),
+		topicoptions.WithWriterProducerID("pool-integration"),
+	}
+	var firstLastSeqNo int64
+
+	require.NoError(t, db.Query().DoTx(ctx, func(ctx context.Context, transaction query.TxActor) error {
+		writer, err := db.Topic().StartTransactionalWriter(transaction, scope.TopicPath(), writerOptions...)
+		if err != nil {
+			return err
+		}
+		info, err := writer.WaitInitInfo(ctx)
+		if err != nil {
+			return err
+		}
+		firstLastSeqNo = info.LastSeqNum
+
+		return writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("first")})
+	}))
+
+	require.NoError(t, db.Query().DoTx(ctx, func(ctx context.Context, transaction query.TxActor) error {
+		writer, err := db.Topic().StartTransactionalWriter(transaction, scope.TopicPath(), writerOptions...)
+		if err != nil {
+			return err
+		}
+		info, err := writer.WaitInitInfo(ctx)
+		if err != nil {
+			return err
+		}
+		require.Greater(t, info.LastSeqNum, firstLastSeqNo)
+
+		return writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("second")})
+	}))
+	require.Equal(t, int32(1), streamStarts.Load(), "compatible writer options should reuse one StreamWrite session")
+
+	var payloads []string
+	for len(payloads) < 2 {
+		batch, err := scope.TopicReader().ReadMessagesBatch(ctx)
+		require.NoError(t, err)
+		for _, message := range batch.Messages {
+			data, readErr := io.ReadAll(message)
+			require.NoError(t, readErr)
+			payloads = append(payloads, string(data))
+		}
+	}
+	require.Equal(t, []string{"first", "second"}, payloads)
 }
 
 // TestTopicTransactionalWriterWithLazyTx exercises transactional topic writes when the query transaction is lazy

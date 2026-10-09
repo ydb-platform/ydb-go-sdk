@@ -3,6 +3,7 @@ package topicwriterinternal
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
@@ -13,6 +14,35 @@ type WriterWithTransaction struct {
 	streamWriter *WriterReconnector
 	tx           tx.Transaction
 	tracer       *trace.Topic
+	pool         *ReconnectorPool
+	pooledMu     sync.RWMutex
+	closed       bool
+	closeErr     error
+	initialInfo  InitialInfo
+	hasSnapshot  bool
+}
+
+func NewPooledTopicWriterTransaction(
+	w *WriterReconnector,
+	tx tx.Transaction,
+	tracer *trace.Topic,
+	pool *ReconnectorPool,
+) *WriterWithTransaction {
+	res := NewTopicWriterTransaction(w, tx, tracer)
+	res.pool = pool
+	w.m.RLock()
+	res.hasSnapshot = w.initDone
+	res.initialInfo = w.initInfo
+	w.m.RUnlock()
+	if res.hasSnapshot {
+		w.queue.m.RLock()
+		if w.queue.lastSeqNo > res.initialInfo.LastSeqNum {
+			res.initialInfo.LastSeqNum = w.queue.lastSeqNo
+		}
+		w.queue.m.RUnlock()
+	}
+
+	return res
 }
 
 func NewTopicWriterTransaction(w *WriterReconnector, tx tx.Transaction, tracer *trace.Topic) *WriterWithTransaction {
@@ -56,10 +86,26 @@ func (w *WriterWithTransaction) WaitInit(ctx context.Context) error {
 }
 
 func (w *WriterWithTransaction) WaitInitInfo(ctx context.Context) (InitialInfo, error) {
-	return w.streamWriter.WaitInitInfo(ctx)
+	info, err := w.streamWriter.WaitInitInfo(ctx)
+	if err != nil {
+		return InitialInfo{}, err
+	}
+	if w.pool != nil && w.hasSnapshot {
+		return w.initialInfo, nil
+	}
+
+	return info, nil
 }
 
 func (w *WriterWithTransaction) Write(ctx context.Context, messages []PublicMessage) error {
+	if w.pool != nil {
+		w.pooledMu.RLock()
+		defer w.pooledMu.RUnlock()
+		if w.closed {
+			return ErrPublicWriterClosed
+		}
+	}
+
 	if err := w.tx.UnLazy(ctx); err != nil {
 		return fmt.Errorf("ydb: failed to materialize transaction: %w", err)
 	}
@@ -72,6 +118,17 @@ func (w *WriterWithTransaction) Write(ctx context.Context, messages []PublicMess
 }
 
 func (w *WriterWithTransaction) Close(ctx context.Context) error {
+	if w.pool != nil {
+		w.pooledMu.Lock()
+		defer w.pooledMu.Unlock()
+		if !w.closed {
+			w.closed = true
+			w.closeErr = w.streamWriter.Flush(ctx)
+		}
+
+		return w.closeErr
+	}
+
 	return w.streamWriter.Close(ctx)
 }
 
@@ -79,6 +136,13 @@ func (w *WriterWithTransaction) onTransactionCompleted(err error) {
 	// after transaction finished by any reason - the writer closed without flush
 	noNeedFlushCtx, cancel := context.WithCancel(context.Background())
 	cancel()
+
+	if w.pool != nil {
+		_ = w.Close(noNeedFlushCtx)
+		w.pool.Put(w.streamWriter, err == nil && w.closeErr == nil)
+
+		return
+	}
 
 	_ = w.Close(noNeedFlushCtx)
 }
