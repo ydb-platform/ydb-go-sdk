@@ -17,12 +17,6 @@ jobs:
     concurrency:
       group: benchmarks-${{ github.event.pull_request.number }}
       cancel-in-progress: true
-    env:
-      YDB_CONNECTION_STRING: grpc://localhost:2136/local
-      YDB_CONNECTION_STRING_SECURE: grpcs://localhost:2135/local
-      YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
-      YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
-      HIDE_APPLICATION_OUTPUT: 1
     steps:
       - name: Checkout master revision
         uses: actions/checkout@v4
@@ -91,6 +85,12 @@ jobs:
       - name: Benchmark master integration tests
         working-directory: master
         shell: bash
+        env:
+          YDB_CONNECTION_STRING: grpc://localhost:2136/local
+          YDB_CONNECTION_STRING_SECURE: grpcs://localhost:2135/local
+          YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
+          YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
+          HIDE_APPLICATION_OUTPUT: 1
         run: |
           set -euo pipefail
           mkdir -p ../benchmark-results/integration
@@ -100,6 +100,12 @@ jobs:
       - name: Benchmark PR integration tests
         working-directory: pr
         shell: bash
+        env:
+          YDB_CONNECTION_STRING: grpc://localhost:2136/local
+          YDB_CONNECTION_STRING_SECURE: grpcs://localhost:2135/local
+          YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
+          YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
+          HIDE_APPLICATION_OUTPUT: 1
         run: |
           set -euo pipefail
           go test -tags integration -run '^$' -bench . -count=10 -benchmem -cpu=2 -timeout=90m ./tests/integration/... | tee ../benchmark-results/integration/pr.txt
