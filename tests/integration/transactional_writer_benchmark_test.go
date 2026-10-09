@@ -75,8 +75,8 @@ func BenchmarkTransactionalWriterAutoSplit(b *testing.B) {
 
 	txWriterPrepareBenchmark(b, ctx, db, cfg)
 	txWriterWaitForAutoSplit(b, ctx, db, cfg)
-	b.Run("tx", func(b *testing.B) {
-		txWriterRunBenchmark(b, ctx, db, cfg, txWriterAutoSplitBenchmarkPartitions)
+	b.Run(fmt.Sprintf("active-partitions-%d", txWriterAutoSplitBenchmarkPartitions), func(b *testing.B) {
+		txWriterRunBenchmark(b, ctx, db, cfg)
 		activePartitions, err := txWriterActivePartitionCount(ctx, db, cfg.TopicPath)
 		if err != nil {
 			b.Fatal(err)
@@ -146,7 +146,7 @@ func txWriterPrepareBenchmark(b *testing.B, ctx context.Context, db *ydb.Driver,
 	})
 }
 
-func txWriterRunBenchmark(b *testing.B, ctx context.Context, db *ydb.Driver, cfg txWriterConfig, activePartitions int) {
+func txWriterRunBenchmark(b *testing.B, ctx context.Context, db *ydb.Driver, cfg txWriterConfig) {
 	b.Helper()
 
 	payload := txWriterMakePayload(cfg.MessageSize)
@@ -170,9 +170,6 @@ func txWriterRunBenchmark(b *testing.B, ctx context.Context, db *ydb.Driver, cfg
 	workerStats := make([]txWriterWorkerStats, cfg.Concurrency)
 	b.Run("transactions", func(b *testing.B) {
 		b.ReportAllocs()
-		if activePartitions > 0 {
-			b.ReportMetric(float64(activePartitions), "active-partitions")
-		}
 		if err := txWriterRunParallelTransactions(ctx, b, runners, workerStats); err != nil {
 			b.Fatalf("benchmark transaction failed: %v", err)
 		}
@@ -328,7 +325,7 @@ func txWriterRunFixedPartitionBenchmark(b *testing.B, benchmarkCase txWriterStan
 
 	for _, cfg := range configs {
 		b.Run(fmt.Sprintf("p%d", cfg.PreparePartitions), func(b *testing.B) {
-			txWriterRunBenchmark(b, ctx, db, cfg, 0)
+			txWriterRunBenchmark(b, ctx, db, cfg)
 		})
 	}
 }
