@@ -1,0 +1,134 @@
+name: benchmarks
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, reopened, synchronize, labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    # The old suite-specific labels remain aliases for existing pull requests.
+    if: contains(github.event.pull_request.labels.*.name, 'run_benchmarks') || contains(github.event.pull_request.labels.*.name, 'run_sdk_benchmarks') || contains(github.event.pull_request.labels.*.name, 'run_intergration_benchmarks')
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    concurrency:
+      group: benchmarks-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    env:
+      YDB_CONNECTION_STRING: grpc://localhost:2136/local
+      YDB_CONNECTION_STRING_SECURE: grpcs://localhost:2135/local
+      YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
+      YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
+      HIDE_APPLICATION_OUTPUT: 1
+    steps:
+      - name: Checkout master revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: master
+          persist-credentials: false
+
+      - name: Checkout PR revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.x
+          cache-dependency-path: master/go.sum
+
+      - name: Install benchstat
+        run: go install golang.org/x/perf/cmd/benchstat@v0.0.0-20260908200009-22c9c6c9d4da
+
+      - name: Benchmark master SDK packages
+        working-directory: master
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ../benchmark-results/sdk
+          go test -run '^$' -bench . -benchtime=100ms -count=10 -benchmem -cpu=2 -timeout=90m ./... | tee ../benchmark-results/sdk/master.txt
+          grep -q '^Benchmark' ../benchmark-results/sdk/master.txt
+
+      - name: Benchmark PR SDK packages
+        working-directory: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -run '^$' -bench . -benchtime=100ms -count=10 -benchmem -cpu=2 -timeout=90m ./... | tee ../benchmark-results/sdk/pr.txt
+          grep -q '^Benchmark' ../benchmark-results/sdk/pr.txt
+
+      - name: Start local YDB for integration benchmarks
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name ydb -h localhost \
+            -p 2135:2135 -p 2136:2136 -p 8765:8765 \
+            -v /tmp/ydb_certs:/ydb_certs \
+            -e YDB_FEATURE_FLAGS=enable_external_data_sources \
+            -e YDB_LOCAL_SURVIVE_RESTART=true \
+            -e YDB_USE_IN_MEMORY_PDISKS=true \
+            -e YDB_TABLE_ENABLE_PREPARED_DDL=true \
+            -e YDB_ENABLE_COLUMN_TABLES=true \
+            ydbplatform/local-ydb:26.3.1.16
+          for attempt in {1..120}; do
+            status="$(docker inspect --format '{{.State.Health.Status}}' ydb)"
+            if [ "$status" = healthy ]; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs ydb
+          exit 1
+
+      - name: Benchmark master integration tests
+        working-directory: master
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ../benchmark-results/integration
+          go test -tags integration -run '^$' -bench . -count=10 -benchmem -cpu=2 -timeout=90m ./tests/integration/... | tee ../benchmark-results/integration/master.txt
+          grep -q '^Benchmark' ../benchmark-results/integration/master.txt
+
+      - name: Benchmark PR integration tests
+        working-directory: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -tags integration -run '^$' -bench . -count=10 -benchmem -cpu=2 -timeout=90m ./tests/integration/... | tee ../benchmark-results/integration/pr.txt
+          grep -q '^Benchmark' ../benchmark-results/integration/pr.txt
+
+      - name: Compare both suites
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MASTER_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          benchstat="$(go env GOPATH)/bin/benchstat"
+          for suite in sdk integration; do
+            "$benchstat" "master=benchmark-results/$suite/master.txt" "pr=benchmark-results/$suite/pr.txt" > "benchmark-results/$suite/benchstat.txt"
+            "$benchstat" -format csv "master=benchmark-results/$suite/master.txt" "pr=benchmark-results/$suite/pr.txt" > "benchmark-results/$suite/benchstat.csv" 2> "benchmark-results/$suite/benchstat-csv-warnings.txt"
+            test -s "benchmark-results/$suite/benchstat.txt"
+            test -s "benchmark-results/$suite/benchstat.csv"
+          done
+          jq -n --argjson pr "$PR_NUMBER" --argjson run "$GITHUB_RUN_ID" \
+            --arg master "$MASTER_SHA" --arg head "$PR_SHA" \
+            '{pr: $pr, run_id: $run, master_sha: $master, head_sha: $head}' > benchmark-results/metadata.json
+
+      - name: Upload full benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results/
+          if-no-files-found: ignore
+          retention-days: 30
