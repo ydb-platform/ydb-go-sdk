@@ -7,6 +7,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/querytimestamp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -37,19 +38,20 @@ type (
 
 	// executeSettings is a holder for execute settings
 	executeSettings struct {
-		syntax                 Syntax
-		params                 params.Parameters
-		execMode               ExecMode
-		statsMode              StatsMode
-		resourcePool           string
-		statsCallback          func(queryStats stats.QueryStats)
-		callOptions            []grpc.CallOption
-		txControl              *tx.Control
-		userProvidedTxControl  bool // track if user explicitly provided TxControl
-		retryOptions           []retry.Option
-		issueCallback          func(issues []*Ydb_Issue.IssueMessage)
-		responsePartLimitBytes int64
-		label                  string
+		syntax                  Syntax
+		params                  params.Parameters
+		execMode                ExecMode
+		statsMode               StatsMode
+		resourcePool            string
+		statsCallback           func(queryStats stats.QueryStats)
+		commitTimestampCallback func(*querytimestamp.VirtualTimestamp)
+		callOptions             []grpc.CallOption
+		txControl               *tx.Control
+		userProvidedTxControl   bool // track if user explicitly provided TxControl
+		retryOptions            []retry.Option
+		issueCallback           func(issues []*Ydb_Issue.IssueMessage)
+		responsePartLimitBytes  int64
+		label                   string
 		// responsePartPrefetch is how many stream parts to read ahead of the
 		// consumer (0 disables prefetch and is the default).
 		responsePartPrefetch int
@@ -84,8 +86,9 @@ type (
 	issuesOption           struct {
 		callback func([]*Ydb_Issue.IssueMessage)
 	}
-	responsePartPrefetch int
-	nopOption            struct{}
+	commitTimestampOption func(*querytimestamp.VirtualTimestamp)
+	responsePartPrefetch  int
+	nopOption             struct{}
 )
 
 func (poolID resourcePool) applyExecuteOption(s *executeSettings) {
@@ -102,6 +105,18 @@ func (s *executeSettings) IssuesOpts() func([]*Ydb_Issue.IssueMessage) {
 
 func (s *executeSettings) StatsCallback() func(stats.QueryStats) {
 	return s.statsCallback
+}
+
+func (s *executeSettings) CommitTimestampCallback() func(*querytimestamp.VirtualTimestamp) {
+	return s.commitTimestampCallback
+}
+
+func (callback commitTimestampOption) applyExecuteOption(s *executeSettings) {
+	s.commitTimestampCallback = callback
+}
+
+func WithCommitTimestamp(callback func(*querytimestamp.VirtualTimestamp)) Execute {
+	return commitTimestampOption(callback)
 }
 
 func (t txCommitOption) applyExecuteOption(s *executeSettings) {

@@ -16,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/querytimestamp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -27,6 +28,7 @@ type executeSettings interface {
 	ExecMode() options.ExecMode
 	StatsMode() options.StatsMode
 	StatsCallback() func(stats stats.QueryStats)
+	CommitTimestampCallback() func(*querytimestamp.VirtualTimestamp)
 	TxControl() options.TxControl
 	Syntax() options.Syntax
 	Params() params.Parameters

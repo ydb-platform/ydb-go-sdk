@@ -1,3 +1,5 @@
+* Added `query.WithStrictSerializableReadWrite` and `query.StrictSerializableReadWriteTxControl`, exposed optional commit timestamps from Query Service transactions and execute results, and added `VirtualTimestamp.Compare` for values from the same Query client
+
 ## v3.155.0
 * Fixed query result decoding to preserve nested optional values and Pg NULLs
 * Added experimental `query.WithResultFormatArrow(ipc.NewReader, opts...)`, `ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader, opts...)` and `query.WithYdbValue`, preserving the Query Service row and scan APIs without an Arrow Go dependency

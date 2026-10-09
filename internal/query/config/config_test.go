@@ -40,6 +40,14 @@ func TestNew(t *testing.T) {
 		require.Equal(t, "/local", cfg.PoolName())
 	})
 
+	t.Run("DatabaseIdentity", func(t *testing.T) {
+		first := New(WithDatabase("/local"))
+		second := New(WithDatabase("/local"))
+		require.Equal(t, "/local", first.Database())
+		require.NotNil(t, first.DatabaseIdentity())
+		require.NotSame(t, first.DatabaseIdentity(), second.DatabaseIdentity())
+	})
+
 	t.Run("WithPoolLimitZero", func(t *testing.T) {
 		cfg := New(WithPoolLimit(0))
 		require.Equal(t, DefaultPoolMaxSize, cfg.PoolLimit())

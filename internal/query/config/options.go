@@ -11,6 +11,12 @@ import (
 
 type Option func(*Config)
 
+func WithDatabase(database string) Option {
+	return func(c *Config) {
+		c.database = database
+	}
+}
+
 func WithDefaultResultFormatArrow(decoder arrow.Decoder) Option {
 	return func(c *Config) {
 		c.defaultArrowDecoder = decoder
