@@ -67,7 +67,8 @@ class BenchmarkReportTests(unittest.TestCase):
 pkg: github.com/ydb-platform/ydb-go-sdk/v3
 ,master,,pr,,,
 ,sec/op,CI,sec/op,CI,vs base,P
-Removed-2,1e-06,2%,,,?,
+Removed-2,1e-06,2%
+Added-2,,,1e-06,2%
 """
         report = render_report(
             sdk_csv,
@@ -79,6 +80,7 @@ Removed-2,1e-06,2%,,,?,
 
         self.assertIn("🟡 Comparison incomplete", report)
         self.assertIn("Removed-2", report)
+        self.assertIn("Added-2", report)
         self.assertIn("not comparable", report)
 
     def test_benchmark_names_are_escaped_before_rendering_html(self):

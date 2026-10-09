@@ -71,8 +71,9 @@ def parse_benchstat_csv(source):
             metric = row[1]
             seen_tables += 1
             continue
-        if not metric or len(row) < 7 or row[0] == "geomean":
+        if not metric or row[0] == "geomean":
             continue
+        row += [""] * max(0, 7 - len(row))
 
         change = row[5].strip()
         if change not in ("~", "", "?") and not CHANGE.fullmatch(change):
