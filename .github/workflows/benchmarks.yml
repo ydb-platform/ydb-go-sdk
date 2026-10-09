@@ -97,6 +97,7 @@ jobs:
           "$benchstat" -format csv master=benchmark-results/master.txt pr=benchmark-results/pr.txt > benchmark-results/benchstat.csv 2> benchmark-results/benchstat-csv-warnings.txt
           test -s benchmark-results/benchstat-all.txt
           test -s benchmark-results/benchstat.csv
+          python3 pr/.github/scripts/benchstat_preview.py benchmark-results/benchstat-all.txt benchmark-preview/benchstat-all.txt
           jq -n --argjson pr "$PR_NUMBER" --argjson run "$GITHUB_RUN_ID" \
             --arg master "$MASTER_SHA" --arg head "$PR_SHA" \
             '{pr: $pr, run_id: $run, master_sha: $master, head_sha: $head}' > benchmark-results/metadata.json
@@ -113,7 +114,7 @@ jobs:
       - name: Upload browser-readable benchstat
         uses: actions/upload-artifact@v7
         with:
-          path: benchmark-results/benchstat-all.txt
+          path: benchmark-preview/benchstat-all.txt
           archive: false
           if-no-files-found: error
           retention-days: 30
