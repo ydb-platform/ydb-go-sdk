@@ -1,3 +1,4 @@
+## v3.155.1
 * Fixed resource leaks after failed driver initialization and in nested `Driver.With` calls
 
 ## v3.155.0
