@@ -1,0 +1,140 @@
+package topicwriterinternal
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
+)
+
+func TestReconnectorPool_ReusesOnlyCompletedTransactions(t *testing.T) {
+	pool := newStoppedReconnectorPool()
+	cfg := NewWriterReconnectorConfig(WithTopic("topic"))
+
+	first, err := pool.Get(cfg)
+	require.NoError(t, err)
+	other, err := pool.Get(cfg)
+	require.NoError(t, err)
+	require.NotSame(t, first, other, "simultaneous transactions need exclusive reconnectors")
+
+	transaction := &poolTestTransaction{}
+	writer := NewPooledTopicWriterTransaction(first, transaction, nil, pool)
+	require.NoError(t, transaction.beforeCommit(context.Background()))
+	require.ErrorIs(t, writer.Write(context.Background(), nil), ErrPublicWriterClosed)
+	require.NotSame(t, first, mustGetReconnector(t, pool, cfg), "commit has not completed")
+	transaction.complete(nil)
+
+	reused := mustGetReconnector(t, pool, cfg)
+	require.Same(t, first, reused)
+	require.False(t, reused.queue.closed)
+}
+
+func TestReconnectorPool_DiscardsRolledBackTransaction(t *testing.T) {
+	pool := newStoppedReconnectorPool()
+	cfg := NewWriterReconnectorConfig(WithTopic("topic"))
+	first := mustGetReconnector(t, pool, cfg)
+	transaction := &poolTestTransaction{}
+	NewPooledTopicWriterTransaction(first, transaction, nil, pool)
+	transaction.complete(errors.New("rollback"))
+
+	require.NotSame(t, first, mustGetReconnector(t, pool, cfg))
+}
+
+func TestReconnectorPool_DiscardsFailedCommit(t *testing.T) {
+	pool := newStoppedReconnectorPool()
+	cfg := NewWriterReconnectorConfig(WithTopic("topic"))
+	first := mustGetReconnector(t, pool, cfg)
+	transaction := &poolTestTransaction{}
+	NewPooledTopicWriterTransaction(first, transaction, nil, pool)
+	require.NoError(t, transaction.beforeCommit(context.Background()))
+	transaction.complete(errors.New("commit failed"))
+
+	require.NotSame(t, first, mustGetReconnector(t, pool, cfg))
+}
+
+func TestReconnectorPool_ClosesIdleReconnectorWithClient(t *testing.T) {
+	pool := newStoppedReconnectorPool()
+	cfg := NewWriterReconnectorConfig(WithTopic("topic"))
+	w := mustGetReconnector(t, pool, cfg)
+	pool.Put(w, true)
+	require.NoError(t, pool.Close(context.Background()))
+	require.True(t, w.queue.closed)
+	_, err := pool.Get(cfg)
+	require.Error(t, err)
+}
+
+func TestReconnectorPool_WaitInitInfoReflectsPreviousCommittedWrites(t *testing.T) {
+	pool := newStoppedReconnectorPool()
+	cfg := NewWriterReconnectorConfig(WithTopic("topic"))
+	w := mustGetReconnector(t, pool, cfg)
+	w.initDone = true
+	w.initInfo = InitialInfo{LastSeqNum: 2}
+	close(w.initDoneCh)
+	w.queue.lastSeqNo = 5
+	pool.Put(w, true)
+
+	reused := mustGetReconnector(t, pool, cfg)
+	transaction := &poolTestTransaction{}
+	writer := NewPooledTopicWriterTransaction(reused, transaction, nil, pool)
+	info, err := writer.WaitInitInfo(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, int64(5), info.LastSeqNum)
+}
+
+func newStoppedReconnectorPool() *ReconnectorPool {
+	return &ReconnectorPool{create: func(cfg WriterReconnectorConfig) (*WriterReconnector, error) {
+		return newWriterReconnectorStopped(cfg), nil
+	}}
+}
+
+func mustGetReconnector(t *testing.T, pool *ReconnectorPool, cfg WriterReconnectorConfig) *WriterReconnector {
+	t.Helper()
+	w, err := pool.Get(cfg)
+	require.NoError(t, err)
+
+	return w
+}
+
+type poolTestTransaction struct {
+	tx.LazyID
+
+	before []tx.OnTransactionBeforeCommit
+	done   []tx.OnTransactionCompletedFunc
+}
+
+func (t *poolTestTransaction) UnLazy(context.Context) error { return nil }
+func (t *poolTestTransaction) SessionID() string            { return "session" }
+func (t *poolTestTransaction) NodeID() uint32               { return 1 }
+
+func (t *poolTestTransaction) Rollback(context.Context) error {
+	t.complete(errors.New("rollback"))
+
+	return nil
+}
+
+func (t *poolTestTransaction) OnBeforeCommit(f tx.OnTransactionBeforeCommit) {
+	t.before = append(t.before, f)
+}
+
+func (t *poolTestTransaction) OnCompleted(f tx.OnTransactionCompletedFunc) {
+	t.done = append(t.done, f)
+}
+
+func (t *poolTestTransaction) beforeCommit(ctx context.Context) error {
+	for _, f := range t.before {
+		if err := f(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (t *poolTestTransaction) complete(err error) {
+	for _, f := range t.done {
+		f(err)
+	}
+}

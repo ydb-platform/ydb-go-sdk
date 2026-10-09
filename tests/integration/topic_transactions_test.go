@@ -177,6 +177,53 @@ func TestTopicWriterTLI(t *testing.T) {
 	scope.Require.Equal("test", string(content))
 }
 
+func TestTopicTransactionalWriterReusesReconnector(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	db := scope.Driver()
+	var firstLastSeqNo int64
+
+	require.NoError(t, db.Query().DoTx(ctx, func(ctx context.Context, transaction query.TxActor) error {
+		writer, err := db.Topic().StartTransactionalWriter(transaction, scope.TopicPath())
+		if err != nil {
+			return err
+		}
+		info, err := writer.WaitInitInfo(ctx)
+		if err != nil {
+			return err
+		}
+		firstLastSeqNo = info.LastSeqNum
+
+		return writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("first")})
+	}))
+
+	require.NoError(t, db.Query().DoTx(ctx, func(ctx context.Context, transaction query.TxActor) error {
+		writer, err := db.Topic().StartTransactionalWriter(transaction, scope.TopicPath())
+		if err != nil {
+			return err
+		}
+		info, err := writer.WaitInitInfo(ctx)
+		if err != nil {
+			return err
+		}
+		require.Greater(t, info.LastSeqNum, firstLastSeqNo)
+
+		return writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("second")})
+	}))
+
+	var payloads []string
+	for len(payloads) < 2 {
+		batch, err := scope.TopicReader().ReadMessagesBatch(ctx)
+		require.NoError(t, err)
+		for _, message := range batch.Messages {
+			data, readErr := io.ReadAll(message)
+			require.NoError(t, readErr)
+			payloads = append(payloads, string(data))
+		}
+	}
+	require.Equal(t, []string{"first", "second"}, payloads)
+}
+
 // TestTopicTransactionalWriterWithLazyTx exercises transactional topic writes when the query transaction is lazy
 // (`query.WithLazyTx(true)`). Without materializing the transaction before the topic stream sends the tx id, YDB
 // returns `Transaction not found: LAZY_TX` on the topic writer receive path.
