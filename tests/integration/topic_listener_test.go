@@ -21,6 +21,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
@@ -28,6 +29,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
+
+const listenerReconnectSetupTimeout = time.Second
 
 func TestTopicListener(t *testing.T) {
 	scope := newScope(t)
@@ -476,7 +479,13 @@ func TestTopicListenerCustomRetryPolicyRestartsPartition(t *testing.T) {
 	stopper.StopOnce()
 
 	require.ErrorIs(t, xtest.Receive(t, checkedErrors, "the retry policy callback"), streamErr)
-	second := xtest.Receive(t, partitionStarts, "the partition session after the custom retry")
+	// A forced retry of a permanent error uses slow backoff before reconnecting.
+	second := xtest.ReceiveWithTimeout(
+		t,
+		partitionStarts,
+		"the partition session after the custom retry",
+		backoff.Slow.MaxDelay(0)+listenerReconnectSetupTimeout,
+	)
 	require.Equal(t, first.PartitionSession.TopicPath, second.PartitionSession.TopicPath)
 	require.Equal(t, first.PartitionSession.PartitionID, second.PartitionSession.PartitionID)
 	require.NotEqual(t, first.PartitionSession.PartitionSessionID, second.PartitionSession.PartitionSessionID)
