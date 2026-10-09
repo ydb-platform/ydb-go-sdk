@@ -7,6 +7,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
@@ -23,6 +25,7 @@ type partitionWriterPool struct {
 
 	ackCallback            func(partitionID int64, seqNo int64)
 	partitionSplitCallback func(partitionID int64)
+	topology               *topology.Topic
 	onWriterInit           func()
 	onError                func(err error)
 }
@@ -34,6 +37,7 @@ func newPartitionWriterPool(
 	bg *background.Worker,
 	ackCallback func(partitionID int64, seqNo int64),
 	partitionSplitCallback func(partitionID int64),
+	topology *topology.Topic,
 	onWriterInit func(),
 	onError func(err error),
 ) *partitionWriterPool {
@@ -44,6 +48,7 @@ func newPartitionWriterPool(
 		bg:                     bg,
 		ackCallback:            ackCallback,
 		partitionSplitCallback: partitionSplitCallback,
+		topology:               topology,
 		onWriterInit:           onWriterInit,
 		onError:                onError,
 		writers:                make(map[int64]*writerWrapper),
@@ -80,7 +85,8 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 				p.ackCallback(partitionID, seqNo)
 			}),
 			withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
-				if isOperationErrorOverloaded(args.Error) {
+				if xerrors.IsOperationErrorTopicPartitionInactive(args.Error) {
+					p.topology.ReportInactivePartition(partitionID)
 					p.partitionSplitCallback(partitionID)
 
 					return topic.PublicRetryDecisionStop

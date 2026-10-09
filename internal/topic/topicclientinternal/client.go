@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -35,6 +36,7 @@ type Client struct {
 	cred                   credentials.Credentials
 	defaultOperationParams rawydb.OperationParams
 	rawClient              rawtopic.Client
+	topicTopologies        *topology.Registry
 }
 
 func New(
@@ -50,12 +52,20 @@ func New(
 	var defaultOperationParams rawydb.OperationParams
 	topic.OperationParamsFromConfig(&defaultOperationParams, &cfg.Common)
 
-	return &Client{
+	var client *Client
+	client = &Client{
 		cfg:                    cfg,
 		cred:                   cred,
 		defaultOperationParams: defaultOperationParams,
 		rawClient:              rawClient,
+		topicTopologies: topology.NewRegistry(func(
+			ctx context.Context, path string,
+		) (topictypes.TopicDescription, error) {
+			return client.Describe(ctx, path)
+		}),
 	}
+
+	return client
 }
 
 func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
@@ -385,9 +395,7 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 		cfg.MultiMode = true
 
 		internal, err := internalmultiwriter.NewMultiWriter(
-			func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-				return c.Describe(ctx, path)
-			},
+			c.topicTopologies.Get(cfg.Topic()),
 			&cfg,
 			mwCfg,
 		)
@@ -427,9 +435,7 @@ func (c *Client) StartTransactionalWriter(
 		cfg.MultiMode = true
 
 		multiwriter, err := internalmultiwriter.NewMultiWriter(
-			func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
-				return c.Describe(ctx, path)
-			},
+			c.topicTopologies.Get(cfg.Topic()),
 			&cfg,
 			mwCfg,
 		)

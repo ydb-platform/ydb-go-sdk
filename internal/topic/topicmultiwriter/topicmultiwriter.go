@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
 )
 
 type MultiWriter struct {
@@ -23,7 +24,7 @@ type MultiWriter struct {
 }
 
 func NewMultiWriter(
-	topicDescriber TopicDescriber,
+	topology *topology.Topic,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
 ) (*MultiWriter, error) {
@@ -46,7 +47,7 @@ func NewMultiWriter(
 		cfg:          multiWriterCfg,
 		writerCfg:    writerCfg,
 		encoders:     encoders,
-		orchestrator: newOrchestrator(ctx, cancel, topicDescriber, background, writerCfg, multiWriterCfg),
+		orchestrator: newOrchestrator(ctx, cancel, topology, background, writerCfg, multiWriterCfg),
 		background:   background,
 	}
 

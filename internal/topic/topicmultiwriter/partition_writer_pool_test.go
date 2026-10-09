@@ -7,12 +7,18 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 var errCreate = errors.New("create error")
@@ -87,6 +93,9 @@ func newPoolForTest(t *testing.T, factory *poolMockFactory) (*partitionWriterPoo
 		bg,
 		func(partitionID, seqNo int64) {},
 		func(partitionID int64) {},
+		topology.NewRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
+			return topictypes.TopicDescription{}, nil
+		}).Get("test/topic"),
 		func() {},
 		func(err error) {},
 	)
@@ -94,48 +103,159 @@ func newPoolForTest(t *testing.T, factory *poolMockFactory) (*partitionWriterPoo
 	return pool, cancel
 }
 
-func TestSenderStepReturnsNonOverloadedWriterInitError(t *testing.T) {
-	t.Parallel()
-
-	ctx, cancel := context.WithCancel(xtest.Context(t))
+func TestPartitionWriterPoolReportsOnlyInactivePartitionErrors(t *testing.T) {
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	initErr := errors.New("writer init failed")
-	testWriter := &poolTestWriter{}
-	wrapper := &writerWrapper{writer: testWriter, direct: true}
-	wrapper.setInitErr(initErr)
-	wrapper.initDone.Store(true)
+	var describes int
+	pool.topology = topology.NewRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
+		describes++
+		if describes == 1 {
+			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{PartitionID: 1, Active: true}}}, nil
+		}
 
-	mu := &xsync.Mutex{}
-	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
-	topicwriterinternal.WithMaxQueueLen(10)(writerCfg)
-	buf := newInflightBuffer(ctx, mu, writerCfg, func() error { return nil })
-	partitions := map[int64]*PartitionInfo{1: {}}
+		return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+			{PartitionID: 1, ChildPartitionIDs: []int64{2}},
+			{PartitionID: 2, Active: true, ParentPartitionIDs: []int64{1}},
+		}}, nil
+	}).Get("test/topic")
+	var scheduled []int64
+	pool.partitionSplitCallback = func(partitionID int64) {
+		scheduled = append(scheduled, partitionID)
+	}
+	pool.writerCfg.RetrySettings.CheckError = func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+		return topic.PublicRetryDecisionRetry
+	}
 
-	mu.WithLock(func() {
-		buf.pushNeedLock(message{
-			MessageWithDataContent: topicwritercommon.MessageWithDataContent{
-				PublicMessage: topicwritercommon.PublicMessage{
-					SeqNo:       1,
-					PartitionID: 1,
-				},
-			},
-		})
-	})
+	initial, err := pool.topology.Partitions(t.Context())
+	require.NoError(t, err)
+	_, err = pool.get(1, true)
+	require.NoError(t, err)
+	checkError := factory.lastCfg.RetrySettings.CheckError
 
-	s := newSender(
-		ctx,
-		partitions,
-		mu,
-		buf,
-		&partitionWriterPool{writers: map[int64]*writerWrapper{1: wrapper}},
-		newPartitionSplitReceiver(func(partitionID int64) error { return nil }, func(err error) {}),
-		func(err error) {},
+	decision := checkError(topic.NewCheckRetryArgs(errors.New("other writer error")))
+	require.Equal(t, topic.PublicRetryDecisionRetry, decision)
+	require.Empty(t, scheduled)
+	unchanged, err := pool.topology.Partitions(t.Context())
+	require.NoError(t, err)
+	require.Same(t, initial, unchanged)
+	require.Equal(t, 1, describes)
+
+	decision = checkError(topic.NewCheckRetryArgs(xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))))
+	require.Equal(t, topic.PublicRetryDecisionRetry, decision)
+	require.Empty(t, scheduled)
+	require.Equal(t, 1, describes)
+
+	inactiveErr := xerrors.Operation(
+		xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
+		xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: xerrors.IssueCodeTopicPartitionInactive}}),
 	)
+	decision = checkError(topic.NewCheckRetryArgs(inactiveErr))
+	require.Equal(t, topic.PublicRetryDecisionStop, decision)
+	require.Equal(t, []int64{1}, scheduled)
+	updated, err := pool.topology.Partitions(t.Context())
+	require.NoError(t, err)
+	infos := updated.Infos()
+	require.Len(t, infos, 2)
+	require.Equal(t, int64(2), infos[1].PartitionID)
+	require.True(t, infos[1].Active)
+	require.Equal(t, 2, describes)
+}
 
-	err := s.step()
-	require.ErrorIs(t, err, initErr)
-	require.Equal(t, int64(0), testWriter.writeCalled.Load())
+func TestSenderStepHandlesWriterInitError(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name      string
+		initErr   error
+		wantSplit bool
+	}{
+		{name: "other error", initErr: errors.New("writer init failed")},
+		{name: "ordinary overload", initErr: xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))},
+		{
+			name: "inactive partition",
+			initErr: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
+				xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{IssueCode: xerrors.IssueCodeTopicPartitionInactive}}),
+			),
+			wantSplit: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithCancel(xtest.Context(t))
+			defer cancel()
+
+			testWriter := &poolTestWriter{}
+			wrapper := &writerWrapper{writer: testWriter, direct: true}
+			wrapper.setInitErr(tc.initErr)
+			wrapper.initDone.Store(true)
+
+			mu := &xsync.Mutex{}
+			writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+			topicwriterinternal.WithMaxQueueLen(10)(writerCfg)
+			buf := newInflightBuffer(ctx, mu, writerCfg, func() error { return nil })
+			partitions := map[int64]*PartitionInfo{1: {}}
+
+			mu.WithLock(func() {
+				buf.pushNeedLock(message{
+					MessageWithDataContent: topicwritercommon.MessageWithDataContent{
+						PublicMessage: topicwritercommon.PublicMessage{
+							SeqNo:       1,
+							PartitionID: 1,
+						},
+					},
+				})
+			})
+
+			var describes int
+			topology := topology.NewRegistry(func(context.Context, string) (topictypes.TopicDescription, error) {
+				describes++
+				if describes == 1 {
+					return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{PartitionID: 1, Active: true}}}, nil
+				}
+
+				return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
+					{PartitionID: 1, ChildPartitionIDs: []int64{2}},
+					{PartitionID: 2, Active: true, ParentPartitionIDs: []int64{1}},
+				}}, nil
+			}).Get("test/topic")
+			initial, err := topology.Partitions(ctx)
+			require.NoError(t, err)
+
+			splits := newPartitionSplitReceiver(func(partitionID int64) error { return nil }, func(err error) {})
+			s := newSender(
+				ctx,
+				partitions,
+				mu,
+				buf,
+				&partitionWriterPool{writers: map[int64]*writerWrapper{1: wrapper}, topology: topology},
+				splits,
+				func(err error) {},
+			)
+
+			err = s.step()
+			require.Equal(t, int64(0), testWriter.writeCalled.Load())
+			if tc.wantSplit {
+				require.NoError(t, err)
+				require.Equal(t, 1, splits.partitionSplits.Len())
+				updated, err := topology.Partitions(ctx)
+				require.NoError(t, err)
+				infos := updated.Infos()
+				require.Len(t, infos, 2)
+				require.Equal(t, int64(2), infos[1].PartitionID)
+				require.True(t, infos[1].Active)
+			} else {
+				require.ErrorIs(t, err, tc.initErr)
+				require.Equal(t, 0, splits.partitionSplits.Len())
+				unchanged, err := topology.Partitions(ctx)
+				require.NoError(t, err)
+				require.Same(t, initial, unchanged)
+			}
+		})
+	}
 }
 
 func TestPartitionWriterPool_CreateDirectWriterSeedsDirectWritePartition(t *testing.T) {

@@ -2,7 +2,6 @@ package topicmultiwriter
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topology"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -33,7 +33,7 @@ type orchestrator struct {
 	mu             *xsync.Mutex
 
 	partitionChooser PartitionChooser
-	topicDescriber   TopicDescriber
+	topology         *topology.Topic
 
 	partitions map[int64]*PartitionInfo
 	initDone   empty.Chan
@@ -53,7 +53,7 @@ type orchestrator struct {
 func newOrchestrator(
 	ctx context.Context,
 	stop context.CancelFunc,
-	topicDescriber TopicDescriber,
+	topology *topology.Topic,
 	background *background.Worker,
 	writerCfg *topicwriterinternal.WriterReconnectorConfig,
 	multiWriterCfg *MultiWriterConfig,
@@ -74,7 +74,7 @@ func newOrchestrator(
 		writerCfg:        writerCfg,
 		multiWriterCfg:   multiWriterCfg,
 		mu:               &xsync.Mutex{},
-		topicDescriber:   topicDescriber,
+		topology:         topology,
 		ctx:              ctx,
 		stop:             stop,
 		partitions:       make(map[int64]*PartitionInfo),
@@ -100,6 +100,7 @@ func newOrchestrator(
 		background,
 		o.ackReceiver.push,
 		o.partitionSplitReceiver.push,
+		topology,
 		func() {
 			o.sender.wakeup()
 		},
@@ -149,7 +150,7 @@ func (o *orchestrator) sleepOrDone(delay time.Duration) error {
 func (o *orchestrator) init() (err error) {
 	defer close(o.initDone)
 
-	describeResult, err := o.topicDescriber(o.ctx, o.writerCfg.Topic())
+	partitions, err := o.topology.Partitions(o.ctx)
 	if err != nil {
 		o.stopWithError(err)
 
@@ -157,7 +158,7 @@ func (o *orchestrator) init() (err error) {
 	}
 
 	o.mu.WithLock(func() {
-		for _, partition := range describeResult.Partitions {
+		for _, partition := range partitions.Infos() {
 			o.partitions[partition.PartitionID] = &PartitionInfo{
 				PartitionInfo: partition,
 			}
@@ -618,45 +619,15 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 	return maxSeqNo, nil
 }
 
-func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topictypes.TopicDescription, error) {
-	const (
-		maxRetries = 5
-		retryDelay = 100 * time.Millisecond
-	)
-
-	for range maxRetries {
-		describeResult, err := o.topicDescriber(o.ctx, o.writerCfg.Topic())
-		if err == nil {
-			var needRetry bool
-			for _, partition := range describeResult.Partitions {
-				if partition.PartitionID == splitPartitionID {
-					needRetry = len(partition.ChildPartitionIDs) == 0
-
-					break
-				}
-			}
-
-			if !needRetry {
-				return describeResult, nil
-			}
-		}
-
-		if err := o.sleepOrDone(retryDelay); err != nil {
-			return topictypes.TopicDescription{}, err
-		}
-	}
-
-	return topictypes.TopicDescription{}, errors.New("failed to describe topic")
-}
-
 //nolint:funlen
 func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	var isAlreadySplitted bool
 
-	describeResult, err := o.describeTopicWithRetries(partitionID)
+	partitions, err := o.topology.Partitions(o.ctx)
 	if err != nil {
 		return err
 	}
+	describeResult := topictypes.TopicDescription{Partitions: partitions.Infos()}
 
 	o.mu.WithLock(func() {
 		partition := o.partitions[partitionID]
