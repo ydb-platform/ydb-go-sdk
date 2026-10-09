@@ -14,9 +14,10 @@ import (
 //   - before commit, it flushes all pending messages by calling Close(ctx)
 //   - after transaction completion (commit or rollback), it closes the writer without flush.
 type MultiWriterWithTransaction struct {
-	multiWriter *MultiWriter
-	tx          tx.Transaction
-	tracer      *trace.Topic
+	multiWriter   *MultiWriter
+	tx            tx.Transaction
+	tracer        *trace.Topic
+	pooledFactory *pooledWritersFactory
 }
 
 // NewTopicMultiWriterTransaction creates a transactional multi-writer wrapper.
@@ -45,6 +46,9 @@ func NewTopicMultiWriterTransaction(
 }
 
 func (w *MultiWriterWithTransaction) onBeforeCommitTransaction(ctx context.Context) (err error) {
+	if w.pooledFactory != nil {
+		w.pooledFactory.beginCommit()
+	}
 	// For multi-writer we do not have a single topic session ID like WriterReconnector,
 	// so we only ensure that all buffered messages are flushed by closing the writer.
 	//
@@ -59,6 +63,9 @@ func (w *MultiWriterWithTransaction) onTransactionCompleted(err error) {
 	cancel()
 
 	_ = w.multiWriter.Close(noNeedFlushCtx)
+	if w.pooledFactory != nil {
+		w.pooledFactory.completed(err)
+	}
 }
 
 // WaitInit waits until initialization is completed or an error occurs.

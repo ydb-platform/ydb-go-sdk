@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -132,6 +133,99 @@ func TestReconnectorPool_DoesNotPoolWriterSpecificCallback(t *testing.T) {
 		cfg.OnAckReceivedCallback = func(int64) {}
 	})
 	require.False(t, cfg.CanPool())
+}
+
+func TestReconnectorPool_ReusesMultiwriterReconnectorAcrossLeases(t *testing.T) {
+	pool := newStoppedReconnectorPool()
+	cfg := NewWriterReconnectorConfig(WithTopic("topic"), WithProducerID("producer"))
+	cfg.MultiMode = true
+	cfg.MultiWriterConfig = &struct{}{}
+	cfg.OnAckReceivedCallback = func(int64) {}
+	first, err := pool.GetMulti(cfg)
+	require.NoError(t, err)
+	require.NoError(t, first.Close(context.Background()))
+	first.Release(true)
+
+	second, err := pool.GetMulti(cfg)
+	require.NoError(t, err)
+	require.Same(t, first.entry.writer, second.entry.writer)
+}
+
+func TestReconnectorPool_MultiwriterCallbacksFollowCurrentLease(t *testing.T) {
+	pool := newStoppedReconnectorPool()
+	cfg := NewWriterReconnectorConfig(WithTopic("topic"), WithProducerID("producer"))
+	cfg.MultiMode = true
+	cfg.MultiWriterConfig = &struct{}{}
+	firstAcks := 0
+	cfg.OnAckReceivedCallback = func(int64) { firstAcks++ }
+	cfg.RetrySettings.CheckError = func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+		return topic.PublicRetryDecisionStop
+	}
+	first, err := pool.GetMulti(cfg)
+	require.NoError(t, err)
+	first.entry.callbacks.ack(1)
+	require.Equal(t, topic.PublicRetryDecisionStop,
+		first.entry.callbacks.retry(topic.NewCheckRetryArgs(errors.New("retry"))))
+	require.NoError(t, first.Close(context.Background()))
+	first.Release(true)
+
+	secondAcks := 0
+	cfg.OnAckReceivedCallback = func(int64) { secondAcks++ }
+	cfg.RetrySettings.CheckError = func(topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+		return topic.PublicRetryDecisionRetry
+	}
+	second, err := pool.GetMulti(cfg)
+	require.NoError(t, err)
+	second.entry.callbacks.ack(2)
+	require.Equal(t, 1, firstAcks)
+	require.Equal(t, 1, secondAcks)
+	require.Equal(t, topic.PublicRetryDecisionRetry,
+		second.entry.callbacks.retry(topic.NewCheckRetryArgs(errors.New("retry"))))
+}
+
+func TestReconnectorPool_MultiwriterFailedTransactionDiscardsLease(t *testing.T) {
+	pool := newStoppedReconnectorPool()
+	cfg := NewWriterReconnectorConfig(WithTopic("topic"), WithProducerID("producer"))
+	cfg.MultiMode = true
+	cfg.MultiWriterConfig = &struct{}{}
+	first, err := pool.GetMulti(cfg)
+	require.NoError(t, err)
+	require.NoError(t, first.Close(context.Background()))
+	first.Release(false)
+
+	second, err := pool.GetMulti(cfg)
+	require.NoError(t, err)
+	require.NotSame(t, first.entry.writer, second.entry.writer)
+}
+
+func TestReconnectorPool_MultiwriterDifferentProducerKeepsSeparateSession(t *testing.T) {
+	pool := newStoppedReconnectorPool()
+	cfg := NewWriterReconnectorConfig(WithTopic("topic"), WithProducerID("first"))
+	cfg.MultiMode = true
+	cfg.MultiWriterConfig = &struct{}{}
+	first, err := pool.GetMulti(cfg)
+	require.NoError(t, err)
+	require.NoError(t, first.Close(context.Background()))
+	first.Release(true)
+
+	WithProducerID("second")(&cfg)
+	second, err := pool.GetMulti(cfg)
+	require.NoError(t, err)
+	require.NotSame(t, first.entry.writer, second.entry.writer)
+}
+
+func TestReconnectorPool_ClientCloseClosesIdleMultiwriterReconnector(t *testing.T) {
+	pool := newStoppedReconnectorPool()
+	cfg := NewWriterReconnectorConfig(WithTopic("topic"), WithProducerID("producer"))
+	cfg.MultiMode = true
+	cfg.MultiWriterConfig = &struct{}{}
+	lease, err := pool.GetMulti(cfg)
+	require.NoError(t, err)
+	require.NoError(t, lease.Close(context.Background()))
+	lease.Release(true)
+
+	require.NoError(t, pool.Close(context.Background()))
+	require.True(t, lease.entry.writer.queue.closed)
 }
 
 func newStoppedReconnectorPool() *ReconnectorPool {

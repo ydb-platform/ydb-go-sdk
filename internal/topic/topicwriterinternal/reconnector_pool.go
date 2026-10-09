@@ -8,10 +8,11 @@ import (
 
 // ReconnectorPool owns writer reconnectors across transactional writers of one Topic client.
 type ReconnectorPool struct {
-	mu     sync.Mutex
-	idle   map[string][]*WriterReconnector
-	closed bool
-	create func(WriterReconnectorConfig) (*WriterReconnector, error)
+	mu        sync.Mutex
+	idle      map[string][]*WriterReconnector
+	multiIdle map[multiPoolKey][]*multiReconnectorEntry
+	closed    bool
+	create    func(WriterReconnectorConfig) (*WriterReconnector, error)
 }
 
 func NewReconnectorPool() *ReconnectorPool {
@@ -80,11 +81,18 @@ func (p *ReconnectorPool) Close(ctx context.Context) error {
 	p.closed = true
 	idle := p.idle
 	p.idle = nil
+	multiIdle := p.multiIdle
+	p.multiIdle = nil
 	p.mu.Unlock()
 
 	for _, writers := range idle {
 		for _, w := range writers {
 			_ = w.Close(ctx)
+		}
+	}
+	for _, entries := range multiIdle {
+		for _, entry := range entries {
+			_ = entry.writer.Close(ctx)
 		}
 	}
 

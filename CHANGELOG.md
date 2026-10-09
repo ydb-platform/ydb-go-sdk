@@ -1,4 +1,4 @@
-* Reused compatible transactional topic writer sessions across successful transactions on the same Topic client
+* Reused compatible single and multi-partition transactional topic writer sessions across successful transactions on the same Topic client
 
 ## v3.155.0
 * Fixed query result decoding to preserve nested optional values and Pg NULLs

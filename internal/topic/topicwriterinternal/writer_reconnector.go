@@ -217,10 +217,24 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 // CanPool reports whether a reconnector can safely retain this configuration
 // across transactional writers. The client records its tracer before user options.
 func (cfg WriterReconnectorConfig) CanPool() bool {
-	if cfg.MultiMode || cfg.MultiWriterConfig != nil || cfg.customConnect || cfg.customLogContext ||
-		cfg.OnWriterInitResponseCallback != nil || cfg.OnAckReceivedCallback != nil ||
-		len(cfg.AdditionalEncoders) != 0 || cfg.RetrySettings.CheckError != nil ||
-		cfg.Common.PanicCallback() != nil || !reflect.DeepEqual(cfg.Common.TraceRetry(), &trace.Retry{}) {
+	if cfg.MultiMode || cfg.MultiWriterConfig != nil || cfg.OnAckReceivedCallback != nil ||
+		cfg.RetrySettings.CheckError != nil {
+		return false
+	}
+
+	return cfg.canPoolCommon()
+}
+
+// CanPoolMulti reports whether the per-partition reconnector can be leased to
+// another multiwriter after its transaction completes.
+func (cfg WriterReconnectorConfig) CanPoolMulti() bool {
+	return cfg.MultiMode && cfg.MultiWriterConfig != nil && cfg.canPoolCommon()
+}
+
+func (cfg WriterReconnectorConfig) canPoolCommon() bool {
+	if cfg.customConnect || cfg.customLogContext || cfg.OnWriterInitResponseCallback != nil ||
+		len(cfg.AdditionalEncoders) != 0 || cfg.Common.PanicCallback() != nil ||
+		!reflect.ValueOf(cfg.Common.TraceRetry()).Elem().IsZero() {
 		return false
 	}
 	if cfg.poolBaselineTracer != nil {
@@ -228,6 +242,24 @@ func (cfg WriterReconnectorConfig) CanPool() bool {
 	}
 
 	return reflect.DeepEqual(cfg.Tracer, &trace.Topic{})
+}
+
+func (cfg WriterReconnectorConfig) poolCompatibleMulti(other WriterReconnectorConfig) bool {
+	if !cfg.CanPoolMulti() || !other.CanPoolMulti() {
+		return false
+	}
+	cfg.MultiWriterConfig, other.MultiWriterConfig = nil, nil
+	cfg.OnAckReceivedCallback, other.OnAckReceivedCallback = nil, nil
+	cfg.RetrySettings.CheckError, other.RetrySettings.CheckError = nil, nil
+	cfg.Connect, other.Connect = nil, nil
+	cfg.Tracer, other.Tracer = nil, nil
+	cfg.poolBaselineTracer, other.poolBaselineTracer = nil, nil
+	// Multiwriter always assigns a partition-specific producer ID after creating
+	// the base configuration. Compare that ID literally, even when the base
+	// configuration initially generated a different default producer ID.
+	cfg.generatedProducerID, other.generatedProducerID = false, false
+
+	return reflect.DeepEqual(cfg, other)
 }
 
 // PoolCompatible compares the effective writer configuration. Generated producer

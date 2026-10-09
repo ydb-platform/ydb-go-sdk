@@ -239,6 +239,38 @@ func TestTopicTransactionalWriterReusesReconnector(t *testing.T) {
 	require.Equal(t, []string{"first", "second"}, payloads)
 }
 
+func TestTopicTransactionalMultiWriterReusesClientReconnector(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+	var streamStarts atomic.Int32
+	db := scope.Driver(ydb.WithTraceTopic(trace.Topic{
+		OnWriterInitStream: func(trace.TopicWriterInitStreamStartInfo) func(trace.TopicWriterInitStreamDoneInfo) {
+			streamStarts.Add(1)
+
+			return nil
+		},
+	}))
+
+	for _, payload := range []string{"first", "second"} {
+		require.NoError(t, db.Query().DoTx(ctx, func(ctx context.Context, transaction query.TxActor) error {
+			writer, err := db.Topic().StartTransactionalWriter(transaction, scope.TopicPath(),
+				topicoptions.WithWriterDirectWrite(false),
+				topicoptions.WithWriteToManyPartitions(
+					topicoptions.WithWriterPartitionByKey(topicoptions.KafkaHashPartitionChooser()),
+					topicoptions.WithProducerIDPrefix("pool-multi-integration"),
+				),
+			)
+			if err != nil {
+				return err
+			}
+
+			return writer.Write(ctx, topicwriter.Message{Key: "same-key", Data: strings.NewReader(payload)})
+		}))
+	}
+
+	require.Equal(t, int32(1), streamStarts.Load(), "the client should reuse the partition StreamWrite session")
+}
+
 // TestTopicTransactionalWriterWithLazyTx exercises transactional topic writes when the query transaction is lazy
 // (`query.WithLazyTx(true)`). Without materializing the transaction before the topic stream sends the tx id, YDB
 // returns `Transaction not found: LAZY_TX` on the topic writer receive path.

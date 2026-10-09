@@ -428,22 +428,19 @@ func (c *Client) StartTransactionalWriter(
 	if ok && mwCfg != nil {
 		cfg.MultiMode = true
 
-		multiwriter, err := internalmultiwriter.NewMultiWriter(
+		multiWriterWithTx, err := internalmultiwriter.NewPooledTransactionalMultiWriter(
 			func(ctx context.Context, path string) (topictypes.TopicDescription, error) {
 				return c.Describe(ctx, path)
 			},
 			&cfg,
 			mwCfg,
+			internalTx,
+			c.cfg.Trace,
+			c.reconnectorPool,
 		)
 		if err != nil {
 			return nil, err
 		}
-
-		multiWriterWithTx := internalmultiwriter.NewTopicMultiWriterTransaction(
-			multiwriter,
-			internalTx,
-			c.cfg.Trace,
-		)
 
 		// internal multi-writer already implements the necessary interface for topicwriter.Writer.
 		return topicwriter.NewTxWriterWrapper(multiWriterWithTx), nil
