@@ -1,0 +1,102 @@
+name: SLO final-error QA
+
+on:
+  push:
+    branches:
+      - qa/slo-final-error-20261010/**
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  workload:
+    name: Gate (${{ matrix.sdk.name }})
+    runs-on: large-runner
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        sdk:
+          - name: database-sql-table
+            path: database/sql/table
+          - name: database-sql-query
+            path: database/sql/query
+          - name: native-query
+            path: native/query
+          - name: native-table
+            path: native/table
+          - name: native-table-over-query-service
+            path: native/table-over-query-service
+          - name: native-bulk-upsert
+            path: native/bulk-upsert
+            args: -batch-size=10
+          - name: native-table-node-hints
+            path: native/table-node-hints
+            args: -min-partition-count=10
+          - name: native-query-node-hints
+            path: native/query-node-hints
+            args: -min-partition-count=10
+          - name: gorm-query
+            path: gorm/query
+          - name: gorm-table
+            path: gorm/table
+          - name: xorm-query
+            path: xorm/query
+          - name: xorm-table
+            path: xorm/table
+    concurrency:
+      group: final-error-${{ github.ref }}-${{ matrix.sdk.name }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v5
+        with:
+          path: current
+
+      - name: Install infrastructure tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo curl -fLo /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/download/v4.48.2/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+          sudo mkdir -p /usr/local/lib/docker/cli-plugins
+          sudo curl -fLo /usr/local/lib/docker/cli-plugins/docker-compose \
+            https://github.com/docker/compose/releases/download/v2.40.3/docker-compose-linux-x86_64
+          sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+          docker compose version
+
+      - name: Set up workload builder
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: v0.30.1
+          use: false
+
+      - name: Build actual workload
+        uses: docker/build-push-action@v7
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: current
+          file: current/tests/slo/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: ydb-app-current
+          build-args: SRC_PATH=${{ matrix.sdk.path }}
+          cache-from: type=gha,scope=final-error-go-deps
+          cache-to: ${{ matrix.sdk.name == 'native-query' && 'type=gha,scope=final-error-go-deps,mode=max' || '' }}
+
+      - name: Run actual workload process gate
+        uses: ydb-platform/ydb-slo-action/init@1cd8fe8433514e8b1e21461d5babb5169fb6460e
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workload_name: final-error-${{ matrix.sdk.name }}
+          workload_duration: '60'
+          workload_current_ref: qa-${{ github.sha }}
+          workload_current_image: ydb-app-current
+          workload_current_command: -read-rps=100 -write-rps=25 -prefill-count=1000 ${{ matrix.sdk.args }}
+          fail_on_workload_error: 'true'
+          disable_compose_profiles: chaos
