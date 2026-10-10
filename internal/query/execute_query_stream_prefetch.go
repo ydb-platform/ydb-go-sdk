@@ -14,6 +14,7 @@ import (
 // executeQueryPartRecv is one logical item from ExecuteQuery stream (typed Recv).
 type executeQueryPartRecv struct {
 	part *Ydb_Query.ExecuteQueryResponsePart
+	wire *wirePart
 	err  error
 }
 
@@ -44,8 +45,8 @@ func (p *asyncPrefetchExecuteQueryStream) pump() {
 	defer close(p.ch)
 	ctx := p.QueryService_ExecuteQueryClient.Context()
 	for {
-		part, err := p.QueryService_ExecuteQueryClient.Recv()
-		item := executeQueryPartRecv{part: part, err: err}
+		part, wire, err := recvQueryPart(p.QueryService_ExecuteQueryClient)
+		item := executeQueryPartRecv{part: part, wire: wire, err: err}
 
 		select {
 		case p.ch <- item:
@@ -60,12 +61,20 @@ func (p *asyncPrefetchExecuteQueryStream) pump() {
 }
 
 func (p *asyncPrefetchExecuteQueryStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+	part, _, err := p.RecvPart()
+
+	return part, err
+}
+
+func (p *asyncPrefetchExecuteQueryStream) RecvPart() (
+	*Ydb_Query.ExecuteQueryResponsePart, *wirePart, error,
+) {
 	item, ok := <-p.ch
 	if !ok {
-		return nil, io.EOF
+		return nil, nil, io.EOF
 	}
 
-	return item.part, item.err
+	return item.part, item.wire, item.err
 }
 
 func (p *asyncPrefetchExecuteQueryStream) RecvMsg(m any) error {

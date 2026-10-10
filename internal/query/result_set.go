@@ -36,6 +36,8 @@ type (
 		recv                func() (*Ydb_Query.ExecuteQueryResponsePart, error)
 		columns             []*Ydb.Column
 		currentPart         *Ydb_Query.ExecuteQueryResponsePart
+		wirePart            *wirePart
+		nextWirePart        func() *wirePart
 		rowIndex            int
 		ended               atomic.Bool
 		mustBeLastResultSet bool
@@ -164,6 +166,7 @@ func newResultSet(
 	}
 }
 
+//nolint:funlen // Keep row transitions and response-part lifetime together.
 func (rs *resultSet) nextRow(ctx context.Context) (query.Row, error) {
 	rs.rowIndex++
 	for {
@@ -204,6 +207,9 @@ func (rs *resultSet) nextRow(ctx context.Context) (query.Row, error) {
 			}
 			rs.rowIndex = 0
 			rs.currentPart = part
+			if rs.nextWirePart != nil {
+				rs.wirePart = rs.nextWirePart()
+			}
 			rs.arrowBatches = nil
 			rs.arrowDecoded = false
 			if part == nil {
@@ -229,6 +235,10 @@ func (rs *resultSet) nextRow(ctx context.Context) (query.Row, error) {
 
 func (rs *resultSet) partRowCount(ctx context.Context) (int, error) {
 	if rs.currentPart.GetResultSet().GetFormat() != Ydb.ResultSet_FORMAT_ARROW {
+		if rs.wirePart != nil {
+			return rs.wirePart.RowCount(), nil
+		}
+
 		return len(rs.currentPart.GetResultSet().GetRows()), nil
 	}
 	if !rs.arrowDecoded {
@@ -265,6 +275,8 @@ func (rs *resultSet) partRow() query.Row {
 			rs.arrowBatchOffset += len(data.rows)
 			rs.arrowBatchIndex++
 		}
+	} else if rs.wirePart != nil && rs.rowIndex < rs.wirePart.RowCount() {
+		return rs.wirePart.row(rs.rowIndex, rs.columns)
 	} else if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
 		return NewRow(rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex])
 	}
