@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -30,28 +31,6 @@ import (
 // Each operation has a 10-second deadline, shared across DoTx retries.
 // The benchmark has no separate run deadline.
 
-// Set the integration scope connection and credentials before running.
-// Baseline: 2026-10-05, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
-// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
-// Run:
-//
-//	go test -tags integration ./tests/integration -run '^$' \
-//	  -bench '^BenchmarkTransactionalWriterSingle$' -count=3 -cpu=4
-
-/*
-BenchmarkTransactionalWriterSingle/p64-4       	      48	  23889453 ns/op	   78291 B/op	    1242 allocs/op
-BenchmarkTransactionalWriterSingle/p64-4       	      50	  23411710 ns/op	   77808 B/op	    1241 allocs/op
-BenchmarkTransactionalWriterSingle/p64-4       	      49	  23004689 ns/op	   77906 B/op	    1241 allocs/op
-BenchmarkTransactionalWriterSingle/p128-4      	      46	  23238680 ns/op	   78458 B/op	    1242 allocs/op
-BenchmarkTransactionalWriterSingle/p128-4      	      43	  23386471 ns/op	   77757 B/op	    1242 allocs/op
-BenchmarkTransactionalWriterSingle/p128-4      	      52	  22377686 ns/op	   77755 B/op	    1241 allocs/op
-BenchmarkTransactionalWriterSingle/p256-4      	      46	  23632148 ns/op	   77797 B/op	    1241 allocs/op
-BenchmarkTransactionalWriterSingle/p256-4      	      46	  23219518 ns/op	   77593 B/op	    1241 allocs/op
-BenchmarkTransactionalWriterSingle/p256-4      	      46	  23649817 ns/op	   77598 B/op	    1241 allocs/op
-BenchmarkTransactionalWriterSingle/p512-4      	      45	  23628352 ns/op	   77491 B/op	    1240 allocs/op
-BenchmarkTransactionalWriterSingle/p512-4      	      46	  24408697 ns/op	   78076 B/op	    1242 allocs/op
-BenchmarkTransactionalWriterSingle/p512-4      	      48	  22490911 ns/op	   77705 B/op	    1242 allocs/op
-*/
 // BenchmarkTransactionalWriterSingle measures a single-partition writer.
 func BenchmarkTransactionalWriterSingle(b *testing.B) {
 	txWriterRunFixedPartitionBenchmark(b, txWriterStandardBenchmarkCase{
@@ -59,28 +38,6 @@ func BenchmarkTransactionalWriterSingle(b *testing.B) {
 	})
 }
 
-// Set the integration scope connection and credentials before running.
-// Baseline: 2026-10-05, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
-// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
-// Run:
-//
-//	go test -tags integration ./tests/integration -run '^$' \
-//	  -bench '^BenchmarkTransactionalWriterManyKey$' -count=3 -cpu=4
-
-/*
-BenchmarkTransactionalWriterManyKey/p64-4      	       8	 130323490 ns/op	 2233584 B/op	   33196 allocs/op
-BenchmarkTransactionalWriterManyKey/p64-4      	       9	 132717532 ns/op	 2236381 B/op	   33224 allocs/op
-BenchmarkTransactionalWriterManyKey/p64-4      	       9	 126536292 ns/op	 2244664 B/op	   33292 allocs/op
-BenchmarkTransactionalWriterManyKey/p128-4     	       6	 245919139 ns/op	 4463174 B/op	   65800 allocs/op
-BenchmarkTransactionalWriterManyKey/p128-4     	       6	 409303215 ns/op	 4421866 B/op	   65428 allocs/op
-BenchmarkTransactionalWriterManyKey/p128-4     	       3	 378757222 ns/op	 4465864 B/op	   65794 allocs/op
-BenchmarkTransactionalWriterManyKey/p256-4     	       2	 535159021 ns/op	 8843192 B/op	  130468 allocs/op
-BenchmarkTransactionalWriterManyKey/p256-4     	       2	 610078833 ns/op	 8844652 B/op	  130510 allocs/op
-BenchmarkTransactionalWriterManyKey/p256-4     	       2	 619463146 ns/op	 8846828 B/op	  130533 allocs/op
-BenchmarkTransactionalWriterManyKey/p512-4     	       1	1727684750 ns/op	17649552 B/op	  260649 allocs/op
-BenchmarkTransactionalWriterManyKey/p512-4     	       1	1897948625 ns/op	17612872 B/op	  260454 allocs/op
-BenchmarkTransactionalWriterManyKey/p512-4     	       1	2380674708 ns/op	17639000 B/op	  260815 allocs/op
-*/
 // BenchmarkTransactionalWriterManyKey measures keyed multi-partition writing.
 func BenchmarkTransactionalWriterManyKey(b *testing.B) {
 	txWriterRunFixedPartitionBenchmark(b, txWriterStandardBenchmarkCase{
@@ -88,28 +45,6 @@ func BenchmarkTransactionalWriterManyKey(b *testing.B) {
 	})
 }
 
-// Set the integration scope connection and credentials before running.
-// Baseline: 2026-10-05, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
-// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
-// Run:
-//
-//	go test -tags integration ./tests/integration -run '^$' \
-//	  -bench '^BenchmarkTransactionalWriterManyBoundedKey$' -count=3 -cpu=4
-
-/*
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       7	 163805839 ns/op	 2298929 B/op	   33897 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       7	 161294512 ns/op	 2272589 B/op	   33612 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p64-4         	       8	 132987354 ns/op	 2282266 B/op	   33663 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       5	 310225292 ns/op	 4487283 B/op	   66202 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       4	 430267188 ns/op	 4518120 B/op	   66512 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p128-4        	       4	 293932323 ns/op	 4520344 B/op	   66440 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       1	1236404000 ns/op	 8909776 B/op	  131741 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       1	1160582833 ns/op	 8926152 B/op	  131869 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p256-4        	       1	1185910250 ns/op	 8939096 B/op	  131973 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1990103750 ns/op	17839800 B/op	  262958 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1979818792 ns/op	17823408 B/op	  263171 allocs/op
-BenchmarkTransactionalWriterManyBoundedKey/p512-4        	       1	1944340333 ns/op	17819568 B/op	  263172 allocs/op
-*/
 // BenchmarkTransactionalWriterManyBoundedKey measures bounded-key multi-partition writing.
 func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
 	txWriterRunFixedPartitionBenchmark(b, txWriterStandardBenchmarkCase{
@@ -117,23 +52,10 @@ func BenchmarkTransactionalWriterManyBoundedKey(b *testing.B) {
 	})
 }
 
-// Set the integration scope connection and credentials before running.
-// Baseline: 2026-10-05, Go 1.27.1 on Apple M3 Pro (darwin/arm64), YDB
-// ydb-stable-26-3-1-17 on one dedicated node with 4 CPU cores and 8 GB RAM.
-// Run:
-//
-//	go test -tags integration ./tests/integration -run '^$' \
-//	  -bench '^BenchmarkTransactionalWriterAutoSplit$' \
-//	  -benchtime=300x -count=3 -cpu=4
-
-/*
-BenchmarkTransactionalWriterAutoSplit/tx-4         	     300	  30704545 ns/op	  160715 B/op	    2501 allocs/op
-BenchmarkTransactionalWriterAutoSplit/tx-4         	     300	  28699257 ns/op	  173742 B/op	    2709 allocs/op
-BenchmarkTransactionalWriterAutoSplit/tx-4         	     300	  28877437 ns/op	  173551 B/op	    2708 allocs/op
-*/
-// BenchmarkTransactionalWriterAutoSplit measures bounded-key writing while YDB may split partitions.
+// BenchmarkTransactionalWriterAutoSplit measures bounded-key writing after YDB splits a partition.
+// The setup waits for two active partitions, and the partition cap prevents
+// another topology change during measurement.
 func BenchmarkTransactionalWriterAutoSplit(b *testing.B) {
-	b.StopTimer()
 	scope := newScope(b)
 	ctx := scope.Ctx
 	db := scope.Driver()
@@ -152,14 +74,23 @@ func BenchmarkTransactionalWriterAutoSplit(b *testing.B) {
 	cfg.AutoSplitStabilization = 2 * time.Second
 
 	txWriterPrepareBenchmark(b, ctx, db, cfg)
-	b.Run("tx", func(b *testing.B) {
+	txWriterWaitForAutoSplit(b, ctx, db, cfg)
+	b.Run(fmt.Sprintf("active-partitions-%d", txWriterAutoSplitBenchmarkPartitions), func(b *testing.B) {
 		txWriterRunBenchmark(b, ctx, db, cfg)
+		activePartitions, err := txWriterActivePartitionCount(ctx, db, cfg.TopicPath)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if activePartitions != txWriterAutoSplitBenchmarkPartitions {
+			b.Fatalf("active partitions after measurement: got %d, want %d", activePartitions, txWriterAutoSplitBenchmarkPartitions)
+		}
 	})
 }
 
 const (
 	txWriterStandardBenchmarkTopicPrefix = "tx-writer-benchmark"
 	txWriterStandardBenchmarkTable       = "tx-writer-benchmark-state"
+	txWriterAutoSplitBenchmarkPartitions = 2
 )
 
 const txWriterTransactionTimeout = 10 * time.Second
@@ -217,19 +148,84 @@ func txWriterPrepareBenchmark(b *testing.B, ctx context.Context, db *ydb.Driver,
 
 func txWriterRunBenchmark(b *testing.B, ctx context.Context, db *ydb.Driver, cfg txWriterConfig) {
 	b.Helper()
-	b.StopTimer()
 
 	payload := txWriterMakePayload(cfg.MessageSize)
 	runners := txWriterNewTransactionRunners(db, cfg, payload)
-	workerStats := make([]txWriterWorkerStats, cfg.Concurrency)
-	b.ReportAllocs()
-	b.ResetTimer()
-	b.StartTimer()
-	err := txWriterRunParallelTransactions(ctx, b, runners, workerStats)
-	b.StopTimer()
-	if err != nil {
-		b.Fatalf("benchmark transaction failed: %v", err)
+	var warmup sync.WaitGroup
+	warmupErrors := make(chan error, len(runners))
+	warmup.Add(len(runners))
+	for _, runner := range runners {
+		go func() {
+			defer warmup.Done()
+			if err := runner.execute(ctx, 0); err != nil {
+				warmupErrors <- err
+			}
+		}()
 	}
+	warmup.Wait()
+	close(warmupErrors)
+	for err := range warmupErrors {
+		b.Fatalf("benchmark warmup failed: %v", err)
+	}
+	workerStats := make([]txWriterWorkerStats, cfg.Concurrency)
+	b.Run("transactions", func(b *testing.B) {
+		b.ReportAllocs()
+		if err := txWriterRunParallelTransactions(ctx, b, runners, workerStats); err != nil {
+			b.Fatalf("benchmark transaction failed: %v", err)
+		}
+	})
+}
+
+func txWriterWaitForAutoSplit(b *testing.B, ctx context.Context, db *ydb.Driver, cfg txWriterConfig) {
+	b.Helper()
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+
+	prefillConfig := cfg
+	prefillConfig.ProducerIDPrefix += "-prefill"
+	runners := txWriterNewTransactionRunners(db, prefillConfig, txWriterMakePayload(cfg.MessageSize))
+	for batch := uint64(0); ; batch++ {
+		var workers sync.WaitGroup
+		errors := make(chan error, len(runners))
+		workers.Add(len(runners))
+		for _, runner := range runners {
+			go func() {
+				defer workers.Done()
+				for number := batch*8 + 1; number <= (batch+1)*8; number++ {
+					if err := runner.execute(ctx, number); err != nil {
+						errors <- err
+						return
+					}
+				}
+			}()
+		}
+		workers.Wait()
+		close(errors)
+		for err := range errors {
+			b.Fatalf("write before auto split: %v", err)
+		}
+		activePartitions, err := txWriterActivePartitionCount(ctx, db, cfg.TopicPath)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if activePartitions == txWriterAutoSplitBenchmarkPartitions {
+			return
+		}
+	}
+}
+
+func txWriterActivePartitionCount(ctx context.Context, db *ydb.Driver, topicPath string) (int, error) {
+	description, err := db.Topic().Describe(ctx, topicPath)
+	if err != nil {
+		return 0, fmt.Errorf("describe benchmark topic %q: %w", topicPath, err)
+	}
+	activePartitions := 0
+	for _, partition := range description.Partitions {
+		if partition.Active {
+			activePartitions++
+		}
+	}
+	return activePartitions, nil
 }
 
 func txWriterRunParallelTransactions(
@@ -312,7 +308,6 @@ type txWriterWorkerStats struct {
 
 func txWriterRunFixedPartitionBenchmark(b *testing.B, benchmarkCase txWriterStandardBenchmarkCase) {
 	b.Helper()
-	b.StopTimer()
 	scope := newScope(b)
 	ctx := scope.Ctx
 	db := scope.Driver()
@@ -339,8 +334,6 @@ const txWriterBenchmarkTableQueryTemplate = `
 UPSERT INTO %s (run_id, worker_id, updated_at)
 VALUES ($run_id, $worker_id, CurrentUtcTimestamp());
 `
-
-const ydbMaxTopicPartitions int64 = 35_000
 
 func txWriterTopicAutoPartitioningSettings(cfg txWriterConfig) topictypes.AutoPartitioningSettings {
 	settings := topictypes.AutoPartitioningSettings{
@@ -388,10 +381,8 @@ CREATE TABLE IF NOT EXISTS %s (
 	if cfg.AutoSplit {
 		createOptions = append(
 			createOptions,
-			// YDB treats an omitted maximum as equal to the minimum, which would
-			// disable splitting. Use the server-wide ceiling so the benchmark does
-			// not introduce a lower partition limit of its own.
-			topicoptions.CreateWithMaxActivePartitions(ydbMaxTopicPartitions),
+			// Keep the measured topology fixed after the initial split.
+			topicoptions.CreateWithMaxActivePartitions(txWriterAutoSplitBenchmarkPartitions),
 			topicoptions.CreateWithPartitionWriteSpeedBytesPerSecond(cfg.AutoSplitWriteSpeed),
 			topicoptions.CreateWithPartitionWriteBurstBytes(cfg.AutoSplitBurstBytes),
 		)

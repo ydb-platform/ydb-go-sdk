@@ -1,9 +1,8 @@
 // This file compare idle-queue container implementations.
 //
 // itemsContainer defines the interface under test;
-// map, list, xsync.Set, and slice backends are exercised by BenchmarkContainers.
-// sliceContainer won that benchmark (see results in BenchmarkContainers) and
-// is the production implementation in container.go, wired as Pool.idle (pool.go).
+// map, list, xsync.Set, and slice backends are exercised by BenchmarkContainerOperations.
+// sliceContainer is the production implementation in container.go, wired as Pool.idle (pool.go).
 package pool
 
 import (
@@ -117,11 +116,10 @@ func TestSliceContainerPopByNodeIDOrOldestIfReturnsOldestFirst(t *testing.T) {
 	require.Zero(t, items.Len())
 }
 
-// BenchmarkContainers/xsync.Set-12         	 1174489	      1011 ns/op	      86 B/op	       1 allocs/op
-// BenchmarkContainers/slice-12             	 1000000	      1511 ns/op	       0 B/op	       0 allocs/op
-// BenchmarkContainers/map-12               	  674767	      1757 ns/op	       1 B/op	       0 allocs/op
-// BenchmarkContainers/xlist.List-12        	  694712	      1504 ns/op	      33 B/op	       1 allocs/op
-func BenchmarkContainers(b *testing.B) {
+// BenchmarkContainerOperations compares successful container operations with a fixed
+// workload. The node lookup advances with the FIFO order of the list backend.
+// BenchmarkPoolWith covers the concurrent pool path separately.
+func BenchmarkContainerOperations(b *testing.B) {
 	for _, tt := range []struct {
 		name  string
 		items itemsContainer[*testItem, testItem]
@@ -159,32 +157,23 @@ func BenchmarkContainers(b *testing.B) {
 				}))
 			}
 
-			b.ResetTimer()
-			b.ReportAllocs()
-
 			require.Equal(b, containerLen, container.Len())
-
-			b.SetParallelism(containerLen)
-			b.RunParallel(func(pb *testing.PB) {
-				var i uint32
-				for pb.Next() {
-					{
-						info, err := container.Pop()
-						if err != nil {
-							require.Nil(b, info)
-							require.ErrorIs(b, err, errNothingIdleItems)
-						} else {
-							require.NoError(b, container.Put(info))
-						}
+			b.Run("PopAndPopByNodeID", func(b *testing.B) {
+				b.ReportAllocs()
+				for i := 0; b.Loop(); i++ {
+					info, err := container.Pop()
+					if err != nil {
+						b.Fatal(err)
 					}
-					{
-						info, err := container.PopByNodeID(i % containerLen)
-						if err != nil {
-							require.Nil(b, info)
-							require.ErrorIs(b, err, errNothingIdleItems)
-						} else {
-							require.NoError(b, container.Put(info))
-						}
+					if err := container.Put(info); err != nil {
+						b.Fatal(err)
+					}
+					info, err = container.PopByNodeID(uint32((2*i + 1) % containerLen))
+					if err != nil {
+						b.Fatal(err)
+					}
+					if err := container.Put(info); err != nil {
+						b.Fatal(err)
 					}
 				}
 			})
