@@ -125,8 +125,10 @@ func Run(factory WorkloadFactory) {
 		logger.Errorf("start cpu profile failed: %v", err)
 	}
 
-	runCtx, runCancel := context.WithTimeout(ctx, cfg.RunDuration())
+	runCtx, runCancel := context.WithCancel(ctx)
+	runTimer := time.AfterFunc(cfg.RunDuration(), runCancel)
 	err = workload.Run(runCtx)
+	runTimer.Stop()
 	runCancel()
 	if err != nil {
 		logger.Errorf("run failed: %v", err)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -161,19 +160,17 @@ func (s *Storage) Run(ctx context.Context) error {
 	readRL := framework.NewRateLimiter(int(s.params.ReadRPS))
 	writeRL := framework.NewRateLimiter(int(s.params.WriteRPS))
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+	group, ctx := errgroup.WithContext(ctx)
 
-	go func() {
-		defer wg.Done()
-		framework.RunWorkers(ctx, int(s.params.ReadRPS), readRL, func(ctx context.Context) {
+	group.Go(func() error {
+		return framework.RunWorkers(ctx, int(s.params.ReadRPS), readRL, func(ctx context.Context) error {
 			ids := make([]generator.RowID, 0, s.batchSize)
 			for range s.batchSize {
 				row, err := s.gen.Generate()
 				if err != nil {
 					s.fw.Logger.Errorf("generate error: %v", err)
 
-					return
+					return err
 				}
 				ids = append(ids, row.ID)
 			}
@@ -183,19 +180,19 @@ func (s *Storage) Run(ctx context.Context) error {
 			if err != nil && ctx.Err() == nil {
 				s.fw.Logger.Errorf("read failed: %v", err)
 			}
+			return err
 		})
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
-		framework.RunWorkers(ctx, int(s.params.WriteRPS), writeRL, func(ctx context.Context) {
+	group.Go(func() error {
+		return framework.RunWorkers(ctx, int(s.params.WriteRPS), writeRL, func(ctx context.Context) error {
 			rows := make([]generator.Row, 0, s.batchSize)
 			for range s.batchSize {
 				row, err := s.gen.Generate()
 				if err != nil {
 					s.fw.Logger.Errorf("generate error: %v", err)
 
-					return
+					return err
 				}
 				rows = append(rows, row)
 			}
@@ -205,12 +202,11 @@ func (s *Storage) Run(ctx context.Context) error {
 			if err != nil && ctx.Err() == nil {
 				s.fw.Logger.Errorf("write failed: %v", err)
 			}
+			return err
 		})
-	}()
+	})
 
-	wg.Wait()
-
-	return nil
+	return group.Wait()
 }
 
 func (s *Storage) Cooldown(ctx context.Context) error {

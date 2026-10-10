@@ -204,6 +204,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workload_name: ${{ matrix.sdk.name }}
           workload_duration: ${{ inputs.slo_workload_duration_seconds || '600' }}
+          fail_on_workload_error: true
           workload_current_ref: ${{ github.head_ref || github.ref_name }}
           workload_current_image: ydb-app-current
           workload_current_command: ${{ matrix.sdk.command }}
