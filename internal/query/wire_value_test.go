@@ -120,6 +120,35 @@ func TestDecodePartRejectsTruncatedResponse(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestWireRowHandlesUnknownAndMalformedFields(t *testing.T) {
+	columns := []*Ydb.Column{{Name: "id", Type: wirePrimitive(Ydb.Type_UINT64)}}
+	row, err := proto.Marshal(&Ydb.Value{Items: []*Ydb.Value{
+		{Value: &Ydb.Value_Uint64Value{Uint64Value: 42}},
+	}})
+	require.NoError(t, err)
+	row = protowire.AppendTag(row, 200, protowire.VarintType)
+	row = protowire.AppendVarint(row, 9)
+
+	t.Run("unknown field", func(t *testing.T) {
+		part := &wirePart{frame: row, rows: []rowSpan{{end: uint32(len(row))}}}
+		var got uint64
+		require.NoError(t, part.row(0, columns).Scan(&got))
+		require.Equal(t, uint64(42), got)
+	})
+	for name, frame := range map[string][]byte{
+		"invalid tag":     {0xff},
+		"truncated value": {0x62, 0x7f},
+	} {
+		t.Run(name, func(t *testing.T) {
+			part := &wirePart{frame: frame, rows: []rowSpan{{end: uint32(len(frame))}}}
+			var got uint64
+			wireRow := part.row(0, columns)
+			require.Error(t, wireRow.Scan(&got))
+			require.Error(t, wireRow.ScanNamed(scanner.NamedRef("id", &got)))
+		})
+	}
+}
+
 func TestWireValueRowOtherScannersAndFallback(t *testing.T) {
 	original := &Ydb_Query.ExecuteQueryResponsePart{ResultSet: &Ydb.ResultSet{
 		Columns: []*Ydb.Column{
