@@ -13,6 +13,9 @@ go test -mod=readonly -race -tags integration \
 go test -tags integration -run '^$' -bench BenchmarkFormats -benchtime=100x -count=5 -cpu=4 -v
 ```
 
+For a quick checksum and setup check, use `-benchtime=1x -count=1` before a
+longer measurement run.
+
 Set `YDB_CONNECTION_STRING` if it differs from `grpc://localhost:2136/local`.
 Tests use anonymous credentials. The [YQL type tests](types_integration_test.go)
 use self-contained `SELECT` expressions without creating tables. They compare
@@ -34,15 +37,14 @@ Wait until `ydb -e grpc://localhost:2136 -d /local sql -s 'SELECT 1;'` succeeds.
 The benchmark consumes 1, 10, 100, 1,000 and 10,000 ordered table rows with six columns,
 nullable values and 64-byte payloads. It compares `Session.Query` + `Scan`,
 direct `Session.QueryArrow` column access, and `Session.Query` + `WithResultFormatArrow` +
-`Scan` using the same session, SQL and 32 KiB response-part limit.
-Each variant has ten warmup queries before `b.Loop()` starts measuring. All six
-columns are read into a benchmark sink; correctness is checked by the
-integration tests.
-The Value and WithResultFormatArrow consumers reuse Scan destinations and arguments across
+`Scan` using the same session, SQL, checksum and 32 KiB response-part limit.
+Each variant has ten warmup queries. All returned columns participate in the
+checksum; the row count and checksum must match on every RPC.
+The Query and WithResultFormatArrow consumers reuse Scan destinations and arguments across
 rows; nullable scans still allocate each non-null destination value.
 
-The standard Go benchmark metrics are `ns/op`, `B/op` and `allocs/op`.
-`ns/op` includes server work, transport, decoding and scans; `B/op` and
+Reported `ns/op` includes server work and transport; `cpu-ns/op` is client process
+user + system CPU from `getrusage`, including decoding, scans and GC. `B/op` and
 `allocs/op` are Go allocations. Run benchmarks without `-race` and without other
 concurrent workloads. Docker CPU architecture/emulation and resource limits
 matter for elapsed time. These measurements are not serialization-only numbers
