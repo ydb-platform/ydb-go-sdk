@@ -61,7 +61,12 @@ func (p *asyncPrefetchExecuteQueryStream) pump() {
 }
 
 func (p *asyncPrefetchExecuteQueryStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-	part, _, err := p.RecvPart()
+	part, wire, err := p.RecvPart()
+	if err != nil || wire == nil {
+		return part, err
+	}
+	part = new(Ydb_Query.ExecuteQueryResponsePart)
+	err = proto.Unmarshal(wire.frame, part)
 
 	return part, err
 }

@@ -46,12 +46,7 @@ func (s wireQueryStream) RecvPart() (*Ydb_Query.ExecuteQueryResponsePart, *wireP
 }
 
 func (s wireQueryStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-	part, wire, err := s.RecvPart()
-	if err == nil {
-		err = wire.MaterializeRows()
-	}
-
-	return part, err
+	return s.QueryService_ExecuteQueryClient.Recv()
 }
 
 func recvQueryPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
