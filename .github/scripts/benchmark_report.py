@@ -214,11 +214,11 @@ def _card_priority(measurements):
 
 
 def _card_lines(name, measurements):
-    changed = [row for row in measurements if row.direction in ("regression", "improvement")]
+    changed = [row for row in measurements if row.direction != "unchanged"]
     status = _card_status(changed)
     directions = {row.direction for row in changed}
     icon = "🔴🟢" if "regression" in directions and "improvement" in directions else {
-        "regression": "🔴", "improvement": "🟢"
+        "regression": "🔴", "incomplete": "🟡", "improvement": "🟢"
     }[status]
     summary = "; ".join(_metric_phrase(row) for row in changed)
     lines = [
@@ -241,8 +241,7 @@ def _card_lines(name, measurements):
 
 def _package_lines(measurements, max_cards=None):
     cards = _cards(measurements)
-    visible = [(key, value) for key, value in cards.items()
-               if _card_status(value) in ("regression", "improvement")]
+    visible = [(key, value) for key, value in cards.items() if _card_status(value) != "unchanged"]
     packages = defaultdict(list)
     for key, value in visible:
         packages[key[0]].append((key[1], value))
@@ -260,10 +259,11 @@ def _package_lines(measurements, max_cards=None):
         counts = _scope_counts({name: rows for name, rows in package_cards})
         labels = []
         for direction, icon, singular in (("regression", "🔴", "regression"),
+                                          ("incomplete", "🟡", "incomplete"),
                                           ("improvement", "🟢", "improvement")):
             if counts[direction]:
                 n = counts[direction]
-                labels.append(f"{icon} {n} {singular}{'s' if n != 1 else ''}")
+                labels.append(f"{icon} {n} {singular}{'s' if n != 1 and direction != 'incomplete' else ''}")
         lines += [f"#### <code>{html.escape(_package_name(package))}</code> — {' · '.join(labels)}", ""]
         for name, rows in selected:
             lines += _card_lines(name, rows)
@@ -312,7 +312,7 @@ def render_report(csv_source, *, artifact_url, preview_url, master_sha, head_sha
             "",
             f"**{totals['regression']} benchmarks with regressions · "
             f"{totals['improvement']} with improvements only · "
-            f"{totals['incomplete']} not comparable · "
+            f"{totals['incomplete']} incomplete · "
             f"{totals['unchanged']} with no detected change.**",
             "",
             f"**Time trend across all packages:** {_time_trend(measurements)}",
