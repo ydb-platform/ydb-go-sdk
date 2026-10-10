@@ -1,7 +1,5 @@
 package query
 
-//go:generate go run gen_wire_fields.go
-
 import (
 	"bytes"
 	"fmt"
@@ -72,23 +70,6 @@ func (p *wirePart) row(index int, columns []*Ydb.Column) *Row {
 	return &p.rowObjects[index]
 }
 
-// MaterializeRows builds protobuf rows for consumers of the typed Recv API.
-func (p *wirePart) MaterializeRows() error {
-	if len(p.rows) == 0 {
-		return nil
-	}
-	resultSet := p.meta.GetResultSet()
-	for _, span := range p.rows {
-		row := new(Ydb.Value)
-		if err := proto.Unmarshal(p.frame[span.start:span.end], row); err != nil {
-			return err
-		}
-		resultSet.Rows = append(resultSet.Rows, row)
-	}
-
-	return nil
-}
-
 // decodeWirePart copies and decodes a FORMAT_VALUE response part.
 func decodeWirePart(data []byte) (*wirePart, error) {
 	// A row may outlive the next RecvMsg, so the part must own its wire bytes.
@@ -111,7 +92,7 @@ func decodeOwnedPart(frame []byte) (*wirePart, error) {
 		if valueLen < 0 {
 			return nil, protowire.ParseError(valueLen)
 		}
-		if field == wirePartResultSetField && wireType == wirePartResultSetWireType {
+		if field == wirevalue.PartResultSetField && wireType == wirevalue.PartResultSetWireType {
 			resultSetBytes, n := protowire.ConsumeBytes(frame[tagLen:])
 			if n < 0 {
 				return nil, protowire.ParseError(n)
@@ -121,7 +102,7 @@ func decodeOwnedPart(frame []byte) (*wirePart, error) {
 			if err != nil {
 				return nil, err
 			}
-			metadata = protowire.AppendTag(metadata, wirePartResultSetField, wirePartResultSetWireType)
+			metadata = protowire.AppendTag(metadata, wirevalue.PartResultSetField, wirevalue.PartResultSetWireType)
 			metadata = protowire.AppendBytes(metadata, resultSetMetadata)
 		} else {
 			metadata = append(metadata, frame[:tagLen+valueLen]...)
@@ -153,7 +134,7 @@ func stripWireValueRows(data []byte, part *wirePart, base int) ([]byte, error) {
 		if valueLen < 0 {
 			return nil, protowire.ParseError(valueLen)
 		}
-		if field == wireResultSetRowsField && wireType == wireResultSetRowsWireType {
+		if field == wirevalue.ResultSetRowsField && wireType == wirevalue.ResultSetRowsWireType {
 			row, n := protowire.ConsumeBytes(data[tagLen:])
 			if n < 0 {
 				return nil, protowire.ParseError(n)
@@ -175,31 +156,19 @@ func scanRowBytes(r *Row, dst []any) error {
 	if len(dst) != len(columns) {
 		return scanner.Indexed(r.scannerData()).Scan(dst...)
 	}
-	data := r.part.rowBytes(r.index)
+	cells := rowCells{data: r.part.rowBytes(r.index)}
 	index := 0
-	for len(data) > 0 {
-		field, wireType, tagLen := protowire.ConsumeTag(data)
-		if tagLen < 0 {
-			return protowire.ParseError(tagLen)
-		}
-		valueLen := protowire.ConsumeFieldValue(field, wireType, data[tagLen:])
-		if valueLen < 0 {
-			return protowire.ParseError(valueLen)
-		}
-		if field == wireValueItemsField && wireType == wireValueItemsWireType {
-			cell, n := protowire.ConsumeBytes(data[tagLen:])
-			if n < 0 {
-				return protowire.ParseError(n)
+	for cells.Next() {
+		if index < len(dst) {
+			columnType := columns[index].GetType()
+			if err := scanWireValueDestination(columnType, r.part.columnTypes[index], cells.Cell(), dst[index]); err != nil {
+				return fmt.Errorf("scan error on column index %d: %w", index, err)
 			}
-			if index < len(dst) {
-				columnType := columns[index].GetType()
-				if err := scanWireValueDestination(columnType, r.part.columnTypes[index], cell, dst[index]); err != nil {
-					return fmt.Errorf("scan error on column index %d: %w", index, err)
-				}
-			}
-			index++
 		}
-		data = data[tagLen+valueLen:]
+		index++
+	}
+	if err := cells.Err(); err != nil {
+		return err
 	}
 	if index < len(dst) {
 		return fmt.Errorf("wire value decoder: row has %d cells, want %d", index, len(dst))
@@ -250,32 +219,56 @@ func (r *Row) cell(column int) ([]byte, error) {
 	if column < 0 || column >= len(r.part.columns) {
 		return nil, fmt.Errorf("wire value decoder: column %d out of range", column)
 	}
-	data := r.part.rowBytes(r.index)
+	cells := rowCells{data: r.part.rowBytes(r.index)}
 	index := 0
-	for len(data) > 0 {
-		field, wireType, tagLen := protowire.ConsumeTag(data)
-		if tagLen < 0 {
-			return nil, protowire.ParseError(tagLen)
+	for cells.Next() {
+		if index == column {
+			return cells.Cell(), nil
 		}
-		valueLen := protowire.ConsumeFieldValue(field, wireType, data[tagLen:])
-		if valueLen < 0 {
-			return nil, protowire.ParseError(valueLen)
-		}
-		if field == wireValueItemsField && wireType == wireValueItemsWireType {
-			cell, n := protowire.ConsumeBytes(data[tagLen:])
-			if n < 0 {
-				return nil, protowire.ParseError(n)
-			}
-			if index == column {
-				return cell, nil
-			}
-			index++
-		}
-		data = data[tagLen+valueLen:]
+		index++
+	}
+	if err := cells.Err(); err != nil {
+		return nil, err
 	}
 
 	return nil, fmt.Errorf("wire value decoder: missing column %d", column)
 }
+
+type rowCells struct {
+	data []byte
+	cell []byte
+	err  error
+}
+
+func (c *rowCells) Next() bool {
+	for len(c.data) > 0 {
+		field, wireType, tagLen := protowire.ConsumeTag(c.data)
+		if tagLen < 0 {
+			c.err = protowire.ParseError(tagLen)
+
+			return false
+		}
+		valueLen := protowire.ConsumeFieldValue(field, wireType, c.data[tagLen:])
+		if valueLen < 0 {
+			c.err = protowire.ParseError(valueLen)
+
+			return false
+		}
+		value := c.data[tagLen : tagLen+valueLen]
+		c.data = c.data[tagLen+valueLen:]
+		if field == wirevalue.ValueItemsField && wireType == wirevalue.ValueItemsWireType {
+			c.cell, _ = protowire.ConsumeBytes(value)
+
+			return true
+		}
+	}
+
+	return false
+}
+
+func (c *rowCells) Cell() []byte { return c.cell }
+
+func (c *rowCells) Err() error { return c.err }
 
 func scanWireValueCell(columnType *Ydb.Type, cell wirevalue.Cell, dst any) bool {
 	primitive, optional := wireValuePrimitive(columnType)
