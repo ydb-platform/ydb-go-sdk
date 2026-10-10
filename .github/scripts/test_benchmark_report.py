@@ -81,9 +81,10 @@ Added-2,,,1e-06,2%
         )
 
         self.assertIn("🟡 Comparison incomplete", report)
-        self.assertIn("Removed-2", report)
-        self.assertIn("Added-2", report)
-        self.assertIn("not comparable", report)
+        self.assertIn("2 not comparable", report)
+        self.assertNotIn("Removed-2", report)
+        self.assertNotIn("Added-2", report)
+        self.assertNotIn("<details>", report)
 
     def test_benchmark_names_are_escaped_before_rendering_html(self):
         sdk_csv = SDK_CSV.replace("Slow-2", "Slow<script>-2")
@@ -149,8 +150,34 @@ Custom-2,100,1%,110,1%,+10.00%,p=0.001 n=10
         )
 
         self.assertIn("🟡 Comparison incomplete", report)
-        self.assertIn("direction unknown", report)
+        self.assertIn("1 not comparable", report)
+        self.assertNotIn("Custom-2", report)
+        self.assertNotIn("direction unknown", report)
         self.assertNotIn("🔴 Performance regressions reported", report)
+
+    def test_not_comparable_metric_is_hidden_in_regression_card(self):
+        sdk_csv = """\
+pkg: github.com/ydb-platform/ydb-go-sdk/v3/internal/pool
+,master,,pr,,,
+,sec/op,CI,sec/op,CI,vs base,P
+Mixed-2,1e-06,1%,1.2e-06,1%,+20.00%,p=0.001 n=10
+
+,master,,pr,,,
+,B/op,CI,B/op,CI,vs base,P
+Mixed-2,100,1%
+"""
+        report = render_report(
+            sdk_csv,
+            artifact_url="https://github.com/example/repo/actions/runs/1/artifacts/2",
+            preview_url="https://github.com/example/repo/actions/runs/1/artifacts/3",
+            master_sha="a" * 40,
+            head_sha="b" * 40,
+        )
+
+        self.assertIn("🔴 <code>Mixed-2</code>", report)
+        self.assertIn("slower (+20.00% sec/op)", report)
+        self.assertNotIn("not comparable (B/op)", report)
+        self.assertNotIn("| B/op |", report)
 
 
 if __name__ == "__main__":
