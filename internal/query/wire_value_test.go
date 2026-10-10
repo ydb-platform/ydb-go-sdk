@@ -1,6 +1,7 @@
 package query
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,6 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
@@ -153,6 +155,48 @@ func TestWireValueRowOtherScannersAndFallback(t *testing.T) {
 	var fromValues uint64
 	require.NoError(t, value.CastTo(values[0], &fromValues))
 	require.Equal(t, uint64(5), fromValues)
+}
+
+func TestWireValueRowScansComplexTypesWithoutProtobufValues(t *testing.T) {
+	values := []value.Value{
+		value.BoolValue(true),
+		value.Uint32Value(12),
+		value.DecimalValue(value.BigEndianUint128(1, 2), 22, 9),
+		value.OptionalValue(value.NullValue(types.Int32)),
+		value.ListValue(value.Int32Value(1), value.Int32Value(2)),
+		value.DictValue(value.DictValueField{K: value.TextValue("key"), V: value.Int64Value(9)}),
+		value.VariantValueTuple(value.TextValue("selected"), 1, types.NewTuple(types.Int32, types.Text)),
+		value.PgValue(25, "text"),
+	}
+	columns := make([]*Ydb.Column, len(values))
+	items := make([]*Ydb.Value, len(values))
+	for i, v := range values {
+		pb := value.ToYDB(v)
+		columns[i] = &Ydb.Column{Name: fmt.Sprintf("column_%d", i), Type: pb.GetType()}
+		items[i] = pb.GetValue()
+	}
+	original := &Ydb_Query.ExecuteQueryResponsePart{ResultSet: &Ydb.ResultSet{
+		Columns: columns, Rows: []*Ydb.Value{{Items: items}},
+	}}
+	frame, err := proto.Marshal(original)
+	require.NoError(t, err)
+	part, err := decodeWirePart(frame)
+	require.NoError(t, err)
+	row := part.row(0, columns)
+	require.Empty(t, part.Meta().GetResultSet().GetRows())
+
+	scanned := make([]value.Value, len(values))
+	dst := make([]any, len(values))
+	for i := range scanned {
+		dst[i] = &scanned[i]
+	}
+	require.NoError(t, row.Scan(dst...))
+	returned := row.Values()
+	for i, want := range values {
+		require.Equal(t, want.Type().Yql(), scanned[i].Type().Yql(), "scan column %d", i)
+		require.Equal(t, want.Yql(), scanned[i].Yql(), "scan column %d", i)
+		require.Equal(t, want.Yql(), returned[i].Yql(), "values column %d", i)
+	}
 }
 
 func wirePrimitive(id Ydb.Type_PrimitiveTypeId) *Ydb.Type {
