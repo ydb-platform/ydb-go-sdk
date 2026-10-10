@@ -13,6 +13,9 @@ go test -mod=readonly -race -tags integration \
 go test -tags integration -run '^$' -bench BenchmarkFormats -benchtime=100x -count=5 -cpu=4 -v
 ```
 
+For a quick checksum and setup check, use `-benchtime=1x -count=1` before a
+longer measurement run.
+
 Set `YDB_CONNECTION_STRING` if it differs from `grpc://localhost:2136/local`.
 Tests use anonymous credentials. The [YQL type tests](types_integration_test.go)
 use self-contained `SELECT` expressions without creating tables. They compare
