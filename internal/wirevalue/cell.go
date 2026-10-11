@@ -1,5 +1,7 @@
 package wirevalue
 
+//go:generate go run gen_fields.go
+
 import (
 	"math"
 
