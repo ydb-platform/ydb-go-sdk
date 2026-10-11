@@ -191,11 +191,11 @@ func Open(
 	}
 
 	if core.cc != nil {
-		core.Client = Ydb_Query_V1.NewQueryServiceClient(
+		core.Client = WireQueryClient(Ydb_Query_V1.NewQueryServiceClient(
 			conn.WithContextModifier(core.cc, func(ctx context.Context) context.Context {
 				return meta.WithTrailerCallback(balancerContext.WithNodeID(ctx, core.NodeID()), core.checkCloseHint)
 			}),
-		)
+		))
 	}
 
 	core.id = response.GetSessionId()
