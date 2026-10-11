@@ -56,6 +56,18 @@ func TestExecuteQueryUsesWireRowsAcrossParts(t *testing.T) {
 			require.ErrorIs(t, err, io.EOF)
 		})
 	}
+	for _, prefetch := range []int{0, 2} {
+		t.Run(fmt.Sprintf("typed recv prefetch=%d", prefetch), func(t *testing.T) {
+			client := WireQueryClient(Ydb_Query_V1.NewQueryServiceClient(conn))
+			stream, err := client.ExecuteQuery(t.Context(), &Ydb_Query.ExecuteQueryRequest{})
+			require.NoError(t, err)
+			stream = wrapExecuteQueryStreamWithAsyncPrefetch(stream, prefetch)
+			part, err := stream.Recv()
+			require.NoError(t, err)
+			require.Len(t, part.GetResultSet().GetRows(), 1)
+			require.Equal(t, uint64(42), part.GetResultSet().GetRows()[0].GetItems()[0].GetUint64Value())
+		})
+	}
 	t.Run("materialized", func(t *testing.T) {
 		ctx := t.Context()
 		r, err := execute(ctx, "session", WireQueryClient(Ydb_Query_V1.NewQueryServiceClient(conn)), "SELECT id FROM test",

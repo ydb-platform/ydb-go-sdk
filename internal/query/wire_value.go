@@ -63,23 +63,6 @@ func (p *wirePart) row(index int, columns []*Ydb.Column) *Row {
 	return &p.rowObjects[index]
 }
 
-// MaterializeRows builds protobuf rows for consumers of the typed Recv API.
-func (p *wirePart) MaterializeRows() error {
-	if len(p.rows) == 0 {
-		return nil
-	}
-	resultSet := p.meta.GetResultSet()
-	for _, span := range p.rows {
-		row := new(Ydb.Value)
-		if err := proto.Unmarshal(p.frame[span.start:span.end], row); err != nil {
-			return err
-		}
-		resultSet.Rows = append(resultSet.Rows, row)
-	}
-
-	return nil
-}
-
 // decodeWirePart copies and decodes a FORMAT_VALUE response part.
 func decodeWirePart(data []byte) (*wirePart, error) {
 	// A row may outlive the next RecvMsg, so the part must own its wire bytes.
