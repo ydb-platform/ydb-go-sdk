@@ -1,7 +1,5 @@
 package query
 
-//go:generate go run gen_wire_fields.go
-
 import (
 	"bytes"
 	"fmt"
@@ -15,17 +13,20 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wirevalue"
 )
 
 // wirePart holds the original response bytes while exposing rows without
 // constructing a protobuf Value tree. Only FORMAT_VALUE is supported.
 type wirePart struct {
-	meta       *Ydb_Query.ExecuteQueryResponsePart
-	frame      []byte
-	rows       []rowSpan
-	rowObjects []Row
-	columns    []*Ydb.Column
+	meta        *Ydb_Query.ExecuteQueryResponsePart
+	frame       []byte
+	rows        []rowSpan
+	rowObjects  []Row
+	columns     []*Ydb.Column
+	columnTypes []types.Type
 }
 
 var _ operation.Status = (*wirePart)(nil)
@@ -56,6 +57,10 @@ func (p *wirePart) rowBytes(index int) []byte {
 func (p *wirePart) row(index int, columns []*Ydb.Column) *Row {
 	if p.rowObjects == nil {
 		p.columns = columns
+		p.columnTypes = make([]types.Type, len(columns))
+		for i, column := range columns {
+			p.columnTypes[i] = types.TypeFromYDB(column.GetType())
+		}
 		p.rowObjects = make([]Row, len(p.rows))
 		for i := range p.rowObjects {
 			p.rowObjects[i] = Row{part: p, index: i}
@@ -87,7 +92,7 @@ func decodeOwnedPart(frame []byte) (*wirePart, error) {
 		if valueLen < 0 {
 			return nil, protowire.ParseError(valueLen)
 		}
-		if field == wirePartResultSetField && wireType == wirePartResultSetWireType {
+		if field == wirevalue.PartResultSetField && wireType == wirevalue.PartResultSetWireType {
 			resultSetBytes, n := protowire.ConsumeBytes(frame[tagLen:])
 			if n < 0 {
 				return nil, protowire.ParseError(n)
@@ -97,7 +102,7 @@ func decodeOwnedPart(frame []byte) (*wirePart, error) {
 			if err != nil {
 				return nil, err
 			}
-			metadata = protowire.AppendTag(metadata, wirePartResultSetField, wirePartResultSetWireType)
+			metadata = protowire.AppendTag(metadata, wirevalue.PartResultSetField, wirevalue.PartResultSetWireType)
 			metadata = protowire.AppendBytes(metadata, resultSetMetadata)
 		} else {
 			metadata = append(metadata, frame[:tagLen+valueLen]...)
@@ -129,7 +134,7 @@ func stripWireValueRows(data []byte, part *wirePart, base int) ([]byte, error) {
 		if valueLen < 0 {
 			return nil, protowire.ParseError(valueLen)
 		}
-		if field == wireResultSetRowsField && wireType == wireResultSetRowsWireType {
+		if field == wirevalue.ResultSetRowsField && wireType == wirevalue.ResultSetRowsWireType {
 			row, n := protowire.ConsumeBytes(data[tagLen:])
 			if n < 0 {
 				return nil, protowire.ParseError(n)
@@ -151,30 +156,19 @@ func scanRowBytes(r *Row, dst []any) error {
 	if len(dst) != len(columns) {
 		return scanner.Indexed(r.scannerData()).Scan(dst...)
 	}
-	data := r.part.rowBytes(r.index)
+	cells := rowCells{data: r.part.rowBytes(r.index)}
 	index := 0
-	for len(data) > 0 {
-		field, wireType, tagLen := protowire.ConsumeTag(data)
-		if tagLen < 0 {
-			return protowire.ParseError(tagLen)
-		}
-		valueLen := protowire.ConsumeFieldValue(field, wireType, data[tagLen:])
-		if valueLen < 0 {
-			return protowire.ParseError(valueLen)
-		}
-		if field == wireValueItemsField && wireType == wireValueItemsWireType {
-			cell, n := protowire.ConsumeBytes(data[tagLen:])
-			if n < 0 {
-				return protowire.ParseError(n)
+	for cells.Next() {
+		if index < len(dst) {
+			columnType := columns[index].GetType()
+			if err := scanWireValueDestination(columnType, r.part.columnTypes[index], cells.Cell(), dst[index]); err != nil {
+				return fmt.Errorf("scan error on column index %d: %w", index, err)
 			}
-			if index < len(dst) {
-				if err := scanWireValueDestination(columns[index].GetType(), cell, dst[index]); err != nil {
-					return fmt.Errorf("scan error on column index %d: %w", index, err)
-				}
-			}
-			index++
 		}
-		data = data[tagLen+valueLen:]
+		index++
+	}
+	if err := cells.Err(); err != nil {
+		return err
 	}
 	if index < len(dst) {
 		return fmt.Errorf("wire value decoder: row has %d cells, want %d", index, len(dst))
@@ -188,12 +182,12 @@ func (r *Row) ColumnValue(column int) value.Value {
 	if err != nil {
 		return nil
 	}
-	var v Ydb.Value
-	if err := proto.Unmarshal(cell, &v); err != nil {
+	v, err := value.FromWire(r.part.columnTypes[column], cell)
+	if err != nil {
 		return nil
 	}
 
-	return value.FromYDB(r.part.columns[column].GetType(), &v)
+	return v
 }
 
 func (r *Row) ScanColumn(column int, dst any) error {
@@ -202,194 +196,172 @@ func (r *Row) ScanColumn(column int, dst any) error {
 		return err
 	}
 
-	return scanWireValueDestination(r.part.columns[column].GetType(), cell, dst)
+	return scanWireValueDestination(r.part.columns[column].GetType(), r.part.columnTypes[column], cell, dst)
 }
 
-func scanWireValueDestination(columnType *Ydb.Type, cell []byte, dst any) error {
-	if done, err := scanWireValueCell(columnType, cell, dst); done || err != nil {
+func scanWireValueDestination(columnType *Ydb.Type, decodedType types.Type, cell []byte, dst any) error {
+	parsed, err := wirevalue.Parse(cell)
+	if err != nil {
 		return err
 	}
-	var v Ydb.Value
-	if err := proto.Unmarshal(cell, &v); err != nil {
+	if scanWireValueCell(columnType, parsed, dst) {
+		return nil
+	}
+	v, err := value.FromCell(decodedType, parsed)
+	if err != nil {
 		return err
 	}
 
-	return value.CastTo(value.FromYDB(columnType, &v), dst)
+	return value.CastTo(v, dst)
 }
 
 func (r *Row) cell(column int) ([]byte, error) {
 	if column < 0 || column >= len(r.part.columns) {
 		return nil, fmt.Errorf("wire value decoder: column %d out of range", column)
 	}
-	data := r.part.rowBytes(r.index)
+	cells := rowCells{data: r.part.rowBytes(r.index)}
 	index := 0
-	for len(data) > 0 {
-		field, wireType, tagLen := protowire.ConsumeTag(data)
-		if tagLen < 0 {
-			return nil, protowire.ParseError(tagLen)
+	for cells.Next() {
+		if index == column {
+			return cells.Cell(), nil
 		}
-		valueLen := protowire.ConsumeFieldValue(field, wireType, data[tagLen:])
-		if valueLen < 0 {
-			return nil, protowire.ParseError(valueLen)
-		}
-		if field == wireValueItemsField && wireType == wireValueItemsWireType {
-			cell, n := protowire.ConsumeBytes(data[tagLen:])
-			if n < 0 {
-				return nil, protowire.ParseError(n)
-			}
-			if index == column {
-				return cell, nil
-			}
-			index++
-		}
-		data = data[tagLen+valueLen:]
+		index++
+	}
+	if err := cells.Err(); err != nil {
+		return nil, err
 	}
 
 	return nil, fmt.Errorf("wire value decoder: missing column %d", column)
 }
 
-//nolint:gocyclo,funlen // Keep scalar wire parsing and destination assignment in one allocation-free path.
-func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error) {
-	primitive, optional := wireValuePrimitive(columnType)
-	var kind protowire.Number
-	var numeric uint64
-	var payload []byte
-	for len(cell) > 0 {
-		field, wireType, tagLen := protowire.ConsumeTag(cell)
+type rowCells struct {
+	data []byte
+	cell []byte
+	err  error
+}
+
+func (c *rowCells) Next() bool {
+	for len(c.data) > 0 {
+		field, wireType, tagLen := protowire.ConsumeTag(c.data)
 		if tagLen < 0 {
-			return true, protowire.ParseError(tagLen)
+			c.err = protowire.ParseError(tagLen)
+
+			return false
 		}
-		data := cell[tagLen:]
-		valueLen := protowire.ConsumeFieldValue(field, wireType, data)
+		valueLen := protowire.ConsumeFieldValue(field, wireType, c.data[tagLen:])
 		if valueLen < 0 {
-			return true, protowire.ParseError(valueLen)
-		}
-		switch wireType {
-		case wireValueBoolWireType:
-			if field == wireValueBoolField || field == wireValueNullField {
-				numeric, _ = protowire.ConsumeVarint(data)
-				kind = field
-			}
-		case wireValueInt32WireType:
-			if field == wireValueInt32Field || field == wireValueUint32Field || field == wireValueFloatField {
-				v, _ := protowire.ConsumeFixed32(data)
-				numeric, kind = uint64(v), field
-			}
-		case wireValueInt64WireType:
-			if field == wireValueInt64Field || field == wireValueUint64Field ||
-				field == wireValueDoubleField || field == wireValueLow128Field {
-				numeric, _ = protowire.ConsumeFixed64(data)
-				kind = field
-			}
-		case wireValueBytesWireType:
-			if field == wireValueBytesField || field == wireValueTextField || field == wireValueNestedField {
-				payload, _ = protowire.ConsumeBytes(data)
-				kind = field
-			}
-		}
-		cell = cell[tagLen+valueLen:]
-	}
-	//nolint:nestif // A null optional must clear each supported destination type.
-	if kind == wireValueNullField && optional {
-		switch p := dst.(type) {
-		case **int32:
-			if p == nil {
-				return false, nil
-			}
-			*p = nil
-		case **bool:
-			if p == nil {
-				return false, nil
-			}
-			*p = nil
-		case **float64:
-			if p == nil {
-				return false, nil
-			}
-			*p = nil
-		case **string:
-			if p == nil {
-				return false, nil
-			}
-			*p = nil
-		case **[]byte:
-			if p == nil {
-				return false, nil
-			}
-			*p = nil
-		default:
-			return false, nil
-		}
+			c.err = protowire.ParseError(valueLen)
 
-		return true, nil
+			return false
+		}
+		value := c.data[tagLen : tagLen+valueLen]
+		c.data = c.data[tagLen+valueLen:]
+		if field == wirevalue.ValueItemsField && wireType == wirevalue.ValueItemsWireType {
+			c.cell, _ = protowire.ConsumeBytes(value)
+
+			return true
+		}
 	}
+
+	return false
+}
+
+func (c *rowCells) Cell() []byte { return c.cell }
+
+func (c *rowCells) Err() error { return c.err }
+
+func scanWireValueCell(columnType *Ydb.Type, cell wirevalue.Cell, dst any) bool {
+	primitive, optional := wireValuePrimitive(columnType)
+	if cell.Kind() == wirevalue.ValueNullField && optional {
+		return clearOptionalDestination(dst)
+	}
+	if primitive == Ydb.Type_UINT64 && cell.Kind() == wirevalue.ValueUint64Field {
+		if p, ok := dst.(*uint64); ok && p != nil {
+			*p = cell.Uint64()
+
+			return true
+		}
+	}
+	if optional {
+		return scanOptionalCell(primitive, cell, dst)
+	}
+
+	return false
+}
+
+func scanOptionalCell(primitive Ydb.Type_PrimitiveTypeId, cell wirevalue.Cell, dst any) bool {
 	switch primitive {
-	case Ydb.Type_UINT64:
-		if kind == wireValueUint64Field {
-			if p, ok := dst.(*uint64); ok && p != nil {
-				*p = numeric
-
-				return true, nil
-			}
-		}
 	case Ydb.Type_INT32:
-		if kind == wireValueInt32Field {
-			if p, ok := dst.(**int32); ok && optional && p != nil {
-				if *p == nil {
-					*p = new(int32)
-				}
-				**p = int32(numeric)
-
-				return true, nil
-			}
+		if cell.Kind() == wirevalue.ValueInt32Field {
+			return assignOptional(dst, int32(cell.Uint32()))
 		}
 	case Ydb.Type_BOOL:
-		if kind == wireValueBoolField {
-			if p, ok := dst.(**bool); ok && optional && p != nil {
-				if *p == nil {
-					*p = new(bool)
-				}
-				**p = numeric != 0
-
-				return true, nil
-			}
+		if cell.Kind() == wirevalue.ValueBoolField {
+			return assignOptional(dst, cell.Uint64() != 0)
 		}
 	case Ydb.Type_DOUBLE:
-		if kind == wireValueDoubleField {
-			if p, ok := dst.(**float64); ok && optional && p != nil {
-				if *p == nil {
-					*p = new(float64)
-				}
-				**p = math.Float64frombits(numeric)
-
-				return true, nil
-			}
+		if cell.Kind() == wirevalue.ValueDoubleField {
+			return assignOptional(dst, cell.Float64())
 		}
 	case Ydb.Type_UTF8:
-		if kind == wireValueTextField {
-			if p, ok := dst.(**string); ok && optional && p != nil {
-				if *p == nil {
-					*p = new(string)
-				}
-				**p = string(payload)
-
-				return true, nil
-			}
+		if cell.Kind() == wirevalue.ValueTextField {
+			return assignOptional(dst, string(cell.Bytes()))
 		}
 	case Ydb.Type_STRING:
-		if kind == wireValueBytesField {
-			if p, ok := dst.(**[]byte); ok && optional && p != nil {
-				if *p == nil {
-					*p = new([]byte)
-				}
-				**p = bytes.Clone(payload)
-
-				return true, nil
-			}
+		if cell.Kind() == wirevalue.ValueBytesField {
+			return assignOptional(dst, bytes.Clone(cell.Bytes()))
 		}
 	}
 
-	return false, nil
+	return false
+}
+
+func assignOptional[T any](dst any, v T) bool {
+	p, ok := dst.(**T)
+	if !ok || p == nil {
+		return false
+	}
+	if *p == nil {
+		*p = new(T)
+	}
+	**p = v
+
+	return true
+}
+
+func clearOptionalDestination(dst any) bool {
+	switch p := dst.(type) {
+	case **int32:
+		if p == nil {
+			return false
+		}
+		*p = nil
+	case **bool:
+		if p == nil {
+			return false
+		}
+		*p = nil
+	case **float64:
+		if p == nil {
+			return false
+		}
+		*p = nil
+	case **string:
+		if p == nil {
+			return false
+		}
+		*p = nil
+	case **[]byte:
+		if p == nil {
+			return false
+		}
+		*p = nil
+	default:
+
+		return false
+	}
+
+	return true
 }
 
 func wireValuePrimitive(t *Ydb.Type) (Ydb.Type_PrimitiveTypeId, bool) {
