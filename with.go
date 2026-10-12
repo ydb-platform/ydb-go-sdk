@@ -57,6 +57,11 @@ func (d *Driver) With(ctx context.Context, opts ...Option) (*Driver, error) {
 	}()
 
 	if err = child.connect(ctx); err != nil {
+		child.ctxCancel()
+		if child.pool != nil {
+			_ = child.pool.RemoveRef(context.WithoutCancel(ctx))
+		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
