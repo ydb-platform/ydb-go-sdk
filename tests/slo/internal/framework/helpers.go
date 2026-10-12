@@ -3,7 +3,6 @@ package framework
 import (
 	"context"
 	"errors"
-	"os"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
@@ -27,8 +26,12 @@ func RunWorkers(
 				case <-workerCtx.Done():
 					return nil
 				default:
-					if err := rl.Wait(workerCtx); err != nil {
+					err := rl.Wait(workerCtx)
+					if err != nil && errors.Is(err, workerCtx.Err()) {
 						return nil
+					}
+					if err != nil {
+						return err
 					}
 					if err := fn(workerCtx); err != nil {
 						if workerCtx.Err() != nil && errors.Is(err, context.Canceled) {
@@ -36,9 +39,6 @@ func RunWorkers(
 						}
 
 						return err
-					}
-					if os.Getenv("SLO_QA_FINAL_ERROR") == "1" {
-						return errors.New("slo qa final operation: SLO_QA_GO_FINAL_OPERATION")
 					}
 				}
 			}

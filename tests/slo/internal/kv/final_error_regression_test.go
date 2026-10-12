@@ -20,6 +20,7 @@ func TestFinalErrorWorkloadRunReturnsFinalReadError(t *testing.T) {
 		case called <- struct{}{}:
 		default:
 		}
+
 		return errFinal
 	}}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -51,6 +52,7 @@ func TestFinalErrorBatchWorkloadRunReturnsFinalWriteDeadline(t *testing.T) {
 		case called <- struct{}{}:
 		default:
 		}
+
 		return context.DeadlineExceeded
 	}}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -80,6 +82,7 @@ func TestFinalErrorWorkloadSuccessfulFinalOutcome(t *testing.T) {
 	defer cancel()
 	db := &finalErrorDatabase{attempts: 2, read: func(context.Context) error {
 		cancel()
+
 		return nil
 	}}
 	if err := finalErrorWorkload(t, db).Run(ctx); err != nil {
@@ -94,6 +97,7 @@ func TestFinalErrorWorkloadExpectedShutdown(t *testing.T) {
 	db := &finalErrorDatabase{read: func(ctx context.Context) error {
 		close(called)
 		<-ctx.Done()
+
 		return ctx.Err()
 	}}
 	result := make(chan error, 1)
@@ -122,16 +126,20 @@ func TestFinalErrorProcessExit(t *testing.T) {
 				if mode == "failure" {
 					return errors.New("terminal read failure")
 				}
+
 				return nil
 			}}
 			if mode == "shutdown-deadline" {
 				db.read = func(ctx context.Context) error {
 					<-ctx.Done()
+
 					return context.DeadlineExceeded
 				}
 			}
+
 			return New(fw, finalErrorParams(), db), nil
 		})
+
 		return
 	}
 	for _, mode := range []string{"success", "failure", "shutdown-deadline"} {
@@ -150,6 +158,7 @@ func TestFinalErrorProcessExit(t *testing.T) {
 				if err != nil {
 					t.Fatalf("healthy process failed: %v\n%s", err, output)
 				}
+
 				return
 			}
 			var exitError *exec.ExitError
@@ -170,9 +179,11 @@ func (d *finalErrorDatabase) DropTable(context.Context) error   { return nil }
 func (d *finalErrorDatabase) Read(ctx context.Context, _ generator.RowID) (generator.Row, int, error) {
 	return generator.Row{}, max(1, d.attempts), d.read(ctx)
 }
+
 func (d *finalErrorDatabase) Write(context.Context, generator.Row) (int, error) {
 	return 1, nil
 }
+
 func (d *finalErrorDatabase) Close(context.Context) error { return nil }
 
 type finalErrorBatchDatabase struct {
@@ -184,18 +195,22 @@ func (d *finalErrorBatchDatabase) DropTable(context.Context) error   { return ni
 func (d *finalErrorBatchDatabase) ReadBatch(context.Context, []generator.RowID) ([]generator.Row, int, error) {
 	return nil, 1, nil
 }
+
 func (d *finalErrorBatchDatabase) WriteBatch(ctx context.Context, _ []generator.Row) (int, error) {
 	return 1, d.write(ctx)
 }
+
 func (d *finalErrorBatchDatabase) Close(context.Context) error { return nil }
 
 func finalErrorWorkload(t *testing.T, db *finalErrorDatabase) *Workload {
 	t.Helper()
+
 	return New(finalErrorFramework(), finalErrorParams(), db)
 }
 
 func finalErrorFramework() *framework.Framework {
 	metrics, _ := framework.NewMetrics(context.Background(), &framework.Config{})
+
 	return &framework.Framework{Metrics: metrics, Logger: framework.NewLogger()}
 }
 

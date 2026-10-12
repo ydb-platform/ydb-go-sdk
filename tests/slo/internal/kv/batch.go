@@ -86,6 +86,7 @@ func (w *BatchWorkload) Run(ctx context.Context) error {
 			if err != nil && ctx.Err() == nil {
 				w.fw.Logger.Errorf("read failed: %v", err)
 			}
+
 			return err
 		})
 	})
@@ -108,6 +109,7 @@ func (w *BatchWorkload) Run(ctx context.Context) error {
 			if err != nil && ctx.Err() == nil {
 				w.fw.Logger.Errorf("write failed: %v", err)
 			}
+
 			return err
 		})
 	})

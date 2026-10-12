@@ -33,13 +33,11 @@ WITH (
     UNIFORM_PARTITIONS = %d
 )`
 
-var (
-	readTx = table.TxControl(
-		table.BeginTx(
-			table.WithOnlineReadOnly(),
-		),
-		table.CommitTx(),
-	)
+var readTx = table.TxControl(
+	table.BeginTx(
+		table.WithOnlineReadOnly(),
+	),
+	table.CommitTx(),
 )
 
 type db struct {
