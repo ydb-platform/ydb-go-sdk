@@ -40,10 +40,6 @@ var (
 		),
 		table.CommitTx(),
 	)
-
-	writeTx = table.SerializableReadWriteTxControl(
-		table.CommitTx(),
-	)
 )
 
 type db struct {
@@ -68,8 +64,7 @@ func NewStorage(_ context.Context, fw *framework.Framework) (framework.Workload,
 			),
 		),
 		&gorm.Config{
-			Logger:                 gormLogger.Default.LogMode(gormLogger.Warn),
-			SkipDefaultTransaction: true,
+			Logger: gormLogger.Default.LogMode(gormLogger.Warn),
 		},
 	)
 	if err != nil {
@@ -147,7 +142,7 @@ func (d *db) Write(ctx context.Context, row generator.Row) (attempts int, err er
 		return 0, err
 	}
 
-	err = retry.Do(ydbSDK.WithTxControl(ctx, writeTx), rawDB,
+	err = retry.Do(ctx, rawDB,
 		func(ctx context.Context, _ *sql.Conn) error {
 			if err = ctx.Err(); err != nil {
 				return err
