@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"errors"
+	"os"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
@@ -35,6 +36,9 @@ func RunWorkers(
 						}
 
 						return err
+					}
+					if os.Getenv("SLO_QA_FINAL_ERROR") == "1" {
+						return errors.New("slo qa final operation: SLO_QA_GO_FINAL_OPERATION")
 					}
 				}
 			}
