@@ -12,7 +12,7 @@ permissions:
 jobs:
   workload:
     name: Gate (${{ matrix.sdk.name }})
-    runs-on: large-runner
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
