@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"path"
 	"strconv"
 	"time"
 
@@ -61,7 +62,7 @@ func NewStorage(ctx context.Context, fw *framework.Framework) (framework.Workloa
 		ydb.WithFakeTx(ydb.ScriptingQueryMode),
 		ydb.WithAutoDeclare(),
 		ydb.WithNumericArgs(),
-		ydb.WithTablePathPrefix(fw.Config.Label),
+		ydb.WithTablePathPrefix(path.Join(fw.Config.Database, fw.Config.Label)),
 		ydb.WithDefaultQueryMode(ydb.ScriptingQueryMode),
 	)
 	if err != nil {

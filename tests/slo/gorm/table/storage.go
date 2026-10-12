@@ -68,7 +68,8 @@ func NewStorage(_ context.Context, fw *framework.Framework) (framework.Workload,
 			),
 		),
 		&gorm.Config{
-			Logger: gormLogger.Default.LogMode(gormLogger.Warn),
+			Logger:                 gormLogger.Default.LogMode(gormLogger.Warn),
+			SkipDefaultTransaction: true,
 		},
 	)
 	if err != nil {
