@@ -40,12 +40,16 @@ jobs:
             args: -min-partition-count=10
           - name: gorm-query
             path: gorm/query
+            args: -prefill-count=100
           - name: gorm-table
             path: gorm/table
+            args: -prefill-count=100
           - name: xorm-query
             path: xorm/query
+            args: -prefill-count=100
           - name: xorm-table
             path: xorm/table
+            args: -prefill-count=100
     concurrency:
       group: final-error-${{ github.ref }}-${{ matrix.sdk.name }}
       cancel-in-progress: false
