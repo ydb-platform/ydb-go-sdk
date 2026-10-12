@@ -232,23 +232,35 @@ func TestUnboundedChanContextVsMessage(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Start a goroutine that will send a message after context is cancelled
+	receiveDone := make(empty.Chan)
+	senderDone := make(empty.Chan)
+
+	// Deliver the later message only after the cancelled receive returns.
+	// Receive does not prioritize cancellation over an already buffered message.
 	go func() {
+		defer close(senderDone)
 		xtest.WaitChannelClosed(t, ctx.Done())
+		xtest.WaitChannelClosed(t, receiveDone)
 		ch.Send(42)
 	}()
 
-	// Start another goroutine that will cancel context after shorter delay
-	go func() {
-		time.Sleep(2 * time.Millisecond)
-		cancel()
-	}()
+	go cancel()
 
-	// Context cancellation should win
 	_, ok, err := ch.Receive(ctx)
+	close(receiveDone)
+	xtest.WaitChannelClosed(t, senderDone)
+
 	if !errors.Is(err, context.Canceled) || ok {
 		t.Errorf("Expected context.Canceled error and ok=false, got ok=%v, err=%v", ok, err)
 	}
+
+	receiveCtx, cancelReceive := context.WithTimeout(context.Background(), time.Second)
+	defer cancelReceive()
+
+	msg, ok, err := ch.Receive(receiveCtx)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, 42, msg)
 }
 
 func TestUnboundedChanConcurrentSendReceive(t *testing.T) {
