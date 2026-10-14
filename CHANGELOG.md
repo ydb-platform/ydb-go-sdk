@@ -1,3 +1,4 @@
+* Added a concurrent transactional counter RMW scenario for SDK SLO tests
 * Added immutable generation and payload verification with isolated tables to SLO KV workloads
 
 ## v3.155.1
