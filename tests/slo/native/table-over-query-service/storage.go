@@ -10,7 +10,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 
@@ -24,13 +23,14 @@ PRAGMA TablePathPrefix("%s");
 
 DECLARE $id AS Uint64;
 DECLARE $payload_str AS Utf8;
+DECLARE $payload_hash AS Uint64;
 DECLARE $payload_double AS Double;
 DECLARE $payload_timestamp AS Timestamp;
 
 UPSERT INTO ` + "`%s`" + ` (
-	id, hash, payload_str, payload_double, payload_timestamp
+	id, hash, payload_str, payload_double, payload_timestamp, payload_hash
 ) VALUES (
-	$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
+	$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp, $payload_hash
 );
 `
 
@@ -107,10 +107,11 @@ func (d *db) Read(ctx context.Context, id generator.RowID) (_ generator.Row, att
 	ctx, cancel := context.WithTimeout(ctx, d.readTimeout)
 	defer cancel()
 
-	var row generator.Row
+	var rows []generator.Row
 
 	err = d.driver.Table().Do(ctx,
 		func(ctx context.Context, session table.Session) (err error) {
+			rows = nil
 			if err = ctx.Err(); err != nil {
 				return err
 			}
@@ -128,25 +129,9 @@ func (d *db) Read(ctx context.Context, id generator.RowID) (_ generator.Row, att
 				_ = res.Close()
 			}()
 
-			if err = res.NextResultSetErr(ctx); err != nil {
-				return err
-			}
+			rows, err = kv.ReadTableRows(ctx, res)
 
-			if !res.NextRow() {
-				return fmt.Errorf("entry not found, id = %v", id)
-			}
-
-			err = res.ScanNamed(
-				named.Required("id", &row.ID),
-				named.Optional("payload_str", &row.PayloadStr),
-				named.Optional("payload_double", &row.PayloadDouble),
-				named.Optional("payload_timestamp", &row.PayloadTimestamp),
-			)
-			if err != nil {
-				return err
-			}
-
-			return res.Err()
+			return err
 		},
 		table.WithIdempotent(),
 		table.WithTrace(trace.Table{
@@ -157,6 +142,15 @@ func (d *db) Read(ctx context.Context, id generator.RowID) (_ generator.Row, att
 			},
 		}),
 	)
+
+	var row generator.Row
+	if err == nil {
+		if len(rows) != 1 {
+			err = fmt.Errorf("data mismatch: id %d returned %d rows, want 1", id, len(rows))
+		} else {
+			row = rows[0]
+		}
+	}
 
 	return row, attempts, err
 }
@@ -179,6 +173,7 @@ func (d *db) Write(ctx context.Context, row generator.Row) (attempts int, _ erro
 				table.NewQueryParameters(
 					table.ValueParam("$id", types.Uint64Value(row.ID)),
 					table.ValueParam("$payload_str", types.UTF8Value(*row.PayloadStr)),
+					table.ValueParam("$payload_hash", types.Uint64Value(*row.PayloadHash)),
 					table.ValueParam("$payload_double", types.DoubleValue(*row.PayloadDouble)),
 					table.ValueParam("$payload_timestamp", types.TimestampValueFromTime(*row.PayloadTimestamp)),
 				),

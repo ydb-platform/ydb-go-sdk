@@ -1,3 +1,5 @@
+* Added immutable generation and payload verification with isolated tables to SLO KV workloads
+
 ## v3.155.1
 * Fixed resource leaks after failed driver initialization and in nested `Driver.With` calls
 

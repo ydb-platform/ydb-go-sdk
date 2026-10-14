@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 	"go.opentelemetry.io/otel/attribute"
@@ -50,6 +48,7 @@ type Storage struct {
 	batchSize           uint
 	nodeSelector        *atomic.Pointer[nodehints.NodeSelector]
 	gen                 *generator.SeededGenerator
+	control             generator.Row
 	nodeHintMissesGauge otelmetric.Int64UpDownCounter
 	createSQL           string
 	dropSQL             string
@@ -143,7 +142,7 @@ func (s *Storage) Setup(ctx context.Context) error {
 	return nil
 }
 
-func (s *Storage) Warmup(_ context.Context) error {
+func (s *Storage) Warmup(ctx context.Context) error {
 	s.fw.Logger.Printf("waiting 10s for partition stabilization...")
 	time.Sleep(10 * time.Second) //nolint:mnd
 
@@ -152,7 +151,29 @@ func (s *Storage) Warmup(_ context.Context) error {
 	ns := s.nodeSelector.Load()
 	idx, nodeID := ns.GetRandomNodeID(s.gen)
 	s.fw.Logger.Printf("all requests to node id: %d", nodeID)
-	s.gen.SetRange(ns.LowerBounds[idx], ns.UpperBounds[idx])
+	lower, upper := ns.LowerBounds[idx], ns.UpperBounds[idx]
+	if upper-lower < 2 {
+		return fmt.Errorf("selected partition has no separate control and load keys")
+	}
+	// Reserve the first key in this partition; arbitrary load reads may be absent.
+	s.gen.SetRange(lower+1, upper)
+	row, err := generator.New(lower).Generate()
+	if err != nil {
+		return err
+	}
+	row = kv.ControlRow(row)
+	expected := kv.CloneRow(row)
+	if _, err := s.writeBatch(ctx, []generator.Row{row}); err != nil {
+		return err
+	}
+	actual, _, err := s.readBatch(ctx, []generator.RowID{row.ID})
+	if err != nil {
+		return err
+	}
+	if err := kv.CheckRows([]generator.Row{expected}, actual); err != nil {
+		return err
+	}
+	s.control = expected
 
 	return nil
 }
@@ -161,41 +182,47 @@ func (s *Storage) Run(ctx context.Context) error {
 	readRL := framework.NewRateLimiter(int(s.params.ReadRPS))
 	writeRL := framework.NewRateLimiter(int(s.params.WriteRPS))
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+	group, ctx := errgroup.WithContext(ctx)
 
-	go func() {
-		defer wg.Done()
-		framework.RunWorkers(ctx, int(s.params.ReadRPS), readRL, func(ctx context.Context) {
+	group.Go(func() error {
+		return framework.RunWorkers(ctx, int(s.params.ReadRPS), readRL, func(ctx context.Context) error {
 			ids := make([]generator.RowID, 0, s.batchSize)
 			for range s.batchSize {
 				row, err := s.gen.Generate()
 				if err != nil {
 					s.fw.Logger.Errorf("generate error: %v", err)
 
-					return
+					return err
 				}
 				ids = append(ids, row.ID)
 			}
 			span := s.fw.Metrics.Start(framework.OperationTypeRead)
 			_, attempts, err := s.readBatch(ctx, ids)
 			span.Finish(err, attempts)
+			if err == nil {
+				actual, _, controlErr := s.readBatch(ctx, []generator.RowID{s.control.ID})
+				err = controlErr
+				if err == nil {
+					err = kv.CheckRows([]generator.Row{s.control}, actual)
+				}
+			}
 			if err != nil && ctx.Err() == nil {
 				s.fw.Logger.Errorf("read failed: %v", err)
 			}
-		})
-	}()
 
-	go func() {
-		defer wg.Done()
-		framework.RunWorkers(ctx, int(s.params.WriteRPS), writeRL, func(ctx context.Context) {
+			return err
+		})
+	})
+
+	group.Go(func() error {
+		return framework.RunWorkers(ctx, int(s.params.WriteRPS), writeRL, func(ctx context.Context) error {
 			rows := make([]generator.Row, 0, s.batchSize)
 			for range s.batchSize {
 				row, err := s.gen.Generate()
 				if err != nil {
 					s.fw.Logger.Errorf("generate error: %v", err)
 
-					return
+					return err
 				}
 				rows = append(rows, row)
 			}
@@ -205,12 +232,12 @@ func (s *Storage) Run(ctx context.Context) error {
 			if err != nil && ctx.Err() == nil {
 				s.fw.Logger.Errorf("write failed: %v", err)
 			}
+
+			return err
 		})
-	}()
+	})
 
-	wg.Wait()
-
-	return nil
+	return group.Wait()
 }
 
 func (s *Storage) Cooldown(ctx context.Context) error {
@@ -316,7 +343,12 @@ func (s *Storage) readBatch(ctx context.Context, rowIDs []generator.RowID) (_ []
 	}
 
 	keys := make([]types.Value, 0, len(rowIDs))
+	seen := make(map[generator.RowID]bool, len(rowIDs))
 	for _, rowID := range rowIDs {
+		if seen[rowID] {
+			continue
+		}
+		seen[rowID] = true
 		keys = append(keys, types.StructValue(
 			types.StructFieldValue("id", types.Uint64Value(rowID)),
 		))
@@ -343,34 +375,9 @@ func (s *Storage) readBatch(ctx context.Context, rowIDs []generator.RowID) (_ []
 		_ = res.Close()
 	}()
 
-	readRows := make([]generator.Row, 0, len(rowIDs))
-	for res.NextResultSet(ctx) {
-		if err = res.Err(); err != nil {
-			return nil, attempts, err
-		}
+	readRows, err := kv.ReadTableRows(reqCtx, res)
 
-		if res.CurrentResultSet().Truncated() {
-			return nil, attempts, fmt.Errorf("read rows result set truncated")
-		}
-
-		for res.NextRow() {
-			var row generator.Row
-			err = res.ScanNamed(
-				named.Required("id", &row.ID),
-				named.Optional("payload_str", &row.PayloadStr),
-				named.Optional("payload_double", &row.PayloadDouble),
-				named.Optional("payload_timestamp", &row.PayloadTimestamp),
-				named.Optional("payload_hash", &row.PayloadHash),
-			)
-			if err != nil {
-				return nil, attempts, err
-			}
-
-			readRows = append(readRows, row)
-		}
-	}
-
-	return readRows, attempts, nil
+	return readRows, attempts, err
 }
 
 func (s *Storage) createTable(ctx context.Context) error {

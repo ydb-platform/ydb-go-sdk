@@ -2,8 +2,9 @@ package framework
 
 import (
 	"context"
-	"sync"
+	"errors"
 
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 )
 
@@ -15,25 +16,34 @@ func RunWorkers(
 	ctx context.Context,
 	n int,
 	rl *rate.Limiter,
-	fn func(ctx context.Context),
-) {
-	var wg sync.WaitGroup
-	wg.Add(n)
+	fn func(ctx context.Context) error,
+) error {
+	group, workerCtx := errgroup.WithContext(ctx)
 	for range n {
-		go func() {
-			defer wg.Done()
+		group.Go(func() error {
 			for {
 				select {
-				case <-ctx.Done():
-					return
+				case <-workerCtx.Done():
+					return nil
 				default:
-					if err := rl.Wait(ctx); err != nil {
-						return
+					err := rl.Wait(workerCtx)
+					if err != nil && errors.Is(err, workerCtx.Err()) {
+						return nil
 					}
-					fn(ctx)
+					if err != nil {
+						return err
+					}
+					if err := fn(workerCtx); err != nil {
+						if workerCtx.Err() != nil && errors.Is(err, context.Canceled) {
+							return nil
+						}
+
+						return err
+					}
 				}
 			}
-		}()
+		})
 	}
-	wg.Wait()
+
+	return group.Wait()
 }

@@ -177,7 +177,6 @@ jobs:
 
       - name: Build baseline workload image
         id: build-baseline
-        continue-on-error: true
         uses: docker/build-push-action@v7
         with:
           builder: ${{ steps.buildx.outputs.name }}
@@ -190,12 +189,6 @@ jobs:
             SRC_PATH=${{ matrix.sdk.path }}
           cache-from: type=gha,scope=slo-deps
 
-      - name: Use current workload image as baseline fallback
-        if: steps.build-baseline.outcome == 'failure'
-        run: |
-          echo "::warning::Baseline Docker build failed; using the current workload image"
-          docker tag ydb-app-current ydb-app-baseline
-
       - name: Run SLO Tests
         uses: ydb-platform/ydb-slo-action/init@v2
         timeout-minutes: 30
@@ -204,6 +197,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workload_name: ${{ matrix.sdk.name }}
           workload_duration: ${{ inputs.slo_workload_duration_seconds || '600' }}
+          fail_on_workload_error: true
           workload_current_ref: ${{ github.head_ref || github.ref_name }}
           workload_current_image: ydb-app-current
           workload_current_command: ${{ matrix.sdk.command }}

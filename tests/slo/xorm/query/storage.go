@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
+	"path"
 	"strconv"
 	"time"
 
@@ -61,7 +61,7 @@ func NewStorage(ctx context.Context, fw *framework.Framework) (framework.Workloa
 		ydb.WithFakeTx(ydb.ScriptingQueryMode),
 		ydb.WithAutoDeclare(),
 		ydb.WithNumericArgs(),
-		ydb.WithTablePathPrefix(fw.Config.Label),
+		ydb.WithTablePathPrefix(path.Join(fw.Config.Database, fw.Config.Label)),
 		ydb.WithDefaultQueryMode(ydb.ScriptingQueryMode),
 	)
 	if err != nil {
@@ -78,7 +78,8 @@ func NewStorage(ctx context.Context, fw *framework.Framework) (framework.Workloa
 	xe.SetMaxOpenConns(params.PoolSize())
 	xe.SetMaxIdleConns(params.PoolSize())
 	xe.SetConnMaxIdleTime(time.Second)
-	xe.SetTableMapper(newMapper(fw.Config.Ref, fw.Config.Ref))
+	tableName := path.Base(params.TablePath)
+	xe.SetTableMapper(newMapper(tableName, tableName))
 	xe.SetLogLevel(log.LOG_DEBUG)
 	xe.Dialect().SetParams(map[string]string{
 		"AUTO_PARTITIONING_BY_SIZE":              autoPartitioningEnabled,
@@ -107,19 +108,15 @@ func (d *db) Read(ctx context.Context, entryID generator.RowID) (_ generator.Row
 	ctx, cancel := context.WithTimeout(ctx, d.readTimeout)
 	defer cancel()
 
-	row := generator.Row{ID: entryID}
+	var rows []generator.Row
 
-	err := retry.Do(ctx, d.xe.DB().DB,
-		func(ctx context.Context, _ *sql.Conn) error {
-			has, err := d.xe.Context(ctx).Where("hash = Digest::NumericHash(?)", entryID).Get(&row)
-			if err != nil {
-				return fmt.Errorf("get entry error: %w", err)
-			}
-			if !has {
-				return errors.New("get entry: entry not found")
-			}
+	err := retry.Retry(ctx,
+		func(ctx context.Context) error {
+			rows = nil
+			var err error
+			rows, err = kv.ReadXORMRows(ctx, d.xe, entryID)
 
-			return nil
+			return err
 		},
 		retry.WithIdempotent(true),
 		retry.WithTrace(
@@ -133,6 +130,15 @@ func (d *db) Read(ctx context.Context, entryID generator.RowID) (_ generator.Row
 		),
 	)
 
+	var row generator.Row
+	if err == nil {
+		if len(rows) != 1 {
+			err = fmt.Errorf("data mismatch: id %d returned %d rows, want 1", entryID, len(rows))
+		} else {
+			row = rows[0]
+		}
+	}
+
 	return row, attempts, err
 }
 
@@ -144,8 +150,8 @@ func (d *db) Write(ctx context.Context, row generator.Row) (attempts int, _ erro
 	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
 	defer cancel()
 
-	err := retry.Do(ctx, d.xe.DB().DB,
-		func(ctx context.Context, _ *sql.Conn) error {
+	err := retry.Retry(ctx,
+		func(ctx context.Context) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
@@ -177,7 +183,7 @@ func (d *db) CreateTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
 	defer cancel()
 
-	return retry.Do(ctx, d.xe.DB().DB, func(ctx context.Context, _ *sql.Conn) error {
+	return retry.Retry(ctx, func(ctx context.Context) error {
 		return d.xe.Context(ctx).CreateTable(generator.Row{})
 	})
 }
@@ -190,7 +196,7 @@ func (d *db) DropTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
 	defer cancel()
 
-	return retry.Do(ctx, d.xe.DB().DB, func(ctx context.Context, _ *sql.Conn) error {
+	return retry.Retry(ctx, func(ctx context.Context) error {
 		return d.xe.Context(ctx).DropTable(generator.Row{})
 	})
 }
