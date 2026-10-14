@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"path"
 	"time"
 
 	ydb "github.com/ydb-platform/gorm-driver"
@@ -33,17 +33,11 @@ WITH (
     UNIFORM_PARTITIONS = %d
 )`
 
-var (
-	readTx = table.TxControl(
-		table.BeginTx(
-			table.WithOnlineReadOnly(),
-		),
-		table.CommitTx(),
-	)
-
-	writeTx = table.SerializableReadWriteTxControl(
-		table.CommitTx(),
-	)
+var readTx = table.TxControl(
+	table.BeginTx(
+		table.WithOnlineReadOnly(),
+	),
+	table.CommitTx(),
 )
 
 type db struct {
@@ -77,7 +71,7 @@ func NewStorage(_ context.Context, fw *framework.Framework) (framework.Workload,
 
 	return kv.New(fw, params, &db{
 		gormDB:    gormDB,
-		tableName: fw.Config.Ref,
+		tableName: path.Base(params.TablePath),
 		tableOptions: fmt.Sprintf(optionsTemplate,
 			params.PartitionSize,
 			params.MinPartitionCount,
@@ -97,20 +91,16 @@ func (d *db) Read(ctx context.Context, id generator.RowID) (_ generator.Row, att
 	ctx, cancel := context.WithTimeout(ctx, d.readTimeout)
 	defer cancel()
 
-	rawDB, err := d.gormDB.DB()
-	if err != nil {
-		return generator.Row{}, 0, err
-	}
-
-	var r generator.Row
-	err = retry.Do(ydbSDK.WithTxControl(ctx, readTx), rawDB,
-		func(ctx context.Context, _ *sql.Conn) error {
+	var rows []generator.Row
+	err = retry.Retry(ydbSDK.WithTxControl(ctx, readTx),
+		func(ctx context.Context) error {
+			rows = nil
 			if err = ctx.Err(); err != nil {
 				return err
 			}
 
 			return d.gormDB.WithContext(ctx).Scopes(scopeTable(d.tableName)).Model(&generator.Row{}).
-				First(&r, "hash = ? AND id = ?",
+				Find(&rows, "hash = ? AND id = ?",
 					clause.Expr{
 						SQL:  numericHashExpression,
 						Vars: []any{id},
@@ -130,7 +120,16 @@ func (d *db) Read(ctx context.Context, id generator.RowID) (_ generator.Row, att
 		),
 	)
 
-	return r, attempts, err
+	var row generator.Row
+	if err == nil {
+		if len(rows) != 1 {
+			err = fmt.Errorf("data mismatch: id %d returned %d rows, want 1", id, len(rows))
+		} else {
+			row = rows[0]
+		}
+	}
+
+	return row, attempts, err
 }
 
 func (d *db) Write(ctx context.Context, row generator.Row) (attempts int, err error) {
@@ -141,13 +140,8 @@ func (d *db) Write(ctx context.Context, row generator.Row) (attempts int, err er
 	ctx, cancel := context.WithTimeout(ctx, d.writeTimeout)
 	defer cancel()
 
-	rawDB, err := d.gormDB.DB()
-	if err != nil {
-		return 0, err
-	}
-
-	err = retry.Do(ydbSDK.WithTxControl(ctx, writeTx), rawDB,
-		func(ctx context.Context, _ *sql.Conn) error {
+	err = retry.Retry(ctx,
+		func(ctx context.Context) error {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
@@ -160,6 +154,7 @@ func (d *db) Write(ctx context.Context, row generator.Row) (attempts int, err er
 					},
 					"ID":               row.ID,
 					"PayloadStr":       row.PayloadStr,
+					"PayloadHash":      row.PayloadHash,
 					"PayloadDouble":    row.PayloadDouble,
 					"PayloadTimestamp": row.PayloadTimestamp,
 				}).Error

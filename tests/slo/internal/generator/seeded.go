@@ -2,6 +2,7 @@ package generator
 
 import (
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -10,6 +11,7 @@ type Range struct {
 	Right uint64
 }
 type SeededGenerator struct {
+	mu       sync.Mutex
 	rng      *rand.Rand
 	setRange *Range
 }
@@ -24,7 +26,7 @@ func (g *SeededGenerator) ConstructRow() (Row, error) {
 	e := Row{
 		PayloadHash:      func(a uint64) *uint64 { return &a }(rand.Uint64()),    //nolint:gosec
 		PayloadDouble:    func(a float64) *float64 { return &a }(rand.Float64()), //nolint:gosec // speed more important
-		PayloadTimestamp: func(a time.Time) *time.Time { return &a }(time.Now()),
+		PayloadTimestamp: func(a time.Time) *time.Time { return &a }(time.Now().UTC().Truncate(time.Microsecond)),
 	}
 
 	var err error
@@ -41,6 +43,9 @@ func (g *SeededGenerator) Generate() (Row, error) {
 	if err != nil {
 		return Row{}, err
 	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
 	if g.setRange == nil {
 		row.ID = g.rng.Uint64()
 	} else {
@@ -51,6 +56,9 @@ func (g *SeededGenerator) Generate() (Row, error) {
 }
 
 func (g *SeededGenerator) SetRange(l uint64, r uint64) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
 	g.setRange = &Range{
 		Left:  l,
 		Right: r,

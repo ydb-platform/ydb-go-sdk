@@ -37,7 +37,7 @@ func (g *Impl) Generate() (Row, error) {
 		ID:               id,
 		PayloadHash:      func(a uint64) *uint64 { return &a }(rand.Uint64()),    //nolint:gosec
 		PayloadDouble:    func(a float64) *float64 { return &a }(rand.Float64()), //nolint:gosec // speed more important
-		PayloadTimestamp: func(a time.Time) *time.Time { return &a }(time.Now()),
+		PayloadTimestamp: func(a time.Time) *time.Time { return &a }(time.Now().UTC().Truncate(time.Microsecond)),
 	}
 
 	var err error
