@@ -9,6 +9,7 @@ on:
     branches:
       - master
       - release-*
+      - fix/slo-kv-checks-20261014
   workflow_dispatch:
     inputs:
       github_issue:
@@ -50,6 +51,8 @@ jobs:
             path: database/sql/query
           - name: native-query
             path: native/query
+          - name: native-query-rmw
+            path: native/query-rmw
           - name: native-table
             path: native/table
           - name: native-table-over-query-service
