@@ -29,14 +29,23 @@ type (
 		client                   Ydb_Query_V1.QueryServiceClient
 		trace                    *trace.Query
 		lazyTx                   bool
+		defaultArrowDecoder      arrow.Decoder
 		streamResultCloseTimeout time.Duration
 	}
 )
 
+func (s *Session) withDefaultExecuteOptions(opts ...options.Execute) []options.Execute {
+	if s.defaultArrowDecoder == nil {
+		return opts
+	}
+
+	return append([]options.Execute{options.WithResultFormatArrow(s.defaultArrowDecoder)}, opts...)
+}
+
 func (s *Session) QueryResultSet(
 	ctx context.Context, q string, opts ...options.Execute,
 ) (rs result.ClosableResultSet, finalErr error) {
-	settings := options.ExecuteSettings(opts...)
+	settings := options.ExecuteSettings(s.withDefaultExecuteOptions(opts...)...)
 
 	if err := validateTxControl(settings); err != nil {
 		return nil, err
@@ -84,7 +93,7 @@ func (s *Session) queryRow(
 }
 
 func (s *Session) QueryRow(ctx context.Context, q string, opts ...options.Execute) (_ query.Row, finalErr error) {
-	settings := options.ExecuteSettings(opts...)
+	settings := options.ExecuteSettings(s.withDefaultExecuteOptions(opts...)...)
 
 	if err := validateTxControl(settings); err != nil {
 		return nil, err
@@ -231,7 +240,7 @@ func (s *Session) onSessionError(err error) {
 }
 
 func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (finalErr error) {
-	settings := options.ExecuteSettings(opts...)
+	settings := options.ExecuteSettings(s.withDefaultExecuteOptions(opts...)...)
 
 	if err := validateTxControl(settings); err != nil {
 		return err
@@ -267,7 +276,7 @@ func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (
 }
 
 func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) (_ query.Result, finalErr error) {
-	settings := options.ExecuteSettings(opts...)
+	settings := options.ExecuteSettings(s.withDefaultExecuteOptions(opts...)...)
 
 	if err := validateTxControl(settings); err != nil {
 		return nil, err

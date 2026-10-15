@@ -15,11 +15,11 @@ func DatabaseSQL(config Config) trace.DatabaseSQL {
 
 	conns := config.GaugeVec("conns")
 
-	query := config.CounterVec("query", "status", "query_mode")
-	queryLatency := config.WithSystem("query").TimerVec("latency", "query_mode")
+	query := config.CounterVec("query", statusLabel, queryModeLabel)
+	queryLatency := config.WithSystem("query").TimerVec("latency", queryModeLabel)
 
-	exec := config.CounterVec("exec", "status", "query_mode")
-	execLatency := config.WithSystem("exec").TimerVec("latency", "query_mode")
+	exec := config.CounterVec("exec", statusLabel, queryModeLabel)
+	execLatency := config.WithSystem("exec").TimerVec("latency", queryModeLabel)
 
 	txs := config.GaugeVec("tx")
 	txLatency := config.WithSystem("tx").TimerVec("latency")
@@ -103,11 +103,11 @@ func DatabaseSQL(config Config) trace.DatabaseSQL {
 
 				status := errorBrief(info.Error)
 				exec.With(map[string]string{
-					"status":     status,
-					"query_mode": mode,
+					statusLabel:    status,
+					queryModeLabel: mode,
 				}).Inc()
 				execLatency.With(map[string]string{
-					"query_mode": mode,
+					queryModeLabel: mode,
 				}).Record(time.Since(start))
 			}
 		},
@@ -124,11 +124,11 @@ func DatabaseSQL(config Config) trace.DatabaseSQL {
 
 				status := errorBrief(info.Error)
 				query.With(map[string]string{
-					"status":     status,
-					"query_mode": mode,
+					statusLabel:    status,
+					queryModeLabel: mode,
 				}).Inc()
 				queryLatency.With(map[string]string{
-					"query_mode": mode,
+					queryModeLabel: mode,
 				}).Record(time.Since(start))
 			}
 		},

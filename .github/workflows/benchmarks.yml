@@ -1,0 +1,120 @@
+name: benchmarks
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, reopened, synchronize, labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    # The old suite-specific labels remain aliases for existing pull requests.
+    if: contains(github.event.pull_request.labels.*.name, 'run_benchmarks') || contains(github.event.pull_request.labels.*.name, 'run_sdk_benchmarks') || contains(github.event.pull_request.labels.*.name, 'run_intergration_benchmarks')
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    concurrency:
+      group: benchmarks-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    services:
+      ydb:
+        image: ydbplatform/local-ydb:26.3.1.16
+        ports:
+          - 2135:2135
+          - 2136:2136
+          - 8765:8765
+        volumes:
+          - /tmp/ydb_certs:/ydb_certs
+        env:
+          YDB_FEATURE_FLAGS: enable_external_data_sources
+          YDB_LOCAL_SURVIVE_RESTART: true
+          YDB_USE_IN_MEMORY_PDISKS: true
+          YDB_TABLE_ENABLE_PREPARED_DDL: true
+          YDB_ENABLE_COLUMN_TABLES: true
+        options: '-h localhost --name ydb'
+    steps:
+      - name: Checkout master revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: master
+          persist-credentials: false
+
+      - name: Checkout PR revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.x
+          cache-dependency-path: master/go.sum
+
+      - name: Install benchstat
+        run: go install golang.org/x/perf/cmd/benchstat@v0.0.0-20260908200009-22c9c6c9d4da
+
+      - name: Run benchmarks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p benchmark-results/sdk benchmark-results/integration
+          run_benchmarks() {
+            local revision="$1" suite="$2"
+            shift 2
+            (cd "$revision" && go test "$@") | tee "benchmark-results/$suite/$revision.txt"
+            grep -q '^Benchmark' "benchmark-results/$suite/$revision.txt"
+          }
+
+          run_benchmarks master sdk -run '^$' -bench . -benchtime=100ms -count=10 -benchmem -cpu=2 -timeout=90m ./...
+          run_benchmarks pr sdk -run '^$' -bench . -benchtime=100ms -count=10 -benchmem -cpu=2 -timeout=90m ./...
+
+          export YDB_CONNECTION_STRING=grpc://localhost:2136/local
+          export YDB_CONNECTION_STRING_SECURE=grpcs://localhost:2135/local
+          export YDB_SSL_ROOT_CERTIFICATES_FILE=/tmp/ydb_certs/ca.pem
+          export YDB_SESSIONS_SHUTDOWN_URLS='http://localhost:8765/actors/kqp_proxy?force_shutdown=all'
+          export HIDE_APPLICATION_OUTPUT=1
+          run_benchmarks master integration -tags integration -run '^$' -bench . -count=10 -benchmem -cpu=2 -timeout=90m ./tests/integration/...
+          run_benchmarks pr integration -tags integration -run '^$' -bench . -count=10 -benchmem -cpu=2 -timeout=90m ./tests/integration/...
+          for revision in master pr; do
+            cat "benchmark-results/sdk/$revision.txt" "benchmark-results/integration/$revision.txt" > "benchmark-results/$revision.txt"
+          done
+
+      - name: Compare benchmarks
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MASTER_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          benchstat="$(go env GOPATH)/bin/benchstat"
+          "$benchstat" master=benchmark-results/master.txt pr=benchmark-results/pr.txt > benchmark-results/benchstat-all.txt
+          "$benchstat" -format csv master=benchmark-results/master.txt pr=benchmark-results/pr.txt > benchmark-results/benchstat.csv 2> benchmark-results/benchstat-csv-warnings.txt
+          test -s benchmark-results/benchstat-all.txt
+          test -s benchmark-results/benchstat.csv
+          python3 pr/.github/scripts/benchstat_preview.py benchmark-results/benchstat-all.txt benchmark-preview/benchstat-all.txt
+          jq -n --argjson pr "$PR_NUMBER" --argjson run "$GITHUB_RUN_ID" \
+            --arg master "$MASTER_SHA" --arg head "$PR_SHA" \
+            '{pr: $pr, run_id: $run, master_sha: $master, head_sha: $head}' > benchmark-results/metadata.json
+
+      - name: Upload full benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Upload browser-readable benchstat
+        uses: actions/upload-artifact@v7
+        with:
+          path: benchmark-preview/benchstat-all.txt
+          archive: false
+          if-no-files-found: error
+          retention-days: 30

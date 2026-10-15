@@ -2,6 +2,13 @@ package main
 
 import "time"
 
+const (
+	season1Title = "Season 1"
+	season2Title = "Season 2"
+	season3Title = "Season 3"
+	season4Title = "Season 4"
+)
+
 var data = []Series{
 	{
 		Title: "IT Crowd",
@@ -11,7 +18,7 @@ var data = []Series{
 		ReleaseDate: date("2006-02-03"),
 		Seasons: []Season{
 			{
-				Title:      "Season 1",
+				Title:      season1Title,
 				FirstAired: date("2006-02-03"),
 				LastAired:  date("2006-03-03"),
 				Episodes: []Episode{
@@ -42,7 +49,7 @@ var data = []Series{
 				},
 			},
 			{
-				Title:      "Season 2",
+				Title:      season2Title,
 				FirstAired: date("2007-08-24"),
 				LastAired:  date("2007-09-28"),
 				Episodes: []Episode{
@@ -73,7 +80,7 @@ var data = []Series{
 				},
 			},
 			{
-				Title:      "Season 3",
+				Title:      season3Title,
 				FirstAired: date("2008-11-21"),
 				LastAired:  date("2008-12-26"),
 				Episodes: []Episode{
@@ -104,7 +111,7 @@ var data = []Series{
 				},
 			},
 			{
-				Title:      "Season 4",
+				Title:      season4Title,
 				FirstAired: date("2010-06-25"),
 				LastAired:  date("2010-07-30"),
 				Episodes: []Episode{
@@ -144,7 +151,7 @@ var data = []Series{
 		ReleaseDate: date("2014-04-06"),
 		Seasons: []Season{
 			{
-				Title:      "Season 1",
+				Title:      season1Title,
 				FirstAired: date("2006-02-03"),
 				LastAired:  date("2006-03-03"),
 				Episodes: []Episode{
@@ -183,7 +190,7 @@ var data = []Series{
 				},
 			},
 			{
-				Title:      "Season 2",
+				Title:      season2Title,
 				FirstAired: date("2007-08-24"),
 				LastAired:  date("2007-09-28"),
 				Episodes: []Episode{
@@ -230,7 +237,7 @@ var data = []Series{
 				},
 			},
 			{
-				Title:      "Season 3",
+				Title:      season3Title,
 				FirstAired: date("2008-11-21"),
 				LastAired:  date("2008-12-26"),
 				Episodes: []Episode{
@@ -277,7 +284,7 @@ var data = []Series{
 				},
 			},
 			{
-				Title:      "Season 4",
+				Title:      season4Title,
 				FirstAired: date("2010-06-25"),
 				LastAired:  date("2010-07-30"),
 				Episodes: []Episode{

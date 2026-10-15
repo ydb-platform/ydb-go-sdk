@@ -22,10 +22,10 @@ const (
 )
 
 var (
-	topicMessageLabels      = []string{"endpoint", "database", "topic", "consumer", "reader.name"}
-	topicStreamLabels       = []string{"endpoint", "database", "consumer", "reader.name"}
+	topicMessageLabels      = []string{endpointLabel, databaseLabel, "topic", consumerLabel, readerNameLabel}
+	topicStreamLabels       = []string{endpointLabel, databaseLabel, consumerLabel, readerNameLabel}
 	topicSessionErrorLabels = []string{
-		"endpoint", "database", "consumer", "reader.name",
+		endpointLabel, databaseLabel, consumerLabel, readerNameLabel,
 		"retry_decision", "status_code", "error.type",
 	}
 )
@@ -282,10 +282,10 @@ func messageLabels(readerInfo trace.TopicReaderInfo, topic string) map[string]st
 
 func streamLabels(readerInfo trace.TopicReaderInfo) map[string]string {
 	return map[string]string{
-		"endpoint":    readerInfo.Endpoint,
-		"database":    readerInfo.Database,
-		"consumer":    readerInfo.Consumer,
-		"reader.name": readerInfo.ReaderName,
+		endpointLabel:   readerInfo.Endpoint,
+		databaseLabel:   readerInfo.Database,
+		consumerLabel:   readerInfo.Consumer,
+		readerNameLabel: readerInfo.ReaderName,
 	}
 }
 

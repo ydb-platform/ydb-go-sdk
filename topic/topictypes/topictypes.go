@@ -114,8 +114,9 @@ func (m *MeteringMode) ToRaw(raw *rawtopic.MeteringMode) {
 
 // PartitionSettings settings of partitions
 type PartitionSettings struct {
-	MinActivePartitions      int64
-	MaxActivePartitions      int64
+	MinActivePartitions int64
+	MaxActivePartitions int64
+	// Deprecated: YDB ignores this field. Use MaxActivePartitions instead.
 	PartitionCountLimit      int64
 	AutoPartitioningSettings AutoPartitioningSettings
 }
@@ -124,7 +125,6 @@ type PartitionSettings struct {
 func (s *PartitionSettings) ToRaw(raw *rawtopic.PartitioningSettings) {
 	raw.MinActivePartitions = s.MinActivePartitions
 	raw.MaxActivePartitions = s.MaxActivePartitions
-	raw.PartitionCountLimit = s.PartitionCountLimit
 	s.AutoPartitioningSettings.ToRaw(&raw.AutoPartitioningSettings)
 }
 
@@ -132,7 +132,7 @@ func (s *PartitionSettings) ToRaw(raw *rawtopic.PartitioningSettings) {
 func (s *PartitionSettings) FromRaw(raw *rawtopic.PartitioningSettings) {
 	s.MinActivePartitions = raw.MinActivePartitions
 	s.MaxActivePartitions = raw.MaxActivePartitions
-	s.PartitionCountLimit = raw.PartitionCountLimit
+	s.PartitionCountLimit = 0
 	s.AutoPartitioningSettings.FromRaw(&raw.AutoPartitioningSettings)
 }
 

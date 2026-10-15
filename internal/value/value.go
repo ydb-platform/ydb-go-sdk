@@ -113,22 +113,18 @@ func FromYDB(t *Ydb.Type, v *Ydb.Value) Value {
 }
 
 func nullValueFromYDB(x *Ydb.Value, t types.Type) (_ Value, ok bool) {
-	for {
-		switch xx := x.GetValue().(type) {
-		case *Ydb.Value_NestedValue:
-			x = xx.NestedValue
-		case *Ydb.Value_NullFlagValue:
-			switch tt := t.(type) {
-			case types.Optional:
-				return NullValue(tt.InnerType()), true
-			case types.Void:
-				return VoidValue(), true
-			default:
-				return nil, false
-			}
+	switch x.GetValue().(type) {
+	case *Ydb.Value_NullFlagValue:
+		switch tt := t.(type) {
+		case types.Optional:
+			return NullValue(tt.InnerType()), true
+		case types.Void:
+			return VoidValue(), true
 		default:
 			return nil, false
 		}
+	default:
+		return nil, false
 	}
 }
 
@@ -223,6 +219,15 @@ func primitiveValueFromYDB(t types.Primitive, v *Ydb.Value) (Value, error) {
 	case types.TzTimestamp:
 		return TzTimestampValue(v.GetTextValue()), nil
 
+	case types.TzDate32:
+		return tzDate32Value(v.GetTextValue()), nil
+
+	case types.TzDatetime64:
+		return tzDatetime64Value(v.GetTextValue()), nil
+
+	case types.TzTimestamp64:
+		return tzTimestamp64Value(v.GetTextValue()), nil
+
 	case types.Bytes:
 		return BytesValue(v.GetBytesValue()), nil
 
@@ -249,7 +254,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		return VoidValue(), nil
 
 	case types.Null:
-		return NullValue(tt), nil
+		return LiteralNullValue(), nil
 
 	case *types.Decimal:
 		return DecimalValue(BigEndianUint128(v.GetHigh_128(), v.GetLow_128()), ttt.Precision(), ttt.Scale()), nil
@@ -260,21 +265,37 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Type_OptionalType", tt))
 		}
 		t = tt.OptionalType.GetItem()
-		if nestedValue, ok := v.GetValue().(*Ydb.Value_NestedValue); ok {
+		if nestedValue, ok := v.GetValue().(*Ydb.Value_NestedValue); ok &&
+			(terminalNull(v) || !variantPayload(ttt.InnerType())) {
 			return OptionalValue(FromYDB(t, nestedValue.NestedValue)), nil
 		}
 
 		return OptionalValue(FromYDB(t, v)), nil
 
+	case *types.Tagged:
+		return &taggedValue{
+			t:     ttt,
+			value: FromYDB(ttt.InnerType().ToYDB(), v),
+		}, nil
+
+	case types.EmptyList:
+		return ListValue(), nil
+
+	case types.EmptyDict:
+		return DictValue(), nil
+
 	case *types.List:
-		return ListValue(func() []Value {
+		vv := ListValue(func() []Value {
 			vv := make([]Value, len(v.GetItems()))
 			for i, vvv := range v.GetItems() {
 				vv[i] = FromYDB(ttt.ItemType().ToYDB(), vvv)
 			}
 
 			return vv
-		}()...), nil
+		}()...)
+		vv.t = ttt
+
+		return vv, nil
 
 	case *types.Tuple:
 		return TupleValue(func() []Value {
@@ -300,7 +321,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		}()...), nil
 
 	case *types.Dict:
-		return DictValue(func() []DictValueField {
+		vv := DictValue(func() []DictValueField {
 			vv := make([]DictValueField, len(v.GetPairs()))
 			for i, vvv := range v.GetPairs() {
 				vv[i] = DictValueField{
@@ -310,17 +331,23 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 			}
 
 			return vv
-		}()...), nil
+		}()...)
+		vv.t = ttt
+
+		return vv, nil
 
 	case *types.Set:
-		return SetValue(func() []Value {
+		vv := SetValue(func() []Value {
 			vv := make([]Value, len(v.GetPairs()))
 			for i, vvv := range v.GetPairs() {
 				vv[i] = FromYDB(ttt.ItemType().ToYDB(), vvv.GetKey())
 			}
 
 			return vv
-		}()...), nil
+		}()...)
+		vv.t = ttt
+
+		return vv, nil
 
 	case *types.VariantStruct:
 
@@ -355,6 +382,10 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		), nil
 
 	case *types.PgType:
+		if _, null := v.GetValue().(*Ydb.Value_NullFlagValue); null {
+			return PgNullValue(ttt.OID), nil
+		}
+
 		return &pgValue{
 			t: types.PgType{
 				OID: ttt.OID,
@@ -1634,8 +1665,9 @@ func ListValue(items ...Value) *listValue {
 }
 
 type pgValue struct {
-	t   types.PgType
-	val string
+	t    types.PgType
+	val  string
+	null bool
 }
 
 func (v pgValue) castTo(dst any) error {
@@ -1657,6 +1689,10 @@ func (v pgValue) Type() types.Type {
 }
 
 func (v pgValue) toYDB() *Ydb.Value {
+	if v.null {
+		return &Ydb.Value{Value: &Ydb.Value_NullFlagValue{}}
+	}
+
 	return &Ydb.Value{
 		Value: &Ydb.Value_TextValue{
 			TextValue: v.val,
@@ -1665,6 +1701,10 @@ func (v pgValue) toYDB() *Ydb.Value {
 }
 
 func (v pgValue) Yql() string {
+	if v.null {
+		return fmt.Sprintf("PgCast(NULL,PgType(%v))", v.t.OID)
+	}
+
 	return fmt.Sprintf(`PgConst("%v", PgType(%v))`, v.val, v.t.OID)
 }
 
@@ -1748,6 +1788,8 @@ func (v *setValue) toYDB() *Ydb.Value {
 	return result
 }
 
+func PgNullValue(oid uint32) Value { return pgValue{t: types.PgType{OID: oid}, null: true} }
+
 func PgValue(oid uint32, val string) pgValue {
 	return pgValue{
 		t: types.PgType{
@@ -1784,7 +1826,7 @@ func NullValue(t types.Type) *optionalValue {
 }
 
 type optionalValue struct {
-	innerType types.Type
+	innerType types.Optional
 	value     Value
 }
 
@@ -1839,21 +1881,42 @@ func (v *optionalValue) Type() types.Type {
 	return v.innerType
 }
 
-func (v *optionalValue) toYDB() *Ydb.Value {
-	if _, opt := v.value.(*optionalValue); opt {
-		return &Ydb.Value{
-			Value: &Ydb.Value_NestedValue{
-				NestedValue: v.value.toYDB(),
-			},
+func terminalNull(v *Ydb.Value) bool {
+	for {
+		switch item := v.GetValue().(type) {
+		case *Ydb.Value_NullFlagValue:
+			return true
+		case *Ydb.Value_NestedValue:
+			v = item.NestedValue
+		default:
+			return false
 		}
 	}
-	if v.value != nil {
-		return v.value.toYDB()
+}
+
+func variantPayload(t types.Type) bool {
+	switch t := t.(type) {
+	case *types.VariantTuple, *types.VariantStruct:
+		return true
+	case types.Optional:
+		return variantPayload(t.InnerType())
+	case *types.Tagged:
+		return variantPayload(t.InnerType())
+	default:
+		return false
+	}
+}
+
+func (v *optionalValue) toYDB() *Ydb.Value {
+	if v.value == nil {
+		return &Ydb.Value{Value: &Ydb.Value_NullFlagValue{}}
+	}
+	inner := v.value.toYDB()
+	if terminalNull(inner) {
+		return &Ydb.Value{Value: &Ydb.Value_NestedValue{NestedValue: inner}}
 	}
 
-	return &Ydb.Value{
-		Value: &Ydb.Value_NullFlagValue{},
-	}
+	return inner
 }
 
 func OptionalValue(v Value) *optionalValue {
@@ -3119,6 +3182,15 @@ func zeroPrimitiveValue(t types.Primitive) Value {
 
 	case types.TzTimestamp:
 		return TzTimestampValue("")
+
+	case types.TzDate32:
+		return tzDate32Value("")
+
+	case types.TzDatetime64:
+		return tzDatetime64Value("")
+
+	case types.TzTimestamp64:
+		return tzTimestamp64Value("")
 
 	case types.Bytes:
 		return BytesValue([]byte{})

@@ -10,7 +10,7 @@ import (
 //nolint:funlen
 func table(config Config) (t trace.Table) {
 	config = config.WithSystem("table")
-	alive := config.GaugeVec("sessions", "node_id")
+	alive := config.GaugeVec("sessions", nodeIDLabel)
 	session := config.WithSystem("session")
 	config = config.WithSystem("pool")
 	limit := config.GaugeVec("limit")
@@ -23,7 +23,7 @@ func table(config Config) (t trace.Table) {
 	get := config.CounterVec("get")
 	put := config.CounterVec("put")
 	with := config.GaugeVec("with")
-	nodeHint := config.CounterVec("node_hint", "preferred_node_id", "session_node_id", "hit")
+	nodeHint := config.CounterVec("node_hint", preferredNodeIDLabel, sessionNodeIDLabel, hitLabel)
 	t.OnInit = func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
 		return func(info trace.TableInitDoneInfo) {
 			if config.Details()&trace.TableEvents == 0 {
@@ -44,7 +44,7 @@ func table(config Config) (t trace.Table) {
 			}
 
 			alive.With(map[string]string{
-				"node_id": idToString(safeSessionNodeID(info.Session)),
+				nodeIDLabel: idToString(safeSessionNodeID(info.Session)),
 			}).Add(1)
 		}
 	}
@@ -54,7 +54,7 @@ func table(config Config) (t trace.Table) {
 		}
 
 		alive.With(map[string]string{
-			"node_id": idToString(safeSessionNodeID(info.Session)),
+			nodeIDLabel: idToString(safeSessionNodeID(info.Session)),
 		}).Add(-1)
 
 		return nil
@@ -86,9 +86,9 @@ func table(config Config) (t trace.Table) {
 				preferred := idToString(info.NodeHintInfo.PreferredNodeID)
 				actual := idToString(info.NodeHintInfo.SessionNodeID)
 				nodeHint.With(map[string]string{
-					"preferred_node_id": preferred,
-					"session_node_id":   actual,
-					"hit":               strconv.FormatBool(preferred == actual),
+					preferredNodeIDLabel: preferred,
+					sessionNodeIDLabel:   actual,
+					hitLabel:             strconv.FormatBool(preferred == actual),
 				}).Inc()
 			}
 		}
@@ -122,9 +122,9 @@ func table(config Config) (t trace.Table) {
 		inUse.With(nil).Set(float64(info.Size - info.Idle))
 	}
 	{
-		latency := session.WithSystem("query").TimerVec("latency", "label")
-		errs := session.WithSystem("query").CounterVec("errs", "status", "label")
-		attempts := session.WithSystem("query").HistogramVec("attempts", []float64{0, 1, 2, 3, 4, 5, 7, 10}, "label")
+		latency := session.WithSystem("query").TimerVec("latency", operationLabel)
+		errs := session.WithSystem("query").CounterVec("errs", statusLabel, operationLabel)
+		attempts := session.WithSystem("query").HistogramVec("attempts", []float64{0, 1, 2, 3, 4, 5, 7, 10}, operationLabel)
 		t.OnDo = func(info trace.TableDoStartInfo) func(trace.TableDoDoneInfo) {
 			start := time.Now()
 			label := info.Label
@@ -134,20 +134,20 @@ func table(config Config) (t trace.Table) {
 					return
 				}
 
-				labels := map[string]string{"label": label}
+				labels := map[string]string{operationLabel: label}
 				latency.With(labels).Record(time.Since(start))
 				errs.With(map[string]string{
-					"status": errorBrief(doneInfo.Error),
-					"label":  label,
+					statusLabel:    errorBrief(doneInfo.Error),
+					operationLabel: label,
 				}).Inc()
 				attempts.With(labels).Record(float64(doneInfo.Attempts))
 			}
 		}
 	}
 	{
-		latency := session.WithSystem("tx").TimerVec("latency", "label")
-		errs := session.WithSystem("tx").CounterVec("errs", "status", "label")
-		attempts := session.WithSystem("tx").HistogramVec("attempts", []float64{0, 1, 2, 3, 4, 5, 7, 10}, "label")
+		latency := session.WithSystem("tx").TimerVec("latency", operationLabel)
+		errs := session.WithSystem("tx").CounterVec("errs", statusLabel, operationLabel)
+		attempts := session.WithSystem("tx").HistogramVec("attempts", []float64{0, 1, 2, 3, 4, 5, 7, 10}, operationLabel)
 		t.OnDoTx = func(info trace.TableDoTxStartInfo) func(trace.TableDoTxDoneInfo) {
 			start := time.Now()
 			label := info.Label
@@ -157,11 +157,11 @@ func table(config Config) (t trace.Table) {
 					return
 				}
 
-				labels := map[string]string{"label": label}
+				labels := map[string]string{operationLabel: label}
 				latency.With(labels).Record(time.Since(start))
 				errs.With(map[string]string{
-					"status": errorBrief(doneInfo.Error),
-					"label":  label,
+					statusLabel:    errorBrief(doneInfo.Error),
+					operationLabel: label,
 				}).Inc()
 				attempts.With(labels).Record(float64(doneInfo.Attempts))
 			}

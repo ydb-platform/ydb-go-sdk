@@ -177,3 +177,59 @@ func TestEqualCreateOptions(t *testing.T) {
 		})
 	}
 }
+
+func TestCreatePartitionCountLimitUsesMaxActivePartitions(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		opts []CreateOption
+		want int64
+	}{
+		{"Unset", nil, 0},
+		{"Legacy", []CreateOption{CreateWithPartitionCountLimit(7)}, 7},
+		{"Modern", []CreateOption{CreateWithMaxActivePartitions(9)}, 9},
+		{"LegacyLast", []CreateOption{CreateWithMaxActivePartitions(9), CreateWithPartitionCountLimit(7)}, 7},
+		{"ModernLast", []CreateOption{CreateWithPartitionCountLimit(7), CreateWithMaxActivePartitions(9)}, 9},
+		{"Zero", []CreateOption{CreateWithPartitionCountLimit(0)}, 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &rawtopic.CreateTopicRequest{}
+			for _, opt := range tt.opts {
+				opt.ApplyCreateOption(req)
+			}
+
+			proto := req.ToProto().GetPartitioningSettings()
+			require.Equal(t, tt.want, proto.GetMaxActivePartitions())
+			message := proto.ProtoReflect()
+			require.False(t, message.Has(message.Descriptor().Fields().ByNumber(2)))
+		})
+	}
+}
+
+func TestAlterPartitionCountLimitUsesMaxActivePartitions(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		opts     []AlterOption
+		want     int64
+		hasValue bool
+	}{
+		{"Unset", nil, 0, false},
+		{"Legacy", []AlterOption{AlterWithPartitionCountLimit(7)}, 7, true},
+		{"Modern", []AlterOption{AlterWithMaxActivePartitions(9)}, 9, true},
+		{"LegacyLast", []AlterOption{AlterWithMaxActivePartitions(9), AlterWithPartitionCountLimit(7)}, 7, true},
+		{"ModernLast", []AlterOption{AlterWithPartitionCountLimit(7), AlterWithMaxActivePartitions(9)}, 9, true},
+		{"Zero", []AlterOption{AlterWithPartitionCountLimit(0)}, 0, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &rawtopic.AlterTopicRequest{}
+			for _, opt := range tt.opts {
+				opt.ApplyAlterOption(req)
+			}
+
+			proto := req.ToProto().GetAlterPartitioningSettings()
+			require.Equal(t, tt.want, proto.GetSetMaxActivePartitions())
+			require.Equal(t, tt.hasValue, proto.SetMaxActivePartitions != nil)
+			message := proto.ProtoReflect()
+			require.False(t, message.Has(message.Descriptor().Fields().ByNumber(2)))
+		})
+	}
+}

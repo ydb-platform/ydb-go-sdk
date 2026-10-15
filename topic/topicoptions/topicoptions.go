@@ -65,12 +65,12 @@ func (minActivePartitions withMinActivePartitions) ApplyAlterOption(req *rawtopi
 type withPartitionCountLimit int64
 
 func (partitionCountLimit withPartitionCountLimit) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
-	request.PartitioningSettings.PartitionCountLimit = int64(partitionCountLimit)
+	request.PartitioningSettings.MaxActivePartitions = int64(partitionCountLimit)
 }
 
 func (partitionCountLimit withPartitionCountLimit) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
-	req.AlterPartitionSettings.SetPartitionCountLimit.HasValue = true
-	req.AlterPartitionSettings.SetPartitionCountLimit.Value = int64(partitionCountLimit)
+	req.AlterPartitionSettings.SetMaxActivePartitions.HasValue = true
+	req.AlterPartitionSettings.SetMaxActivePartitions.Value = int64(partitionCountLimit)
 }
 
 type withRetentionPeriod time.Duration

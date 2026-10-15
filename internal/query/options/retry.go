@@ -158,7 +158,7 @@ func WithRetryBudget(b budget.Budget) RetryOptionsOption {
 func ParseDoOpts(t *trace.Query, opts ...DoOption) (s *doSettings) {
 	s = &doSettings{
 		trace: t,
-		label: "undefined",
+		label: defaultLabel,
 	}
 
 	for _, opt := range opts {

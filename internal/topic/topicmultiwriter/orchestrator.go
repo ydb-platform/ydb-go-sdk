@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -296,7 +297,18 @@ func (o *orchestrator) saveMessageContent(msg *message) error {
 	// This keeps multiwriter-owned messages resendable even if a downstream writer
 	// reads the original reader and fails before enqueueing to its own buffer.
 	err := msg.CacheMessageData(rawtopiccommon.CodecRaw)
-	onCompressDone(err)
+
+	traceErr := err
+	var uncompressedSize, compressedSize int
+	if traceErr == nil && tracer.OnWriterCompressMessages != nil {
+		var content []byte
+		content, traceErr = msg.GetEncodedBytes(rawtopiccommon.CodecRaw)
+		if traceErr == nil {
+			compressedSize = len(content)
+			uncompressedSize = msg.BufUncompressedSize
+		}
+	}
+	onCompressDone(traceErr, uncompressedSize, compressedSize)
 	if err != nil {
 		return err
 	}
@@ -471,11 +483,11 @@ func (o *orchestrator) scheduleResendMessages(
 		inFlightIndexChain.Remove(iter)
 	}
 
-	for i := len(inFlightMessagesToAdd) - 1; i >= 0; i-- {
-		o.buf.getInflightMessagesIndex(inFlightMessagesToAdd[i].Value.PartitionID).PushFront(inFlightMessagesToAdd[i])
+	for _, msg := range slices.Backward(inFlightMessagesToAdd) {
+		o.buf.getInflightMessagesIndex(msg.Value.PartitionID).PushFront(msg)
 	}
-	for i := len(messagesToResendToAdd) - 1; i >= 0; i-- {
-		o.buf.getMessagesToResendIndex(messagesToResendToAdd[i].Value.PartitionID).PushFront(messagesToResendToAdd[i])
+	for _, msg := range slices.Backward(messagesToResendToAdd) {
+		o.buf.getMessagesToResendIndex(msg.Value.PartitionID).PushFront(msg)
 	}
 
 	for resendPartitionID, count := range pendingResendByPartition {

@@ -2,6 +2,8 @@ package balancer
 
 import (
 	"math"
+	"strconv"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
 func TestEndpointElectorSelectsRandomEndpointFromBestPriority(t *testing.T) {
@@ -258,6 +261,85 @@ func TestIsConnectionStateUsable(t *testing.T) {
 	require.True(t, isConnectionStateUsable(state.Banned, true))
 	require.False(t, isConnectionStateUsable(state.Destroyed, true))
 }
+
+// cpu: Apple M3 Pro; go1.27.0 darwin/arm64; GOMAXPROCS=4.
+// Baseline: master 9cd397464; median of five runs, one second per case.
+//
+//	GOTOOLCHAIN=go1.27.0 go test -run '^$' -bench '^BenchmarkEndpointElector$' \
+//	  -benchmem -benchtime=1s -count=5 -cpu=4 ./internal/balancer
+//
+// BenchmarkEndpointElector/Equal/1/Serial-4              6.986 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/1/Parallel-4          133.100 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/1/Serial-4             6.975 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/1/Parallel-4         133.000 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/2/Serial-4              6.876 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/2/Parallel-4          133.000 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/2/Serial-4             6.867 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/2/Parallel-4         121.100 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/9/Serial-4              7.455 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/9/Parallel-4          130.200 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/9/Serial-4             7.411 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/9/Parallel-4         109.700 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/1000/Serial-4           7.357 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Equal/1000/Parallel-4       133.800 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/1000/Serial-4          7.359 ns/op     0 B/op   0 allocs/op
+// BenchmarkEndpointElector/Skewed/1000/Parallel-4      133.800 ns/op     0 B/op   0 allocs/op
+//
+// Fixed loads measure selection cost, not RPC latency.
+func BenchmarkEndpointElector(b *testing.B) {
+	for _, size := range []int{1, 2, 9, 1000} {
+		for _, skewed := range []bool{false, true} {
+			name := "Equal"
+			if skewed {
+				name = "Skewed"
+			}
+			for _, parallel := range []bool{false, true} {
+				mode := "Serial"
+				if parallel {
+					mode = "Parallel"
+				}
+				b.Run(name+"/"+strconv.Itoa(size)+"/"+mode, func(b *testing.B) {
+					connections := make([]conn.Conn, size)
+					priorities := make([]policy.EndpointPriority, size)
+					for i := range connections {
+						c := &busyElectorConn{Conn: electorConnection("node", uint32(i+1), state.Online)}
+						if skewed {
+							c.load.Store(int64(i % 8))
+						}
+						connections[i] = c
+						priorities[i] = policy.EndpointPriority{Key: c.Endpoint().Key()}
+					}
+					elector := newEndpointElector(priorities, connectionMap(connections...), xrand.New(xrand.WithLock()))
+					b.ReportAllocs()
+					b.ResetTimer()
+					if parallel {
+						b.RunParallel(func(pb *testing.PB) {
+							for pb.Next() {
+								if _, _, ok := elector.Next(); !ok {
+									b.Error("no candidate")
+								}
+							}
+						})
+					} else {
+						for range b.N {
+							if _, _, ok := elector.Next(); !ok {
+								b.Fatal("no candidate")
+							}
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+type busyElectorConn struct {
+	conn.Conn
+
+	load atomic.Int64
+}
+
+func (c *busyElectorConn) InFlight() int64 { return c.load.Load() }
 
 func electorConnection(address string, nodeID uint32, connectionState state.State) conn.Conn {
 	return &mock.Conn{AddrField: address, NodeIDField: nodeID, StateField: connectionState}

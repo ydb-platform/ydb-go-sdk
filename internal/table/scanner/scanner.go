@@ -844,10 +844,10 @@ func (s *valueScanner) setByte(dst *[]byte) {
 
 func (s *valueScanner) trySetByteArray(v any, optional, def bool) bool {
 	rv := reflect.ValueOf(v)
-	if rv.Kind() == reflect.Ptr {
+	if rv.Kind() == reflect.Pointer {
 		rv = rv.Elem()
 	}
-	if rv.Kind() == reflect.Ptr {
+	if rv.Kind() == reflect.Pointer {
 		if !optional {
 			return false
 		}
@@ -1176,7 +1176,7 @@ func (s *valueScanner) scanOptional(v any, defaultValueForOptional bool) {
 		ok := s.trySetByteArray(v, true, false)
 		if !ok {
 			rv := reflect.TypeOf(v)
-			if rv.Kind() == reflect.Ptr && rv.Elem().Kind() == reflect.Ptr {
+			if rv.Kind() == reflect.Pointer && rv.Elem().Kind() == reflect.Pointer {
 				_ = s.errorf(0, "scan row failed: type %T is unknown", v)
 			} else {
 				_ = s.errorf(0, "scan row failed: type %T is not optional! use double pointer or sql.Scanner.", v)

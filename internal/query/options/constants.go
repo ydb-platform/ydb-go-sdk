@@ -6,3 +6,5 @@ const (
 	ResultSetsTypeOrdered = ResultSetsType(iota)
 	ResultSetsTypeConcurrent
 )
+
+const defaultLabel = "undefined"

@@ -330,7 +330,7 @@ func (w *Writer) importDeps(deps []dep) {
 
 func (w *Writer) isStdLib(pkg string) bool {
 	w.ensureStdLibMapping()
-	s := strings.Split(pkg, "/")[0]
+	s, _, _ := strings.Cut(pkg, "/")
 
 	return w.std[s]
 }

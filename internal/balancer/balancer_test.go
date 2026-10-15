@@ -19,10 +19,12 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/stats"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -60,6 +62,10 @@ func (c *poolRegisteredConn) Endpoint() endpoint.Endpoint {
 
 func (c *poolRegisteredConn) State() state.State {
 	return c.inner.State()
+}
+
+func (c *poolRegisteredConn) InFlight() int64 {
+	return c.inner.InFlight()
 }
 
 func (c *poolRegisteredConn) Unban(ctx context.Context) {
@@ -257,6 +263,62 @@ func TestMaxConnectionsWithNodeIDSoftLimit(t *testing.T) {
 	require.ErrorIs(t, err, ErrNoEndpoints)
 	require.Nil(t, selected)
 	require.Equal(t, state.Banned, pinned.State(), "a quarantined connection must not be revived either")
+}
+
+func TestWithNodeIDCountsRPC(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	p := userBalancers.WithMaxConnections(
+		userBalancers.PreferLocations(userBalancers.RandomChoice(), "local"), 2,
+	)
+	cfg := config.New(config.WithBalancer(p), config.WithGrpcOptions(
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(func(ctx context.Context, _ string, _, _ any, _ *grpc.ClientConn,
+			_ grpc.UnaryInvoker, _ ...grpc.CallOption,
+		) error {
+			close(entered)
+			select {
+			case <-release:
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}),
+	))
+	pool := conn.NewPool(ctx, cfg)
+	b := &Balancer{driverConfig: cfg, policy: p, pool: pool, random: noShuffleRand{}}
+	t.Cleanup(func() {
+		require.NoError(t, b.Close(context.Background()))
+		require.NoError(t, pool.RemoveRef(context.Background()))
+	})
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
+		endpoint.New("127.0.0.1:1", endpoint.WithID(1), endpoint.WithLocation("local")),
+		endpoint.New("127.0.0.1:2", endpoint.WithID(2), endpoint.WithLocation("local")),
+		endpoint.New("127.0.0.1:3", endpoint.WithID(3), endpoint.WithLocation("remote")),
+	}, "")
+	pinnedCtx := userBalancers.WithNodeID(conn.WithoutWrapping(ctx), 3)
+	target, err := b.nextConn(pinnedCtx)
+	require.NoError(t, err)
+	require.EqualValues(t, 3, target.Endpoint().NodeID())
+	result := make(chan error, 1)
+	go func() { result <- b.Invoke(pinnedCtx, "/test", nil, nil) }()
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		t.Fatal("pinned RPC did not enter transport")
+	}
+	require.EqualValues(t, 1, target.InFlight())
+	candidates := b.connections().elector.snapshot.Load().connections
+	require.Len(t, candidates, 2)
+	for _, candidate := range candidates {
+		require.NotEqualValues(t, 3, candidate.Endpoint().NodeID())
+	}
+	require.Len(t, b.connections().All(), 3)
+	close(release)
+	require.NoError(t, <-result)
+	require.Zero(t, target.InFlight())
 }
 
 func TestTryAddPinnedConnectionDefensivePaths(t *testing.T) {
@@ -773,6 +835,51 @@ type mockResolver struct{}
 
 func (r *mockResolver) ResolveNow(resolver.ResolveNowOptions) {}
 func (r *mockResolver) Close()                                {}
+
+func TestNewClosesConnectionAfterDiscoveryFailure(t *testing.T) {
+	var active, calls atomic.Int64
+
+	listener := bufconn.Listen(1024 * 1024)
+	server := grpc.NewServer(
+		grpc.StatsHandler(&serverConnStats{active: &active}),
+		grpc.UnknownServiceHandler(func(any, grpc.ServerStream) error {
+			calls.Add(1)
+
+			return status.Error(codes.NotFound, "synthetic discovery failure")
+		}),
+	)
+	t.Cleanup(func() {
+		server.Stop()
+		_ = listener.Close()
+	})
+
+	go func() { _ = server.Serve(listener) }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cfg := config.New(
+		config.WithEndpoint("127.0.0.1:2135"),
+		config.WithDatabase("/missing"),
+		config.WithBalancer(userBalancers.RandomChoice()),
+		config.WithGrpcOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithContextDialer(func(ctx context.Context, address string) (net.Conn, error) {
+				return listener.DialContext(ctx)
+			}),
+		),
+	)
+
+	for attempt := int64(1); attempt <= 3; attempt++ {
+		pool := conn.NewPool(ctx, cfg)
+		balancer, err := New(ctx, cfg, pool)
+		require.NoError(t, pool.RemoveRef(context.WithoutCancel(ctx)))
+		require.Error(t, err)
+		require.Nil(t, balancer)
+		require.Equal(t, attempt, calls.Load())
+		require.Eventually(t, func() bool { return active.Load() == 0 }, time.Second, time.Millisecond)
+	}
+}
 
 func TestNew(t *testing.T) {
 	t.Run("context already canceled", func(t *testing.T) {

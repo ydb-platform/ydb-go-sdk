@@ -17,6 +17,14 @@ ignore:
   - testutil
   - examples
   - internal/mock
+  - internal/topic/topicmock
+  - internal/topic/topicwritetest
+  - internal/topic/topicmultiwriter/stubs
+  - internal/grpcwrapper/rawtopic/rawtopicreadermock
+  - internal/xsql/test_helpers.go
+  - internal/xsql/test
+  - internal/query/test
+  - internal/table/test
   - internal/cmd
   - pkg/xtest
   - tests

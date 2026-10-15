@@ -20,6 +20,8 @@ func Any(v Value) (any, error) { //nolint:funlen,gocyclo
 	}
 
 	switch vv := v.(type) {
+	case literalNullValue:
+		return nil, nil //nolint:nilnil
 	case boolValue:
 		return bool(vv), nil
 	case uint8Value:

@@ -19,6 +19,8 @@ import (
 	"slo/internal/kv"
 )
 
+const numericHashExpression = "Digest::NumericHash(?)"
+
 const optionsTemplate = `
 WITH (
     AUTO_PARTITIONING_BY_SIZE = ENABLED,
@@ -92,7 +94,7 @@ func (d *db) Read(ctx context.Context, id generator.RowID) (_ generator.Row, att
 			return d.gormDB.WithContext(ctx).Scopes(scopeTable(d.tableName)).Model(&generator.Row{}).
 				First(&r, "hash = ? AND id = ?",
 					clause.Expr{
-						SQL:  "Digest::NumericHash(?)",
+						SQL:  numericHashExpression,
 						Vars: []any{id},
 					},
 					id,
@@ -135,7 +137,7 @@ func (d *db) Write(ctx context.Context, row generator.Row) (attempts int, err er
 			return d.gormDB.WithContext(ctx).Scopes(scopeTable(d.tableName)).Model(&generator.Row{}).
 				Create(map[string]any{
 					"Hash": clause.Expr{
-						SQL:  "Digest::NumericHash(?)",
+						SQL:  numericHashExpression,
 						Vars: []any{row.ID},
 					},
 					"ID":               row.ID,

@@ -3,7 +3,6 @@ package scanner
 import (
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -27,8 +26,7 @@ func (s IndexedScanner) Scan(dst ...any) (err error) {
 		)
 	}
 	for i := range dst {
-		v := s.data.seekByIndex(i)
-		if err := value.CastTo(v, dst[i]); err != nil {
+		if err := s.data.scanByIndex(i, dst[i]); err != nil {
 			return xerrors.WithStackTrace(fmt.Errorf("scan error on column index %d: %w", i, err))
 		}
 	}

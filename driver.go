@@ -325,8 +325,9 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 	}()
 
 	if err = d.connect(ctx); err != nil {
+		d.ctxCancel()
 		if d.pool != nil {
-			_ = d.pool.RemoveRef(ctx)
+			_ = d.pool.RemoveRef(context.WithoutCancel(ctx))
 		}
 
 		return nil, xerrors.WithStackTrace(err)
@@ -367,6 +368,11 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:
 	}()
 
 	if err = d.connect(ctx); err != nil {
+		d.ctxCancel()
+		if d.pool != nil {
+			_ = d.pool.RemoveRef(context.WithoutCancel(ctx))
+		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -376,17 +382,19 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:
 //nolint:cyclop, nonamedreturns, funlen
 func driverFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 	ctx, driverCtxCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
-	defer func() {
-		if err != nil {
-			driverCtxCancel()
-		}
-	}()
-
 	d := &Driver{
 		children:     make(map[uint64]*Driver),
 		ctxCancel:    driverCtxCancel,
 		metaBalancer: &balancerWithMeta{},
 	}
+	defer func() {
+		if err != nil {
+			driverCtxCancel()
+			if d.pool != nil {
+				_ = d.pool.RemoveRef(context.WithoutCancel(ctx))
+			}
+		}
+	}()
 
 	if caFile, has := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); has {
 		d.opts = append(d.opts,

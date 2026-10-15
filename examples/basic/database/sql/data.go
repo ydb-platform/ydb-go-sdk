@@ -7,6 +7,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
+const (
+	season1Title = "Season 1"
+	season2Title = "Season 2"
+	season3Title = "Season 3"
+	season4Title = "Season 4"
+)
+
 func seriesData(id string, released time.Time, title, info, comment string) types.Value {
 	var commentv types.Value
 	if comment == "" {
@@ -73,7 +80,7 @@ func getDataForITCrowd(seriesID string) (series types.Value, seasons, episodes [
 		last     time.Time
 		episodes map[string]time.Time
 	}{
-		{"Season 1", date("2006-02-03"), date("2006-03-03"), map[string]time.Time{
+		{season1Title, date("2006-02-03"), date("2006-03-03"), map[string]time.Time{
 			"Yesterday's Jam":             date("2006-02-03"),
 			"Calamity Jen":                date("2006-02-03"),
 			"Fifty-Fifty":                 date("2006-02-10"),
@@ -81,7 +88,7 @@ func getDataForITCrowd(seriesID string) (series types.Value, seasons, episodes [
 			"The Haunting of Bill Crouse": date("2006-02-24"),
 			"Aunt Irma Visits":            date("2006-03-03"),
 		}},
-		{"Season 2", date("2007-08-24"), date("2007-09-28"), map[string]time.Time{
+		{season2Title, date("2007-08-24"), date("2007-09-28"), map[string]time.Time{
 			"The Work Outing":            date("2006-08-24"),
 			"Return of the Golden Child": date("2007-08-31"),
 			"Moss and the German":        date("2007-09-07"),
@@ -89,7 +96,7 @@ func getDataForITCrowd(seriesID string) (series types.Value, seasons, episodes [
 			"Smoke and Mirrors":          date("2007-09-21"),
 			"Men Without Women":          date("2007-09-28"),
 		}},
-		{"Season 3", date("2008-11-21"), date("2008-12-26"), map[string]time.Time{
+		{season3Title, date("2008-11-21"), date("2008-12-26"), map[string]time.Time{
 			"From Hell":       date("2008-11-21"),
 			"Are We Not Men?": date("2008-11-28"),
 			"Tramps Like Us":  date("2008-12-05"),
@@ -97,7 +104,7 @@ func getDataForITCrowd(seriesID string) (series types.Value, seasons, episodes [
 			"Friendface":      date("2008-12-19"),
 			"Calendar Geeks":  date("2008-12-26"),
 		}},
-		{"Season 4", date("2010-06-25"), date("2010-07-30"), map[string]time.Time{
+		{season4Title, date("2010-06-25"), date("2010-07-30"), map[string]time.Time{
 			"Jen The Fredo":         date("2010-06-25"),
 			"The Final Countdown":   date("2010-07-02"),
 			"Something Happened":    date("2010-07-09"),
@@ -129,7 +136,7 @@ func getDataForSiliconValley(seriesID string) (series types.Value, seasons, epis
 		last     time.Time
 		episodes map[string]time.Time
 	}{
-		{"Season 1", date("2006-02-03"), date("2006-03-03"), map[string]time.Time{
+		{season1Title, date("2006-02-03"), date("2006-03-03"), map[string]time.Time{
 			"Minimum Viable Product":        date("2014-04-06"),
 			"The Cap Table":                 date("2014-04-13"),
 			"Articles of Incorporation":     date("2014-04-20"),
@@ -139,7 +146,7 @@ func getDataForSiliconValley(seriesID string) (series types.Value, seasons, epis
 			"Proof of Concept":              date("2014-05-18"),
 			"Optimal Tip-to-Tip Efficiency": date("2014-06-01"),
 		}},
-		{"Season 2", date("2007-08-24"), date("2007-09-28"), map[string]time.Time{
+		{season2Title, date("2007-08-24"), date("2007-09-28"), map[string]time.Time{
 			"Sand Hill Shuffle":      date("2015-04-12"),
 			"Runaway Devaluation":    date("2015-04-19"),
 			"Bad Money":              date("2015-04-26"),
@@ -151,7 +158,7 @@ func getDataForSiliconValley(seriesID string) (series types.Value, seasons, epis
 			"Binding Arbitration":    date("2015-06-07"),
 			"Two Days of the Condor": date("2015-06-14"),
 		}},
-		{"Season 3", date("2008-11-21"), date("2008-12-26"), map[string]time.Time{
+		{season3Title, date("2008-11-21"), date("2008-12-26"), map[string]time.Time{
 			"Founder Friendly":               date("2016-04-24"),
 			"Two in the Box":                 date("2016-05-01"),
 			"Meinertzhagen's Haversack":      date("2016-05-08"),
@@ -163,7 +170,7 @@ func getDataForSiliconValley(seriesID string) (series types.Value, seasons, epis
 			"Daily Active Users":             date("2016-06-19"),
 			"The Uptick":                     date("2016-06-26"),
 		}},
-		{"Season 4", date("2010-06-25"), date("2010-07-30"), map[string]time.Time{
+		{season4Title, date("2010-06-25"), date("2010-07-30"), map[string]time.Time{
 			"Success Failure":       date("2017-04-23"),
 			"Terms of Service":      date("2017-04-30"),
 			"Intellectual Property": date("2017-05-07"),

@@ -18,6 +18,7 @@ linters:
     - err113
     - exhaustive
     - exhaustruct
+    - exhaustruct_v5
     - fatcontext
     - forbidigo
     - gochecknoglobals

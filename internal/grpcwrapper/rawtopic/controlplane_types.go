@@ -56,7 +56,6 @@ const (
 type PartitioningSettings struct {
 	MinActivePartitions      int64
 	MaxActivePartitions      int64
-	PartitionCountLimit      int64
 	AutoPartitioningSettings AutoPartitioningSettings
 }
 
@@ -67,7 +66,6 @@ func (s *PartitioningSettings) FromProto(proto *Ydb_Topic.PartitioningSettings) 
 
 	s.MinActivePartitions = proto.GetMinActivePartitions()
 	s.MaxActivePartitions = proto.GetMaxActivePartitions()
-	s.PartitionCountLimit = proto.GetPartitionCountLimit() //nolint:staticcheck
 
 	return s.AutoPartitioningSettings.FromProto(proto.GetAutoPartitioningSettings())
 }
@@ -76,7 +74,6 @@ func (s *PartitioningSettings) ToProto() *Ydb_Topic.PartitioningSettings {
 	return &Ydb_Topic.PartitioningSettings{
 		MinActivePartitions:      s.MinActivePartitions,
 		MaxActivePartitions:      s.MaxActivePartitions,
-		PartitionCountLimit:      s.PartitionCountLimit,
 		AutoPartitioningSettings: s.AutoPartitioningSettings.ToProto(),
 	}
 }
@@ -155,7 +152,6 @@ func (s *AutoPartitioningWriteSpeedStrategy) FromProto(speed *Ydb_Topic.AutoPart
 type AlterPartitioningSettings struct {
 	SetMinActivePartitions        rawoptional.Int64
 	SetMaxActivePartitions        rawoptional.Int64
-	SetPartitionCountLimit        rawoptional.Int64
 	AlterAutoPartitioningSettings *AlterAutoPartitioningSettings
 }
 
@@ -163,7 +159,6 @@ func (s *AlterPartitioningSettings) ToProto() *Ydb_Topic.AlterPartitioningSettin
 	return &Ydb_Topic.AlterPartitioningSettings{
 		SetMinActivePartitions:        s.SetMinActivePartitions.ToProto(),
 		SetMaxActivePartitions:        s.SetMaxActivePartitions.ToProto(),
-		SetPartitionCountLimit:        s.SetPartitionCountLimit.ToProto(),
 		AlterAutoPartitioningSettings: s.AlterAutoPartitioningSettings.ToProto(),
 	}
 }

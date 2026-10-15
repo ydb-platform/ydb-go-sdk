@@ -21,3 +21,10 @@ func TestConnectionEndpointMetadata(t *testing.T) {
 	require.True(t, metadata.LocalDC)
 	require.Equal(t, endpoint.PileStatePrimary, metadata.BridgePileState)
 }
+
+func TestConnectionInFlight(t *testing.T) {
+	connection := &Conn{}
+	require.Zero(t, connection.InFlight())
+	connection.InFlightField = 3
+	require.Equal(t, int64(3), connection.InFlight())
+}

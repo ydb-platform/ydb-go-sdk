@@ -27,6 +27,15 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+const (
+	metricsNamespace = "app"
+	methodLabel      = "method"
+	successLabel     = "success"
+	indexMethod      = "index"
+	shortenMethod    = "shorten"
+	longerMethod     = "longer"
+)
+
 //go:embed static/index.html
 var static embed.FS
 
@@ -103,15 +112,15 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (*service, 
 		var (
 			registry = prometheus.NewRegistry()
 			calls    = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-				Namespace: "app",
+				Namespace: metricsNamespace,
 				Name:      "calls",
 				Help:      "application calls counter",
 			}, []string{
-				"method",
-				"success",
+				methodLabel,
+				successLabel,
 			})
 			callsLatency = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-				Namespace: "app",
+				Namespace: metricsNamespace,
 				Name:      "latency",
 				Help:      "application calls latencies",
 				Buckets: []float64{
@@ -126,15 +135,15 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (*service, 
 					(10000 * time.Millisecond).Seconds(),
 				},
 			}, []string{
-				"success",
-				"method",
+				successLabel,
+				methodLabel,
 			})
 			callsErrors = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-				Namespace: "app",
+				Namespace: metricsNamespace,
 				Name:      "errors",
 				Help:      "application errors counter",
 			}, []string{
-				"method",
+				methodLabel,
 			})
 		)
 
@@ -299,16 +308,16 @@ func (s *service) handleIndex(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if err != nil {
 			s.callsErrors.With(prometheus.Labels{
-				"method": "index",
+				methodLabel: indexMethod,
 			}).Add(1)
 		}
 		s.callsLatency.With(prometheus.Labels{
-			"method":  "index",
-			"success": successToString(err == nil),
+			methodLabel:  indexMethod,
+			successLabel: successToString(err == nil),
 		}).Observe(time.Since(start).Seconds())
 		s.calls.With(prometheus.Labels{
-			"method":  "index",
-			"success": successToString(err == nil),
+			methodLabel:  indexMethod,
+			successLabel: successToString(err == nil),
 		}).Add(1)
 	}()
 	tpl, err = template.ParseFS(static, "static/index.html")
@@ -339,16 +348,16 @@ func (s *service) handleShorten(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if err != nil {
 			s.callsErrors.With(prometheus.Labels{
-				"method": "shorten",
+				methodLabel: shortenMethod,
 			}).Add(1)
 		}
 		s.callsLatency.With(prometheus.Labels{
-			"method":  "shorten",
-			"success": successToString(err == nil),
+			methodLabel:  shortenMethod,
+			successLabel: successToString(err == nil),
 		}).Observe(time.Since(start).Seconds())
 		s.calls.With(prometheus.Labels{
-			"method":  "index",
-			"success": successToString(err == nil),
+			methodLabel:  indexMethod,
+			successLabel: successToString(err == nil),
 		}).Add(1)
 	}()
 	url, err = io.ReadAll(r.Body)
@@ -382,16 +391,16 @@ func (s *service) handleLonger(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if err != nil {
 			s.callsErrors.With(prometheus.Labels{
-				"method": "longer",
+				methodLabel: longerMethod,
 			}).Add(1)
 		}
 		s.callsLatency.With(prometheus.Labels{
-			"method":  "longer",
-			"success": successToString(err == nil),
+			methodLabel:  longerMethod,
+			successLabel: successToString(err == nil),
 		}).Observe(time.Since(start).Seconds())
 		s.calls.With(prometheus.Labels{
-			"method":  "index",
-			"success": successToString(err == nil),
+			methodLabel:  indexMethod,
+			successLabel: successToString(err == nil),
 		}).Add(1)
 	}()
 	shortLink := mux.Vars(r)["short"]

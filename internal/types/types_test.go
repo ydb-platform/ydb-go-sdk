@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pg"
 )
@@ -893,6 +894,21 @@ func TestProtobufType(t *testing.T) {
 }
 
 func TestTypeFromYDB(t *testing.T) {
+	t.Run("EmptyCollections", func(t *testing.T) {
+		for _, tt := range []struct {
+			wire *Ydb.Type
+			want Type
+		}{
+			{&Ydb.Type{Type: &Ydb.Type_EmptyListType{}}, NewEmptyList()},
+			{&Ydb.Type{Type: &Ydb.Type_EmptyDictType{}}, NewEmptyDict()},
+		} {
+			t.Run(tt.want.Yql(), func(t *testing.T) {
+				got := TypeFromYDB(tt.wire)
+				require.True(t, Equal(tt.want, got))
+				require.True(t, proto.Equal(tt.wire, got.ToYDB()))
+			})
+		}
+	})
 	t.Run("PrimitiveTypes", func(t *testing.T) {
 		primitives := []struct {
 			ydbType Ydb.Type_PrimitiveTypeId

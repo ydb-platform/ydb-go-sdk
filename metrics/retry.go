@@ -8,9 +8,9 @@ import (
 
 func retry(config Config) (t trace.Retry) {
 	config = config.WithSystem("retry")
-	errs := config.CounterVec("errors", "status", "retry_label", "final")
-	attempts := config.HistogramVec("attempts", []float64{0, 1, 2, 3, 4, 5, 7, 10}, "retry_label")
-	latency := config.TimerVec("latency", "retry_label")
+	errs := config.CounterVec("errors", statusLabel, retryLabel, "final")
+	attempts := config.HistogramVec("attempts", []float64{0, 1, 2, 3, 4, 5, 7, 10}, retryLabel)
+	latency := config.TimerVec("latency", retryLabel)
 	t.OnRetry = func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 		label := info.Label
 		if label == "" {
@@ -24,15 +24,15 @@ func retry(config Config) (t trace.Retry) {
 			}
 
 			attempts.With(map[string]string{
-				"retry_label": label,
+				retryLabel: label,
 			}).Record(float64(info.Attempts))
 			errs.With(map[string]string{
-				"status":      errorBrief(info.Error),
-				"retry_label": label,
-				"final":       "true",
+				statusLabel: errorBrief(info.Error),
+				retryLabel:  label,
+				"final":     "true",
 			}).Inc()
 			latency.With(map[string]string{
-				"retry_label": label,
+				retryLabel: label,
 			}).Record(time.Since(start))
 		}
 	}
