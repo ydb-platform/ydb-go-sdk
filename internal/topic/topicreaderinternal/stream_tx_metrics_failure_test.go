@@ -33,8 +33,10 @@ func TestTopicStreamReader_PopMessagesBatchTxReleasesBufferWhenMaterializationFa
 		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
 			queued <- info.MessagesCount
 		},
-		OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
-			acknowledged <- info.MessagesCount
+		OnReaderCommittedNotify: func(info trace.TopicReaderCommittedNotifyInfo) {
+			if info.MessagesCount > 0 {
+				acknowledged <- info.MessagesCount
+			}
 		},
 		OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
 			sessionErrors <- info

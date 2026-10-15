@@ -60,11 +60,11 @@ func setupTopicReaderReceivedMessages(t *trace.Topic, config Config) {
 		return
 	}
 	t.OnReaderMessagesReceived = func(info trace.TopicReaderMessagesReceivedInfo) {
-		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderMessageEvents) {
+		if !topicMetricEnabled(config.Details(), info.ReaderInfo.Listener, trace.TopicReaderMessageEvents) {
 			return
 		}
 		addCounter(
-			messages.With(messageLabels(info.Endpoint, info.Database, info.Topic, info.Consumer, info.ReaderName)),
+			messages.With(messageLabels(info.ReaderInfo, info.Topic)),
 			info.MessagesCount,
 		)
 	}
@@ -83,11 +83,11 @@ func setupTopicReaderDeliveredMessages(t *trace.Topic, config Config) {
 		return
 	}
 	t.OnReaderMessagesDelivered = func(info trace.TopicReaderMessagesDeliveredInfo) {
-		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderMessageEvents) {
+		if !topicMetricEnabled(config.Details(), info.ReaderInfo.Listener, trace.TopicReaderMessageEvents) {
 			return
 		}
 		addCounter(
-			deliveredMessages.With(messageLabels(info.Endpoint, info.Database, info.Topic, info.Consumer, info.ReaderName)),
+			deliveredMessages.With(messageLabels(info.ReaderInfo, info.Topic)),
 			info.MessagesCount,
 		)
 	}
@@ -102,20 +102,35 @@ func setupTopicReaderReceivedBytes(t *trace.Topic, config Config) {
 		topicReaderReceivedBytesUnit,
 		topicStreamLabels,
 	)
-	if config.Details()&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) == 0 {
-		return
-	}
-	t.OnReaderReceivedBytes = func(info trace.TopicReaderReceivedBytesInfo) {
-		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderMessageEvents) {
-			return
-		}
-		if info.Bytes <= 0 {
+	recordBytes := func(readerInfo trace.TopicReaderInfo, bytes int) {
+		if bytes <= 0 {
 			return
 		}
 		addCounterWithAdd(
-			receivedBytes.With(streamLabels(info.Endpoint, info.Database, info.Consumer, info.ReaderName)),
-			info.Bytes,
+			receivedBytes.With(streamLabels(readerInfo)),
+			bytes,
 		)
+	}
+
+	if config.Details()&trace.TopicReaderMessageEvents != 0 {
+		t.OnReaderReceiveDataResponse = func(
+			info trace.TopicReaderReceiveDataResponseStartInfo,
+		) func(trace.TopicReaderReceiveDataResponseDoneInfo) {
+			if info.DataResponse != nil {
+				recordBytes(info.ReaderInfo, info.DataResponse.GetBytesSize())
+			}
+
+			return nil
+		}
+	}
+
+	if config.Details()&trace.TopicListenerStreamEvents != 0 {
+		t.OnListenerReceiveMessage = func(info trace.TopicListenerReceiveMessageInfo) {
+			if info.Error != nil {
+				return
+			}
+			recordBytes(info.ReaderInfo, info.BytesSize)
+		}
 	}
 }
 
@@ -132,10 +147,10 @@ func setupTopicReaderSessionErrors(t *trace.Topic, config Config) {
 		return
 	}
 	t.OnReaderSessionError = func(info trace.TopicReaderSessionErrorInfo) {
-		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderStreamEvents) {
+		if !topicMetricEnabled(config.Details(), info.ReaderInfo.Listener, trace.TopicReaderStreamEvents) {
 			return
 		}
-		labels := streamLabels(info.Endpoint, info.Database, info.Consumer, info.ReaderName)
+		labels := streamLabels(info.ReaderInfo)
 		labels["retry_decision"] = info.RetryDecision
 		labels["status_code"] = info.StatusCode
 		labels["error.type"] = info.ErrorType
@@ -156,11 +171,11 @@ func setupTopicReaderCommitQueued(t *trace.Topic, config Config) {
 		return
 	}
 	t.OnReaderCommitQueued = func(info trace.TopicReaderCommitQueuedInfo) {
-		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderStreamEvents) {
+		if !topicMetricEnabled(config.Details(), info.ReaderInfo.Listener, trace.TopicReaderStreamEvents) {
 			return
 		}
 		addCounterWithAdd(
-			commitQueued.With(messageLabels(info.Endpoint, info.Database, info.Topic, info.Consumer, info.ReaderName)),
+			commitQueued.With(messageLabels(info.ReaderInfo, info.Topic)),
 			info.MessagesCount,
 		)
 	}
@@ -178,12 +193,15 @@ func setupTopicReaderCommitAcknowledged(t *trace.Topic, config Config) {
 	if config.Details()&(trace.TopicReaderStreamEvents|trace.TopicListenerStreamEvents) == 0 {
 		return
 	}
-	t.OnReaderCommitAcknowledged = func(info trace.TopicReaderCommitAcknowledgedInfo) {
-		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderStreamEvents) {
+	t.OnReaderCommittedNotify = func(info trace.TopicReaderCommittedNotifyInfo) {
+		if !topicMetricEnabled(config.Details(), info.ReaderInfo.Listener, trace.TopicReaderStreamEvents) {
+			return
+		}
+		if info.MessagesCount <= 0 {
 			return
 		}
 		addCounterWithAdd(
-			commitAcknowledged.With(messageLabels(info.Endpoint, info.Database, info.Topic, info.Consumer, info.ReaderName)),
+			commitAcknowledged.With(messageLabels(info.ReaderInfo, info.Topic)),
 			info.MessagesCount,
 		)
 	}
@@ -202,11 +220,11 @@ func setupTopicReaderLocalBufferMessages(t *trace.Topic, config Config) {
 		return
 	}
 	t.OnReaderLocalBufferChanged = func(info trace.TopicReaderLocalBufferChangedInfo) {
-		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderMessageEvents) {
+		if !topicMetricEnabled(config.Details(), info.ReaderInfo.Listener, trace.TopicReaderMessageEvents) {
 			return
 		}
 		addGauge(
-			localBufferMessages.With(messageLabels(info.Endpoint, info.Database, info.Topic, info.Consumer, info.ReaderName)),
+			localBufferMessages.With(messageLabels(info.ReaderInfo, info.Topic)),
 			float64(info.MessagesDelta),
 		)
 	}
@@ -225,11 +243,11 @@ func setupTopicReaderCreditBalanceBytes(t *trace.Topic, config Config) {
 		return
 	}
 	t.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
-		if !topicMetricEnabled(config.Details(), info.Listener, trace.TopicReaderMessageEvents) {
+		if !topicMetricEnabled(config.Details(), info.ReaderInfo.Listener, trace.TopicReaderMessageEvents) {
 			return
 		}
 		addGauge(
-			creditBalanceBytes.With(streamLabels(info.Endpoint, info.Database, info.Consumer, info.ReaderName)),
+			creditBalanceBytes.With(streamLabels(info.ReaderInfo)),
 			float64(info.BytesDelta),
 		)
 	}
@@ -255,19 +273,19 @@ func topicGauge(readerConfig Config, legacySystem, legacyName, name, unit string
 	return readerConfig.WithSystem(legacySystem).GaugeVec(legacyName, labels...)
 }
 
-func messageLabels(endpoint, database, topic, consumer, readerName string) map[string]string {
-	labels := streamLabels(endpoint, database, consumer, readerName)
+func messageLabels(readerInfo trace.TopicReaderInfo, topic string) map[string]string {
+	labels := streamLabels(readerInfo)
 	labels["topic"] = topic
 
 	return labels
 }
 
-func streamLabels(endpoint, database, consumer, readerName string) map[string]string {
+func streamLabels(readerInfo trace.TopicReaderInfo) map[string]string {
 	return map[string]string{
-		"endpoint":    endpoint,
-		"database":    database,
-		"consumer":    consumer,
-		"reader.name": readerName,
+		"endpoint":    readerInfo.Endpoint,
+		"database":    readerInfo.Database,
+		"consumer":    readerInfo.Consumer,
+		"reader.name": readerInfo.ReaderName,
 	}
 }
 

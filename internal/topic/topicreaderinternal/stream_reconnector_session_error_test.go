@@ -402,10 +402,10 @@ func TestReaderReconnectorCloseReportsStoredRawStreamError(t *testing.T) {
 				require.ErrorIs(t, event.Error, tt.streamErr)
 				require.Equal(t, "PermissionDenied", event.StatusCode)
 				require.Equal(t, "transport_error", event.ErrorType)
-				require.Equal(t, "endpoint", event.Endpoint)
-				require.Equal(t, "/database", event.Database)
-				require.Equal(t, "consumer", event.Consumer)
-				require.Equal(t, "reader", event.ReaderName)
+				require.Equal(t, "endpoint", event.ReaderInfo.Endpoint)
+				require.Equal(t, "/database", event.ReaderInfo.Database)
+				require.Equal(t, "consumer", event.ReaderInfo.Consumer)
+				require.Equal(t, "reader", event.ReaderInfo.ReaderName)
 			case <-time.After(time.Second):
 				t.Fatal("stored raw stream session error was not emitted by Close")
 			}

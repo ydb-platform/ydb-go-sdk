@@ -67,9 +67,15 @@ func TestStreamListener_ReceivedBytesUsesProtocolSizeForDroppedBatch(t *testing.
 
 	receivedBytes := make(chan int, 1)
 	creditDeltas := make(chan int, 4)
-	listener.tracer.OnReaderReceivedBytes = func(info trace.TopicReaderReceivedBytesInfo) {
-		receivedBytes <- info.Bytes
-		cancel()
+	listener.tracer.OnListenerReceiveMessage = func(info trace.TopicListenerReceiveMessageInfo) {
+		if info.Error == nil && info.BytesSize > 0 {
+			require.Equal(t, "node:2135", info.ReaderInfo.Endpoint)
+			require.Equal(t, "/db", info.ReaderInfo.Database)
+			require.Equal(t, "consumer", info.ReaderInfo.Consumer)
+			require.Equal(t, "reader", info.ReaderInfo.ReaderName)
+			receivedBytes <- info.BytesSize
+			cancel()
+		}
 	}
 	listener.tracer.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
 		creditDeltas <- info.BytesDelta
@@ -115,6 +121,7 @@ func TestStreamListener_LocalBufferTracksQueueAndHandler(t *testing.T) {
 			Database:   "/db",
 			Consumer:   "consumer",
 			ReaderName: "reader",
+			Listener:   true,
 		},
 	}
 	var (
@@ -214,7 +221,7 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 		e := fixenv.New(t)
 		ctx := sf.Context(e)
 		listener := StreamListener(e)
-		queued, acknowledged := setupListenerCommitMetrics(t, listener)
+		queued, acknowledged, notifications := setupListenerCommitMetrics(t, listener)
 		session := listenerMetricStartPartition(t, e, listener)
 		batch := listenerMetricCommitBatch(t, listener.cfg.Decoders, session)
 
@@ -242,14 +249,16 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 		// The wire range is checked above as [0, 5), so its span is five.
 		require.Equal(t, 5, listenerMetricDelta(t, queued))
 		require.Equal(t, 5, listenerMetricDelta(t, acknowledged))
+		require.Equal(t, 5, listenerMetricDelta(t, notifications))
 		require.NoError(t, listener.onCommitResponse(listenerMetricCommitResponse(session, rawydb.StatusSuccess, 5)))
+		require.Zero(t, listenerMetricDelta(t, notifications))
 		require.NoError(t, listener.onCommitResponse(listenerMetricCommitResponse(session, rawydb.StatusSuccess, 4)))
+		require.Zero(t, listenerMetricDelta(t, notifications))
 		listenerMetricNoDelta(t, acknowledged)
 		event.Confirm()
 		listenerMetricNoDelta(t, queued)
 		require.NoError(t, listener.Close(ctx, errors.New("test close")))
 		topicreadercommon.TraceCommitQueued(ctx, topicreadercommon.GetCommitRange(batch))
-		topicreadercommon.TraceCommitAcknowledged(ctx, session, rawtopiccommon.NewOffset(5))
 		listenerMetricNoDelta(t, queued)
 		listenerMetricNoDelta(t, acknowledged)
 	})
@@ -259,7 +268,7 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 		ctx, cancel := context.WithTimeout(sf.Context(e), time.Second)
 		defer cancel()
 		listener := StreamListener(e)
-		queued, acknowledged := setupListenerCommitMetrics(t, listener)
+		queued, acknowledged, notifications := setupListenerCommitMetrics(t, listener)
 		session := listenerMetricStartPartition(t, e, listener)
 		batch := listenerMetricCommitBatch(t, listener.cfg.Decoders, session)
 
@@ -272,12 +281,42 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 		require.NoError(t, event.ConfirmWithAck(ctx))
 		require.Equal(t, 5, listenerMetricDelta(t, queued))
 		require.Equal(t, 5, listenerMetricDelta(t, acknowledged))
+		require.Equal(t, 5, listenerMetricDelta(t, notifications))
 		require.NoError(t, listener.Close(ctx, errors.New("test close")))
 		topicreadercommon.TraceCommitQueued(ctx, topicreadercommon.GetCommitRange(batch))
-		topicreadercommon.TraceCommitAcknowledged(ctx, session, rawtopiccommon.NewOffset(5))
 		listenerMetricNoDelta(t, queued)
 		listenerMetricNoDelta(t, acknowledged)
 	})
+}
+
+func TestStreamListener_CommitNotifyWithoutQueuedTracing(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+	t.Cleanup(func() {
+		_ = listener.Close(context.Background(), errors.New("test cleanup"))
+	})
+	listener.cfg = &StreamListenerConfig{
+		Decoders: topicreadercommon.NewMultiDecoder(),
+		ReaderInfo: topicreadercommon.ReaderInfo{
+			Endpoint:   "node:2135",
+			Database:   "/db",
+			Consumer:   "consumer",
+			ReaderName: "reader",
+			Listener:   true,
+		},
+	}
+	notifications := make(chan int, 1)
+	listener.tracer = &trace.Topic{
+		OnReaderCommittedNotify: func(info trace.TopicReaderCommittedNotifyInfo) {
+			notifications <- info.MessagesCount
+		},
+	}
+	session := listenerMetricStartPartition(t, e, listener)
+
+	require.NoError(t, listener.onCommitResponse(listenerMetricCommitResponse(session, rawydb.StatusSuccess, 5)))
+	require.Zero(t, listenerMetricDelta(t, notifications))
+	listenerMetricNoDelta(t, notifications)
+	require.NoError(t, listener.Close(context.Background(), errors.New("test close")))
 }
 
 func TestStreamListener_MetricBalancesArePerStreamForSameReaderName(t *testing.T) {
@@ -434,7 +473,7 @@ func TestStreamListenerStartCommitOverridePreservesSessionOffsets(t *testing.T) 
 func setupListenerCommitMetrics(
 	t *testing.T,
 	listener *streamListener,
-) (queued, acknowledged chan int) {
+) (queued, acknowledged, notifications chan int) {
 	t.Helper()
 
 	t.Cleanup(func() {
@@ -451,16 +490,20 @@ func setupListenerCommitMetrics(
 	}
 	queued = make(chan int, 4)
 	acknowledged = make(chan int, 4)
+	notifications = make(chan int, 8)
 	listener.tracer = &trace.Topic{
 		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
 			queued <- info.MessagesCount
 		},
-		OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
-			acknowledged <- info.MessagesCount
+		OnReaderCommittedNotify: func(info trace.TopicReaderCommittedNotifyInfo) {
+			notifications <- info.MessagesCount
+			if info.MessagesCount > 0 {
+				acknowledged <- info.MessagesCount
+			}
 		},
 	}
 
-	return queued, acknowledged
+	return queued, acknowledged, notifications
 }
 
 func listenerMetricResponse(session *topicreadercommon.PartitionSession, bytesSize int) *rawtopicreader.ReadResponse {

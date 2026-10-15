@@ -61,6 +61,39 @@ func TestCommitterCommit(t *testing.T) {
 	})
 }
 
+func TestCommitterOnCommitNotifyOnlyWakesWaiters(t *testing.T) {
+	var notified int
+	session := newCommitMetricsTestSession(t, &trace.Topic{
+		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {},
+		OnReaderCommittedNotify: func(trace.TopicReaderCommittedNotifyInfo) {
+			notified++
+		},
+	})
+	commitRange := CommitRange{
+		PartitionSession:  session,
+		CommitOffsetStart: 1,
+		CommitOffsetEnd:   2,
+	}
+	require.Equal(t, 1, RegisterCommitQueued(commitRange))
+
+	committer := NewCommitterStopped(&trace.Topic{}, context.Background(), CommitModeSync, nil)
+	waiter := newCommitWaiter(session, 2)
+	committer.m.WithLock(func() {
+		committer.addWaiterNeedLock(waiter)
+	})
+
+	committer.OnCommitNotify(session, 2)
+	select {
+	case <-waiter.Committed:
+	default:
+		t.Fatal("commit waiter was not notified")
+	}
+	require.Zero(t, notified)
+	// ACK registration belongs to the stream caller and remains available after
+	// the waiter notification.
+	require.Equal(t, 1, RegisterCommitAcknowledged(session, 2))
+}
+
 func TestCommitterFlushWaitsForConcurrentFlush(t *testing.T) {
 	ctx := xtest.Context(t)
 	sendStarted := make(chan struct{})

@@ -395,7 +395,16 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 				return
 			}
 
-			gtrace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, "", 0, err)
+			gtrace.TopicOnListenerReceiveMessage(
+				l.tracer,
+				&logCtx,
+				l.cfg.ReaderInfo,
+				l.listenerID,
+				l.sessionID,
+				"",
+				0,
+				err,
+			)
 			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
 			l.goClose(ctx, xerrors.WithStackTrace(xerrors.Wrap(
 				fmt.Errorf("ydb: failed read message from the stream in the topic reader listener: %w", err),
@@ -408,11 +417,19 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 		bytesSize := 0
 		if mess, ok := mess.(*rawtopicreader.ReadResponse); ok {
 			bytesSize = mess.BytesSize
-			l.traceReceivedBytes(bytesSize)
 			l.changeCreditBalance(-bytesSize)
 		}
 
-		gtrace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, messageType, bytesSize, nil)
+		gtrace.TopicOnListenerReceiveMessage(
+			l.tracer,
+			&logCtx,
+			l.cfg.ReaderInfo,
+			l.listenerID,
+			l.sessionID,
+			messageType,
+			bytesSize,
+			nil,
+		)
 
 		if err := l.routeMessage(ctx, mess); err != nil {
 			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
@@ -429,20 +446,6 @@ func (l *streamListener) changeCreditBalance(delta int) {
 	l.creditBalance.Change(delta, l.traceCreditDelta)
 }
 
-func (l *streamListener) traceReceivedBytes(bytes int) {
-	logCtx := l.background.Context()
-	gtrace.TopicOnReaderReceivedBytes(
-		l.tracer,
-		&logCtx,
-		l.cfg.ReaderInfo.Endpoint,
-		l.cfg.ReaderInfo.Database,
-		l.cfg.ReaderInfo.Consumer,
-		l.cfg.ReaderInfo.ReaderName,
-		l.cfg.ReaderInfo.Listener,
-		bytes,
-	)
-}
-
 func (l *streamListener) finalizeCreditBalance() {
 	if l.tracer == nil || l.tracer.OnReaderCreditBalanceChanged == nil {
 		return
@@ -455,13 +458,15 @@ func (l *streamListener) traceCreditDelta(delta int) {
 	logCtx := l.background.Context()
 	gtrace.TopicOnReaderCreditBalanceChanged(
 		l.tracer, &logCtx,
-		l.cfg.ReaderInfo.Endpoint, l.cfg.ReaderInfo.Database, l.cfg.ReaderInfo.Consumer,
-		l.cfg.ReaderInfo.ReaderName, l.cfg.ReaderInfo.Listener, delta,
+		l.cfg.ReaderInfo, delta,
 	)
 }
 
 func (l *streamListener) traceLocalBufferDelta(topic string, delta int) {
-	topicreadercommon.TraceLocalBufferChanged(l.background.Context(), l.tracer, l.cfg.ReaderInfo, topic, delta)
+	traceCtx := l.background.Context()
+	gtrace.TopicOnReaderLocalBufferChanged(
+		l.tracer, &traceCtx, l.cfg.ReaderInfo, topic, delta,
+	)
 }
 
 func (l *streamListener) localBufferTrackingEnabled() bool {
@@ -582,9 +587,10 @@ func (l *streamListener) splitAndRouteReadResponse(
 			continue
 		}
 		if accepted {
-			topicreadercommon.TraceMessagesReceived(
-				l.background.Context(),
+			traceCtx := l.background.Context()
+			gtrace.TopicOnReaderMessagesReceived(
 				l.tracer,
+				&traceCtx,
 				l.cfg.ReaderInfo,
 				topic,
 				messagesCount,
@@ -622,22 +628,20 @@ func (l *streamListener) onCommitResponse(msg *rawtopicreader.CommitOffsetRespon
 		session.SetCommittedOffsetForward(commit.CommittedOffset)
 
 		// Notify the syncCommitter about the commit
-		l.syncCommitter.OnCommitNotifyAfterAcknowledgedRegistration(
-			session,
-			commit.CommittedOffset,
-			messagesCount,
-		)
+		l.syncCommitter.OnCommitNotify(session, commit.CommittedOffset)
 
 		// Emit trace event - use partition context instead of background
 		logCtx := session.Context()
 		gtrace.TopicOnReaderCommittedNotify(
 			l.tracer,
 			&logCtx,
+			l.cfg.ReaderInfo,
 			l.listenerID,
 			session.Topic,
 			session.PartitionID,
 			session.StreamPartitionSessionID.ToInt64(),
 			commit.CommittedOffset.ToInt64(),
+			messagesCount,
 		)
 	}
 

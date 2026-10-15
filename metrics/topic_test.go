@@ -24,18 +24,17 @@ func TestTopicReaderReceivedMessagesMetric(t *testing.T) {
 
 	tests := []trace.TopicReaderMessagesReceivedInfo{
 		{
-			Endpoint:      "node-a:2135",
-			Database:      "/local",
+			ReaderInfo: trace.TopicReaderInfo{
+				Endpoint: "node-a:2135", Database: "/local", Consumer: "consumer-a", ReaderName: "reader-a",
+			},
 			Topic:         "/local/topic-a",
-			Consumer:      "consumer-a",
-			ReaderName:    "reader-a",
 			MessagesCount: 3,
 		},
 		{
-			Endpoint:      "node-b:2135",
-			Database:      "/other",
+			ReaderInfo: trace.TopicReaderInfo{
+				Endpoint: "node-b:2135", Database: "/other", ReaderName: "reader-b",
+			},
 			Topic:         "/other/topic-b",
-			ReaderName:    "reader-b",
 			MessagesCount: 2,
 		},
 	}

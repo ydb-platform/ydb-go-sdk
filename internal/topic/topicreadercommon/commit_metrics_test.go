@@ -3,16 +3,17 @@ package topicreadercommon
 import (
 	"context"
 	"errors"
+	"io"
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -67,47 +68,51 @@ func TestCommitRangeBoundariesSurviveBatchOperationsAndPublicMutation(t *testing
 	require.Equal(t, rawtopiccommon.Offset(15), GetCommitRange(merged).CommitOffsetEnd)
 }
 
-func TestTraceCommitAcknowledgedAfterRegistrationWithoutHook(t *testing.T) {
+func TestSetupCommitMetricsRequiresQueuedTrace(t *testing.T) {
 	var nilSession *PartitionSession
 	nilSession.SetupCommitMetrics(&trace.Topic{}, ReaderInfo{})
 
-	session := NewPartitionSession(context.Background(), "topic", 1, 1, "", 2, 3, 0)
-	t.Cleanup(session.Close)
-	session.SetupCommitMetrics(nil, ReaderInfo{})
-	session.SetupCommitMetrics(&trace.Topic{}, ReaderInfo{})
-	require.Nil(t, session.commitMetrics)
-
-	queuedTracer := &trace.Topic{
-		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {},
+	logOnlyTrace := log.Topic(log.Default(io.Discard), trace.DetailsAll)
+	tests := []struct {
+		name   string
+		tracer *trace.Topic
+	}{
+		{name: "nil", tracer: nil},
+		{name: "empty", tracer: &trace.Topic{}},
+		{name: "log only old notify", tracer: &logOnlyTrace},
+		{name: "composed empty", tracer: gtrace.Compose(&trace.Topic{}, &trace.Topic{})},
+		{
+			name:   "composed log only old notify",
+			tracer: gtrace.Compose(&logOnlyTrace, &trace.Topic{}),
+		},
 	}
-	session.SetupCommitMetrics(queuedTracer, ReaderInfo{})
-	require.NotNil(t, session.commitMetrics)
-	session.SetupCommitMetrics(&trace.Topic{
-		OnReaderCommitAcknowledged: func(trace.TopicReaderCommitAcknowledgedInfo) {},
-	}, ReaderInfo{})
-	require.Nil(t, session.commitMetrics.tracker)
-	require.NotPanics(t, func() {
-		TraceCommitAcknowledgedAfterRegistration(context.Background(), session, 1)
-	})
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			session := NewPartitionSession(context.Background(), "topic", 1, 1, "", 2, 3, 0)
+			defer session.Close()
+			session.SetupCommitMetrics(test.tracer, ReaderInfo{})
+			require.Nil(t, session.commitMetrics)
+		})
+	}
 
-	queued := 0
+	// Queued tracing is the explicit opt-in that also enables ACK range tracking.
+	queuedOnlySession := NewPartitionSession(context.Background(), "topic", 1, 1, "", 2, 3, 0)
+	defer queuedOnlySession.Close()
+	queuedOnlySession.SetupCommitMetrics(&trace.Topic{
+		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {},
+	}, ReaderInfo{})
+	require.NotNil(t, queuedOnlySession.commitMetrics)
+	require.NotNil(t, queuedOnlySession.commitMetrics.tracker)
+
 	closedSession := NewPartitionSession(context.Background(), "topic", 1, 1, "", 2, 3, 0)
 	closedSession.Close()
 	closedSession.SetupCommitMetrics(&trace.Topic{
-		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) { queued++ },
+		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {
+			t.Fatal("closed session must not emit queued trace")
+		},
 	}, ReaderInfo{})
-	message := NewPublicMessageBuilder().PartitionSession(closedSession).Offset(10).Build()
-	TraceCommitQueued(closedSession.Context(), GetCommitRange(message))
-	require.Zero(t, queued)
-}
-
-func TestComposedEmptyTraceDoesNotAllocateCommitTracking(t *testing.T) {
-	session := NewPartitionSession(context.Background(), "topic", 1, 1, "", 2, 3, 0)
-	defer session.Close()
-	tracer := gtrace.Compose(&trace.Topic{}, &trace.Topic{})
-	tracer = gtrace.Compose(tracer, &trace.Topic{})
-	session.SetupCommitMetrics(tracer, ReaderInfo{})
-	require.Nil(t, session.commitMetrics)
+	TraceCommitQueued(closedSession.Context(), CommitRange{PartitionSession: closedSession})
+	require.Nil(t, closedSession.commitMetrics)
 }
 
 func TestPublicMessageBuilderPreservesCommitRangeBoundaries(t *testing.T) {
@@ -129,13 +134,9 @@ func TestPublicMessageBuilderPreservesCommitRangeBoundaries(t *testing.T) {
 
 func TestCommitTraceUsesRangeCountsAndFIFOAcknowledgements(t *testing.T) {
 	var queued []trace.TopicReaderCommitQueuedInfo
-	var acknowledged []trace.TopicReaderCommitAcknowledgedInfo
 	tracer := &trace.Topic{
 		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
 			queued = append(queued, info)
-		},
-		OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
-			acknowledged = append(acknowledged, info)
 		},
 	}
 	session := newCommitMetricsTestSession(t, tracer)
@@ -150,40 +151,29 @@ func TestCommitTraceUsesRangeCountsAndFIFOAcknowledgements(t *testing.T) {
 	require.Equal(t, 6, queued[0].MessagesCount)
 	require.Equal(t, 6, queued[1].MessagesCount)
 	require.Equal(t, 6, queued[2].MessagesCount)
-	require.Equal(t, "endpoint", queued[0].Endpoint)
-	require.Equal(t, "database", queued[0].Database)
-	require.Equal(t, "consumer", queued[0].Consumer)
-	require.Equal(t, "reader", queued[0].ReaderName)
+	require.Equal(t, "endpoint", queued[0].ReaderInfo.Endpoint)
+	require.Equal(t, "database", queued[0].ReaderInfo.Database)
+	require.Equal(t, "consumer", queued[0].ReaderInfo.Consumer)
+	require.Equal(t, "reader", queued[0].ReaderInfo.ReaderName)
 	require.Equal(t, int64(1), queued[0].PartitionID)
 	require.Equal(t, int64(2), queued[0].PartitionSessionID)
 
-	TraceCommitAcknowledged(session.Context(), session, 14)
-	require.Empty(t, acknowledged)
-	TraceCommitAcknowledged(session.Context(), session, 16)
-	require.Len(t, acknowledged, 1)
-	require.Equal(t, 12, acknowledged[0].MessagesCount)
-	TraceCommitAcknowledged(session.Context(), session, 16)
-	TraceCommitAcknowledged(session.Context(), session, 19)
-	require.Len(t, acknowledged, 1)
-	TraceCommitAcknowledged(session.Context(), session, 20)
-	require.Len(t, acknowledged, 2)
-	require.Equal(t, 6, acknowledged[1].MessagesCount)
+	require.Zero(t, RegisterCommitAcknowledged(session, 14))
+	require.Equal(t, 12, RegisterCommitAcknowledged(session, 16))
+	require.Zero(t, RegisterCommitAcknowledged(session, 16))
+	require.Zero(t, RegisterCommitAcknowledged(session, 19))
+	require.Equal(t, 6, RegisterCommitAcknowledged(session, 20))
 	session.Close()
 	TraceCommitQueued(session.Context(), first)
-	TraceCommitAcknowledged(session.Context(), session, 16)
 	require.Len(t, queued, 3)
-	require.Len(t, acknowledged, 2)
+	require.Zero(t, RegisterCommitAcknowledged(session, 20))
 }
 
-func TestCommitQueuedRegistrationPrecedesTraceEmission(t *testing.T) {
+func TestQueuedRegistrationPrecedesTraceEmission(t *testing.T) {
 	queued := 0
-	acknowledged := 0
 	session := newCommitMetricsTestSession(t, &trace.Topic{
 		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {
 			queued++
-		},
-		OnReaderCommitAcknowledged: func(trace.TopicReaderCommitAcknowledgedInfo) {
-			acknowledged++
 		},
 	})
 	message := NewPublicMessageBuilder().PartitionSession(session).Offset(10).Build()
@@ -191,80 +181,26 @@ func TestCommitQueuedRegistrationPrecedesTraceEmission(t *testing.T) {
 
 	messagesCount := RegisterCommitQueued(commitRange)
 	require.Equal(t, 1, messagesCount)
-	TraceCommitAcknowledged(session.Context(), session, 11)
-	require.Equal(t, 1, acknowledged)
+	require.Equal(t, 1, RegisterCommitAcknowledged(session, 11))
 	require.Zero(t, queued)
 
 	TraceCommitQueuedAfterRegistration(session.Context(), commitRange, messagesCount)
 	require.Equal(t, 1, queued)
-	TraceCommitAcknowledged(session.Context(), session, 11)
-	require.Equal(t, 1, acknowledged)
+	require.Zero(t, RegisterCommitAcknowledged(session, 11))
 }
 
-func TestCommitAcknowledgedRegistrationSurvivesCloseBeforeTrace(t *testing.T) {
-	var acknowledged int
+func TestCommitAcknowledgedRegistrationStopsAfterClose(t *testing.T) {
 	session := newCommitMetricsTestSession(t, &trace.Topic{
-		OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
-			acknowledged += info.MessagesCount
-		},
+		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {},
 	})
 	message := NewPublicMessageBuilder().PartitionSession(session).Offset(10).Build()
 	commitRange := GetCommitRange(message)
 
 	require.Equal(t, 1, RegisterCommitQueued(commitRange))
-	messagesCount := RegisterCommitAcknowledged(session, 11)
-	require.Equal(t, 1, messagesCount)
+	require.Equal(t, 1, RegisterCommitAcknowledged(session, 11))
 	session.SetCommittedOffsetForward(11)
 	session.Close()
-
-	TraceCommitAcknowledgedAfterRegistration(session.Context(), session, messagesCount)
-	require.Equal(t, 1, acknowledged)
-}
-
-func TestCommitterRegistersAcknowledgementBeforeWaiterNotification(t *testing.T) {
-	allowTrace := make(chan struct{})
-	acknowledged := make(chan int, 1)
-	session := newCommitMetricsTestSession(t, &trace.Topic{
-		OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
-			<-allowTrace
-			acknowledged <- info.MessagesCount
-		},
-	})
-	message := NewPublicMessageBuilder().PartitionSession(session).Offset(10).Build()
-	committer := NewCommitterStopped(
-		&trace.Topic{},
-		context.Background(),
-		CommitModeSync,
-		func(rawtopicreader.ClientMessage) error { return nil },
-	)
-	t.Cleanup(func() {
-		require.NoError(t, committer.Close(context.Background(), errors.New("test committer closed")))
-	})
-
-	waiter, err := committer.pushCommit(GetCommitRange(message))
-	require.NoError(t, err)
-	go func() {
-		<-waiter.Committed
-		session.Close()
-		close(allowTrace)
-	}()
-
-	notifyDone := make(chan struct{})
-	go func() {
-		committer.OnCommitNotify(session, 11)
-		close(notifyDone)
-	}()
-	select {
-	case <-notifyDone:
-	case <-time.After(time.Second):
-		t.Fatal("commit notification did not complete")
-	}
-	select {
-	case count := <-acknowledged:
-		require.Equal(t, 1, count)
-	case <-time.After(time.Second):
-		t.Fatal("acknowledged event was lost after waiter notification")
-	}
+	require.Zero(t, RegisterCommitAcknowledged(session, 12))
 }
 
 func TestCommitTraceCallbacksCanCloseSession(t *testing.T) {
@@ -354,7 +290,6 @@ func TestCommitterTracesOnlyAcceptedCommits(t *testing.T) {
 func TestCommitterQueueTraceCanReenterLazyRequest(t *testing.T) {
 	ctx := context.Background()
 	queued := make(chan trace.TopicReaderCommitQueuedInfo, 4)
-	acknowledged := make(chan trace.TopicReaderCommitAcknowledgedInfo, 4)
 	reentrantWait := make(chan error, 1)
 	var request *commitRequest
 	var committer *Committer
@@ -364,9 +299,6 @@ func TestCommitterQueueTraceCanReenterLazyRequest(t *testing.T) {
 			queued <- info
 			request.Confirm()
 			reentrantWait <- request.Wait(ctx)
-		},
-		OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
-			acknowledged <- info
 		},
 	})
 	committer = NewCommitterStopped(&trace.Topic{}, ctx, CommitModeSync,
@@ -398,11 +330,8 @@ func TestCommitterQueueTraceCanReenterLazyRequest(t *testing.T) {
 	}
 	require.Equal(t, int32(1), sends.Load())
 	queuedInfo := xtest.Receive(t, queued, "queued commit metric")
-	acknowledgedInfo := xtest.Receive(t, acknowledged, "acknowledged commit metric")
 	require.Empty(t, queued)
-	require.Empty(t, acknowledged)
 	require.Equal(t, 1, queuedInfo.MessagesCount)
-	require.Equal(t, 1, acknowledgedInfo.MessagesCount)
 }
 
 func TestCommitMessageTrackerCountsRangeLengths(t *testing.T) {

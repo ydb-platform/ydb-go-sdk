@@ -59,10 +59,10 @@ func TestReader_MessagesDeliveredTrace(t *testing.T) {
 	require.Same(t, deliveredBatch, batch)
 	require.Len(t, events, 1)
 	require.NotNil(t, events[0].Context)
-	require.Equal(t, "configured:2135", events[0].Endpoint)
-	require.Equal(t, "/local", events[0].Database)
+	require.Equal(t, "configured:2135", events[0].ReaderInfo.Endpoint)
+	require.Equal(t, "/local", events[0].ReaderInfo.Database)
 	require.Equal(t, "/local/topic", events[0].Topic)
-	require.Equal(t, "consumer", events[0].Consumer)
+	require.Equal(t, "consumer", events[0].ReaderInfo.Consumer)
 	require.Equal(t, 3, events[0].MessagesCount)
 
 	message, err := reader.ReadMessage(context.Background())

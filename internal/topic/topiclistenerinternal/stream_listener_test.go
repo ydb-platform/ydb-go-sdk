@@ -82,10 +82,10 @@ func TestStreamListener_MessagesReceivedTrace(t *testing.T) {
 
 	require.NoError(t, listener.splitAndRouteReadResponse(readResponse(1)))
 	require.Len(t, events, 1)
-	require.Equal(t, "configured:2135", events[0].Endpoint)
-	require.Equal(t, "/local", events[0].Database)
+	require.Equal(t, "configured:2135", events[0].ReaderInfo.Endpoint)
+	require.Equal(t, "/local", events[0].ReaderInfo.Database)
 	require.Equal(t, "/local/topic", events[0].Topic)
-	require.Equal(t, "consumer", events[0].Consumer)
+	require.Equal(t, "consumer", events[0].ReaderInfo.Consumer)
 	require.Equal(t, 2, events[0].MessagesCount)
 
 	invalidResponse := readResponse(3)

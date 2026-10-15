@@ -208,9 +208,9 @@ func (r *Reader) traceMessagesDelivered(ctx context.Context, batch *topicreaderc
 	if batch == nil || len(batch.Messages) == 0 {
 		return
 	}
-	topicreadercommon.TraceMessagesDelivered(
-		ctx,
+	gtrace.TopicOnReaderMessagesDelivered(
 		r.tracer,
+		&ctx,
 		r.readerInfo,
 		batch.Topic(),
 		len(batch.Messages),

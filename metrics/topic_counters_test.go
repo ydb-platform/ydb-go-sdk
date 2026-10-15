@@ -1,10 +1,16 @@
 package metrics
 
 import (
+	"bytes"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
+	ydblog "github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -74,11 +80,12 @@ func TestDisabledTopicMetricsDoNotEnableTracking(t *testing.T) {
 	tracer := topic(recordingConfig{registry: newRecordingRegistry(), details: trace.TopicReaderCustomerEvents})
 	require.Nil(t, tracer.OnReaderMessagesReceived)
 	require.Nil(t, tracer.OnReaderMessagesDelivered)
-	require.Nil(t, tracer.OnReaderReceivedBytes)
+	require.Nil(t, tracer.OnReaderReceiveDataResponse)
+	require.Nil(t, tracer.OnListenerReceiveMessage)
 	require.Nil(t, tracer.OnReaderLocalBufferChanged)
 	require.Nil(t, tracer.OnReaderCreditBalanceChanged)
 	require.Nil(t, tracer.OnReaderCommitQueued)
-	require.Nil(t, tracer.OnReaderCommitAcknowledged)
+	require.Nil(t, tracer.OnReaderCommittedNotify)
 	require.Nil(t, tracer.OnReaderSessionError)
 }
 
@@ -86,22 +93,29 @@ func TestTopicReaderMetricsHonorDetailsGroups(t *testing.T) {
 	messageEvents := topic(recordingConfig{registry: newRecordingRegistry(), details: trace.TopicReaderMessageEvents})
 	require.NotNil(t, messageEvents.OnReaderMessagesReceived)
 	require.NotNil(t, messageEvents.OnReaderMessagesDelivered)
-	require.NotNil(t, messageEvents.OnReaderReceivedBytes)
+	require.NotNil(t, messageEvents.OnReaderReceiveDataResponse)
+	require.Nil(t, messageEvents.OnListenerReceiveMessage)
 	require.NotNil(t, messageEvents.OnReaderLocalBufferChanged)
 	require.NotNil(t, messageEvents.OnReaderCreditBalanceChanged)
 	require.Nil(t, messageEvents.OnReaderCommitQueued)
-	require.Nil(t, messageEvents.OnReaderCommitAcknowledged)
+	require.Nil(t, messageEvents.OnReaderCommittedNotify)
 	require.Nil(t, messageEvents.OnReaderSessionError)
 
 	streamEvents := topic(recordingConfig{registry: newRecordingRegistry(), details: trace.TopicReaderStreamEvents})
 	require.Nil(t, streamEvents.OnReaderMessagesReceived)
 	require.Nil(t, streamEvents.OnReaderMessagesDelivered)
-	require.Nil(t, streamEvents.OnReaderReceivedBytes)
+	require.Nil(t, streamEvents.OnReaderReceiveDataResponse)
+	require.Nil(t, streamEvents.OnListenerReceiveMessage)
 	require.Nil(t, streamEvents.OnReaderLocalBufferChanged)
 	require.Nil(t, streamEvents.OnReaderCreditBalanceChanged)
 	require.NotNil(t, streamEvents.OnReaderCommitQueued)
-	require.NotNil(t, streamEvents.OnReaderCommitAcknowledged)
+	require.NotNil(t, streamEvents.OnReaderCommittedNotify)
 	require.NotNil(t, streamEvents.OnReaderSessionError)
+
+	listenerEvents := topic(recordingConfig{registry: newRecordingRegistry(), details: trace.TopicListenerStreamEvents})
+	require.Nil(t, listenerEvents.OnReaderReceiveDataResponse)
+	require.NotNil(t, listenerEvents.OnListenerReceiveMessage)
+	require.NotNil(t, listenerEvents.OnReaderCommittedNotify)
 }
 
 func TestTopicReaderCountersIgnoreNonPositiveDeltas(t *testing.T) {
@@ -114,10 +128,12 @@ func TestTopicReaderCountersIgnoreNonPositiveDeltas(t *testing.T) {
 	for _, count := range []int{0, -1} {
 		tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{MessagesCount: count})
 		tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{MessagesCount: count})
-		tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{Bytes: count})
+		tracer.OnReaderReceiveDataResponse(readerBytesInfo(trace.TopicReaderInfo{}, count))
+		tracer.OnListenerReceiveMessage(listenerBytesInfo(trace.TopicReaderInfo{}, count, nil))
 		tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{MessagesCount: count})
-		tracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{MessagesCount: count})
+		tracer.OnReaderCommittedNotify(trace.TopicReaderCommittedNotifyInfo{MessagesCount: count})
 	}
+	tracer.OnListenerReceiveMessage(listenerBytesInfo(trace.TopicReaderInfo{}, 10, errors.New("receive failed")))
 	require.Empty(t, capture.adds)
 	require.Empty(t, registry.values)
 }
@@ -133,6 +149,13 @@ func TestTopicReaderCountersRecordLabeledValues(t *testing.T) {
 		recordingConfig: recordingConfig{registry: registry, details: trace.TopicReaderStreamEvents},
 		capture:         capture,
 	})
+	listenerTracer := topic(topicAddCounterConfig{
+		recordingConfig: recordingConfig{registry: registry, details: trace.TopicListenerStreamEvents},
+		capture:         capture,
+	})
+	readerInfo := trace.TopicReaderInfo{
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader",
+	}
 	messageLabels := map[string]string{
 		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
 	}
@@ -145,29 +168,32 @@ func TestTopicReaderCountersRecordLabeledValues(t *testing.T) {
 	}
 
 	messageTracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 4,
+		ReaderInfo: readerInfo,
+		Topic:      "/topic", MessagesCount: 4,
 	})
 	messageTracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 3,
+		ReaderInfo: readerInfo,
+		Topic:      "/topic", MessagesCount: 3,
 	})
-	messageTracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", Bytes: 12,
-	})
+	messageTracer.OnReaderReceiveDataResponse(readerBytesInfo(readerInfo, 12))
+	listenerTracer.OnListenerReceiveMessage(listenerBytesInfo(readerInfo, 8, nil))
 	streamTracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 2,
+		ReaderInfo: readerInfo,
+		Topic:      "/topic", MessagesCount: 2,
 	})
-	streamTracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer", ReaderName: "reader", MessagesCount: 1,
+	streamTracer.OnReaderCommittedNotify(trace.TopicReaderCommittedNotifyInfo{
+		ReaderInfo: readerInfo,
+		Topic:      "/topic", MessagesCount: 1,
 	})
 	streamTracer.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader",
+		ReaderInfo:    readerInfo,
 		RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
 	})
 
 	require.Equal(t, map[string][]int64{
 		"ydb.topic.reader.received.messages":   {4},
 		"ydb.topic.reader.delivered.messages":  {3},
-		"ydb.topic.reader.received.bytes":      {12},
+		"ydb.topic.reader.received.bytes":      {12, 8},
 		"ydb.topic.reader.commit.queued":       {2},
 		"ydb.topic.reader.commit.acknowledged": {1},
 		"ydb.topic.reader.session.errors":      {1},
@@ -176,31 +202,80 @@ func TestTopicReaderCountersRecordLabeledValues(t *testing.T) {
 	require.Equal(t, float64(3), registry.value("ydb.topic.reader.delivered.messages", messageLabels))
 	require.Equal(t, float64(2), registry.value("ydb.topic.reader.commit.queued", messageLabels))
 	require.Equal(t, float64(1), registry.value("ydb.topic.reader.commit.acknowledged", messageLabels))
-	require.Equal(t, float64(12), registry.value("ydb.topic.reader.received.bytes", streamLabels))
+	require.Equal(t, float64(20), registry.value("ydb.topic.reader.received.bytes", streamLabels))
 	require.Equal(t, float64(1), registry.value("ydb.topic.reader.session.errors", errorLabels))
+}
+
+func TestTopicReaderMetricsComposeWithLogging(t *testing.T) {
+	for _, metricsFirst := range []bool{true, false} {
+		name := "logging first"
+		if metricsFirst {
+			name = "metrics first"
+		}
+		t.Run(name, func(t *testing.T) {
+			registry := newRecordingRegistry()
+			capture := &topicCounterCapture{}
+			config := recordingConfig{registry: registry, details: trace.DetailsAll}
+			metricsTrace := topic(topicAddCounterConfig{recordingConfig: config, capture: capture})
+			var logs bytes.Buffer
+			loggingTrace := ydblog.Topic(
+				ydblog.Default(&logs, ydblog.WithMinLevel(ydblog.TRACE)),
+				config,
+			)
+
+			var composed *trace.Topic
+			if metricsFirst {
+				composed = gtrace.Compose(&metricsTrace, &loggingTrace)
+			} else {
+				composed = gtrace.Compose(&loggingTrace, &metricsTrace)
+			}
+
+			readerInfo := trace.TopicReaderInfo{}
+			finishReaderReceive := composed.OnReaderReceiveDataResponse(trace.TopicReaderReceiveDataResponseStartInfo{
+				ReaderInfo:   readerInfo,
+				DataResponse: &rawtopicreader.ReadResponse{BytesSize: 7},
+			})
+			require.NotNil(t, finishReaderReceive)
+			finishReaderReceive(trace.TopicReaderReceiveDataResponseDoneInfo{})
+			composed.OnListenerReceiveMessage(trace.TopicListenerReceiveMessageInfo{
+				ReaderInfo:  readerInfo,
+				MessageType: "ReadResponse",
+				BytesSize:   11,
+			})
+			composed.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{MessagesCount: 3})
+			composed.OnReaderCommittedNotify(trace.TopicReaderCommittedNotifyInfo{MessagesCount: 2})
+
+			require.Equal(t, []int64{7, 11}, capture.adds["ydb.topic.reader.received.bytes"])
+			require.Equal(t, []int64{2}, capture.adds["ydb.topic.reader.commit.acknowledged"])
+			require.Equal(t, 1, strings.Count(
+				logs.String(),
+				"topic reader data response received and process done",
+			))
+		})
+	}
 }
 
 func TestTopicReaderCountersSupportLegacyCounterConfig(t *testing.T) {
 	registry := newRecordingRegistry()
 	tracer := topic(recordingConfig{registry: registry, system: "custom", details: trace.DetailsAll})
+	readerInfo := trace.TopicReaderInfo{
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader",
+	}
 	tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
-		ReaderName: "reader", MessagesCount: 3,
+		ReaderInfo: readerInfo,
+		Topic:      "/topic", MessagesCount: 3,
 	})
-	tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer",
-		ReaderName: "reader", Bytes: 1,
-	})
+	tracer.OnReaderReceiveDataResponse(readerBytesInfo(readerInfo, 1))
 	tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
-		ReaderName: "reader", MessagesCount: 1,
+		ReaderInfo: readerInfo,
+		Topic:      "/topic", MessagesCount: 1,
 	})
-	tracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
-		ReaderName: "reader", MessagesCount: 1,
+	tracer.OnReaderCommittedNotify(trace.TopicReaderCommittedNotifyInfo{
+		ReaderInfo: readerInfo,
+		Topic:      "/topic", MessagesCount: 1,
 	})
 	tracer.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader",
+		ReaderInfo:    readerInfo,
 		RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
 	})
 
@@ -232,24 +307,19 @@ func TestTopicReaderCountersUseInt64AddForLargeDeltas(t *testing.T) {
 		recordingConfig: recordingConfig{registry: registry, details: trace.DetailsAll},
 		capture:         capture,
 	})
+	readerInfo := trace.TopicReaderInfo{
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader",
+	}
 
-	tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", Bytes: largeDelta,
-	})
+	tracer.OnReaderReceiveDataResponse(readerBytesInfo(readerInfo, largeDelta))
 	tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
-		Endpoint:      "node",
-		Database:      "/db",
+		ReaderInfo:    readerInfo,
 		Topic:         "/topic",
-		Consumer:      "consumer",
-		ReaderName:    "reader",
 		MessagesCount: largeDelta,
 	})
-	tracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{
-		Endpoint:      "node",
-		Database:      "/db",
+	tracer.OnReaderCommittedNotify(trace.TopicReaderCommittedNotifyInfo{
+		ReaderInfo:    readerInfo,
 		Topic:         "/topic",
-		Consumer:      "consumer",
-		ReaderName:    "reader",
 		MessagesCount: largeDelta,
 	})
 
@@ -267,21 +337,26 @@ func TestTopicReaderGaugesApplyDeltasWithoutSet(t *testing.T) {
 		recordingConfig: recordingConfig{registry: registry, details: trace.TopicReaderMessageEvents},
 		capture:         capture,
 	})
+	readerInfo := trace.TopicReaderInfo{
+		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader",
+	}
 
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
-		ReaderName: "reader", MessagesDelta: 5,
+		ReaderInfo: readerInfo,
+		Topic:      "/topic", MessagesDelta: 5,
 	})
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
-		Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: "consumer",
-		ReaderName: "reader", MessagesDelta: -2,
+		ReaderInfo: readerInfo,
+		Topic:      "/topic", MessagesDelta: -2,
 	})
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{MessagesDelta: 0})
 	tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", BytesDelta: 100,
+		ReaderInfo: readerInfo,
+		BytesDelta: 100,
 	})
 	tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
-		Endpoint: "node", Database: "/db", Consumer: "consumer", ReaderName: "reader", BytesDelta: -40,
+		ReaderInfo: readerInfo,
+		BytesDelta: -40,
 	})
 	tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{BytesDelta: 0})
 
@@ -307,30 +382,38 @@ func TestTopicMetricCallbacksProvideAllDeclaredLabels(t *testing.T) {
 		{name: "with consumer and reader name", consumer: "consumer", readerName: "reader"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			readerInfo := trace.TopicReaderInfo{
+				Endpoint: "node", Database: "/db", Consumer: test.consumer, ReaderName: test.readerName,
+			}
 			tracer := topic(strictTopicConfig{
 				recordingConfig: recordingConfig{details: trace.DetailsAll},
 				t:               t,
 			})
 
 			tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
-				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: test.consumer,
-				ReaderName: test.readerName, MessagesCount: 1,
+				ReaderInfo: readerInfo,
+				Topic:      "/topic", MessagesCount: 1,
 			})
-			tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{
-				Endpoint: "node", Database: "/db", Consumer: test.consumer,
-				ReaderName: test.readerName, Bytes: 1,
+			tracer.OnReaderReceiveDataResponse(readerBytesInfo(readerInfo, 1))
+			tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
+				ReaderInfo: readerInfo,
+				Topic:      "/topic", MessagesCount: 1,
+			})
+			tracer.OnReaderCommittedNotify(trace.TopicReaderCommittedNotifyInfo{
+				ReaderInfo: readerInfo,
+				Topic:      "/topic", MessagesCount: 1,
 			})
 			tracer.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{
-				Endpoint: "node", Database: "/db", Consumer: test.consumer, ReaderName: test.readerName,
+				ReaderInfo:    readerInfo,
 				RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
 			})
 			tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
-				Endpoint: "node", Database: "/db", Topic: "/topic", Consumer: test.consumer,
-				ReaderName: test.readerName, MessagesDelta: 1,
+				ReaderInfo: readerInfo,
+				Topic:      "/topic", MessagesDelta: 1,
 			})
 			tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
-				Endpoint: "node", Database: "/db", Consumer: test.consumer,
-				ReaderName: test.readerName, BytesDelta: 1,
+				ReaderInfo: readerInfo,
+				BytesDelta: 1,
 			})
 		})
 	}
@@ -357,17 +440,32 @@ func TestTopicMetricsSeparateReaderAndListenerDetails(t *testing.T) {
 				if listener {
 					count = 10
 				}
-				tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{Listener: listener, MessagesCount: count})
-				tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{Listener: listener, MessagesCount: count})
-				tracer.OnReaderReceivedBytes(trace.TopicReaderReceivedBytesInfo{Listener: listener, Bytes: count})
-				tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{Listener: listener, MessagesDelta: count})
-				tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
-					Listener: listener, BytesDelta: count,
+				readerInfo := trace.TopicReaderInfo{Listener: listener}
+				tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
+					ReaderInfo: readerInfo, MessagesCount: count,
 				})
-				tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{Listener: listener, MessagesCount: count})
-				tracer.OnReaderCommitAcknowledged(trace.TopicReaderCommitAcknowledgedInfo{Listener: listener, MessagesCount: count})
+				tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{
+					ReaderInfo: readerInfo, MessagesCount: count,
+				})
+				if listener && tracer.OnListenerReceiveMessage != nil {
+					tracer.OnListenerReceiveMessage(listenerBytesInfo(readerInfo, count, nil))
+				} else if !listener && tracer.OnReaderReceiveDataResponse != nil {
+					tracer.OnReaderReceiveDataResponse(readerBytesInfo(readerInfo, count))
+				}
+				tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
+					ReaderInfo: readerInfo, MessagesDelta: count,
+				})
+				tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
+					ReaderInfo: readerInfo, BytesDelta: count,
+				})
+				tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
+					ReaderInfo: readerInfo, MessagesCount: count,
+				})
+				tracer.OnReaderCommittedNotify(trace.TopicReaderCommittedNotifyInfo{
+					ReaderInfo: readerInfo, MessagesCount: count,
+				})
 				for range count {
-					tracer.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{Listener: listener})
+					tracer.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{ReaderInfo: readerInfo})
 				}
 			}
 			for _, path := range []string{
@@ -587,4 +685,27 @@ func (g topicTrackingGauge) Set(value float64) {
 	}
 	g.capture.sets[g.path]++
 	g.registry.set(g.path, g.labels, value)
+}
+
+func readerBytesInfo(
+	readerInfo trace.TopicReaderInfo,
+	bytes int,
+) trace.TopicReaderReceiveDataResponseStartInfo {
+	return trace.TopicReaderReceiveDataResponseStartInfo{
+		ReaderInfo:   readerInfo,
+		DataResponse: &rawtopicreader.ReadResponse{BytesSize: bytes},
+	}
+}
+
+func listenerBytesInfo(
+	readerInfo trace.TopicReaderInfo,
+	bytes int,
+	err error,
+) trace.TopicListenerReceiveMessageInfo {
+	return trace.TopicListenerReceiveMessageInfo{
+		ReaderInfo:  readerInfo,
+		MessageType: "ReadResponse",
+		BytesSize:   bytes,
+		Error:       err,
+	}
 }

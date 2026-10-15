@@ -68,7 +68,7 @@ func newNameTestReader(t *testing.T, names ...string) (topicreaderinternal.Reade
 	var readerName string
 	readerTrace := trace.Topic{
 		OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
-			readerName = info.ReaderName
+			readerName = info.ReaderInfo.ReaderName
 		},
 	}
 	opts := []ReaderOption{

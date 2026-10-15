@@ -360,6 +360,8 @@ func TestPartitionWorkerInterface_MessagesDeliveredTraceBeforeHandlerPanic(t *te
 
 func TestPartitionWorkerInterface_MergedBatchMessagesDeliveredOnce(t *testing.T) {
 	ctx := xtest.Context(t)
+	type contextKey struct{}
+	ctx = context.WithValue(ctx, contextKey{}, "original")
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -368,10 +370,12 @@ func TestPartitionWorkerInterface_MergedBatchMessagesDeliveredOnce(t *testing.T)
 	mockHandler := NewMockEventHandler(ctrl)
 	handlerCalled := make(empty.Chan)
 	var events []trace.TopicReaderMessagesDeliveredInfo
+	var handlerContextPreserved bool
 
 	mockHandler.EXPECT().
 		OnReadMessages(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(context.Context, *PublicReadMessages) error {
+		DoAndReturn(func(handlerCtx context.Context, _ *PublicReadMessages) error {
+			handlerContextPreserved = handlerCtx.Value(contextKey{}) == "original"
 			close(handlerCalled)
 
 			return nil
@@ -384,6 +388,7 @@ func TestPartitionWorkerInterface_MergedBatchMessagesDeliveredOnce(t *testing.T)
 		mockHandler,
 		func(rawtopicreader.PartitionSessionID, error) {},
 		&trace.Topic{OnReaderMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
+			*info.Context = context.Background()
 			events = append(events, info)
 		}},
 		"test-listener",
@@ -396,6 +401,7 @@ func TestPartitionWorkerInterface_MergedBatchMessagesDeliveredOnce(t *testing.T)
 
 	worker.Start(ctx)
 	xtest.WaitChannelClosed(t, handlerCalled)
+	require.True(t, handlerContextPreserved)
 	require.NoError(t, worker.Close(ctx, nil))
 	require.Len(t, events, 1)
 	require.Equal(t, 5, events[0].MessagesCount)
@@ -834,10 +840,10 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 	xtest.WaitChannelClosed(t, errorReceived)
 	require.True(t, deliveredBeforeHandler.Load())
 	require.Len(t, events, 1)
-	require.Equal(t, "configured:2135", events[0].Endpoint)
-	require.Equal(t, "/local", events[0].Database)
+	require.Equal(t, "configured:2135", events[0].ReaderInfo.Endpoint)
+	require.Equal(t, "/local", events[0].ReaderInfo.Database)
 	require.Equal(t, "test-topic", events[0].Topic)
-	require.Equal(t, "consumer", events[0].Consumer)
+	require.Equal(t, "consumer", events[0].ReaderInfo.Consumer)
 	require.Equal(t, 1, events[0].MessagesCount)
 
 	// Verify error contains user handler error using atomic access

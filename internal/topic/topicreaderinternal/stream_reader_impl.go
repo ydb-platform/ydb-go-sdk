@@ -841,13 +841,15 @@ func (r *topicStreamReaderImpl) traceCreditDelta(delta int) {
 	logCtx := r.cfg.BaseContext
 	gtrace.TopicOnReaderCreditBalanceChanged(
 		r.cfg.Trace, &logCtx,
-		r.cfg.ReaderInfo.Endpoint, r.cfg.ReaderInfo.Database, r.cfg.ReaderInfo.Consumer,
-		r.cfg.ReaderInfo.ReaderName, r.cfg.ReaderInfo.Listener, delta,
+		r.cfg.ReaderInfo, delta,
 	)
 }
 
 func (r *topicStreamReaderImpl) traceLocalBufferDelta(topic string, delta int) {
-	topicreadercommon.TraceLocalBufferChanged(r.cfg.BaseContext, r.cfg.Trace, r.cfg.ReaderInfo, topic, delta)
+	traceCtx := r.cfg.BaseContext
+	gtrace.TopicOnReaderLocalBufferChanged(
+		r.cfg.Trace, &traceCtx, r.cfg.ReaderInfo, topic, delta,
+	)
 }
 
 func (r *topicStreamReaderImpl) localBufferTrackingEnabled() bool {
@@ -895,21 +897,18 @@ func (r *topicStreamReaderImpl) updateTokenLoop(ctx context.Context) {
 
 func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse) (err error) {
 	logCtx := r.cfg.BaseContext
-	gtrace.TopicOnReaderReceivedBytes(
-		r.cfg.Trace,
-		&logCtx,
-		r.cfg.ReaderInfo.Endpoint,
-		r.cfg.ReaderInfo.Database,
-		r.cfg.ReaderInfo.Consumer,
-		r.cfg.ReaderInfo.ReaderName,
-		r.cfg.ReaderInfo.Listener,
-		msg.BytesSize,
-	)
 	r.changeCreditBalance(-msg.BytesSize)
 
 	resCapacity := r.addRestBufferBytes(-msg.BytesSize)
 
-	onDone := gtrace.TopicOnReaderReceiveDataResponse(r.cfg.Trace, &logCtx, r.readConnectionID, resCapacity, msg)
+	onDone := gtrace.TopicOnReaderReceiveDataResponse(
+		r.cfg.Trace,
+		&logCtx,
+		r.cfg.ReaderInfo,
+		r.readConnectionID,
+		resCapacity,
+		msg,
+	)
 	defer func() {
 		onDone(err)
 	}()
@@ -932,9 +931,10 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 			return err
 		}
 
-		topicreadercommon.TraceMessagesReceived(
-			r.cfg.BaseContext,
+		traceCtx := r.cfg.BaseContext
+		gtrace.TopicOnReaderMessagesReceived(
 			r.cfg.Trace,
+			&traceCtx,
 			r.cfg.ReaderInfo,
 			topic,
 			messagesCount,
@@ -1022,14 +1022,16 @@ func (r *topicStreamReaderImpl) onCommitResponse(msg *rawtopicreader.CommitOffse
 		gtrace.TopicOnReaderCommittedNotify(
 			r.cfg.Trace,
 			&logCtx,
+			r.cfg.ReaderInfo,
 			r.readConnectionID,
 			partition.Topic,
 			partition.PartitionID,
 			partition.StreamPartitionSessionID.ToInt64(),
 			commit.CommittedOffset.ToInt64(),
+			messagesCount,
 		)
 
-		r.committer.OnCommitNotifyAfterAcknowledgedRegistration(partition, commit.CommittedOffset, messagesCount)
+		r.committer.OnCommitNotify(partition, commit.CommittedOffset)
 	}
 
 	return nil

@@ -47,10 +47,10 @@ func TestTopicStreamReaderImpl_MessagesReceivedTraceUsesConfiguredEndpoint(t *te
 
 	require.Len(t, events, 1)
 	for _, event := range events {
-		require.Equal(t, "configured:2135", event.Endpoint)
-		require.Equal(t, "/local", event.Database)
+		require.Equal(t, "configured:2135", event.ReaderInfo.Endpoint)
+		require.Equal(t, "/local", event.ReaderInfo.Database)
 		require.Equal(t, "/test", event.Topic)
-		require.Equal(t, "consumer", event.Consumer)
+		require.Equal(t, "consumer", event.ReaderInfo.Consumer)
 		require.Equal(t, 2, event.MessagesCount)
 	}
 
@@ -147,10 +147,10 @@ func TestTopicStreamReaderImpl_MessagesReceivedTraceSnapshotsBatchBeforeHandoff(
 
 		select {
 		case event := <-events:
-			require.Equal(t, "configured:2135", event.Endpoint)
-			require.Equal(t, "/local", event.Database)
+			require.Equal(t, "configured:2135", event.ReaderInfo.Endpoint)
+			require.Equal(t, "/local", event.ReaderInfo.Database)
 			require.Equal(t, "/test", event.Topic)
-			require.Equal(t, "consumer", event.Consumer)
+			require.Equal(t, "consumer", event.ReaderInfo.Consumer)
 			require.Equal(t, 2, event.MessagesCount)
 		case <-time.After(time.Second):
 			t.Fatal("timed out waiting for received messages trace")

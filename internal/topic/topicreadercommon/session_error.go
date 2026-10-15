@@ -71,11 +71,7 @@ func TraceReaderSessionError(
 	gtrace.TopicOnReaderSessionError(
 		tracer,
 		&ctx,
-		readerInfo.Endpoint,
-		readerInfo.Database,
-		readerInfo.Consumer,
-		readerInfo.ReaderName,
-		readerInfo.Listener,
+		readerInfo,
 		retryDecision,
 		classification.StatusCode,
 		classification.ErrorType,

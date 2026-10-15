@@ -333,26 +333,6 @@ func (c *Committer) waitCommitAck(ctx context.Context, waiter commitWaiter) erro
 }
 
 func (c *Committer) OnCommitNotify(session *PartitionSession, offset rawtopiccommon.Offset) {
-	messagesCount := RegisterCommitAcknowledged(session, offset)
-	c.onCommitNotify(session, offset, messagesCount)
-}
-
-// OnCommitNotifyAfterAcknowledgedRegistration wakes synchronous commit
-// waiters after the caller has registered the acknowledgement. Registration
-// must happen before the session publishes its committed offset.
-func (c *Committer) OnCommitNotifyAfterAcknowledgedRegistration(
-	session *PartitionSession,
-	offset rawtopiccommon.Offset,
-	messagesCount int,
-) {
-	c.onCommitNotify(session, offset, messagesCount)
-}
-
-func (c *Committer) onCommitNotify(
-	session *PartitionSession,
-	offset rawtopiccommon.Offset,
-	messagesCount int,
-) {
 	c.m.WithLock(func() {
 		for i := range c.waiters {
 			waiter := c.waiters[i]
@@ -364,9 +344,6 @@ func (c *Committer) onCommitNotify(
 			}
 		}
 	})
-	if session != nil {
-		TraceCommitAcknowledgedAfterRegistration(session.Context(), session, messagesCount)
-	}
 }
 
 func (c *Committer) addWaiterNeedLock(waiter commitWaiter) {

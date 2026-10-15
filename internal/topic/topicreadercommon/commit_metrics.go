@@ -28,8 +28,8 @@ func (m *partitionSessionCommitMetrics) close() {
 }
 
 // SetupCommitMetrics enables commit range trace events and acknowledgement
-// tracking for the partition session. It must be called before messages are
-// delivered.
+// tracking for the partition session when queued-commit tracing is enabled. It
+// must be called before messages are delivered.
 func (s *PartitionSession) SetupCommitMetrics(tracer *trace.Topic, readerInfo ReaderInfo) {
 	if s == nil || tracer == nil {
 		return
@@ -37,7 +37,7 @@ func (s *PartitionSession) SetupCommitMetrics(tracer *trace.Topic, readerInfo Re
 	if s.ctx != nil && s.ctx.Err() != nil {
 		return
 	}
-	if tracer.OnReaderCommitQueued == nil && tracer.OnReaderCommitAcknowledged == nil {
+	if tracer.OnReaderCommitQueued == nil {
 		return
 	}
 	if s.commitMetrics != nil {
@@ -48,9 +48,7 @@ func (s *PartitionSession) SetupCommitMetrics(tracer *trace.Topic, readerInfo Re
 		tracer:     tracer,
 		readerInfo: readerInfo,
 	}
-	if tracer.OnReaderCommitAcknowledged != nil {
-		metrics.tracker = NewCommitMessageTracker(s.CommittedOffset())
-	}
+	metrics.tracker = NewCommitMessageTracker(s.CommittedOffset())
 	s.commitMetrics = metrics
 }
 
@@ -114,12 +112,8 @@ func TraceCommitQueuedAfterRegistration(ctx context.Context, commitRange CommitR
 	gtrace.TopicOnReaderCommitQueued(
 		metrics.tracer,
 		&ctx,
-		metrics.readerInfo.Endpoint,
-		metrics.readerInfo.Database,
+		metrics.readerInfo,
 		session.Topic,
-		metrics.readerInfo.Consumer,
-		metrics.readerInfo.ReaderName,
-		metrics.readerInfo.Listener,
 		session.PartitionID,
 		session.StreamPartitionSessionID.ToInt64(),
 		messagesCount,
@@ -143,46 +137,6 @@ func RegisterCommitAcknowledged(session *PartitionSession, exclusiveOffset rawto
 	}
 
 	return metrics.tracker.Acknowledge(exclusiveOffset)
-}
-
-// TraceCommitAcknowledgedAfterRegistration emits a successful commit
-// acknowledgement after the caller has registered it with
-// RegisterCommitAcknowledged. The callback runs even if the session closes
-// after registration.
-func TraceCommitAcknowledgedAfterRegistration(
-	ctx context.Context,
-	session *PartitionSession,
-	messagesCount int,
-) {
-	if session == nil || session.commitMetrics == nil || messagesCount == 0 {
-		return
-	}
-
-	metrics := session.commitMetrics
-	if metrics.tracer.OnReaderCommitAcknowledged == nil {
-		return
-	}
-
-	gtrace.TopicOnReaderCommitAcknowledged(
-		metrics.tracer,
-		&ctx,
-		metrics.readerInfo.Endpoint,
-		metrics.readerInfo.Database,
-		session.Topic,
-		metrics.readerInfo.Consumer,
-		metrics.readerInfo.ReaderName,
-		metrics.readerInfo.Listener,
-		session.PartitionID,
-		session.StreamPartitionSessionID.ToInt64(),
-		messagesCount,
-	)
-}
-
-// TraceCommitAcknowledged records a successful commit acknowledgement and
-// emits only the newly completed range span.
-func TraceCommitAcknowledged(ctx context.Context, session *PartitionSession, exclusiveOffset rawtopiccommon.Offset) {
-	messagesCount := RegisterCommitAcknowledged(session, exclusiveOffset)
-	TraceCommitAcknowledgedAfterRegistration(ctx, session, messagesCount)
 }
 
 // CommitMessageTracker tracks accepted commit ranges until the server

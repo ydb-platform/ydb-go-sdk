@@ -99,9 +99,23 @@ func TestTopicStreamReader_CreditBalanceIgnoresFailedSend(t *testing.T) {
 func TestTopicStreamReader_ReceivedBytesUsesProtocolSizeWhenBatchIsDropped(t *testing.T) {
 	e := newTopicReaderTestEnv(t)
 	receivedBytes := make(chan int, 1)
+	e.reader.cfg.ReaderInfo = topicreadercommon.ReaderInfo{
+		Endpoint:   "node:2135",
+		Database:   "/db",
+		Consumer:   "consumer",
+		ReaderName: "reader",
+	}
 	e.reader.cfg.Trace = &trace.Topic{
-		OnReaderReceivedBytes: func(info trace.TopicReaderReceivedBytesInfo) {
-			receivedBytes <- info.Bytes
+		OnReaderReceiveDataResponse: func(
+			info trace.TopicReaderReceiveDataResponseStartInfo,
+		) func(trace.TopicReaderReceiveDataResponseDoneInfo) {
+			require.Equal(t, "node:2135", info.ReaderInfo.Endpoint)
+			require.Equal(t, "/db", info.ReaderInfo.Database)
+			require.Equal(t, "consumer", info.ReaderInfo.Consumer)
+			require.Equal(t, "reader", info.ReaderInfo.ReaderName)
+			receivedBytes <- info.DataResponse.GetBytesSize()
+
+			return nil
 		},
 	}
 
@@ -193,9 +207,13 @@ func TestTopicStreamReader_LocalBufferRollbackAfterFinalization(t *testing.T) {
 func TestTopicReader_CommitMetricsRegisterBeforeSynchronousAckAndClose(t *testing.T) {
 	test := newReaderCommitMetricsTest(t)
 	committedOffsets := make(chan int64, 1)
-	test.env.reader.cfg.Trace.OnReaderCommittedNotify = func(trace.TopicReaderCommittedNotifyInfo) {
+	onCommittedNotify := test.env.reader.cfg.Trace.OnReaderCommittedNotify
+	test.env.reader.cfg.Trace.OnReaderCommittedNotify = func(info trace.TopicReaderCommittedNotifyInfo) {
 		committedOffsets <- test.env.partitionSession.CommittedOffset().ToInt64()
 		test.env.partitionSession.Close()
+		if onCommittedNotify != nil {
+			onCommittedNotify(info)
+		}
 	}
 	commitSent := make(chan *rawtopicreader.CommitOffsetRequest, 1)
 	test.env.stream.EXPECT().Send(gomock.AssignableToTypeOf(&rawtopicreader.CommitOffsetRequest{})).
@@ -227,7 +245,6 @@ func TestTopicReader_CommitMetricsRegisterBeforeSynchronousAckAndClose(t *testin
 	// acknowledgement remains reported even after the session is closed.
 	require.NoError(t, test.reader.Close(context.Background()))
 	topicreadercommon.TraceCommitQueued(test.env.ctx, topicreadercommon.GetCommitRange(test.batch))
-	topicreadercommon.TraceCommitAcknowledged(test.env.ctx, test.env.partitionSession, rawtopiccommon.NewOffset(25))
 	readerMetricNoDelta(t, test.queued)
 	readerMetricNoDelta(t, test.acknowledged)
 }
@@ -246,13 +263,47 @@ func TestTopicReader_CommitMetricsIgnoreDuplicateAndStaleAcknowledgements(t *tes
 		}},
 	}))
 	readerMetricNoDelta(t, test.acknowledged)
+	readerMetricNoDelta(t, test.notifications)
 	require.NoError(t, test.env.reader.onCommitResponse(readerMetricCommitResponse(test.env, 25)))
 	require.Equal(t, 5, readerMetricDelta(t, test.acknowledged))
+	require.Equal(t, 5, readerMetricDelta(t, test.notifications))
 
 	// Direct calls provide a processing barrier for duplicate and stale ACKs.
 	require.NoError(t, test.env.reader.onCommitResponse(readerMetricCommitResponse(test.env, 25)))
+	require.Zero(t, readerMetricDelta(t, test.notifications))
 	require.NoError(t, test.env.reader.onCommitResponse(readerMetricCommitResponse(test.env, 24)))
+	require.Zero(t, readerMetricDelta(t, test.notifications))
 	readerMetricNoDelta(t, test.acknowledged)
+}
+
+func TestTopicReader_CommitNotifyWithoutQueuedTracing(t *testing.T) {
+	e := newTopicReaderTestEnv(t)
+	e.reader.cfg.ReaderInfo = topicreadercommon.ReaderInfo{
+		Endpoint:   "node:2135",
+		Database:   "/db",
+		Consumer:   "consumer",
+		ReaderName: "reader",
+	}
+	notifications := make(chan int, 1)
+	e.reader.cfg.Trace = &trace.Topic{
+		OnReaderCommittedNotify: func(info trace.TopicReaderCommittedNotifyInfo) {
+			notifications <- info.MessagesCount
+		},
+	}
+
+	const sessionID = rawtopicreader.PartitionSessionID(42)
+	require.NoError(t, e.reader.onStartPartitionSessionRequest(&rawtopicreader.StartPartitionSessionRequest{
+		PartitionSession: rawtopicreader.PartitionSession{
+			PartitionSessionID: sessionID,
+			Path:               e.partitionSession.Topic,
+			PartitionID:        e.partitionSession.PartitionID,
+		},
+		CommittedOffset: rawtopiccommon.NewOffset(20),
+	}))
+	e.partitionSessionID = sessionID
+	require.NoError(t, e.reader.onCommitResponse(readerMetricCommitResponse(&e, 25)))
+	require.Zero(t, readerMetricDelta(t, notifications))
+	readerMetricNoDelta(t, notifications)
 }
 
 func TestTopicStreamReader_MetricBalancesArePerStreamForSameReaderName(t *testing.T) {
@@ -360,11 +411,12 @@ type readerBatchResult struct {
 }
 
 type readerCommitMetricsTest struct {
-	env          *streamEnv
-	reader       *Reader
-	batch        *topicreadercommon.PublicBatch
-	queued       chan int
-	acknowledged chan int
+	env           *streamEnv
+	reader        *Reader
+	batch         *topicreadercommon.PublicBatch
+	queued        chan int
+	acknowledged  chan int
+	notifications chan int
 }
 
 func newReaderCommitMetricsTest(t *testing.T) *readerCommitMetricsTest {
@@ -379,12 +431,16 @@ func newReaderCommitMetricsTest(t *testing.T) *readerCommitMetricsTest {
 	}
 	queued := make(chan int, 4)
 	acknowledged := make(chan int, 4)
+	notifications := make(chan int, 8)
 	e.reader.cfg.Trace = &trace.Topic{
 		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
 			queued <- info.MessagesCount
 		},
-		OnReaderCommitAcknowledged: func(info trace.TopicReaderCommitAcknowledgedInfo) {
-			acknowledged <- info.MessagesCount
+		OnReaderCommittedNotify: func(info trace.TopicReaderCommittedNotifyInfo) {
+			notifications <- info.MessagesCount
+			if info.MessagesCount > 0 {
+				acknowledged <- info.MessagesCount
+			}
 		},
 	}
 
@@ -432,11 +488,12 @@ func newReaderCommitMetricsTest(t *testing.T) *readerCommitMetricsTest {
 		})
 
 		return &readerCommitMetricsTest{
-			env:          &e,
-			reader:       reader,
-			batch:        result.batch,
-			queued:       queued,
-			acknowledged: acknowledged,
+			env:           &e,
+			reader:        reader,
+			batch:         result.batch,
+			queued:        queued,
+			acknowledged:  acknowledged,
+			notifications: notifications,
 		}
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for reader batch")

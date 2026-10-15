@@ -106,10 +106,10 @@ func TestReaderReconnectorLoopStopsAfterAdmittedRetry(t *testing.T) {
 					require.ErrorIs(t, event.Error, retryErr)
 					require.Equal(t, "Unavailable", event.StatusCode)
 					require.Equal(t, "transport_error", event.ErrorType)
-					require.Equal(t, "endpoint", event.Endpoint)
-					require.Equal(t, "/database", event.Database)
-					require.Equal(t, "consumer", event.Consumer)
-					require.Equal(t, "reader", event.ReaderName)
+					require.Equal(t, "endpoint", event.ReaderInfo.Endpoint)
+					require.Equal(t, "/database", event.ReaderInfo.Database)
+					require.Equal(t, "consumer", event.ReaderInfo.Consumer)
+					require.Equal(t, "reader", event.ReaderInfo.ReaderName)
 				default:
 					t.Fatal("retry stop session error was not emitted")
 				}
