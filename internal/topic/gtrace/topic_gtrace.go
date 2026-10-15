@@ -291,6 +291,50 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 		}
 	}
 	{
+		h1 := lhs.OnReaderCommitQueued
+		h2 := rhs.OnReaderCommitQueued
+		ret.OnReaderCommitQueued = func(t trace.TopicReaderCommitQueuedInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderCommitQueued = nil
+		}
+	}
+	{
+		h1 := lhs.OnReaderSessionError
+		h2 := rhs.OnReaderSessionError
+		ret.OnReaderSessionError = func(t trace.TopicReaderSessionErrorInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderSessionError = nil
+		}
+	}
+	{
 		h1 := lhs.OnReaderClose
 		h2 := rhs.OnReaderClose
 		ret.OnReaderClose = func(t trace.TopicReaderCloseStartInfo) func(trace.TopicReaderCloseDoneInfo) {
@@ -695,6 +739,94 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 					r1(t)
 				}
 			}
+		}
+	}
+	{
+		h1 := lhs.OnReaderMessagesReceived
+		h2 := rhs.OnReaderMessagesReceived
+		ret.OnReaderMessagesReceived = func(t trace.TopicReaderMessagesReceivedInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderMessagesReceived = nil
+		}
+	}
+	{
+		h1 := lhs.OnReaderMessagesDelivered
+		h2 := rhs.OnReaderMessagesDelivered
+		ret.OnReaderMessagesDelivered = func(t trace.TopicReaderMessagesDeliveredInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderMessagesDelivered = nil
+		}
+	}
+	{
+		h1 := lhs.OnReaderLocalBufferChanged
+		h2 := rhs.OnReaderLocalBufferChanged
+		ret.OnReaderLocalBufferChanged = func(t trace.TopicReaderLocalBufferChangedInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderLocalBufferChanged = nil
+		}
+	}
+	{
+		h1 := lhs.OnReaderCreditBalanceChanged
+		h2 := rhs.OnReaderCreditBalanceChanged
+		ret.OnReaderCreditBalanceChanged = func(t trace.TopicReaderCreditBalanceChangedInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+		if h1 == nil && h2 == nil {
+			ret.OnReaderCreditBalanceChanged = nil
 		}
 	}
 	{
@@ -1520,6 +1652,20 @@ func onReaderCommittedNotify(t *trace.Topic, t1 trace.TopicReaderCommittedNotify
 	}
 	fn(t1)
 }
+func onReaderCommitQueued(t *trace.Topic, t1 trace.TopicReaderCommitQueuedInfo) {
+	fn := t.OnReaderCommitQueued
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func onReaderSessionError(t *trace.Topic, t1 trace.TopicReaderSessionErrorInfo) {
+	fn := t.OnReaderSessionError
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
 func onReaderClose(t *trace.Topic, t1 trace.TopicReaderCloseStartInfo) func(trace.TopicReaderCloseDoneInfo) {
 	fn := t.OnReaderClose
 	if fn == nil {
@@ -1694,6 +1840,34 @@ func onReaderReceiveDataResponse(t *trace.Topic, t1 trace.TopicReaderReceiveData
 		}
 	}
 	return res
+}
+func onReaderMessagesReceived(t *trace.Topic, t1 trace.TopicReaderMessagesReceivedInfo) {
+	fn := t.OnReaderMessagesReceived
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func onReaderMessagesDelivered(t *trace.Topic, t1 trace.TopicReaderMessagesDeliveredInfo) {
+	fn := t.OnReaderMessagesDelivered
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func onReaderLocalBufferChanged(t *trace.Topic, t1 trace.TopicReaderLocalBufferChangedInfo) {
+	fn := t.OnReaderLocalBufferChanged
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func onReaderCreditBalanceChanged(t *trace.Topic, t1 trace.TopicReaderCreditBalanceChangedInfo) {
+	fn := t.OnReaderCreditBalanceChanged
+	if fn == nil {
+		return
+	}
+	fn(t1)
 }
 func onReaderReadMessages(t *trace.Topic, t1 trace.TopicReaderReadMessagesStartInfo) func(trace.TopicReaderReadMessagesDoneInfo) {
 	fn := t.OnReaderReadMessages
@@ -2097,15 +2271,39 @@ func TopicOnReaderSendCommitMessage(t *trace.Topic, c *context.Context, commitsI
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderCommittedNotify(t *trace.Topic, c *context.Context, readerConnectionID string, topic string, partitionID int64, partitionSessionID int64, committedOffset int64) {
+func TopicOnReaderCommittedNotify(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, readerConnectionID string, topic string, partitionID int64, partitionSessionID int64, committedOffset int64, messagesCount int) {
 	var p trace.TopicReaderCommittedNotifyInfo
 	p.Context = c
+	p.ReaderInfo = readerInfo
 	p.ReaderConnectionID = readerConnectionID
 	p.Topic = topic
 	p.PartitionID = partitionID
 	p.PartitionSessionID = partitionSessionID
 	p.CommittedOffset = committedOffset
+	p.MessagesCount = messagesCount
 	onReaderCommittedNotify(t, p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnReaderCommitQueued(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, topic string, partitionID int64, partitionSessionID int64, messagesCount int) {
+	var p trace.TopicReaderCommitQueuedInfo
+	p.Context = c
+	p.ReaderInfo = readerInfo
+	p.Topic = topic
+	p.PartitionID = partitionID
+	p.PartitionSessionID = partitionSessionID
+	p.MessagesCount = messagesCount
+	onReaderCommitQueued(t, p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnReaderSessionError(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, retryDecision string, statusCode string, errorType string, e error) {
+	var p trace.TopicReaderSessionErrorInfo
+	p.Context = c
+	p.ReaderInfo = readerInfo
+	p.RetryDecision = retryDecision
+	p.StatusCode = statusCode
+	p.ErrorType = errorType
+	p.Error = e
+	onReaderSessionError(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TopicOnReaderClose(t *trace.Topic, c *context.Context, readerConnectionID string, closeReason error) func(closeError error) {
@@ -2268,9 +2466,10 @@ func TopicOnReaderSentDataRequest(t *trace.Topic, c *context.Context, readerConn
 	onReaderSentDataRequest(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderReceiveDataResponse(t *trace.Topic, c *context.Context, readerConnectionID string, localBufferSizeAfterReceive int, dataResponse trace.TopicReaderDataResponseInfo) func(error) {
+func TopicOnReaderReceiveDataResponse(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, readerConnectionID string, localBufferSizeAfterReceive int, dataResponse trace.TopicReaderDataResponseInfo) func(error) {
 	var p trace.TopicReaderReceiveDataResponseStartInfo
 	p.Context = c
+	p.ReaderInfo = readerInfo
 	p.ReaderConnectionID = readerConnectionID
 	p.LocalBufferSizeAfterReceive = localBufferSizeAfterReceive
 	p.DataResponse = dataResponse
@@ -2280,6 +2479,41 @@ func TopicOnReaderReceiveDataResponse(t *trace.Topic, c *context.Context, reader
 		p.Error = e
 		res(p)
 	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnReaderMessagesReceived(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, topic string, messagesCount int) {
+	var p trace.TopicReaderMessagesReceivedInfo
+	p.Context = c
+	p.ReaderInfo = readerInfo
+	p.Topic = topic
+	p.MessagesCount = messagesCount
+	onReaderMessagesReceived(t, p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnReaderMessagesDelivered(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, topic string, messagesCount int) {
+	var p trace.TopicReaderMessagesDeliveredInfo
+	p.Context = c
+	p.ReaderInfo = readerInfo
+	p.Topic = topic
+	p.MessagesCount = messagesCount
+	onReaderMessagesDelivered(t, p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnReaderLocalBufferChanged(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, topic string, messagesDelta int) {
+	var p trace.TopicReaderLocalBufferChangedInfo
+	p.Context = c
+	p.ReaderInfo = readerInfo
+	p.Topic = topic
+	p.MessagesDelta = messagesDelta
+	onReaderLocalBufferChanged(t, p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnReaderCreditBalanceChanged(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, bytesDelta int) {
+	var p trace.TopicReaderCreditBalanceChangedInfo
+	p.Context = c
+	p.ReaderInfo = readerInfo
+	p.BytesDelta = bytesDelta
+	onReaderCreditBalanceChanged(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TopicOnReaderReadMessages(t *trace.Topic, c *context.Context, minCount int, maxCount int, freeBufferCapacity int) func(messagesCount int, topic string, partitionID int64, partitionSessionID int64, offsetStart int64, offsetEnd int64, freeBufferCapacity int, _ error) {
@@ -2489,9 +2723,10 @@ func TopicOnListenerInit(t *trace.Topic, c *context.Context, listenerID string, 
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnListenerReceiveMessage(t *trace.Topic, c *context.Context, listenerID string, sessionID string, messageType string, bytesSize int, e error) {
+func TopicOnListenerReceiveMessage(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, listenerID string, sessionID string, messageType string, bytesSize int, e error) {
 	var p trace.TopicListenerReceiveMessageInfo
 	p.Context = c
+	p.ReaderInfo = readerInfo
 	p.ListenerID = listenerID
 	p.SessionID = sessionID
 	p.MessageType = messageType

@@ -113,6 +113,7 @@ func (c *Committer) Commit(ctx context.Context, commitRange CommitRange) error {
 
 func (c *Committer) pushCommit(commitRange CommitRange) (commitWaiter, error) {
 	var resErr error
+	var messagesCount int
 	waiter := newCommitWaiter(commitRange.PartitionSession, commitRange.CommitOffsetEnd)
 	c.m.WithLock(func() {
 		if err := c.backgroundWorker.Context().Err(); err != nil {
@@ -122,10 +123,20 @@ func (c *Committer) pushCommit(commitRange CommitRange) (commitWaiter, error) {
 		}
 
 		c.commits.Append(&commitRange)
+		messagesCount = RegisterCommitQueued(commitRange)
 		if c.mode == CommitModeSync {
 			c.addWaiterNeedLock(waiter)
 		}
 	})
+	if resErr != nil {
+		return waiter, resErr
+	}
+
+	traceCtx := c.backgroundWorker.Context()
+	if commitRange.PartitionSession != nil {
+		traceCtx = commitRange.PartitionSession.Context()
+	}
+	TraceCommitQueuedAfterRegistration(traceCtx, commitRange, messagesCount)
 
 	select {
 	case c.commitLoopSignal <- struct{}{}:
@@ -135,21 +146,22 @@ func (c *Committer) pushCommit(commitRange CommitRange) (commitWaiter, error) {
 	return waiter, resErr
 }
 
-func (c *Committer) pushRequest(request *commitRequest) {
+func (c *Committer) pushRequest(request *commitRequest) int {
 	commitRange := request.commitRange
 	if !c.mode.CommitsEnabled() {
 		request.finishSend(xerrors.WithStackTrace(ErrCommitDisabled))
 
-		return
+		return 0
 	}
 	if c.mode == CommitModeSync && commitRange.PartitionSession != nil &&
 		commitRange.PartitionSession.Context().Err() != nil {
 		request.finishSend(xerrors.WithStackTrace(ErrPublicCommitSessionToExpiredSession))
 
-		return
+		return 0
 	}
 
 	var resErr error
+	var messagesCount int
 	c.m.WithLock(func() {
 		if err := c.backgroundWorker.Context().Err(); err != nil {
 			resErr = err
@@ -158,17 +170,20 @@ func (c *Committer) pushRequest(request *commitRequest) {
 		}
 
 		c.commits.Append(&commitRange)
+		messagesCount = RegisterCommitQueued(commitRange)
 		c.requests = append(c.requests, request)
 	})
 	if resErr != nil {
 		request.finishSend(resErr)
 
-		return
+		return 0
 	}
 	select {
 	case c.commitLoopSignal <- struct{}{}:
 	default:
 	}
+
+	return messagesCount
 }
 
 func (c *Committer) pushCommitsLoop(ctx context.Context) {
