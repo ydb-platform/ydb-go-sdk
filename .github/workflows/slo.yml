@@ -190,7 +190,8 @@ jobs:
           cache-from: type=gha,scope=slo-deps
 
       - name: Run SLO Tests
-        uses: ydb-platform/ydb-slo-action/init@v3
+        # Pin legacy telemetry fixes until ydb-slo-action#81 is merged.
+        uses: ydb-platform/ydb-slo-action/init@e136720bca3783a0bd2d14e78ac591275573c0b3
         timeout-minutes: 30
         with:
           github_issue: ${{ github.event.inputs.github_issue }}
