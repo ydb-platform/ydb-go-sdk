@@ -11,76 +11,19 @@ jobs:
     runs-on: ubuntu-latest
     name: Publish YDB SLO Report
     permissions:
+      actions: read
       checks: write
       contents: read
       pull-requests: write
-    if: github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Publish YDB SLO Report
-        uses: ydb-platform/ydb-slo-action/report@v2
+        uses: ydb-platform/ydb-slo-action/report@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           github_run_id: ${{ github.event.workflow_run.id }}
+          remove_label: ${{ github.event.workflow_run.event == 'pull_request' && 'SLO' || '' }}
           thresholds_yaml: |
             metrics:
               - name: "node_hints_misses"
                 direction: lower_is_better
                 critical_max: 0 # more than zero and node_hints workload fails
-  remove-slo-label:
-    needs: test-ydb-slo-action
-    if: always() && github.event.workflow_run.event == 'pull_request'
-    runs-on: ubuntu-latest
-    name: Remove SLO Label
-    permissions:
-      pull-requests: write
-    steps:
-      - name: Remove SLO label from PR
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const workflowRun = context.payload.workflow_run;
-            let pullRequestNumbers = [];
-
-            if (workflowRun.pull_requests?.length > 0) {
-              pullRequestNumbers = workflowRun.pull_requests.map((pr) => pr.number);
-            } else if (workflowRun.head_branch && workflowRun.head_repository?.owner?.login) {
-              const head = `${workflowRun.head_repository.owner.login}:${workflowRun.head_branch}`;
-              const { data: pulls } = await github.rest.pulls.list({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                head,
-                state: 'all',
-                per_page: 100,
-              });
-
-              const matched = workflowRun.head_sha
-                ? pulls.filter((pr) => pr.head.sha === workflowRun.head_sha)
-                : pulls;
-              pullRequestNumbers = (matched.length > 0 ? matched : pulls).map((pr) => pr.number);
-
-              if (pullRequestNumbers.length === 0) {
-                console.log(`No pull requests found for head ${head}`);
-              } else {
-                console.log(`Resolved pull request(s) from head ${head}: #${pullRequestNumbers.join(', #')}`);
-              }
-            } else {
-              console.log('No pull requests associated with this workflow run and unable to resolve head');
-            }
-
-            for (const number of pullRequestNumbers) {
-              try {
-                await github.rest.issues.removeLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: number,
-                  name: 'SLO'
-                });
-                console.log(`Removed SLO label from PR #${number}`);
-              } catch (error) {
-                if (error.status === 404) {
-                  console.log(`SLO label not found on PR #${number}, skipping`);
-                } else {
-                  throw error;
-                }
-              }
-            }

@@ -190,7 +190,7 @@ jobs:
           cache-from: type=gha,scope=slo-deps
 
       - name: Run SLO Tests
-        uses: ydb-platform/ydb-slo-action/init@v2
+        uses: ydb-platform/ydb-slo-action/init@v3
         timeout-minutes: 30
         with:
           github_issue: ${{ github.event.inputs.github_issue }}
@@ -204,6 +204,7 @@ jobs:
           workload_baseline_ref: ${{ steps.baseline.outputs.ref }}
           workload_baseline_image: ydb-app-baseline
           workload_baseline_command: ${{ matrix.sdk.command }}
+          metrics_schema: legacy_table
           disable_compose_profiles: "${{ (matrix.sdk.name == 'native-table-node-hints' || matrix.sdk.name == 'native-query-node-hints') && 'chaos' || '' }}"
           metrics_yaml: ${{ matrix.sdk.metrics_yaml }}
 
