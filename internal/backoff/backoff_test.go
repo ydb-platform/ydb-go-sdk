@@ -41,6 +41,47 @@ func TestDelays(t *testing.T) {
 	}
 }
 
+func TestMaxDelay(t *testing.T) {
+	duration := func(s string) (d time.Duration) {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			panic(err)
+		}
+
+		return d
+	}
+	backoff := New(
+		WithSlotDuration(duration("500ms")),
+		WithCeiling(6),
+		WithJitterLimit(0.5),
+	)
+	fixedDelay := New(
+		WithSlotDuration(duration("500ms")),
+		WithCeiling(6),
+		WithJitterLimit(1),
+	)
+	for i, d := range map[int]time.Duration{
+		0: duration("500ms"),
+		1: duration("1s"),
+		2: duration("2s"),
+		3: duration("4s"),
+		4: duration("8s"),
+		5: duration("16s"),
+		6: duration("32s"),
+		7: duration("32s"),
+		8: duration("32s"),
+	} {
+		t.Run(fmt.Sprintf("%v -> %v", i, d), func(t *testing.T) {
+			require.Equal(t, d, backoff.MaxDelay(i))
+			require.Equal(t, d, fixedDelay.Delay(i))
+		})
+	}
+}
+
+func TestMaxDelayDefaultsSlotToOneSecond(t *testing.T) {
+	require.Equal(t, time.Second, New().MaxDelay(0))
+}
+
 func TestLogBackoff(t *testing.T) {
 	type exp struct {
 		eq  time.Duration

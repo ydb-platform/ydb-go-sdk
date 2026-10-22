@@ -1,6 +1,7 @@
-* Fixed topic multi-writer writes to other partitions blocking while a split session closes
-* Fixed topic multi-writer recovery after a partition session fails to initialize
 * Changed topic multi-writer initialization to improve startup performance for topics with many partitions
+
+## v3.155.1
+* Fixed resource leaks after failed driver initialization and in nested `Driver.With` calls
 
 ## v3.155.0
 * Fixed query result decoding to preserve nested optional values and Pg NULLs
