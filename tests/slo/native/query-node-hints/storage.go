@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -25,19 +24,20 @@ import (
 const writeQuery = `
 DECLARE $id AS Uint64;
 DECLARE $payload_str AS Utf8;
+DECLARE $payload_hash AS Uint64;
 DECLARE $payload_double AS Double;
 DECLARE $payload_timestamp AS Timestamp;
 
 UPSERT INTO ` + "`%s`" + ` (
-	id, payload_str, payload_double, payload_timestamp
+	id, payload_str, payload_double, payload_timestamp, payload_hash
 ) VALUES (
-	$id, $payload_str, $payload_double, $payload_timestamp
+	$id, $payload_str, $payload_double, $payload_timestamp, $payload_hash
 );
 `
 
 const readQuery = `
 DECLARE $id AS Uint64;
-SELECT id, payload_str, payload_double, payload_timestamp
+SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
 FROM ` + "`%s`" + ` WHERE id = $id;
 `
 
@@ -65,6 +65,7 @@ type Storage struct {
 	misses              chan struct{}
 	nodeSelector        *atomic.Pointer[nodehints.NodeSelector]
 	gen                 *generator.SeededGenerator
+	control             generator.Row
 	nodeHintMissesGauge otelmetric.Int64UpDownCounter
 	createSQL           string
 	dropSQL             string
@@ -127,9 +128,9 @@ func NewStorage(ctx context.Context, fw *framework.Framework) (*Storage, error) 
 	return s, nil
 }
 
-func (s *Storage) reportNodeHintMisses(val int64) {
+func (s *Storage) reportNodeHintMisses() {
 	if s.nodeHintMissesGauge != nil {
-		s.nodeHintMissesGauge.Add(context.Background(), val, otelmetric.WithAttributes(
+		s.nodeHintMissesGauge.Add(context.Background(), 1, otelmetric.WithAttributes(
 			attribute.String("ref", s.fw.Config.Ref),
 		))
 	}
@@ -166,16 +167,38 @@ func (s *Storage) Setup(ctx context.Context) error {
 	return nil
 }
 
-func (s *Storage) Warmup(_ context.Context) error {
+func (s *Storage) Warmup(ctx context.Context) error {
 	s.fw.Logger.Printf("waiting 10s for partition stabilization...")
 	time.Sleep(10 * time.Second) //nolint:mnd
 
-	s.reportNodeHintMisses(1)
+	s.reportNodeHintMisses()
 
 	ns := s.nodeSelector.Load()
 	idx, nodeID := ns.GetRandomNodeID(s.gen)
 	s.fw.Logger.Printf("all requests to node id: %d", nodeID)
-	s.gen.SetRange(ns.LowerBounds[idx], ns.UpperBounds[idx])
+	lower, upper := ns.LowerBounds[idx], ns.UpperBounds[idx]
+	if upper-lower < 2 {
+		return fmt.Errorf("selected partition has no separate control and load keys")
+	}
+	// Reserve the first key in this partition; arbitrary load reads may be absent.
+	s.gen.SetRange(lower+1, upper)
+	row, err := generator.New(lower).Generate()
+	if err != nil {
+		return err
+	}
+	row = kv.ControlRow(row)
+	expected := kv.CloneRow(row)
+	if _, _, err := s.write(ctx, row); err != nil {
+		return err
+	}
+	actual, _, _, err := s.read(ctx, row.ID)
+	if err != nil {
+		return err
+	}
+	if err := kv.CheckRow(expected, actual); err != nil {
+		return err
+	}
+	s.control = expected
 
 	return nil
 }
@@ -184,54 +207,63 @@ func (s *Storage) Run(ctx context.Context) error {
 	readRL := framework.NewRateLimiter(int(s.params.ReadRPS))
 	writeRL := framework.NewRateLimiter(int(s.params.WriteRPS))
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+	group, ctx := errgroup.WithContext(ctx)
 
-	go func() {
-		defer wg.Done()
-		framework.RunWorkers(ctx, int(s.params.ReadRPS), readRL, func(ctx context.Context) {
+	group.Go(func() error {
+		return framework.RunWorkers(ctx, int(s.params.ReadRPS), readRL, func(ctx context.Context) error {
 			row, err := s.gen.Generate()
 			if err != nil {
 				s.fw.Logger.Errorf("generate error: %v", err)
 
-				return
+				return err
 			}
 			span := s.fw.Metrics.Start(framework.OperationTypeRead)
 			_, attempts, missed, err := s.read(ctx, row.ID)
 			span.Finish(err, attempts)
 			if missed {
-				s.reportNodeHintMisses(1)
+				s.reportNodeHintMisses()
+			}
+			if err == nil {
+				actual, _, controlMissed, controlErr := s.read(ctx, s.control.ID)
+				if controlMissed {
+					s.reportNodeHintMisses()
+				}
+				err = controlErr
+				if err == nil {
+					err = kv.CheckRow(s.control, actual)
+				}
 			}
 			if err != nil && ctx.Err() == nil {
 				s.fw.Logger.Errorf("read failed: %v", err)
 			}
-		})
-	}()
 
-	go func() {
-		defer wg.Done()
-		framework.RunWorkers(ctx, int(s.params.WriteRPS), writeRL, func(ctx context.Context) {
+			return err
+		})
+	})
+
+	group.Go(func() error {
+		return framework.RunWorkers(ctx, int(s.params.WriteRPS), writeRL, func(ctx context.Context) error {
 			row, err := s.gen.Generate()
 			if err != nil {
 				s.fw.Logger.Errorf("generate error: %v", err)
 
-				return
+				return err
 			}
 			span := s.fw.Metrics.Start(framework.OperationTypeWrite)
 			attempts, missed, err := s.write(ctx, row)
 			span.Finish(err, attempts)
 			if missed {
-				s.reportNodeHintMisses(1)
+				s.reportNodeHintMisses()
 			}
 			if err != nil && ctx.Err() == nil {
 				s.fw.Logger.Errorf("write failed: %v", err)
 			}
+
+			return err
 		})
-	}()
+	})
 
-	wg.Wait()
-
-	return nil
+	return group.Wait()
 }
 
 func (s *Storage) Teardown(ctx context.Context) error {
@@ -276,9 +308,12 @@ func (s *Storage) read(ctx context.Context, entryID generator.RowID) (
 	defer cancel()
 
 	e := generator.Row{}
+	var rowCount int
 
 	err := s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) (err error) {
+			e = generator.Row{}
+			rowCount = 0
 			if err = ctx.Err(); err != nil {
 				return err
 			}
@@ -300,25 +335,29 @@ func (s *Storage) read(ctx context.Context, entryID generator.RowID) (
 				_ = res.Close(ctx)
 			}()
 
-			rs, err := res.NextResultSet(ctx)
-			if err != nil {
+			for {
+				rs, err := res.NextResultSet(ctx)
 				if errors.Is(err, io.EOF) {
 					return nil
 				}
-
-				return err
-			}
-
-			row, err := rs.NextRow(ctx)
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					return nil
+				if err != nil {
+					return err
 				}
-
-				return err
+				for {
+					row, err := rs.NextRow(ctx)
+					if errors.Is(err, io.EOF) {
+						break
+					}
+					if err != nil {
+						return err
+					}
+					e = generator.Row{}
+					if err := row.ScanStruct(&e, query.WithScanStructAllowMissingColumnsFromSelect()); err != nil {
+						return err
+					}
+					rowCount++
+				}
 			}
-
-			return row.ScanStruct(&e, query.WithScanStructAllowMissingColumnsFromSelect())
 		},
 		query.WithIdempotent(),
 		query.WithTrace(&trace.Query{
@@ -335,6 +374,10 @@ func (s *Storage) read(ctx context.Context, entryID generator.RowID) (
 		missed = true
 	default:
 		missed = false
+	}
+
+	if err == nil && rowCount > 1 {
+		err = fmt.Errorf("data mismatch: id %d returned %d rows", entryID, rowCount)
 	}
 
 	return e, attempts, missed, err
@@ -359,6 +402,7 @@ func (s *Storage) write(ctx context.Context, e generator.Row) (attempts int, mis
 					ydb.ParamsBuilder().
 						Param("$id").Uint64(e.ID).
 						Param("$payload_str").Text(*e.PayloadStr).
+						Param("$payload_hash").Uint64(*e.PayloadHash).
 						Param("$payload_double").Double(*e.PayloadDouble).
 						Param("$payload_timestamp").Timestamp(*e.PayloadTimestamp).
 						Build(),

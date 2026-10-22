@@ -19,13 +19,14 @@ import (
 const writeQuery = `
 DECLARE $id AS Uint64;
 DECLARE $payload_str AS Utf8;
+DECLARE $payload_hash AS Uint64;
 DECLARE $payload_double AS Double;
 DECLARE $payload_timestamp AS Timestamp;
 
 UPSERT INTO %s (
-	id, hash, payload_str, payload_double, payload_timestamp
+	id, hash, payload_str, payload_double, payload_timestamp, payload_hash
 ) VALUES (
-	$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
+	$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp, $payload_hash
 );
 `
 
@@ -100,9 +101,12 @@ func (d *db) Read(ctx context.Context, id generator.RowID) (_ generator.Row, att
 	defer cancel()
 
 	var row generator.Row
+	var rowCount int
 
 	err := d.driver.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
+			row = generator.Row{}
+			rowCount = 0
 			if err := ctx.Err(); err != nil {
 				return err
 			}
@@ -126,25 +130,29 @@ func (d *db) Read(ctx context.Context, id generator.RowID) (_ generator.Row, att
 				_ = res.Close(ctx)
 			}()
 
-			rs, err := res.NextResultSet(ctx)
-			if err != nil {
+			for {
+				rs, err := res.NextResultSet(ctx)
 				if errors.Is(err, io.EOF) {
 					return nil
 				}
-
-				return err
-			}
-
-			r, err := rs.NextRow(ctx)
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					return nil
+				if err != nil {
+					return err
 				}
-
-				return err
+				for {
+					r, err := rs.NextRow(ctx)
+					if errors.Is(err, io.EOF) {
+						break
+					}
+					if err != nil {
+						return err
+					}
+					row = generator.Row{}
+					if err := r.ScanStruct(&row, query.WithScanStructAllowMissingColumnsFromSelect()); err != nil {
+						return err
+					}
+					rowCount++
+				}
 			}
-
-			return r.ScanStruct(&row, query.WithScanStructAllowMissingColumnsFromSelect())
 		},
 		query.WithIdempotent(),
 		query.WithTrace(&trace.Query{
@@ -156,6 +164,10 @@ func (d *db) Read(ctx context.Context, id generator.RowID) (_ generator.Row, att
 		}),
 		query.WithLabel("READ"),
 	)
+
+	if err == nil && rowCount != 1 {
+		err = fmt.Errorf("data mismatch: id %d returned %d rows, want 1", id, rowCount)
+	}
 
 	return row, attempts, err
 }
@@ -176,6 +188,7 @@ func (d *db) Write(ctx context.Context, row generator.Row) (attempts int, _ erro
 					ydb.ParamsBuilder().
 						Param("$id").Uint64(row.ID).
 						Param("$payload_str").Text(*row.PayloadStr).
+						Param("$payload_hash").Uint64(*row.PayloadHash).
 						Param("$payload_double").Double(*row.PayloadDouble).
 						Param("$payload_timestamp").Timestamp(*row.PayloadTimestamp).
 						Build(),

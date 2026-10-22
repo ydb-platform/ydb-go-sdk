@@ -2,12 +2,12 @@ package kv
 
 import (
 	"context"
+	"crypto/rand"
 	"flag"
 	"fmt"
-	"math/rand"
+	mathrand "math/rand"
 	"os"
 	"path"
-	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
@@ -43,7 +43,7 @@ type Params struct {
 	ReadTimeout       time.Duration
 	WriteTimeout      time.Duration
 	PrefillCount      uint64
-	TablePath         string // path.Join(fw.Config.Database, fw.Config.Label, fw.Config.Ref)
+	TablePath         string // unique for this process's complete setup/run/teardown
 	PartitionSize     uint   // MB
 	MinPartitionCount uint
 	MaxPartitionCount uint
@@ -92,7 +92,7 @@ func ParseParams(fw *framework.Framework, name string, extraFlags func(*flag.Fla
 		ReadTimeout:       time.Duration(readTimeout) * time.Millisecond,
 		WriteTimeout:      time.Duration(writeTimeout) * time.Millisecond,
 		PrefillCount:      prefillCount,
-		TablePath:         path.Join(fw.Config.Database, fw.Config.Label, fw.Config.Ref),
+		TablePath:         path.Join(fw.Config.Database, fw.Config.Label, fw.Config.Ref+"-"+rand.Text()),
 		PartitionSize:     partitionSize,
 		MinPartitionCount: minPartitionCount,
 		MaxPartitionCount: maxPartitionCount,
@@ -102,9 +102,10 @@ func ParseParams(fw *framework.Framework, name string, extraFlags func(*flag.Fla
 
 // Workload implements framework.Workload for the KV workload pattern.
 type Workload struct {
-	fw     *framework.Framework
-	db     Database
-	params Params
+	fw       *framework.Framework
+	db       Database
+	params   Params
+	expected []generator.Row
 }
 
 var _ framework.Workload = (*Workload)(nil)
@@ -117,6 +118,11 @@ func New(fw *framework.Framework, params Params, db Database) *Workload {
 }
 
 func (w *Workload) Setup(ctx context.Context) error {
+	if w.params.PrefillCount == 0 {
+		return fmt.Errorf("prefill-count must be positive for controlled reads")
+	}
+	w.expected = make([]generator.Row, w.params.PrefillCount)
+
 	if err := w.db.CreateTable(ctx); err != nil {
 		return fmt.Errorf("create table failed: %w", err)
 	}
@@ -130,7 +136,12 @@ func (w *Workload) Setup(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
+			row = ControlRow(row)
+			expected := CloneRow(row)
 			_, err = w.db.Write(ctx, row)
+			if err == nil {
+				w.expected[row.ID] = expected
+			}
 
 			return err
 		})
@@ -149,30 +160,32 @@ func (w *Workload) Run(ctx context.Context) error {
 	readRL := framework.NewRateLimiter(int(w.params.ReadRPS))
 	writeRL := framework.NewRateLimiter(int(w.params.WriteRPS))
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+	group, ctx := errgroup.WithContext(ctx)
 
-	go func() {
-		defer wg.Done()
-		framework.RunWorkers(ctx, int(w.params.ReadRPS), readRL, func(ctx context.Context) {
-			id := uint64(rand.Intn(int(w.params.PrefillCount))) //nolint:gosec
+	group.Go(func() error {
+		return framework.RunWorkers(ctx, int(w.params.ReadRPS), readRL, func(ctx context.Context) error {
+			id := uint64(mathrand.Intn(int(w.params.PrefillCount))) //nolint:gosec
 			span := w.fw.Metrics.Start(framework.OperationTypeRead)
-			_, attempts, err := w.db.Read(ctx, id)
+			row, attempts, err := w.db.Read(ctx, id)
+			if err == nil {
+				err = CheckRow(w.expected[id], row)
+			}
 			span.Finish(err, attempts)
 			if err != nil && ctx.Err() == nil {
 				w.fw.Logger.Errorf("read failed: %v", err)
 			}
-		})
-	}()
 
-	go func() {
-		defer wg.Done()
-		framework.RunWorkers(ctx, int(w.params.WriteRPS), writeRL, func(ctx context.Context) {
+			return err
+		})
+	})
+
+	group.Go(func() error {
+		return framework.RunWorkers(ctx, int(w.params.WriteRPS), writeRL, func(ctx context.Context) error {
 			row, err := runGen.Generate()
 			if err != nil {
 				w.fw.Logger.Errorf("generate error: %v", err)
 
-				return
+				return err
 			}
 			span := w.fw.Metrics.Start(framework.OperationTypeWrite)
 			attempts, err := w.db.Write(ctx, row)
@@ -180,12 +193,12 @@ func (w *Workload) Run(ctx context.Context) error {
 			if err != nil && ctx.Err() == nil {
 				w.fw.Logger.Errorf("write failed: %v", err)
 			}
+
+			return err
 		})
-	}()
+	})
 
-	wg.Wait()
-
-	return nil
+	return group.Wait()
 }
 
 func (w *Workload) Teardown(ctx context.Context) error {

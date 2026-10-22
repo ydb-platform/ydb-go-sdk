@@ -41,9 +41,9 @@ const dropTableQuery = `DROP TABLE %s;`
 
 const writeQuery = `
 UPSERT INTO %s (
-	id, hash, payload_str, payload_double, payload_timestamp
+	id, hash, payload_str, payload_double, payload_timestamp, payload_hash
 ) VALUES (
-	$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
+	$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp, $payload_hash
 );
 `
 
@@ -126,20 +126,33 @@ func (d *db) Read(ctx context.Context, entryID generator.RowID) (_ generator.Row
 	defer cancel()
 
 	var res generator.Row
+	var rowCount int
 
 	err := retry.Do(ydb.WithTxControl(ctx, readTx), d.sqlDB,
 		func(ctx context.Context, cc *sql.Conn) error {
+			res = generator.Row{}
+			rowCount = 0
 			if err := ctx.Err(); err != nil {
 				return err
 			}
 
-			row := cc.QueryRowContext(ydb.WithQueryMode(ctx, ydb.DataQueryMode), d.selectSQL,
+			rows, err := cc.QueryContext(ydb.WithQueryMode(ctx, ydb.DataQueryMode), d.selectSQL,
 				sql.Named("id", &entryID),
 			)
+			if err != nil {
+				return err
+			}
+			defer rows.Close()
+			for rows.Next() {
+				res = generator.Row{}
+				if err := rows.Scan(&res.ID, &res.PayloadStr, &res.PayloadDouble,
+					&res.PayloadTimestamp, &res.PayloadHash); err != nil {
+					return err
+				}
+				rowCount++
+			}
 
-			var hash *uint64
-
-			return row.Scan(&res.ID, &res.PayloadStr, &res.PayloadDouble, &res.PayloadTimestamp, &hash)
+			return rows.Err()
 		},
 		retry.WithIdempotent(true),
 		retry.WithTrace(
@@ -152,6 +165,10 @@ func (d *db) Read(ctx context.Context, entryID generator.RowID) (_ generator.Row
 			},
 		),
 	)
+
+	if err == nil && rowCount != 1 {
+		err = fmt.Errorf("data mismatch: id %d returned %d rows, want 1", entryID, rowCount)
+	}
 
 	return res, attempts, err
 }
@@ -173,6 +190,7 @@ func (d *db) Write(ctx context.Context, e generator.Row) (attempts int, _ error)
 			_, err := cc.ExecContext(ydb.WithQueryMode(ctx, ydb.DataQueryMode), d.upsertSQL,
 				sql.Named("id", e.ID),
 				sql.Named("payload_str", *e.PayloadStr),
+				sql.Named("payload_hash", *e.PayloadHash),
 				sql.Named("payload_double", *e.PayloadDouble),
 				sql.Named("payload_timestamp", *e.PayloadTimestamp),
 			)

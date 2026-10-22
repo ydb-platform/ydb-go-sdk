@@ -11,7 +11,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 
@@ -141,7 +140,12 @@ func (d *db) ReadBatch(ctx context.Context, rowIDs []generator.RowID) (_ []gener
 	}
 
 	keys := make([]types.Value, 0, len(rowIDs))
+	seen := make(map[generator.RowID]bool, len(rowIDs))
 	for _, rowID := range rowIDs {
+		if seen[rowID] {
+			continue
+		}
+		seen[rowID] = true
 		keys = append(keys, types.StructValue(
 			types.StructFieldValue("id", types.Uint64Value(rowID)),
 		))
@@ -161,34 +165,9 @@ func (d *db) ReadBatch(ctx context.Context, rowIDs []generator.RowID) (_ []gener
 		_ = res.Close()
 	}()
 
-	readRows := make([]generator.Row, 0, len(rowIDs))
-	for res.NextResultSet(ctx) {
-		if err = res.Err(); err != nil {
-			return nil, attempts, err
-		}
+	readRows, err := kv.ReadTableRows(ctx, res)
 
-		if res.CurrentResultSet().Truncated() {
-			return nil, attempts, fmt.Errorf("read rows result set truncated")
-		}
-
-		for res.NextRow() {
-			var row generator.Row
-			err = res.ScanNamed(
-				named.Required("id", &row.ID),
-				named.Optional("payload_str", &row.PayloadStr),
-				named.Optional("payload_double", &row.PayloadDouble),
-				named.Optional("payload_timestamp", &row.PayloadTimestamp),
-				named.Optional("payload_hash", &row.PayloadHash),
-			)
-			if err != nil {
-				return nil, attempts, err
-			}
-
-			readRows = append(readRows, row)
-		}
-	}
-
-	return readRows, attempts, nil
+	return readRows, attempts, err
 }
 
 func (d *db) CreateTable(ctx context.Context) error {
