@@ -487,6 +487,7 @@ func (f *overloadedSplitFactory) Create(cfg topicwriterinternal.WriterReconnecto
 func newMultiWriterForSplitRace(
 	t *testing.T,
 	factory writersFactory,
+	opts ...PublicMultiWriterOption,
 ) (*MultiWriter, *partitionchooser.BoundPartitionChooser, context.Context) {
 	t.Helper()
 
@@ -497,13 +498,14 @@ func newMultiWriterForSplitRace(
 			{PartitionID: 0, Active: true, ToBound: []byte("m")},
 			{PartitionID: 1, Active: true, FromBound: []byte("m")},
 		}}, nil
-	})
+	}, opts...)
 }
 
 func newMultiWriterForSplitRaceWithDescriber(
 	t *testing.T,
 	factory writersFactory,
 	describer TopicDescriber,
+	opts ...PublicMultiWriterOption,
 ) (*MultiWriter, *partitionchooser.BoundPartitionChooser, context.Context) {
 	t.Helper()
 
@@ -520,6 +522,9 @@ func newMultiWriterForSplitRaceWithDescriber(
 	withWritersFactory(factory)(&multiCfg)
 	WithProducerIDPrefix("test-producer")(&multiCfg)
 	WithWriterPartitionByKey(chooser)(&multiCfg)
+	for _, opt := range opts {
+		opt(&multiCfg)
+	}
 
 	w, err := NewMultiWriter(describer, writerCfg, &multiCfg)
 	require.NoError(t, err)

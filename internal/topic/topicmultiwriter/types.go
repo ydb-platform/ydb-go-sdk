@@ -44,10 +44,11 @@ type ack struct {
 type writerWrapper struct {
 	writer
 
-	initDone   atomic.Bool
-	initDoneCh chan struct{}
-	initErr    atomic.Value
-	direct     bool
+	initDone    atomic.Bool
+	initDoneCh  chan struct{}
+	initErr     atomic.Value
+	direct      bool
+	initWaiters int // Guarded by orchestrator.mu.
 }
 
 func (w *writerWrapper) waitInit(ctx context.Context, workerDone <-chan struct{}) error {

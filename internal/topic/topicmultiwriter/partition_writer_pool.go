@@ -24,7 +24,7 @@ type partitionWriterPool struct {
 	idle      *idleWriterManager
 
 	ackCallback            func(partitionID int64, seqNo int64)
-	partitionSplitCallback func(partitionID int64)
+	partitionSplitCallback func(partitionID int64, reason error)
 	onWriterInit           func()
 	onError                func(err error)
 }
@@ -36,7 +36,7 @@ func newPartitionWriterPool(
 	bg *background.Worker,
 	maxSeqNo *seqNoCounter,
 	ackCallback func(partitionID int64, seqNo int64),
-	partitionSplitCallback func(partitionID int64),
+	partitionSplitCallback func(partitionID int64, reason error),
 	onWriterInit func(),
 	onError func(err error),
 ) *partitionWriterPool {
@@ -86,7 +86,7 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 			}),
 			withCustomCheckRetryErrorFunction(func(args topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
 				if isOperationErrorOverloaded(args.Error) {
-					p.partitionSplitCallback(partitionID)
+					p.partitionSplitCallback(partitionID, args.Error)
 
 					return topic.PublicRetryDecisionStop
 				}
@@ -240,16 +240,16 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 }
 
 func (p *partitionWriterPool) evict(partitionID int64) {
-	if old := p.remove(partitionID); old != nil {
+	if old := p.remove(partitionID, nil); old != nil {
 		_ = old.Close(p.ctx)
 	}
 }
 
-func (p *partitionWriterPool) remove(partitionID int64) writer {
+func (p *partitionWriterPool) remove(partitionID int64, expected *writerWrapper) writer {
 	var toClose writer
 	p.mu.WithLock(func() {
 		w := p.writers[partitionID]
-		if w == nil {
+		if w == nil || (expected != nil && w != expected) {
 			return
 		}
 		delete(p.writers, partitionID)

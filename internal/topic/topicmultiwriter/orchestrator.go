@@ -316,6 +316,9 @@ func (o *orchestrator) waitAutoSeqNoWriter(ctx context.Context, msg *message) er
 				}
 				if seqNoReady == nil {
 					writer, err = o.writerPool.get(msg.PartitionID, true)
+					if err == nil {
+						writer.initWaiters++
+					}
 				}
 			}
 		})
@@ -332,15 +335,12 @@ func (o *orchestrator) waitAutoSeqNoWriter(ctx context.Context, msg *message) er
 				continue
 			}
 		}
-		if err = writer.waitInit(ctx, o.background.Done()); err == nil {
+		if err = o.waitWriterInit(ctx, msg.PartitionID, writer); err == nil {
 			return nil
 		}
 		if isOperationErrorOverloaded(err) {
-			if splitErr := o.onPartitionSplit(msg.PartitionID); splitErr != nil {
-				resultErr := fmt.Errorf("handle overloaded partition %d: %w: %w", msg.PartitionID, err, splitErr)
-				o.stopWithError(resultErr)
-
-				return resultErr
+			if splitErr := o.waitPartitionSplit(ctx, msg.PartitionID, err); splitErr != nil {
+				return splitErr
 			}
 
 			continue
@@ -359,6 +359,36 @@ func (o *orchestrator) waitAutoSeqNoWriter(ctx context.Context, msg *message) er
 			return err
 		}
 	}
+}
+
+func (o *orchestrator) waitPartitionSplit(ctx context.Context, partitionID int64, reason error) error {
+	err := o.partitionSplitReceiver.wait(ctx, o.ctx.Done(), partitionID, reason)
+	if errors.Is(err, ErrAlreadyClosed) {
+		if resultErr := o.getResultErr(); resultErr != nil {
+			return resultErr
+		}
+	}
+
+	return err
+}
+
+func (o *orchestrator) waitWriterInit(ctx context.Context, partitionID int64, writer *writerWrapper) error {
+	defer o.mu.WithLock(func() {
+		writer.initWaiters--
+		if ctx.Err() == nil || writer.initWaiters != 0 || writer.getInitErr() != nil {
+			return
+		}
+		partition := o.partitions[partitionID]
+		inflight := o.buf.inFlightMessagesIndex[partitionID]
+		if partition == nil || partition.Splitted() || (inflight != nil && inflight.Len() > 0) {
+			return
+		}
+		// The last cancelled waiter has no queued messages to trigger eviction by
+		// an acknowledgement. Return only its own direct session to idle management.
+		o.writerPool.remove(partitionID, writer)
+	})
+
+	return writer.waitInit(ctx, o.background.Done())
 }
 
 func (o *orchestrator) saveMessageContent(msg *message) error {
@@ -597,6 +627,13 @@ func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topicty
 //nolint:funlen
 func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	var isAlreadySplitted bool
+	o.mu.WithLock(func() {
+		partition := o.partitions[partitionID]
+		isAlreadySplitted = partition != nil && partition.Splitted()
+	})
+	if isAlreadySplitted {
+		return nil
+	}
 
 	describeResult, err := o.describeTopicWithRetries(partitionID)
 	if err != nil {
@@ -662,7 +699,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 			childPartition.seqNoReady = nil
 		}
 
-		if old := o.writerPool.remove(partitionID); old != nil {
+		if old := o.writerPool.remove(partitionID, nil); old != nil {
 			writersToClose = append(writersToClose, old)
 		}
 	})

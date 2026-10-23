@@ -89,7 +89,7 @@ func newPoolForTest(t *testing.T, factory *poolMockFactory) (*partitionWriterPoo
 		bg,
 		&seqNoCounter{},
 		func(partitionID, seqNo int64) {},
-		func(partitionID int64) {},
+		func(partitionID int64, reason error) {},
 		func() {},
 		func(err error) {},
 	)
@@ -195,6 +195,20 @@ func TestPartitionWriterPool_GetReturnsFromIdleAfterEvict(t *testing.T) {
 	require.Equal(t, 1, factory.createCalls)
 }
 
+func TestPartitionWriterPool_RemoveKeepsReplacement(t *testing.T) {
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+	old, err := pool.get(1, true)
+	require.NoError(t, err)
+	replacement, err := pool.get(1, false)
+	require.NoError(t, err)
+	require.Nil(t, pool.remove(1, old))
+	current, err := pool.get(1, false)
+	require.NoError(t, err)
+	require.Same(t, replacement, current)
+}
+
 func TestPartitionWriterPool_CloseAllClosesAllWriters(t *testing.T) {
 	t.Parallel()
 
@@ -272,7 +286,7 @@ func TestPartitionWriterPool_ReplacingWriterDoesNotBlockOtherPartitions(t *testi
 	pool := newPartitionWriterPool(ctx, &MultiWriterConfig{
 		ProducerIDPrefix: "test-prefix", WriterIdleTimeout: defaultWriterIdleTimeout, writersFactory: factory,
 	}, &topicwriterinternal.WriterReconnectorConfig{}, bg, &seqNoCounter{},
-		func(int64, int64) {}, func(int64) {}, func() {}, func(error) {})
+		func(int64, int64) {}, func(int64, error) {}, func() {}, func(error) {})
 	_, err := pool.get(1, true)
 	require.NoError(t, err)
 
@@ -310,7 +324,7 @@ func TestPartitionWriterPool_CloseWaitsForWriterReplacement(t *testing.T) {
 	pool := newPartitionWriterPool(ctx, &MultiWriterConfig{
 		ProducerIDPrefix: "test-prefix", WriterIdleTimeout: defaultWriterIdleTimeout, writersFactory: factory,
 	}, &topicwriterinternal.WriterReconnectorConfig{}, bg, &seqNoCounter{},
-		func(int64, int64) {}, func(int64) {}, func() {}, func(error) {})
+		func(int64, int64) {}, func(int64, error) {}, func() {}, func(error) {})
 	_, err := pool.get(1, true)
 	require.NoError(t, err)
 
