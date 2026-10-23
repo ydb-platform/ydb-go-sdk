@@ -106,7 +106,7 @@ func TestOrchestratorCancelledInitKeepsQueuedSession(t *testing.T) {
 	}}
 	w, _, ctx := newMultiWriterForSplitRace(t, factory, WithWriterIdleTimeout(time.Nanosecond))
 	t.Cleanup(func() { close(factory.writer.release) })
-	wr, err := w.orchestrator.writerPool.get(0, true)
+	wr, err := w.orchestrator.writerPool.get(0)
 	require.NoError(t, err)
 	<-factory.writer.started
 	require.NoError(t, w.orchestrator.buf.acquireMessage(ctx))
@@ -120,9 +120,90 @@ func TestOrchestratorCancelledInitKeepsQueuedSession(t *testing.T) {
 	cancel()
 	require.ErrorIs(t, w.orchestrator.waitWriterInit(writeCtx, 0, wr), context.Canceled)
 	require.Zero(t, w.orchestrator.writerPool.idle.getWritersCount(), "queued messages still need the session")
-	current, err := w.orchestrator.writerPool.get(0, true)
+	current, err := w.orchestrator.writerPool.get(0)
 	require.NoError(t, err)
 	require.Same(t, wr, current)
+}
+
+func TestMultiWriterCloseDuringSplit(t *testing.T) {
+	for _, stage := range []string{"parent_close", "probe"} {
+		for _, expired := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/expired=%t", stage, expired), func(t *testing.T) {
+				parent := &splitCloseWriter{
+					started: make(chan struct{}), release: make(chan struct{}), closed: make(chan struct{}),
+				}
+				probe := &splitBaselineProbe{started: make(chan struct{}), release: make(chan struct{})}
+				probeWriter := &splitCloseWriter{
+					writer: probe, started: make(chan struct{}), release: make(chan struct{}), closed: make(chan struct{}),
+				}
+				close(probeWriter.release)
+				started := parent.started
+				if stage == "probe" {
+					close(parent.release)
+					started = probe.started
+				}
+				factory := &splitCloseFactory{parent: parent, probe: probeWriter}
+				w, _, ctx := newMultiWriterForSplitRaceWithDescriber(t, factory, splitRaceDescriber())
+				writeDone := make(chan error, 1)
+				go func() { writeDone <- w.Write(ctx, cancellationTestMessage()) }()
+				<-started
+				closeCtx := ctx
+				if expired {
+					var cancel context.CancelFunc
+					closeCtx, cancel = context.WithDeadline(ctx, time.Now().Add(-time.Second))
+					defer cancel()
+				}
+				err := w.Close(closeCtx)
+				if expired {
+					require.ErrorIs(t, err, context.DeadlineExceeded)
+				} else {
+					require.NoError(t, err)
+				}
+				require.Error(t, <-writeDone)
+				<-parent.closed
+				require.EqualValues(t, 1, parent.closeCalls.Load())
+				if stage == "probe" {
+					<-probeWriter.closed
+					require.EqualValues(t, 1, probeWriter.closeCalls.Load())
+				}
+			})
+		}
+	}
+}
+
+func TestMultiWriterClosingSplitParentDoesNotBlockOtherPartitions(t *testing.T) {
+	parent := &splitCloseWriter{
+		started: make(chan struct{}), release: make(chan struct{}), closed: make(chan struct{}),
+	}
+	probe := &splitBaselineProbe{started: make(chan struct{}), release: make(chan struct{})}
+	close(probe.release)
+	probeWriter := &splitCloseWriter{
+		writer: probe, started: make(chan struct{}), release: make(chan struct{}), closed: make(chan struct{}),
+	}
+	close(probeWriter.release)
+	child := &orderedSeqWriter{writes: make(chan int64, 1)}
+	other := &orderedSeqWriter{writes: make(chan int64, 1)}
+	factory := &splitCloseFactory{
+		overloadedSplitFactory: overloadedSplitFactory{child: child},
+		parent:                 parent, probe: probeWriter, other: other,
+	}
+	w, _, ctx := newMultiWriterForSplitRaceWithDescriber(t, factory, splitRaceDescriber())
+	release := sync.OnceFunc(func() { close(parent.release) })
+	t.Cleanup(release)
+	writeDone := make(chan error, 1)
+	go func() { writeDone <- w.Write(ctx, cancellationTestMessage()) }()
+	<-parent.started
+
+	msg := cancellationTestMessage()
+	msg[0].Key = "z"
+	require.NoError(t, w.Write(ctx, msg))
+	require.Equal(t, int64(1), <-other.writes)
+	release()
+	require.NoError(t, <-writeDone)
+	require.Equal(t, int64(101), <-child.writes)
+	require.True(t, probe.closed.Load())
+	require.NoError(t, w.Flush(ctx))
+	require.NoError(t, w.Close(ctx))
 }
 
 func testCancelledWriteWithOtherWaiter(t *testing.T, cancelOther bool) {
@@ -265,4 +346,57 @@ func (ctx *notifyingDoneContext) Done() <-chan struct{} {
 	}
 
 	return ctx.Context.Done()
+}
+
+type splitCloseWriter struct {
+	writer
+
+	started    chan struct{}
+	release    chan struct{}
+	closed     chan struct{}
+	closeCalls atomic.Int32
+	once       sync.Once
+}
+
+func (w *splitCloseWriter) Close(ctx context.Context) error {
+	w.closeCalls.Add(1)
+	w.once.Do(func() {
+		close(w.started)
+		select {
+		case <-w.release:
+		case <-ctx.Done():
+		}
+		_ = w.writer.Close(ctx)
+		close(w.closed)
+	})
+
+	return nil
+}
+
+type splitCloseFactory struct {
+	overloadedSplitFactory
+
+	parent *splitCloseWriter
+	probe  *splitCloseWriter
+	other  *orderedSeqWriter
+}
+
+func (f *splitCloseFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	partitionID, direct := cfg.PartitionID()
+	if !direct {
+		return f.probe, nil
+	}
+	if partitionID == 0 {
+		parent, err := f.overloadedSplitFactory.Create(cfg)
+		f.parent.writer = parent
+
+		return f.parent, err
+	}
+	if partitionID == 1 {
+		f.other.onAckReceivedCallback = cfg.OnAckReceivedCallback
+
+		return f.other, nil
+	}
+
+	return f.overloadedSplitFactory.Create(cfg)
 }

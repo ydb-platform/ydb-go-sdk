@@ -47,7 +47,6 @@ type writerWrapper struct {
 	initDone    atomic.Bool
 	initDoneCh  chan struct{}
 	initErr     atomic.Value
-	direct      bool
 	initWaiters int // Guarded by orchestrator.mu.
 }
 

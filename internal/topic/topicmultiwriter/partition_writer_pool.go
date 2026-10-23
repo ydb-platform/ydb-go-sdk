@@ -18,10 +18,9 @@ type partitionWriterPool struct {
 	bg        *background.Worker
 	maxSeqNo  *seqNoCounter
 
-	mu        xsync.Mutex
-	writers   map[int64]*writerWrapper
-	replacing map[int64]chan struct{}
-	idle      *idleWriterManager
+	mu      xsync.Mutex
+	writers map[int64]*writerWrapper
+	idle    *idleWriterManager
 
 	ackCallback            func(partitionID int64, seqNo int64)
 	partitionSplitCallback func(partitionID int64, reason error)
@@ -51,7 +50,6 @@ func newPartitionWriterPool(
 		onWriterInit:           onWriterInit,
 		onError:                onError,
 		writers:                make(map[int64]*writerWrapper),
-		replacing:              make(map[int64]chan struct{}),
 		idle:                   newIdleWriterManager(ctx, cfg.WriterIdleTimeout),
 	}
 
@@ -121,108 +119,31 @@ func (p *partitionWriterPool) createDirectWriter(partitionID int64) (writer, err
 	return wr, nil
 }
 
-func (p *partitionWriterPool) createNonDirectWriter(partitionID int64) (writer, error) {
-	writerCfg := *p.writerCfg
-	writerCfg.MultiMode = true
-	topicwriterinternal.WithProducerID(p.getProducerID(partitionID))(&writerCfg)
-	writer, err := p.cfg.writersFactory.Create(writerCfg)
+func (p *partitionWriterPool) get(partitionID int64) (*writerWrapper, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	return writer, err
-}
-
-//nolint:funlen
-func (p *partitionWriterPool) get(partitionID int64, direct bool) (*writerWrapper, error) {
-	for {
-		var (
-			result   *writerWrapper
-			err      error
-			old      writer
-			wait     <-chan struct{}
-			finished chan struct{}
-		)
-		p.mu.WithLock(func() {
-			if err = p.ctx.Err(); err != nil {
-				return
-			}
-			if wait = p.replacing[partitionID]; wait != nil {
-				return
-			}
-
-			if existing := p.writers[partitionID]; existing != nil {
-				if existing.direct == direct {
-					result = existing
-
-					return
-				}
-				delete(p.writers, partitionID)
-				old = existing
-			} else if idle, ok := p.idle.getWriterIfExists(partitionID); ok {
-				if idle.direct == direct {
-					p.writers[partitionID] = idle
-					result = idle
-
-					return
-				}
-				old = idle
-			}
-			if old == nil {
-				result, err = p.createNewWriter(partitionID, direct)
-
-				return
-			}
-			finished = make(chan struct{})
-			p.replacing[partitionID] = finished
-		})
-		if wait != nil {
-			select {
-			case <-wait:
-				continue
-			case <-p.ctx.Done():
-				return nil, p.ctx.Err()
-			}
-		}
-		if old != nil {
-			_ = old.Close(p.ctx)
-			p.mu.WithLock(func() {
-				if err = p.ctx.Err(); err == nil {
-					result, err = p.createNewWriter(partitionID, direct)
-				}
-				delete(p.replacing, partitionID)
-				close(finished)
-			})
-		}
-
-		return result, err
+	if err := p.ctx.Err(); err != nil {
+		return nil, err
 	}
-}
+	if existing := p.writers[partitionID]; existing != nil {
+		return existing, nil
+	}
+	if idle, ok := p.idle.getWriterIfExists(partitionID); ok {
+		p.writers[partitionID] = idle
 
-func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*writerWrapper, error) {
-	var (
-		wr  writer
-		err error
-	)
-
-	if direct {
-		wr, err = p.createDirectWriter(partitionID)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		wr, err = p.createNonDirectWriter(partitionID)
-		if err != nil {
-			return nil, err
-		}
+		return idle, nil
 	}
 
+	wr, err := p.createDirectWriter(partitionID)
+	if err != nil {
+		return nil, err
+	}
 	wrapper := &writerWrapper{
 		writer:     wr,
-		direct:     direct,
 		initDoneCh: make(chan struct{}),
 	}
 	p.writers[partitionID] = wrapper
-	if !direct {
-		return wrapper, nil
-	}
 
 	p.bg.Start(fmt.Sprintf("writer-init-%d", partitionID), func(ctx context.Context) {
 		info, err := wr.WaitInitInfo(ctx)
@@ -240,28 +161,35 @@ func (p *partitionWriterPool) createNewWriter(partitionID int64, direct bool) (*
 }
 
 func (p *partitionWriterPool) evict(partitionID int64) {
-	if old := p.remove(partitionID, nil); old != nil {
-		_ = old.Close(p.ctx)
-	}
+	p.remove(partitionID, nil)
 }
 
-func (p *partitionWriterPool) remove(partitionID int64, expected *writerWrapper) writer {
-	var toClose writer
-	p.mu.WithLock(func() {
-		w := p.writers[partitionID]
-		if w == nil || (expected != nil && w != expected) {
-			return
-		}
-		delete(p.writers, partitionID)
-		if w.direct {
-			p.idle.addWriter(partitionID, w)
-			p.idle.wakeup()
-		} else {
-			toClose = w
-		}
-	})
+func (p *partitionWriterPool) remove(partitionID int64, expected *writerWrapper) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	return toClose
+	w := p.writers[partitionID]
+	if w == nil || (expected != nil && w != expected) {
+		return
+	}
+	delete(p.writers, partitionID)
+	p.idle.addWriter(partitionID, w)
+	p.idle.wakeup()
+}
+
+// detach transfers ownership of the partition session to the split handler.
+func (p *partitionWriterPool) detach(partitionID int64) *writerWrapper {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if w := p.writers[partitionID]; w != nil {
+		delete(p.writers, partitionID)
+
+		return w
+	}
+	w, _ := p.idle.getWriterIfExists(partitionID)
+
+	return w
 }
 
 func (p *partitionWriterPool) discard(partitionID int64, failed *writerWrapper) {
@@ -280,24 +208,6 @@ func (p *partitionWriterPool) discard(partitionID int64, failed *writerWrapper) 
 
 func (p *partitionWriterPool) close(ctx context.Context) error {
 	var writersToClose []writer
-	for {
-		var replacing []<-chan struct{}
-		p.mu.WithLock(func() {
-			for _, ch := range p.replacing {
-				replacing = append(replacing, ch)
-			}
-		})
-		if len(replacing) == 0 {
-			break
-		}
-		for _, ch := range replacing {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-ch:
-			}
-		}
-	}
 
 	p.mu.WithLock(func() {
 		writersToClose = make([]writer, 0, len(p.writers))

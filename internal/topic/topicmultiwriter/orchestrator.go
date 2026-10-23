@@ -304,8 +304,8 @@ func (o *orchestrator) waitAutoSeqNoWriter(ctx context.Context, msg *message) er
 			seqNoReady <-chan struct{}
 			err        error
 		)
-		// A split uses a non-direct writer for the old partition. Do not replace it
-		// with a direct writer while it is reading the last SeqNo.
+		// Route away from split parents and wait for their SeqNo baseline before
+		// opening a child session.
 		o.mu.WithLock(func() {
 			if partition := o.partitions[msg.PartitionID]; partition != nil && partition.Splitted() {
 				err = o.rechoosePartition(msg)
@@ -315,7 +315,7 @@ func (o *orchestrator) waitAutoSeqNoWriter(ctx context.Context, msg *message) er
 					seqNoReady = partition.seqNoReady
 				}
 				if seqNoReady == nil {
-					writer, err = o.writerPool.get(msg.PartitionID, true)
+					writer, err = o.writerPool.get(msg.PartitionID)
 					if err == nil {
 						writer.initWaiters++
 					}
@@ -664,18 +664,11 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		return resultErr
 	}
 
-	// Each partition has its own ProducerID. An ancestor's SeqNo cannot
-	// acknowledge a message sent to this partition after a process restart.
-	probe, err := o.writerPool.get(partitionID, false)
+	lastSeqNo, err := o.probePartitionSeqNo(partitionID)
 	if err != nil {
 		return err
 	}
-	info, err := probe.WaitInitInfo(o.ctx)
-	if err != nil {
-		return err
-	}
-	o.currentSeqNo.advance(info.LastSeqNum)
-	var writersToClose []writer
+	o.currentSeqNo.advance(lastSeqNo)
 	o.mu.WithLock(func() {
 		partition := o.partitions[partitionID]
 		if partition == nil {
@@ -684,7 +677,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 			return
 		}
 
-		err = o.scheduleResendMessages(partitionID, info.LastSeqNum)
+		err = o.scheduleResendMessages(partitionID, lastSeqNo)
 		if err != nil {
 			resultErr = err
 
@@ -698,16 +691,35 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 			close(childPartition.seqNoReady)
 			childPartition.seqNoReady = nil
 		}
-
-		if old := o.writerPool.remove(partitionID, nil); old != nil {
-			writersToClose = append(writersToClose, old)
-		}
 	})
-	for _, old := range writersToClose {
-		_ = old.Close(o.ctx)
-	}
 
 	return resultErr
+}
+
+// probePartitionSeqNo owns the retired session and the temporary probe. The
+// existing split worker completes their cleanup before it exits during shutdown.
+func (o *orchestrator) probePartitionSeqNo(partitionID int64) (int64, error) {
+	if old := o.writerPool.detach(partitionID); old != nil {
+		_ = old.Close(o.ctx)
+	}
+	if err := o.ctx.Err(); err != nil {
+		return 0, err
+	}
+
+	// Each partition has its own ProducerID. An ancestor's SeqNo cannot
+	// acknowledge a message sent to this partition after a process restart.
+	cfg := *o.writerCfg
+	cfg.MultiMode = true
+	topicwriterinternal.WithProducerID(o.writerPool.getProducerID(partitionID))(&cfg)
+	probe, err := o.multiWriterCfg.writersFactory.Create(cfg)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = probe.Close(o.ctx) }()
+
+	info, err := probe.WaitInitInfo(o.ctx)
+
+	return info.LastSeqNum, err
 }
 
 func (o *orchestrator) getResultErr() error {

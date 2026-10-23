@@ -3,10 +3,8 @@ package topicmultiwriter
 import (
 	"context"
 	"errors"
-	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -105,7 +103,7 @@ func TestSenderStepReturnsNonOverloadedWriterInitError(t *testing.T) {
 
 	initErr := errors.New("writer init failed")
 	testWriter := &poolTestWriter{}
-	wrapper := &writerWrapper{writer: testWriter, direct: true}
+	wrapper := &writerWrapper{writer: testWriter}
 	wrapper.setInitErr(initErr)
 	wrapper.initDone.Store(true)
 
@@ -150,7 +148,7 @@ func TestPartitionWriterPool_CreateDirectWriterSeedsDirectWritePartition(t *test
 
 	pool.cfg.DirectWrite = true
 
-	_, err := pool.get(7, true)
+	_, err := pool.get(7)
 	require.NoError(t, err)
 	require.Equal(t, []int64{7}, factory.partitionIDs)
 }
@@ -162,14 +160,14 @@ func TestPartitionWriterPool_GetCreatesWriterAndReturnsSameOnSecondGet(t *testin
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	w1, err := pool.get(1, true)
+	w1, err := pool.get(1)
 	require.NoError(t, err)
 	require.NotNil(t, w1)
 	require.Equal(t, 1, factory.createCalls)
 	require.Equal(t, []int64{1}, factory.partitionIDs)
 	require.Equal(t, []string{"test-prefix-1"}, factory.producerIDs)
 
-	w2, err := pool.get(1, true)
+	w2, err := pool.get(1)
 	require.NoError(t, err)
 	require.Same(t, w1, w2)
 	require.Equal(t, 1, factory.createCalls)
@@ -182,14 +180,14 @@ func TestPartitionWriterPool_GetReturnsFromIdleAfterEvict(t *testing.T) {
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	w1, err := pool.get(1, true)
+	w1, err := pool.get(1)
 	require.NoError(t, err)
 	require.NotNil(t, w1)
 	require.Equal(t, 1, factory.createCalls)
 
 	pool.evict(1)
 
-	w2, err := pool.get(1, true)
+	w2, err := pool.get(1)
 	require.NoError(t, err)
 	require.Same(t, w1, w2)
 	require.Equal(t, 1, factory.createCalls)
@@ -199,12 +197,14 @@ func TestPartitionWriterPool_RemoveKeepsReplacement(t *testing.T) {
 	factory := &poolMockFactory{}
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
-	old, err := pool.get(1, true)
+	old, err := pool.get(1)
 	require.NoError(t, err)
-	replacement, err := pool.get(1, false)
+	pool.discard(1, old)
+	replacement, err := pool.get(1)
 	require.NoError(t, err)
-	require.Nil(t, pool.remove(1, old))
-	current, err := pool.get(1, false)
+	pool.remove(1, old)
+	require.Zero(t, pool.idle.getWritersCount())
+	current, err := pool.get(1)
 	require.NoError(t, err)
 	require.Same(t, replacement, current)
 }
@@ -216,9 +216,9 @@ func TestPartitionWriterPool_CloseAllClosesAllWriters(t *testing.T) {
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	_, err := pool.get(1, true)
+	_, err := pool.get(1)
 	require.NoError(t, err)
-	_, err = pool.get(2, true)
+	_, err = pool.get(2)
 	require.NoError(t, err)
 	require.Len(t, factory.writers, 2)
 
@@ -236,7 +236,7 @@ func TestPartitionWriterPool_CloseAllClosesIdleWriters(t *testing.T) {
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	_, err := pool.get(1, true)
+	_, err := pool.get(1)
 	require.NoError(t, err)
 	require.Len(t, factory.writers, 1)
 
@@ -256,7 +256,7 @@ func TestPartitionWriterPool_GetProducerIDFormat(t *testing.T) {
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	_, err := pool.get(5, true)
+	_, err := pool.get(5)
 	require.NoError(t, err)
 	require.Equal(t, []string{"test-prefix-5"}, factory.producerIDs)
 	require.Equal(t, []int64{5}, factory.partitionIDs)
@@ -271,111 +271,30 @@ func TestPartitionWriterPool_GetReturnsErrorWhenCreateFails(t *testing.T) {
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	w, err := pool.get(1, true)
+	w, err := pool.get(1)
 	require.ErrorIs(t, err, errCreate)
 	require.Nil(t, w)
 	require.Equal(t, 1, factory.createCalls)
 }
 
-func TestPartitionWriterPool_ReplacingWriterDoesNotBlockOtherPartitions(t *testing.T) {
-	old := &blockingCloseWriter{started: make(chan struct{}), release: make(chan struct{})}
-	factory := &blockingCloseFactory{old: old}
-	ctx, cancel := context.WithCancel(xtest.Context(t))
-	defer cancel()
-	bg := background.NewWorker(ctx, "pool-test")
-	pool := newPartitionWriterPool(ctx, &MultiWriterConfig{
-		ProducerIDPrefix: "test-prefix", WriterIdleTimeout: defaultWriterIdleTimeout, writersFactory: factory,
-	}, &topicwriterinternal.WriterReconnectorConfig{}, bg, &seqNoCounter{},
-		func(int64, int64) {}, func(int64, error) {}, func() {}, func(error) {})
-	_, err := pool.get(1, true)
-	require.NoError(t, err)
+func TestPartitionWriterPool_DetachTransfersOwnership(t *testing.T) {
+	for _, state := range []string{"active", "idle"} {
+		t.Run(state, func(t *testing.T) {
+			factory := &poolMockFactory{}
+			pool, cancel := newPoolForTest(t, factory)
+			defer cancel()
+			w, err := pool.get(1)
+			require.NoError(t, err)
+			if state == "idle" {
+				pool.evict(1)
+			}
 
-	replaced := make(chan error, 1)
-	go func() {
-		_, err := pool.get(1, false)
-		replaced <- err
-	}()
-	<-old.started
-	release := sync.OnceFunc(func() { close(old.release) })
-	defer release()
-
-	other := make(chan error, 1)
-	go func() {
-		_, err := pool.get(2, true)
-		other <- err
-	}()
-	select {
-	case err := <-other:
-		require.NoError(t, err)
-	case <-time.After(time.Second):
-		t.Fatal("closing partition 1 blocked partition 2")
+			require.Same(t, w, pool.detach(1))
+			require.Zero(t, pool.getWritersCount())
+			require.Nil(t, pool.detach(1))
+			require.NoError(t, pool.close(xtest.Context(t)))
+			require.False(t, factory.writers[0].closed.Load(), "the detached writer belongs to the caller")
+			require.NoError(t, w.Close(xtest.Context(t)))
+		})
 	}
-	release()
-	require.NoError(t, <-replaced)
-}
-
-func TestPartitionWriterPool_CloseWaitsForWriterReplacement(t *testing.T) {
-	old := &blockingCloseWriter{started: make(chan struct{}), release: make(chan struct{})}
-	replacement := &poolTestWriter{}
-	factory := &blockingCloseFactory{old: old, replacement: replacement}
-	ctx, cancel := context.WithCancel(xtest.Context(t))
-	defer cancel()
-	bg := background.NewWorker(ctx, "pool-test")
-	pool := newPartitionWriterPool(ctx, &MultiWriterConfig{
-		ProducerIDPrefix: "test-prefix", WriterIdleTimeout: defaultWriterIdleTimeout, writersFactory: factory,
-	}, &topicwriterinternal.WriterReconnectorConfig{}, bg, &seqNoCounter{},
-		func(int64, int64) {}, func(int64, error) {}, func() {}, func(error) {})
-	_, err := pool.get(1, true)
-	require.NoError(t, err)
-
-	replaced := make(chan error, 1)
-	go func() {
-		_, err := pool.get(1, false)
-		replaced <- err
-	}()
-	<-old.started
-	release := sync.OnceFunc(func() { close(old.release) })
-	defer release()
-
-	closed := make(chan error, 1)
-	go func() { closed <- pool.close(ctx) }()
-	select {
-	case err := <-closed:
-		t.Fatalf("pool close returned before replacement completed: %v", err)
-	case <-time.After(50 * time.Millisecond):
-	}
-
-	release()
-	require.NoError(t, <-replaced)
-	require.NoError(t, <-closed)
-	require.True(t, replacement.closed.Load(), "replacement writer must be closed")
-}
-
-type blockingCloseWriter struct {
-	poolTestWriter
-
-	started chan struct{}
-	release chan struct{}
-}
-
-func (w *blockingCloseWriter) Close(context.Context) error {
-	close(w.started)
-	<-w.release
-
-	return nil
-}
-
-type blockingCloseFactory struct {
-	old         *blockingCloseWriter
-	replacement *poolTestWriter
-}
-
-func (f *blockingCloseFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
-	if partitionID, direct := cfg.PartitionID(); partitionID == 1 && direct {
-		return f.old, nil
-	} else if !direct && cfg.ProducerID() == "test-prefix-1" && f.replacement != nil {
-		return f.replacement, nil
-	}
-
-	return &poolTestWriter{}, nil
 }
