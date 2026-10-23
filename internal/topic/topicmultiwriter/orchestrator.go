@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -262,14 +261,12 @@ func (o *orchestrator) pushMessage(ctx context.Context, msg message) (err error)
 	return nil
 }
 
-func (o *orchestrator) assignSeqNoNeedLock(msg *message, autoSetSeqNo bool) (retry bool, err error) {
+func (o *orchestrator) assignSeqNoNeedLock(msg *message, autoSetSeqNo bool) (notReady bool, err error) {
 	if !autoSetSeqNo {
 		return false, o.reserveSeqNoNeedLock(msg.PartitionID, msg.SeqNo)
 	}
-	if partition := o.partitions[msg.PartitionID]; partition != nil && partition.Splitted() {
-		return true, nil
-	}
-	if partition := o.partitions[msg.PartitionID]; partition != nil && partition.seqNoReady != nil {
+	if partition := o.partitions[msg.PartitionID]; partition != nil &&
+		(partition.Splitted() || partition.seqNoReady != nil) {
 		return true, nil
 	}
 	msg.SeqNo = o.currentSeqNo.next()
@@ -440,36 +437,6 @@ func (o *orchestrator) onAckReceivedNeedLock(partitionID, seqNo int64) {
 	}
 }
 
-func (o *orchestrator) getSplittedPartitionAncestors(
-	describeResult *topictypes.TopicDescription,
-	partitionID int64,
-) []int64 {
-	partitionToParent := make(map[int64]int64)
-	for _, partition := range describeResult.Partitions {
-		if len(partition.ParentPartitionIDs) == 0 {
-			continue
-		}
-		partitionToParent[partition.PartitionID] = partition.ParentPartitionIDs[0]
-	}
-
-	var (
-		ancestors          = []int64{partitionID}
-		currentPartitionID = partitionID
-	)
-
-	for {
-		parentID, ok := partitionToParent[currentPartitionID]
-		if !ok {
-			break
-		}
-
-		ancestors = append(ancestors, parentID)
-		currentPartitionID = parentID
-	}
-
-	return ancestors
-}
-
 func (o *orchestrator) addNewPartitions(
 	parentPartition *PartitionInfo,
 	describeResult *topictypes.TopicDescription,
@@ -596,74 +563,6 @@ func (o *orchestrator) scheduleResendMessages(
 	return nil
 }
 
-//nolint:funlen
-func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err error) {
-	var errGroup errgroup.Group
-	errGroup.SetLimit(10)
-
-	for _, partition := range partitions {
-		errGroup.Go(func() (resultErr error) {
-			var (
-				partitionInfo      *PartitionInfo
-				seqNoAlreadyCached bool
-				splitted           bool
-			)
-			o.mu.WithLock(func() {
-				partitionInfo = o.partitions[partition]
-				if partitionInfo == nil {
-					return
-				}
-				seqNoAlreadyCached = partitionInfo.CachedMaxSeqNo != 0
-				maxSeqNo = max(maxSeqNo, partitionInfo.CachedMaxSeqNo)
-				splitted = partitionInfo.Splitted()
-			})
-			if partitionInfo == nil {
-				return fmt.Errorf("partition not found: %d", partition)
-			}
-			if seqNoAlreadyCached {
-				return nil
-			}
-
-			var writer *writerWrapper
-			if splitted {
-				writer, resultErr = o.writerPool.get(partition, false)
-				if resultErr != nil {
-					return resultErr
-				}
-			} else {
-				o.mu.WithLock(func() {
-					writer, resultErr = o.writerPool.get(partition, true)
-				})
-			}
-
-			if resultErr != nil {
-				return resultErr
-			}
-
-			initInfo, err := writer.WaitInitInfo(o.ctx)
-			if err != nil {
-				return err
-			}
-
-			o.mu.WithLock(func() {
-				maxSeqNo = max(maxSeqNo, initInfo.LastSeqNum)
-				partitionInfo.CachedMaxSeqNo = initInfo.LastSeqNum
-			})
-			if splitted {
-				o.currentSeqNo.advance(initInfo.LastSeqNum)
-			}
-
-			return nil
-		})
-	}
-
-	if err := errGroup.Wait(); err != nil {
-		return 0, err
-	}
-
-	return maxSeqNo, nil
-}
-
 func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topictypes.TopicDescription, error) {
 	const (
 		maxRetries = 5
@@ -728,11 +627,17 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		return resultErr
 	}
 
-	ancestors := o.getSplittedPartitionAncestors(&describeResult, partitionID)
-	maxSeqNo, err := o.getMaxSeqNo(ancestors)
+	// Each partition has its own ProducerID. An ancestor's SeqNo cannot
+	// acknowledge a message sent to this partition after a process restart.
+	probe, err := o.writerPool.get(partitionID, false)
 	if err != nil {
 		return err
 	}
+	info, err := probe.WaitInitInfo(o.ctx)
+	if err != nil {
+		return err
+	}
+	o.currentSeqNo.advance(info.LastSeqNum)
 	var writersToClose []writer
 	o.mu.WithLock(func() {
 		partition := o.partitions[partitionID]
@@ -742,7 +647,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 			return
 		}
 
-		err = o.scheduleResendMessages(partitionID, maxSeqNo)
+		err = o.scheduleResendMessages(partitionID, info.LastSeqNum)
 		if err != nil {
 			resultErr = err
 
@@ -757,10 +662,8 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 			childPartition.seqNoReady = nil
 		}
 
-		for _, ancestor := range ancestors {
-			if old := o.writerPool.remove(ancestor); old != nil {
-				writersToClose = append(writersToClose, old)
-			}
+		if old := o.writerPool.remove(partitionID); old != nil {
+			writersToClose = append(writersToClose, old)
 		}
 	})
 	for _, old := range writersToClose {

@@ -18,7 +18,6 @@ type PartitionInfo struct {
 
 	Locked          bool
 	PendingResend   int
-	CachedMaxSeqNo  int64
 	LastQueuedSeqNo int64
 	seqNoReady      chan struct{}
 }

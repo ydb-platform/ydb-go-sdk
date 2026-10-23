@@ -12,14 +12,115 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/partitionchooser"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter/stubs"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
+
+func TestMultiWriterResendsAfterRestartWithSplitAncestor(t *testing.T) {
+	factory := &restartSplitFactory{
+		parent: &splitBeforeAckWriter{writes: make(chan int64, 1)},
+		child:  &orderedSeqWriter{writes: make(chan int64, 1)},
+	}
+	var describes atomic.Int32
+	w, _, ctx := newMultiWriterForSplitRaceWithDescriber(t, factory, func(context.Context, string) (
+		topictypes.TopicDescription, error,
+	) {
+		desc := splitTopicDescription()
+		if describes.Add(1) > 1 {
+			desc.Partitions[1].ChildPartitionIDs = []int64{4, 5}
+			desc.Partitions = append(desc.Partitions,
+				topictypes.PartitionInfo{PartitionID: 4, Active: true, ToBound: []byte("d"), ParentPartitionIDs: []int64{2}},
+				topictypes.PartitionInfo{
+					PartitionID: 5, Active: true, FromBound: []byte("d"), ToBound: []byte("g"), ParentPartitionIDs: []int64{2},
+				},
+			)
+		}
+
+		return desc, nil
+	})
+	require.Zero(t, w.getWritersCount(), "WaitInit must not open partition sessions")
+	require.NoError(t, w.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data: bytes.NewReader([]byte("message")), Key: "a",
+	}}))
+	require.Equal(t, int64(1), <-factory.parent.writes)
+
+	flushDone := make(chan error, 1)
+	go func() { flushDone <- w.Flush(ctx) }()
+	select {
+	case seqNo := <-factory.child.writes:
+		require.Equal(t, int64(1), seqNo, "resending must preserve the original SeqNo")
+		factory.childAck(seqNo)
+	case err := <-flushDone:
+		t.Fatalf("unacknowledged message was reported as acknowledged and dropped during split: %v", err)
+	}
+	require.NoError(t, <-flushDone)
+	require.NoError(t, w.Close(ctx))
+}
+
+func TestOrchestratorSplitUsesPartitionProducerSeqNo(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		lastSeqNo int64
+		wantAck   bool
+	}{
+		{name: "uncommitted message", lastSeqNo: 0, wantAck: false},
+		{name: "committed message with lost ack", lastSeqNo: 1, wantAck: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(xtest.Context(t))
+			defer cancel()
+			bg := background.NewWorker(ctx, "split test")
+			t.Cleanup(func() { _ = bg.Close(ctx, nil) })
+			chooser := partitionchooser.NewBoundPartitionChooser(partitionchooser.WithKeyHasher(func(key string) string {
+				return key
+			}))
+			desc := splitTopicDescription()
+			desc.Partitions[1].ChildPartitionIDs = []int64{4}
+			desc.Partitions = append(desc.Partitions, topictypes.PartitionInfo{
+				PartitionID: 4, Active: true, ToBound: []byte("g"), ParentPartitionIDs: []int64{2},
+			})
+			o := newOrchestrator(ctx, cancel, func(context.Context, string) (topictypes.TopicDescription, error) {
+				return desc, nil
+			}, bg, &topicwriterinternal.WriterReconnectorConfig{}, &MultiWriterConfig{
+				ProducerIDPrefix: "test-producer",
+				PartitionChooser: chooser,
+				writersFactory:   &restartSplitFactory{lastSeqNo: tc.lastSeqNo},
+			})
+			for _, p := range splitTopicDescription().Partitions {
+				o.partitions[p.PartitionID] = &PartitionInfo{PartitionInfo: p}
+			}
+			require.NoError(t, chooser.AddNewPartitions(o.partitions[2].PartitionInfo))
+			require.NoError(t, o.buf.acquireMessage(ctx))
+			acked := false
+			o.buf.pushNeedLock(message{
+				MessageWithDataContent: topicwritercommon.MessageWithDataContent{
+					PublicMessage: topicwritercommon.PublicMessage{PartitionID: 2, SeqNo: 1, Key: "a"},
+				},
+				onAckCallback: func() { acked = true },
+			})
+
+			require.NoError(t, o.onPartitionSplit(2))
+			require.Equal(t, tc.wantAck, acked)
+			if tc.wantAck {
+				require.Zero(t, o.buf.inFlightMessages.Len())
+			} else {
+				require.Equal(t, 1, o.buf.inFlightMessages.Len())
+				msg := o.buf.inFlightMessages.Front().Value
+				require.Equal(t, int64(4), msg.PartitionID)
+				require.Equal(t, int64(1), msg.SeqNo)
+				require.False(t, msg.ackReceived)
+				require.Equal(t, 1, o.buf.messagesToResendIndex[4].Len())
+			}
+		})
+	}
+}
 
 type lastSeqWritersFactory struct {
 	writers map[int64]*orderedSeqWriter
@@ -543,4 +644,49 @@ func TestMultiWriterRechoosesPartitionWhenOldSessionInitIsInterruptedBySplit(t *
 	require.NoError(t, <-writeDone)
 	require.False(t, probe.writer.(*poolTestWriter).closed.Load(), "the seqNo probe must stay open")
 	requireMessageOnPartitionTwo(t, w)
+}
+
+type splitBeforeAckWriter struct {
+	poolTestWriter
+
+	writes chan int64
+}
+
+func (w *splitBeforeAckWriter) WriteInternal(
+	_ context.Context,
+	messages []topicwritercommon.MessageWithDataContent,
+) error {
+	for _, msg := range messages {
+		w.writes <- msg.SeqNo
+	}
+
+	return xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
+}
+
+type restartSplitFactory struct {
+	parent    *splitBeforeAckWriter
+	child     *orderedSeqWriter
+	childAck  func(int64)
+	lastSeqNo int64
+}
+
+func (f *restartSplitFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
+	if partitionID, direct := cfg.PartitionID(); direct {
+		if partitionID == 2 {
+			return f.parent, nil
+		}
+		if partitionID == 4 {
+			f.childAck = cfg.OnAckReceivedCallback
+
+			return f.child, nil
+		}
+	}
+	if cfg.ProducerID() == "test-producer-0" {
+		return &orderedSeqWriter{lastSeqNo: 100}, nil
+	}
+	if cfg.ProducerID() == "test-producer-2" {
+		return &orderedSeqWriter{lastSeqNo: f.lastSeqNo}, nil
+	}
+
+	return &poolTestWriter{}, nil
 }
