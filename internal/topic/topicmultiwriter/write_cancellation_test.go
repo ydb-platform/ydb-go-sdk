@@ -24,13 +24,11 @@ func TestMultiWriterWriteCancellationDuringSplit(t *testing.T) {
 			var once sync.Once
 			var describes atomic.Int32
 			child := &orderedSeqWriter{writes: make(chan int64, 1)}
-			factory := &cancellationSplitFactory{
-				overloadedSplitFactory: overloadedSplitFactory{child: child, skipSplitCallback: true},
-			}
+			factory := &splitWritersFactory{child: child, skipSplitCallback: true}
 			if stage == "probe" {
 				factory.probe = &splitBaselineProbe{started: started, release: release}
 			}
-			w, _, ctx := newMultiWriterForSplitRaceWithDescriber(t, factory, func(ctx context.Context, _ string) (
+			w, ctx := newMultiWriterForSplitRaceWithDescriber(t, factory, func(ctx context.Context, _ string) (
 				topictypes.TopicDescription, error,
 			) {
 				if describes.Add(1) == 1 {
@@ -72,39 +70,61 @@ func TestMultiWriterWriteCancellationDuringSplit(t *testing.T) {
 	}
 }
 
-func TestMultiWriterCancelledFirstWriteClosesIdleSession(t *testing.T) {
-	factory := &cancellationInitFactory{writer: &cancellationInitWriter{
-		started: make(chan struct{}), release: make(chan struct{}), closed: make(chan struct{}),
-	}}
-	w, _, ctx := newMultiWriterForSplitRace(t, factory, WithWriterIdleTimeout(time.Nanosecond))
-	t.Cleanup(func() { close(factory.writer.release) })
-	writeCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	done := make(chan error, 1)
-	go func() { done <- w.Write(writeCtx, cancellationTestMessage()) }()
-	<-factory.writer.started
-	cancel()
-	require.ErrorIs(t, <-done, context.Canceled)
-	select {
-	case <-factory.writer.closed:
-	case <-time.After(time.Second):
-		t.Fatal("cancelled first write left a session open beyond its idle timeout")
-	}
-}
-
 func TestMultiWriterCancelledWriteKeepsSessionForOtherWaiter(t *testing.T) {
 	for _, cancelOther := range []bool{false, true} {
 		t.Run(fmt.Sprintf("cancel_other=%t", cancelOther), func(t *testing.T) {
-			testCancelledWriteWithOtherWaiter(t, cancelOther)
+			factory := &cancellationInitFactory{writer: newCancellationInitWriter()}
+			w, ctx := newMultiWriterForSplitRace(t, factory, WithWriterIdleTimeout(time.Nanosecond))
+			release := sync.OnceFunc(func() { close(factory.writer.release) })
+			t.Cleanup(release)
+			writeCtx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			firstDone := make(chan error, 1)
+			go func() { firstDone <- w.Write(writeCtx, cancellationTestMessage()) }()
+			<-factory.writer.started
+			otherCtx, cancelSecond := context.WithCancel(ctx)
+			defer cancelSecond()
+			secondCtx := &notifyingDoneContext{Context: otherCtx, observed: make(chan struct{}, 10)}
+			secondDone := make(chan error, 1)
+			go func() { secondDone <- w.Write(secondCtx, cancellationTestMessage()) }()
+			for {
+				<-secondCtx.observed
+				var bothWaiting bool
+				w.orchestrator.mu.WithLock(func() {
+					w.orchestrator.writerPool.mu.WithLock(func() {
+						bothWaiting = w.orchestrator.writerPool.writers[0].initWaiters == 2
+					})
+				})
+				if bothWaiting {
+					break
+				}
+			}
+			cancel()
+			require.ErrorIs(t, <-firstDone, context.Canceled)
+			require.Zero(t, w.orchestrator.writerPool.idle.getWritersCount(), "a waiting caller still needs the session")
+			if cancelOther {
+				cancelSecond()
+				require.ErrorIs(t, <-secondDone, context.Canceled)
+				select {
+				case <-factory.writer.closed:
+				case <-time.After(time.Second):
+					t.Fatal("session stayed open after its last waiting caller cancelled")
+				}
+
+				return
+			}
+			release()
+			require.NoError(t, <-secondDone)
+			require.Equal(t, int64(1), <-factory.writer.writes)
+			require.NoError(t, w.Flush(ctx))
+			require.NoError(t, w.Close(ctx))
 		})
 	}
 }
 
 func TestOrchestratorCancelledInitKeepsQueuedSession(t *testing.T) {
-	factory := &cancellationInitFactory{writer: &cancellationInitWriter{
-		started: make(chan struct{}), release: make(chan struct{}), closed: make(chan struct{}),
-	}}
-	w, _, ctx := newMultiWriterForSplitRace(t, factory, WithWriterIdleTimeout(time.Nanosecond))
+	factory := &cancellationInitFactory{writer: newCancellationInitWriter()}
+	w, ctx := newMultiWriterForSplitRace(t, factory, WithWriterIdleTimeout(time.Nanosecond))
 	t.Cleanup(func() { close(factory.writer.release) })
 	wr, err := w.orchestrator.writerPool.get(0)
 	require.NoError(t, err)
@@ -130,6 +150,7 @@ func TestMultiWriterCloseDuringSplit(t *testing.T) {
 		for _, expired := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/expired=%t", stage, expired), func(t *testing.T) {
 				parent := &splitCloseWriter{
+					writer:  &overloadedSplitWriter{},
 					started: make(chan struct{}), release: make(chan struct{}), closed: make(chan struct{}),
 				}
 				probe := &splitBaselineProbe{started: make(chan struct{}), release: make(chan struct{})}
@@ -142,8 +163,8 @@ func TestMultiWriterCloseDuringSplit(t *testing.T) {
 					close(parent.release)
 					started = probe.started
 				}
-				factory := &splitCloseFactory{parent: parent, probe: probeWriter}
-				w, _, ctx := newMultiWriterForSplitRaceWithDescriber(t, factory, splitRaceDescriber())
+				factory := &splitWritersFactory{parent: parent, probe: probeWriter}
+				w, ctx := newMultiWriterForSplitRaceWithDescriber(t, factory, splitRaceDescriber())
 				writeDone := make(chan error, 1)
 				go func() { writeDone <- w.Write(ctx, cancellationTestMessage()) }()
 				<-started
@@ -173,21 +194,15 @@ func TestMultiWriterCloseDuringSplit(t *testing.T) {
 
 func TestMultiWriterClosingSplitParentDoesNotBlockOtherPartitions(t *testing.T) {
 	parent := &splitCloseWriter{
+		writer:  &overloadedSplitWriter{},
 		started: make(chan struct{}), release: make(chan struct{}), closed: make(chan struct{}),
 	}
 	probe := &splitBaselineProbe{started: make(chan struct{}), release: make(chan struct{})}
 	close(probe.release)
-	probeWriter := &splitCloseWriter{
-		writer: probe, started: make(chan struct{}), release: make(chan struct{}), closed: make(chan struct{}),
-	}
-	close(probeWriter.release)
 	child := &orderedSeqWriter{writes: make(chan int64, 1)}
 	other := &orderedSeqWriter{writes: make(chan int64, 1)}
-	factory := &splitCloseFactory{
-		overloadedSplitFactory: overloadedSplitFactory{child: child},
-		parent:                 parent, probe: probeWriter, other: other,
-	}
-	w, _, ctx := newMultiWriterForSplitRaceWithDescriber(t, factory, splitRaceDescriber())
+	factory := &splitWritersFactory{parent: parent, probe: probe, child: child, other: other}
+	w, ctx := newMultiWriterForSplitRaceWithDescriber(t, factory, splitRaceDescriber())
 	release := sync.OnceFunc(func() { close(parent.release) })
 	t.Cleanup(release)
 	writeDone := make(chan error, 1)
@@ -206,85 +221,24 @@ func TestMultiWriterClosingSplitParentDoesNotBlockOtherPartitions(t *testing.T) 
 	require.NoError(t, w.Close(ctx))
 }
 
-func testCancelledWriteWithOtherWaiter(t *testing.T, cancelOther bool) {
-	t.Helper()
-	factory := &cancellationInitFactory{writer: &cancellationInitWriter{
-		started: make(chan struct{}), release: make(chan struct{}), closed: make(chan struct{}),
-		writes: make(chan int64, 1),
-	}}
-	w, _, ctx := newMultiWriterForSplitRace(t, factory, WithWriterIdleTimeout(time.Nanosecond))
-	release := sync.OnceFunc(func() { close(factory.writer.release) })
-	t.Cleanup(release)
-	writeCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	firstDone := make(chan error, 1)
-	go func() { firstDone <- w.Write(writeCtx, cancellationTestMessage()) }()
-	<-factory.writer.started
-	otherCtx, cancelSecond := context.WithCancel(ctx)
-	defer cancelSecond()
-	secondCtx := &notifyingDoneContext{Context: otherCtx, observed: make(chan struct{}, 10)}
-	secondDone := make(chan error, 1)
-	go func() { secondDone <- w.Write(secondCtx, cancellationTestMessage()) }()
-	for {
-		<-secondCtx.observed
-		var bothWaiting bool
-		w.orchestrator.mu.WithLock(func() {
-			w.orchestrator.writerPool.mu.WithLock(func() {
-				bothWaiting = w.orchestrator.writerPool.writers[0].initWaiters == 2
-			})
-		})
-		if bothWaiting {
-			break
-		}
-	}
-	cancel()
-	require.ErrorIs(t, <-firstDone, context.Canceled)
-	require.Zero(t, w.orchestrator.writerPool.idle.getWritersCount(), "a waiting caller still needs the session")
-	if cancelOther {
-		cancelSecond()
-		require.ErrorIs(t, <-secondDone, context.Canceled)
-		select {
-		case <-factory.writer.closed:
-		case <-time.After(time.Second):
-			t.Fatal("session stayed open after its last waiting caller cancelled")
-		}
-
-		return
-	}
-	release()
-	require.NoError(t, <-secondDone)
-	require.Equal(t, int64(1), <-factory.writer.writes)
-	require.NoError(t, w.Flush(ctx))
-	require.NoError(t, w.Close(ctx))
-}
-
 func cancellationTestMessage() []topicwriterinternal.PublicMessage {
 	return []topicwriterinternal.PublicMessage{{Data: bytes.NewReader([]byte("message")), Key: "a"}}
 }
 
-type cancellationSplitFactory struct {
-	overloadedSplitFactory
-
-	probe *splitBaselineProbe
-}
-
-func (f *cancellationSplitFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
-	if _, direct := cfg.PartitionID(); !direct && f.probe != nil {
-		return f.probe, nil
-	}
-
-	return f.overloadedSplitFactory.Create(cfg)
-}
-
 type cancellationInitWriter struct {
-	poolTestWriter
+	orderedSeqWriter
 
 	started chan struct{}
 	release chan struct{}
 	closed  chan struct{}
 	once    sync.Once
-	writes  chan int64
-	onAck   func(int64)
+}
+
+func newCancellationInitWriter() *cancellationInitWriter {
+	return &cancellationInitWriter{
+		orderedSeqWriter: orderedSeqWriter{writes: make(chan int64, 1)},
+		started:          make(chan struct{}), release: make(chan struct{}), closed: make(chan struct{}),
+	}
 }
 
 func (w *cancellationInitWriter) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
@@ -302,25 +256,19 @@ func (w *cancellationInitWriter) WaitInitInfo(ctx context.Context) (topicwriteri
 func (w *cancellationInitWriter) Close(ctx context.Context) error {
 	w.once.Do(func() { close(w.closed) })
 
-	return w.poolTestWriter.Close(ctx)
+	return nil
 }
 
 func (w *cancellationInitWriter) WriteInternal(
 	ctx context.Context,
-	messages []topicwritercommon.MessageWithDataContent,
+	msgs []topicwritercommon.MessageWithDataContent,
 ) error {
-	for _, msg := range messages {
-		select {
-		case <-w.closed:
-			return ErrAlreadyClosed
-		case <-ctx.Done():
-			return ctx.Err()
-		case w.writes <- msg.SeqNo:
-			w.onAck(msg.SeqNo)
-		}
+	select {
+	case <-w.closed:
+		return ErrAlreadyClosed
+	default:
+		return w.orderedSeqWriter.WriteInternal(ctx, msgs)
 	}
-
-	return nil
 }
 
 type cancellationInitFactory struct {
@@ -328,7 +276,7 @@ type cancellationInitFactory struct {
 }
 
 func (f *cancellationInitFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
-	f.writer.onAck = cfg.OnAckReceivedCallback
+	f.writer.onAckReceivedCallback = cfg.OnAckReceivedCallback
 
 	return f.writer, nil
 }
@@ -371,32 +319,4 @@ func (w *splitCloseWriter) Close(ctx context.Context) error {
 	})
 
 	return nil
-}
-
-type splitCloseFactory struct {
-	overloadedSplitFactory
-
-	parent *splitCloseWriter
-	probe  *splitCloseWriter
-	other  *orderedSeqWriter
-}
-
-func (f *splitCloseFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
-	partitionID, direct := cfg.PartitionID()
-	if !direct {
-		return f.probe, nil
-	}
-	if partitionID == 0 {
-		parent, err := f.overloadedSplitFactory.Create(cfg)
-		f.parent.writer = parent
-
-		return f.parent, err
-	}
-	if partitionID == 1 {
-		f.other.onAckReceivedCallback = cfg.OnAckReceivedCallback
-
-		return f.other, nil
-	}
-
-	return f.overloadedSplitFactory.Create(cfg)
 }
