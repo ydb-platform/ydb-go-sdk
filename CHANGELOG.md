@@ -1,3 +1,5 @@
+* Changed topic multi-writer initialization to improve startup performance for topics with many partitions
+
 ## v3.155.1
 * Fixed resource leaks after failed driver initialization and in nested `Driver.With` calls
 

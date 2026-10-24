@@ -2,6 +2,7 @@ package topicmultiwriter
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 )
@@ -10,7 +11,13 @@ type partitionSplitReceiver struct {
 	partitionSplitCallback func(partitionID int64) error
 	onError                func(err error)
 	wakeupChan             empty.Chan
-	partitionSplits        *guardedList[int64]
+	partitionSplits        *guardedList[partitionSplit]
+}
+
+type partitionSplit struct {
+	partitionID int64
+	reason      error
+	done        chan error
 }
 
 func newPartitionSplitReceiver(
@@ -20,7 +27,7 @@ func newPartitionSplitReceiver(
 	return &partitionSplitReceiver{
 		partitionSplitCallback: partitionSplitCallback,
 		wakeupChan:             make(empty.Chan, 1),
-		partitionSplits:        newGuardedList[int64](),
+		partitionSplits:        newGuardedList[partitionSplit](),
 		onError:                onError,
 	}
 }
@@ -34,19 +41,44 @@ func (p *partitionSplitReceiver) run(ctx context.Context) {
 		}
 
 		partitionSplits := p.partitionSplits.Consume()
-		for _, partitionID := range partitionSplits {
-			if err := p.partitionSplitCallback(partitionID); err != nil {
+		for _, split := range partitionSplits {
+			err := p.partitionSplitCallback(split.partitionID)
+			if err != nil {
+				err = fmt.Errorf("handle overloaded partition %d: %w: %w", split.partitionID, split.reason, err)
 				p.onError(err)
-
+			}
+			if split.done != nil {
+				split.done <- err
+			}
+			if err != nil {
 				return
 			}
 		}
 	}
 }
 
-func (p *partitionSplitReceiver) push(partitionID int64) {
-	p.partitionSplits.PushBack(partitionID)
+func (p *partitionSplitReceiver) push(partitionID int64, reason error) {
+	p.partitionSplits.PushBack(partitionSplit{partitionID: partitionID, reason: reason})
 	p.wakeup()
+}
+
+func (p *partitionSplitReceiver) wait(
+	ctx context.Context,
+	workerDone <-chan struct{},
+	partitionID int64,
+	reason error,
+) error {
+	done := make(chan error, 1)
+	p.partitionSplits.PushBack(partitionSplit{partitionID: partitionID, reason: reason, done: done})
+	p.wakeup()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-workerDone:
+		return ErrAlreadyClosed
+	case err := <-done:
+		return err
+	}
 }
 
 func (p *partitionSplitReceiver) wakeup() {
