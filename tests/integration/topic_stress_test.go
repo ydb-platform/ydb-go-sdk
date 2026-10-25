@@ -96,10 +96,12 @@ func stressTestInATopic(
 		var writer *topicwriter.Writer
 
 		defer func() {
-			closeErr := writer.Close(context.Background())
+			if writer != nil {
+				closeErr := writer.Close(context.Background())
 
-			if resErr == nil && closeErr != nil {
-				resErr = closeErr
+				if resErr == nil && closeErr != nil {
+					resErr = closeErr
+				}
 			}
 
 			wg.Done()
@@ -140,10 +142,12 @@ func stressTestInATopic(
 	readFromTopic := func(ctx context.Context, wg *sync.WaitGroup) (resErr error) {
 		var reader *topicreader.Reader
 		defer func() {
-			closeErr := reader.Close(context.Background())
+			if reader != nil {
+				closeErr := reader.Close(context.Background())
 
-			if resErr == nil && closeErr != nil {
-				resErr = closeErr
+				if resErr == nil && closeErr != nil {
+					resErr = closeErr
+				}
 			}
 
 			if ctx.Err() != nil && errors.Is(resErr, context.Canceled) {
@@ -204,7 +208,7 @@ func stressTestInATopic(
 	time.Sleep(testTime)
 	stopWrite.Store(true)
 
-	xtest.WaitGroup(t, &writersWG)
+	xtest.WaitGroupWithTimeout(t, &writersWG, time.Minute)
 
 	for i := 0; i < topicWriters; i++ {
 		err := <-writersErrors
@@ -226,7 +230,7 @@ func stressTestInATopic(
 	})
 
 	stopReader()
-	xtest.WaitGroup(t, &readersWG)
+	xtest.WaitGroupWithTimeout(t, &readersWG, time.Minute)
 
 	for i := 0; i < topicReaders; i++ {
 		err := <-readersError
