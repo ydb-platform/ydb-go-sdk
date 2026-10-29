@@ -15,11 +15,19 @@ import (
 var _ query.Row = (*Row)(nil)
 
 type Row struct {
+	data  *scanner.Data
+	part  *wirePart
+	index int
+}
+
+type rowWithData struct {
+	Row
+
 	data scanner.Data
 }
 
 func (r *Row) Values() []value.Value {
-	return r.data.Values()
+	return r.scannerData().Values()
 }
 
 func NewRow(columns []*Ydb.Column, v *Ydb.Value) *Row {
@@ -31,11 +39,27 @@ func newDecodedRow(columns []*Ydb.Column, values []value.Value) *Row {
 }
 
 func newRow(data *scanner.Data) *Row {
-	return &Row{data: *data}
+	r := &rowWithData{data: *data}
+	r.Row.data = &r.data
+
+	return &r.Row
+}
+
+func (r *Row) scannerData() *scanner.Data {
+	if r.data != nil {
+		return r.data
+	}
+
+	return scanner.NewDirectData(r.part.columns, r)
 }
 
 func (r *Row) Scan(dst ...any) error {
-	err := scanner.Indexed(&r.data).Scan(dst...)
+	var err error
+	if r.part != nil {
+		err = scanRowBytes(r, dst)
+	} else {
+		err = scanner.Indexed(r.data).Scan(dst...)
+	}
 	if err != nil {
 		return xerrors.WithStackTrace(
 			xerrors.WithStackTrace(err),
@@ -47,7 +71,7 @@ func (r *Row) Scan(dst ...any) error {
 }
 
 func (r *Row) ScanNamed(dst ...scanner.NamedDestination) error {
-	err := scanner.Named(&r.data).ScanNamed(dst...)
+	err := scanner.Named(r.scannerData()).ScanNamed(dst...)
 	if err != nil {
 		return xerrors.WithStackTrace(
 			xerrors.WithStackTrace(err),
@@ -59,7 +83,7 @@ func (r *Row) ScanNamed(dst ...scanner.NamedDestination) error {
 }
 
 func (r *Row) ScanStruct(dst any, opts ...scanner.ScanStructOption) error {
-	err := scanner.Struct(&r.data).ScanStruct(dst, opts...)
+	err := scanner.Struct(r.scannerData()).ScanStruct(dst, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(
 			xerrors.WithStackTrace(err),
