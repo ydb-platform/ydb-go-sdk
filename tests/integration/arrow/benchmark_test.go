@@ -5,7 +5,9 @@ package witharrow
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -65,27 +67,45 @@ func BenchmarkFormats(b *testing.B) {
 			sql := fmt.Sprintf(
 				"SELECT id,score,active,amount,name,payload FROM query_arrow_benchmark WHERE id < %d ORDER BY id;", size,
 			)
-			for _, variant := range []string{"Value", "QueryArrow", "WithResultFormatArrow"} {
+			count, expected, err := consumeRows(ctx, s, sql, nil)
+			if err != nil {
+				return err
+			}
+			if count != size {
+				return fmt.Errorf("fixture rows=%d, want %d", count, size)
+			}
+			b.Logf("rows=%d checksum=%016x", size, expected)
+			for _, variant := range []string{"Query", "QueryArrow", "WithResultFormatArrow"} {
 				b.Run(fmt.Sprintf("%d/%s", size, variant), func(b *testing.B) {
-					opts := []query.ExecuteOption{query.WithResponsePartLimitSizeBytes(32 << 10)}
-					if variant == "WithResultFormatArrow" {
-						opts = append(opts, arrowOption)
-					}
-					run := func() error { return consumeRows(ctx, s, sql, opts) }
-					if variant == "QueryArrow" {
-						run = func() error { return consumeArrow(ctx, s, sql, opts) }
+					run := func() (int, uint64, error) {
+						if variant == "QueryArrow" {
+							return consumeArrow(ctx, s, sql)
+						}
+						var opts []query.ExecuteOption
+						if variant == "WithResultFormatArrow" {
+							opts = append(opts, arrowOption)
+						}
+
+						return consumeRows(ctx, s, sql, opts)
 					}
 					for range 10 {
-						if err := run(); err != nil {
-							b.Fatal(err)
+						n, h, err := run()
+						if err != nil || n != size || h != expected {
+							b.Fatalf("warmup: rows=%d checksum=%016x err=%v", n, h, err)
 						}
 					}
 					b.ReportAllocs()
-					for b.Loop() {
-						if err := run(); err != nil {
-							b.Fatal(err)
+					b.ResetTimer()
+					startCPU := processCPU(b)
+					for i := 0; i < b.N; i++ {
+						n, h, err := run()
+						if err != nil || n != size || h != expected {
+							b.Fatalf("rows=%d checksum=%016x err=%v", n, h, err)
 						}
 					}
+					cpu := processCPU(b) - startCPU
+					b.StopTimer()
+					b.ReportMetric(float64(cpu.Nanoseconds())/float64(b.N), "cpu-ns/op")
 				})
 			}
 		}
@@ -97,12 +117,14 @@ func BenchmarkFormats(b *testing.B) {
 	}
 }
 
-func consumeRows(ctx context.Context, s query.Session, sql string, opts []query.ExecuteOption) error {
-	res, err := s.Query(ctx, sql, opts...)
+func consumeRows(ctx context.Context, s query.Session, sql string, opts []query.ExecuteOption) (int, uint64, error) {
+	res, err := s.Query(ctx, sql, append(opts, query.WithResponsePartLimitSizeBytes(32<<10))...)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	defer res.Close(ctx)
+	n := 0
+	hash := uint64(14695981039346656037)
 	var id uint64
 	var score *int32
 	var active *bool
@@ -112,35 +134,38 @@ func consumeRows(ctx context.Context, s query.Session, sql string, opts []query.
 	dst := []any{&id, &score, &active, &amount, &name, &payload}
 	for rs, err := range res.ResultSets(ctx) {
 		if err != nil {
-			return err
+			return 0, 0, err
 		}
 		for row, err := range rs.Rows(ctx) {
 			if err != nil {
-				return err
+				return 0, 0, err
 			}
 			if err := row.Scan(dst...); err != nil {
-				return err
+				return 0, 0, err
 			}
-			consumeValues(id, score, active, amount, name, payload)
+			hash = checksum(hash, id, score, active, amount, name, payload)
+			n++
 		}
 	}
 
-	return res.Close(ctx)
+	return n, hash, res.Close(ctx)
 }
 
-func consumeArrow(ctx context.Context, s query.Session, sql string, opts []query.ExecuteOption) error {
-	res, err := s.QueryArrow(ctx, sql, opts...)
+func consumeArrow(ctx context.Context, s query.Session, sql string) (int, uint64, error) {
+	res, err := s.QueryArrow(ctx, sql, query.WithResponsePartLimitSizeBytes(32<<10))
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	defer res.Close(ctx)
+	n := 0
+	hash := uint64(14695981039346656037)
 	for part, err := range res.Parts(ctx) {
 		if err != nil {
-			return err
+			return 0, 0, err
 		}
 		reader, err := ipc.NewReader(part)
 		if err != nil {
-			return err
+			return 0, 0, err
 		}
 		for reader.Next() {
 			batch := reader.RecordBatch()
@@ -176,45 +201,71 @@ func consumeArrow(ctx context.Context, s query.Session, sql string, opts []query
 					v := payloads.Value(i)
 					payload = &v
 				}
-				consumeValues(ids.Value(i), score, active, amount, name, payload)
+				hash = checksum(hash, ids.Value(i), score, active, amount, name, payload)
+				n++
 			}
 		}
 		err = reader.Err()
 		reader.Release()
 		if err != nil {
-			return err
+			return 0, 0, err
 		}
 	}
 
-	return res.Close(ctx)
+	return n, hash, res.Close(ctx)
 }
 
-type benchmarkRow struct {
-	id      uint64
-	score   int32
-	active  bool
-	amount  float64
-	name    string
-	payload []byte
+func checksum(h, id uint64, score *int32, active *bool, amount *float64, name *string, payload *[]byte) uint64 {
+	mix := func(v uint64) { h = (h ^ v) * 1099511628211 }
+	mix(id)
+	if score == nil {
+		mix(0)
+	} else {
+		mix(1)
+		mix(uint64(*score))
+	}
+	if active == nil {
+		mix(0)
+	} else {
+		mix(1)
+		if *active {
+			mix(1)
+		} else {
+			mix(0)
+		}
+	}
+	if amount == nil {
+		mix(0)
+	} else {
+		mix(1)
+		mix(math.Float64bits(*amount))
+	}
+	if name == nil {
+		mix(0)
+	} else {
+		mix(1)
+		for _, c := range []byte(*name) {
+			mix(uint64(c))
+		}
+	}
+	if payload == nil {
+		mix(0)
+	} else {
+		mix(1)
+		for _, c := range *payload {
+			mix(uint64(c))
+		}
+	}
+
+	return h
 }
 
-var benchmarkSink benchmarkRow
+func processCPU(b *testing.B) time.Duration {
+	var usage syscall.Rusage
+	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &usage); err != nil {
+		b.Fatal(err)
+	}
 
-func consumeValues(id uint64, score *int32, active *bool, amount *float64, name *string, payload *[]byte) {
-	benchmarkSink = benchmarkRow{id: id}
-	if score != nil {
-		benchmarkSink.score = *score
-	}
-	if active != nil {
-		benchmarkSink.active = *active
-	}
-	if amount != nil {
-		benchmarkSink.amount = *amount
-	}
-	if name != nil {
-		benchmarkSink.name = *name
-	}
-	if payload != nil {
-		benchmarkSink.payload = *payload
-	}
+	return time.Duration(usage.Utime.Sec+usage.Stime.Sec)*time.Second +
+		time.Duration(usage.Utime.Usec+usage.Stime.Usec)*time.Microsecond
 }
