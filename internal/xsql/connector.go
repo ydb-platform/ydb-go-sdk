@@ -125,8 +125,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, finalErr error)
 
 	switch c.processor {
 	case QUERY:
-		queryClient := internalQuery.WireQueryClient(Ydb_Query_V1.NewQueryServiceClient(c.balancer))
-		s, err := internalQuery.CreateSession(ctx, queryClient, c.queryConfig)
+		s, err := internalQuery.CreateSession(ctx, Ydb_Query_V1.NewQueryServiceClient(c.balancer), c.queryConfig)
 		defer func() {
 			onDone(s, finalErr)
 		}()
