@@ -19,7 +19,7 @@ MODULE = "github.com/ydb-platform/ydb-go-sdk/v3"
 MARKER = "<!-- benchmark-report -->"
 CHANGE = re.compile(r"^[+-]\d+(?:\.\d+)?%$")
 P_VALUE = re.compile(r"^p=(\d+(?:\.\d+)?) n=(\d+)$")
-METRIC_ORDER = {"sec/op": 0, "sec/op(p50)": 1, "sec/op(p99)": 2, "B/op": 3, "allocs/op": 4}
+METRIC_ORDER = {"sec/op": 0, "cpu-sec/op": 1, "sec/op(p50)": 2, "sec/op(p99)": 3, "B/op": 4, "allocs/op": 5}
 
 
 @dataclass(frozen=True)
@@ -134,6 +134,7 @@ def _metric_phrase(measurement):
         return f"changed ({measurement.change} {metric}; direction unknown)"
     phrases = {
         "sec/op": ("slower", "faster"),
+        "cpu-sec/op": ("uses more CPU", "uses less CPU"),
         "sec/op(p50)": ("higher p50 latency", "lower p50 latency"),
         "sec/op(p99)": ("higher p99 latency", "lower p99 latency"),
         "B/op": ("allocates more memory", "allocates less memory"),
