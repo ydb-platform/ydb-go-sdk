@@ -10,7 +10,7 @@ go test -race -tags integration ./...
 go test -mod=readonly -race -tags integration \
   -coverpkg=github.com/ydb-platform/ydb-go-sdk/v3/... \
   -coverprofile arrow.txt -covermode atomic ./...
-go test -tags integration -run '^$' -bench BenchmarkFormats -benchtime=100x -count=5 -cpu=4 -v
+go test -tags integration -run '^$' -bench '^BenchmarkFormats$' -benchtime=100x -count=5 -cpu=4 -benchmem -v
 ```
 
 For a quick checksum and setup check, use `-benchtime=1x -count=1` before a
@@ -35,13 +35,22 @@ docker run -d --name ydb-query-with-arrow --hostname localhost \
 
 Wait until `ydb -e grpc://localhost:2136 -d /local sql -s 'SELECT 1;'` succeeds.
 The benchmark consumes 1, 10, 100, 1,000 and 10,000 ordered table rows with six columns,
-nullable values and 64-byte payloads. It compares `Session.Query` + `Scan`,
-direct `Session.QueryArrow` column access, and `Session.Query` + `WithResultFormatArrow` +
-`Scan` using the same session, SQL, checksum and 32 KiB response-part limit.
+nullable values and 64-byte payloads. It measures direct `Session.QueryArrow`
+column access and `Session.Query` + `WithResultFormatArrow` + `Scan` using the
+same session, SQL, checksum and 32 KiB response-part limit.
 Each variant has ten warmup queries. All returned columns participate in the
 checksum; the row count and checksum must match on every RPC.
-The Query and WithResultFormatArrow consumers reuse Scan destinations and arguments across
+The `WithResultFormatArrow` consumer reuses Scan destinations and arguments across
 rows; nullable scans still allocate each non-null destination value.
+
+Ordinary `Session.Query` + `Scan` is measured by `BenchmarkQueryRows` in the
+[main integration package](../README.md#query-result-benchmark), so it runs in
+the standard integration benchmark suite without an Arrow dependency. Both
+modules share the fixture, checksum, scan consumer and measurement helpers.
+Compare matching row counts across the two packages using the same Go version,
+`-cpu`, benchmark flags and database conditions. Run them sequentially; they use
+the same fixture table, but separate processes and sessions. Keep package and
+benchmark names in the results so that the Query baseline remains identifiable.
 
 Reported `ns/op` includes server work and transport; `cpu-ns/op` is client process
 user + system CPU from `getrusage`, including decoding, scans and GC. `B/op` and
