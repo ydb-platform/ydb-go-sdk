@@ -1,5 +1,3 @@
-//go:build ignore
-
 package main
 
 import (
@@ -29,6 +27,7 @@ func main() {
 	}
 }
 
+//nolint:funlen
 func generate() error {
 	part := (&Ydb_Query.ExecuteQueryResponsePart{}).ProtoReflect().Descriptor()
 	resultSet := (&Ydb.ResultSet{}).ProtoReflect().Descriptor()
@@ -90,6 +89,7 @@ func generate() error {
 	if err != nil {
 		return err
 	}
+
 	return os.WriteFile("wire_fields_gen.go", formatted, 0o644)
 }
 

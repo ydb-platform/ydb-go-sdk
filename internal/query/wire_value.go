@@ -1,6 +1,6 @@
 package query
 
-//go:generate go run gen_wire_fields.go
+//go:generate go run ../cmd/gwirefields
 
 import (
 	"bytes"
