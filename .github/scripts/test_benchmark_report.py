@@ -152,6 +152,30 @@ Custom-2,100,1%,110,1%,+10.00%,p=0.001 n=10
         self.assertIn("direction unknown", report)
         self.assertNotIn("🔴 Performance regressions reported", report)
 
+    def test_process_cpu_changes_have_a_known_direction(self):
+        for change, pr, outcome, phrase in (
+            ("-20.00%", 8e-7, "🟢 Improvements reported; no regressions detected", "uses less CPU"),
+            ("+20.00%", 1.2e-6, "🔴 Performance regressions reported", "uses more CPU"),
+        ):
+            with self.subTest(change=change):
+                cpu_csv = f"""\
+pkg: github.com/ydb-platform/ydb-go-sdk/v3/tests/integration
+,master,,pr,,,
+,cpu-sec/op,CI,cpu-sec/op,CI,vs base,P
+Query/10000-2,1e-6,1%,{pr},1%,{change},p=0.001 n=10
+"""
+                report = render_report(
+                    cpu_csv,
+                    artifact_url="https://github.com/example/repo/actions/runs/1/artifacts/2",
+                    preview_url="https://github.com/example/repo/actions/runs/1/artifacts/3",
+                    master_sha="a" * 40,
+                    head_sha="b" * 40,
+                )
+
+                self.assertIn(outcome, report)
+                self.assertIn(f"{phrase} ({change} cpu-sec/op)", report)
+                self.assertNotIn("direction unknown", report)
+
 
 if __name__ == "__main__":
     unittest.main()
