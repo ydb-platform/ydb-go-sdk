@@ -364,7 +364,7 @@ func TestMultiEncoder(t *testing.T) {
 
 	t.Run("NotResetableWriter", func(t *testing.T) {
 		testMultiEncoder := NewMultiEncoder()
-		require.Len(t, testMultiEncoder.ep, 2)
+		require.Len(t, testMultiEncoder.m, 2)
 
 		buf := &bytes.Buffer{}
 		_, err := testMultiEncoder.EncodeBytes(rawtopiccommon.CodecRaw, buf, []byte("test_data"))
@@ -379,7 +379,7 @@ func TestMultiEncoder(t *testing.T) {
 		testMultiEncoder.AddEncoder(customCodecCode, func(writer io.Writer) (io.WriteCloser, error) {
 			return gzip.NewWriter(writer), nil
 		})
-		require.Len(t, testMultiEncoder.ep, 3)
+		require.Len(t, testMultiEncoder.m, 3)
 
 		buf := &bytes.Buffer{}
 		_, err := testMultiEncoder.EncodeBytes(customCodecCode, buf, []byte("test_data_1"))
