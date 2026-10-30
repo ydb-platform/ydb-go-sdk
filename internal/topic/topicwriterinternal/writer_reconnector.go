@@ -70,7 +70,7 @@ type WriterReconnectorConfig struct {
 	MaxMessageSize               int
 	MaxQueueLen                  int
 	Common                       config.Common
-	AdditionalEncoders           map[rawtopiccommon.Codec]topicwritercommon.PublicCreateEncoderFunc
+	AdditionalEncoders           map[rawtopiccommon.Codec]*topicwritercommon.Encoder
 	Connect                      ConnectFunc
 	WaitServerAck                bool
 	AutoSetSeqNo                 bool
@@ -254,8 +254,8 @@ func newWriterReconnectorStopped(
 	res.queue.OnAckReceived = res.onAckReceived
 	res.queue.AckCallback = res.cfg.OnAckReceivedCallback
 
-	for codec, creator := range cfg.AdditionalEncoders {
-		res.encodersMap.AddEncoder(codec, creator)
+	for codec, encoder := range cfg.AdditionalEncoders {
+		res.encodersMap.AddSharedEncoder(codec, encoder)
 	}
 
 	res.sessionID = "not-connected-" + writerInstanceID.String()

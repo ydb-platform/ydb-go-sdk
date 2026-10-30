@@ -1,3 +1,5 @@
+* Reduced custom topic encoder allocations by sharing pools across writers that reuse the same `topicoptions.WithWriterAddEncoder` option.
+
 ## v3.155.1
 * Fixed resource leaks after failed driver initialization and in nested `Driver.With` calls
 
