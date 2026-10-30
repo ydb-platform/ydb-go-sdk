@@ -347,6 +347,14 @@ func TestMultiEncoder(t *testing.T) {
 		return string(decompressedMsg)
 	}
 
+	t.Run("UnsupportedCodec", func(t *testing.T) {
+		var output bytes.Buffer
+		n, err := NewMultiEncoder().EncodeBytes(rawtopiccommon.Codec(10001), &output, []byte("payload"))
+		require.Error(t, err)
+		require.Zero(t, n)
+		require.Empty(t, output.Bytes())
+	})
+
 	t.Run("BuffersPool", func(t *testing.T) {
 		testMultiEncoder := NewMultiEncoder()
 
