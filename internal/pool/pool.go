@@ -55,7 +55,7 @@ type (
 		stats *xsync.Value[dynamicStats]
 
 		sema chan struct{}
-		idle *sliceContainer[PT, T] // see BenchmarkContainers in container_test.go
+		idle *sliceContainer[PT, T] // see BenchmarkContainerOperations in container_test.go
 
 		done chan struct{}
 	}

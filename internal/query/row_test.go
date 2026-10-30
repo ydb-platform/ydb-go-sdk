@@ -132,32 +132,32 @@ func generateData(count int) []*Row {
 }
 
 func BenchmarkScanner(b *testing.B) {
+	// Keep calibration from changing the fixture size and heap pressure.
+	const fixtureRows = 1024
+	rows := generateData(fixtureRows)
+
 	b.Run("Scan", func(b *testing.B) {
 		b.ReportAllocs()
-		rows := generateData(b.N)
 		var (
 			id    uint64     // for requied scan
 			title *string    // for optional scan
 			date  *time.Time // for optional scan with default type value
 		)
-		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if err := rows[i].Scan(&id, &title, &date); err != nil {
+			if err := rows[i%fixtureRows].Scan(&id, &title, &date); err != nil {
 				b.Error(err)
 			}
 		}
 	})
 	b.Run("ScanNamed", func(b *testing.B) {
 		b.ReportAllocs()
-		rows := generateData(b.N)
 		var (
 			id    uint64     // for requied scan
 			title *string    // for optional scan
 			date  *time.Time // for optional scan with default type value
 		)
-		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if err := rows[i].ScanNamed(
+			if err := rows[i%fixtureRows].ScanNamed(
 				scanner.NamedRef("series_id", &id),
 				scanner.NamedRef("title", &title),
 				scanner.NamedRef("release_date", &date),
@@ -168,15 +168,13 @@ func BenchmarkScanner(b *testing.B) {
 	})
 	b.Run("ScanStruct", func(b *testing.B) {
 		b.ReportAllocs()
-		rows := generateData(b.N)
 		var info struct {
 			SeriesID    string     `sql:"series_id"`
 			Title       *string    `sql:"title"`
 			ReleaseDate *time.Time `sql:"release_date"`
 		}
-		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if err := rows[i].ScanStruct(&info); err != nil {
+			if err := rows[i%fixtureRows].ScanStruct(&info); err != nil {
 				b.Error(err)
 			}
 		}
