@@ -1,3 +1,5 @@
+* Added topic reader and listener metrics for message flow, session errors, commit progress, and buffers. See [METRICS.md](METRICS.md).
+
 ## v3.155.1
 * Fixed resource leaks after failed driver initialization and in nested `Driver.With` calls
 

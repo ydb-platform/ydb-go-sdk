@@ -24,6 +24,7 @@ type PartitionSession struct {
 	lastReceivedOffsetEndVal atomic.Int64
 	committedOffsetVal       atomic.Int64
 	noMoreMessages           atomic.Bool
+	commitMetrics            *partitionSessionCommitMetrics
 }
 
 func NewPartitionSession(
@@ -63,6 +64,9 @@ func (s *PartitionSession) SetContext(ctx context.Context) {
 
 func (s *PartitionSession) Close() {
 	s.ctxCancel()
+	if s.commitMetrics != nil {
+		s.commitMetrics.close()
+	}
 }
 
 func (s *PartitionSession) CommittedOffset() rawtopiccommon.Offset {
