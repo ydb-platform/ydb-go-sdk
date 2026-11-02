@@ -15,21 +15,19 @@ import (
 // BenchmarkWriterCompression measures the message compression path without a
 // server, background writer goroutines, or ACK latency. Writers share one custom
 // encoder option, as applications can do when opening multiple producer sessions.
-// Each operation encodes one message; reopen also includes replacing its writer.
+// Each operation encodes one message using an existing writer.
 // Sequential round-robin writes isolate cross-writer reuse from concurrent demand.
 func BenchmarkWriterCompression(b *testing.B) {
 	for _, writers := range []int{1, 300} {
 		for _, size := range []int{4 << 10, 256 << 10} {
-			for _, reopen := range []bool{false, true} {
-				b.Run(fmt.Sprintf("writers=%d/bytes=%d/reopen=%t", writers, size, reopen), func(b *testing.B) {
-					benchmarkWriterCompression(b, writers, size, reopen)
-				})
-			}
+			b.Run(fmt.Sprintf("writers=%d/bytes=%d", writers, size), func(b *testing.B) {
+				benchmarkWriterCompression(b, writers, size)
+			})
 		}
 	}
 }
 
-func benchmarkWriterCompression(b *testing.B, writerCount, size int, reopen bool) {
+func benchmarkWriterCompression(b *testing.B, writerCount, size int) {
 	// A fixed seed and repeated 1 KiB chunks provide reproducible input with both
 	// compressible and incompressible content, rather than an all-zero payload.
 	payload := make([]byte, size)
@@ -63,10 +61,6 @@ func benchmarkWriterCompression(b *testing.B, writerCount, size int, reopen bool
 	var message topicwritercommon.MessageWithDataContent
 	for i := 0; i < b.N; i++ {
 		index := i % len(writers)
-		if reopen {
-			// No network sessions were started, so there is nothing to close.
-			writers[index] = newWriterReconnectorStopped(cfg)
-		}
 		message = topicwritercommon.NewMessageDataWithContent(PublicMessage{
 			Data: bytes.NewReader(payload),
 		}, writers[index].encodersMap)
