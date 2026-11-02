@@ -38,7 +38,7 @@ jobs:
       # Run without -race: instrumentation changes allocation and timing results.
       # The label-gated benchmarks workflow also picks this up for base/PR comparisons.
       - name: Benchmark topic compression
-        if: matrix.os == 'ubuntu' && matrix.go-version == '1.27.x' && github.event_name != 'schedule'
+        if: github.event_name != 'schedule'
         shell: bash
         env:
           GOGC: '100'
@@ -47,10 +47,10 @@ jobs:
           go version > topic-compression-benchmarks.txt
           go test -run '^$' -bench '^BenchmarkWriterCompression$' -benchmem -benchtime=100ms -count=5 -cpu=2 ./internal/topic/topicwriterinternal | tee -a topic-compression-benchmarks.txt
       - name: Upload topic compression benchmarks
-        if: always() && matrix.os == 'ubuntu' && matrix.go-version == '1.27.x' && github.event_name != 'schedule'
+        if: github.event_name != 'schedule'
         uses: actions/upload-artifact@v4
         with:
-          name: topic-compression-benchmarks
+          name: topic-compression-benchmarks-${{ matrix.os }}-go-${{ matrix.go-version }}
           path: topic-compression-benchmarks.txt
           if-no-files-found: ignore
           retention-days: 90
