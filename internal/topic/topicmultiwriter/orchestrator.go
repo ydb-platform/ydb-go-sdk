@@ -387,26 +387,38 @@ func (o *orchestrator) addNewPartitions(
 	parentPartition *PartitionInfo,
 	describeResult *topictypes.TopicDescription,
 	splittedPartitionID int64,
-) error {
+) ([]int64, error) {
 	var (
-		childPartitions = make([]int64, 0, 2)
-		partitionsToAdd = make([]topictypes.PartitionInfo, 0, 2)
+		childPartitions   = make([]int64, 0, 2)
+		partitionsToAdd   = make([]topictypes.PartitionInfo, 0, 2)
+		activeDescendants []int64
 	)
 
 	for _, partition := range describeResult.Partitions {
 		if len(partition.ParentPartitionIDs) > 0 && partition.ParentPartitionIDs[0] == splittedPartitionID {
 			childPartitions = append(childPartitions, partition.PartitionID)
-			partitionsToAdd = append(partitionsToAdd, partition)
-			o.partitions[partition.PartitionID] = &PartitionInfo{
+			child := &PartitionInfo{
 				PartitionInfo: partition,
 				Locked:        true,
+			}
+			o.partitions[partition.PartitionID] = child
+			// A single refresh can include several splits; route only to active leaves.
+			if child.Splitted() {
+				descendants, err := o.addNewPartitions(child, describeResult, partition.PartitionID)
+				if err != nil {
+					return nil, err
+				}
+				activeDescendants = append(activeDescendants, descendants...)
+			} else if child.Active {
+				partitionsToAdd = append(partitionsToAdd, partition)
+				activeDescendants = append(activeDescendants, partition.PartitionID)
 			}
 		}
 	}
 
 	parentPartition.ChildPartitionIDs = childPartitions
 
-	return o.partitionChooser.AddNewPartitions(partitionsToAdd...)
+	return activeDescendants, o.partitionChooser.AddNewPartitions(partitionsToAdd...)
 }
 
 func (o *orchestrator) rechoosePartition(msg *message) (err error) {
@@ -604,7 +616,10 @@ func (o *orchestrator) getMaxSeqNo(partitions []int64) (maxSeqNo int64, err erro
 
 			o.mu.WithLock(func() {
 				maxSeqNo = max(maxSeqNo, initInfo.LastSeqNum)
-				partitionInfo.CachedMaxSeqNo = initInfo.LastSeqNum
+				// Only a retired partition has an immutable committed baseline.
+				if splitted {
+					partitionInfo.CachedMaxSeqNo = initInfo.LastSeqNum
+				}
 			})
 
 			return nil
@@ -652,6 +667,7 @@ func (o *orchestrator) describeTopicWithRetries(splitPartitionID int64) (topicty
 //nolint:funlen
 func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 	var isAlreadySplitted bool
+	var activeDescendants []int64
 
 	describeResult, err := o.describeTopicWithRetries(partitionID)
 	if err != nil {
@@ -672,7 +688,8 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		}
 
 		partition.Locked = true
-		if resultErr = o.addNewPartitions(partition, &describeResult, partitionID); resultErr != nil {
+		activeDescendants, resultErr = o.addNewPartitions(partition, &describeResult, partitionID)
+		if resultErr != nil {
 			return
 		}
 		o.partitionChooser.RemovePartition(partitionID)
@@ -703,7 +720,7 @@ func (o *orchestrator) onPartitionSplit(partitionID int64) (resultErr error) {
 		}
 
 		partition.Locked = false
-		for _, child := range partition.ChildPartitionIDs {
+		for _, child := range activeDescendants {
 			o.partitions[child].Locked = false
 		}
 

@@ -1,3 +1,5 @@
+* Fixed topic multi-writer routing and resends after successive partition splits, including refreshing committed sequence numbers before resending
+
 ## v3.155.1
 * Fixed resource leaks after failed driver initialization and in nested `Driver.With` calls
 
