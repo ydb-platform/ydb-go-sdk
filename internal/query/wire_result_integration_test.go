@@ -16,23 +16,62 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 )
 
-func TestExecuteQueryUsesWireRowsAcrossParts(t *testing.T) {
-	listener := bufconn.Listen(1 << 20)
-	server := grpc.NewServer()
-	Ydb_Query_V1.RegisterQueryServiceServer(server, &wireResultServer{})
-	go func() { _ = server.Serve(listener) }()
-	defer server.Stop()
+func TestClientRowDecoding(t *testing.T) {
+	conn := newWireResultConn(t)
+	for _, tt := range []struct {
+		name string
+		opts []config.Option
+		wire bool
+	}{
+		{name: "default"},
+		{name: "enabled", opts: []config.Option{config.WithProtoWireDecoding(true)}, wire: true},
+		{name: "disabled", opts: []config.Option{config.WithProtoWireDecoding(false)}},
+		{
+			name: "last option wins",
+			opts: []config.Option{config.WithProtoWireDecoding(true), config.WithProtoWireDecoding(false)},
+		},
+		{name: "implicit default", opts: []config.Option{config.AllowImplicitSessions()}},
+		{
+			name: "implicit enabled",
+			opts: []config.Option{config.AllowImplicitSessions(), config.WithProtoWireDecoding(true)},
+			wire: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := t.Context()
+			client, err := New(ctx, conn, config.New(tt.opts...))
+			require.NoError(t, err)
+			defer client.Close(ctx)
 
-	dialer := func(context.Context, string) (net.Conn, error) {
-		return listener.Dial()
+			for _, prefetch := range []int{0, 2} {
+				t.Run(fmt.Sprintf("prefetch=%d", prefetch), func(t *testing.T) {
+					r, err := client.Query(ctx, "SELECT id FROM test", options.WithResponsePartPrefetch(prefetch))
+					require.NoError(t, err)
+					defer r.Close(ctx)
+					rs, err := r.NextResultSet(ctx)
+					require.NoError(t, err)
+					for _, want := range []uint64{42, 43} {
+						row, err := rs.NextRow(ctx)
+						require.NoError(t, err)
+						var got uint64
+						require.NoError(t, row.Scan(&got))
+						require.Equal(t, want, got)
+						require.Equal(t, tt.wire, row.(*Row).part != nil, "row storage must match the selected decoder")
+					}
+					_, err = rs.NextRow(ctx)
+					require.ErrorIs(t, err, io.EOF)
+				})
+			}
+		})
 	}
-	conn, err := grpc.NewClient("passthrough:///bufnet", grpc.WithContextDialer(dialer),
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.NoError(t, err)
-	defer conn.Close()
+}
+
+func TestExecuteQueryUsesWireRowsAcrossParts(t *testing.T) {
+	conn := newWireResultConn(t)
 
 	for _, prefetch := range []int{0, 2} {
 		t.Run(fmt.Sprintf("prefetch=%d", prefetch), func(t *testing.T) {
@@ -122,8 +161,50 @@ func TestExecuteQueryUsesWireRowsAcrossParts(t *testing.T) {
 	})
 }
 
+func newWireResultConn(t *testing.T) *grpc.ClientConn {
+	t.Helper()
+	listener := bufconn.Listen(1 << 20)
+	server := grpc.NewServer()
+	Ydb_Query_V1.RegisterQueryServiceServer(server, &wireResultServer{})
+	go func() { _ = server.Serve(listener) }()
+	t.Cleanup(server.Stop)
+
+	dialer := func(context.Context, string) (net.Conn, error) {
+		return listener.Dial()
+	}
+	conn, err := grpc.NewClient("passthrough:///bufnet", grpc.WithContextDialer(dialer),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+
+	return conn
+}
+
 type wireResultServer struct {
 	Ydb_Query_V1.UnimplementedQueryServiceServer
+}
+
+func (*wireResultServer) CreateSession(context.Context, *Ydb_Query.CreateSessionRequest) (
+	*Ydb_Query.CreateSessionResponse, error,
+) {
+	return &Ydb_Query.CreateSessionResponse{Status: Ydb.StatusIds_SUCCESS, SessionId: "session"}, nil
+}
+
+func (*wireResultServer) AttachSession(_ *Ydb_Query.AttachSessionRequest,
+	stream Ydb_Query_V1.QueryService_AttachSessionServer,
+) error {
+	if err := stream.Send(&Ydb_Query.SessionState{Status: Ydb.StatusIds_SUCCESS}); err != nil {
+		return err
+	}
+	<-stream.Context().Done()
+
+	return stream.Context().Err()
+}
+
+func (*wireResultServer) DeleteSession(context.Context, *Ydb_Query.DeleteSessionRequest) (
+	*Ydb_Query.DeleteSessionResponse, error,
+) {
+	return &Ydb_Query.DeleteSessionResponse{Status: Ydb.StatusIds_SUCCESS}, nil
 }
 
 func (*wireResultServer) ExecuteQuery(request *Ydb_Query.ExecuteQueryRequest,

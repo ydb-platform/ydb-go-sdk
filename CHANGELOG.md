@@ -1,4 +1,4 @@
-* Changed native Query Service `FORMAT_VALUE` result decoding to scan rows directly from protobuf wire data, reducing allocations when scanning large results with supported scalar destinations
+* Added experimental `ydb.WithQueryProtoWireDecoding(bool)` to opt into direct protobuf wire decoding of native Query Service `FORMAT_VALUE` rows, reducing allocations with supported scalar scan destinations; standard protobuf decoding remains the default
 
 ## v3.155.1
 * Fixed resource leaks after failed driver initialization and in nested `Driver.With` calls

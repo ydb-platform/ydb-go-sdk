@@ -816,7 +816,10 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) (
 	)
 	defer onDone()
 
-	client := WireQueryClient(Ydb_Query_V1.NewQueryServiceClient(cc))
+	client := Ydb_Query_V1.NewQueryServiceClient(cc)
+	if cfg.ProtoWireDecoding() {
+		client = WireQueryClient(client)
+	}
 
 	return newWithQueryServiceClient(ctx, client, cc, cfg)
 }
