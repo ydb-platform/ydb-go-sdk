@@ -86,7 +86,7 @@ func (s *sender) iterateThroughMessagesIndex(
 				break
 			}
 
-			wr, err := s.writerPool.get(msg.PartitionID, true)
+			wr, err := s.writerPool.get(msg.PartitionID)
 			if err != nil {
 				return fmt.Errorf("failed to get writer: %w", err)
 			}
@@ -97,7 +97,7 @@ func (s *sender) iterateThroughMessagesIndex(
 
 			if err := wr.getInitErr(); err != nil {
 				if isOperationErrorOverloaded(err) {
-					s.partitionSplitReceiver.push(partitionID)
+					s.partitionSplitReceiver.push(partitionID, err)
 
 					break
 				}
@@ -110,7 +110,7 @@ func (s *sender) iterateThroughMessagesIndex(
 				[]topicwritercommon.MessageWithDataContent{msg.MessageWithDataContent},
 			); err != nil {
 				if isOperationErrorOverloaded(err) {
-					s.partitionSplitReceiver.push(partitionID)
+					s.partitionSplitReceiver.push(partitionID, err)
 
 					break
 				}

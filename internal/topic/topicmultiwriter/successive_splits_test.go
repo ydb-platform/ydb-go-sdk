@@ -161,7 +161,39 @@ func TestMultiWriter_WaitsForAncestorBaselineBeforeWritingToDescendant(t *testin
 	require.NoError(t, multiWriter.Close(ctx))
 }
 
-func newSuccessiveSplitsMultiWriter(t testing.TB, factory writersFactory) *MultiWriter {
+func TestMultiWriter_AssignsSeqNoAfterSuccessiveSplits(t *testing.T) {
+	t.Parallel()
+
+	ctx := xtest.Context(t)
+	writes := make(chan successiveSplitWrite, 1)
+	multiWriter := newSuccessiveSplitsMultiWriter(t, &successiveSplitWritersFactory{
+		writes: writes,
+		initInfo: func(_ context.Context, _ string, pinned bool) (topicwriterinternal.InitialInfo, error) {
+			if pinned {
+				return topicwriterinternal.InitialInfo{}, nil
+			}
+
+			return topicwriterinternal.InitialInfo{LastSeqNum: 41}, nil
+		},
+	}, topicwriterinternal.WithAutoSetSeqNo(true))
+	require.NoError(t, multiWriter.WaitInit(ctx))
+	require.NoError(t, multiWriter.orchestrator.onPartitionSplit(0))
+	require.NoError(t, multiWriter.Write(ctx, []topicwriterinternal.PublicMessage{{
+		Data: bytes.NewBufferString("new message"), Key: "partition-key",
+	}}))
+	written := <-writes
+	require.Equal(t, int64(4), written.partitionID)
+	require.Equal(t, int64(42), written.seqNo)
+	written.ack(written.seqNo)
+	require.NoError(t, multiWriter.Flush(ctx))
+	require.NoError(t, multiWriter.Close(ctx))
+}
+
+func newSuccessiveSplitsMultiWriter(
+	t testing.TB,
+	factory writersFactory,
+	opts ...topicwriterinternal.PublicWriterOption,
+) *MultiWriter {
 	t.Helper()
 
 	ctx := xtest.Context(t)
@@ -179,6 +211,7 @@ func newSuccessiveSplitsMultiWriter(t testing.TB, factory writersFactory) *Multi
 			return successiveSplitsDescription(), nil
 		},
 		factory,
+		opts...,
 	)
 	t.Cleanup(func() {
 		multiWriter.orchestrator.stop()

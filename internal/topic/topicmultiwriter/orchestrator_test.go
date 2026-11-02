@@ -47,34 +47,9 @@ func TestOrchestratorSplitInstallsActiveDescendants(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, tc.want, got, "key %q must route to an active descendant", tc.key)
 		require.False(t, multiWriter.orchestrator.partitions[got].Locked)
+		require.Nil(t, multiWriter.orchestrator.partitions[got].seqNoReady,
+			"automatic sequence numbers must be ready after the split baseline")
 	}
-}
-
-func TestOrchestratorGetMaxSeqNoRefreshesAfterSplit(t *testing.T) {
-	ctx := context.Background()
-	multiWriter := newTestMultiWriterWithCustomWritersFactory(t,
-		func(context.Context, string) (topictypes.TopicDescription, error) {
-			return topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{{Active: true}}}, nil
-		},
-		&successiveSplitWritersFactory{
-			initInfo: func(_ context.Context, _ string, pinned bool) (topicwriterinternal.InitialInfo, error) {
-				if pinned {
-					return topicwriterinternal.InitialInfo{LastSeqNum: 10}, nil
-				}
-
-				return topicwriterinternal.InitialInfo{LastSeqNum: 42}, nil
-			},
-		},
-	)
-	t.Cleanup(func() { require.NoError(t, multiWriter.Close(ctx)) })
-	require.NoError(t, multiWriter.WaitInit(ctx))
-	multiWriter.orchestrator.mu.WithLock(func() {
-		multiWriter.orchestrator.partitions[0].ChildPartitionIDs = []int64{2, 3}
-	})
-
-	got, err := multiWriter.orchestrator.getMaxSeqNo([]int64{0})
-	require.NoError(t, err)
-	require.Equal(t, int64(42), got, "split baseline must include commits after active initialization")
 }
 
 func TestOrchestratorSaveMessageContent(t *testing.T) {
