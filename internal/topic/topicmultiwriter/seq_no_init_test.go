@@ -204,6 +204,34 @@ func TestMultiWriterStopsAfterFirstSessionSplitProbeFails(t *testing.T) {
 	require.ErrorIs(t, err, probeErr, "later writes must fail instead of waiting on the child's seq no")
 }
 
+func TestMultiWriterWaitingWriteReturnsSplitProbeError(t *testing.T) {
+	probeErr := errors.New("parent seq no probe failed")
+	probe := &splitBaselineProbe{started: make(chan struct{}), release: make(chan struct{}), err: probeErr}
+	w, ctx := newMultiWriterForSplitRaceWithDescriber(t, &splitWritersFactory{
+		probe: probe, skipSplitCallback: true,
+	}, splitRaceDescriber())
+	firstDone := make(chan error, 1)
+	go func() { firstDone <- w.Write(ctx, cancellationTestMessage()) }()
+	<-probe.started
+
+	reader := &blockingReader{started: make(chan struct{}), release: make(chan struct{}), data: []byte("message")}
+	waitingCtx := &notifyingDoneContext{Context: ctx}
+	waitingDone := make(chan error, 1)
+	go func() {
+		waitingDone <- w.Write(waitingCtx, []topicwriterinternal.PublicMessage{{Data: reader, Key: "a"}})
+	}()
+	<-reader.started
+	// The next context wait is for the child's SeqNo baseline.
+	waitingCtx.observed = make(chan struct{}, 1)
+	close(reader.release)
+	<-waitingCtx.observed
+	close(probe.release)
+
+	require.ErrorIs(t, <-firstDone, probeErr)
+	require.ErrorIs(t, <-waitingDone, probeErr, "writes already waiting for a child must preserve the stop cause")
+	require.Empty(t, w.orchestrator.buf.messagesSema, "failed writes must release their queue slots")
+}
+
 func TestMultiWriterStopsWhenOverloadedSessionHasNoSplit(t *testing.T) {
 	var describes atomic.Int32
 	w, ctx := newMultiWriterForSplitRaceWithDescriber(t, &splitWritersFactory{
@@ -314,13 +342,14 @@ type splitBaselineProbe struct {
 
 	started chan struct{}
 	release chan struct{}
+	err     error
 }
 
 func (w *splitBaselineProbe) WaitInitInfo(ctx context.Context) (topicwriterinternal.InitialInfo, error) {
 	close(w.started)
 	select {
 	case <-w.release:
-		return topicwriterinternal.InitialInfo{LastSeqNum: 100}, nil
+		return topicwriterinternal.InitialInfo{LastSeqNum: 100}, w.err
 	case <-ctx.Done():
 		return topicwriterinternal.InitialInfo{}, ctx.Err()
 	}

@@ -16,6 +16,42 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
+func TestMultiWriterWriteCancellationWhenSplitRoutingDoesNotProgress(t *testing.T) {
+	parent := &orderedSeqWriter{writes: make(chan int64, 1)}
+	w, ctx := newMultiWriterForSplitRace(t, &lastSeqWritersFactory{
+		writers: map[int64]*orderedSeqWriter{0: parent},
+	}, WithWriterPartitionByPartitionID())
+	require.NoError(t, w.Write(ctx, cancellationTestMessage()))
+	require.Equal(t, int64(1), <-parent.writes)
+	require.NoError(t, w.Flush(ctx))
+
+	reader := &blockingReader{started: make(chan struct{}), release: make(chan struct{}), data: []byte("message")}
+	writeCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- w.Write(writeCtx, []topicwriterinternal.PublicMessage{{PartitionID: 0, Data: reader}})
+	}()
+	<-reader.started
+	w.orchestrator.mu.WithLock(func() {
+		// Metadata can reveal children before split handling updates the chooser.
+		w.orchestrator.partitions[0].ChildPartitionIDs = []int64{2, 3}
+	})
+	cancel()
+	close(reader.release)
+
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		w.orchestrator.stop()
+		<-done
+		t.Fatal("Write ignored cancellation while repeatedly choosing a split partition")
+	}
+	require.Empty(t, w.orchestrator.buf.messagesSema, "cancelled writes must release their queue slot")
+	require.Equal(t, int64(1), w.orchestrator.currentSeqNo.value.Load(), "cancelled writes must not receive a SeqNo")
+}
+
 func TestMultiWriterWriteCancellationDuringSplit(t *testing.T) {
 	for _, stage := range []string{"describe", "probe"} {
 		t.Run(stage, func(t *testing.T) {

@@ -276,6 +276,9 @@ func (o *orchestrator) assignSeqNoNeedLock(msg *message, autoSetSeqNo bool) (not
 
 func (o *orchestrator) enqueueMessage(ctx context.Context, msg message, autoSetSeqNo bool) (err error) {
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if autoSetSeqNo {
 			if err = o.waitAutoSeqNoWriter(ctx, &msg); err != nil {
 				return err
@@ -297,6 +300,7 @@ func (o *orchestrator) enqueueMessage(ctx context.Context, msg message, autoSetS
 	}
 }
 
+//nolint:funlen // Keep session readiness and split retry handling in one loop.
 func (o *orchestrator) waitAutoSeqNoWriter(ctx context.Context, msg *message) error {
 	for {
 		var (
@@ -330,6 +334,10 @@ func (o *orchestrator) waitAutoSeqNoWriter(ctx context.Context, msg *message) er
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-o.ctx.Done():
+				if err := o.getResultErr(); err != nil {
+					return err
+				}
+
 				return ErrAlreadyClosed
 			case <-seqNoReady:
 				continue
