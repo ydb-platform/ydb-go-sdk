@@ -70,7 +70,8 @@ func decodeWirePart(data []byte) (*wirePart, error) {
 }
 
 func decodeOwnedPart(frame []byte) (*wirePart, error) {
-	if len(frame) > math.MaxUint32 {
+	// Row offsets must fit in rowSpan's uint32 fields.
+	if uint(len(frame)) > math.MaxUint32 {
 		return nil, fmt.Errorf("wire value decoder: response part exceeds 4 GiB")
 	}
 	part := &wirePart{meta: new(Ydb_Query.ExecuteQueryResponsePart), frame: frame}
@@ -246,7 +247,7 @@ func (r *Row) cell(column int) ([]byte, error) {
 	return nil, fmt.Errorf("wire value decoder: missing column %d", column)
 }
 
-//nolint:gocyclo,funlen // Keep scalar wire parsing and destination assignment in one allocation-free path.
+//nolint:gocyclo,funlen // Keep scalar wire parsing and destination assignment together.
 func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error) {
 	primitive, optional := wireValuePrimitive(columnType)
 	var kind protowire.Number
@@ -332,9 +333,7 @@ func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error)
 	case Ydb.Type_INT32:
 		if kind == 2 {
 			if p, ok := dst.(**int32); ok && optional && p != nil {
-				if *p == nil {
-					*p = new(int32)
-				}
+				*p = new(int32)
 				**p = int32(numeric)
 
 				return true, nil
@@ -343,9 +342,7 @@ func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error)
 	case Ydb.Type_BOOL:
 		if kind == 1 {
 			if p, ok := dst.(**bool); ok && optional && p != nil {
-				if *p == nil {
-					*p = new(bool)
-				}
+				*p = new(bool)
 				**p = numeric != 0
 
 				return true, nil
@@ -354,9 +351,7 @@ func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error)
 	case Ydb.Type_DOUBLE:
 		if kind == 7 {
 			if p, ok := dst.(**float64); ok && optional && p != nil {
-				if *p == nil {
-					*p = new(float64)
-				}
+				*p = new(float64)
 				**p = math.Float64frombits(numeric)
 
 				return true, nil
@@ -365,9 +360,7 @@ func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error)
 	case Ydb.Type_UTF8:
 		if kind == 9 {
 			if p, ok := dst.(**string); ok && optional && p != nil {
-				if *p == nil {
-					*p = new(string)
-				}
+				*p = new(string)
 				**p = string(payload)
 
 				return true, nil
@@ -376,9 +369,7 @@ func scanWireValueCell(columnType *Ydb.Type, cell []byte, dst any) (bool, error)
 	case Ydb.Type_STRING:
 		if kind == 8 {
 			if p, ok := dst.(**[]byte); ok && optional && p != nil {
-				if *p == nil {
-					*p = new([]byte)
-				}
+				*p = new([]byte)
 				**p = bytes.Clone(payload)
 
 				return true, nil

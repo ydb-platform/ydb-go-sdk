@@ -26,7 +26,7 @@ import (
 )
 
 func TestSessionCorePreservesRowDecoding(t *testing.T) {
-	cc := newWireResultConn(t)
+	cc := newWireResultConn(t, &wireResultServer{})
 	for _, tt := range []struct {
 		name string
 		wire bool

@@ -18,10 +18,12 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
+	publicquery "github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 func TestClientRowDecoding(t *testing.T) {
-	conn := newWireResultConn(t)
+	conn := newWireResultConn(t, &wireResultServer{})
 	for _, tt := range []struct {
 		name string
 		opts []config.Option
@@ -71,7 +73,7 @@ func TestClientRowDecoding(t *testing.T) {
 }
 
 func TestExecuteQueryUsesWireRowsAcrossParts(t *testing.T) {
-	conn := newWireResultConn(t)
+	conn := newWireResultConn(t, &wireResultServer{})
 
 	for _, prefetch := range []int{0, 2} {
 		t.Run(fmt.Sprintf("prefetch=%d", prefetch), func(t *testing.T) {
@@ -161,11 +163,92 @@ func TestExecuteQueryUsesWireRowsAcrossParts(t *testing.T) {
 	})
 }
 
-func newWireResultConn(t *testing.T) *grpc.ClientConn {
+func TestQueryPreservesScannedOptionalValues(t *testing.T) {
+	server := &optionalWireResultServer{
+		columns: []*Ydb.Column{
+			{Name: "score", Type: wireOptional(Ydb.Type_INT32)},
+			{Name: "active", Type: wireOptional(Ydb.Type_BOOL)},
+			{Name: "amount", Type: wireOptional(Ydb.Type_DOUBLE)},
+			{Name: "name", Type: wireOptional(Ydb.Type_UTF8)},
+			{Name: "payload", Type: wireOptional(Ydb.Type_STRING)},
+		},
+	}
+	for i, word := range []string{"one", "two"} {
+		server.rows = append(server.rows, &Ydb.Value{Items: []*Ydb.Value{
+			{Value: &Ydb.Value_Int32Value{Int32Value: int32(i + 1)}},
+			{Value: &Ydb.Value_BoolValue{BoolValue: i == 0}},
+			{Value: &Ydb.Value_DoubleValue{DoubleValue: float64(i) + 1.5}},
+			{Value: &Ydb.Value_TextValue{TextValue: word}},
+			{Value: &Ydb.Value_BytesValue{BytesValue: []byte(word)}},
+		}})
+	}
+	conn := newWireResultConn(t, server)
+	type destination struct {
+		Score   *int32   `sql:"score"`
+		Active  *bool    `sql:"active"`
+		Amount  *float64 `sql:"amount"`
+		Name    *string  `sql:"name"`
+		Payload *[]byte  `sql:"payload"`
+	}
+	for _, wire := range []bool{false, true} {
+		for _, prefetch := range []int{0, 2} {
+			for _, tt := range []struct {
+				name string
+				scan func(publicquery.Row, *destination) error
+			}{
+				{name: "Scan", scan: func(row publicquery.Row, dst *destination) error {
+					return row.Scan(&dst.Score, &dst.Active, &dst.Amount, &dst.Name, &dst.Payload)
+				}},
+				{name: "ScanNamed", scan: func(row publicquery.Row, dst *destination) error {
+					return row.ScanNamed(scanner.NamedRef("score", &dst.Score), scanner.NamedRef("active", &dst.Active),
+						scanner.NamedRef("amount", &dst.Amount), scanner.NamedRef("name", &dst.Name),
+						scanner.NamedRef("payload", &dst.Payload))
+				}},
+				{name: "ScanStruct", scan: func(row publicquery.Row, dst *destination) error {
+					return row.ScanStruct(dst)
+				}},
+			} {
+				t.Run(fmt.Sprintf("wire=%v/prefetch=%d/%s", wire, prefetch, tt.name), func(t *testing.T) {
+					ctx := t.Context()
+					client, err := New(ctx, conn, config.New(config.WithProtoWireDecoding(wire)))
+					require.NoError(t, err)
+					defer client.Close(ctx)
+
+					r, err := client.Query(ctx, "SELECT score, active, amount, name, payload FROM test",
+						options.WithResponsePartPrefetch(prefetch))
+					require.NoError(t, err)
+					defer r.Close(ctx)
+					rs, err := r.NextResultSet(ctx)
+					require.NoError(t, err)
+					var dst destination
+					var saved []destination
+					for range server.rows {
+						row, err := rs.NextRow(ctx)
+						require.NoError(t, err)
+						require.NoError(t, tt.scan(row, &dst))
+						saved = append(saved, dst)
+					}
+					_, err = rs.NextRow(ctx)
+					require.ErrorIs(t, err, io.EOF)
+					var got [][]any
+					for _, item := range saved {
+						got = append(got, []any{*item.Score, *item.Active, *item.Amount, *item.Name, *item.Payload})
+					}
+					require.Equal(t, [][]any{
+						{int32(1), true, 1.5, "one", []byte("one")},
+						{int32(2), false, 2.5, "two", []byte("two")},
+					}, got, "scanning the second row must preserve the first row's values")
+				})
+			}
+		}
+	}
+}
+
+func newWireResultConn(t *testing.T, queryServer Ydb_Query_V1.QueryServiceServer) *grpc.ClientConn {
 	t.Helper()
 	listener := bufconn.Listen(1 << 20)
 	server := grpc.NewServer()
-	Ydb_Query_V1.RegisterQueryServiceServer(server, &wireResultServer{})
+	Ydb_Query_V1.RegisterQueryServiceServer(server, queryServer)
 	go func() { _ = server.Serve(listener) }()
 	t.Cleanup(server.Stop)
 
@@ -182,6 +265,32 @@ func newWireResultConn(t *testing.T) *grpc.ClientConn {
 
 type wireResultServer struct {
 	Ydb_Query_V1.UnimplementedQueryServiceServer
+}
+
+type optionalWireResultServer struct {
+	wireResultServer
+
+	columns []*Ydb.Column
+	rows    []*Ydb.Value
+}
+
+func (s *optionalWireResultServer) ExecuteQuery(_ *Ydb_Query.ExecuteQueryRequest,
+	stream Ydb_Query_V1.QueryService_ExecuteQueryServer,
+) error {
+	for i, row := range s.rows {
+		part := &Ydb_Query.ExecuteQueryResponsePart{
+			Status:    Ydb.StatusIds_SUCCESS,
+			ResultSet: &Ydb.ResultSet{Rows: []*Ydb.Value{row}},
+		}
+		if i == 0 {
+			part.ResultSet.Columns = s.columns
+		}
+		if err := stream.Send(part); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (*wireResultServer) CreateSession(context.Context, *Ydb_Query.CreateSessionRequest) (

@@ -155,6 +155,46 @@ func TestWireValueRowOtherScannersAndFallback(t *testing.T) {
 	require.Equal(t, uint64(5), fromValues)
 }
 
+func TestScanWireOptionalDestinationPreservesValues(t *testing.T) {
+	t.Run("Int32", func(t *testing.T) {
+		testWireOptionalDestination[int32](t, value.Int32Value(1), value.Int32Value(2))
+	})
+	t.Run("Bool", func(t *testing.T) {
+		testWireOptionalDestination[bool](t, value.BoolValue(true), value.BoolValue(false))
+	})
+	t.Run("Double", func(t *testing.T) {
+		testWireOptionalDestination[float64](t, value.DoubleValue(1.5), value.DoubleValue(2.5))
+	})
+	t.Run("Utf8", func(t *testing.T) {
+		testWireOptionalDestination[string](t, value.TextValue("first"), value.TextValue("second"))
+	})
+	t.Run("String", func(t *testing.T) {
+		testWireOptionalDestination[[]byte](t, value.BytesValue([]byte("first")), value.BytesValue([]byte("second")))
+	})
+}
+
+func testWireOptionalDestination[T any](t *testing.T, first, second value.Value) {
+	t.Helper()
+
+	var got, want *T
+	var savedGot, savedWant []*T
+	for _, source := range []value.Value{
+		value.OptionalValue(first),
+		value.OptionalValue(second),
+		value.NullValue(first.Type()),
+		value.OptionalValue(first),
+	} {
+		typed := value.ToYDB(source)
+		cell, err := proto.Marshal(typed.GetValue())
+		require.NoError(t, err)
+		require.NoError(t, value.CastTo(source, &want))
+		require.NoError(t, scanWireValueDestination(typed.GetType(), cell, &got))
+		savedGot = append(savedGot, got)
+		savedWant = append(savedWant, want)
+		require.Equal(t, savedWant, savedGot, "scanning %s must preserve previously scanned values", source.Yql())
+	}
+}
+
 func wirePrimitive(id Ydb.Type_PrimitiveTypeId) *Ydb.Type {
 	return &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: id}}
 }
