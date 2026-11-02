@@ -40,11 +40,8 @@ func benchmarkWriterCompression(b *testing.B, writerCount, size int, reopen bool
 		copy(payload[offset:offset+1024], payload[offset-1024:offset])
 	}
 
-	var created int
 	cfg := NewWriterReconnectorConfig(WithAddEncoder(rawtopiccommon.CodecGzip,
 		func(output io.Writer) (io.WriteCloser, error) {
-			created++
-
 			return gzip.NewWriterLevel(output, gzip.BestSpeed)
 		}))
 	writers := make([]*WriterReconnector, writerCount)
@@ -60,7 +57,6 @@ func benchmarkWriterCompression(b *testing.B, writerCount, size int, reopen bool
 
 	// Keep normal GC behavior: sync.Pool retention is part of the workload.
 	// Setup and initial warm-up are excluded from both time and allocation counts.
-	created = 0
 	b.SetBytes(int64(len(payload)))
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -79,7 +75,6 @@ func benchmarkWriterCompression(b *testing.B, writerCount, size int, reopen bool
 		}
 	}
 	b.StopTimer()
-	b.ReportMetric(float64(created)/float64(b.N), "encoders/op")
 
 	// Check a real compressed result outside the measured section.
 	reader, err := gzip.NewReader(bytes.NewReader(message.BufEncoded.Bytes()))
