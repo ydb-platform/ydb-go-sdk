@@ -152,15 +152,17 @@ func TestOrchestratorDoesNotAssignSeqNoBeforeSplitBaseline(t *testing.T) {
 		partitions:       map[int64]*PartitionInfo{0: parent},
 		partitionChooser: chooser,
 	}
-	require.NoError(t, o.addNewPartitions(parent, &topictypes.TopicDescription{Partitions: []topictypes.PartitionInfo{
-		{PartitionID: 2, Active: true, ParentPartitionIDs: []int64{0}},
-	}}, 0))
-	var msg message
-	msg.PartitionID = 2
-	retry, err := o.assignSeqNoNeedLock(&msg, true)
+	description := successiveSplitsDescription()
+	_, err := o.addNewPartitions(parent, &description, 0)
 	require.NoError(t, err)
-	require.True(t, retry, "SeqNo assignment must wait for the parent baseline")
-	require.Zero(t, msg.SeqNo)
+	for _, partitionID := range []int64{3, 4, 5} {
+		var msg message
+		msg.PartitionID = partitionID
+		retry, err := o.assignSeqNoNeedLock(&msg, true)
+		require.NoError(t, err)
+		require.True(t, retry, "partition %d must wait for the parent baseline", partitionID)
+		require.Zero(t, msg.SeqNo)
+	}
 	require.Zero(t, o.currentSeqNo.value.Load())
 }
 
