@@ -57,21 +57,21 @@ func benchmarkWriterCompression(b *testing.B, writerCount, size int) {
 	// Setup and initial warm-up are excluded from both time and allocation counts.
 	b.SetBytes(int64(len(payload)))
 	b.ReportAllocs()
-	b.ResetTimer()
-	var message topicwritercommon.MessageWithDataContent
-	for i := 0; i < b.N; i++ {
-		index := i % len(writers)
-		message = topicwritercommon.NewMessageDataWithContent(PublicMessage{
+	var encoded []byte
+	index := 0
+	for b.Loop() {
+		message := topicwritercommon.NewMessageDataWithContent(PublicMessage{
 			Data: bytes.NewReader(payload),
 		}, writers[index].encodersMap)
 		if err := message.CacheMessageData(rawtopiccommon.CodecGzip); err != nil {
 			b.Fatal(err)
 		}
+		encoded = message.BufEncoded.Bytes()
+		index = (index + 1) % len(writers)
 	}
-	b.StopTimer()
 
 	// Check a real compressed result outside the measured section.
-	reader, err := gzip.NewReader(bytes.NewReader(message.BufEncoded.Bytes()))
+	reader, err := gzip.NewReader(bytes.NewReader(encoded))
 	if err != nil {
 		b.Fatal(err)
 	}

@@ -1,5 +1,3 @@
-* Added CI benchmarks for topic writer compression across multiple writers
-
 ## v3.156.0
 * Fixed topic multi-writer write cancellation and error reporting during partition splits
 * Changed topic multi-writer initialization to improve startup performance for topics with many partitions

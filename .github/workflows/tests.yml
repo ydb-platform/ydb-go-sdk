@@ -35,25 +35,6 @@ jobs:
           cache: true
       - name: Run tests
         run: go test -race -coverprofile unit.txt -covermode atomic -v ./...
-      # Run without -race: instrumentation changes allocation and timing results.
-      # The label-gated benchmarks workflow also picks this up for base/PR comparisons.
-      - name: Benchmark topic compression
-        if: github.event_name != 'schedule'
-        shell: bash
-        env:
-          GOGC: '100'
-          GOMEMLIMIT: 'off'
-        run: |
-          go version > topic-compression-benchmarks.txt
-          go test -run '^$' -bench '^BenchmarkWriterCompression$' -benchmem -benchtime=100ms -count=5 -cpu=2 ./internal/topic/topicwriterinternal | tee -a topic-compression-benchmarks.txt
-      - name: Upload topic compression benchmarks
-        if: github.event_name != 'schedule'
-        uses: actions/upload-artifact@v4
-        with:
-          name: topic-compression-benchmarks-${{ matrix.os }}-go-${{ matrix.go-version }}
-          path: topic-compression-benchmarks.txt
-          if-no-files-found: ignore
-          retention-days: 90
       - name: Upload unit-tests coverage report to Codecov
         if: github.event_name != 'schedule'
         uses: codecov/codecov-action@v4

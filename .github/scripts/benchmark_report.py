@@ -19,7 +19,7 @@ MODULE = "github.com/ydb-platform/ydb-go-sdk/v3"
 MARKER = "<!-- benchmark-report -->"
 CHANGE = re.compile(r"^[+-]\d+(?:\.\d+)?%$")
 P_VALUE = re.compile(r"^p=(\d+(?:\.\d+)?) n=(\d+)$")
-METRIC_ORDER = {"sec/op": 0, "cpu-sec/op": 1, "sec/op(p50)": 2, "sec/op(p99)": 3, "B/op": 4, "allocs/op": 5}
+METRIC_ORDER = {"sec/op": 0, "cpu-sec/op": 1, "sec/op(p50)": 2, "sec/op(p99)": 3, "B/op": 4, "allocs/op": 5, "B/s": 6}
 
 
 @dataclass(frozen=True)
@@ -43,6 +43,8 @@ class Measurement:
             return "unchanged"
         if self.metric not in METRIC_ORDER:
             return "unknown"
+        if self.metric == "B/s":
+            return "improvement" if self.change.startswith("+") else "regression"
         return "regression" if self.change.startswith("+") else "improvement"
 
 
@@ -50,6 +52,7 @@ def parse_benchstat_csv(source):
     """Parse the CSV table columns emitted by the pinned benchstat CLI."""
     package = None
     metric = None
+    columns = {}
     seen_tables = 0
     measurements = []
     keys = set()
@@ -61,12 +64,17 @@ def parse_benchstat_csv(source):
             if row[0].startswith("pkg: "):
                 package = row[0][5:].strip()
                 metric = None
+                columns = {}
             continue
-        if row[0] == "" and len(row) >= 7 and row[1] == "master" and row[3] == "pr":
+        if row in (["", "master", "", "pr", "", "", ""], ["", "master", ""], ["", "pr", ""]):
+            columns = {name: index for index, name in enumerate(row) if name in ("master", "pr")}
             metric = None
             continue
-        if row[0] == "" and len(row) >= 7 and row[2] == "CI" and row[4] == "CI":
-            if row[1] != row[3] or row[5:7] != ["vs base", "P"] or not package:
+        if row[0] == "" and columns:
+            expected = [""] + [row[1], "CI"] * len(columns)
+            if len(columns) == 2:
+                expected += ["vs base", "P"]
+            if row != expected or not row[1] or not package:
                 raise ValueError(f"Invalid benchstat header on line {line_number}")
             metric = row[1]
             seen_tables += 1
@@ -75,10 +83,10 @@ def parse_benchstat_csv(source):
             continue
         row += [""] * max(0, 7 - len(row))
 
-        change = row[5].strip()
+        change = row[5].strip() if len(columns) == 2 else ""
         if change not in ("~", "", "?") and not CHANGE.fullmatch(change):
             raise ValueError(f"Invalid benchstat change on line {line_number}: {change!r}")
-        p_text = row[6].strip()
+        p_text = row[6].strip() if len(columns) == 2 else ""
         match = P_VALUE.fullmatch(p_text) if p_text else None
         if change not in ("", "?") and not match:
             raise ValueError(f"Missing benchstat p-value on line {line_number}")
@@ -86,15 +94,17 @@ def parse_benchstat_csv(source):
         if key in keys:
             raise ValueError(f"Duplicate benchmark metric on line {line_number}: {key!r}")
         keys.add(key)
+        master_column = columns.get("master")
+        pr_column = columns.get("pr")
         measurements.append(
             Measurement(
                 package=package,
                 name=row[0],
                 metric=metric,
-                master=_number(row[1], line_number),
-                master_ci=row[2].strip(),
-                pr=_number(row[3], line_number),
-                pr_ci=row[4].strip(),
+                master=_number(row[master_column], line_number) if master_column else None,
+                master_ci=row[master_column + 1].strip() if master_column else "",
+                pr=_number(row[pr_column], line_number) if pr_column else None,
+                pr_ci=row[pr_column + 1].strip() if pr_column else "",
                 change=change,
                 p=match.group(1) if match else "",
                 n=int(match.group(2)) if match else None,
@@ -139,6 +149,7 @@ def _metric_phrase(measurement):
         "sec/op(p99)": ("higher p99 latency", "lower p99 latency"),
         "B/op": ("allocates more memory", "allocates less memory"),
         "allocs/op": ("performs more allocations", "performs fewer allocations"),
+        "B/s": ("lower throughput", "higher throughput"),
     }
     regression, improvement = phrases[metric]
     word = regression if measurement.direction == "regression" else improvement
