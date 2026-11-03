@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
-	"reflect"
 	"runtime"
 	"testing"
 
@@ -14,7 +13,8 @@ import (
 )
 
 func TestEncoderOptionSharedAcrossWriters(t *testing.T) {
-	option := WithAddEncoder(rawtopiccommon.CodecGzip, func(output io.Writer) (io.WriteCloser, error) {
+	const codec = rawtopiccommon.Codec(10001)
+	option := WithAddEncoder(codec, func(output io.Writer) (io.WriteCloser, error) {
 		return gzip.NewWriter(output), nil
 	})
 
@@ -23,14 +23,9 @@ func TestEncoderOptionSharedAcrossWriters(t *testing.T) {
 		newTestWriterStopped(option),
 		newTestWriterStopped(option),
 	}
-	t.Run("RegisteredEncoder", func(t *testing.T) {
-		expected := reflect.ValueOf(writers[0].cfg.AdditionalEncoders[rawtopiccommon.CodecGzip]).Pointer()
+	t.Run("SharedOption", func(t *testing.T) {
 		for _, writer := range writers {
-			// Check the installed encoder: sync.Pool may discard compressors, especially under -race.
-			encoders := reflect.ValueOf(writer.encodersMap).Elem().FieldByName("m")
-			actual := encoders.MapIndex(reflect.ValueOf(rawtopiccommon.CodecGzip))
-			require.True(t, actual.IsValid())
-			require.Equal(t, expected, actual.Pointer())
+			require.Same(t, writers[0].cfg.AdditionalEncoders[codec], writer.cfg.AdditionalEncoders[codec])
 		}
 	})
 
@@ -41,7 +36,7 @@ func TestEncoderOptionSharedAcrossWriters(t *testing.T) {
 			for _, writer := range writers {
 				var output bytes.Buffer
 				payload := bytes.Repeat([]byte{byte(round)}, 100)
-				_, err := writer.encodersMap.EncodeBytes(rawtopiccommon.CodecGzip, &output, payload)
+				_, err := writer.encodersMap.EncodeBytes(codec, &output, payload)
 				require.NoError(t, err)
 				reader, err := gzip.NewReader(&output)
 				require.NoError(t, err)

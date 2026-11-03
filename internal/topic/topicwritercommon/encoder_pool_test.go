@@ -8,7 +8,23 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 )
+
+func TestMultiEncoderSharesEncoder(t *testing.T) {
+	t.Parallel()
+
+	const codec = rawtopiccommon.Codec(10001)
+	encoder := NewEncoder(func(output io.Writer) (io.WriteCloser, error) {
+		return &poolTestWriter{output: output}, nil
+	})
+	for range 2 {
+		encoders := NewMultiEncoder()
+		encoders.AddSharedEncoder(codec, encoder)
+		require.Same(t, encoder, encoders.m[codec])
+	}
+}
 
 func TestEncoderDiscardsFailures(t *testing.T) {
 	failure := errors.New("encoder failure")
