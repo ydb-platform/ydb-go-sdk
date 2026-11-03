@@ -30,6 +30,9 @@ type ResetableWriter = topicwritercommon.PublicResetableWriter
 //
 // If CreateEncoderFunc returns a writer implementing ResetableWriter, then the compression objects
 // will be reused for this codec. This will reduce the load on the GC.
+// Reusing the returned option across writers also shares their compression objects.
+// Idle objects may be discarded during garbage collection, as with sync.Pool.
+// Separate calls to WithWriterAddEncoder keep their pools independent.
 func WithWriterAddEncoder(codec topictypes.Codec, f CreateEncoderFunc) WriterOption {
 	return topicwriterinternal.WithAddEncoder(rawtopiccommon.Codec(codec), f)
 }
