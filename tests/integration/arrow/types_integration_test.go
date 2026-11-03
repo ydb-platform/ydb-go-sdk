@@ -29,67 +29,62 @@ import (
 )
 
 func TestArrowYQLScalars(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
-	defer cancel()
-	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close(ctx)
-
-	for _, test := range scalarFixtures() {
-		t.Run(test.values[0].Type().Yql(), func(t *testing.T) {
-			for _, mode := range []string{"required", "optional", "all-null", "empty"} {
-				t.Run(mode, func(t *testing.T) {
-					want := test.values
-					goType := test.goType
-					switch mode {
-					case "optional":
-						want = []types.Value{types.NullValue(want[0].Type())}
-						for _, v := range test.values {
-							want = append(want, types.OptionalValue(v), types.NullValue(v.Type()))
+	forEachProtoWireDriver(t, func(t *testing.T, db *ydb.Driver) {
+		ctx := t.Context()
+		for _, test := range scalarFixtures() {
+			t.Run(test.values[0].Type().Yql(), func(t *testing.T) {
+				for _, mode := range []string{"required", "optional", "all-null", "empty"} {
+					t.Run(mode, func(t *testing.T) {
+						want := test.values
+						goType := test.goType
+						switch mode {
+						case "optional":
+							want = []types.Value{types.NullValue(want[0].Type())}
+							for _, v := range test.values {
+								want = append(want, types.OptionalValue(v), types.NullValue(v.Type()))
+							}
+							goType = reflect.PointerTo(goType)
+						case "all-null":
+							want = []types.Value{types.NullValue(want[0].Type()), types.NullValue(want[0].Type())}
+							goType = reflect.PointerTo(goType)
 						}
-						goType = reflect.PointerTo(goType)
-					case "all-null":
-						want = []types.Value{types.NullValue(want[0].Type()), types.NullValue(want[0].Type())}
-						goType = reflect.PointerTo(goType)
-					}
-					statement := scalarSelect(want)
-					logicalType := want[0].Type()
-					if mode == "empty" {
-						statement = strings.Replace(statement, " ORDER BY id;", " WHERE FALSE ORDER BY id;", 1)
-						want = nil
-					}
-					if err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
-						for _, format := range []string{"Ydb.Value", "WithResultFormatArrow"} {
-							t.Run(format, func(t *testing.T) {
-								alloc := memory.NewCheckedAllocator(memory.DefaultAllocator)
-								defer alloc.AssertSize(t, 0)
-								var calls atomic.Int32
-								factory := func(part io.Reader, opts ...ipc.Option) (*ipc.Reader, error) {
-									calls.Add(1)
-
-									return ipc.NewReader(part, opts...)
-								}
-								option := query.WithYdbValue()
-								if format == "WithResultFormatArrow" {
-									option = query.WithResultFormatArrow(factory, ipc.WithAllocator(alloc))
-								}
-								assertScalarRows(ctx, t, s, statement, option, logicalType, goType, want)
-								if format == "WithResultFormatArrow" && len(want) > 0 && calls.Load() == 0 {
-									t.Fatal("server did not return Arrow IPC")
-								}
-							})
+						statement := scalarSelect(want)
+						logicalType := want[0].Type()
+						if mode == "empty" {
+							statement = strings.Replace(statement, " ORDER BY id;", " WHERE FALSE ORDER BY id;", 1)
+							want = nil
 						}
+						if err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
+							for _, format := range []string{"Ydb.Value", "WithResultFormatArrow"} {
+								t.Run(format, func(t *testing.T) {
+									alloc := memory.NewCheckedAllocator(memory.DefaultAllocator)
+									defer alloc.AssertSize(t, 0)
+									var calls atomic.Int32
+									factory := func(part io.Reader, opts ...ipc.Option) (*ipc.Reader, error) {
+										calls.Add(1)
 
-						return nil
-					}); err != nil {
-						t.Fatal(err)
-					}
-				})
-			}
-		})
-	}
+										return ipc.NewReader(part, opts...)
+									}
+									option := query.WithYdbValue()
+									if format == "WithResultFormatArrow" {
+										option = query.WithResultFormatArrow(factory, ipc.WithAllocator(alloc))
+									}
+									assertScalarRows(ctx, t, s, statement, option, logicalType, goType, want)
+									if format == "WithResultFormatArrow" && len(want) > 0 && calls.Load() == 0 {
+										t.Fatal("server did not return Arrow IPC")
+									}
+								})
+							}
+
+							return nil
+						}); err != nil {
+							t.Fatal(err)
+						}
+					})
+				}
+			})
+		}
+	})
 }
 
 func TestArrowYQLAliases(t *testing.T) {
@@ -127,45 +122,50 @@ func TestArrowYQLAliases(t *testing.T) {
 func TestArrowYQLTypes(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Minute)
 	defer cancel()
-	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials())
+	baselineDB, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close(ctx)
-	for _, test := range fullTypeFixtures() {
-		t.Run(test.name, func(t *testing.T) {
-			for _, mode := range []string{"required", "optional", "null"} {
-				t.Run(mode, func(t *testing.T) {
-					expression := test.expression
-					switch mode {
-					case "optional":
-						expression = "Just(" + expression + ")"
-					case "null":
-						expression = "Nothing(OptionalType(TypeOf(" + expression + ")))"
-					}
-					statement := "SELECT " + expression + " AS value;"
-					baseline, err := db.Query().QueryRow(ctx, statement, query.WithYdbValue())
-					if err != nil {
-						t.Fatal(err)
-					}
-					want := baseline.Values()
-					if mode == "required" && want[0].Type().Yql() != test.logicalType {
-						t.Fatalf("logical type=%s, want %s", want[0].Type().Yql(), test.logicalType)
-					}
-					if err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
-						if mode == "required" {
-							assertRawArrowType(ctx, t, s, statement, test.physicalType)
+	defer baselineDB.Close(ctx)
+	forEachProtoWireDriver(t, func(t *testing.T, db *ydb.Driver) {
+		for _, test := range fullTypeFixtures() {
+			t.Run(test.name, func(t *testing.T) {
+				for _, mode := range []string{"required", "optional", "null"} {
+					t.Run(mode, func(t *testing.T) {
+						expression := test.expression
+						logicalType := test.logicalType
+						switch mode {
+						case "optional":
+							expression = "Just(" + expression + ")"
+							logicalType = "Optional<" + logicalType + ">"
+						case "null":
+							expression = "Nothing(OptionalType(TypeOf(" + expression + ")))"
+							logicalType = "Optional<" + logicalType + ">"
 						}
-						assertValueRows(ctx, t, s, statement, want)
+						statement := "SELECT " + expression + " AS value;"
+						baseline, err := baselineDB.Query().QueryRow(ctx, statement, query.WithYdbValue())
+						if err != nil {
+							t.Fatal(err)
+						}
+						want := baseline.Values()
+						if want[0].Type().Yql() != logicalType {
+							t.Fatalf("logical type=%s, want %s", want[0].Type().Yql(), logicalType)
+						}
+						if err := db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
+							if mode == "required" {
+								assertRawArrowType(ctx, t, s, statement, test.physicalType)
+							}
+							assertValueRows(ctx, t, s, statement, want)
 
-						return nil
-					}); err != nil {
-						t.Fatal(err)
-					}
-				})
-			}
-		})
-	}
+							return nil
+						}); err != nil {
+							t.Fatal(err)
+						}
+					})
+				}
+			})
+		}
+	})
 }
 
 func TestArrowYQLTimezones(t *testing.T) {
@@ -512,6 +512,29 @@ func TestArrowYQLParts(t *testing.T) {
 	}
 }
 
+func forEachProtoWireDriver(t *testing.T, test func(*testing.T, *ydb.Driver)) {
+	t.Helper()
+	for _, mode := range []struct {
+		name string
+		opts []ydb.Option
+	}{
+		{name: "default"},
+		{name: "wire-disabled", opts: []ydb.Option{ydb.WithQueryProtoWireDecoding(false)}},
+		{name: "wire-enabled", opts: []ydb.Option{ydb.WithQueryProtoWireDecoding(true)}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			db, err := ydb.Open(t.Context(), connectionString(),
+				append([]ydb.Option{ydb.WithAnonymousCredentials()}, mode.opts...)...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close(t.Context())
+
+			test(t, db)
+		})
+	}
+}
+
 type scalarFixture struct {
 	goType reflect.Type
 	values []types.Value
@@ -537,12 +560,14 @@ func scalarFixtures() []scalarFixture {
 		{reflect.TypeFor[uint32](), []types.Value{types.Uint32Value(0), types.Uint32Value(math.MaxUint32)}},
 		{reflect.TypeFor[uint64](), []types.Value{types.Uint64Value(0), types.Uint64Value(math.MaxUint64)}},
 		{reflect.TypeFor[float32](), []types.Value{
-			types.FloatValue(-math.MaxFloat32), types.FloatValue(math.SmallestNonzeroFloat32), types.FloatValue(1.25),
+			types.FloatValue(-math.MaxFloat32), types.FloatValue(math.MaxFloat32), types.FloatValue(math.SmallestNonzeroFloat32),
+			types.FloatValue(0), types.FloatValue(1.25),
 			types.FloatValue(float32(math.Copysign(0, -1))), types.FloatValue(float32(math.Inf(1))),
 			types.FloatValue(float32(math.Inf(-1))), types.FloatValue(float32(math.NaN())),
 		}},
 		{reflect.TypeFor[float64](), []types.Value{
-			types.DoubleValue(-math.MaxFloat64), types.DoubleValue(math.SmallestNonzeroFloat64), types.DoubleValue(1.25),
+			types.DoubleValue(-math.MaxFloat64), types.DoubleValue(math.MaxFloat64),
+			types.DoubleValue(math.SmallestNonzeroFloat64), types.DoubleValue(0), types.DoubleValue(1.25),
 			types.DoubleValue(math.Copysign(0, -1)), types.DoubleValue(math.Inf(1)),
 			types.DoubleValue(math.Inf(-1)), types.DoubleValue(math.NaN()),
 		}},
@@ -806,64 +831,81 @@ func readResultValues(ctx context.Context, t *testing.T, result query.Result, wa
 
 func assertValueRows(ctx context.Context, t *testing.T, executor query.Executor, statement string, want []types.Value) {
 	t.Helper()
-	alloc := memory.NewCheckedAllocator(memory.DefaultAllocator)
-	defer alloc.AssertSize(t, 0)
-	var calls atomic.Int32
-	factory := func(part io.Reader, opts ...ipc.Option) (*ipc.Reader, error) {
-		calls.Add(1)
+	for _, format := range []string{"Ydb.Value", "WithResultFormatArrow"} {
+		t.Run(format, func(t *testing.T) {
+			alloc := memory.NewCheckedAllocator(memory.DefaultAllocator)
+			defer alloc.AssertSize(t, 0)
+			var calls atomic.Int32
+			factory := func(part io.Reader, opts ...ipc.Option) (*ipc.Reader, error) {
+				calls.Add(1)
 
-		return ipc.NewReader(part, opts...)
+				return ipc.NewReader(part, opts...)
+			}
+			option := query.WithYdbValue()
+			if format == "WithResultFormatArrow" {
+				option = query.WithResultFormatArrow(factory, ipc.WithAllocator(alloc))
+			}
+			result, err := executor.QueryResultSet(ctx, statement, option)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer result.Close(ctx)
+			if columns := result.Columns(); !reflect.DeepEqual(columns, []string{"value"}) {
+				t.Fatalf("columns=%v", columns)
+			}
+			columns := result.ColumnTypes()
+			if len(columns) != len(want) {
+				t.Fatalf("column types=%d, want %d", len(columns), len(want))
+			}
+			for i := range columns {
+				if !proto.Equal(columns[i].ToYDB(), want[i].Type().ToYDB()) {
+					t.Fatalf("column %d type=%s, want %s", i, columns[i].Yql(), want[i].Type().Yql())
+				}
+			}
+			var count int
+			var saved []types.Value
+			for row, err := range result.Rows(ctx) {
+				if err != nil {
+					t.Fatal(err)
+				}
+				count++
+				if count != 1 {
+					t.Fatal("unexpected extra row")
+				}
+				saved = row.Values()
+				assertValues(t, saved, want)
+				var scanned types.Value
+				if err := row.Scan(&scanned); err != nil {
+					t.Fatal(err)
+				}
+				assertValues(t, []types.Value{scanned}, want)
+				if err := row.ScanNamed(query.Named("value", &scanned)); err != nil {
+					t.Fatal(err)
+				}
+				assertValues(t, []types.Value{scanned}, want)
+				dst := struct {
+					Value types.Value `sql:"value"`
+				}{}
+				if err := row.ScanStruct(&dst); err != nil {
+					t.Fatal(err)
+				}
+				assertValues(t, []types.Value{dst.Value}, want)
+				var expected, actual driver.Value
+				expectedErr := types.CastTo(want[0], &expected)
+				actualErr := row.Scan(&actual)
+				if (expectedErr == nil) != (actualErr == nil) || (expectedErr == nil && !reflect.DeepEqual(actual, expected)) {
+					t.Fatalf("driver.Value Scan: got %v (%v), want %v (%v)", actual, actualErr, expected, expectedErr)
+				}
+			}
+			if count != 1 || (format == "WithResultFormatArrow" && calls.Load() == 0) {
+				t.Fatalf("rows=%d, IPC reader calls=%d", count, calls.Load())
+			}
+			if err := result.Close(ctx); err != nil {
+				t.Fatal(err)
+			}
+			assertValues(t, saved, want)
+		})
 	}
-	result, err := executor.QueryResultSet(ctx, statement, query.WithResultFormatArrow(factory, ipc.WithAllocator(alloc)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer result.Close(ctx)
-	if columns := result.ColumnTypes(); len(columns) != len(want) {
-		t.Fatalf("columns=%d, want %d", len(columns), len(want))
-	}
-	var count int
-	var saved []types.Value
-	for row, err := range result.Rows(ctx) {
-		if err != nil {
-			t.Fatal(err)
-		}
-		count++
-		if count != 1 {
-			t.Fatal("unexpected extra row")
-		}
-		saved = row.Values()
-		assertValues(t, saved, want)
-		var scanned types.Value
-		if err := row.Scan(&scanned); err != nil {
-			t.Fatal(err)
-		}
-		assertValues(t, []types.Value{scanned}, want)
-		if err := row.ScanNamed(query.Named("value", &scanned)); err != nil {
-			t.Fatal(err)
-		}
-		assertValues(t, []types.Value{scanned}, want)
-		dst := struct {
-			Value types.Value `sql:"value"`
-		}{}
-		if err := row.ScanStruct(&dst); err != nil {
-			t.Fatal(err)
-		}
-		assertValues(t, []types.Value{dst.Value}, want)
-		var expected, actual driver.Value
-		expectedErr := types.CastTo(want[0], &expected)
-		actualErr := row.Scan(&actual)
-		if (expectedErr == nil) != (actualErr == nil) || (expectedErr == nil && !reflect.DeepEqual(actual, expected)) {
-			t.Fatalf("driver.Value Scan: got %v (%v), want %v (%v)", actual, actualErr, expected, expectedErr)
-		}
-	}
-	if count != 1 || calls.Load() == 0 {
-		t.Fatalf("rows=%d, IPC reader calls=%d", count, calls.Load())
-	}
-	if err := result.Close(ctx); err != nil {
-		t.Fatal(err)
-	}
-	assertValues(t, saved, want)
 }
 
 func assertValues(t *testing.T, got, want []types.Value) {

@@ -11,6 +11,12 @@ import (
 
 type Option func(*Config)
 
+func WithProtoWireDecoding(enabled bool) Option {
+	return func(c *Config) {
+		c.protoWireDecoding = enabled
+	}
+}
+
 func WithDefaultResultFormatArrow(decoder arrow.Decoder) Option {
 	return func(c *Config) {
 		c.defaultArrowDecoder = decoder

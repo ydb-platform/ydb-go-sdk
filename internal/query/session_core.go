@@ -196,6 +196,9 @@ func Open(
 				return meta.WithTrailerCallback(balancerContext.WithNodeID(ctx, core.NodeID()), core.checkCloseHint)
 			}),
 		)
+		if _, ok := client.(wireQueryClient); ok {
+			core.Client = WireQueryClient(core.Client)
+		}
 	}
 
 	core.id = response.GetSessionId()

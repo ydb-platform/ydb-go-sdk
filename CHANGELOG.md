@@ -1,3 +1,5 @@
+* Added experimental `ydb.WithQueryProtoWireDecoding(bool)` to opt into direct protobuf wire decoding of native Query Service `FORMAT_VALUE` rows, reducing allocations
+
 ## v3.156.0
 * Fixed topic multi-writer write cancellation and error reporting during partition splits
 * Changed topic multi-writer initialization to improve startup performance for topics with many partitions
