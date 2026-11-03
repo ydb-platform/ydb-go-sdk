@@ -34,6 +34,81 @@ WriterSingle/p64-2,0.01,2%,0.013,2%,+30.00%,p=0.001 n=10
 
 
 class BenchmarkReportTests(unittest.TestCase):
+    def test_throughput_changes_use_higher_is_better_direction(self):
+        for change, pr, outcome, phrase in (
+            ("+20.00%", 120, "🟢 Improvements reported; no regressions detected", "higher throughput"),
+            ("-20.00%", 80, "🔴 Performance regressions reported", "lower throughput"),
+        ):
+            with self.subTest(change=change):
+                report = render_report(
+                    f"""\
+pkg: github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal
+,master,,pr,,,
+,B/s,CI,B/s,CI,vs base,P
+WriterCompression-2,100,1%,{pr},1%,{change},p=0.001 n=10
+""",
+                    artifact_url="https://github.com/example/repo/actions/runs/1/artifacts/2",
+                    preview_url="https://github.com/example/repo/actions/runs/1/artifacts/3",
+                    master_sha="a" * 40,
+                    head_sha="b" * 40,
+                )
+
+                self.assertIn(outcome, report)
+                self.assertIn(f"{phrase} ({change} B/s)", report)
+                self.assertNotIn("direction unknown", report)
+
+    def test_one_sided_throughput_tables_keep_values_in_the_correct_revision(self):
+        for revision, expected in (
+            ("pr", "| B/s | — | 100 B/s ±1% | — | — |"),
+            ("master", "| B/s | 100 B/s ±1% | — | — | — |"),
+        ):
+            with self.subTest(revision=revision):
+                report = render_report(
+                    SDK_CSV + f"""\
+
+,{revision},
+,B/s,CI
+Added-2,100,1%
+
+,master,,pr,,,
+,B/op,CI,B/op,CI,vs base,P
+AfterThroughput-2,10,1%,12,1%,+20.00%,p=0.001 n=10
+""",
+                    artifact_url="https://github.com/example/repo/actions/runs/1/artifacts/2",
+                    preview_url="https://github.com/example/repo/actions/runs/1/artifacts/3",
+                    master_sha="a" * 40,
+                    head_sha="b" * 40,
+                )
+
+                self.assertIn("Added-2", report)
+                self.assertIn("not comparable (B/s)", report)
+                self.assertIn(expected, report)
+                self.assertIn("1 incomplete", report)
+                self.assertIn("AfterThroughput-2", report)
+                self.assertIn("| B/op | 10 B/op ±1% | 12 B/op ±1% | +20.00% |", report)
+
+    def test_optional_throughput_measurements_are_not_compared_to_zero(self):
+        report = render_report(
+            """\
+pkg: github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal
+,master,,pr,,,
+,B/s,CI,B/s,CI,vs base,P
+WithoutSetBytesInMaster-2,,,100,1%
+WithoutSetBytesInPR-2,100,1%
+""",
+            artifact_url="https://github.com/example/repo/actions/runs/1/artifacts/2",
+            preview_url="https://github.com/example/repo/actions/runs/1/artifacts/3",
+            master_sha="a" * 40,
+            head_sha="b" * 40,
+        )
+
+        self.assertIn("🟡 Comparison incomplete", report)
+        self.assertIn("0 benchmarks with regressions · 0 with improvements only · 2 incomplete", report)
+        self.assertIn("WithoutSetBytesInMaster-2", report)
+        self.assertIn("WithoutSetBytesInPR-2", report)
+        self.assertIn("| B/s | — | 100 B/s ±1% | — | — |", report)
+        self.assertIn("| B/s | 100 B/s ±1% | — | — | — |", report)
+
     def test_combined_report_explains_status_and_keeps_details_under_packages(self):
         artifact_url = "https://github.com/ydb-platform/ydb-go-sdk/actions/runs/42/artifacts/7"
         preview_url = "https://github.com/ydb-platform/ydb-go-sdk/actions/runs/42/artifacts/8"
@@ -60,6 +135,7 @@ class BenchmarkReportTests(unittest.TestCase):
         self.assertIn("PR median", report)
         self.assertIn("p &lt; 0.001", report)
         self.assertNotIn("NoChange-2", report)
+        self.assertNotIn("| B/s |", report)
         self.assertEqual(5, report.count("<details>"))
         self.assertIn(f"[Open full benchstat in browser]({preview_url})", report)
         self.assertTrue(report.rstrip().endswith(f"[Download full benchstat and raw results]({artifact_url})"))
