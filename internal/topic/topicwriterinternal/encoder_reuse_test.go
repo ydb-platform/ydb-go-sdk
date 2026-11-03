@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
+	"reflect"
 	"runtime"
 	"testing"
 
@@ -22,26 +23,35 @@ func TestEncoderOptionSharedAcrossWriters(t *testing.T) {
 		newTestWriterStopped(option),
 		newTestWriterStopped(option),
 	}
-	for _, writer := range writers {
-		require.Same(t, writers[0].cfg.AdditionalEncoders[rawtopiccommon.CodecGzip],
-			writer.cfg.AdditionalEncoders[rawtopiccommon.CodecGzip])
-	}
-	for round := range 3 {
+	t.Run("RegisteredEncoder", func(t *testing.T) {
+		expected := reflect.ValueOf(writers[0].cfg.AdditionalEncoders[rawtopiccommon.CodecGzip]).Pointer()
 		for _, writer := range writers {
-			var output bytes.Buffer
-			payload := bytes.Repeat([]byte{byte(round)}, 100)
-			_, err := writer.encodersMap.EncodeBytes(rawtopiccommon.CodecGzip, &output, payload)
-			require.NoError(t, err)
-			reader, err := gzip.NewReader(&output)
-			require.NoError(t, err)
-			decoded, err := io.ReadAll(reader)
-			require.NoError(t, err)
-			require.NoError(t, reader.Close())
-			require.Equal(t, payload, decoded)
-			runtime.GC()
-			runtime.GC()
+			// Check the installed encoder: sync.Pool may discard compressors, especially under -race.
+			encoders := reflect.ValueOf(writer.encodersMap).Elem().FieldByName("m")
+			actual := encoders.MapIndex(reflect.ValueOf(rawtopiccommon.CodecGzip))
+			require.True(t, actual.IsValid())
+			require.Equal(t, expected, actual.Pointer())
 		}
-	}
+	})
+
+	t.Run("AfterGC", func(t *testing.T) {
+		for round := range 3 {
+			runtime.GC()
+			runtime.GC()
+			for _, writer := range writers {
+				var output bytes.Buffer
+				payload := bytes.Repeat([]byte{byte(round)}, 100)
+				_, err := writer.encodersMap.EncodeBytes(rawtopiccommon.CodecGzip, &output, payload)
+				require.NoError(t, err)
+				reader, err := gzip.NewReader(&output)
+				require.NoError(t, err)
+				decoded, err := io.ReadAll(reader)
+				require.NoError(t, err)
+				require.NoError(t, reader.Close())
+				require.Equal(t, payload, decoded)
+			}
+		}
+	})
 }
 
 func TestSeparateEncoderOptionsStayIndependent(t *testing.T) {
