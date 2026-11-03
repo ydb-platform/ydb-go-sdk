@@ -1,3 +1,4 @@
+## v3.156.1
 * Reduced custom topic encoder allocations by sharing pools across writers that reuse the same `topicoptions.WithWriterAddEncoder` option.
 
 ## v3.156.0
