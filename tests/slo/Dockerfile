@@ -17,10 +17,14 @@ RUN set -eu; \
     done
 
 ARG SRC_PATH
+ARG BRIDGE_PROBE=false
 COPY . /src
 
 WORKDIR /src/tests/slo/${SRC_PATH}
 RUN CGO_ENABLED=0 go build -o /build/slo-go-workload .
+RUN if [ "$BRIDGE_PROBE" = true ]; then \
+        cd /src/tests/slo && CGO_ENABLED=0 go build -o /build/bridge-probe ./bridge/probe; \
+    fi
 
 FROM scratch
 COPY --from=build /build /
