@@ -45,6 +45,14 @@ def prepare(action, image):
                 "hard_limit_bytes: 17179869184", "hard_limit_bytes: 1610612736"
             )
         )
+    readiness = deploy / "ydb/rootfs/opt/ydb.tech/scripts/ydbd/check-readiness.sh"
+    text = readiness.read_text()
+    if text.count("local max_attempts=30") != 2:
+        raise RuntimeError("Unexpected readiness implementation")
+    # Keep the GOOD/SQL predicates; only allow more time for cold initialization.
+    readiness.write_text(
+        text.replace("local max_attempts=30", "local max_attempts=150", 1)
+    )
     probe = copy.deepcopy(config["services"]["workload-current"])
     probe.update(
         container_name="ydb-bridge-probe", entrypoint=["/bridge-probe"], command=[]

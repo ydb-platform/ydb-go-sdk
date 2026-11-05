@@ -32,7 +32,10 @@ old pile comes back fails the unavailable-pile check.
 Compose 2.40.3 is installed explicitly for the Action's `up --quiet-build`.
 The hosted adapter supplies the server build argument, bounds node memory,
 aligns workload reservations with its limit and disables `extra-nodes`.
-The server binary and Action lifecycle sources are unchanged.
+Cold-start health polling has a bounded 150-attempt budget instead of 30:
+hosted runs reached GOOD just after the original budget expired. The GOOD and
+per-node SQL predicates and all chaos scenarios are unchanged. The server
+binary and Action's TypeScript lifecycle are not modified.
 
 `go-hosted-2dc` artifacts contain the combined `result.json`, native/probe/chaos
 logs, stop/start events and the resolved server image. Recovery/data oracle
