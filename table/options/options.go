@@ -233,6 +233,22 @@ func WithIndexType(t IndexType) IndexOption {
 	return t
 }
 
+type vectorKMeansTreeIndex struct {
+	settings *Ydb_Table.KMeansTreeSettings
+}
+
+func (v vectorKMeansTreeIndex) ApplyIndexOption(d *indexDesc) {
+	d.Type = &Ydb_Table.TableIndex_GlobalVectorKmeansTreeIndex{
+		GlobalVectorKmeansTreeIndex: &Ydb_Table.GlobalVectorKMeansTreeIndex{VectorSettings: v.settings},
+	}
+}
+
+// WithVectorKMeansTreeIndex configures a global vector k-means tree index.
+// Pass it to WithIndex or WithAddIndex. The server validates the settings.
+func WithVectorKMeansTreeIndex(settings *Ydb_Table.KMeansTreeSettings) IndexOption {
+	return vectorKMeansTreeIndex{settings: settings}
+}
+
 type columnFamilies []ColumnFamily
 
 func (cf columnFamilies) ApplyAlterTableOption(d *AlterTableDesc) {

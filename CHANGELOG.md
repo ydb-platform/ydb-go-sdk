@@ -1,3 +1,5 @@
+* Added global vector k-means tree index options and vector settings in `DescribeTable`; unrecognized index types now return `IndexTypeUnknown`.
+
 ## v3.156.1
 * Reduced custom topic encoder allocations by sharing pools across writers that reuse the same `topicoptions.WithWriterAddEncoder` option.
 
