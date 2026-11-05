@@ -19,9 +19,14 @@ SCENARIOS = [
 ]
 
 
-def command(*args, check=True):
+def command(*args, check=True, timeout=None):
     return subprocess.run(
-        args, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=check
+        args,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=check,
+        timeout=timeout,
     ).stdout
 
 
@@ -45,6 +50,24 @@ def main():
         (artifacts / f"{name}.log").write_text(
             command("docker", "logs", name, check=False)
         )
+    try:
+        health = command(
+            "docker",
+            "exec",
+            "ydb-storage-1",
+            "/opt/ydb.tech/ydb/bin/ydb",
+            "-e",
+            "grpc://localhost:2136",
+            "monitoring",
+            "healthcheck",
+            "--format",
+            "json",
+            check=False,
+            timeout=30,
+        )
+        (artifacts / "healthcheck.json").write_text(health)
+    except Exception as error:
+        (artifacts / "healthcheck-error.txt").write_text(repr(error))
     try:
         if result["action_outcome"] != "success":
             result["errors"].append("Action did not complete successfully")
