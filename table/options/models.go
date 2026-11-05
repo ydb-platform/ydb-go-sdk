@@ -46,6 +46,9 @@ type IndexDescription struct {
 	DataColumns  []string
 	Status       Ydb_Table.TableIndexDescription_Status
 	Type         IndexType
+	// VectorSettings is present for a global vector k-means tree index when
+	// the server returns its settings. Optional protobuf values retain presence.
+	VectorSettings *Ydb_Table.KMeansTreeSettings
 }
 
 type Description struct {
@@ -304,6 +307,9 @@ const (
 	IndexTypeGlobal = IndexType(iota)
 	IndexTypeGlobalAsync
 	IndexTypeGlobalUnique
+	IndexTypeGlobalVectorKMeansTree
+	// IndexTypeUnknown denotes an index type the server did not specify or the SDK does not recognize.
+	IndexTypeUnknown
 )
 
 func (t IndexType) ApplyIndexOption(d *indexDesc) {
@@ -316,6 +322,8 @@ func (t IndexType) ApplyIndexOption(d *indexDesc) {
 		d.Type = &Ydb_Table.TableIndex_GlobalAsyncIndex{
 			GlobalAsyncIndex: &Ydb_Table.GlobalAsyncIndex{},
 		}
+	case IndexTypeGlobalVectorKMeansTree:
+		WithVectorKMeansTreeIndex(nil).ApplyIndexOption(d)
 	case IndexTypeGlobalUnique:
 		d.Type = &Ydb_Table.TableIndex_GlobalUniqueIndex{
 			GlobalUniqueIndex: &Ydb_Table.GlobalUniqueIndex{},

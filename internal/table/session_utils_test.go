@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -236,6 +237,70 @@ func TestProcessIndexes(t *testing.T) {
 		require.Equal(t, options.IndexTypeGlobalAsync, result[1].Type)
 		require.Equal(t, options.IndexTypeGlobalUnique, result[2].Type)
 	})
+}
+
+func TestVectorIndexDescriptionRoundTrip(t *testing.T) {
+	settings := &Ydb_Table.KMeansTreeSettings{
+		Settings: &Ydb_Table.VectorIndexSettings{
+			Metric:          Ydb_Table.VectorIndexSettings_DISTANCE_COSINE.Enum(),
+			VectorType:      Ydb_Table.VectorIndexSettings_VECTOR_TYPE_FLOAT.Enum(),
+			VectorDimension: proto.Uint32(128),
+		},
+		Clusters:   proto.Uint32(16),
+		Levels:     proto.Uint32(2),
+		Autoupdate: proto.Bool(false),
+	}
+	indexOptions := []options.IndexOption{
+		options.WithIndexColumns("embedding"),
+		options.WithDataColumns("label"),
+		options.WithVectorKMeansTreeIndex(settings),
+	}
+	var create options.CreateTableDesc
+	options.WithIndex("embedding_index", indexOptions...).ApplyCreateTableOption(&create)
+	require.Len(t, create.Indexes, 1)
+	var alter options.AlterTableDesc
+	options.WithAddIndex("embedding_index", indexOptions...).ApplyAlterTableOption(&alter)
+	require.Len(t, alter.AddIndexes, 1)
+	index := alter.AddIndexes[0]
+	require.True(t, proto.Equal(create.Indexes[0], index))
+	require.True(t, proto.Equal(settings, index.GetGlobalVectorKmeansTreeIndex().GetVectorSettings()))
+
+	data, err := proto.Marshal(&Ydb_Table.DescribeTableResult{Indexes: []*Ydb_Table.TableIndexDescription{{
+		Name: index.GetName(), IndexColumns: index.GetIndexColumns(), DataColumns: index.GetDataColumns(),
+		Status: Ydb_Table.TableIndexDescription_STATUS_READY,
+		Type: &Ydb_Table.TableIndexDescription_GlobalVectorKmeansTreeIndex{
+			GlobalVectorKmeansTreeIndex: index.GetGlobalVectorKmeansTreeIndex(),
+		},
+	}}})
+	require.NoError(t, err)
+	var description Ydb_Table.DescribeTableResult
+	require.NoError(t, proto.Unmarshal(data, &description))
+	got := processIndexes(description.GetIndexes())
+	require.Len(t, got, 1)
+	require.Equal(t, options.IndexTypeGlobalVectorKMeansTree, got[0].Type)
+	require.Equal(t, "embedding_index", got[0].Name)
+	require.Equal(t, []string{"embedding"}, got[0].IndexColumns)
+	require.Equal(t, []string{"label"}, got[0].DataColumns)
+	require.Equal(t, Ydb_Table.TableIndexDescription_STATUS_READY, got[0].Status)
+	require.True(t, proto.Equal(settings, got[0].VectorSettings))
+}
+
+func TestProcessIndexesUnrecognizedType(t *testing.T) {
+	descriptions := []*Ydb_Table.TableIndexDescription{
+		{Name: "unspecified"},
+		{Name: "json", Type: &Ydb_Table.TableIndexDescription_GlobalJsonIndex{
+			GlobalJsonIndex: &Ydb_Table.GlobalJsonIndex{},
+		}},
+		{Name: "vector_without_settings", Type: &Ydb_Table.TableIndexDescription_GlobalVectorKmeansTreeIndex{
+			GlobalVectorKmeansTreeIndex: &Ydb_Table.GlobalVectorKMeansTreeIndex{},
+		}},
+	}
+	got := processIndexes(descriptions)
+	require.Len(t, got, 3)
+	require.Equal(t, options.IndexTypeUnknown, got[0].Type)
+	require.Equal(t, options.IndexTypeUnknown, got[1].Type)
+	require.Equal(t, options.IndexTypeGlobalVectorKMeansTree, got[2].Type)
+	require.Nil(t, got[2].VectorSettings)
 }
 
 func TestProcessChangefeeds(t *testing.T) {

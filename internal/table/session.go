@@ -708,21 +708,26 @@ func processAttributes(attrs map[string]string) map[string]string {
 func processIndexes(indexes []*Ydb_Table.TableIndexDescription) []options.IndexDescription {
 	idxs := make([]options.IndexDescription, len(indexes))
 	for i, idx := range indexes {
-		var typ options.IndexType
-		switch idx.GetType().(type) {
+		typ := options.IndexTypeUnknown
+		var vectorSettings *Ydb_Table.KMeansTreeSettings
+		switch kind := idx.GetType().(type) {
 		case *Ydb_Table.TableIndexDescription_GlobalAsyncIndex:
 			typ = options.IndexTypeGlobalAsync
 		case *Ydb_Table.TableIndexDescription_GlobalIndex:
 			typ = options.IndexTypeGlobal
 		case *Ydb_Table.TableIndexDescription_GlobalUniqueIndex:
 			typ = options.IndexTypeGlobalUnique
+		case *Ydb_Table.TableIndexDescription_GlobalVectorKmeansTreeIndex:
+			typ = options.IndexTypeGlobalVectorKMeansTree
+			vectorSettings = kind.GlobalVectorKmeansTreeIndex.GetVectorSettings()
 		}
 		idxs[i] = options.IndexDescription{
-			Name:         idx.GetName(),
-			IndexColumns: idx.GetIndexColumns(),
-			DataColumns:  idx.GetDataColumns(),
-			Status:       idx.GetStatus(),
-			Type:         typ,
+			Name:           idx.GetName(),
+			IndexColumns:   idx.GetIndexColumns(),
+			DataColumns:    idx.GetDataColumns(),
+			Status:         idx.GetStatus(),
+			Type:           typ,
+			VectorSettings: vectorSettings,
 		}
 	}
 
