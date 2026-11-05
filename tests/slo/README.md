@@ -1,5 +1,50 @@
 # SLO workload
 
+## GitHub-hosted Bridge recovery qualification
+
+`.github/workflows/slo-2dc.yml` runs native Query on `ubuntu-24.04` with a
+pinned SLO Action, a resolved server image and a bounded four-node topology.
+The 15-minute functional profile uses 50 reads/s and 10 writes/s. It does not
+replace the larger runner's performance baseline or activate its `SLO` label.
+
+Transient operation errors are diagnostic: the required behavior is continued
+work and intact acknowledged data. One additional Go Query driver stays alive
+through all five upstream Bridge scenarios, performs serializable write/read
+transactions with a 30-second operation context, and audits all acknowledged
+rows after chaos completes. The workload image includes this probe only when
+built with `BRIDGE_PROBE=true`; normal SLO images keep their existing entrypoint.
+
+The gate requires:
+
+- completion of all five scenarios without restarting the chaos process;
+- successful control transactions while each database-node outage is in effect,
+  after each recovery, and at the end of the run;
+- recent successful native reads and writes;
+- every acknowledged control row present with the expected payload;
+- no OOM or unexpected automatic YDB-node restart.
+
+Docker stop/start events define the actual unavailable-pile intervals. Short
+restarts used during rejoin are excluded from the outage-window count. The
+native error count and failed probe calls remain in the evidence but do not
+fail a recovered client by themselves. A client that only resumes when the
+old pile comes back fails the unavailable-pile check.
+
+Compose 2.40.3 is installed explicitly for the Action's `up --quiet-build`.
+The hosted adapter supplies the server build argument, bounds node memory,
+aligns workload reservations with its limit and disables `extra-nodes`.
+The server binary and Action lifecycle sources are unchanged.
+
+`go-hosted-2dc` artifacts contain the combined `result.json`, native/probe/chaos
+logs, stop/start events and the resolved server image. Recovery/data oracle
+tests run before deployment. After the workflow is available for dispatch:
+
+```bash
+gh workflow run slo-2dc.yml --ref <branch> -f server_image=<image-reference>
+```
+
+This qualifies an already configured Bridge cluster. Config v1/v2 conversion
+and per-database storage migration are separate scenarios.
+
 SLO is the type of test where app based on ydb-sdk is tested against falling YDB cluster nodes, tablets, network
 (that is possible situations for distributed DBs with hundreds of nodes)
 

@@ -1,0 +1,110 @@
+name: Hosted 2DC SLO
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/slo-2dc.yml
+      - tests/slo/bridge/**
+      - tests/slo/Dockerfile
+  workflow_dispatch:
+    inputs:
+      server_image:
+        description: YDB server image to qualify (resolved to a digest)
+        default: cr.yandex/crpb3d0up7s6a7iuofo9/ydb-appteam-ci/local-ydb:trunk
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  bridge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    concurrency:
+      group: hosted-2dc-${{ github.ref }}
+      cancel-in-progress: true
+    env:
+      WORKLOAD_MEMORY_LIMIT: 1G
+      WORKLOAD_CPU_LIMIT: '1.00'
+      WORKLOAD_CURRENT_IMAGE: go-slo-bridge:current
+      REQUESTED_IMAGE: ${{ inputs.server_image || 'cr.yandex/crpb3d0up7s6a7iuofo9/ydb-appteam-ci/local-ydb@sha256:6c227c994f83a3c34398f8ac7e46e10f9e2eefa35c9c4ac7775950d9920e7566' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ydb-platform/ydb-slo-action
+          ref: 54c3c03de1ce8c6a2d8b0828b328bd5db82ef2bb
+          path: .slo-action
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the Compose version required by the action
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.docker/cli-plugins"
+          curl -fsSL --retry 3 \
+            https://github.com/docker/compose/releases/download/v2.40.3/docker-compose-linux-x86_64 \
+            -o "$HOME/.docker/cli-plugins/docker-compose"
+          chmod +x "$HOME/.docker/cli-plugins/docker-compose"
+          docker compose version
+          docker compose up --help | grep -F -- --quiet-build
+      - name: Record runner and resolve server image
+        run: |
+          set -euo pipefail
+          mkdir -p bridge-artifacts
+          free -h
+          df -h
+          docker version
+          docker compose version
+          docker pull --platform linux/amd64 "$REQUESTED_IMAGE"
+          docker image inspect "$REQUESTED_IMAGE" > bridge-artifacts/server-image.json
+          SERVER_IMAGE=$(docker image inspect --format '{{index .RepoDigests 0}}' "$REQUESTED_IMAGE")
+          printf '%s\n' "$SERVER_IMAGE" > bridge-artifacts/server-image.txt
+          python tests/slo/bridge/prepare.py .slo-action "$SERVER_IMAGE"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27'
+          cache: false
+      - name: Check recovery and data oracles
+        run: |
+          python -m unittest discover -s tests/slo/bridge -p 'test_*.py'
+          cd tests/slo
+          go test -race -shuffle=on -count=1 ./bridge/probe
+      - name: Build current Go SDK workload and probe
+        run: >-
+          docker build -f tests/slo/Dockerfile
+          --build-arg SRC_PATH=native/query --build-arg BRIDGE_PROBE=true
+          -t go-slo-bridge:current .
+      - name: Record database node stop/start intervals
+        run: |
+          docker events --filter type=container --filter label=ydb.node.type=database \
+            --filter event=stop --filter event=start --format '{{json .}}' \
+            > bridge-artifacts/docker-events.jsonl 2>&1 &
+      - name: Run all five Bridge scenarios
+        id: slo
+        uses: ./.slo-action/init
+        timeout-minutes: 35
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workload_name: native-query
+          workload_duration: '900'
+          workload_current_ref: current
+          workload_current_image: go-slo-bridge:current
+          workload_current_command: >-
+            -read-rps=50 -write-rps=10 -read-timeout=30000 -write-timeout=30000
+          bridge_mode: true
+          disable_compose_profiles: extra-nodes
+          fail_on_workload_error: true
+      - name: Verify scenario coverage, SDK results and data
+        if: always()
+        timeout-minutes: 3
+        env:
+          ACTION_OUTCOME: ${{ steps.slo.outcome }}
+        run: python tests/slo/bridge/verify.py
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-hosted-2dc
+          path: bridge-artifacts/
+          retention-days: 14
