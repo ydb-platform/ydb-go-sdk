@@ -56,6 +56,17 @@ func WithWriterPartitionByKey(partitionChooser PartitionChooser) PublicPartition
 	}
 }
 
+func cloneBuiltinPartitionChooser(chooser PartitionChooser) PartitionChooser {
+	switch c := chooser.(type) {
+	case *partitionchooser.BoundPartitionChooser:
+		return c.Clone()
+	case *partitionchooser.HashPartitionChooser:
+		return partitionchooser.NewHashPartitionChooser()
+	default:
+		return chooser
+	}
+}
+
 func withWritersFactory(writersFactory writersFactory) PublicMultiWriterOption {
 	return func(cfg *MultiWriterConfig) {
 		cfg.writersFactory = writersFactory

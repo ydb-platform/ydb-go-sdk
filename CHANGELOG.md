@@ -1,3 +1,5 @@
+* Fixed built-in multi-partition chooser state leaking between writers and repeated hash partition registration changing key routing.
+
 ## v3.156.1
 * Reduced custom topic encoder allocations by sharing pools across writers that reuse the same `topicoptions.WithWriterAddEncoder` option.
 
