@@ -79,7 +79,7 @@ func newOrchestrator(
 		partitions:       make(map[int64]*PartitionInfo),
 		initDone:         make(empty.Chan),
 		background:       background,
-		partitionChooser: multiWriterCfg.PartitionChooser,
+		partitionChooser: cloneBuiltinPartitionChooser(multiWriterCfg.PartitionChooser),
 	}
 
 	o.buf = newInflightBuffer(ctx, o.mu, writerCfg, func() error { return o.getResultErr() })

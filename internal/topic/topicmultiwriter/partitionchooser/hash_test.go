@@ -71,3 +71,24 @@ func TestHashPartitionChooser(t *testing.T) {
 		require.Contains(t, []int64{0, 1}, partitionID)
 	})
 }
+
+func TestHashPartitionChooserRepeatedInitialization(t *testing.T) {
+	chooser := NewHashPartitionChooser()
+	partitions := []topictypes.PartitionInfo{{PartitionID: 0}, {PartitionID: 1}}
+	require.NoError(t, chooser.AddNewPartitions(partitions...))
+	expected := make(map[string]int64)
+	for _, key := range []string{"a", "b", "c", "d", "key0", "key1"} {
+		partition, err := chooser.ChoosePartition(topicwriterinternal.PublicMessage{Key: key})
+		require.NoError(t, err)
+		expected[key] = partition
+	}
+	for range 3 {
+		require.NoError(t, chooser.AddNewPartitions(partitions...))
+		require.Equal(t, []int64{0, 1}, chooser.partitions)
+		for key, partition := range expected {
+			actual, err := chooser.ChoosePartition(topicwriterinternal.PublicMessage{Key: key})
+			require.NoError(t, err)
+			require.Equal(t, partition, actual)
+		}
+	}
+}

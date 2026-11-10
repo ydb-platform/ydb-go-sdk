@@ -45,6 +45,7 @@ func (c *HashPartitionChooser) AddNewPartitions(partitions ...topictypes.Partiti
 	}
 
 	slices.Sort(c.partitions)
+	c.partitions = slices.Compact(c.partitions)
 
 	return nil
 }

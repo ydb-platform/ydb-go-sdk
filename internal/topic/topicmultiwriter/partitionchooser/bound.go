@@ -56,6 +56,11 @@ func NewBoundPartitionChooser(options ...BoundPartitionChooserOption) *BoundPart
 	return chooser
 }
 
+// Clone copies configuration without sharing partition registrations between writers.
+func (c *BoundPartitionChooser) Clone() *BoundPartitionChooser {
+	return NewBoundPartitionChooser(WithKeyHasher(c.keyHasher))
+}
+
 func (c *BoundPartitionChooser) ChoosePartition(msg topicwriterinternal.PublicMessage) (int64, error) {
 	if len(c.partitions) == 0 {
 		return 0, fmt.Errorf("no partitions configured")
