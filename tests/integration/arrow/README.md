@@ -35,9 +35,12 @@ docker run -d --name ydb-query-with-arrow --hostname localhost \
 
 Wait until `ydb -e grpc://localhost:2136 -d /local sql -s 'SELECT 1;'` succeeds.
 The benchmark consumes 1, 10, 100, 1,000 and 10,000 ordered table rows with six columns,
-nullable values and 64-byte payloads. It compares `Session.Query` + `Scan`,
+nullable values and 64-byte payloads. It compares default `Session.Query` + `Scan`,
+`Session.Query` + `Scan` with `ydb.WithQueryProtoWireDecoding(true)`,
 direct `Session.QueryArrow` column access, and `Session.Query` + `WithResultFormatArrow` +
-`Scan` using the same session, SQL, checksum and 32 KiB response-part limit.
+`Scan` using the same SQL, checksum and 32 KiB response-part limit.
+The `QueryProtoWireDecoding` variant uses a separate driver and session with the
+option enabled; all other variants share a session with the default decoder.
 Each variant has ten warmup queries. All returned columns participate in the
 checksum; the row count and checksum must match on every RPC.
 The Query and WithResultFormatArrow consumers reuse Scan destinations and arguments across

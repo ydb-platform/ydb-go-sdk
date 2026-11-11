@@ -29,6 +29,15 @@ account for this when producing application side effects. See the
 | Arrow through `query.WithResultFormatArrow(ipc.NewReader)` | Evaluate for larger results when retaining `Scan`, `ScanNamed`, `ScanStruct` and `Values` is useful | Rows refer to retained column batches. The decoder scans requested cells directly; `Values` and fallback conversions create owned `types.Value` objects on demand. |
 | Raw Arrow through `Session.QueryArrow` | Column processing that can consume Arrow batches directly | Avoids conversion to SDK rows. The application reads IPC, manages Arrow resources, and keeps borrowed column data within the batch lifetime. |
 
+Native Query Service `Ydb.Value` results use standard protobuf decoding by default.
+Pass the experimental `ydb.WithQueryProtoWireDecoding(true)` option to `ydb.Open`
+to decode rows directly from protobuf wire data with fewer allocations. Supported
+scalar destinations use direct scans; other destinations use the existing SDK
+value constructors and conversions without an intermediate protobuf value tree.
+This applies to Client, Session and TxActor queries, including `Do` and `DoTx`;
+it preserves the result format and row APIs. Arrow results and `database/sql`
+connectors keep their existing decoding paths.
+
 Arrow requires server support and the `EnableArrowResultSetFormat` feature.
 `query.WithResultFormatArrow` and the driver default option are experimental. Format selection
 does not change materialization: `Client.Query` still keeps the entire result in
