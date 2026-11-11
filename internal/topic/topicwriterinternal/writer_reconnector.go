@@ -25,7 +25,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -184,7 +183,7 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 	}
 
 	if cfg.connectTimeout == 0 {
-		cfg.connectTimeout = value.InfiniteDuration
+		cfg.connectTimeout = time.Minute
 	}
 
 	if cfg.producerID == "" {
