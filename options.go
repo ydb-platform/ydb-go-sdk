@@ -537,8 +537,8 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 }
 
 // WithQueryProtoWireDecoding enables direct decoding of native Query Service
-// FORMAT_VALUE rows from protobuf wire data, reducing allocations when scanning
-// supported scalar destinations. It applies to queries on [query.Client],
+// FORMAT_VALUE rows from protobuf wire data without an intermediate protobuf
+// value tree, reducing allocations. It applies to queries on [query.Client],
 // [query.Session] and [query.TxActor], including queries inside Do and DoTx.
 // The default is false: rows are decoded with the standard protobuf codec.
 // Arrow results and database/sql connectors keep their existing decoding paths.

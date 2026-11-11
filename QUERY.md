@@ -31,8 +31,9 @@ account for this when producing application side effects. See the
 
 Native Query Service `Ydb.Value` results use standard protobuf decoding by default.
 Pass the experimental `ydb.WithQueryProtoWireDecoding(true)` option to `ydb.Open`
-to scan supported scalar destinations directly from protobuf wire data with fewer
-allocations. Other destinations retain standard per-cell decoding and conversion.
+to decode rows directly from protobuf wire data with fewer allocations. Supported
+scalar destinations use direct scans; other destinations use the existing SDK
+value constructors and conversions without an intermediate protobuf value tree.
 This applies to Client, Session and TxActor queries, including `Do` and `DoTx`;
 it preserves the result format and row APIs. Arrow results and `database/sql`
 connectors keep their existing decoding paths.
