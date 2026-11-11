@@ -25,42 +25,60 @@ type PublicResetableWriter interface {
 	Reset(wr io.Writer)
 }
 
-type encoderPool struct {
-	pool sync.Pool
+// Encoder reuses compression writers for one codec configuration.
+// It can be shared by topic writers using the same encoder option.
+type Encoder struct {
+	create PublicCreateEncoderFunc
+	pool   sync.Pool
 }
 
-func (p *encoderPool) Get() PublicResetableWriter {
-	enc, _ := p.pool.Get().(PublicResetableWriter)
-
-	return enc
+func NewEncoder(create PublicCreateEncoderFunc) *Encoder {
+	return &Encoder{create: create}
 }
 
-func (p *encoderPool) Put(wr PublicResetableWriter) {
-	p.pool.Put(wr)
-}
-
-func newEncoderPool() *encoderPool {
-	return &encoderPool{
-		pool: sync.Pool{},
+func (e *Encoder) EncodeBytes(target io.Writer, data []byte) (int, error) {
+	enc, err := e.newWriter(target)
+	if err != nil {
+		return 0, err
 	}
+	n, err := enc.Write(data)
+	if err == nil {
+		err = enc.Close()
+	}
+	if err != nil {
+		return 0, err
+	}
+	if reusable, ok := enc.(PublicResetableWriter); ok {
+		e.pool.Put(reusable)
+	}
+
+	return n, nil
+}
+
+func (e *Encoder) newWriter(target io.Writer) (io.WriteCloser, error) {
+	if enc, ok := e.pool.Get().(PublicResetableWriter); ok {
+		enc.Reset(target)
+
+		return enc, nil
+	}
+
+	return e.create(target)
 }
 
 type MultiEncoder struct {
-	m map[rawtopiccommon.Codec]PublicCreateEncoderFunc
+	m map[rawtopiccommon.Codec]*Encoder
 
 	bp xsync.Pool[bytes.Buffer]
-	ep map[rawtopiccommon.Codec]*encoderPool
 }
 
 func NewMultiEncoder() *MultiEncoder {
 	me := &MultiEncoder{
-		m: make(map[rawtopiccommon.Codec]PublicCreateEncoderFunc),
+		m: make(map[rawtopiccommon.Codec]*Encoder),
 		bp: xsync.Pool[bytes.Buffer]{
 			New: func() *bytes.Buffer {
 				return &bytes.Buffer{}
 			},
 		},
-		ep: make(map[rawtopiccommon.Codec]*encoderPool),
 	}
 
 	me.AddEncoder(rawtopiccommon.CodecRaw, func(writer io.Writer) (io.WriteCloser, error) {
@@ -74,8 +92,11 @@ func NewMultiEncoder() *MultiEncoder {
 }
 
 func (e *MultiEncoder) AddEncoder(codec rawtopiccommon.Codec, creator PublicCreateEncoderFunc) {
-	e.m[codec] = creator
-	e.ep[codec] = newEncoderPool()
+	e.AddSharedEncoder(codec, NewEncoder(creator))
+}
+
+func (e *MultiEncoder) AddSharedEncoder(codec rawtopiccommon.Codec, encoder *Encoder) {
+	e.m[codec] = encoder
 }
 
 func (e *MultiEncoder) Encode(codec rawtopiccommon.Codec, target io.Writer, source io.Reader) (int, error) {
@@ -91,41 +112,11 @@ func (e *MultiEncoder) Encode(codec rawtopiccommon.Codec, target io.Writer, sour
 }
 
 func (e *MultiEncoder) EncodeBytes(codec rawtopiccommon.Codec, target io.Writer, data []byte) (int, error) {
-	enc, err := e.createEncodeWriter(codec, target)
-	if err != nil {
-		return 0, err
+	if encoder, ok := e.m[codec]; ok {
+		return encoder.EncodeBytes(target, data)
 	}
 
-	n, err := enc.Write(data)
-	if err == nil {
-		err = enc.Close()
-	}
-	if err != nil {
-		return 0, err
-	}
-
-	if resetableEnc, ok := enc.(PublicResetableWriter); ok {
-		e.ep[codec].Put(resetableEnc)
-	}
-
-	return n, nil
-}
-
-func (e *MultiEncoder) createEncodeWriter(codec rawtopiccommon.Codec, target io.Writer) (io.WriteCloser, error) {
-	if ePool, ok := e.ep[codec]; ok {
-		wr := ePool.Get()
-		if wr != nil {
-			wr.Reset(target)
-
-			return wr, nil
-		}
-	}
-
-	if encoderCreator, ok := e.m[codec]; ok {
-		return encoderCreator(target)
-	}
-
-	return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)))
+	return 0, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)))
 }
 
 func (e *MultiEncoder) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {

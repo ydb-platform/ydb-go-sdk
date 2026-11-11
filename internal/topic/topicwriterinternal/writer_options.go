@@ -22,11 +22,13 @@ func WithAddEncoder(
 	codec rawtopiccommon.Codec,
 	encoderFunc topicwritercommon.PublicCreateEncoderFunc,
 ) PublicWriterOption {
+	encoder := topicwritercommon.NewEncoder(encoderFunc)
+
 	return func(cfg *WriterReconnectorConfig) {
 		if cfg.AdditionalEncoders == nil {
-			cfg.AdditionalEncoders = map[rawtopiccommon.Codec]topicwritercommon.PublicCreateEncoderFunc{}
+			cfg.AdditionalEncoders = map[rawtopiccommon.Codec]*topicwritercommon.Encoder{}
 		}
-		cfg.AdditionalEncoders[codec] = encoderFunc
+		cfg.AdditionalEncoders[codec] = encoder
 	}
 }
 

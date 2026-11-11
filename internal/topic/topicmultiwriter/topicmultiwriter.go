@@ -37,8 +37,8 @@ func NewMultiWriter(
 		encoders    = topicwritercommon.NewMultiEncoder()
 	)
 
-	for codec, creator := range writerCfg.AdditionalEncoders {
-		encoders.AddEncoder(codec, creator)
+	for codec, encoder := range writerCfg.AdditionalEncoders {
+		encoders.AddSharedEncoder(codec, encoder)
 	}
 
 	p := &MultiWriter{
