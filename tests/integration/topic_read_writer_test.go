@@ -19,7 +19,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -34,6 +37,84 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestTopicWriterReconnectsAfterInitResponseTimeout(t *testing.T) {
+	for _, tt := range []struct {
+		name             string
+		receivedResponse bool
+	}{
+		{name: "CancelledStream"},
+		{name: "ReceivedResponseAtTimeout", receivedResponse: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			scope := newScope(t)
+			topicPath := scope.TopicPath()
+			stopper := NewGrpcStopper(status.Error(codes.Unavailable, "write acknowledgement interrupted"))
+			var initCount atomic.Int32
+			var ackInterrupted atomic.Bool
+			initHeld := make(chan struct{})
+			initCancelled := make(chan struct{})
+			stopper.onRecvMsg = func(ctx context.Context, message any) error {
+				response, ok := message.(*Ydb_Topic.StreamWriteMessage_FromServer)
+				if !ok {
+					return nil
+				}
+				if len(response.GetWriteResponse().GetAcks()) > 0 && ackInterrupted.CompareAndSwap(false, true) {
+					return status.Error(codes.Unavailable, "write acknowledgement interrupted")
+				}
+				if response.GetInitResponse() != nil && initCount.Add(1) == 2 {
+					close(initHeld)
+					<-ctx.Done()
+					close(initCancelled)
+					if !tt.receivedResponse {
+						return status.FromContextError(ctx.Err()).Err()
+					}
+					// A received response can race with cancellation of its stream context.
+					// Return that response successfully to exercise the timeout boundary.
+				}
+
+				return nil
+			}
+			driver := scope.driverNamed("writer-init-timeout", ydb.With(config.WithGrpcOptions(
+				grpc.WithStreamInterceptor(stopper.StreamClientInterceptor),
+			)))
+			writer, err := driver.Topic().StartWriter(topicPath,
+				topicoptions.WithWriterProducerID(scope.TopicWriterProducerID()),
+				topicoptions.WithWriterWaitServerAck(true),
+				topicoptions.WithWriterConnectTimeout(time.Second),
+			)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				defer cancel()
+				_ = writer.Close(ctx)
+			})
+			ctx := scope.Ctx
+			require.NoError(t, writer.WaitInit(ctx))
+			const payload = "unacknowledged message survives an init timeout"
+			writeDone := make(chan error, 1)
+			go func() {
+				writeDone <- writer.Write(ctx, topicwriter.Message{Data: strings.NewReader(payload)})
+			}()
+			<-initHeld
+			<-initCancelled
+			require.NoError(t, <-writeDone)
+			require.GreaterOrEqual(t, initCount.Load(), int32(3))
+			require.NoError(t, writer.Flush(ctx))
+			message, err := scope.TopicReader().ReadMessage(ctx)
+			require.NoError(t, err)
+			require.Equal(t, scope.TopicWriterProducerID(), message.ProducerID)
+			require.EqualValues(t, 1, message.SeqNo)
+			data, err := io.ReadAll(message)
+			require.NoError(t, err)
+			require.Equal(t, payload, string(data))
+			description, err := driver.Topic().Describe(ctx, topicPath, topicoptions.IncludePartitionStats())
+			require.NoError(t, err)
+			require.Len(t, description.Partitions, 1)
+			require.EqualValues(t, 1, description.Partitions[0].PartitionStats.PartitionsOffset.End)
+		})
+	}
+}
 
 func TestTopicWriterLogMessagesWithoutData(t *testing.T) {
 	scope := newScope(t)

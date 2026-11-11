@@ -1,4 +1,6 @@
-* Changed the default topic writer connection and initialization timeout to one minute when no operation timeout is configured
+* Added `topicoptions.WithWriterConnectTimeout` to override or disable the topic writer connection and initialization timeout
+* Fixed topic writer recovery when initialization races with its timeout, cancellation of pending initialization on close, and preservation of configured retry budgets across failed attempts
+* Changed the default topic writer connection and initialization timeout to one minute when no operation timeout is configured. With this default, reconnect backoff resets after a connection lasts more than ten minutes instead of more than one minute; shorter connections retain accumulated backoff
 
 ## v3.156.1
 * Reduced custom topic encoder allocations by sharing pools across writers that reuse the same `topicoptions.WithWriterAddEncoder` option.

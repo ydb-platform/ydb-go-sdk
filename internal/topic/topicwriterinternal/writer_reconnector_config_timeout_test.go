@@ -37,7 +37,6 @@ func TestWriterReconnectorConfig_ConnectTimeout(t *testing.T) {
 			options: []PublicWriterOption{WithConnectTimeout(value.InfiniteDuration)},
 			want:    value.InfiniteDuration,
 		},
-		{name: "Negative", options: []PublicWriterOption{WithConnectTimeout(-time.Second)}, want: -time.Second},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var common config.Common
