@@ -25,7 +25,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -34,7 +33,10 @@ import (
 )
 
 var (
-	errConnTimeout           = xerrors.Wrap(errors.New("ydb: connection timeout"))
+	errConnTimeout = xerrors.Retryable(
+		errors.New("ydb: connection timeout"),
+		xerrors.WithName("TopicWriterConnectionTimeout"),
+	)
 	errStopWriterReconnector = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
 	ErrNonZeroSeqNo          = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
 	errNoAllowedCodecs       = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
@@ -184,7 +186,7 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 	}
 
 	if cfg.connectTimeout == 0 {
-		cfg.connectTimeout = value.InfiniteDuration
+		cfg.connectTimeout = time.Minute
 	}
 
 	if cfg.producerID == "" {
@@ -538,8 +540,7 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	attempt := 0
 	createStreamContext := func() (context.Context, context.CancelFunc) {
-		// need suppress parent context cancelation for flush buffer while close writer
-		return xcontext.WithCancel(xcontext.ValueOnly(ctx))
+		return xcontext.WithCancel(ctx)
 	}
 
 	//nolint:ineffassign,staticcheck,wastedassign
@@ -550,6 +551,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	var reconnectReason error
 	var prevAttemptTime time.Time
 	var startOfRetries time.Time
+	connectionEstablished := false
 
 	for {
 		if ctx.Err() != nil {
@@ -560,7 +562,8 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtx, streamCtxCancel = createStreamContext()
 
 		now := time.Now()
-		if startOfRetries.IsZero() || topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
+		if startOfRetries.IsZero() || (connectionEstablished &&
+			topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout)) {
 			attempt = 0
 			startOfRetries = w.cfg.clock.Now()
 		} else {
@@ -585,6 +588,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		)
 
 		writer, err := w.startWriteStream(streamCtx)
+		connectionEstablished = err == nil
 		w.onWriterChange(writer)
 		onStreamError := onWriterStarted(err)
 		if err == nil {
