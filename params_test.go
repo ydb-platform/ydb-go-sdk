@@ -108,12 +108,12 @@ func makeParamsUsingParamsBuilder(tb testing.TB) params.Parameters {
 		Build()
 }
 
-func makeParamsFromProtobuf(tb testing.TB) params.Parameters {
+func makeParamsUsingRawProtobuf(tb testing.TB) params.Parameters {
 	return ydb.ParamsBuilder().
-		Param("$a").FromProtobuf(a).
-		Param("$b").FromProtobuf(b).
-		Param("$c").FromProtobuf(c).
-		Param("$d").FromProtobuf(d).
+		Param("$a").Raw(a).
+		Param("$b").Raw(b).
+		Param("$c").Raw(c).
+		Param("$d").Raw(d).
 		Build()
 }
 
@@ -152,8 +152,19 @@ func TestParams(t *testing.T) {
 		pb, err := params.ToYDB()
 		require.NoError(t, err)
 		require.Equal(t, fmt.Sprint(exp), fmt.Sprint(pb))
+		t.Run("FromProtobuf", func(t *testing.T) {
+			params := ydb.ParamsBuilder().
+				Param("$a").FromProtobuf(a).
+				Param("$b").FromProtobuf(b).
+				Param("$c").FromProtobuf(c).
+				Param("$d").FromProtobuf(d).
+				Build()
+			pb, err := params.ToYDB()
+			require.NoError(t, err)
+			require.Equal(t, fmt.Sprint(exp), fmt.Sprint(pb))
+		})
 		t.Run("Raw", func(t *testing.T) {
-			params := makeParamsFromProtobuf(t)
+			params := makeParamsUsingRawProtobuf(t)
 			pb, err := params.ToYDB()
 			require.NoError(t, err)
 			require.Equal(t, fmt.Sprint(exp), fmt.Sprint(pb))
@@ -184,7 +195,7 @@ func BenchmarkParams(b *testing.B) {
 	b.Run("RawProtobuf", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			params := makeParamsFromProtobuf(b)
+			params := makeParamsUsingRawProtobuf(b)
 			_, _ = params.ToYDB()
 		}
 	})

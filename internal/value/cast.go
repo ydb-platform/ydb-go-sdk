@@ -1,25 +1,27 @@
 package value
 
 import (
- "github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/proto"
 )
 
 func CastTo(v Value, dst any) error {
 	if dst == nil {
 		return errNilDestination
 	}
-	
+
 	switch x := dst.(type) {
 	case *Value:
 		*x = v
 
 		return nil
 	case **Value:
-		**x = v
+		*x = &v
 
 		return nil
 	case *Ydb.Value:
-		*x = *v.toYDB()
+		proto.Reset(x)
+		proto.Merge(x, v.toYDB())
 
 		return nil
 	case **Ydb.Value:

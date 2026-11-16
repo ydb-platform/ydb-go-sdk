@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -83,6 +84,22 @@ func TestToValue(t *testing.T) {
 		dst  value.Value
 		err  error
 	}{
+		{
+			name: "RawProtobufValue",
+			src: Ydb.TypedValue{
+				Type:  &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}},
+				Value: &Ydb.Value{Value: &Ydb.Value_Uint64Value{Uint64Value: 123}},
+			},
+			dst: value.Uint64Value(123),
+		},
+		{
+			name: "RawProtobufValuePointer",
+			src: &Ydb.TypedValue{
+				Type:  &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}},
+				Value: &Ydb.Value{Value: &Ydb.Value_Uint64Value{Uint64Value: 123}},
+			},
+			dst: value.Uint64Value(123),
+		},
 		{
 			name: xtest.CurrentFileLine(),
 			src:  value.BoolValue(true),

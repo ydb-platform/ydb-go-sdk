@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"net/url"
 	"reflect"
 	"sort"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -313,6 +313,10 @@ func toValue(v any) (_ value.Value, err error) {
 		return toValue(x.Interface())
 	case value.Value:
 		return x, nil
+	case Ydb.TypedValue:
+		return value.FromProtobuf(&x), nil
+	case *Ydb.TypedValue:
+		return value.FromProtobuf(x), nil
 	}
 
 	if vv := reflect.ValueOf(v); vv.Kind() == reflect.Pointer {
@@ -346,10 +350,6 @@ func toValue(v any) (_ value.Value, err error) {
 		return toValue(x.Interface())
 	case value.Value:
 		return x, nil
-	case Ydb.TypedValue:
-		return value.FromProtobuf(&x), nil
-	case *Ydb.TypedValue:
-		return value.FromProtobuf(x), nil
 	case bool:
 		return value.BoolValue(x), nil
 	case int:
