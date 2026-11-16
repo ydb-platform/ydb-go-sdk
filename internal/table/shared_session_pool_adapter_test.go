@@ -2,6 +2,7 @@ package table
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -19,7 +20,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestSessionFromQueryCoreClose(t *testing.T) {
@@ -161,6 +164,56 @@ func TestSharedTableAdapterBadSession(t *testing.T) {
 	require.Equal(t, 2, attempts)
 	require.EqualValues(t, 2, created.Load())
 	require.False(t, oldCore.IsAlive())
+}
+
+func TestSharedTableAdapterInvalidCallbackSession(t *testing.T) {
+	a, created := newAdapterTestPool(t, &adapterTestConn{})
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	cause := errors.New("invalid table callback session")
+	attempts := 0
+	var firstError error
+	var first *Session
+	require.NoError(t, a.With(ctx, func(_ context.Context, s *Session) error {
+		attempts++
+		if attempts == 1 {
+			first = s
+
+			return retry.RetryableError(cause, xerrors.Invalid(s))
+		}
+		require.NotSame(t, first.queryCore, s.queryCore)
+		require.NotEqual(t, first.ID(), s.ID())
+
+		return nil
+	}, retry.WithTrace(&trace.Retry{
+		OnRetryAttempt: func(info trace.RetryAttemptStartInfo) func(trace.RetryAttemptDoneInfo) {
+			return func(done trace.RetryAttemptDoneInfo) {
+				if info.Attempt == 1 {
+					firstError = done.Error
+				}
+			}
+		},
+	})))
+	require.ErrorIs(t, firstError, cause)
+	require.NotNil(t, xerrors.RetryableError(firstError))
+	require.Equal(t, 2, attempts)
+	require.EqualValues(t, 2, created.Load())
+	require.False(t, first.queryCore.IsAlive())
+}
+
+func TestSharedTableAdapterCallbackError(t *testing.T) {
+	a, created := newAdapterTestPool(t, &adapterTestConn{})
+	cause := errors.New("table callback error")
+	attempts := 0
+	err := a.With(t.Context(), func(context.Context, *Session) error {
+		attempts++
+
+		return cause
+	})
+	require.ErrorIs(t, err, cause)
+	require.Nil(t, xerrors.RetryableError(err))
+	require.Equal(t, 1, attempts)
+	require.EqualValues(t, 1, created.Load())
 }
 
 type adapterTestCore struct {

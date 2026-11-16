@@ -5,6 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
@@ -26,6 +27,11 @@ func (a *sessionPoolAdapter) With(ctx context.Context,
 		s.defaultArrowDecoder = a.cfg.DefaultArrowDecoder()
 		s.streamResultCloseTimeout = a.cfg.SessionDeleteTimeout()
 
-		return f(ctx, &s)
+		err := f(ctx, &s)
+		if !xerrors.IsValid(err, &s) {
+			physical.SetStatus(StatusClosing)
+		}
+
+		return err
 	}, opts...)
 }

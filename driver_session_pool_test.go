@@ -2,6 +2,7 @@ package ydb_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"net"
@@ -20,7 +21,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -221,6 +224,91 @@ func TestDriverSharedSessionPoolCloseCancelsOperation(t *testing.T) {
 				require.NoError(t, tableClient.Do(ctx, func(context.Context, table.Session) error { return nil }))
 			}
 			require.NoError(t, db.Close(ctx))
+		})
+	}
+}
+
+func TestDriverSharedSessionPoolInvalidObjectLifecycle(t *testing.T) {
+	for _, api := range []string{"table", "query"} {
+		t.Run(api, func(t *testing.T) {
+			var created, deleted atomic.Int32
+			db, server := newSharedPoolTestDriver(t, 1, 0, ydb.WithTraceTable(trace.Table{
+				OnSessionNew: func(trace.TableSessionNewStartInfo) func(trace.TableSessionNewDoneInfo) {
+					return func(info trace.TableSessionNewDoneInfo) {
+						if info.Error == nil {
+							created.Add(1)
+						}
+					}
+				},
+				OnSessionDelete: func(trace.TableSessionDeleteStartInfo) func(trace.TableSessionDeleteDoneInfo) {
+					deleted.Add(1)
+
+					return nil
+				},
+			}))
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			attempts := 0
+			cause := errors.New("invalid callback session")
+			var err error
+			if api == "table" {
+				err = db.Table().Do(ctx, func(_ context.Context, s table.Session) error {
+					attempts++
+					if deleted.Load() > 0 {
+						return nil
+					}
+
+					return retry.RetryableError(cause, xerrors.Invalid(s))
+				})
+			} else {
+				err = db.Query().Do(ctx, func(_ context.Context, s query.Session) error {
+					attempts++
+					if deleted.Load() > 0 {
+						return nil
+					}
+
+					return retry.RetryableError(cause, xerrors.Invalid(s))
+				})
+			}
+			require.NoError(t, err)
+			require.Equal(t, 2, attempts)
+			require.EqualValues(t, 2, created.Load())
+			require.EqualValues(t, 1, deleted.Load())
+			require.Equal(t, 2, server.createdCount())
+			require.NoError(t, db.Close(ctx))
+			require.EqualValues(t, 2, deleted.Load())
+		})
+	}
+}
+
+func TestDriverSharedSessionPoolExplicitCloseLifecycle(t *testing.T) {
+	for _, mode := range []string{"pooled", "standalone"} {
+		t.Run(mode, func(t *testing.T) {
+			var deleted atomic.Int32
+			db, server := newSharedPoolTestDriver(t, 1, 0, ydb.WithTraceTable(trace.Table{
+				OnSessionDelete: func(trace.TableSessionDeleteStartInfo) func(trace.TableSessionDeleteDoneInfo) {
+					deleted.Add(1)
+
+					return nil
+				},
+			}))
+			if mode == "pooled" {
+				require.NoError(t, db.Table().Do(t.Context(), func(ctx context.Context, s table.Session) error {
+					closable, ok := s.(table.ClosableSession)
+					require.True(t, ok)
+
+					return closable.Close(ctx)
+				}))
+			} else {
+				//nolint:staticcheck // Verify standalone session compatibility.
+				s, err := db.Table().CreateSession(t.Context())
+				require.NoError(t, err)
+				require.NoError(t, s.Close(t.Context()))
+			}
+			require.EqualValues(t, 1, deleted.Load())
+			require.NoError(t, db.Close(t.Context()))
+			require.EqualValues(t, 1, deleted.Load())
+			require.Equal(t, map[string]int{"session-1": 1}, server.deletedCounts())
 		})
 	}
 }

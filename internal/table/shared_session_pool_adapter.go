@@ -40,6 +40,10 @@ func (a *sessionPoolAdapter) With(
 			}
 		}()
 		if err := f(ctx, s); err != nil {
+			if !xerrors.IsValid(err, s) {
+				s.SetStatus(table.SessionClosing)
+			}
+
 			return xerrors.WithStackTrace(err)
 		}
 
@@ -48,7 +52,7 @@ func (a *sessionPoolAdapter) With(
 }
 
 func sessionFromQueryCore(cc grpc.ClientConnInterface, cfg *config.Config, core query.Core) *Session {
-	s := &Session{config: cfg, status: table.SessionReady}
+	s := &Session{config: cfg, status: table.SessionReady, borrowed: true}
 	initQuerySession(s, cc, core)
 
 	return s

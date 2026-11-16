@@ -50,6 +50,16 @@ func (d *Driver) sharedSessionPoolSettings(queryCfg *queryConfig.Config) *queryC
 
 func sharedTablePoolTrace(t *trace.Table) *trace.Query {
 	return &trace.Query{
+		OnSessionCreate: func(info trace.QuerySessionCreateStartInfo) func(trace.QuerySessionCreateDoneInfo) {
+			done := tableTrace.TableOnSessionNew(t, info.Context, info.Call)
+
+			return func(info trace.QuerySessionCreateDoneInfo) { done(info.Session, info.Error) }
+		},
+		OnSessionDelete: func(info trace.QuerySessionDeleteStartInfo) func(trace.QuerySessionDeleteDoneInfo) {
+			done := tableTrace.TableOnSessionDelete(t, info.Context, info.Call, info.Session)
+
+			return func(info trace.QuerySessionDeleteDoneInfo) { done(info.Error) }
+		},
 		OnPoolGet: func(info trace.QueryPoolGetStartInfo) func(trace.QueryPoolGetDoneInfo) {
 			done := tableTrace.TableOnPoolGet(t, info.Context, info.Call)
 

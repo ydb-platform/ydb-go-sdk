@@ -198,6 +198,7 @@ type Session struct {
 	config    *config.Config
 	dataQuery dataQueryExecutor
 	queryCore query.Core
+	borrowed  bool
 	lastUsage atomic.Int64
 	statusMtx sync.RWMutex
 	nodeID    atomic.Uint32
@@ -450,6 +451,10 @@ func (s *Session) ID() string {
 }
 
 func (s *Session) Close(ctx context.Context) (finalErr error) {
+	if s.borrowed {
+		return s.closeOnce(ctx)
+	}
+
 	onDone := gtrace.TableOnSessionDelete(s.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).Close"),
 		s,
