@@ -3,6 +3,7 @@ package bind
 import (
 	"sort"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xstring"
 )
@@ -26,15 +27,22 @@ func (m AutoDeclare) ToYdb(sql string, args ...any) (
 	}
 
 	var (
-		declares = make([]string, 0, len(params))
-		buffer   = xstring.Buffer()
+		declares     = make([]string, 0, len(params))
+		nullBindings []string
+		buffer       = xstring.Buffer()
 	)
 	defer buffer.Free()
 
 	buffer.WriteString("-- bind declares\n")
 
 	for _, param := range params {
+		if types.Equal(param.Value().Type(), types.NewNull()) {
+			nullBindings = append(nullBindings, param.Name()+" = NULL;")
+
+			continue
+		}
 		declares = append(declares, "DECLARE "+param.Name()+" AS "+param.Value().Type().Yql()+";")
+		newArgs = append(newArgs, param)
 	}
 
 	sort.Strings(declares)
@@ -43,14 +51,15 @@ func (m AutoDeclare) ToYdb(sql string, args ...any) (
 		buffer.WriteString(d)
 		buffer.WriteByte('\n')
 	}
+	sort.Strings(nullBindings)
+	for _, binding := range nullBindings {
+		buffer.WriteString(binding)
+		buffer.WriteByte('\n')
+	}
 
 	buffer.WriteByte('\n')
 
 	buffer.WriteString(sql)
-
-	for _, param := range params {
-		newArgs = append(newArgs, param)
-	}
 
 	return buffer.String(), newArgs, nil
 }

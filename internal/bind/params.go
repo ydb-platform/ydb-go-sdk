@@ -307,7 +307,7 @@ func toValue(v any) (_ value.Value, err error) {
 
 	switch x := v.(type) {
 	case nil:
-		return value.VoidValue(), nil
+		return value.LiteralNullValue(), nil
 	case reflect.Value:
 		return toValue(x.Interface())
 	case value.Value:
