@@ -3,6 +3,7 @@ package balancer
 import (
 	"math"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -322,6 +323,65 @@ func TestEndpointElectorReadsCurrentLoadWithoutRefresh(t *testing.T) {
 	require.Same(t, first, selected)
 }
 
+func TestEndpointElectorConcurrentSelectionsAvoidBusyConnection(t *testing.T) {
+	const workers = 16
+	connections := []*busyElectorConn{
+		{Conn: electorConnection("first", 1, state.Online)},
+		{Conn: electorConnection("second", 2, state.Online)},
+	}
+	elector := newEndpointElector([]policy.EndpointPriority{
+		{Key: connections[0].Endpoint().Key()}, {Key: connections[1].Endpoint().Key()},
+	}, connectionMap(connections[0], connections[1]), nil)
+	for busy := range connections {
+		t.Run(strconv.Itoa(busy), func(t *testing.T) {
+			idle := 1 - busy
+			connections[busy].load.Store(2 * workers)
+			connections[idle].load.Store(0)
+			type selection struct {
+				connection  conn.Conn
+				allowBanned bool
+				ok          bool
+			}
+			results := make(chan selection, workers)
+			release := make(chan struct{})
+			var wg sync.WaitGroup
+			for range workers {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					connection, allowBanned, ok := elector.Next()
+					c, _ := connection.(*busyElectorConn)
+					if c != nil {
+						c.load.Add(1)
+					}
+					results <- selection{connection, allowBanned, ok}
+					<-release
+					if c != nil {
+						c.load.Add(-1)
+					}
+				}()
+			}
+			selected := make([]selection, workers)
+			for i := range selected {
+				selected[i] = <-results
+			}
+			heldBusy, heldIdle := connections[busy].InFlight(), connections[idle].InFlight()
+			close(release)
+			wg.Wait()
+
+			for _, result := range selected {
+				require.True(t, result.ok)
+				require.False(t, result.allowBanned)
+				require.Same(t, connections[idle], result.connection)
+			}
+			require.EqualValues(t, 2*workers, heldBusy)
+			require.EqualValues(t, workers, heldIdle)
+			require.EqualValues(t, 2*workers, connections[busy].InFlight())
+			require.Zero(t, connections[idle].InFlight())
+		})
+	}
+}
+
 func TestEndpointElectorSingleCandidateNeedsNoRandomDraw(t *testing.T) {
 	connection := electorConnection("single", 1, state.Online)
 	rand := &electorDrawsRand{t: t}
@@ -333,7 +393,8 @@ func TestEndpointElectorSingleCandidateNeedsNoRandomDraw(t *testing.T) {
 }
 
 // cpu: Apple M3 Pro; go1.27.0 darwin/arm64; GOMAXPROCS=4.
-// P2C on master 6b54e06b2; median of five runs, one second per case.
+// Measured with P2C on master 6b54e06b2, before rebase onto 800f7098.
+// Median of five runs, one second per case.
 //
 //	GOTOOLCHAIN=go1.27.0 go test -run '^$' -bench '^BenchmarkEndpointElector$' \
 //	  -benchmem -benchtime=1s -count=5 -cpu=4 ./internal/balancer
