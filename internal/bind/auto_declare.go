@@ -27,8 +27,9 @@ func (m AutoDeclare) ToYdb(sql string, args ...any) (
 	}
 
 	var (
-		declares = make([]string, 0, len(params))
-		buffer   = xstring.Buffer()
+		declares     = make([]string, 0, len(params))
+		nullBindings []string
+		buffer       = xstring.Buffer()
 	)
 	defer buffer.Free()
 
@@ -36,7 +37,7 @@ func (m AutoDeclare) ToYdb(sql string, args ...any) (
 
 	for _, param := range params {
 		if types.Equal(param.Value().Type(), types.NewNull()) {
-			declares = append(declares, param.Name()+" = NULL;")
+			nullBindings = append(nullBindings, param.Name()+" = NULL;")
 
 			continue
 		}
@@ -48,6 +49,11 @@ func (m AutoDeclare) ToYdb(sql string, args ...any) (
 
 	for _, d := range declares {
 		buffer.WriteString(d)
+		buffer.WriteByte('\n')
+	}
+	sort.Strings(nullBindings)
+	for _, binding := range nullBindings {
+		buffer.WriteString(binding)
 		buffer.WriteByte('\n')
 	}
 
