@@ -1,3 +1,5 @@
+* **Breaking change:** driver session pool is shared between `table.Client` and `query.Client`. `WithSessionPoolSizeLimit(N)` and related `WithSessionPool*` options now configure a single pool on the driver (at most **N** concurrent sessions total, not N per client). Table pooled operations use Query `CreateSession` + `AttachSession` (aligned with ydb-rs-sdk). Use `Driver.SessionPoolStats()` for pool counters. Query implicit session pool is unchanged. Pool settings passed through `WithTableConfigOption` or `WithQueryConfigOption` do not configure the shared owner; migrate them to the driver `WithSessionPool*` options.
+
 ## v3.157.0
 * Fixed topic writer recovery from stalled initialization with a one-minute default attempt timeout and `topicoptions.WithWriterConnectTimeout` to override or disable it; the default backoff reset threshold increases from one to ten minutes
 

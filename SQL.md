@@ -113,8 +113,11 @@ func main() {
 
 ## Session pooling <a name="session-pool"></a>
 
-Native driver `ydb-go-sdk/v3` implements the internal session pool, which uses with `db.Table().Do()` or `db.Table().DoTx()` methods.
+Native driver `ydb-go-sdk/v3` implements a shared session pool for `db.Table().Do()`, `db.Table().DoTx()` and explicit-session `db.Query()` operations.
 Internal session pool are configured with options like `ydb.WithSessionPoolSizeLimit()` and other.
+
+`WithSessionPoolSizeLimit(N)` now limits the total sessions shared by table and query clients to N, rather than N per client. Table pooled operations use Query sessions. `WithSessionPoolIdleThreshold` and `WithSessionPoolSessionIdleTimeToLive` configure the same idle TTL; the last option wins. Query implicit sessions retain a separate pool. Pool settings supplied through `WithTableConfigOption` or `WithQueryConfigOption` do not configure the shared owner; migrate these settings to the driver `WithSessionPool*` options. `Driver.SessionPoolStats()` reports the shared pool counters. Table and query pool trace counters are views of this same pool; use `SessionPoolStats()` for global counts rather than summing the two trace views.
+
 Unlike the session pool in the native driver, `database/sql` contains a different implementation of the session pool, which is configured with `*sql.DB.SetMaxOpenConns` and `*sql.DB.SetMaxIdleConns`.
 Lifetime of a `YDB` session depends on driver configuration and error occurance, such as `sql.driver.ErrBadConn`.
 `YDB` driver for `database/sql` includes the logic to transform the internal `YDB` error codes into `sql.driver.ErrBadConn` and other retryable and non-retryable error types.

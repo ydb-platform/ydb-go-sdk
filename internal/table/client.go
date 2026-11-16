@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
@@ -32,68 +33,85 @@ import (
 // sessionBuilder is the interface that holds logic of creating sessions.
 type sessionBuilder func(ctx context.Context) (*Session, error)
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (*Client, error) { //nolint:funlen
+//nolint:funlen
+func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config,
+	opts ...NewClientOption,
+) (*Client, error) {
 	onDone := gtrace.TableOnInit(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.New"),
 	)
 
-	sessionPool, err := pool.New[*Session, Session](ctx,
-		pool.WithLimit[*Session, Session](config.SizeLimit()),
-		pool.WithWarmUpItems[*Session, Session](config.PoolWarmUpSize()),
-		pool.WithItemUsageLimit[*Session, Session](config.SessionUsageLimit()),
-		pool.WithItemUsageTTL[*Session, Session](config.SessionUsageTTL()),
-		pool.WithIdleTimeToLive[*Session, Session](config.IdleThreshold()),
-		pool.WithCreateItemTimeout[*Session, Session](config.CreateSessionTimeout()),
-		pool.WithCloseItemTimeout[*Session, Session](config.DeleteTimeout()),
-		pool.WithClock[*Session, Session](config.Clock()),
-		pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
-			if !config.DisableSessionBalancer() {
-				ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
-			}
-
-			return newSession(ctx, cc, config)
-		}),
-		pool.WithTrace[*Session, Session](&pool.Trace[*Session, Session]{
-			OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
-				return func(limit int) {
-					onDone(limit)
+	var clientOpts newClientOptions
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&clientOpts)
+		}
+	}
+	var sessionPool sessionPool
+	if clientOpts.sessionPool != nil {
+		sessionPool = &sessionPoolAdapter{sessionPool: clientOpts.sessionPool, cc: cc, cfg: config}
+		onDone(sessionPool.Stats().Limit)
+	} else {
+		createdPool, err := pool.New[*Session, Session](ctx,
+			pool.WithLimit[*Session, Session](config.SizeLimit()),
+			pool.WithWarmUpItems[*Session, Session](config.PoolWarmUpSize()),
+			pool.WithItemUsageLimit[*Session, Session](config.SessionUsageLimit()),
+			pool.WithItemUsageTTL[*Session, Session](config.SessionUsageTTL()),
+			pool.WithIdleTimeToLive[*Session, Session](config.IdleThreshold()),
+			pool.WithCreateItemTimeout[*Session, Session](config.CreateSessionTimeout()),
+			pool.WithCloseItemTimeout[*Session, Session](config.DeleteTimeout()),
+			pool.WithClock[*Session, Session](config.Clock()),
+			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
+				if !config.DisableSessionBalancer() {
+					ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
 				}
-			},
-			OnPut: func(ctx *context.Context, call stack.Caller, item *Session) func(err error) {
-				onDone := gtrace.TableOnPoolPut(config.Trace(), ctx, call, safe.SessionInfo(item))
 
-				return func(err error) {
-					onDone(err)
-				}
-			},
-			OnGet: func(ctx *context.Context, call stack.Caller) func(
-				session *Session,
-				hintInfo *trace.NodeHintInfo,
-				attempts int,
-				err error,
-			) {
-				onDone := gtrace.TableOnPoolGet(config.Trace(), ctx, call)
+				return newSession(ctx, cc, config)
+			}),
+			pool.WithTrace[*Session, Session](&pool.Trace[*Session, Session]{
+				OnNew: func(ctx *context.Context, call stack.Caller) func(limit int) {
+					return func(limit int) {
+						onDone(limit)
+					}
+				},
+				OnPut: func(ctx *context.Context, call stack.Caller, item *Session) func(err error) {
+					onDone := gtrace.TableOnPoolPut(config.Trace(), ctx, call, safe.SessionInfo(item))
 
-				return func(session *Session, hintInfo *trace.NodeHintInfo, attempts int, err error) {
-					onDone(safe.SessionInfo(session), attempts, hintInfo, err)
-				}
-			},
-			OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
-				onDone := gtrace.TableOnPoolWith(config.Trace(), ctx, call)
+					return func(err error) {
+						onDone(err)
+					}
+				},
+				OnGet: func(ctx *context.Context, call stack.Caller) func(
+					session *Session,
+					hintInfo *trace.NodeHintInfo,
+					attempts int,
+					err error,
+				) {
+					onDone := gtrace.TableOnPoolGet(config.Trace(), ctx, call)
 
-				return func(attempts int, err error) {
-					onDone(attempts, err)
-				}
-			},
-			OnChange: func(stats pool.Stats) {
-				gtrace.TableOnPoolStateChange(config.Trace(),
-					stats.Limit, stats.Idle, stats.CreateInProgress, stats.Concurrency, stats.Size,
-				)
-			},
-		}),
-	)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+					return func(session *Session, hintInfo *trace.NodeHintInfo, attempts int, err error) {
+						onDone(safe.SessionInfo(session), attempts, hintInfo, err)
+					}
+				},
+				OnWith: func(ctx *context.Context, call stack.Caller) func(attempts int, err error) {
+					onDone := gtrace.TableOnPoolWith(config.Trace(), ctx, call)
+
+					return func(attempts int, err error) {
+						onDone(attempts, err)
+					}
+				},
+				OnChange: func(stats pool.Stats) {
+					gtrace.TableOnPoolStateChange(config.Trace(),
+						stats.Limit, stats.Idle, stats.CreateInProgress, stats.Concurrency, stats.Size,
+					)
+				},
+			}),
+		)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		sessionPool = createdPool
 	}
 
 	return &Client{
@@ -118,6 +136,7 @@ type Client struct {
 	clock  clockwork.Clock
 	pool   sessionPool
 	done   chan struct{}
+	closed atomic.Bool
 }
 
 func (c *Client) DescribeTable(ctx context.Context, path string, opts ...options.DescribeTableOption) (
@@ -276,6 +295,9 @@ func (c *Client) Close(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(errNilClient)
 	}
 
+	if !c.closed.CompareAndSwap(false, true) {
+		return nil
+	}
 	close(c.done)
 
 	onDone := gtrace.TableOnClose(c.config.Trace(), &ctx,
@@ -301,6 +323,9 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 	if c.isClosed() {
 		return xerrors.WithStackTrace(errClosedClient)
 	}
+
+	ctx, cancel := xcontext.WithDone(ctx, c.done)
+	defer cancel()
 
 	config := c.retryOptions(opts...)
 
@@ -332,6 +357,9 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 	if c.isClosed() {
 		return xerrors.WithStackTrace(errClosedClient)
 	}
+
+	ctx, cancel := xcontext.WithDone(ctx, c.done)
+	defer cancel()
 
 	config := c.retryOptions(opts...)
 

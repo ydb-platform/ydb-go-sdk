@@ -197,6 +197,8 @@ type Session struct {
 	status    table.SessionStatus
 	config    *config.Config
 	dataQuery dataQueryExecutor
+	queryCore query.Core
+	borrowed  bool
 	lastUsage atomic.Int64
 	statusMtx sync.RWMutex
 	nodeID    atomic.Uint32
@@ -245,6 +247,14 @@ func (s *Session) Status() table.SessionStatus {
 	}
 	s.statusMtx.RLock()
 	defer s.statusMtx.RUnlock()
+
+	if s.queryCore != nil && !s.queryCore.IsAlive() {
+		if s.queryCore.Status() == query.StatusClosing.String() {
+			return table.SessionClosing
+		}
+
+		return table.SessionClosed
+	}
 
 	return s.status
 }
@@ -387,7 +397,15 @@ func newQuerySession(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
+	initQuerySession(s, cc, core)
+
+	return s, nil
+}
+
+func initQuerySession(s *Session, cc grpc.ClientConnInterface, core query.Core) {
+	s.queryCore = core
 	s.id = core.ID()
+	s.nodeID.Store(core.NodeID())
 	s.lastUsage.Store(time.Now().Unix())
 	s.client = Ydb_Table_V1.NewTableServiceClient(
 		conn.WithBeforeFunc(
@@ -400,10 +418,10 @@ func newQuerySession(
 		),
 	)
 	s.closeOnce = xsync.OnceFunc(closeQuerySession(core))
-	if config.ExecuteDataQueryOverQueryService() {
+	if s.config.ExecuteDataQueryOverQueryService() {
 		s.dataQuery = queryClientExecutor{
 			core:   core,
-			client: core.Client,
+			client: query.ClientFromCore(core),
 		}
 	} else {
 		s.dataQuery = tableClientExecutor{
@@ -411,8 +429,6 @@ func newQuerySession(
 			ignoreTruncated: s.config.IgnoreTruncated(),
 		}
 	}
-
-	return s, nil
 }
 
 func closeQuerySession(core query.Core) func(context.Context) error {
@@ -435,6 +451,10 @@ func (s *Session) ID() string {
 }
 
 func (s *Session) Close(ctx context.Context) (finalErr error) {
+	if s.borrowed {
+		return s.closeOnce(ctx)
+	}
+
 	onDone := gtrace.TableOnSessionDelete(s.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/table.(*Session).Close"),
 		s,
