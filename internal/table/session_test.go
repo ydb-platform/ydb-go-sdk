@@ -370,7 +370,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			func(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
-						client := New(context.Background(), testutil.NewBalancer(
+						client, newErr := New(context.Background(), testutil.NewBalancer(
 							testutil.WithInvokeHandlers(
 								testutil.InvokeHandlers{
 									testutil.TableExecuteDataQuery: func(any) (proto.Message, error) {
@@ -413,6 +413,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 								},
 							),
 						), config.New())
+						require.NoError(t, newErr)
 						ctx, cancel := xcontext.WithTimeout(
 							context.Background(),
 							time.Second,
@@ -427,7 +428,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 }
 
 func TestCreateTableRegression(t *testing.T) {
-	client := New(context.Background(), testutil.NewBalancer(
+	client, newErr := New(context.Background(), testutil.NewBalancer(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request any) (proto.Message, error) {
@@ -503,6 +504,7 @@ func TestCreateTableRegression(t *testing.T) {
 			},
 		),
 	), config.New(config.UseQuerySession(false)))
+	require.NoError(t, newErr)
 
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
@@ -526,7 +528,7 @@ func TestCreateTableRegression(t *testing.T) {
 }
 
 func TestDescribeTableRegression(t *testing.T) {
-	client := New(context.Background(), testutil.NewBalancer(
+	client, newErr := New(context.Background(), testutil.NewBalancer(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request any) (proto.Message, error) {
@@ -594,6 +596,7 @@ func TestDescribeTableRegression(t *testing.T) {
 			},
 		),
 	), config.New(config.UseQuerySession(false)))
+	require.NoError(t, newErr)
 
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
@@ -920,6 +923,63 @@ func TestRenameTables(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestCloseTableSessionSendsDeleteOnDoneContext(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		ctx  func() (context.Context, context.CancelFunc)
+	}{
+		{
+			name: "live context",
+			ctx: func() (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+		},
+		{
+			name: "canceled context",
+			ctx: func() (context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+
+				return ctx, func() {}
+			},
+		},
+		{
+			name: "expired deadline",
+			ctx: func() (context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithDeadline(context.Background(), time.Unix(0, 0))
+
+				return ctx, cancel
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var deleted int
+			cc := testutil.NewBalancer(
+				testutil.WithInvokeHandlers(
+					testutil.InvokeHandlers{
+						testutil.TableDeleteSession: func(any) (proto.Message, error) {
+							deleted++
+
+							return &Ydb_Table.DeleteSessionResponse{}, nil
+						},
+					},
+				),
+			)
+
+			ctx, cancel := tt.ctx()
+			defer cancel()
+
+			// A done caller context must not prevent DeleteSession: the session id is
+			// known, and skipping the call leaves the session on the server until the
+			// server-side idle timeout expires.
+			require.NoError(t, closeTableSession(
+				Ydb_Table_V1.NewTableServiceClient(cc), config.New(), "test-session",
+			)(ctx))
+			require.Equal(t, 1, deleted)
 		})
 	}
 }

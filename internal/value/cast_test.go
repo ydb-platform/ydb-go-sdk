@@ -67,7 +67,7 @@ func TestCastTo(t *testing.T) {
 		{
 			name:  xtest.CurrentFileLine(),
 			value: TextValue("test"),
-			dst:   (any)(nil),
+			dst:   any(nil),
 			err:   errNilDestination,
 		},
 

@@ -28,6 +28,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -39,22 +40,21 @@ type scopeT struct {
 	Ctx context.Context
 	fixenv.Env
 	Require *require.Assertions
-	t       *xtest.SyncedTest
+	t       testing.TB
 }
 
-func newScope(t *testing.T) *scopeT {
-	st := xtest.MakeSyncedTest(t)
-	at := require.New(st)
-	fEnv := fixenv.New(st)
+func newScope(t testing.TB) *scopeT {
+	at := require.New(t)
+	fEnv := fixenv.New(t)
 	ctx, ctxCancel := context.WithCancel(context.Background())
-	st.Cleanup(func() {
+	t.Cleanup(func() {
 		ctxCancel()
 	})
 	res := &scopeT{
 		Ctx:     ctx,
 		Env:     fEnv,
 		Require: at,
-		t:       st,
+		t:       t,
 	}
 	return res
 }
@@ -267,6 +267,83 @@ func (scope *scopeT) TopicPath(opts ...topicoptions.CreateOption) string {
 	return fixenv.CacheResult(scope.Env, f)
 }
 
+type changefeedPathParams struct {
+	feedName string
+}
+
+// withChangefeedName sets the changefeed name (default in ChangefeedTopicPath is "cdc").
+func withChangefeedName(name string) func(*changefeedPathParams) {
+	return func(p *changefeedPathParams) {
+		p.feedName = name
+	}
+}
+
+// execQuery runs YQL (including DDL) through the Query service client using scope.Ctx.
+func (scope *scopeT) execQuery(yql string) error {
+	return scope.execQueryContext(scope.Ctx, yql)
+}
+
+// execQueryContext runs YQL through the Query client with an explicit context.
+func (scope *scopeT) execQueryContext(ctx context.Context, yql string) error {
+	return scope.Driver().Query().Exec(ctx, yql)
+}
+
+// ChangefeedTopicPath creates a CDC changefeed on the scope test table (via TablePath),
+// registers TopicConsumerName on the implicit CDC topic, and returns the full topic path
+// for StartReader. Cleanup drops the changefeed before the table is removed.
+func (scope *scopeT) ChangefeedTopicPath(opts ...func(*changefeedPathParams)) string {
+	params := changefeedPathParams{feedName: "cdc"}
+	for _, o := range opts {
+		if o != nil {
+			o(&params)
+		}
+	}
+
+	f := func() (*fixenv.GenericResult[string], error) {
+		tablePath := scope.TablePath()
+		table := scope.TableName()
+		prefix := fmt.Sprintf(`PRAGMA TablePathPrefix("%s");`, scope.Folder())
+
+		addFeed := prefix + fmt.Sprintf(`
+ALTER TABLE %s
+ADD CHANGEFEED %s WITH (
+	FORMAT = 'JSON',
+	MODE = 'UPDATES'
+);
+`, table, params.feedName)
+
+		if err := scope.execQuery(addFeed); err != nil {
+			return nil, err
+		}
+
+		topicLocalPath := path.Join(table, params.feedName)
+		addConsumer := prefix + fmt.Sprintf(`
+ALTER TOPIC %s
+ADD CONSUMER %s;
+`, "`"+topicLocalPath+"`", "`"+scope.TopicConsumerName()+"`")
+
+		if err := scope.execQuery(addConsumer); err != nil {
+			return nil, err
+		}
+
+		cdcTopicPath := path.Join(tablePath, params.feedName)
+
+		cleanup := func() {
+			if scope.Failed() {
+				return
+			}
+			dropFeed := prefix + fmt.Sprintf(`
+ALTER TABLE %s DROP CHANGEFEED %s;
+`, table, params.feedName)
+			_ = scope.execQuery(dropFeed)
+		}
+
+		return fixenv.NewGenericResultWithCleanup(cdcTopicPath, cleanup), nil
+	}
+
+	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: params.feedName})
+}
+
 func (scope *scopeT) TopicReader() *topicreader.Reader {
 	return scope.TopicReaderNamed("default-reader")
 }
@@ -283,6 +360,37 @@ func (scope *scopeT) TopicReaderNamed(name string) *topicreader.Reader {
 			}
 		}
 		return fixenv.NewGenericResultWithCleanup(reader, cleanup), err
+	}
+
+	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: name})
+}
+
+func (scope *scopeT) TopicListener(
+	handler topiclistener.EventHandler,
+	opts ...topicoptions.ListenerOption,
+) *topiclistener.TopicListener {
+	return scope.TopicListenerNamed("default-listener", handler, opts...)
+}
+
+func (scope *scopeT) TopicListenerNamed(
+	name string,
+	handler topiclistener.EventHandler,
+	opts ...topicoptions.ListenerOption,
+) *topiclistener.TopicListener {
+	f := func() (*fixenv.GenericResult[*topiclistener.TopicListener], error) {
+		listener, err := scope.Driver().Topic().StartListener(
+			scope.TopicConsumerName(),
+			handler,
+			topicoptions.ReadTopic(scope.TopicPath()),
+			opts...,
+		)
+		cleanup := func() {
+			if listener != nil {
+				_ = listener.Close(scope.Ctx)
+			}
+		}
+
+		return fixenv.NewGenericResultWithCleanup(listener, cleanup), err
 	}
 
 	return fixenv.CacheResult(scope.Env, f, fixenv.CacheOptions{CacheKey: name})
@@ -420,7 +528,7 @@ func (scope *scopeT) TablePath(opts ...func(t *tableNameParams)) string {
 
 // logger for tests
 type testLogger struct {
-	test     *xtest.SyncedTest
+	test     testing.TB
 	testName string
 	minLevel log.Level
 
@@ -429,11 +537,11 @@ type testLogger struct {
 	messages []string
 }
 
-func newLogger(t *xtest.SyncedTest) *testLogger {
+func newLogger(t testing.TB) *testLogger {
 	return newLoggerWithMinLevel(t, 0)
 }
 
-func newLoggerWithMinLevel(t *xtest.SyncedTest, level log.Level) *testLogger {
+func newLoggerWithMinLevel(t testing.TB, level log.Level) *testLogger {
 	logger := &testLogger{
 		test:     t,
 		testName: t.Name(),

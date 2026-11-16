@@ -36,6 +36,9 @@ func (m MockSpan) TraceID() (id string, valid bool) {
 func (m MockSpan) Link(_ spans.Span, _ ...spans.KeyValue) {
 }
 
+func (m MockSpan) SetAttributes(_ ...spans.KeyValue) {
+}
+
 func (m MockSpan) Log(_ string, _ ...spans.KeyValue) {
 }
 

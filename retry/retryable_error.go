@@ -8,7 +8,8 @@ import (
 type retryableErrorOption xerrors.RetryableErrorOption
 
 const (
-	TypeNoBackoff   = backoff.TypeNoBackoff
+	TypeNoBackoff   = backoff.TypeInstant
+	TypeInstant     = backoff.TypeInstant
 	TypeFastBackoff = backoff.TypeFast
 	TypeSlowBackoff = backoff.TypeSlow
 )

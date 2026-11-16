@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -112,10 +113,10 @@ func TestWriterImpl_Write(t *testing.T) {
 		err := w.Write(ctx, newTestMessages(1, 3, 5))
 		require.NoError(t, err)
 
-		expectedMap := map[int]messageWithDataContent{
-			1: newTestMessageWithDataContent(1),
-			2: newTestMessageWithDataContent(3),
-			3: newTestMessageWithDataContent(5),
+		expectedMap := map[int]*queuedMessage{
+			1: {messageWithDataContent: newTestMessageWithDataContent(1)},
+			2: {messageWithDataContent: newTestMessageWithDataContent(3)},
+			3: {messageWithDataContent: newTestMessageWithDataContent(5)},
 		}
 
 		for k := range expectedMap {
@@ -831,6 +832,22 @@ func TestWriterImpl_CloseWithFlush(t *testing.T) {
 	}
 }
 
+func TestWriterImpl_WriteAfterClose_ReturnsErrPublicWriterClosed(t *testing.T) {
+	ctx := context.Background()
+	w := newTestWriterStopped(WithAutoSetSeqNo(true))
+	w.firstConnectionHandled.Store(true)
+
+	terminalErr := errors.New("terminal stream error")
+	closeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	_ = w.close(closeCtx, terminalErr)
+
+	err := w.Write(ctx, []PublicMessage{{Data: bytes.NewReader([]byte("msg"))}})
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrPublicWriterClosed)
+	require.ErrorIs(t, err, terminalErr)
+}
+
 func TestAllMessagesHasSameBufCodec(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		require.True(t, allMessagesHasSameBufCodec(nil))
@@ -1306,7 +1323,63 @@ type sendFromServerResponse struct {
 }
 
 func testCreateInitRequest(w *WriterReconnector) rawtopicwriter.InitRequest {
-	req := newSingleStreamWriterStopped(context.Background(), w.createWriterStreamConfig(nil)).createInitRequest()
+	cfg := newSingleStreamWriterConfig(
+		w.cfg.WritersCommonConfig,
+		nil,
+		&w.queue,
+		w.encodersMap,
+		w.needReceiveLastSeqNo(),
+		w.writerInstanceID,
+		nil,
+	)
 
-	return req
+	return newSingleStreamWriterStopped(context.Background(), cfg).createInitRequest()
+}
+
+func TestWriterReconnector_CreateMessagesWithContent(t *testing.T) {
+	t.Run("ReportsSizes", func(t *testing.T) {
+		var done trace.TopicWriterCompressMessagesDoneInfo
+		tracer := &trace.Topic{
+			OnWriterCompressMessages: func(
+				trace.TopicWriterCompressMessagesStartInfo,
+			) func(trace.TopicWriterCompressMessagesDoneInfo) {
+				return func(info trace.TopicWriterCompressMessagesDoneInfo) {
+					done = info
+				}
+			},
+		}
+		w := newWriterReconnectorStopped(NewWriterReconnectorConfig(WithTrace(tracer)))
+
+		const payload = "hello world"
+		res, err := w.createMessagesWithContent([]PublicMessage{{Data: bytes.NewReader([]byte(payload))}})
+		require.NoError(t, err)
+		require.Len(t, res, 1)
+
+		require.NoError(t, done.Error)
+		require.Equal(t, len(payload), done.UncompressedSize)
+		require.Equal(t, len(payload), done.CompressedSize)
+	})
+
+	t.Run("ReportsErrorWithZeroSizes", func(t *testing.T) {
+		var done trace.TopicWriterCompressMessagesDoneInfo
+		tracer := &trace.Topic{
+			OnWriterCompressMessages: func(
+				trace.TopicWriterCompressMessagesStartInfo,
+			) func(trace.TopicWriterCompressMessagesDoneInfo) {
+				return func(info trace.TopicWriterCompressMessagesDoneInfo) {
+					done = info
+				}
+			},
+		}
+		w := newWriterReconnectorStopped(NewWriterReconnectorConfig(WithTrace(tracer)))
+
+		_, err := w.createMessagesWithContent(
+			[]PublicMessage{{Data: iotest.ErrReader(errors.New("read failed"))}},
+		)
+		require.Error(t, err)
+
+		require.Error(t, done.Error)
+		require.Zero(t, done.UncompressedSize)
+		require.Zero(t, done.CompressedSize)
+	})
 }

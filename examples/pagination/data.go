@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
 func schoolData(city string, num uint32, addr string) types.Value {

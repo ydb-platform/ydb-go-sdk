@@ -21,6 +21,7 @@ func TestOneTimeReader(t *testing.T) {
 		_, err = r.Read(dstBuf)
 		require.ErrorIs(t, err, io.EOF)
 		require.Empty(t, r.reader)
+		require.Nil(t, r.readerMaker)
 		require.Equal(t, io.EOF, r.err)
 	})
 	t.Run("DstMoreThenContent", func(t *testing.T) {

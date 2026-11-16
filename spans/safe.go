@@ -1,12 +1,16 @@
 package spans
 
 import (
+	"context"
 	"fmt"
 	"strconv"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func safeAddress(a interface{ Address() string }) string {
-	if a == nil {
+	if xiface.IsNil(a) {
 		return ""
 	}
 
@@ -14,15 +18,23 @@ func safeAddress(a interface{ Address() string }) string {
 }
 
 func safeNodeID(n interface{ NodeID() uint32 }) string {
-	if n == nil {
+	if xiface.IsNil(n) {
 		return "0"
 	}
 
 	return strconv.FormatUint(uint64(n.NodeID()), 10)
 }
 
+func safeNodeIDInt64(n interface{ NodeID() uint32 }) int64 {
+	if xiface.IsNil(n) {
+		return 0
+	}
+
+	return int64(n.NodeID())
+}
+
 func safeID(id interface{ ID() string }) string {
-	if id == nil {
+	if xiface.IsNil(id) {
 		return ""
 	}
 
@@ -30,7 +42,7 @@ func safeID(id interface{ ID() string }) string {
 }
 
 func safeStatus(s interface{ Status() string }) string {
-	if s == nil {
+	if xiface.IsNil(s) {
 		return ""
 	}
 
@@ -38,7 +50,7 @@ func safeStatus(s interface{ Status() string }) string {
 }
 
 func safeStringer(s fmt.Stringer) string {
-	if s == nil {
+	if xiface.IsNil(s) {
 		return ""
 	}
 
@@ -46,7 +58,7 @@ func safeStringer(s fmt.Stringer) string {
 }
 
 func safeError(err error) string {
-	if err == nil {
+	if xiface.IsNil(err) {
 		return ""
 	}
 
@@ -54,9 +66,46 @@ func safeError(err error) string {
 }
 
 func safeErr(err interface{ Err() error }) error {
-	if err == nil {
+	if xiface.IsNil(err) {
 		return nil
 	}
 
 	return err.Err()
+}
+
+func safeCall(c trace.Call) string {
+	return safeStringer(c)
+}
+
+func safeContext(ctx context.Context) context.Context {
+	if xiface.IsNil(ctx) {
+		return context.Background()
+	}
+
+	return ctx
+}
+
+func safeContextPtr(ctx *context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+
+	return safeContext(*ctx)
+}
+
+func withContextPtr(ctx *context.Context, fn func(context.Context) context.Context) {
+	if ctx == nil {
+		return
+	}
+	*ctx = fn(safeContextPtr(ctx))
+}
+
+func withCallContext(ctx *context.Context, call trace.Call) {
+	withContextPtr(ctx, func(c context.Context) context.Context {
+		return withFunctionID(c, safeCall(call))
+	})
+}
+
+func isNil(v any) bool {
+	return xiface.IsNil(v)
 }

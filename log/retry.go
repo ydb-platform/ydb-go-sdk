@@ -19,7 +19,7 @@ func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
 		if d.Details()&trace.RetryEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "retrier starting work...", "retry")
+		ctx := withFromPtr(info.Context, TRACE, "retrier starting work...", "retry")
 		label := info.Label
 		idempotent := info.Idempotent
 		l.Log(ctx, "start",

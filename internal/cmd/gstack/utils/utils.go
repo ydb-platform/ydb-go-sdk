@@ -14,10 +14,14 @@ import (
 )
 
 type FunctionIDArg struct {
-	FuncDecl      *ast.FuncDecl
-	ArgPos        token.Pos
-	ArgEnd        token.Pos
-	StackCallPath string
+	FuncDecl          *ast.FuncDecl
+	FunctionPos       token.Pos
+	FunctionEnd       token.Pos
+	ArgPos            token.Pos
+	ArgEnd            token.Pos
+	ExtraArgsEnd      token.Pos
+	StackCallPath     string
+	HasPackageComment bool
 }
 
 func ReadFile(filename string, info fs.FileInfo) ([]byte, error) {
@@ -51,6 +55,8 @@ func FixSource(fset *token.FileSet, path string, src []byte, listOfArgs []Functi
 	var fixedSource []byte
 
 	for _, arg := range listOfArgs {
+		functionPosOffset := fset.Position(arg.FunctionPos).Offset
+		functionEndOffset := fset.Position(arg.FunctionEnd).Offset
 		argPosOffset := fset.Position(arg.ArgPos).Offset
 		argEndOffset := fset.Position(arg.ArgEnd).Offset
 
@@ -59,9 +65,20 @@ func FixSource(fset *token.FileSet, path string, src []byte, listOfArgs []Functi
 			return nil, fmt.Errorf("error during making call path: %w", err)
 		}
 
+		fixedSource = append(fixedSource, src[previousArgEnd:functionPosOffset]...)
+		fixedSource = append(fixedSource, "FunctionID"...)
+		previousArgEnd = functionEndOffset
+
+		formattedArg := fmt.Sprintf("%q", argument)
+		if arg.HasPackageComment && arg.StackCallPath != "" {
+			formattedArg += fmt.Sprintf(" /*stack.Package(%q)*/", arg.StackCallPath)
+		}
 		fixedSource = append(fixedSource, src[previousArgEnd:argPosOffset]...)
-		fixedSource = append(fixedSource, fmt.Sprintf("%q", argument)...)
+		fixedSource = append(fixedSource, formattedArg...)
 		previousArgEnd = argEndOffset
+		if arg.ExtraArgsEnd > arg.ArgEnd {
+			previousArgEnd = fset.Position(arg.ExtraArgsEnd).Offset
+		}
 	}
 	fixedSource = append(fixedSource, src[previousArgEnd:]...)
 

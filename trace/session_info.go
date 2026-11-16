@@ -1,6 +1,7 @@
 package trace
 
-type sessionInfo interface {
+// SessionInfo contains session metadata for trace hooks.
+type SessionInfo interface {
 	ID() string
 	NodeID() uint32
 	Status() string

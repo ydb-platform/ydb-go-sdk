@@ -19,7 +19,7 @@ func TestResultRangeResultSets(t *testing.T) {
 	ctx, cancel := context.WithCancel(xtest.Context(t))
 	defer cancel()
 	ctrl := gomock.NewController(t)
-	stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+	stream := newExecuteQueryStreamMock(ctrl)
 	stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 		Status:         Ydb.StatusIds_SUCCESS,
 		ResultSetIndex: 0,

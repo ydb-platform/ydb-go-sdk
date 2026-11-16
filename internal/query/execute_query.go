@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -33,9 +35,10 @@ type executeSettings interface {
 	ResourcePool() string
 	ResponsePartLimitSizeBytes() int64
 	Label() string
-	ConcurrentResultSets() bool
 	UserProvidedTxControl() bool
 	IssuesOpts() func([]*Ydb_Issue.IssueMessage)
+	ResponsePartPrefetch() int
+	ArrowDecoder() arrow.Decoder
 }
 
 type executeScriptConfig interface {
@@ -74,10 +77,10 @@ func executeQueryScriptRequest(q string, cfg executeScriptConfig) (
 	return request, cfg.CallOptions(), nil
 }
 
-func executeQueryRequest(sessionID, q string, cfg executeSettings) (
-	*Ydb_Query.ExecuteQueryRequest,
-	[]grpc.CallOption,
-	error,
+func executeQueryRequest(
+	sessionID, q string, cfg executeSettings, concurrentResultSets options.ResultSetsType,
+) (
+	*Ydb_Query.ExecuteQueryRequest, []grpc.CallOption, error,
 ) {
 	params, err := cfg.Params().ToYDB()
 	if err != nil {
@@ -96,9 +99,13 @@ func executeQueryRequest(sessionID, q string, cfg executeSettings) (
 		},
 		Parameters:             params,
 		StatsMode:              Ydb_Query.StatsMode(cfg.StatsMode()),
-		ConcurrentResultSets:   cfg.ConcurrentResultSets(),
+		ConcurrentResultSets:   concurrentResultSets == options.ResultSetsTypeConcurrent,
 		PoolId:                 cfg.ResourcePool(),
 		ResponsePartLimitBytes: cfg.ResponsePartLimitSizeBytes(),
+	}
+
+	if cfg.ArrowDecoder() != nil {
+		request.ResultSetFormat = Ydb.ResultSet_FORMAT_ARROW
 	}
 
 	return request, cfg.CallOptions(), nil
@@ -113,11 +120,11 @@ func queryQueryContent(syntax Ydb_Query.Syntax, q string) *Ydb_Query.QueryConten
 
 func execute(
 	ctx context.Context, sessionID string, c Ydb_Query_V1.QueryServiceClient,
-	q string, settings executeSettings, opts ...resultOption,
+	q string, settings executeSettings, concurrentResultSets options.ResultSetsType, opts ...resultOption,
 ) (
 	_ *streamResult, finalErr error,
 ) {
-	request, callOptions, err := executeQueryRequest(sessionID, q, settings)
+	request, callOptions, err := executeQueryRequest(sessionID, q, settings, concurrentResultSets)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -140,30 +147,20 @@ func execute(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	// If ctx was cancelled during ExecuteQuery, return a retryable error so the
-	// pool can retry with a fresh session. This is safe regardless of idempotency
-	// because the retry loop operates on the caller's (user's) context: if ctx
-	// was cancelled only due to session death the user context is still alive and
-	// a retry is warranted; if the user cancelled their own context the retry loop
-	// will see its own ctx.Done() and stop without retrying.
-	// The check is non-blocking (ctx.Done() is a closed channel once cancelled),
-	// so it does not affect the "cancel during Recv" path: when ctx is cancelled
-	// only after ExecuteQuery returns, the AfterFunc remains active and will
-	// propagate the cancellation to executeCtx during the blocking Recv call.
-	select {
-	case <-ctx.Done():
-		return nil, xerrors.WithStackTrace(xerrors.Retryable(
-			ctx.Err(),
-			xerrors.WithName("streamResultContext"),
-		))
-	default:
-	}
+	stream = wrapExecuteQueryStreamWithAsyncPrefetch(stream, settings.ResponsePartPrefetch())
 
 	// newResult must use executeCtx, not the parent ctx: parent ctx may already
 	// be done (e.g. session death) while the gRPC stream is still readable.
+	//
+	// withStreamCancel exposes executeCancel to nextPart so a Recv blocked
+	// waiting for the server can be unblocked from the caller's ctx via a
+	// per-call context.AfterFunc; withStreamResultOnClose ensures the same
+	// CancelFunc fires once when the user closes the streamResult.
 	r, err := newResult(executeCtx, stream, append(opts,
 		withStreamResultStatsCallback(settings.StatsCallback()),
+		withArrowDecoder(settings.ArrowDecoder()),
 		withStreamResultOnClose(executeCancel),
+		withStreamCancel(executeCancel),
 	)...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -192,6 +189,8 @@ func readAll(ctx context.Context, r *streamResult) error {
 func readResultSet(ctx context.Context, r *streamResult) (_ *resultSetWithClose, finalErr error) {
 	rs, err := r.nextResultSet(ctx)
 	if err != nil {
+		_ = r.Close(ctx)
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 	rs.mustBeLastResultSet = true
@@ -205,6 +204,7 @@ func readResultSet(ctx context.Context, r *streamResult) (_ *resultSetWithClose,
 func readMaterializedResultSet(ctx context.Context, r *streamResult) (
 	_ *materializedResultSet, rowsCount int, finalErr error,
 ) {
+	r.retainArrowBatches = true
 	defer func() {
 		_ = r.Close(ctx)
 	}()
@@ -236,5 +236,8 @@ func readMaterializedResultSet(ctx context.Context, r *streamResult) (
 		return nil, 0, xerrors.WithStackTrace(err)
 	}
 
-	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), len(rows), nil
+	materialized := MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows)
+	materialized.closeArrow = r.takeArrowBatches()
+
+	return materialized, len(rows), nil
 }

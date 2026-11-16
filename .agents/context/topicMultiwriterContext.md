@@ -1,0 +1,57 @@
+# Topic multiwriter context
+
+> **Load on demand** — only for `WithWriteToManyPartitions`, `internal/topic/topicmultiwriter/`, or multiwriter integration tests.
+> General topic layout: [`topicContext.md`](topicContext.md).
+
+## Entry points
+
+- Public: `topic.Client.StartWriter(path, topicoptions.WithWriteToManyPartitions(opts...))`
+- Internal: `topicmultiwriter.NewMultiWriter` → `MultiWriter` + `orchestrator`
+
+Key files:
+
+| File | Role |
+|------|------|
+| `topicmultiwriter.go` | Public `MultiWriter` API, starts init goroutine |
+| `orchestrator.go` | Init, seq baseline, split handling, sender coordination |
+| `partition_writer_pool.go` | Per-partition writers (direct / non-direct) |
+| `sender.go` | Drains inflight buffer to partition writers |
+| `partition_split_receiver.go` | Serializes split events |
+
+## Init lifecycle (order matters)
+
+```
+NewMultiWriter → background goroutine runs orchestrator.init()
+  1. Describe topic → populate partitions map
+  2. Register active partitions in PartitionChooser
+  3. startWorkers() → ack receiver, partition splitter, sender
+```
+
+`WaitInit()` blocks on `initDone` (closed when `init()` returns). It does not open partition sessions; session errors surface on `Write` or `Flush`.
+
+## Invariant
+
+Message-pipeline workers (splitter / sender / ack) must start only after steps 1–2 succeed.
+
+Direct partition sessions open on first write. Automatic SeqNo assignment waits for the selected session's last SeqNo. After a split, writes to children wait until the parent's SeqNo probe and resend scheduling complete. A failed split probe stops the writer so waiting and later writes receive an error.
+
+Split events pushed before `startWorkers()` stay queued in `partitionSplitReceiver` and run after init.
+
+## Tests
+
+| Test | Package | Role |
+|------|---------|------|
+| `TestMultiWriterWaitsForParentSeqNoBeforeWritingToSplitChild` | `internal/topic/topicmultiwriter` | Split baseline before a child write |
+| `TestMultiWriterRetriesFirstSessionInitAfterSplit` | `internal/topic/topicmultiwriter` | First session initialization interrupted by a split |
+| `TestMultiWriterStopsAfterFirstSessionSplitProbeFails` | `internal/topic/topicmultiwriter` | Failed split probe stops subsequent writes |
+| `TestTopicMultiWriter_AutoPartitioning_SplitDuringInFlightBatch` | `tests/integration` | Auto-partitioning stress; was flaky on `ydbplatform/local-ydb:latest` |
+
+Reproduce integration flakiness:
+
+```bash
+go test -race -tags integration -count=50 \
+  -run 'TestTopicMultiWriter_AutoPartitioning_SplitDuringInFlightBatch$' \
+  ./tests/integration
+```
+
+Unit tests: `go test -race ./internal/topic/topicmultiwriter/...`

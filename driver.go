@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
@@ -71,7 +72,7 @@ type (
 		config  *config.Config
 		options []config.Option
 
-		discovery        *xsync.Once[*internalDiscovery.Client]
+		discovery        *xsync.Once[*driverDiscoveryClient]
 		discoveryOptions []discoveryConfig.Option
 
 		operation *xsync.Once[*operation.Client]
@@ -116,6 +117,12 @@ type (
 		meta     *meta.Meta
 		close    func(ctx context.Context) error
 	}
+	driverDiscoveryClient struct {
+		*internalDiscovery.Client
+
+		pool *conn.Pool
+		conn conn.Conn
+	}
 )
 
 func (b *balancerWithMeta) Invoke(ctx context.Context, method string, args any, reply any,
@@ -144,11 +151,17 @@ func (b *balancerWithMeta) Close(ctx context.Context) error {
 	return b.close(ctx)
 }
 
+func (c *driverDiscoveryClient) Close(ctx context.Context) error {
+	c.pool.Put(ctx, c.conn)
+
+	return c.Client.Close(ctx)
+}
+
 // Close closes Driver and clear resources
 //
 //nolint:nonamedreturns
 func (d *Driver) Close(ctx context.Context) (finalErr error) {
-	onDone := trace.DriverOnClose(d.config.Trace(), &ctx,
+	onDone := gtrace.DriverOnClose(d.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/ydb.(*Driver).Close"),
 	)
 	defer func() {
@@ -192,7 +205,7 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 		d.topic.Close,
 		d.discovery.Close,
 		d.metaBalancer.Close,
-		d.pool.Release,
+		d.pool.RemoveRef,
 	)
 
 	var issues []error
@@ -302,7 +315,7 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	onDone := trace.DriverOnInit(
+	onDone := gtrace.DriverOnInit(
 		d.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/ydb.Open"),
 		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
@@ -312,8 +325,9 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) 
 	}()
 
 	if err = d.connect(ctx); err != nil {
+		d.ctxCancel()
 		if d.pool != nil {
-			_ = d.pool.Release(ctx)
+			_ = d.pool.RemoveRef(context.WithoutCancel(ctx))
 		}
 
 		return nil, xerrors.WithStackTrace(err)
@@ -344,7 +358,7 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	onDone := trace.DriverOnInit(
+	onDone := gtrace.DriverOnInit(
 		d.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/ydb.New"),
 		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
@@ -354,6 +368,11 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:
 	}()
 
 	if err = d.connect(ctx); err != nil {
+		d.ctxCancel()
+		if d.pool != nil {
+			_ = d.pool.RemoveRef(context.WithoutCancel(ctx))
+		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -363,17 +382,19 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:
 //nolint:cyclop, nonamedreturns, funlen
 func driverFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 	ctx, driverCtxCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
-	defer func() {
-		if err != nil {
-			driverCtxCancel()
-		}
-	}()
-
 	d := &Driver{
 		children:     make(map[uint64]*Driver),
 		ctxCancel:    driverCtxCancel,
 		metaBalancer: &balancerWithMeta{},
 	}
+	defer func() {
+		if err != nil {
+			driverCtxCancel()
+			if d.pool != nil {
+				_ = d.pool.RemoveRef(context.WithoutCancel(ctx))
+			}
+		}
+	}()
 
 	if caFile, has := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); has {
 		d.opts = append(d.opts,
@@ -485,7 +506,7 @@ func (d *Driver) connect(ctx context.Context) error {
 					d.tableOptions...,
 				)...,
 			),
-		), nil
+		)
 	})
 
 	d.query = xsync.OnceValue(func() (*internalQuery.Client, error) {
@@ -496,11 +517,12 @@ func (d *Driver) connect(ctx context.Context) error {
 					// prepend common params from root config
 					[]queryConfig.Option{
 						queryConfig.With(d.config.Common),
+						queryConfig.WithPoolName(d.Name()),
 					},
 					d.queryOptions...,
 				)...,
 			),
-		), nil
+		)
 	})
 
 	d.scheme = xsync.OnceValue(func() (*internalScheme.Client, error) {
@@ -549,9 +571,16 @@ func (d *Driver) connect(ctx context.Context) error {
 		), nil
 	})
 
-	d.discovery = xsync.OnceValue(func() (*internalDiscovery.Client, error) {
-		return internalDiscovery.New(xcontext.ValueOnly(ctx),
-			d.pool.Get(endpoint.New(d.config.Endpoint())),
+	d.discovery = xsync.OnceValue(func() (*driverDiscoveryClient, error) {
+		bootstrap := d.pool.Get(endpoint.New(d.config.Endpoint()))
+		if bootstrap == nil {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("discovery bootstrap connection: %w", conn.ErrClosedPool),
+			)
+		}
+
+		client := internalDiscovery.New(xcontext.ValueOnly(ctx),
+			bootstrap,
 			discoveryConfig.New(
 				append(
 					// prepend common params from root config
@@ -565,7 +594,13 @@ func (d *Driver) connect(ctx context.Context) error {
 					d.discoveryOptions...,
 				)...,
 			),
-		), nil
+		)
+
+		return &driverDiscoveryClient{
+			Client: client,
+			pool:   d.pool,
+			conn:   bootstrap,
+		}, nil
 	})
 
 	d.operation = xsync.OnceValue(func() (*operation.Client, error) {

@@ -5,18 +5,20 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	queryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
@@ -214,9 +216,9 @@ func WithConnectionString(connectionString string) Option {
 	}
 }
 
-// WithConnectionTTL defines duration for parking idle connections
+// WithConnectionTTL configures the idle interval after which gRPC connections are parked.
 func WithConnectionTTL(ttl time.Duration) Option {
-	return func(ctx context.Context, d *Driver) error {
+	return func(_ context.Context, d *Driver) error {
 		d.options = append(d.options, config.WithConnectionTTL(ttl))
 
 		return nil
@@ -350,9 +352,9 @@ func WithCredentials(c credentials.Credentials) Option {
 	})
 }
 
-func WithBalancer(balancer *balancerConfig.Config) Option {
+func WithBalancer(policy policy.Policy) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.options = append(d.options, config.WithBalancer(balancer))
+		d.options = append(d.options, config.WithBalancer(policy))
 
 		return nil
 	}
@@ -407,6 +409,8 @@ func MergeOptions(opts ...Option) Option {
 }
 
 // WithDiscoveryInterval sets interval between cluster discovery calls.
+// A negative interval is supported only with balancers.SingleConn; other policies
+// require periodic discovery and make driver initialization return an error.
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.discoveryOptions = append(d.discoveryOptions, discoveryConfig.WithInterval(discoveryInterval))
@@ -426,26 +430,32 @@ func WithRetryBudget(b budget.Budget) Option {
 	}
 }
 
-// WithTraceDriver appends trace.Driver into driver traces
-func WithTraceDriver(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
+// WithDefaultIdempotent sets the default idempotency flag for retrying operations
+// in the native Table and Query clients and in database/sql retry helpers.
+// Per-call idempotency options override this default.
+func WithDefaultIdempotent(idempotent bool) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.options = append(d.options, config.WithTrace(t, opts...))
+		d.tableOptions = append(d.tableOptions, tableConfig.WithDefaultIdempotent(idempotent))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithDefaultIdempotent(idempotent))
+		d.databaseSQLOptions = append(d.databaseSQLOptions, xsql.WithDefaultIdempotent(idempotent))
+
+		return nil
+	}
+}
+
+// WithTraceDriver appends trace.Driver into driver traces
+func WithTraceDriver(t trace.Driver) Option { //nolint:gocritic
+	return func(ctx context.Context, d *Driver) error {
+		d.options = append(d.options, config.WithTrace(t))
 
 		return nil
 	}
 }
 
 // WithTraceRetry appends trace.Retry into retry traces
-func WithTraceRetry(t trace.Retry, opts ...trace.RetryComposeOption) Option {
+func WithTraceRetry(t trace.Retry) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.options = append(d.options,
-			config.WithTraceRetry(&t, append(
-				[]trace.RetryComposeOption{
-					trace.WithRetryPanicCallback(d.panicCallback),
-				},
-				opts...,
-			)...),
-		)
+		d.options = append(d.options, config.WithTraceRetry(&t))
 
 		return nil
 	}
@@ -526,6 +536,55 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 	}
 }
 
+// WithQueryDefaultResultFormatArrow selects Arrow as the default Query Service
+// result format while preserving the ordinary row and scan APIs. It applies to
+// Query, QueryRow and QueryResultSet on query.Client, query.Session and query.TxActor,
+// including queries inside Do and DoTx. Exec also requests Arrow, but discards
+// results without invoking the reader. It does not affect ExecuteScript or
+// FetchScriptResults. The server must support and enable Arrow results.
+//
+// database/sql connectors using Query Service inherit this default from the driver.
+// The decoder must support the result types of every query through those connectors.
+// Connectors using Table Service are unaffected.
+//
+// Pass ipc.NewReader and optional IPC reader options from the application's
+// Apache Arrow Go version; the SDK module has no Apache Arrow Go dependency.
+// Reader, record, array and option types are inferred from the factory.
+// The factory and its options must support concurrent calls. See query.WithResultFormatArrow
+// for supported types and result ownership and lifetime requirements.
+//
+// Compatible Arrow Go modules are github.com/apache/arrow/go/v6 through v17
+// and github.com/apache/arrow-go/v18, using each module's arrow/ipc package.
+// Apache Arrow releases 0.14.0 through 5.0.0 use the legacy IPC package
+// github.com/apache/arrow/go/arrow/ipc and are also compile-compatible.
+// The legacy module was also tested at v0.0.0-20211112161151-bc219186db40.
+// Earlier Apache Arrow releases do not provide ipc.NewReader.
+// Reading Variant columns requires v9 or newer; earlier IPC readers do not support unions.
+// With v6-v13 or the legacy module, google.golang.org/genproto may need an upgrade
+// to avoid ambiguous imports with the SDK's googleapis/rpc dependency.
+//
+// Per-call query.WithResultFormatArrow overrides the reader factory and its options, while
+// query.WithYdbValue selects YDB values for one query. Subsequent queries without
+// an override use the driver default again. A typed nil reader factory selects
+// the default YDB value format; an untyped nil cannot supply generic type arguments.
+//
+// For example (error handling and result consumption omitted):
+//
+//	db, err := ydb.Open(ctx, dsn,
+//		ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader),
+//	)
+//	result, err := db.Query().Query(ctx, sql)
+//	valueResult, err := db.Query().Query(ctx, sql, query.WithYdbValue())
+//
+// Close each result after consuming it, and close the driver when it is no longer needed.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithQueryDefaultResultFormatArrow[A arrow.Array, B arrow.Record[A], R arrow.IPCReader[B], O any](
+	newReader func(io.Reader, ...O) (R, error), opts ...O,
+) Option {
+	return WithQueryConfigOption(queryConfig.WithDefaultResultFormatArrow(arrow.NewDecoder(newReader, opts...)))
+}
+
 // WithQueryConfigOption collects additional configuration options for query.Client.
 // This option does not replace collected option, instead it will appen provided options.
 func WithQueryConfigOption(option queryConfig.Option) Option {
@@ -537,6 +596,7 @@ func WithQueryConfigOption(option queryConfig.Option) Option {
 }
 
 // WithSessionPoolSizeLimit set max size of internal sessions pool in table.Client
+// If sizeLimit is less than or equal to zero then the default pool size limit is used.
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.tableOptions = append(d.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
@@ -626,10 +686,20 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
-// WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
+// WithSessionPoolWarmUpSessions sets the number of sessions to pre-create in session pools at driver initialization.
+// If warmUpSessions is less than or equal to zero, pool warm-up is disabled.
+func WithSessionPoolWarmUpSessions(warmUpSessions int) Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.tableOptions = append(d.tableOptions, tableConfig.WithSessionPoolWarmUpSessions(warmUpSessions))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionPoolWarmUpSessions(warmUpSessions))
+
+		return nil
+	}
+}
+
+// WithSessionPoolKeepAliveMinSize
 //
-// Deprecated: use WithApplicationName instead.
-// Will be removed after Oct 2024.
+// Deprecated: will be removed after Nov 2026.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
 	return func(ctx context.Context, d *Driver) error { return nil }
@@ -637,8 +707,7 @@ func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
 
 // WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
 //
-// Deprecated: use WithApplicationName instead.
-// Will be removed after Oct 2024.
+// Deprecated: will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error { return nil }
@@ -677,19 +746,11 @@ func WithSharedBalancer(parent *Driver) Option {
 }
 
 // WithTraceTable appends trace.Table into table traces
-func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //nolint:gocritic
+func WithTraceTable(t trace.Table) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.tableOptions = append(
 			d.tableOptions,
-			tableConfig.WithTrace(
-				&t,
-				append(
-					[]trace.TableComposeOption{
-						trace.WithTablePanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			tableConfig.WithTrace(&t),
 		)
 
 		return nil
@@ -697,17 +758,10 @@ func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //
 }
 
 // WithTraceQuery appends trace.Query into query traces
-func WithTraceQuery(t trace.Query, opts ...trace.QueryComposeOption) Option { //nolint:gocritic
+func WithTraceQuery(t trace.Query) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.queryOptions = append(d.queryOptions,
-			queryConfig.WithTrace(&t,
-				append(
-					[]trace.QueryComposeOption{
-						trace.WithQueryPanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			queryConfig.WithTrace(&t),
 		)
 
 		return nil
@@ -715,18 +769,10 @@ func WithTraceQuery(t trace.Query, opts ...trace.QueryComposeOption) Option { //
 }
 
 // WithTraceScripting scripting trace option
-func WithTraceScripting(t trace.Scripting, opts ...trace.ScriptingComposeOption) Option {
+func WithTraceScripting(t trace.Scripting) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.scriptingOptions = append(d.scriptingOptions,
-			scriptingConfig.WithTrace(
-				t,
-				append(
-					[]trace.ScriptingComposeOption{
-						trace.WithScriptingPanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			scriptingConfig.WithTrace(t),
 		)
 
 		return nil
@@ -734,18 +780,10 @@ func WithTraceScripting(t trace.Scripting, opts ...trace.ScriptingComposeOption)
 }
 
 // WithTraceScheme returns scheme trace option
-func WithTraceScheme(t trace.Scheme, opts ...trace.SchemeComposeOption) Option {
+func WithTraceScheme(t trace.Scheme) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.schemeOptions = append(d.schemeOptions,
-			schemeConfig.WithTrace(
-				t,
-				append(
-					[]trace.SchemeComposeOption{
-						trace.WithSchemePanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			schemeConfig.WithTrace(t),
 		)
 
 		return nil
@@ -753,18 +791,10 @@ func WithTraceScheme(t trace.Scheme, opts ...trace.SchemeComposeOption) Option {
 }
 
 // WithTraceCoordination returns coordination trace option
-func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationComposeOption) Option { //nolint:gocritic
+func WithTraceCoordination(t trace.Coordination) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.coordinationOptions = append(d.coordinationOptions,
-			coordinationConfig.WithTrace(
-				&t,
-				append(
-					[]trace.CoordinationComposeOption{
-						trace.WithCoordinationPanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			coordinationConfig.WithTrace(&t),
 		)
 
 		return nil
@@ -772,18 +802,10 @@ func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationCompo
 }
 
 // WithTraceRatelimiter returns ratelimiter trace option
-func WithTraceRatelimiter(t trace.Ratelimiter, opts ...trace.RatelimiterComposeOption) Option {
+func WithTraceRatelimiter(t trace.Ratelimiter) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.ratelimiterOptions = append(d.ratelimiterOptions,
-			ratelimiterConfig.WithTrace(
-				t,
-				append(
-					[]trace.RatelimiterComposeOption{
-						trace.WithRatelimiterPanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			ratelimiterConfig.WithTrace(t),
 		)
 
 		return nil
@@ -800,56 +822,33 @@ func WithRatelimiterOptions(opts ...ratelimiterConfig.Option) Option {
 }
 
 // WithTraceDiscovery adds configured discovery tracer to Driver
-func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption) Option {
+func WithTraceDiscovery(t trace.Discovery) Option {
 	return func(ctx context.Context, d *Driver) error {
 		d.discoveryOptions = append(d.discoveryOptions,
-			discoveryConfig.WithTrace(
-				t,
-				append(
-					[]trace.DiscoveryComposeOption{
-						trace.WithDiscoveryPanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			discoveryConfig.WithTrace(t),
 		)
 
 		return nil
 	}
 }
 
-// WithTraceTopic adds configured discovery tracer to Driver
-func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option { //nolint:gocritic
+// WithTraceTopic adds configured topic tracer to Driver
+func WithTraceTopic(t trace.Topic) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.topicOptions = append(d.topicOptions,
-			topicoptions.WithTrace(
-				t,
-				append(
-					[]trace.TopicComposeOption{
-						trace.WithTopicPanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			topicoptions.WithTrace(t),
 		)
 
 		return nil
 	}
 }
 
-// WithTraceDatabaseSQL adds configured discovery tracer to Driver
-func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) Option { //nolint:gocritic
+// WithTraceDatabaseSQL adds configured database/sql tracer to Driver
+func WithTraceDatabaseSQL(t trace.DatabaseSQL) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.databaseSQLOptions = append(d.databaseSQLOptions,
-			xsql.WithTrace(
-				&t,
-				append(
-					[]trace.DatabaseSQLComposeOption{
-						trace.WithDatabaseSQLPanicCallback(d.panicCallback),
-					},
-					opts...,
-				)...,
-			),
+			xsql.WithComposePanicCallback(d.panicCallback),
+			xsql.WithTrace(&t),
 		)
 
 		return nil
@@ -860,7 +859,7 @@ func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeO
 
 func withOnClose(onClose func(c *Driver)) Option {
 	return func(ctx context.Context, d *Driver) error {
-		d.onClose = append(d.onClose, onClose)
+		d.onClose = []func(c *Driver){onClose}
 
 		return nil
 	}
@@ -868,8 +867,12 @@ func withOnClose(onClose func(c *Driver)) Option {
 
 func withConnPool(pool *conn.Pool) Option {
 	return func(ctx context.Context, d *Driver) error {
+		if d.pool == pool {
+			return nil
+		}
+
 		d.pool = pool
 
-		return pool.Take(ctx)
+		return pool.AddRef(ctx)
 	}
 }

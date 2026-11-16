@@ -16,8 +16,8 @@ import (
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
 type scopeTableStreamExecuteScanQuery struct {
@@ -28,8 +28,7 @@ type scopeTableStreamExecuteScanQuery struct {
 	sum uint64
 }
 
-func TestTableMultipleResultSets(sourceTest *testing.T) {
-	t := xtest.MakeSyncedTest(sourceTest)
+func TestTableMultipleResultSets(t *testing.T) {
 	var (
 		scope = &scopeTableStreamExecuteScanQuery{
 			folder:          t.Name(),

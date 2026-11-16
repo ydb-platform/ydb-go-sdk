@@ -3,18 +3,26 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/rekby/fixenv"
 	"github.com/rekby/fixenv/sf"
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestStreamListener_WorkerCreationAndRouting(t *testing.T) {
@@ -69,6 +77,29 @@ func TestStreamListener_WorkerCreationAndRouting(t *testing.T) {
 	require.NotNil(t, session)
 	require.Equal(t, "test-topic", session.Topic)
 	require.Equal(t, int64(1), session.PartitionID)
+}
+
+func TestStreamListenerClosesSessionRejectedDuringShutdown(t *testing.T) {
+	ctx := xtest.Context(t)
+	cfg := NewStreamListenerConfig()
+	listener := &streamListener{
+		cfg:     &cfg,
+		handler: NewMockEventHandler(gomock.NewController(t)),
+	}
+	listener.initVars(&atomic.Int64{})
+	listener.closing.Store(true)
+	request := &rawtopicreader.StartPartitionSessionRequest{
+		PartitionSession: rawtopicreader.PartitionSession{
+			PartitionSessionID: 42,
+			Path:               "test-topic",
+			PartitionID:        1,
+		},
+	}
+
+	require.NoError(t, listener.handleStartPartition(ctx, request))
+	session, err := listener.sessions.Get(request.PartitionSession.PartitionSessionID)
+	require.NoError(t, err)
+	require.ErrorIs(t, session.Context().Err(), context.Canceled)
 }
 
 func TestStreamListener_RoutingToExistingWorker(t *testing.T) {
@@ -217,6 +248,801 @@ func TestStreamListener_CloseWorkers(t *testing.T) {
 	require.Empty(t, listener.workers)
 }
 
+func TestStreamListenerCloseWaitsForRemovedWorker(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+	worker := listener.createWorkerForPartition(PartitionSession(e))
+
+	removed := make(chan struct{})
+	release := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+	}()
+	originalOnStopped := worker.onStopped
+	worker.onStopped = func(id rawtopicreader.PartitionSessionID, _ error) {
+		originalOnStopped(id, errPartitionQueueClosed)
+		close(removed)
+		<-release
+	}
+	worker.messageQueue.Close()
+	xtest.WaitChannelClosed(t, removed)
+
+	closeCtx, cancelClose := context.WithTimeout(sf.Context(e), 20*time.Millisecond)
+	require.ErrorIs(t, listener.Close(closeCtx, ErrUserCloseTopic), context.DeadlineExceeded)
+	cancelClose()
+
+	close(release)
+	released = true
+	require.NoError(t, listener.Close(xtest.ContextWithCommonTimeout(sf.Context(e), t), ErrUserCloseTopic))
+}
+
+func TestStreamListenerCloseWaitsForStartingWorker(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+	startEntered := make(chan struct{})
+	allowStart := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(allowStart)
+		}
+	}()
+	listener.tracer.OnPartitionWorkerStart = func(trace.TopicPartitionWorkerStartInfo) {
+		close(startEntered)
+		<-allowStart
+	}
+
+	created := make(chan *PartitionWorker, 1)
+	session := PartitionSession(e)
+	go func() {
+		created <- listener.createWorkerForPartition(session)
+	}()
+	xtest.WaitChannelClosed(t, startEntered)
+
+	closeResult := make(chan error, 1)
+	closeCtx := xtest.ContextWithCommonTimeout(sf.Context(e), t)
+	go func() {
+		closeResult <- listener.Close(closeCtx, ErrUserCloseTopic)
+	}()
+
+	select {
+	case err := <-closeResult:
+		t.Fatalf("Close returned before worker startup completed: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(allowStart)
+	released = true
+	require.NotNil(t, <-created)
+	require.NoError(t, <-closeResult)
+}
+
+func TestStreamListenerMergeFailureKeepsBatchesSeparate(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+	session := PartitionSession(e)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+	}()
+	EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, event *PublicEventStartPartitionSession) error {
+			close(entered)
+			<-release
+			event.Confirm()
+
+			return nil
+		},
+	)
+	processed := make(chan struct{}, 2)
+	EventHandlerMock(e).EXPECT().OnReadMessages(gomock.Any(), gomock.Any()).Times(2).DoAndReturn(
+		func(context.Context, *PublicReadMessages) error {
+			processed <- struct{}{}
+
+			return nil
+		},
+	)
+	worker := listener.createWorkerForPartition(session)
+	worker.AddRawServerMessage(&rawtopicreader.StartPartitionSessionRequest{})
+	xtest.WaitChannelClosed(t, entered)
+	first, err := topicreadercommon.NewBatch(session, nil)
+	require.NoError(t, err)
+	second, err := topicreadercommon.NewBatch(session, nil)
+	require.NoError(t, err)
+	topicreadercommon.BatchSetCommitRangeForTest(first, topicreadercommon.CommitRange{
+		PartitionSession: session, CommitOffsetStart: 1, CommitOffsetEnd: 2,
+	})
+	topicreadercommon.BatchSetCommitRangeForTest(second, topicreadercommon.CommitRange{
+		PartitionSession: session, CommitOffsetStart: 4, CommitOffsetEnd: 5,
+	})
+	metadata := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
+	worker.AddMessagesBatch(metadata, first)
+	worker.AddMessagesBatch(metadata, second)
+	require.False(t, listener.closing.Load(), "a failed optimization must not stop the listener")
+	close(release)
+	released = true
+	_ = xtest.Receive(t, processed, "the first batch")
+	_ = xtest.Receive(t, processed, "the second batch")
+	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
+}
+
+func TestStreamListenerClosePrefersCompletedShutdown(t *testing.T) {
+	shutdownErr := errors.New("shutdown failed")
+	done := make(chan struct{})
+	close(done)
+	listener := &streamListener{shutdownDone: done, shutdownErr: shutdownErr}
+	listener.closing.Store(true)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	require.ErrorIs(t, listener.Close(ctx, ErrUserCloseTopic), shutdownErr)
+}
+
+func TestNewStreamListenerWaitsForFailedInitCleanup(t *testing.T) {
+	ctx := xtest.Context(t)
+	initErr := status.Error(codes.Unavailable, "init response failed")
+	client := &failedInitTopicClient{stream: &failedInitGRPCStream{err: initErr}}
+	cfg := NewStreamListenerConfig()
+	cfg.Consumer = "test-consumer"
+	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "test-topic"}}
+	closeStarted := make(chan struct{})
+	closeRelease := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(closeRelease)
+		}
+	}()
+	cfg.Tracer.OnListenerClose = func(trace.TopicListenerCloseStartInfo) func(trace.TopicListenerCloseDoneInfo) {
+		close(closeStarted)
+		<-closeRelease
+
+		return nil
+	}
+	result := make(chan error, 1)
+	go func() {
+		_, err := newStreamListener(ctx, client, NewMockEventHandler(gomock.NewController(t)), &cfg, &atomic.Int64{})
+		result <- err
+	}()
+
+	select {
+	case err := <-result:
+		t.Fatalf("initialization returned before cleanup began: %v", err)
+	case <-closeStarted:
+	case <-ctx.Done():
+		t.Fatal("initialization cleanup did not begin")
+	}
+	select {
+	case err := <-result:
+		t.Fatalf("initialization returned before cleanup completed: %v", err)
+	default:
+	}
+
+	close(closeRelease)
+	released = true
+	require.ErrorIs(t, xtest.Receive(t, result, "the initialization error"), initErr)
+	require.ErrorIs(t, context.Cause(client.stream.ctx), initErr)
+}
+
+func TestNewStreamListenerCanceledInitDoesNotWaitForCleanup(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+	initErr := status.Error(codes.Unavailable, "init response failed")
+	client := &failedInitTopicClient{stream: &failedInitGRPCStream{err: initErr}}
+	cfg := NewStreamListenerConfig()
+	cfg.Consumer = "test-consumer"
+	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "test-topic"}}
+	closeStarted := make(chan struct{})
+	closeRelease := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(closeRelease)
+		}
+	}()
+	cfg.Tracer.OnListenerClose = func(trace.TopicListenerCloseStartInfo) func(trace.TopicListenerCloseDoneInfo) {
+		close(closeStarted)
+		<-closeRelease
+
+		return nil
+	}
+	result := make(chan error, 1)
+	go func() {
+		_, err := newStreamListener(ctx, client, NewMockEventHandler(gomock.NewController(t)), &cfg, &atomic.Int64{})
+		result <- err
+	}()
+
+	xtest.WaitChannelClosed(t, closeStarted)
+	cancel()
+	require.ErrorIs(t, xtest.Receive(t, result, "the canceled initialization"), initErr)
+
+	close(closeRelease)
+	released = true
+}
+
+func TestNewStreamListenerCancellationDuringInitDoesNotHang(t *testing.T) {
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+	client := &blockingInitTopicClient{started: make(chan struct{})}
+	cfg := NewStreamListenerConfig()
+	cfg.Consumer = "test-consumer"
+	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "test-topic"}}
+	result := make(chan error, 1)
+	go func() {
+		_, err := newStreamListener(ctx, client, NewMockEventHandler(gomock.NewController(t)), &cfg, &atomic.Int64{})
+		result <- err
+	}()
+	xtest.WaitChannelClosed(t, client.started)
+	cancel()
+	require.ErrorIs(t, xtest.Receive(t, result, "the canceled initialization"), context.Canceled)
+}
+
+func TestStreamListener_SendMessagesLoopIssuesReadRequestOnFreeBytes(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+	streamMock := StreamMock(e)
+
+	const bufferSize = 42
+	sendDone := make(chan struct{})
+	streamMock.EXPECT().Send(gomock.Any()).DoAndReturn(func(msg rawtopicreader.ClientMessage) error {
+		readReq, ok := msg.(*rawtopicreader.ReadRequest)
+		require.True(t, ok)
+		require.Equal(t, bufferSize, readReq.BytesSize)
+		close(sendDone)
+
+		return nil
+	})
+
+	listener.background.Start("stream listener send loop", listener.sendMessagesLoop)
+	defer func() {
+		_ = listener.background.Close(ctx, errors.New("test finished"))
+	}()
+
+	listener.freeBytes <- bufferSize
+
+	select {
+	case <-sendDone:
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for read request send")
+	}
+}
+
+func TestStreamListener_ReadResponseReturnsCreditWhenWorkerMissing(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+	streamMock := StreamMock(e)
+
+	session := topicreadercommon.NewPartitionSession(
+		ctx,
+		"test-topic",
+		1,
+		0,
+		listener.sessionID,
+		100,
+		1,
+		rawtopiccommon.NewOffset(0),
+	)
+	require.NoError(t, listener.sessions.Add(session))
+
+	const uncompressedSize = 4
+	sendDone := make(chan struct{})
+	streamMock.EXPECT().Send(gomock.Any()).DoAndReturn(func(msg rawtopicreader.ClientMessage) error {
+		readReq, ok := msg.(*rawtopicreader.ReadRequest)
+		require.True(t, ok)
+		require.Equal(t, uncompressedSize, readReq.BytesSize)
+		close(sendDone)
+
+		return nil
+	})
+
+	listener.background.Start("stream listener send loop", listener.sendMessagesLoop)
+	defer func() {
+		_ = listener.background.Close(ctx, errors.New("test finished"))
+	}()
+
+	err := listener.routeMessage(ctx, &rawtopicreader.ReadResponse{
+		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
+			Status: rawydb.StatusSuccess,
+		},
+		BytesSize: uncompressedSize,
+		PartitionData: []rawtopicreader.PartitionData{
+			{
+				PartitionSessionID: 100,
+				Batches: []rawtopicreader.Batch{
+					{
+						Codec: rawtopiccommon.CodecRaw,
+						MessageData: []rawtopicreader.MessageData{
+							{
+								Offset:           10,
+								SeqNo:            1,
+								CreatedAt:        testTime(0),
+								Data:             []byte("test"),
+								UncompressedSize: uncompressedSize,
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	select {
+	case <-sendDone:
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for read request after unrouted batch credit return")
+	}
+}
+
+func TestStreamListener_CollectPendingFreeBytesCoalesces(t *testing.T) {
+	listener := &streamListener{}
+	listener.initVars(&atomic.Int64{})
+	listener.freeBytes = make(chan int, 3)
+
+	listener.freeBytes <- 10
+	listener.freeBytes <- 25
+
+	require.Equal(t, 40, listener.collectPendingFreeBytes(5))
+}
+
+func TestStreamListener_ReadBufferReleaseZero(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+
+	require.NotPanics(t, func() {
+		listener.ReadBufferRelease(0)
+	})
+}
+
+func TestStreamListener_ReadResponseReturnsCreditAfterWorkerProcessing(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+	streamMock := StreamMock(e)
+
+	EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(
+		gomock.Any(),
+		gomock.Any(),
+	).DoAndReturn(func(ctx context.Context, event *PublicEventStartPartitionSession) error {
+		event.Confirm()
+
+		return nil
+	})
+
+	handlerDone := make(chan struct{})
+	EventHandlerMock(e).EXPECT().OnReadMessages(
+		gomock.Any(),
+		gomock.Any(),
+	).DoAndReturn(func(ctx context.Context, event *PublicReadMessages) error {
+		close(handlerDone)
+
+		return nil
+	})
+
+	const uncompressedSize = 4
+	sendDone := make(chan struct{})
+	streamMock.EXPECT().Send(gomock.Any()).DoAndReturn(func(msg rawtopicreader.ClientMessage) error {
+		readReq, ok := msg.(*rawtopicreader.ReadRequest)
+		if !ok {
+			return nil
+		}
+		require.Equal(t, uncompressedSize, readReq.BytesSize)
+		close(sendDone)
+
+		return nil
+	}).AnyTimes()
+
+	listener.background.Start("stream listener send loop", listener.sendMessagesLoop)
+	defer func() {
+		_ = listener.background.Close(ctx, errors.New("test finished"))
+	}()
+
+	require.NoError(t, listener.routeMessage(ctx, &rawtopicreader.StartPartitionSessionRequest{
+		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
+			Status: rawydb.StatusSuccess,
+		},
+		PartitionSession: rawtopicreader.PartitionSession{
+			PartitionSessionID: 100,
+			Path:               "test-topic",
+			PartitionID:        1,
+		},
+		CommittedOffset: 10,
+		PartitionOffsets: rawtopiccommon.OffsetRange{
+			Start: 5,
+			End:   15,
+		},
+	}))
+
+	require.NoError(t, listener.routeMessage(ctx, &rawtopicreader.ReadResponse{
+		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
+			Status: rawydb.StatusSuccess,
+		},
+		BytesSize: uncompressedSize,
+		PartitionData: []rawtopicreader.PartitionData{
+			{
+				PartitionSessionID: 100,
+				Batches: []rawtopicreader.Batch{
+					{
+						Codec: rawtopiccommon.CodecRaw,
+						MessageData: []rawtopicreader.MessageData{
+							{
+								Offset:           10,
+								SeqNo:            1,
+								CreatedAt:        testTime(0),
+								Data:             []byte("test"),
+								UncompressedSize: uncompressedSize,
+							},
+						},
+					},
+				},
+			},
+		},
+	}))
+
+	xtest.WaitChannelClosed(t, handlerDone)
+
+	select {
+	case <-sendDone:
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for read request after worker processed batch")
+	}
+}
+
+func TestStreamListener_FlushPendingMessagesSendError(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+	streamMock := StreamMock(e)
+
+	streamMock.EXPECT().Send(gomock.Any()).Return(errors.New("send failed"))
+
+	listener.background.Start("stream listener send loop", listener.sendMessagesLoop)
+	defer func() {
+		_ = listener.background.Close(ctx, errors.New("test finished"))
+	}()
+
+	listener.sendMessage(&rawtopicreader.ReadRequest{BytesSize: 10})
+
+	select {
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for listener to close after send error")
+	case <-listener.background.Context().Done():
+	}
+}
+
+func TestStreamListener_FlushPendingMessagesEmpty(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+
+	listener.flushPendingMessages(ctx)
+
+	require.Empty(t, listener.messagesToSend)
+}
+
+func TestStreamListener_ReadResponseConversionError(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+
+	err := listener.splitAndRouteReadResponse(&rawtopicreader.ReadResponse{
+		PartitionData: []rawtopicreader.PartitionData{
+			{PartitionSessionID: 100},
+		},
+	})
+	require.Error(t, err)
+}
+
+func TestStreamListener_RouteStopPartitionToExistingWorker(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+
+	EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(
+		gomock.Any(),
+		gomock.Any(),
+	).DoAndReturn(func(ctx context.Context, event *PublicEventStartPartitionSession) error {
+		event.Confirm()
+
+		return nil
+	})
+
+	stopHandled := make(chan struct{})
+	EventHandlerMock(e).EXPECT().OnStopPartitionSessionRequest(
+		gomock.Any(),
+		gomock.Any(),
+	).DoAndReturn(func(ctx context.Context, event *PublicEventStopPartitionSession) error {
+		event.Confirm()
+		close(stopHandled)
+
+		return nil
+	})
+
+	require.NoError(t, listener.routeMessage(ctx, &rawtopicreader.StartPartitionSessionRequest{
+		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
+			Status: rawydb.StatusSuccess,
+		},
+		PartitionSession: rawtopicreader.PartitionSession{
+			PartitionSessionID: 100,
+			Path:               "test-topic",
+			PartitionID:        1,
+		},
+		CommittedOffset: 10,
+		PartitionOffsets: rawtopiccommon.OffsetRange{
+			Start: 5,
+			End:   15,
+		},
+	}))
+
+	require.NoError(t, listener.routeMessage(ctx, &rawtopicreader.StopPartitionSessionRequest{
+		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
+			Status: rawydb.StatusSuccess,
+		},
+		PartitionSessionID: 100,
+		Graceful:           true,
+		CommittedOffset:    rawtopiccommon.NewOffset(20),
+	}))
+
+	xtest.WaitChannelClosed(t, stopHandled)
+}
+
+func TestStreamListener_ReadBufferReleaseSkipsOnShutdown(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+	listener.freeBytes = make(chan int) // unbuffered: no reader after background stops
+
+	listener.background.Start("stream listener send loop", listener.sendMessagesLoop)
+	require.NoError(t, listener.background.Close(ctx, errors.New("shutdown")))
+
+	require.NotPanics(t, func() {
+		listener.ReadBufferRelease(10)
+	})
+}
+
+func TestStreamListener_ReadBufferReleaseSkipsZeroSize(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+	// Unbuffered with no reader: if the zero-size guard did not short-circuit,
+	// the send would block and the test would deadlock.
+	listener.freeBytes = make(chan int)
+
+	require.NotPanics(t, func() {
+		listener.ReadBufferRelease(0)
+	})
+}
+
+func TestStreamListenerGoClosePreservesFirstReason(t *testing.T) {
+	ctx := xtest.Context(t)
+	var closeReasons []error
+	streamCtx, streamClose := context.WithCancelCause(ctx)
+	listener := &streamListener{
+		streamClose: func(reason error) {
+			closeReasons = append(closeReasons, reason)
+			streamClose(reason)
+		},
+		tracer: &trace.Topic{},
+	}
+	_ = listener.background.Context()
+	firstErr := errors.New("message handler failed")
+
+	listener.goClose(ctx, firstErr)
+	listener.goClose(ctx, context.Canceled)
+	xtest.WaitChannelClosed(t, listener.background.StopDone())
+
+	require.Equal(t, []error{firstErr}, closeReasons)
+	require.ErrorIs(t, context.Cause(streamCtx), firstErr)
+	require.ErrorIs(t, listener.background.CloseReason(), firstErr)
+}
+
+func TestStreamListenerConcurrentGoCloseKeepsStreamCause(t *testing.T) {
+	ctx := xtest.Context(t)
+	streamCtx, streamClose := context.WithCancelCause(ctx)
+	listener := &streamListener{streamClose: streamClose, tracer: &trace.Topic{}}
+	_ = listener.background.Context()
+	firstErr := errors.New("first failure")
+	secondErr := errors.New("second failure")
+	start := make(chan struct{})
+	finished := make(chan struct{}, 2)
+
+	for _, reason := range []error{firstErr, secondErr} {
+		go func() {
+			<-start
+			listener.goClose(ctx, reason)
+			finished <- struct{}{}
+		}()
+	}
+	close(start)
+	<-finished
+	<-finished
+	xtest.WaitChannelClosed(t, listener.background.StopDone())
+
+	cause := context.Cause(streamCtx)
+	require.True(t, errors.Is(cause, firstErr) || errors.Is(cause, secondErr))
+	require.ErrorIs(t, listener.background.CloseReason(), cause)
+}
+
+func TestStreamListenerConcurrentCloseWaitsForSameShutdown(t *testing.T) {
+	ctx := xtest.Context(t)
+	listener := &streamListener{tracer: &trace.Topic{}}
+	_ = listener.background.Context()
+	reason := errors.New("listener failed")
+	start := make(chan struct{})
+	const callers = 32
+	results := make(chan error, callers)
+
+	for range callers {
+		go func() {
+			<-start
+			results <- listener.Close(ctx, reason)
+		}()
+	}
+	close(start)
+
+	for range callers {
+		require.NoError(t, <-results)
+	}
+	require.ErrorIs(t, listener.background.CloseReason(), reason)
+}
+
+func TestStreamListenerUnexpectedWorkerStopClosesListener(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+	worker := listener.createWorkerForPartition(PartitionSession(e))
+	worker.messageQueue.Close()
+
+	require.Eventually(t, listener.closing.Load, time.Second, time.Millisecond)
+	xtest.WaitChannelClosed(t, listener.background.StopDone())
+	require.ErrorIs(t, listener.background.CloseReason(), errPartitionQueueClosed)
+}
+
+func TestStreamListenerBlockedSendBoundsPendingCommits(t *testing.T) {
+	ctx := xtest.Context(t)
+	const batchCount = 100
+
+	releaseSend := make(chan struct{})
+	sendStarted := make(chan struct{})
+	var sendOnce sync.Once
+	send := func(message rawtopicreader.ClientMessage) error {
+		if _, ok := message.(*rawtopicreader.CommitOffsetRequest); !ok {
+			return nil
+		}
+		sendOnce.Do(func() { close(sendStarted) })
+		<-releaseSend
+
+		return nil
+	}
+
+	handler := NewMockEventHandler(gomock.NewController(t))
+	processed := make(chan struct{}, batchCount)
+	var processedCount atomic.Int64
+	handler.EXPECT().OnReadMessages(gomock.Any(), gomock.Any()).Times(batchCount).DoAndReturn(
+		func(_ context.Context, event *PublicReadMessages) error {
+			event.Confirm()
+			processedCount.Add(1)
+			processed <- struct{}{}
+
+			return nil
+		},
+	)
+	cfg := NewStreamListenerConfig()
+	listener := &streamListener{
+		cfg:         &cfg,
+		streamClose: func(error) {},
+		handler:     handler,
+		tracer:      &trace.Topic{},
+		listenerID:  "test-listener-id",
+		sessionID:   "test-session-id",
+		background:  *background.NewWorker(ctx, "blocked-send-listener"),
+	}
+	listener.initVars(&atomic.Int64{})
+	// Occupy the sole credit slot. Until it is drained, the first processed batch
+	// cannot release its credit and the worker cannot create another commit request.
+	listener.freeBytes <- -1
+	listener.syncCommitter = topicreadercommon.NewCommitterStopped(
+		listener.tracer,
+		listener.background.Context(),
+		topicreadercommon.CommitModeSync,
+		send,
+	)
+	listener.syncCommitter.Start()
+
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(releaseSend) }) }
+	defer func() {
+		unblock()
+		require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
+	}()
+
+	session := createTestPartitionSession()
+	require.NoError(t, listener.sessions.Add(session))
+	worker := listener.createWorkerForPartition(session)
+	require.NotNil(t, worker)
+	metadata := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
+	enqueue := func() {
+		worker.AddMessagesBatch(metadata, createTestBatchWithBufferBytes(t, 1))
+		// Keep adjacent batches separate so each one creates its own commit request.
+		worker.AddRawServerMessage(&rawtopicreader.InitResponse{})
+	}
+
+	enqueue()
+	xtest.Receive(t, processed, "the first processed batch")
+	xtest.WaitChannelClosed(t, sendStarted)
+
+	for range batchCount - 1 {
+		enqueue()
+	}
+	// The full credit channel is a deterministic barrier: the worker cannot leave
+	// the first batch while the commit send and read-ahead path are blocked.
+	require.Equal(t, int64(1), processedCount.Load())
+
+	unblock()
+	creditsDrained := make(chan int, 1)
+	go func() {
+		total := 0
+		for range batchCount + 1 { // initial sentinel plus one credit per batch
+			total += <-listener.freeBytes
+		}
+		creditsDrained <- total
+	}()
+	for range batchCount - 1 {
+		xtest.Receive(t, processed, "a batch after unblocking sends")
+	}
+	require.Equal(t, batchCount-1, xtest.Receive(t, creditsDrained, "all released buffer credits"))
+	require.Equal(t, int64(batchCount), processedCount.Load())
+}
+
 func testTime(num int) time.Time {
 	return time.Date(2000, 1, 1, 0, 0, num, 0, time.UTC)
+}
+
+type failedInitTopicClient struct {
+	stream *failedInitGRPCStream
+}
+
+func (c *failedInitTopicClient) StreamRead(
+	ctx context.Context, _ int64, tracer *trace.Topic,
+) (rawtopicreader.StreamReader, error) {
+	c.stream.ctx = ctx
+
+	return rawtopicreader.StreamReader{Stream: c.stream, Tracer: tracer}, nil
+}
+
+type failedInitGRPCStream struct {
+	ctx context.Context //nolint:containedctx
+	err error
+}
+
+func (*failedInitGRPCStream) Send(*Ydb_Topic.StreamReadMessage_FromClient) error {
+	return nil
+}
+
+func (s *failedInitGRPCStream) Recv() (*Ydb_Topic.StreamReadMessage_FromServer, error) {
+	return nil, s.err
+}
+
+func (*failedInitGRPCStream) CloseSend() error {
+	return nil
+}
+
+type blockingInitTopicClient struct {
+	started chan struct{}
+}
+
+func (c *blockingInitTopicClient) StreamRead(
+	ctx context.Context, _ int64, _ *trace.Topic,
+) (rawtopicreader.StreamReader, error) {
+	close(c.started)
+	<-ctx.Done()
+
+	return rawtopicreader.StreamReader{}, ctx.Err()
 }

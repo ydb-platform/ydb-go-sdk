@@ -78,6 +78,12 @@ func CreateWithMaxActivePartitions(count int64) CreateOption {
 	return withMaxActivePartitions(count)
 }
 
+// CreateWithMetricsLevel sets the metrics level for the topic.
+// If this option is not provided, the database default is used.
+func CreateWithMetricsLevel(level uint32) CreateOption {
+	return withMetricsLevel(level)
+}
+
 // CreateWithAutoPartitioningSettings set auto partitioning settings for the topic
 func CreateWithAutoPartitioningSettings(settings topictypes.AutoPartitioningSettings) CreateOption {
 	return withAutoPartitioningSettings(settings)

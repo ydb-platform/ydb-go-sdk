@@ -59,7 +59,7 @@ func TestTopicDescriptionFromRaw(t *testing.T) {
 				Path: "some/path",
 				PartitionSettings: PartitionSettings{
 					MinActivePartitions: 4,
-					PartitionCountLimit: 4,
+					MaxActivePartitions: 4,
 				},
 				Partitions: []PartitionInfo{
 					{
@@ -113,7 +113,7 @@ func TestTopicDescriptionFromRaw(t *testing.T) {
 				},
 				PartitioningSettings: rawtopic.PartitioningSettings{
 					MinActivePartitions: 4,
-					PartitionCountLimit: 4,
+					MaxActivePartitions: 4,
 				},
 				Partitions: []rawtopic.PartitionInfo{
 					{

@@ -18,12 +18,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/types"
 )
 
-func TestCreateTableDescription(sourceTest *testing.T) {
-	t := xtest.MakeSyncedTest(sourceTest)
+func TestCreateTableDescription(t *testing.T) {
 	ctx := xtest.Context(t)
 
 	db, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"),

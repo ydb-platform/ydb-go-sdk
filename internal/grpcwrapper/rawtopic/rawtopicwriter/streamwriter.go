@@ -14,11 +14,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var errConcurencyReadDenied = xerrors.Wrap(errors.New("ydb: read from rawtopicwriter in parallel"))
+var errConcurrencyReadDenied = xerrors.Wrap(errors.New("ydb: read from rawtopicwriter in parallel"))
 
 type GrpcStream interface {
 	Send(messageNew *Ydb_Topic.StreamWriteMessage_FromClient) error
@@ -51,14 +52,14 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 	defer w.readCounter.Add(-1)
 
 	if readCnt != 1 {
-		return nil, xerrors.WithStackTrace(errConcurencyReadDenied)
+		return nil, xerrors.WithStackTrace(errConcurrencyReadDenied)
 	}
 
 	grpcMsg, sendErr := w.Stream.Recv()
 	w.readMessagesCount++
 	defer func() {
 		// defer needs for set good session id on first init response before trace the message
-		trace.TopicOnWriterReceiveGRPCMessage(
+		gtrace.TopicOnWriterReceiveGRPCMessage(
 			w.Tracer, w.LogContext, w.InternalStreamID, w.sessionID, w.readMessagesCount, grpcMsg, sendErr,
 		)
 	}()
@@ -150,7 +151,7 @@ func (w *StreamWriter) Send(rawMsg ClientMessage) (err error) {
 
 	err = w.Stream.Send(&protoMsg)
 	w.writtenMessagesCount++
-	trace.TopicOnWriterSentGRPCMessage(
+	gtrace.TopicOnWriterSentGRPCMessage(
 		w.Tracer,
 		w.LogContext,
 		w.InternalStreamID,

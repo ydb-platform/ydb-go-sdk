@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -19,9 +20,13 @@ func (c Config) Trace() *trace.Scripting {
 type Option func(c *Config)
 
 // WithTrace appends scripting trace to early added traces
-func WithTrace(trace trace.Scripting, opts ...trace.ScriptingComposeOption) Option {
+func WithTrace(t trace.Scripting) Option {
 	return func(c *Config) {
-		c.trace = c.trace.Compose(&trace, opts...)
+		var opts []gtrace.ScriptingComposeOption
+		if cb := c.PanicCallback(); cb != nil {
+			opts = append(opts, gtrace.WithScriptingPanicCallback(cb))
+		}
+		c.trace = gtrace.Compose(c.trace, &t, opts...)
 	}
 }
 

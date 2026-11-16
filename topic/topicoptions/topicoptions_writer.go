@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -30,6 +31,9 @@ type ResetableWriter = topicwritercommon.PublicResetableWriter
 //
 // If CreateEncoderFunc returns a writer implementing ResetableWriter, then the compression objects
 // will be reused for this codec. This will reduce the load on the GC.
+// Reusing the returned option across writers also shares their compression objects.
+// Idle objects may be discarded during garbage collection, as with sync.Pool.
+// Separate calls to WithWriterAddEncoder keep their pools independent.
 func WithWriterAddEncoder(codec topictypes.Codec, f CreateEncoderFunc) WriterOption {
 	return topicwriterinternal.WithAddEncoder(rawtopiccommon.Codec(codec), f)
 }
@@ -127,13 +131,57 @@ func WithWriterProducerID(producerID string) WriterOption {
 // Use WithWriterPartitionID instead.
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+//
+// See [WithWriterPartitionID] for important usage limitations.
 func WithPartitionID(partitionID int64) WriterOption {
 	return WithWriterPartitionID(partitionID)
 }
 
-// WithWriterPartitionID set direct partition id on write session level
+// WithWriterPartitionID pins all writes in the session to a single partition ID.
+//
+// Avoid this option on topics with automatic partitioning (auto-split). After a split
+// the pinned partition may become inactive; the server can then respond with OVERLOADED,
+// which the SDK treats as retryable, so the writer may retry indefinitely and appear
+// stuck.
 func WithWriterPartitionID(partitionID int64) WriterOption {
 	return topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID))
+}
+
+// WithWriterDirectWrite enables direct writes from the SDK to the YDB node that
+// hosts the target partition, bypassing the topic proxy. When the partition is
+// known the writer resolves the hosting node via DescribeTopic(IncludeLocation=true)
+// and binds the gRPC stream to it.
+//
+// The partition can be pinned by the caller via [WithWriterPartitionID], in which
+// case the very first connect already goes direct. Without a pinned partition
+// the first connect goes through the proxy as usual; the partition the server
+// assigns in the InitResponse is captured, the stream is torn down, and the
+// next reconnect binds to the partition's node. User Write calls are parked on
+// the SDK side until the rebound session is ready, so messages never leak to
+// the proxy node.
+//
+// On any session failure the next reconnect re-resolves the partition and hosting
+// node from scratch (proxy probe when the partition is not pinned, then
+// DescribeTopic). This handles topics with auto-partitioning (split / merge
+// invalidates the old partition) and node migrations the SDK can't detect on
+// its own. A user-pinned partition ID stays in writer options; only location
+// and generation are refreshed on each connect.
+//
+// Transient lookup errors (UNAVAILABLE, OVERLOADED, etc.) are retried by the
+// existing writer reconnect loop. Terminal errors (BAD_REQUEST, SCHEME_ERROR,
+// missing partition) stop the writer.
+//
+// Direct write requires either [WithWriterPartitionID] or a producer ID
+// (including the auto-generated one when [WithProducerID] was not set).
+//
+// Every node that hosts a partition of the topic must be reachable from the client.
+// If a write is routed to an unreachable node, the SDK may retry indefinitely and
+// appear stuck. When only a subset of cluster nodes is accessible (for example,
+// through a single proxy endpoint), do not enable this option.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithWriterDirectWrite(enable bool) WriterOption {
+	return topicwriterinternal.WithDirectWrite(enable)
 }
 
 // WithSyncWrite
@@ -225,6 +273,21 @@ func WithWriterSetAutoSeqNo(val bool) WriterOption {
 // if enabled - Message.CreatedAt field must be zero
 func WithWriterSetAutoCreatedAt(val bool) WriterOption {
 	return topicwriterinternal.WithAutosetCreatedTime(val)
+}
+
+// WithWriterConnectTimeout sets the timeout for one attempt to connect and initialize a writer stream.
+// The timeout stops after initialization and does not limit the lifetime of an established stream.
+//
+// Zero inherits the Topic client's operation timeout, falling back to one minute when that timeout is zero.
+// A negative timeout disables this limit, including an inherited operation timeout.
+//
+// This option does not limit the total time spent reconnecting; use [WithWriterStartTimeout] for that.
+func WithWriterConnectTimeout(timeout time.Duration) WriterOption {
+	if timeout < 0 {
+		timeout = value.InfiniteDuration
+	}
+
+	return topicwriterinternal.WithConnectTimeout(timeout)
 }
 
 // WithWriterStartTimeout mean timeout for connect to writer stream and work some time without errors

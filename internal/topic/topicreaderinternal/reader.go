@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -275,7 +276,7 @@ func WithCredentials(cred credentials.Credentials) PublicReaderOption {
 
 func WithTrace(tracer *trace.Topic) PublicReaderOption {
 	return func(cfg *ReaderConfig) {
-		cfg.Trace = cfg.Trace.Compose(tracer)
+		cfg.Trace = gtrace.Compose(cfg.Trace, tracer)
 	}
 }
 

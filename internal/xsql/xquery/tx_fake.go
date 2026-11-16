@@ -7,7 +7,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/common"
 )
 
@@ -25,7 +24,7 @@ func (t *txFake) Exec(ctx context.Context, sql string, params *params.Params) (d
 	return result, nil
 }
 
-func (t *txFake) Query(ctx context.Context, sql string, params *params.Params) (driver.RowsNextResultSet, error) {
+func (t *txFake) Query(ctx context.Context, sql string, params *params.Params) (common.Rows, error) {
 	rows, err := t.conn.Query(ctx, sql, params)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -47,11 +46,11 @@ func beginTxFake(ctx context.Context, c *Conn) common.Tx {
 
 func (t *txFake) Commit(ctx context.Context) (err error) {
 	if !t.conn.isReady() {
-		return badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+		return xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(t),
 			xerrors.Invalid(t.conn),
 			xerrors.Invalid(t.conn.session),
-		)))
+		))
 	}
 
 	return nil
@@ -59,11 +58,11 @@ func (t *txFake) Commit(ctx context.Context) (err error) {
 
 func (t *txFake) Rollback(ctx context.Context) (err error) {
 	if !t.conn.isReady() {
-		return badconn.Map(xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
+		return xerrors.WithStackTrace(xerrors.Retryable(errNotReadyConn,
 			xerrors.Invalid(t),
 			xerrors.Invalid(t.conn),
 			xerrors.Invalid(t.conn.session),
-		)))
+		))
 	}
 
 	return err

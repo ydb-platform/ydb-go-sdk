@@ -64,10 +64,18 @@ func Run(factory WorkloadFactory) {
 		log.Fatalf("create workload failed: %v", err)
 	}
 
+	var cpuProfile *os.File
+
 	defer func() {
 		if r := recover(); r != nil {
 			logger.Errorf("panic recovered: %v", r)
 			exitCode = 1
+		}
+
+		stopCPUProfile(cpuProfile)
+
+		if err := writeHeapProfile(); err != nil {
+			logger.Errorf("write heap profile failed: %v", err)
 		}
 
 		logger.SetPhase(PhaseTeardown)
@@ -111,6 +119,12 @@ func Run(factory WorkloadFactory) {
 
 	// Run
 	logger.SetPhase(PhaseRun)
+
+	cpuProfile, err = startCPUProfile()
+	if err != nil {
+		logger.Errorf("start cpu profile failed: %v", err)
+	}
+
 	runCtx, runCancel := context.WithTimeout(ctx, cfg.RunDuration())
 	err = workload.Run(runCtx)
 	runCancel()

@@ -16,9 +16,10 @@ type TopicDescriber func(ctx context.Context, path string) (topictypes.TopicDesc
 type PartitionInfo struct {
 	topictypes.PartitionInfo
 
-	Locked         bool
-	PendingResend  int
-	CachedMaxSeqNo int64
+	Locked          bool
+	PendingResend   int
+	LastQueuedSeqNo int64
+	seqNoReady      chan struct{}
 }
 
 func (p *PartitionInfo) Splitted() bool {
@@ -43,9 +44,42 @@ type ack struct {
 type writerWrapper struct {
 	writer
 
-	initDone atomic.Bool
-	direct   bool
-	err      error
+	initDone    atomic.Bool
+	initDoneCh  chan struct{}
+	initErr     atomic.Value
+	initWaiters int // Guarded by orchestrator.mu.
+}
+
+func (w *writerWrapper) waitInit(ctx context.Context, workerDone <-chan struct{}) error {
+	select {
+	case <-workerDone:
+		return ErrAlreadyClosed
+	default:
+	}
+	if w.initDone.Load() {
+		return w.getInitErr()
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-workerDone:
+		return ErrAlreadyClosed
+	case <-w.initDoneCh:
+		return w.getInitErr()
+	}
+}
+
+func (w *writerWrapper) setInitErr(err error) {
+	if err != nil {
+		w.initErr.Store(err)
+	}
+}
+
+func (w *writerWrapper) getInitErr() error {
+	err, _ := w.initErr.Load().(error)
+
+	return err
 }
 
 type idleWriterInfo struct {

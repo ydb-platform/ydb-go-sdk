@@ -148,8 +148,11 @@ type (
 	DoTxOption = options.DoTxOption
 )
 
-func WithIdempotent() options.RetryOptionsOption {
-	return options.WithIdempotent()
+// WithIdempotent overrides the default idempotency flag for a single operation.
+// With no argument, it marks the operation as idempotent.
+// No more than one bool argument is allowed.
+func WithIdempotent(bb ...bool) options.RetryOptionsOption {
+	return options.WithIdempotent(bb...)
 }
 
 func WithTrace(t *trace.Query) options.TraceOption {

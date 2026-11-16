@@ -4,11 +4,11 @@ import (
 	"context"
 	"sync/atomic"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Reader reads messages from YDB topics.
@@ -114,7 +114,7 @@ func (r *Reader) PopMessagesBatchTx(
 	tracer := r.reader.Tracer()
 
 	traceCtx := ctx
-	onDone := trace.TopicOnReaderPopBatchTx(tracer, &traceCtx, r.reader.ID(), internalTx.SessionID(), internalTx)
+	onDone := gtrace.TopicOnReaderPopBatchTx(tracer, &traceCtx, r.reader.ID(), internalTx.SessionID(), internalTx)
 	ctx = traceCtx
 
 	defer func() {

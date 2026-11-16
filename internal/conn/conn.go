@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -16,6 +17,7 @@ import (
 	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
@@ -23,7 +25,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -39,10 +40,10 @@ type Conn interface {
 	grpc.ClientConnInterface
 
 	Endpoint() endpoint.Endpoint
-	LastUsage() time.Time
-	GetState() state.State
-	SetState(ctx context.Context, state state.State) state.State
-	Unban(ctx context.Context) state.State
+	State() state.State
+	InFlight() int64
+	Unban(ctx context.Context)
+	Ban(ctx context.Context)
 }
 
 type (
@@ -58,28 +59,23 @@ type (
 		GetState() connectivity.State
 	}
 	conn struct {
-		mtx          sync.RWMutex
-		config       connConfig // ro access
-		grpcConn     grpcClientConnInterface
-		done         chan struct{}
-		endpoint     endpoint.Endpoint // ro access
-		closed       bool
-		state        atomic.Uint32
-		childStreams *xcontext.CancelsGuard
-		lastUsage    xsync.LastUsage
-		onClose      []func(*conn)
+		mtx                     sync.RWMutex
+		config                  connConfig // ro access
+		grpcConn                grpcClientConnInterface
+		done                    chan struct{}
+		endpoint                endpoint.Endpoint // ro access
+		closed                  bool
+		state                   atomic.Uint32
+		inFlight                atomic.Int64
+		lastClusterAnnouncement atomic.Int64
+		childStreams            *xcontext.CancelsGuard
+		usage                   *usageTracker
+		onClose                 []func(*conn)
 	}
 )
 
 func (c *conn) Address() string {
 	return c.endpoint.Address()
-}
-
-func (c *conn) LastUsage() time.Time {
-	c.mtx.RLock()
-	defer c.mtx.RUnlock()
-
-	return c.lastUsage.Get()
 }
 
 func (c *conn) NodeID() uint32 {
@@ -90,60 +86,37 @@ func (c *conn) NodeID() uint32 {
 	return 0
 }
 
-func (c *conn) park(ctx context.Context) (err error) {
-	onDone := trace.DriverOnConnPark(
-		c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).park"),
-		c.Endpoint(),
-	)
-	defer func() {
-		onDone(err)
-	}()
-
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-
-	if c.closed {
-		return nil
-	}
-
-	if c.grpcConn == nil {
-		return nil
-	}
-
-	err = c.close(ctx)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	return nil
-}
-
 func (c *conn) Endpoint() endpoint.Endpoint {
 	if c != nil {
-		return c.endpoint
+		return c.endpoint.Copy(
+			endpoint.WithLastUpdated(time.Unix(c.lastClusterAnnouncement.Load(), 0)),
+		)
 	}
 
 	return nil
 }
 
-func (c *conn) SetState(ctx context.Context, s state.State) state.State {
-	return c.setState(ctx, s)
+func SetState(ctx context.Context, c Conn, s state.State) state.State {
+	if cc, ok := c.(*conn); ok {
+		return cc.setState(ctx, s)
+	}
+
+	return s
 }
 
 func (c *conn) setState(ctx context.Context, s state.State) state.State {
 	if state := state.State(c.state.Swap(uint32(s))); state != s {
-		trace.DriverOnConnStateChange(
+		gtrace.DriverOnConnStateChange(
 			c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).setState"),
-			c.endpoint.Copy(), state,
+			c.Endpoint(), state,
 		)(s)
 	}
 
 	return s
 }
 
-func (c *conn) Unban(ctx context.Context) state.State {
+func (c *conn) unban(ctx context.Context) state.State {
 	var newState state.State
 	c.mtx.RLock()
 	cc := c.grpcConn
@@ -159,8 +132,24 @@ func (c *conn) Unban(ctx context.Context) state.State {
 	return newState
 }
 
-func (c *conn) GetState() (s state.State) {
+func (c *conn) Unban(ctx context.Context) {
+	gtrace.DriverOnConnAllow(
+		c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).Unban"),
+		c.Endpoint(), c.State(),
+	)(c.unban(ctx))
+}
+
+func (c *conn) Ban(ctx context.Context) {
+	c.setState(ctx, state.Banned)
+}
+
+func (c *conn) State() (s state.State) {
 	return state.State(c.state.Load())
+}
+
+func (c *conn) InFlight() int64 {
+	return c.inFlight.Load()
 }
 
 func (c *conn) realConn(ctx context.Context) (cc grpcClientConnInterface, err error) {
@@ -180,10 +169,14 @@ func (c *conn) realConn(ctx context.Context) (cc grpcClientConnInterface, err er
 
 // c.mtx must be locked
 func (c *conn) dial(ctx context.Context) (cc grpcClientConnInterface, err error) {
-	onDone := trace.DriverOnConnDial(
+	if c.closed {
+		return nil, xerrors.WithStackTrace(errClosedConnection)
+	}
+
+	onDone := gtrace.DriverOnConnDial(
 		c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).dial"),
-		c.endpoint.Copy(),
+		c.Endpoint(),
 	)
 	defer func() {
 		onDone(err)
@@ -266,7 +259,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 		return nil
 	}
 
-	onDone := trace.DriverOnConnClose(
+	onDone := gtrace.DriverOnConnClose(
 		c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).Close"),
 		c.Endpoint(),
@@ -409,29 +402,32 @@ func (c *conn) Invoke(
 	res any,
 	opts ...grpc.CallOption,
 ) (err error) {
+	c.inFlight.Add(1)
+	defer c.inFlight.Add(-1)
+
+	stopUsage := c.startUsage()
+	defer stopUsage()
+
 	var (
 		opID   string
 		issues []trace.Issue
-		onDone = trace.DriverOnConnInvoke(
+		onDone = gtrace.DriverOnConnInvoke(
 			c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).Invoke"),
-			c.endpoint, trace.Method(method),
+			c.Endpoint(), trace.Method(method),
 		)
 		cc grpcClientConnInterface
 		md = metadata.MD{}
 	)
 	defer func() {
 		meta.CallTrailerCallback(ctx, md)
-		onDone(err, issues, opID, c.GetState(), md)
+		onDone(err, issues, opID, c.State(), md)
 	}()
 
 	cc, err = c.realConn(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
-
-	stop := c.lastUsage.Start()
-	defer stop()
 
 	opID, issues, err = invoke(
 		ctx,
@@ -454,26 +450,34 @@ func (c *conn) NewStream(
 	method string,
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, finalErr error) {
+	c.inFlight.Add(1)
+	stopInFlight := sync.OnceFunc(func() { c.inFlight.Add(-1) })
+	defer func() {
+		if finalErr != nil {
+			stopInFlight()
+		}
+	}()
+
+	stopUsage := c.startUsage()
+	defer stopUsage()
+
 	var (
-		onDone = trace.DriverOnConnNewStream(
+		onDone = gtrace.DriverOnConnNewStream(
 			c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).NewStream"),
-			c.endpoint.Copy(), trace.Method(method),
+			c.Endpoint(), trace.Method(method),
 		)
 		useWrapping = UseWrapping(ctx)
 	)
 
 	defer func() {
-		onDone(finalErr, c.GetState())
+		onDone(finalErr, c.State())
 	}()
 
 	cc, err := c.realConn(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-
-	stop := c.lastUsage.Start()
-	defer stop()
 
 	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
@@ -482,7 +486,7 @@ func (c *conn) NewStream(
 
 	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
-	ctx, cancel := c.childStreams.WithCancel(ctx)
+	grpcCtx, cancel := c.childStreams.WithCancel(ctx)
 	defer func() {
 		if finalErr != nil {
 			cancel()
@@ -490,15 +494,18 @@ func (c *conn) NewStream(
 	}()
 
 	s := &grpcClientStream{
-		parentConn:   c,
-		streamCtx:    ctx,
-		streamCancel: cancel,
-		wrapping:     useWrapping,
-		traceID:      traceID,
-		sentMark:     sentMark,
+		parentConn: c,
+		requestCtx: ctx,
+		grpcCancel: cancel,
+		wrapping:   useWrapping,
+		traceID:    traceID,
+		sentMark:   sentMark,
 	}
 
-	s.stream, err = cc.NewStream(ctx, desc, method, append(opts, grpc.OnFinish(s.finish))...)
+	s.stream, err = cc.NewStream(grpcCtx, desc, method, append(opts, grpc.OnFinish(func(err error) {
+		stopInFlight()
+		s.finish(err)
+	}))...)
 	if err != nil {
 		if xerrors.IsContextError(err) {
 			return nil, xerrors.WithStackTrace(err)
@@ -536,12 +543,19 @@ func withOnClose(onClose func(*conn)) option {
 	}
 }
 
+func withUsageTracker(clock clockwork.Clock, enabled bool) option {
+	return func(c *conn) {
+		if enabled {
+			c.usage = newUsageTracker(clock)
+		}
+	}
+}
+
 func newConn(e endpoint.Endpoint, config connConfig, opts ...option) *conn {
 	c := &conn{
 		endpoint:     e,
 		config:       config,
 		done:         make(chan struct{}),
-		lastUsage:    xsync.NewLastUsage(),
 		childStreams: xcontext.NewCancelsGuard(),
 		onClose: []func(*conn){
 			func(c *conn) {
@@ -549,7 +563,10 @@ func newConn(e endpoint.Endpoint, config connConfig, opts ...option) *conn {
 			},
 		},
 	}
+
 	c.state.Store(uint32(state.Created))
+	c.lastClusterAnnouncement.Store(time.Now().Unix())
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(c)

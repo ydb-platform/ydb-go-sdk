@@ -12,6 +12,13 @@ func IncludePartitionStats() DescribeOption {
 	}
 }
 
+// IncludeLocation additionally fetches the node that hosts each partition.
+func IncludeLocation() DescribeOption {
+	return func(req *rawtopic.DescribeTopicRequest) {
+		req.IncludeLocation = true
+	}
+}
+
 // DescribeConsumerOption type for options of describe consumer method.
 type DescribeConsumerOption func(req *rawtopic.DescribeConsumerRequest)
 

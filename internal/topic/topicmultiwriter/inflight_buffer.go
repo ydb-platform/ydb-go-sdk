@@ -43,7 +43,11 @@ func (b *inflightBuffer) acquireMessage(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-b.ctx.Done():
-		return b.getError()
+		if err := b.getError(); err != nil {
+			return err
+		}
+
+		return ErrAlreadyClosed
 	case b.messagesSema <- struct{}{}:
 		return nil
 	}

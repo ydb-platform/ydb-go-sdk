@@ -23,7 +23,7 @@ func TestResultSetRangeRows(t *testing.T) {
 	ctx := xtest.Context(t)
 	ctrl := gomock.NewController(t)
 	t.Run("EmptyResultSet", func(t *testing.T) {
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
@@ -69,7 +69,7 @@ func TestResultSetRangeRows(t *testing.T) {
 		require.EqualValues(t, 0, count)
 	})
 	t.Run("SecondResultSetEmpty", func(t *testing.T) {
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
@@ -165,7 +165,7 @@ func TestResultSetRangeRows(t *testing.T) {
 		require.EqualValues(t, count, 3)
 	})
 	t.Run("BreakIterate", func(t *testing.T) {
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
@@ -248,7 +248,7 @@ func TestResultSetRangeRows(t *testing.T) {
 		require.EqualValues(t, count, 1)
 	})
 	t.Run("IntermediateResultSetEmpty", func(t *testing.T) {
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
@@ -402,7 +402,7 @@ func TestResultSetRangeRows(t *testing.T) {
 		require.EqualValues(t, count, 6)
 	})
 	t.Run("OverTwoParts", func(t *testing.T) {
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
@@ -522,7 +522,7 @@ func TestResultSetRangeRows(t *testing.T) {
 	t.Run("CanceledContext", func(t *testing.T) {
 		childCtx, cancel := context.WithCancel(xtest.Context(t))
 		defer cancel()
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
@@ -610,7 +610,7 @@ func TestResultSetRangeRows(t *testing.T) {
 		require.EqualValues(t, count, 2)
 	})
 	t.Run("OperationError", func(t *testing.T) {
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
@@ -703,7 +703,7 @@ func TestResultSetRangeRows(t *testing.T) {
 		require.EqualValues(t, count, 4)
 	})
 	t.Run("TransportError", func(t *testing.T) {
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,
@@ -794,7 +794,7 @@ func TestResultSetRangeRows(t *testing.T) {
 		require.EqualValues(t, count, 4)
 	})
 	t.Run("WrongResultSetIndex", func(t *testing.T) {
-		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream := newExecuteQueryStreamMock(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 			Status:         Ydb.StatusIds_SUCCESS,
 			ResultSetIndex: 0,

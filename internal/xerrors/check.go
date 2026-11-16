@@ -13,7 +13,7 @@ func Check(err error) (
 	if err == nil {
 		return -1,
 			TypeNoError,
-			backoff.TypeNoBackoff
+			backoff.TypeInstant
 	}
 	var e Error
 	if As(err, &e) {
@@ -22,5 +22,5 @@ func Check(err error) (
 
 	return -1,
 		TypeNonRetryable, // unknown errors are not retryable
-		backoff.TypeNoBackoff
+		backoff.TypeInstant
 }

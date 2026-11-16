@@ -5,6 +5,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topiclistenerinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 func TestEqualAlterOptions(t *testing.T) {
@@ -75,6 +80,80 @@ func TestEqualAlterOptions(t *testing.T) {
 	}
 }
 
+func TestWithListenerBufferSizeBytes(t *testing.T) {
+	cfg := topiclistenerinternal.NewStreamListenerConfig()
+
+	WithListenerBufferSizeBytes(42)(&cfg)
+
+	require.Equal(t, 42, cfg.BufferSize)
+}
+
+func TestCreateWithMetricsLevel(t *testing.T) {
+	req := &rawtopic.CreateTopicRequest{}
+	CreateWithMetricsLevel(3).ApplyCreateOption(req)
+
+	require.True(t, req.MetricsLevel.HasValue)
+	require.Equal(t, uint32(3), req.MetricsLevel.Value)
+
+	proto := req.ToProto()
+	require.Equal(t, uint32(3), proto.GetMetricsLevel())
+}
+
+func TestAlterWithSetMetricsLevel(t *testing.T) {
+	req := &rawtopic.AlterTopicRequest{}
+	AlterWithSetMetricsLevel(2).ApplyAlterOption(req)
+
+	require.True(t, req.SetMetricsLevel.HasValue)
+	require.Equal(t, uint32(2), req.SetMetricsLevel.Value)
+	require.False(t, req.ResetMetricsLevel)
+
+	proto := req.ToProto()
+	require.Equal(t, uint32(2), proto.GetSetMetricsLevel())
+}
+
+func TestAlterWithResetMetricsLevel(t *testing.T) {
+	req := &rawtopic.AlterTopicRequest{}
+	AlterWithSetMetricsLevel(5).ApplyAlterOption(req)
+	AlterWithResetMetricsLevel().ApplyAlterOption(req)
+
+	require.False(t, req.SetMetricsLevel.HasValue)
+	require.True(t, req.ResetMetricsLevel)
+
+	proto := req.ToProto()
+	require.NotNil(t, proto.GetResetMetricsLevel())
+}
+
+func TestAlterConsumerOptionsDoNotResetSupportedCodecs(t *testing.T) {
+	// Altering an unrelated consumer property must not send set_supported_codecs,
+	// otherwise the server wipes the consumer's existing codec restriction.
+	for _, opt := range []AlterOption{
+		AlterConsumerWithImportant("name", true),
+		AlterConsumerWithReadFrom("name", time.Unix(0, 0)),
+		AlterConsumerWithAttributes("name", map[string]string{"k": "v"}),
+		AlterConsumerWithAvailabilityPeriod("name", time.Hour),
+	} {
+		req := &rawtopic.AlterTopicRequest{}
+		opt.ApplyAlterOption(req)
+
+		proto := req.ToProto()
+		require.Len(t, proto.GetAlterConsumers(), 1)
+		require.Nil(t, proto.GetAlterConsumers()[0].GetSetSupportedCodecs())
+	}
+}
+
+func TestAlterConsumerWithSupportedCodecsSetsCodecs(t *testing.T) {
+	req := &rawtopic.AlterTopicRequest{}
+	AlterConsumerWithSupportedCodecs("name", []topictypes.Codec{topictypes.CodecGzip}).ApplyAlterOption(req)
+
+	proto := req.ToProto()
+	require.Len(t, proto.GetAlterConsumers(), 1)
+	require.NotNil(t, proto.GetAlterConsumers()[0].GetSetSupportedCodecs())
+	require.Equal(t,
+		[]int32{int32(topictypes.CodecGzip)},
+		proto.GetAlterConsumers()[0].GetSetSupportedCodecs().GetCodecs(),
+	)
+}
+
 func TestEqualCreateOptions(t *testing.T) {
 	for _, tt := range []struct {
 		lhs []CreateOption
@@ -95,6 +174,62 @@ func TestEqualCreateOptions(t *testing.T) {
 	} {
 		t.Run("", func(t *testing.T) {
 			assert.ElementsMatch(t, tt.lhs, tt.rhs) // compare slices with ignore ordering
+		})
+	}
+}
+
+func TestCreatePartitionCountLimitUsesMaxActivePartitions(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		opts []CreateOption
+		want int64
+	}{
+		{"Unset", nil, 0},
+		{"Legacy", []CreateOption{CreateWithPartitionCountLimit(7)}, 7},
+		{"Modern", []CreateOption{CreateWithMaxActivePartitions(9)}, 9},
+		{"LegacyLast", []CreateOption{CreateWithMaxActivePartitions(9), CreateWithPartitionCountLimit(7)}, 7},
+		{"ModernLast", []CreateOption{CreateWithPartitionCountLimit(7), CreateWithMaxActivePartitions(9)}, 9},
+		{"Zero", []CreateOption{CreateWithPartitionCountLimit(0)}, 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &rawtopic.CreateTopicRequest{}
+			for _, opt := range tt.opts {
+				opt.ApplyCreateOption(req)
+			}
+
+			proto := req.ToProto().GetPartitioningSettings()
+			require.Equal(t, tt.want, proto.GetMaxActivePartitions())
+			message := proto.ProtoReflect()
+			require.False(t, message.Has(message.Descriptor().Fields().ByNumber(2)))
+		})
+	}
+}
+
+func TestAlterPartitionCountLimitUsesMaxActivePartitions(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		opts     []AlterOption
+		want     int64
+		hasValue bool
+	}{
+		{"Unset", nil, 0, false},
+		{"Legacy", []AlterOption{AlterWithPartitionCountLimit(7)}, 7, true},
+		{"Modern", []AlterOption{AlterWithMaxActivePartitions(9)}, 9, true},
+		{"LegacyLast", []AlterOption{AlterWithMaxActivePartitions(9), AlterWithPartitionCountLimit(7)}, 7, true},
+		{"ModernLast", []AlterOption{AlterWithPartitionCountLimit(7), AlterWithMaxActivePartitions(9)}, 9, true},
+		{"Zero", []AlterOption{AlterWithPartitionCountLimit(0)}, 0, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &rawtopic.AlterTopicRequest{}
+			for _, opt := range tt.opts {
+				opt.ApplyAlterOption(req)
+			}
+
+			proto := req.ToProto().GetAlterPartitioningSettings()
+			require.Equal(t, tt.want, proto.GetSetMaxActivePartitions())
+			require.Equal(t, tt.hasValue, proto.SetMaxActivePartitions != nil)
+			message := proto.ProtoReflect()
+			require.False(t, message.Has(message.Descriptor().Fields().ByNumber(2)))
 		})
 	}
 }

@@ -1,11 +1,14 @@
 package config
 
 import (
+	"context"
+	"io"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -14,6 +17,7 @@ func TestNew(t *testing.T) {
 		cfg := New()
 		require.NotNil(t, cfg)
 		require.Equal(t, DefaultPoolMaxSize, cfg.PoolLimit())
+		require.Empty(t, cfg.PoolName())
 		require.Equal(t, DefaultSessionCreateTimeout, cfg.SessionCreateTimeout())
 		require.Equal(t, DefaultSessionDeleteTimeout, cfg.SessionDeleteTimeout())
 		require.NotNil(t, cfg.Trace())
@@ -22,11 +26,18 @@ func TestNew(t *testing.T) {
 		require.Equal(t, time.Duration(0), cfg.PoolSessionUsageTTL())
 		require.Equal(t, time.Duration(0), cfg.SessionIdleTimeToLive())
 		require.False(t, cfg.LazyTx())
+		require.False(t, cfg.DefaultIdempotent())
+		require.Equal(t, 0, cfg.PoolWarmUpSize())
 	})
 
 	t.Run("WithPoolLimit", func(t *testing.T) {
 		cfg := New(WithPoolLimit(100))
 		require.Equal(t, 100, cfg.PoolLimit())
+	})
+
+	t.Run("WithPoolName", func(t *testing.T) {
+		cfg := New(WithPoolName("/local"))
+		require.Equal(t, "/local", cfg.PoolName())
 	})
 
 	t.Run("WithPoolLimitZero", func(t *testing.T) {
@@ -89,6 +100,11 @@ func TestNew(t *testing.T) {
 		require.True(t, cfg.LazyTx())
 	})
 
+	t.Run("WithDefaultIdempotent", func(t *testing.T) {
+		cfg := New(WithDefaultIdempotent(true))
+		require.True(t, cfg.DefaultIdempotent())
+	})
+
 	t.Run("WithTrace", func(t *testing.T) {
 		tr := &trace.Query{
 			OnSessionCreate: func(info trace.QuerySessionCreateStartInfo) func(info trace.QuerySessionCreateDoneInfo) {
@@ -120,6 +136,23 @@ func TestNew(t *testing.T) {
 	})
 }
 
+func TestWithSessionPoolWarmUpSessions(t *testing.T) {
+	t.Run("explicit value", func(t *testing.T) {
+		cfg := New(WithSessionPoolWarmUpSessions(20))
+		require.Equal(t, 20, cfg.PoolWarmUpSize())
+	})
+
+	t.Run("zero disables warm-up", func(t *testing.T) {
+		cfg := New(WithSessionPoolWarmUpSessions(0))
+		require.Equal(t, 0, cfg.PoolWarmUpSize())
+	})
+
+	t.Run("negative disables warm-up", func(t *testing.T) {
+		cfg := New(WithSessionPoolWarmUpSessions(-1))
+		require.Equal(t, 0, cfg.PoolWarmUpSize())
+	})
+}
+
 func TestDefaults(t *testing.T) {
 	cfg := defaults()
 	require.NotNil(t, cfg)
@@ -127,4 +160,21 @@ func TestDefaults(t *testing.T) {
 	require.Equal(t, DefaultSessionCreateTimeout, cfg.sessionCreateTimeout)
 	require.Equal(t, DefaultSessionDeleteTimeout, cfg.sessionDeleteTimeout)
 	require.NotNil(t, cfg.trace)
+	require.Equal(t, 0, cfg.poolWarmUpSize)
+}
+
+func TestWithDefaultResultFormatArrow(t *testing.T) {
+	called := false
+	decoder := arrow.Decoder(func(context.Context, []arrow.Column, io.Reader) ([]arrow.Batch, error) {
+		called = true
+
+		return nil, nil
+	})
+	require.Nil(t, New().DefaultArrowDecoder())
+	decode := New(WithDefaultResultFormatArrow(decoder)).DefaultArrowDecoder()
+	require.NotNil(t, decode)
+	_, err := decode(t.Context(), nil, nil)
+	require.NoError(t, err)
+	require.True(t, called)
+	require.Nil(t, New(WithDefaultResultFormatArrow(decoder), WithDefaultResultFormatArrow(nil)).DefaultArrowDecoder())
 }

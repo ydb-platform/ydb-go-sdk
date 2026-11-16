@@ -56,22 +56,21 @@ func (m *idleWriterManager) getWriterIfExists(partitionID int64) (*writerWrapper
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	writer, ok := m.idleWritersMap[partitionID]
-	if !ok {
+	writer := m.removeNeedLock(partitionID)
+	if writer == nil {
 		return nil, false
 	}
-
-	m.removeNeedLock(partitionID)
 
 	return writer, true
 }
 
-func (m *idleWriterManager) removeNeedLock(partitionID int64) {
+func (m *idleWriterManager) removeNeedLock(partitionID int64) *writerWrapper {
 	element, ok := m.idleWritersIndex[partitionID]
 	if !ok {
-		return
+		return nil
 	}
 
+	writer := m.idleWritersMap[partitionID]
 	wasHead := element.Prev() == nil
 	m.idleWriters.Remove(element)
 	delete(m.idleWritersIndex, partitionID)
@@ -80,6 +79,8 @@ func (m *idleWriterManager) removeNeedLock(partitionID int64) {
 	if wasHead {
 		m.wakeup()
 	}
+
+	return writer
 }
 
 func (m *idleWriterManager) wakeup() {
@@ -109,16 +110,42 @@ func (m *idleWriterManager) run() {
 		}
 		timer.Stop()
 
+		var expiredWriter *writerWrapper
 		m.mu.WithLock(func() {
 			element := m.idleWriters.Front()
 			if element == nil {
 				return
 			}
 			if !element.Value.deadline.After(time.Now()) {
-				m.removeNeedLock(element.Value.partitionID)
+				expiredWriter = m.removeNeedLock(element.Value.partitionID)
 			}
 		})
+		if expiredWriter != nil {
+			_ = expiredWriter.Close(m.ctx)
+		}
 	}
+}
+
+func (m *idleWriterManager) close(ctx context.Context) error {
+	var writersToClose []writer
+	m.mu.WithLock(func() {
+		writersToClose = make([]writer, 0, len(m.idleWritersMap))
+		for _, writer := range m.idleWritersMap {
+			writersToClose = append(writersToClose, writer)
+		}
+
+		m.idleWriters.Clear()
+		m.idleWritersIndex = make(map[int64]*xlist.Element[idleWriterInfo])
+		m.idleWritersMap = make(map[int64]*writerWrapper)
+	})
+
+	for _, writer := range writersToClose {
+		if err := writer.Close(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (m *idleWriterManager) getWritersCount() int {

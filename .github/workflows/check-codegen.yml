@@ -37,7 +37,7 @@ jobs:
 
     - name: Clean and re-generate *_gtrace.go files
       run: |
-        rm -f ./trace/*_gtrace.go
+        find . -name '*_gtrace.go' -delete
         go generate ./trace
         go generate ./...
 

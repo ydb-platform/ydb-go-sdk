@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
@@ -18,7 +19,8 @@ var errCreate = errors.New("create error")
 
 // poolTestWriter is a writer implementation that tracks Close calls for tests.
 type poolTestWriter struct {
-	closed atomic.Bool
+	closed      atomic.Bool
+	writeCalled atomic.Int64
 }
 
 func (w *poolTestWriter) Close(_ context.Context) error {
@@ -32,6 +34,8 @@ func (w *poolTestWriter) WaitInitInfo(_ context.Context) (topicwriterinternal.In
 }
 
 func (w *poolTestWriter) WriteInternal(_ context.Context, _ []topicwritercommon.MessageWithDataContent) error {
+	w.writeCalled.Add(1)
+
 	return nil
 }
 
@@ -42,10 +46,12 @@ type poolMockFactory struct {
 	producerIDs  []string
 	returnError  bool
 	writers      []*poolTestWriter
+	lastCfg      topicwriterinternal.WriterReconnectorConfig
 }
 
 func (f *poolMockFactory) Create(cfg topicwriterinternal.WriterReconnectorConfig) (writer, error) {
 	f.createCalls++
+	f.lastCfg = cfg
 	if partID, ok := cfg.PartitionID(); ok {
 		f.partitionIDs = append(f.partitionIDs, partID)
 	}
@@ -79,13 +85,72 @@ func newPoolForTest(t *testing.T, factory *poolMockFactory) (*partitionWriterPoo
 		cfg,
 		writerCfg,
 		bg,
+		&seqNoCounter{},
 		func(partitionID, seqNo int64) {},
-		func(partitionID int64) {},
+		func(partitionID int64, reason error) {},
 		func() {},
 		func(err error) {},
 	)
 
 	return pool, cancel
+}
+
+func TestSenderStepReturnsNonOverloadedWriterInitError(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(xtest.Context(t))
+	defer cancel()
+
+	initErr := errors.New("writer init failed")
+	testWriter := &poolTestWriter{}
+	wrapper := &writerWrapper{writer: testWriter}
+	wrapper.setInitErr(initErr)
+	wrapper.initDone.Store(true)
+
+	mu := &xsync.Mutex{}
+	writerCfg := &topicwriterinternal.WriterReconnectorConfig{}
+	topicwriterinternal.WithMaxQueueLen(10)(writerCfg)
+	buf := newInflightBuffer(ctx, mu, writerCfg, func() error { return nil })
+	partitions := map[int64]*PartitionInfo{1: {}}
+
+	mu.WithLock(func() {
+		buf.pushNeedLock(message{
+			MessageWithDataContent: topicwritercommon.MessageWithDataContent{
+				PublicMessage: topicwritercommon.PublicMessage{
+					SeqNo:       1,
+					PartitionID: 1,
+				},
+			},
+		})
+	})
+
+	s := newSender(
+		ctx,
+		partitions,
+		mu,
+		buf,
+		&partitionWriterPool{ctx: ctx, writers: map[int64]*writerWrapper{1: wrapper}},
+		newPartitionSplitReceiver(func(partitionID int64) error { return nil }, func(err error) {}),
+		func(err error) {},
+	)
+
+	err := s.step()
+	require.ErrorIs(t, err, initErr)
+	require.Equal(t, int64(0), testWriter.writeCalled.Load())
+}
+
+func TestPartitionWriterPool_CreateDirectWriterSeedsDirectWritePartition(t *testing.T) {
+	t.Parallel()
+
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+
+	pool.cfg.DirectWrite = true
+
+	_, err := pool.get(7)
+	require.NoError(t, err)
+	require.Equal(t, []int64{7}, factory.partitionIDs)
 }
 
 func TestPartitionWriterPool_GetCreatesWriterAndReturnsSameOnSecondGet(t *testing.T) {
@@ -95,14 +160,14 @@ func TestPartitionWriterPool_GetCreatesWriterAndReturnsSameOnSecondGet(t *testin
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	w1, err := pool.get(1, true)
+	w1, err := pool.get(1)
 	require.NoError(t, err)
 	require.NotNil(t, w1)
 	require.Equal(t, 1, factory.createCalls)
 	require.Equal(t, []int64{1}, factory.partitionIDs)
 	require.Equal(t, []string{"test-prefix-1"}, factory.producerIDs)
 
-	w2, err := pool.get(1, true)
+	w2, err := pool.get(1)
 	require.NoError(t, err)
 	require.Same(t, w1, w2)
 	require.Equal(t, 1, factory.createCalls)
@@ -115,17 +180,33 @@ func TestPartitionWriterPool_GetReturnsFromIdleAfterEvict(t *testing.T) {
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	w1, err := pool.get(1, true)
+	w1, err := pool.get(1)
 	require.NoError(t, err)
 	require.NotNil(t, w1)
 	require.Equal(t, 1, factory.createCalls)
 
 	pool.evict(1)
 
-	w2, err := pool.get(1, true)
+	w2, err := pool.get(1)
 	require.NoError(t, err)
 	require.Same(t, w1, w2)
 	require.Equal(t, 1, factory.createCalls)
+}
+
+func TestPartitionWriterPool_RemoveKeepsReplacement(t *testing.T) {
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+	old, err := pool.get(1)
+	require.NoError(t, err)
+	pool.discard(1, old)
+	replacement, err := pool.get(1)
+	require.NoError(t, err)
+	pool.remove(1, old)
+	require.Zero(t, pool.idle.getWritersCount())
+	current, err := pool.get(1)
+	require.NoError(t, err)
+	require.Same(t, replacement, current)
 }
 
 func TestPartitionWriterPool_CloseAllClosesAllWriters(t *testing.T) {
@@ -135,9 +216,9 @@ func TestPartitionWriterPool_CloseAllClosesAllWriters(t *testing.T) {
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	_, err := pool.get(1, true)
+	_, err := pool.get(1)
 	require.NoError(t, err)
-	_, err = pool.get(2, true)
+	_, err = pool.get(2)
 	require.NoError(t, err)
 	require.Len(t, factory.writers, 2)
 
@@ -148,6 +229,26 @@ func TestPartitionWriterPool_CloseAllClosesAllWriters(t *testing.T) {
 	require.True(t, factory.writers[1].closed.Load())
 }
 
+func TestPartitionWriterPool_CloseAllClosesIdleWriters(t *testing.T) {
+	t.Parallel()
+
+	factory := &poolMockFactory{}
+	pool, cancel := newPoolForTest(t, factory)
+	defer cancel()
+
+	_, err := pool.get(1)
+	require.NoError(t, err)
+	require.Len(t, factory.writers, 1)
+
+	pool.evict(1)
+	require.Equal(t, 1, pool.idle.getWritersCount())
+
+	err = pool.close(xtest.Context(t))
+	require.NoError(t, err)
+	require.True(t, factory.writers[0].closed.Load())
+	require.Equal(t, 0, pool.idle.getWritersCount())
+}
+
 func TestPartitionWriterPool_GetProducerIDFormat(t *testing.T) {
 	t.Parallel()
 
@@ -155,7 +256,7 @@ func TestPartitionWriterPool_GetProducerIDFormat(t *testing.T) {
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	_, err := pool.get(5, true)
+	_, err := pool.get(5)
 	require.NoError(t, err)
 	require.Equal(t, []string{"test-prefix-5"}, factory.producerIDs)
 	require.Equal(t, []int64{5}, factory.partitionIDs)
@@ -170,8 +271,30 @@ func TestPartitionWriterPool_GetReturnsErrorWhenCreateFails(t *testing.T) {
 	pool, cancel := newPoolForTest(t, factory)
 	defer cancel()
 
-	w, err := pool.get(1, true)
+	w, err := pool.get(1)
 	require.ErrorIs(t, err, errCreate)
 	require.Nil(t, w)
 	require.Equal(t, 1, factory.createCalls)
+}
+
+func TestPartitionWriterPool_DetachTransfersOwnership(t *testing.T) {
+	for _, state := range []string{"active", "idle"} {
+		t.Run(state, func(t *testing.T) {
+			factory := &poolMockFactory{}
+			pool, cancel := newPoolForTest(t, factory)
+			defer cancel()
+			w, err := pool.get(1)
+			require.NoError(t, err)
+			if state == "idle" {
+				pool.evict(1)
+			}
+
+			require.Same(t, w, pool.detach(1))
+			require.Zero(t, pool.getWritersCount())
+			require.Nil(t, pool.detach(1))
+			require.NoError(t, pool.close(xtest.Context(t)))
+			require.False(t, factory.writers[0].closed.Load(), "the detached writer belongs to the caller")
+			require.NoError(t, w.Close(xtest.Context(t)))
+		})
+	}
 }

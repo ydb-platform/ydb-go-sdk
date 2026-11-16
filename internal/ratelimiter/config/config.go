@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -20,9 +21,13 @@ func (c Config) Trace() *trace.Ratelimiter {
 type Option func(c *Config)
 
 // WithTrace appends ratelimiter trace to early defined traces
-func WithTrace(trace trace.Ratelimiter, opts ...trace.RatelimiterComposeOption) Option {
+func WithTrace(t trace.Ratelimiter) Option {
 	return func(c *Config) {
-		c.trace = c.trace.Compose(&trace, opts...)
+		var opts []gtrace.RatelimiterComposeOption
+		if cb := c.PanicCallback(); cb != nil {
+			opts = append(opts, gtrace.WithRatelimiterPanicCallback(cb))
+		}
+		c.trace = gtrace.Compose(c.trace, &t, opts...)
 	}
 }
 

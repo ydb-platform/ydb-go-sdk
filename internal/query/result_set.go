@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
@@ -28,6 +29,7 @@ type (
 		columnTypes []types.Type
 		rows        []query.Row
 		rowIndex    int
+		closeArrow  func()
 	}
 	resultSet struct {
 		index               int64
@@ -35,8 +37,15 @@ type (
 		columns             []*Ydb.Column
 		currentPart         *Ydb_Query.ExecuteQueryResponsePart
 		rowIndex            int
-		done                chan struct{}
+		ended               atomic.Bool
 		mustBeLastResultSet bool
+		notifyError         func(context.Context, error) error
+		decodeArrow         func(context.Context, []*Ydb.Column, *Ydb.ResultSet) ([]*arrowRowData, error)
+		arrowBatches        []*arrowRowData
+		arrowDecoded        bool
+		arrowRowCount       int
+		arrowBatchIndex     int
+		arrowBatchOffset    int
 	}
 	resultSetWithClose struct {
 		*resultSet
@@ -62,7 +71,11 @@ func rangeRows(ctx context.Context, rs result.Set) xiter.Seq2[result.Row, error]
 	}
 }
 
-func (*materializedResultSet) Close(context.Context) error {
+func (rs *materializedResultSet) Close(context.Context) error {
+	if rs.closeArrow != nil {
+		rs.closeArrow()
+	}
+
 	return nil
 }
 
@@ -106,7 +119,7 @@ func (rs *resultSet) Columns() (columnNames []string) {
 
 func (rs *materializedResultSet) NextRow(ctx context.Context) (query.Row, error) {
 	if rs.rowIndex == len(rs.rows) {
-		return nil, xerrors.WithStackTrace(io.EOF)
+		return nil, io.EOF
 	}
 
 	defer func() {
@@ -148,56 +161,115 @@ func newResultSet(
 		currentPart: part,
 		rowIndex:    -1,
 		columns:     part.GetResultSet().GetColumns(),
-		done:        make(chan struct{}),
 	}
 }
 
-func (rs *resultSet) nextRow(ctx context.Context) (*Row, error) {
+func (rs *resultSet) nextRow(ctx context.Context) (query.Row, error) {
 	rs.rowIndex++
 	for {
-		select {
-		case <-rs.done:
+		if rs.ended.Load() {
 			return nil, io.EOF
-		case <-ctx.Done():
-			return nil, xerrors.WithStackTrace(ctx.Err())
-		default:
-			//nolint:nestif
-			if rs.rowIndex == len(rs.currentPart.GetResultSet().GetRows()) {
-				part, err := rs.recv()
-				if err != nil {
-					if xerrors.Is(err, io.EOF) {
-						close(rs.done)
-					}
+		}
 
-					if rs.mustBeLastResultSet && errors.Is(err, errReadNextResultSet) {
-						// prevent detect io.EOF in the error
-						return nil, xerrors.WithStackTrace(xerrors.Wrap(errors.New(err.Error())))
-					}
-
-					return nil, xerrors.WithStackTrace(err)
-				}
-				rs.rowIndex = 0
-				rs.currentPart = part
-				if part == nil {
-					close(rs.done)
-
-					return nil, xerrors.WithStackTrace(io.EOF)
-				}
-			}
-			if rs.currentPart.GetResultSet() != nil && rs.index != rs.currentPart.GetResultSetIndex() {
-				close(rs.done)
-
-				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"received part with result set index = %d, current result set index = %d: %w",
-					rs.index, rs.currentPart.GetResultSetIndex(), errWrongResultSetIndex,
-				))
+		if err := ctx.Err(); err != nil {
+			if rs.notifyError != nil {
+				err = rs.notifyError(ctx, err)
 			}
 
-			if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
-				return NewRow(rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex]), nil
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		rowCount, err := rs.partRowCount(ctx)
+		if err != nil {
+			return nil, err
+		}
+		//nolint:nestif
+		if rs.rowIndex == rowCount {
+			part, err := rs.recv()
+			if err != nil {
+				if xerrors.Is(err, io.EOF) {
+					rs.ended.Store(true)
+				}
+
+				if rs.mustBeLastResultSet && errors.Is(err, errReadNextResultSet) {
+					// prevent detect io.EOF in the error
+					return nil, xerrors.WithStackTrace(xerrors.Wrap(errors.New(err.Error())))
+				}
+
+				if xerrors.Is(err, io.EOF) {
+					return nil, io.EOF
+				}
+
+				return nil, xerrors.WithStackTrace(err)
+			}
+			rs.rowIndex = 0
+			rs.currentPart = part
+			rs.arrowBatches = nil
+			rs.arrowDecoded = false
+			if part == nil {
+				rs.ended.Store(true)
+
+				return nil, io.EOF
 			}
 		}
+		if rs.currentPart.GetResultSet() != nil && rs.index != rs.currentPart.GetResultSetIndex() {
+			rs.ended.Store(true)
+
+			return nil, xerrors.WithStackTrace(fmt.Errorf(
+				"received part with result set index = %d, current result set index = %d: %w",
+				rs.index, rs.currentPart.GetResultSetIndex(), errWrongResultSetIndex,
+			))
+		}
+
+		if row := rs.partRow(); row != nil {
+			return row, nil
+		}
 	}
+}
+
+func (rs *resultSet) partRowCount(ctx context.Context) (int, error) {
+	if rs.currentPart.GetResultSet().GetFormat() != Ydb.ResultSet_FORMAT_ARROW {
+		return len(rs.currentPart.GetResultSet().GetRows()), nil
+	}
+	if !rs.arrowDecoded {
+		var err error
+		rs.arrowBatches, err = rs.decodeArrow(ctx, rs.columns, rs.currentPart.GetResultSet())
+		if err != nil {
+			rs.ended.Store(true)
+			if rs.notifyError != nil {
+				err = rs.notifyError(ctx, err)
+			}
+
+			return 0, xerrors.WithStackTrace(err)
+		}
+		rs.arrowRowCount = 0
+		rs.arrowBatchIndex = 0
+		rs.arrowBatchOffset = 0
+		for _, data := range rs.arrowBatches {
+			rs.arrowRowCount += len(data.rows)
+		}
+		rs.arrowDecoded = true
+	}
+
+	return rs.arrowRowCount, nil
+}
+
+func (rs *resultSet) partRow() query.Row {
+	if rs.currentPart.GetResultSet().GetFormat() == Ydb.ResultSet_FORMAT_ARROW {
+		for rs.arrowBatchIndex < len(rs.arrowBatches) {
+			data := rs.arrowBatches[rs.arrowBatchIndex]
+			index := rs.rowIndex - rs.arrowBatchOffset
+			if index < len(data.rows) {
+				return &data.rows[index]
+			}
+			rs.arrowBatchOffset += len(data.rows)
+			rs.arrowBatchIndex++
+		}
+	} else if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
+		return NewRow(rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex])
+	}
+
+	return nil
 }
 
 func (rs *resultSet) NextRow(ctx context.Context) (_ query.Row, err error) {

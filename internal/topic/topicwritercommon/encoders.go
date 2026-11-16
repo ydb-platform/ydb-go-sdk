@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -24,42 +25,60 @@ type PublicResetableWriter interface {
 	Reset(wr io.Writer)
 }
 
-type encoderPool struct {
-	pool sync.Pool
+// Encoder reuses compression writers for one codec configuration.
+// It can be shared by topic writers using the same encoder option.
+type Encoder struct {
+	create PublicCreateEncoderFunc
+	pool   sync.Pool
 }
 
-func (p *encoderPool) Get() PublicResetableWriter {
-	enc, _ := p.pool.Get().(PublicResetableWriter)
-
-	return enc
+func NewEncoder(create PublicCreateEncoderFunc) *Encoder {
+	return &Encoder{create: create}
 }
 
-func (p *encoderPool) Put(wr PublicResetableWriter) {
-	p.pool.Put(wr)
-}
-
-func newEncoderPool() *encoderPool {
-	return &encoderPool{
-		pool: sync.Pool{},
+func (e *Encoder) EncodeBytes(target io.Writer, data []byte) (int, error) {
+	enc, err := e.newWriter(target)
+	if err != nil {
+		return 0, err
 	}
+	n, err := enc.Write(data)
+	if err == nil {
+		err = enc.Close()
+	}
+	if err != nil {
+		return 0, err
+	}
+	if reusable, ok := enc.(PublicResetableWriter); ok {
+		e.pool.Put(reusable)
+	}
+
+	return n, nil
+}
+
+func (e *Encoder) newWriter(target io.Writer) (io.WriteCloser, error) {
+	if enc, ok := e.pool.Get().(PublicResetableWriter); ok {
+		enc.Reset(target)
+
+		return enc, nil
+	}
+
+	return e.create(target)
 }
 
 type MultiEncoder struct {
-	m map[rawtopiccommon.Codec]PublicCreateEncoderFunc
+	m map[rawtopiccommon.Codec]*Encoder
 
 	bp xsync.Pool[bytes.Buffer]
-	ep map[rawtopiccommon.Codec]*encoderPool
 }
 
 func NewMultiEncoder() *MultiEncoder {
 	me := &MultiEncoder{
-		m: make(map[rawtopiccommon.Codec]PublicCreateEncoderFunc),
+		m: make(map[rawtopiccommon.Codec]*Encoder),
 		bp: xsync.Pool[bytes.Buffer]{
 			New: func() *bytes.Buffer {
 				return &bytes.Buffer{}
 			},
 		},
-		ep: make(map[rawtopiccommon.Codec]*encoderPool),
 	}
 
 	me.AddEncoder(rawtopiccommon.CodecRaw, func(writer io.Writer) (io.WriteCloser, error) {
@@ -73,8 +92,11 @@ func NewMultiEncoder() *MultiEncoder {
 }
 
 func (e *MultiEncoder) AddEncoder(codec rawtopiccommon.Codec, creator PublicCreateEncoderFunc) {
-	e.m[codec] = creator
-	e.ep[codec] = newEncoderPool()
+	e.AddSharedEncoder(codec, NewEncoder(creator))
+}
+
+func (e *MultiEncoder) AddSharedEncoder(codec rawtopiccommon.Codec, encoder *Encoder) {
+	e.m[codec] = encoder
 }
 
 func (e *MultiEncoder) Encode(codec rawtopiccommon.Codec, target io.Writer, source io.Reader) (int, error) {
@@ -90,41 +112,11 @@ func (e *MultiEncoder) Encode(codec rawtopiccommon.Codec, target io.Writer, sour
 }
 
 func (e *MultiEncoder) EncodeBytes(codec rawtopiccommon.Codec, target io.Writer, data []byte) (int, error) {
-	enc, err := e.createEncodeWriter(codec, target)
-	if err != nil {
-		return 0, err
+	if encoder, ok := e.m[codec]; ok {
+		return encoder.EncodeBytes(target, data)
 	}
 
-	n, err := enc.Write(data)
-	if err == nil {
-		err = enc.Close()
-	}
-	if err != nil {
-		return 0, err
-	}
-
-	if resetableEnc, ok := enc.(PublicResetableWriter); ok {
-		e.ep[codec].Put(resetableEnc)
-	}
-
-	return n, nil
-}
-
-func (e *MultiEncoder) createEncodeWriter(codec rawtopiccommon.Codec, target io.Writer) (io.WriteCloser, error) {
-	if ePool, ok := e.ep[codec]; ok {
-		wr := ePool.Get()
-		if wr != nil {
-			wr.Reset(target)
-
-			return wr, nil
-		}
-	}
-
-	if encoderCreator, ok := e.m[codec]; ok {
-		return encoderCreator(target)
-	}
-
-	return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)))
+	return 0, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)))
 }
 
 func (e *MultiEncoder) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {
@@ -198,7 +190,7 @@ func (s *EncoderSelector) CompressMessages(messages []MessageWithDataContent) (r
 	codec, err := s.selectCodec(messages)
 	if err == nil {
 		logCtx := s.logContext
-		onCompressDone := trace.TopicOnWriterCompressMessages(
+		onCompressDone := gtrace.TopicOnWriterCompressMessages(
 			s.tracer,
 			&logCtx,
 			s.writerReconnectorID,
@@ -209,10 +201,47 @@ func (s *EncoderSelector) CompressMessages(messages []MessageWithDataContent) (r
 			trace.TopicWriterCompressMessagesReasonCompressData,
 		)
 		err = CacheMessages(messages, codec, s.parallelCompressors)
-		onCompressDone(err)
+
+		traceErr := err
+		var uncompressedSize, compressedSize int
+		if traceErr == nil && s.tracer.OnWriterCompressMessages != nil {
+			compressedSize, traceErr = CompressedContentSize(messages, codec)
+			if traceErr == nil {
+				uncompressedSize = UncompressedContentSize(messages)
+			}
+		}
+		onCompressDone(traceErr, uncompressedSize, compressedSize)
 	}
 
 	return codec, err
+}
+
+// UncompressedContentSize returns the total uncompressed size in bytes of the messages.
+func UncompressedContentSize(messages []MessageWithDataContent) int {
+	size := 0
+	for i := range messages {
+		size += messages[i].BufUncompressedSize
+	}
+
+	return size
+}
+
+// CompressedContentSize returns the total size in bytes of already cached messages
+// encoded with the given codec.
+func CompressedContentSize(
+	messages []MessageWithDataContent,
+	codec rawtopiccommon.Codec,
+) (int, error) {
+	size := 0
+	for i := range messages {
+		content, err := messages[i].GetEncodedBytes(codec)
+		if err != nil {
+			return 0, err
+		}
+		size += len(content)
+	}
+
+	return size, nil
 }
 
 func (s *EncoderSelector) ResetAllowedCodecs(allowedCodecs rawtopiccommon.SupportedCodecs) {
@@ -270,7 +299,7 @@ func (s *EncoderSelector) measureCodecs(messages []MessageWithDataContent) (rawt
 			firstSeqNo = messages[0].SeqNo
 		}
 		logCtx := s.logContext
-		onCompressDone := trace.TopicOnWriterCompressMessages(
+		onCompressDone := gtrace.TopicOnWriterCompressMessages(
 			s.tracer,
 			&logCtx,
 			s.writerReconnectorID,
@@ -281,20 +310,20 @@ func (s *EncoderSelector) measureCodecs(messages []MessageWithDataContent) (rawt
 			trace.TopicWriterCompressMessagesReasonCodecsMeasure,
 		)
 		err := CacheMessages(messages, codec, s.parallelCompressors)
-		onCompressDone(err)
+
+		var uncompressedSize, compressedSize int
+		if err == nil {
+			compressedSize, err = CompressedContentSize(messages, codec)
+			if err == nil {
+				uncompressedSize = UncompressedContentSize(messages)
+			}
+		}
+		onCompressDone(err, uncompressedSize, compressedSize)
 		if err != nil {
 			return codecUnknown, err
 		}
 
-		size := 0
-		for messIndex := range messages {
-			content, err := messages[messIndex].GetEncodedBytes(codec)
-			if err != nil {
-				return codecUnknown, err
-			}
-			size += len(content)
-		}
-		sizes[codecIndex] = size
+		sizes[codecIndex] = compressedSize
 	}
 
 	minSizeIndex := 0

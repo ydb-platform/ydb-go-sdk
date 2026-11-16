@@ -2,6 +2,8 @@ package metrics
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	configPkg "github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/observability"
 )
 
 func WithTraces(config Config) ydb.Option {
@@ -11,6 +13,7 @@ func WithTraces(config Config) ydb.Option {
 	config = config.WithSystem("ydb")
 
 	return ydb.MergeOptions(
+		ydb.With(configPkg.WithBuildInfo(observability.MetricsChainName, observability.MetricsChainVersion)),
 		ydb.WithTraceDriver(driver(config)),
 		ydb.WithTraceTable(table(config)),
 		ydb.WithTraceQuery(query(config)),

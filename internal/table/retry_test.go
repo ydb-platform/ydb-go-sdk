@@ -7,10 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -85,14 +87,7 @@ func TestDoBadSession(t *testing.T) {
 	ctx := xtest.Context(t)
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		closed := make(map[table.Session]bool)
-		p := pool.New[*Session, Session](ctx,
-			pool.WithMustDeleteItemFunc[*Session, Session](func(session *Session, err error) bool {
-				if !session.IsAlive() {
-					return true
-				}
-
-				return xerrors.MustDeleteTableOrQuerySession(err)
-			}),
+		p, poolErr := pool.New[*Session, Session](ctx,
 			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 				s := simpleSession(t)
 				s.closeOnce = func(_ context.Context) error {
@@ -104,6 +99,7 @@ func TestDoBadSession(t *testing.T) {
 				return s, nil
 			}),
 		)
+		require.NoError(t, poolErr)
 		var (
 			i          int
 			maxRetryes = 100
@@ -144,11 +140,12 @@ func TestDoCreateSessionError(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx, cancel := xcontext.WithTimeout(rootCtx, 30*time.Millisecond)
 		defer cancel()
-		p := pool.New[*Session, Session](ctx,
+		p, poolErr := pool.New[*Session, Session](ctx,
 			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 				return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
 			}),
 		)
+		require.NoError(t, poolErr)
 		err := do(ctx, p, config.New(),
 			func(ctx context.Context, s *Session) error {
 				return nil
@@ -213,6 +210,36 @@ func TestDoImmediateReturn(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRetryOptionsDefaultIdempotent(t *testing.T) {
+	client := &Client{
+		config: config.New(config.WithDefaultIdempotent(true)),
+	}
+
+	t.Run("disabled client default", func(t *testing.T) {
+		settings := (&Client{config: config.New()}).retryOptions()
+
+		attempts, err := runTableIdempotentRetry(settings.RetryOptions...)
+		require.Error(t, err)
+		require.Equal(t, 1, attempts)
+	})
+
+	t.Run("uses client default", func(t *testing.T) {
+		settings := client.retryOptions()
+
+		attempts, err := runTableIdempotentRetry(settings.RetryOptions...)
+		require.NoError(t, err)
+		require.Equal(t, 2, attempts)
+	})
+
+	t.Run("per-call false overrides client default", func(t *testing.T) {
+		settings := client.retryOptions(table.WithIdempotent(false))
+
+		attempts, err := runTableIdempotentRetry(settings.RetryOptions...)
+		require.Error(t, err)
+		require.Equal(t, 1, attempts)
+	})
 }
 
 // We are testing all suspentions of custom operation func against to all deadline
@@ -312,11 +339,12 @@ func TestDoContextDeadline(t *testing.T) {
 		cc: testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	ctx := xtest.Context(t)
-	p := pool.New[*Session, Session](ctx,
+	p, err := pool.New[*Session, Session](ctx,
 		pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
 			return newTableSession(ctx, client.cc, config.New())
 		}),
 	)
+	require.NoError(t, err)
 	r := xrand.New(xrand.WithLock())
 	for i := range timeouts {
 		for j := range sleeps {
@@ -357,23 +385,16 @@ func (e *CustomError) Unwrap() error {
 }
 
 func TestDoWithCustomErrors(t *testing.T) {
-	var (
-		limit = 10
-		ctx   = context.Background()
-		p     = pool.New[*Session, Session](ctx,
-			pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
-				return simpleSession(t), nil
-			}),
-			pool.WithMustDeleteItemFunc[*Session, Session](func(session *Session, err error) bool {
-				if !session.IsAlive() {
-					return true
-				}
+	const limit = 10
 
-				return xerrors.MustDeleteTableOrQuerySession(err)
-			}),
-			pool.WithLimit[*Session, Session](limit),
-		)
+	ctx := context.Background()
+	p, poolErr := pool.New[*Session, Session](ctx,
+		pool.WithCreateItemFunc[*Session, Session](func(ctx context.Context) (*Session, error) {
+			return simpleSession(t), nil
+		}),
+		pool.WithLimit[*Session, Session](limit),
 	)
+	require.NoError(t, poolErr)
 	for _, test := range []struct {
 		error         error
 		retriable     bool
@@ -486,7 +507,6 @@ func (s *singleSession) Close(ctx context.Context) error {
 func (s *singleSession) Stats() pool.Stats {
 	return pool.Stats{
 		Limit: 1,
-		Index: 1,
 	}
 }
 
@@ -496,4 +516,39 @@ func (s *singleSession) With(ctx context.Context,
 	return retry.Retry(ctx, func(ctx context.Context) error {
 		return f(ctx, s.s)
 	}, opts...)
+}
+
+func runTableIdempotentRetry(opts ...retry.Option) (attempts int, err error) {
+	err = retry.Retry(context.Background(), func(context.Context) error {
+		attempts++
+		if attempts == 1 {
+			return tableIdempotentRetryableError{}
+		}
+
+		return nil
+	}, opts...)
+
+	return attempts, err
+}
+
+type tableIdempotentRetryableError struct{}
+
+func (tableIdempotentRetryableError) Error() string {
+	return "idempotent retryable error"
+}
+
+func (tableIdempotentRetryableError) Code() int32 {
+	return -1
+}
+
+func (tableIdempotentRetryableError) Name() string {
+	return "idempotent retryable error"
+}
+
+func (tableIdempotentRetryableError) Type() xerrors.Type {
+	return xerrors.TypeConditionallyRetryable
+}
+
+func (tableIdempotentRetryableError) BackoffType() backoff.Type {
+	return backoff.TypeInstant
 }

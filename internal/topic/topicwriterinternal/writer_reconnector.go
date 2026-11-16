@@ -18,11 +18,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -31,7 +33,10 @@ import (
 )
 
 var (
-	errConnTimeout           = xerrors.Wrap(errors.New("ydb: connection timeout"))
+	errConnTimeout = xerrors.Retryable(
+		errors.New("ydb: connection timeout"),
+		xerrors.WithName("TopicWriterConnectionTimeout"),
+	)
 	errStopWriterReconnector = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
 	ErrNonZeroSeqNo          = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
 	errNoAllowedCodecs       = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
@@ -39,6 +44,10 @@ var (
 	ErrPublicQueueIsFull     = xerrors.Wrap(
 		errors.New("ydb: queue is full"),
 	)
+	// ErrPublicWriterClosed is returned by Writer.Write when the writer has been closed
+	// due to a terminal error or explicit Close call. Use errors.Is to check for this error
+	// and recreate the writer if needed.
+	ErrPublicWriterClosed                          = xerrors.Wrap(errors.New("ydb: writer is closed"))
 	ErrPublicMessagesPutToInternalQueueBeforeError = xerrors.Wrap(errors.New("ydb: the messages was put to internal buffer before the error happened. It mean about the messages can be delivered to the server"))                                                                                                           //nolint:lll
 	errDiffetentTransactions                       = xerrors.Wrap(errors.New("ydb: internal writer has messages from different trasactions. It is internal logic error, write issue please: https://github.com/ydb-platform/ydb-go-sdk/issues/new?assignees=&labels=bug&projects=&template=01_BUG_REPORT.md&title=bug%3A+")) //nolint:lll
 	errWritingByKeyNotSupported                    = xerrors.Wrap(errors.New("ydb: writing by key is not supported for single writer, use WithWriterPartitionByKey or WithPartitionByPartitionID options"))                                                                                                                  //nolint:lll
@@ -49,6 +58,12 @@ var (
 	// It is fast check for return error at writer create context instead of stream initialization
 	// The error will remove in the future, when skip message group id will be allowed by server.
 	errProducerIDNotEqualMessageGroupID = xerrors.Wrap(errors.New("ydb: producer id not equal to message group id, use option WithMessageGroupID(producerID) for create writer")) //nolint:lll
+	errDirectWritePartitionNotFound     = xerrors.Wrap(
+		errors.New("ydb: direct write: target partition not found in topic description"),
+	)
+	errDirectWriteRequiresPartitionOrProducer = xerrors.Wrap(
+		errors.New("ydb: direct write: requires WithWriterPartitionID or WithProducerID"),
+	)
 )
 
 type WriterReconnectorConfig struct {
@@ -57,7 +72,7 @@ type WriterReconnectorConfig struct {
 	MaxMessageSize               int
 	MaxQueueLen                  int
 	Common                       config.Common
-	AdditionalEncoders           map[rawtopiccommon.Codec]topicwritercommon.PublicCreateEncoderFunc
+	AdditionalEncoders           map[rawtopiccommon.Codec]*topicwritercommon.Encoder
 	Connect                      ConnectFunc
 	WaitServerAck                bool
 	AutoSetSeqNo                 bool
@@ -75,16 +90,65 @@ type WriterReconnectorConfig struct {
 	MultiWriterConfig any
 	RetrySettings     topic.RetrySettings
 
+	directWriteEnabled bool
+
 	connectTimeout time.Duration
 }
 
 func (cfg *WriterReconnectorConfig) validate() error {
-	if cfg.defaultPartitioning.Type == rawtopicwriter.PartitioningMessageGroupID &&
-		cfg.producerID != cfg.defaultPartitioning.MessageGroupID {
+	if cfg.partitioning.Type == rawtopicwriter.PartitioningMessageGroupID &&
+		cfg.producerID != cfg.partitioning.MessageGroupID {
 		return xerrors.WithStackTrace(errProducerIDNotEqualMessageGroupID)
 	}
 
-	return nil
+	return cfg.validateDirectWrite()
+}
+
+func (cfg *WriterReconnectorConfig) validateDirectWrite() error {
+	if !cfg.directWriteEnabled ||
+		cfg.partitioning.Type == rawtopicwriter.PartitioningPartitionID ||
+		cfg.producerID != "" {
+		return nil
+	}
+
+	return xerrors.WithStackTrace(errDirectWriteRequiresPartitionOrProducer)
+}
+
+// probeWriterPartition opens a short-lived proxy StreamWrite session, sends InitRequest,
+// reads InitResponse, and returns the assigned partition ID.
+func (cfg *WriterReconnectorConfig) probeWriterPartition(ctx context.Context) (int64, error) {
+	stream, err := cfg.rawTopicClient.StreamWrite(ctx, cfg.Tracer)
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		_ = stream.CloseSend()
+	}()
+
+	req := rawtopicwriter.InitRequest{
+		Path:             cfg.topic,
+		ProducerID:       cfg.producerID,
+		WriteSessionMeta: cfg.writerMeta,
+		Partitioning:     cfg.partitioning,
+	}
+	if err = stream.Send(&req); err != nil {
+		return 0, err
+	}
+
+	recvMessage, err := stream.Recv()
+	if err != nil {
+		return 0, err
+	}
+
+	result, ok := recvMessage.(*rawtopicwriter.InitResult)
+	if !ok {
+		return 0, xerrors.WithStackTrace(fmt.Errorf(
+			"ydb: direct write: probe init response has unexpected type: %T",
+			recvMessage,
+		))
+	}
+
+	return result.PartitionID, nil
 }
 
 func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnectorConfig {
@@ -122,7 +186,7 @@ func NewWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 	}
 
 	if cfg.connectTimeout == 0 {
-		cfg.connectTimeout = value.InfiniteDuration
+		cfg.connectTimeout = time.Minute
 	}
 
 	if cfg.producerID == "" {
@@ -192,8 +256,8 @@ func newWriterReconnectorStopped(
 	res.queue.OnAckReceived = res.onAckReceived
 	res.queue.AckCallback = res.cfg.OnAckReceivedCallback
 
-	for codec, creator := range cfg.AdditionalEncoders {
-		res.encodersMap.AddEncoder(codec, creator)
+	for codec, encoder := range cfg.AdditionalEncoders {
+		res.encodersMap.AddSharedEncoder(codec, encoder)
 	}
 
 	res.sessionID = "not-connected-" + writerInstanceID.String()
@@ -292,7 +356,7 @@ func (w *WriterReconnector) writePrepared(
 	preserveAssignedFields bool,
 ) (resErr error) {
 	if err := w.background.CloseReason(); err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", ErrPublicWriterClosed, err))
 	}
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -401,7 +465,7 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 		sessionID = w.sessionID
 	})
 	logCtx := w.cfg.LogContext
-	onCompressDone := trace.TopicOnWriterCompressMessages(
+	onCompressDone := gtrace.TopicOnWriterCompressMessages(
 		w.cfg.Tracer,
 		&logCtx,
 		w.writerInstanceID,
@@ -417,7 +481,16 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 		targetCodec = rawtopiccommon.CodecRaw
 	}
 	err := topicwritercommon.CacheMessages(res, targetCodec, w.cfg.compressorCount)
-	onCompressDone(err)
+
+	traceErr := err
+	var uncompressedSize, compressedSize int
+	if traceErr == nil && w.cfg.Tracer.OnWriterCompressMessages != nil {
+		compressedSize, traceErr = topicwritercommon.CompressedContentSize(res, targetCodec)
+		if traceErr == nil {
+			uncompressedSize = topicwritercommon.UncompressedContentSize(res)
+		}
+	}
+	onCompressDone(traceErr, uncompressedSize, compressedSize)
 
 	if err != nil {
 		return nil, err
@@ -447,7 +520,7 @@ func (w *WriterReconnector) Close(ctx context.Context) error {
 func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr error) {
 	defer func() {
 		logCtx := w.cfg.LogContext
-		trace.TopicOnWriterClose(w.cfg.Tracer, &logCtx, w.writerInstanceID, reason)
+		gtrace.TopicOnWriterClose(w.cfg.Tracer, &logCtx, w.writerInstanceID, reason)
 	}()
 
 	// stop background work and single stream writer
@@ -467,8 +540,7 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	attempt := 0
 	createStreamContext := func() (context.Context, context.CancelFunc) {
-		// need suppress parent context cancelation for flush buffer while close writer
-		return xcontext.WithCancel(xcontext.ValueOnly(ctx))
+		return xcontext.WithCancel(ctx)
 	}
 
 	//nolint:ineffassign,staticcheck,wastedassign
@@ -479,6 +551,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	var reconnectReason error
 	var prevAttemptTime time.Time
 	var startOfRetries time.Time
+	connectionEstablished := false
 
 	for {
 		if ctx.Err() != nil {
@@ -489,7 +562,8 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtx, streamCtxCancel = createStreamContext()
 
 		now := time.Now()
-		if startOfRetries.IsZero() || topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
+		if startOfRetries.IsZero() || (connectionEstablished &&
+			topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout)) {
 			attempt = 0
 			startOfRetries = w.cfg.clock.Now()
 		} else {
@@ -504,7 +578,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		}
 
 		logCtx := w.cfg.LogContext
-		onWriterStarted := trace.TopicOnWriterReconnect(
+		onWriterStarted := gtrace.TopicOnWriterReconnect(
 			w.cfg.Tracer,
 			&logCtx,
 			w.writerInstanceID,
@@ -514,6 +588,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		)
 
 		writer, err := w.startWriteStream(streamCtx)
+		connectionEstablished = err == nil
 		w.onWriterChange(writer)
 		onStreamError := onWriterStarted(err)
 		if err == nil {
@@ -558,6 +633,41 @@ func (w *WriterReconnector) handleReconnectRetry(
 	return false
 }
 
+// lookupPartitionLocation looks up which node currently hosts the given partition.
+func (w *WriterReconnector) lookupPartitionLocation(
+	ctx context.Context,
+	partitionID int64,
+) (rawtopic.PartitionLocation, error) {
+	res, err := w.cfg.rawTopicClient.DescribeTopic(ctx, rawtopic.DescribeTopicRequest{
+		Path:            w.cfg.topic,
+		IncludeLocation: true,
+	})
+	if err != nil {
+		return rawtopic.PartitionLocation{}, xerrors.WithStackTrace(
+			fmt.Errorf("ydb: direct write: describe topic failed: %w", err),
+		)
+	}
+
+	location, ok := res.LocationOf(partitionID)
+	if !ok {
+		return rawtopic.PartitionLocation{}, xerrors.WithStackTrace(fmt.Errorf(
+			"%w: topic=%q partition_id=%d",
+			errDirectWritePartitionNotFound, w.cfg.topic, partitionID,
+		))
+	}
+
+	return location, nil
+}
+
+func (w *WriterReconnector) resolveDirectWritePartition(ctx context.Context) (int64, error) {
+	if partitionID, ok := w.cfg.PartitionID(); ok &&
+		w.cfg.partitioning.Type == rawtopicwriter.PartitioningPartitionID {
+		return partitionID, nil
+	}
+
+	return w.cfg.probeWriterPartition(xcontext.MergeContexts(ctx, w.cfg.LogContext))
+}
+
 func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *SingleStreamWriter, err error) {
 	// connectCtx with timeout applies only to the connection phase,
 	// allowing the main stream context to remain active after exiting this method
@@ -570,6 +680,30 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 		}
 	}()
 
+	singleStreamConfig := w.cfg.WritersCommonConfig
+	if w.cfg.directWriteEnabled {
+		partitionID, err := w.resolveDirectWritePartition(connectCtx)
+		if err != nil {
+			return nil, err
+		}
+
+		location, err := w.lookupPartitionLocation(connectCtx, partitionID)
+		if err != nil {
+			return nil, err
+		}
+
+		connectCtx = endpoint.WithNodeID(
+			connectCtx,
+			location.NodeIDUint32(),
+			endpoint.WithFallback(false),
+		)
+
+		singleStreamConfig.partitioning = rawtopicwriter.NewPartitioningPartitionWithGeneration(
+			partitionID,
+			location.Generation,
+		)
+	}
+
 	stream, err := w.connectWithTimeout(connectCtx)
 	if err != nil {
 		return nil, err
@@ -577,7 +711,22 @@ func (w *WriterReconnector) startWriteStream(ctx context.Context) (writer *Singl
 
 	w.queue.ResetSentProgress()
 
-	return NewSingleStreamWriter(connectCtx, w.createWriterStreamConfig(stream))
+	var ep trace.EndpointInfo
+	if stream != nil {
+		ep = stream.Endpoint() // endpoint.Endpoint implements trace.EndpointInfo
+	}
+
+	streamCfg := newSingleStreamWriterConfig(
+		singleStreamConfig,
+		stream,
+		&w.queue,
+		w.encodersMap,
+		w.needReceiveLastSeqNo(),
+		w.writerInstanceID,
+		ep,
+	)
+
+	return NewSingleStreamWriter(connectCtx, streamCfg)
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
@@ -690,25 +839,6 @@ func (w *WriterReconnector) waitFirstInitResponse(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-}
-
-func (w *WriterReconnector) createWriterStreamConfig(stream RawTopicWriterStream) SingleStreamWriterConfig {
-	var ep trace.EndpointInfo
-	if stream != nil {
-		ep = stream.Endpoint() // endpoint.Endpoint implements trace.EndpointInfo
-	}
-
-	cfg := newSingleStreamWriterConfig(
-		w.cfg.WritersCommonConfig,
-		stream,
-		&w.queue,
-		w.encodersMap,
-		w.needReceiveLastSeqNo(),
-		w.writerInstanceID,
-		ep,
-	)
-
-	return cfg
 }
 
 func (w *WriterReconnector) GetSessionID() (sessionID string) {

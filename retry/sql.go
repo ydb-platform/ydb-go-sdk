@@ -78,6 +78,7 @@ func DoWithResult[T any](ctx context.Context, db *sql.DB,
 		copy(options.retryOptions[1:], options.retryOptions)
 		options.retryOptions[0] = WithTrace(tracer.TraceRetry())
 	}
+	options.retryOptions = appendDefaultIdempotentOption(db, options.retryOptions)
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyDoOption(&options)
@@ -220,6 +221,7 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 		options.retryOptions[0] = WithTrace(d.TraceRetry())
 		options.retryOptions[1] = WithBudget(d.RetryBudget())
 	}
+	options.retryOptions = appendDefaultIdempotentOption(db, options.retryOptions)
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyDoTxOption(&options)
@@ -255,6 +257,16 @@ func DoTxWithResult[T any](ctx context.Context, db *sql.DB,
 	}
 
 	return v, nil
+}
+
+func appendDefaultIdempotentOption(db *sql.DB, options []Option) []Option {
+	if provider, has := db.Driver().(interface {
+		DefaultIdempotent() bool
+	}); has && provider.DefaultIdempotent() {
+		return append(options, WithIdempotent(true))
+	}
+
+	return options
 }
 
 func transformCommitError(ctx context.Context, err error) error {

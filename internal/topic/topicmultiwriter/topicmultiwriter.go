@@ -37,8 +37,8 @@ func NewMultiWriter(
 		encoders    = topicwritercommon.NewMultiEncoder()
 	)
 
-	for codec, creator := range writerCfg.AdditionalEncoders {
-		encoders.AddEncoder(codec, creator)
+	for codec, encoder := range writerCfg.AdditionalEncoders {
+		encoders.AddSharedEncoder(codec, encoder)
 	}
 
 	p := &MultiWriter{
@@ -63,8 +63,12 @@ func NewMultiWriter(
 }
 
 func (p *MultiWriter) Write(ctx context.Context, messages []topicwriterinternal.PublicMessage) error {
+	if p.closed.Load() {
+		return ErrAlreadyClosed
+	}
+
 	// Same idea as WriterReconnector.waitFirstInitResponse: do not process writes until
-	// orchestrator init() finished (describe topic, seq baseline, partition chooser).
+	// orchestrator init() finished (describe topic and set up partition chooser).
 	if err := p.orchestrator.waitInitDone(ctx); err != nil {
 		return err
 	}
@@ -93,13 +97,16 @@ func (p *MultiWriter) Close(ctx context.Context) error {
 		_ = p.orchestrator.writerPool.close(ctx)
 	}()
 
-	if err := p.orchestrator.flush(ctx); err != nil {
-		return err
-	}
+	flushErr := p.orchestrator.flush(ctx)
 
 	p.orchestrator.stop()
-	if err := p.background.Close(ctx, nil); err != nil {
-		return err
+	backgroundErr := p.background.Close(ctx, nil)
+
+	if flushErr != nil {
+		return flushErr
+	}
+	if backgroundErr != nil {
+		return backgroundErr
 	}
 
 	return p.orchestrator.getResultErr()

@@ -15,8 +15,8 @@ type TopicOption = topic.Option // func(c *topic.Config)
 // WithTrace defines trace over persqueue client calls
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func WithTrace(trace trace.Topic, opts ...trace.TopicComposeOption) TopicOption { //nolint:gocritic
-	return topic.PublicWithTrace(trace, opts...)
+func WithTrace(t trace.Topic) TopicOption { //nolint:gocritic
+	return topic.PublicWithTrace(t)
 }
 
 // WithOperationTimeout set the maximum amount of time a YDB server will process

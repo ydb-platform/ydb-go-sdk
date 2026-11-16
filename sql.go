@@ -261,13 +261,21 @@ func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) Connect
 
 func WithDatabaseSQLTrace(
 	t trace.DatabaseSQL, //nolint:gocritic
-	opts ...trace.DatabaseSQLComposeOption,
 ) ConnectorOption {
-	return xsql.WithTrace(&t, opts...)
+	return xsql.WithTrace(&t)
 }
 
 func WithDisableServerBalancer() ConnectorOption {
 	return xsql.WithDisableServerBalancer()
+}
+
+// WithPrefetchQueryResultParts enables prefetching of ExecuteQuery response parts
+// for all queries executed through database/sql over Query Service.
+//
+// The value is passed to query.WithResponsePartPrefetch under the hood.
+// Zero disables prefetch (the default).
+func WithPrefetchQueryResultParts(parts int) ConnectorOption {
+	return xsql.WithQueryOptions(xquery.WithResponsePartPrefetch(parts))
 }
 
 type SQLConnector interface {
@@ -285,7 +293,12 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 	c, err := xsql.Open(parent, parent.metaBalancer, parent.query.Must().Config(),
 		append(
 			append(
-				parent.databaseSQLOptions,
+				append(
+					[]ConnectorOption{
+						xsql.WithComposePanicCallback(parent.config.PanicCallback()),
+					},
+					parent.databaseSQLOptions...,
+				),
 				opts...,
 			),
 			xsql.WithTraceRetry(parent.config.TraceRetry()),

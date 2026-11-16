@@ -62,19 +62,25 @@ func TestWithSessionPoolSessionUsageLimit(t *testing.T) {
 	})
 }
 
-func TestWithKeepAliveMinSize(t *testing.T) {
-	t.Run("deprecated function", func(t *testing.T) {
-		c := New(WithKeepAliveMinSize(20))
-		// This function is deprecated and does nothing
-		require.Equal(t, DefaultKeepAliveMinSize, c.KeepAliveMinSize())
+func TestWithSessionPoolWarmUpSessions(t *testing.T) {
+	t.Run("explicit value", func(t *testing.T) {
+		c := New(WithSessionPoolWarmUpSessions(20))
+		require.Equal(t, 20, c.PoolWarmUpSize())
 	})
-}
 
-func TestWithIdleKeepAliveThreshold(t *testing.T) {
-	t.Run("deprecated function", func(t *testing.T) {
-		c := New(WithIdleKeepAliveThreshold(5))
-		// This function is deprecated and does nothing
-		require.Equal(t, DefaultIdleKeepAliveThreshold, c.IdleKeepAliveThreshold())
+	t.Run("zero disables warm-up", func(t *testing.T) {
+		c := New(WithSessionPoolWarmUpSessions(0))
+		require.Equal(t, 0, c.PoolWarmUpSize())
+	})
+
+	t.Run("negative disables warm-up", func(t *testing.T) {
+		c := New(WithSessionPoolWarmUpSessions(-1))
+		require.Equal(t, 0, c.PoolWarmUpSize())
+	})
+
+	t.Run("default disables warm-up", func(t *testing.T) {
+		c := New()
+		require.Equal(t, 0, c.PoolWarmUpSize())
 	})
 }
 
@@ -93,14 +99,6 @@ func TestWithIdleThreshold(t *testing.T) {
 	t.Run("negative value", func(t *testing.T) {
 		c := New(WithIdleThreshold(-1 * time.Minute))
 		require.Equal(t, time.Duration(0), c.IdleThreshold())
-	})
-}
-
-func TestWithKeepAliveTimeout(t *testing.T) {
-	t.Run("deprecated function", func(t *testing.T) {
-		c := New(WithKeepAliveTimeout(1 * time.Second))
-		// This function is deprecated and does nothing
-		require.Equal(t, DefaultSessionPoolKeepAliveTimeout, c.KeepAliveTimeout())
 	})
 }
 
@@ -254,6 +252,7 @@ func TestConfigGetters(t *testing.T) {
 			WithIgnoreTruncated(),
 			WithMaxRequestMessageSize(2048),
 			ExecuteDataQueryOverQueryService(true),
+			WithDefaultIdempotent(true),
 		)
 
 		require.Equal(t, 100, c.SizeLimit())
@@ -265,6 +264,7 @@ func TestConfigGetters(t *testing.T) {
 		require.Equal(t, 2048, c.MaxRequestMessageSize())
 		require.True(t, c.ExecuteDataQueryOverQueryService())
 		require.True(t, c.UseQuerySession())
+		require.True(t, c.DefaultIdempotent())
 		require.NotNil(t, c.Trace())
 		require.NotNil(t, c.Clock())
 	})

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"slices"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
@@ -53,7 +54,7 @@ func HideEOF(err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, io.EOF) {
+	if Is(err, io.EOF) {
 		return nil
 	}
 
@@ -90,6 +91,11 @@ func Is(err error, targets ...error) bool {
 	if len(targets) == 0 {
 		panic("empty targets")
 	}
+	// fast check
+	if slices.Contains(targets, err) {
+		return true
+	}
+	// slow check with errors.Is
 	for _, target := range targets {
 		if errors.Is(err, target) {
 			return true

@@ -5,7 +5,6 @@
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/ydb-platform/ydb-go-sdk/v3)](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3)
 [![tests](https://github.com/ydb-platform/ydb-go-sdk/workflows/tests/badge.svg)](https://github.com/ydb-platform/ydb-go-sdk/actions/workflows/tests.yml)
 [![lint](https://github.com/ydb-platform/ydb-go-sdk/workflows/lint/badge.svg)](https://github.com/ydb-platform/ydb-go-sdk/actions/workflows/lint.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/ydb-platform/ydb-go-sdk/v3)](https://goreportcard.com/report/github.com/ydb-platform/ydb-go-sdk/v3)
 [![codecov](https://codecov.io/gh/ydb-platform/ydb-go-sdk/badge.svg?precision=2)](https://app.codecov.io/gh/ydb-platform/ydb-go-sdk)
 ![Code lines](https://sloc.xyz/github/ydb-platform/ydb-go-sdk/?category=code)
 [![View examples](https://img.shields.io/badge/learn-examples-brightgreen.svg)](https://github.com/ydb-platform/ydb-go-sdk/tree/master/examples)
@@ -113,6 +112,22 @@ log.Printf("id = %d, myStr = \"%s\"", id, myStr)
 
 More examples of usage placed in [examples](./examples) directory.
 
+## Query methods and result formats
+
+Use `QueryRow` when exactly one row is expected, `QueryResultSet` for exactly one
+result set, and `Query` for multiple result sets. For large results, iterate
+`s.Query` inside `db.Query().Do`, or `tx.Query` inside `DoTx`: `Client.Query` and
+`Client.QueryResultSet` materialize their results in memory.
+
+Query Service uses `Ydb.Value` by default. Experimental
+`query.WithResultFormatArrow(ipc.NewReader, opts...)` uses your application's Arrow Go version
+while preserving the row and scan APIs;
+`ydb.WithQueryDefaultResultFormatArrow(ipc.NewReader, opts...)` sets the driver default.
+`query.WithYdbValue()` selects YDB values for one query.
+`Session.QueryArrow` exposes raw Arrow IPC for applications that process columns
+and manage Arrow resources themselves. See [Query methods and result formats](QUERY.md)
+for recommendations, decoder requirements, benchmark results and graphs.
+
 ## Credentials <a name="credentials"></a>
 
 Driver implements several ways for making credentials for `YDB`:
@@ -140,6 +155,7 @@ Next packages provide debug tooling:
 | [ydb-go-sdk-zap](https://github.com/ydb-platform/ydb-go-sdk-zap)                 | logging | logging ydb-go-sdk events with `zap` package                                                                                | [ydbZap.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-zap/blob/master/internal/cmd/bench/main.go#L64)                 |
 | [ydb-go-sdk-zerolog](https://github.com/ydb-platform/ydb-go-sdk-zerolog)             | logging | logging ydb-go-sdk events with `zerolog` package                                                                            | [ydbZerolog.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-zerolog/blob/master/internal/cmd/bench/main.go#L47)         |
 | [ydb-go-sdk-logrus](https://github.com/ydb-platform/ydb-go-sdk-logrus)             | logging | logging ydb-go-sdk events with `logrus` package                                                                            | [ydbLogrus.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-logrus/blob/master/internal/cmd/bench/main.go#L48)         |
+| [ydb-go-sdk-slog](https://github.com/ydb-platform/ydb-go-sdk-slog)                 | logging | logging ydb-go-sdk events with `slog` package                                                                                | [ydbSlog.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-slog/blob/master/internal/cmd/bench/main.go#L54)                 |
 | [ydb-go-sdk-prometheus](https://github.com/ydb-platform/ydb-go-sdk-prometheus)   | metrics | prometheus wrapper over [ydb-go-sdk/v3/metrics](https://github.com/ydb-platform/ydb-go-sdk/tree/master/metrics)            | [ydbPrometheus.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-prometheus/blob/master/internal/cmd/bench/native/main.go#L66)   |
 | [ydb-go-sdk-opentracing](https://github.com/ydb-platform/ydb-go-sdk-opentracing) | tracing | OpenTracing plugin for trace internal ydb-go-sdk calls                                                                    | [ydbOpentracing.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-opentracing/blob/master/internal/cmd/native/main.go#L70) |
 | [ydb-go-sdk-otel](https://github.com/ydb-platform/ydb-go-sdk-otel) | tracing | OpenTelemetry plugin for trace internal ydb-go-sdk calls                                                                    | [ydbOtel.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-otel/blob/master/internal/cmd/native/query/main.go#L89) |

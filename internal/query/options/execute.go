@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -19,6 +20,8 @@ var (
 	_ Execute = syntaxOption(0)
 	_ Execute = statsModeOption{}
 	_ Execute = execModeOption(0)
+	_ Execute = responsePartPrefetch(0)
+	_ Execute = nopOption{}
 )
 
 type (
@@ -47,7 +50,10 @@ type (
 		issueCallback          func(issues []*Ydb_Issue.IssueMessage)
 		responsePartLimitBytes int64
 		label                  string
-		concurrentResultSets   bool
+		// responsePartPrefetch is how many stream parts to read ahead of the
+		// consumer (0 disables prefetch and is the default).
+		responsePartPrefetch int
+		arrowDecoder         arrow.Decoder
 	}
 
 	// Execute is an interface for execute method options
@@ -78,7 +84,8 @@ type (
 	issuesOption           struct {
 		callback func([]*Ydb_Issue.IssueMessage)
 	}
-	concurrentResultSets bool
+	responsePartPrefetch int
+	nopOption            struct{}
 )
 
 func (poolID resourcePool) applyExecuteOption(s *executeSettings) {
@@ -113,8 +120,9 @@ func (syntax Syntax) applyExecuteOption(s *executeSettings) {
 }
 
 const (
-	SyntaxYQL        = Syntax(Ydb_Query.Syntax_SYNTAX_YQL_V1)
-	SyntaxPostgreSQL = Syntax(Ydb_Query.Syntax_SYNTAX_PG)
+	SyntaxYQL = Syntax(Ydb_Query.Syntax_SYNTAX_YQL_V1)
+	// Keep the legacy enum mapping for public API compatibility.
+	SyntaxPostgreSQL = Syntax(Ydb_Query.Syntax_SYNTAX_PG) //nolint:staticcheck
 )
 
 func (opt parametersOption) applyExecuteOption(s *executeSettings) {
@@ -137,8 +145,8 @@ func (opts issuesOption) applyExecuteOption(s *executeSettings) {
 	s.issueCallback = opts.callback
 }
 
-func (opt concurrentResultSets) applyExecuteOption(s *executeSettings) {
-	s.concurrentResultSets = bool(opt)
+func (n responsePartPrefetch) applyExecuteOption(s *executeSettings) {
+	s.responsePartPrefetch = int(n)
 }
 
 const (
@@ -162,7 +170,7 @@ func defaultExecuteSettings() executeSettings {
 		statsMode: StatsModeNone,
 		txControl: tx.DefaultTxControl(),
 		params:    &params.Params{},
-		label:     "undefined",
+		label:     defaultLabel,
 	}
 }
 
@@ -214,12 +222,28 @@ func (s *executeSettings) Label() string {
 	return s.label
 }
 
-func (s *executeSettings) ConcurrentResultSets() bool {
-	return s.concurrentResultSets
+func (s *executeSettings) ResponsePartPrefetch() int {
+	return s.responsePartPrefetch
 }
 
 func (s *executeSettings) UserProvidedTxControl() bool {
 	return s.userProvidedTxControl
+}
+
+type arrowOption struct {
+	decoder arrow.Decoder
+}
+
+func (opt arrowOption) applyExecuteOption(s *executeSettings) {
+	s.arrowDecoder = opt.decoder
+}
+
+func WithResultFormatArrow(decoder arrow.Decoder) Execute {
+	return arrowOption{decoder: decoder}
+}
+
+func (s *executeSettings) ArrowDecoder() arrow.Decoder {
+	return s.arrowDecoder
 }
 
 func WithParameters(params params.Parameters) parametersOption {
@@ -254,8 +278,16 @@ func WithResponsePartLimitSizeBytes(size int64) responsePartLimitBytes {
 	return responsePartLimitBytes(size)
 }
 
-func WithConcurrentResultSets(isEnabled bool) concurrentResultSets {
-	return concurrentResultSets(isEnabled)
+// WithResponsePartPrefetch sets how many ExecuteQuery response parts the client
+// reads ahead of the application on the wire. Values greater than zero enable
+// an internal buffer and a background reader so that gRPC Recv can overlap with
+// work between consumer reads. Zero disables prefetch (the default).
+func WithResponsePartPrefetch(parts int) responsePartPrefetch {
+	if parts <= 0 {
+		parts = 0
+	}
+
+	return responsePartPrefetch(parts)
 }
 
 func (size responsePartLimitBytes) applyExecuteOption(s *executeSettings) {
@@ -287,6 +319,12 @@ func WithIssuesHandler(callback func(issues []*Ydb_Issue.IssueMessage)) issuesOp
 func WithCallOptions(opts ...grpc.CallOption) callOptionsOption {
 	return opts
 }
+
+func Nop() nopOption {
+	return nopOption{}
+}
+
+func (nopOption) applyExecuteOption(*executeSettings) {}
 
 func WithTxControl(txControl *tx.Control) *txControlOption {
 	return (*txControlOption)(txControl)

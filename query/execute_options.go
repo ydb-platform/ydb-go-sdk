@@ -70,13 +70,28 @@ func WithResponsePartLimitSizeBytes(size int64) ExecuteOption {
 	return options.WithResponsePartLimitSizeBytes(size)
 }
 
-// WithConcurrentResultSets enables concurrent computation of result sets. It is useful when a single query executes
-// multiple independent SELECT statements.
+// WithResponsePartPrefetch configures how many ExecuteQuery response parts the
+// client reads ahead of application consumption on streamed response-part
+// readers that support prefetching. Values above zero enable a small buffer
+// and a background reader so gRPC Recv can overlap with CPU work between
+// reads. Zero disables prefetch. The default is 0 (no prefetch).
 //
-// WARNING: This option must be used only in Query() method. Using it with other methods results in undefined behavior
-// or an error.
-func WithConcurrentResultSets(isEnabled bool) ExecuteOption {
-	return options.WithConcurrentResultSets(isEnabled)
+// Note: this option is not applied uniformly by every ExecuteQuery-based API.
+// It affects only response consumers that use the response-part streaming path
+// with prefetch support; other consumers may ignore it.
+func WithResponsePartPrefetch(parts int) ExecuteOption {
+	return options.WithResponsePartPrefetch(parts)
+}
+
+// WithConcurrentResultSets is deprecated and has no effect.
+//
+// Client.Query always enables concurrent result sets internally because it materializes the full response.
+// Session, transaction, and other streaming query paths always use sequential result set delivery
+// (`concurrent_result_sets=false` on the wire); the deprecated option no longer changes that behavior.
+//
+// Deprecated: WithConcurrentResultSets is deprecated and has no effect.
+func WithConcurrentResultSets(bool) ExecuteOption {
+	return options.Nop()
 }
 
 func WithCallOptions(opts ...grpc.CallOption) ExecuteOption {

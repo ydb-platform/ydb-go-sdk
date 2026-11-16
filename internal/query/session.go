@@ -2,12 +2,14 @@ package query
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -27,26 +29,35 @@ type (
 		client                   Ydb_Query_V1.QueryServiceClient
 		trace                    *trace.Query
 		lazyTx                   bool
+		defaultArrowDecoder      arrow.Decoder
 		streamResultCloseTimeout time.Duration
 	}
 )
 
+func (s *Session) withDefaultExecuteOptions(opts ...options.Execute) []options.Execute {
+	if s.defaultArrowDecoder == nil {
+		return opts
+	}
+
+	return append([]options.Execute{options.WithResultFormatArrow(s.defaultArrowDecoder)}, opts...)
+}
+
 func (s *Session) QueryResultSet(
 	ctx context.Context, q string, opts ...options.Execute,
 ) (rs result.ClosableResultSet, finalErr error) {
-	settings := options.ExecuteSettings(opts...)
+	settings := options.ExecuteSettings(s.withDefaultExecuteOptions(opts...)...)
 
 	if err := validateTxControl(settings); err != nil {
 		return nil, err
 	}
 
-	onDone := trace.QueryOnSessionQueryResultSet(s.trace, &ctx,
+	onDone := gtrace.QueryOnSessionQueryResultSet(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryResultSet"), s, q)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, settings,
+	r, err := s.execute(ctx, q, settings, options.ResultSetsTypeOrdered,
 		withStreamResultTrace(s.trace),
 		withIssuesHandler(settings.IssuesOpts()),
 	)
@@ -65,7 +76,7 @@ func (s *Session) QueryResultSet(
 func (s *Session) queryRow(
 	ctx context.Context, q string, settings executeSettings, resultOpts ...resultOption,
 ) (row query.Row, finalErr error) {
-	r, err := s.execute(ctx, q, settings, resultOpts...)
+	r, err := s.execute(ctx, q, settings, options.ResultSetsTypeOrdered, resultOpts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -82,13 +93,13 @@ func (s *Session) queryRow(
 }
 
 func (s *Session) QueryRow(ctx context.Context, q string, opts ...options.Execute) (_ query.Row, finalErr error) {
-	settings := options.ExecuteSettings(opts...)
+	settings := options.ExecuteSettings(s.withDefaultExecuteOptions(opts...)...)
 
 	if err := validateTxControl(settings); err != nil {
 		return nil, err
 	}
 
-	onDone := trace.QueryOnSessionQueryRow(s.trace, &ctx,
+	onDone := gtrace.QueryOnSessionQueryRow(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).QueryRow"), s, q)
 	defer func() {
 		onDone(finalErr)
@@ -127,11 +138,11 @@ func (s *Session) Begin(
 ) (
 	tx query.Transaction, finalErr error,
 ) {
-	onDone := trace.QueryOnSessionBegin(s.trace, &ctx,
+	onDone := gtrace.QueryOnSessionBegin(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Begin"), s)
 	defer func() {
 		if finalErr != nil {
-			applyStatusByError(s, finalErr)
+			s.onSessionErrorWithContext(ctx, finalErr)
 			onDone(finalErr, nil)
 		} else {
 			onDone(nil, tx)
@@ -139,13 +150,19 @@ func (s *Session) Begin(
 	}()
 
 	if lazyTx := baseTx.LazyTxFromContext(ctx, s.lazyTx); lazyTx {
+		if !s.IsAlive() {
+			return nil, xerrors.WithStackTrace(xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+			))
+		}
+
 		return &Transaction{
 			s:          s,
 			txSettings: txSettings,
 		}, nil
 	}
 
-	txID, err := begin(ctx, s.client, s.ID(), txSettings)
+	txID, err := begin(ctx, s, txSettings)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -157,36 +174,79 @@ func (s *Session) Begin(
 	}, nil
 }
 
-func (s *Session) execute(
-	ctx context.Context, q string, settings executeSettings, opts ...resultOption,
+func (s *Session) execute(ctx context.Context,
+	q string, settings executeSettings, concurrentResultSets options.ResultSetsType, opts ...resultOption,
 ) (_ *streamResult, finalErr error) {
-	ctx, cancel := xcontext.WithDone(ctx, s.Done())
+	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		if finalErr != nil {
+			s.onSessionErrorWithContext(ctx, finalErr)
 			cancel()
-			applyStatusByError(s, finalErr)
 		}
 	}()
 
-	r, err := execute(ctx, s.ID(), s.client, q, settings, append(opts,
-		withStreamResultOnClose(cancel),
+	r, err := execute(ctx, s.ID(), s.client, q, settings, concurrentResultSets, append(opts,
 		withStreamResultCloseTimeout(s.streamResultCloseTimeout),
+		withStreamResultOnClose(cancel),
 	)...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+	r.onNextPartErr = append(r.onNextPartErr, s.onSessionError)
 
 	return r, nil
 }
 
+func (s *Session) onSessionErrorWithContext(ctx context.Context, err error) {
+	if ctxErr := ctx.Err(); ctxErr != nil && !xerrors.Is(err, io.EOF) {
+		err = ctxErr
+	}
+	s.onSessionError(err)
+}
+
+func (s *Session) onSessionError(err error) {
+	if err == nil || xerrors.Is(err, io.EOF) {
+		return
+	}
+
+	status := StatusFromErr(err)
+	if status == StatusUnknown {
+		if !xerrors.MustDeleteTableOrQuerySession(err) {
+			return
+		}
+		status = StatusError
+	}
+	s.SetStatus(status)
+
+	var reason string
+	switch {
+	case xerrors.Is(err, context.DeadlineExceeded):
+		reason = "client_timeout"
+	case xerrors.Is(err, context.Canceled):
+		reason = "client_cancelled"
+	case xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION, Ydb.StatusIds_SESSION_EXPIRED):
+		reason = "bad_session"
+	case xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_BUSY):
+		reason = "session_busy"
+	case xerrors.IsTransportError(err):
+		reason = "transport_error"
+	}
+
+	core, ok := s.Core.(*sessionCore)
+	if reason == "" || !ok || core.poolName == "" || !core.closedReported.CompareAndSwap(false, true) {
+		return
+	}
+	gtrace.QueryOnSessionClosed(s.trace, core.poolName, reason)
+}
+
 func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (finalErr error) {
-	settings := options.ExecuteSettings(opts...)
+	settings := options.ExecuteSettings(s.withDefaultExecuteOptions(opts...)...)
 
 	if err := validateTxControl(settings); err != nil {
 		return err
 	}
 
-	onDone := trace.QueryOnSessionExec(s.trace, &ctx,
+	onDone := gtrace.QueryOnSessionExec(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Exec"),
 		s,
 		q,
@@ -196,7 +256,7 @@ func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, settings,
+	r, err := s.execute(ctx, q, settings, options.ResultSetsTypeOrdered,
 		withStreamResultTrace(s.trace),
 		withIssuesHandler(settings.IssuesOpts()),
 	)
@@ -216,13 +276,13 @@ func (s *Session) Exec(ctx context.Context, q string, opts ...options.Execute) (
 }
 
 func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) (_ query.Result, finalErr error) {
-	settings := options.ExecuteSettings(opts...)
+	settings := options.ExecuteSettings(s.withDefaultExecuteOptions(opts...)...)
 
 	if err := validateTxControl(settings); err != nil {
 		return nil, err
 	}
 
-	onDone := trace.QueryOnSessionQuery(s.trace, &ctx,
+	onDone := gtrace.QueryOnSessionQuery(s.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Session).Query"),
 		s,
 		q,
@@ -232,7 +292,7 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 		onDone(finalErr)
 	}()
 
-	r, err := s.execute(ctx, q, settings,
+	r, err := s.execute(ctx, q, settings, options.ResultSetsTypeOrdered,
 		withStreamResultTrace(s.trace),
 		withIssuesHandler(settings.IssuesOpts()),
 	)
@@ -252,22 +312,22 @@ func (s *Session) Query(ctx context.Context, q string, opts ...options.Execute) 
 func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Execute) (_ arrow.Result, finalErr error) {
 	settings := options.ExecuteSettings(opts...)
 
-	ctx, cancel := xcontext.WithDone(ctx, s.Done())
 	defer func() {
 		if finalErr != nil {
-			cancel()
-			applyStatusByError(s, finalErr)
+			s.onSessionErrorWithContext(ctx, finalErr)
 		}
 	}()
 
-	request, callOptions, err := executeQueryRequest(s.ID(), q, settings)
+	request, callOptions, err := executeQueryRequest(s.ID(), q, settings, options.ResultSetsTypeOrdered)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
 	request.ResultSetFormat = Ydb.ResultSet_FORMAT_ARROW
 
-	executeCtx, executeCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+	executeCtx, executeCancel := context.WithCancel(xcontext.ValueOnly(ctx))
+	stopCancel := context.AfterFunc(ctx, executeCancel)
+	defer stopCancel()
 	defer func() {
 		if finalErr != nil {
 			executeCancel()
@@ -278,6 +338,13 @@ func (s *Session) QueryArrow(ctx context.Context, q string, opts ...options.Exec
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+	if err = ctx.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
-	return &arrowResult{stream: stream, close: executeCancel}, nil
+	return &arrowResult{
+		stream:  stream,
+		close:   executeCancel,
+		onError: s.onSessionError,
+	}, nil
 }

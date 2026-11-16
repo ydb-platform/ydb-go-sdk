@@ -21,8 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestScripting(sourceTest *testing.T) {
-	t := xtest.MakeSyncedTest(sourceTest)
+func TestScripting(t *testing.T) {
 	ctx := xtest.Context(t)
 
 	db, err := ydb.Open(ctx,
@@ -68,7 +67,7 @@ func TestScripting(sourceTest *testing.T) {
 		if !res.NextResultSet(ctx) {
 			return retry.RetryableError(
 				fmt.Errorf("no result sets"),
-				retry.WithBackoff(retry.TypeNoBackoff),
+				retry.WithBackoff(retry.TypeInstant),
 			)
 		}
 		if !res.NextRow() {
@@ -104,7 +103,7 @@ func TestScripting(sourceTest *testing.T) {
 		if !res.NextResultSet(ctx) {
 			return retry.RetryableError(
 				fmt.Errorf("no result sets"),
-				retry.WithBackoff(retry.TypeNoBackoff),
+				retry.WithBackoff(retry.TypeInstant),
 				retry.WithDeleteSession(),
 			)
 		}

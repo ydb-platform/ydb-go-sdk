@@ -18,7 +18,7 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		if d.Details()&trace.ScriptingEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "scripting", "execute")
+		ctx := withFromPtr(info.Context, TRACE, "ydb", "scripting", "execute")
 		l.Log(ctx, "starting script executing...")
 		start := time.Now()
 
@@ -26,8 +26,8 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 			if info.Error == nil {
 				l.Log(ctx, "start script done",
 					kv.Latency(start),
-					kv.Int("resultSetCount", info.Result.ResultSetCount()),
-					kv.NamedError("resultSetError", info.Result.Err()),
+					kv.Int("resultSetCount", safeResultSetCount(info.Result)),
+					kv.NamedError("resultSetError", safeResultErr(info.Result)),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "start script failed",
@@ -42,7 +42,7 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		if d.Details()&trace.ScriptingEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "scripting", "explain")
+		ctx := withFromPtr(info.Context, TRACE, "ydb", "scripting", "explain")
 		l.Log(ctx, "starting script explain...")
 		start := time.Now()
 
@@ -71,7 +71,7 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		if d.Details()&trace.ScriptingEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "scripting", "stream", "execute")
+		ctx := withFromPtr(info.Context, TRACE, "ydb", "scripting", "stream", "execute")
 		query := info.Query
 		l.Log(ctx, "script stream execute starting...",
 			appendFieldByCondition(l.logQuery,
@@ -119,7 +119,7 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		if d.Details()&trace.ScriptingEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "scripting", "close")
+		ctx := withFromPtr(info.Context, TRACE, "ydb", "scripting", "close")
 		l.Log(ctx, "script close starting...")
 		start := time.Now()
 

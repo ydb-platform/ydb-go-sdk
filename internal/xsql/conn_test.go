@@ -8,7 +8,6 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -48,6 +47,28 @@ func TestConn_CheckNamedValue(t *testing.T) {
 		Value: 123,
 	})
 	require.NoError(t, err)
+}
+
+func TestConn_IsValid(t *testing.T) {
+	t.Run("ValidConn", func(t *testing.T) {
+		conn := &Conn{
+			cc: &mockCommonConn{},
+		}
+		require.True(t, conn.IsValid())
+	})
+
+	t.Run("InvalidConn", func(t *testing.T) {
+		conn := &Conn{
+			cc: &mockInvalidConn{},
+		}
+		require.False(t, conn.IsValid())
+	})
+
+	t.Run("ImplementsDriverValidator", func(t *testing.T) {
+		// Verify that *Conn implements driver.Validator so that database/sql
+		// discards invalid connections before reusing them from the pool.
+		var _ driver.Validator = &Conn{}
+	})
 }
 
 func TestConn_Prepare(t *testing.T) {
@@ -184,8 +205,7 @@ func TestConn_QueryContext(t *testing.T) {
 				clock:     clockwork.NewRealClock(),
 				processor: QUERY,
 			},
-			ctx:       context.Background(),
-			lastUsage: xsync.NewLastUsage(),
+			ctx: context.Background(),
 		}
 		rows, err := conn.QueryContext(context.Background(), "SELECT 1", []driver.NamedValue{})
 		require.NoError(t, err)
@@ -201,8 +221,7 @@ func TestConn_QueryContext(t *testing.T) {
 				clock:     clockwork.NewRealClock(),
 				processor: QUERY,
 			},
-			ctx:       context.Background(),
-			lastUsage: xsync.NewLastUsage(),
+			ctx: context.Background(),
 			currentTx: &Tx{
 				tx: &mockTx{id: "test-tx"},
 			},
@@ -223,8 +242,7 @@ func TestConn_ExecContext(t *testing.T) {
 				clock:     clockwork.NewRealClock(),
 				processor: QUERY,
 			},
-			ctx:       context.Background(),
-			lastUsage: xsync.NewLastUsage(),
+			ctx: context.Background(),
 		}
 		result, err := conn.ExecContext(context.Background(), "INSERT INTO test VALUES (1)", []driver.NamedValue{})
 		require.NoError(t, err)
@@ -240,8 +258,7 @@ func TestConn_ExecContext(t *testing.T) {
 				clock:     clockwork.NewRealClock(),
 				processor: QUERY,
 			},
-			ctx:       context.Background(),
-			lastUsage: xsync.NewLastUsage(),
+			ctx: context.Background(),
 			currentTx: &Tx{
 				tx: &mockTx{id: "test-tx"},
 			},

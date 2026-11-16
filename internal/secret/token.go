@@ -8,6 +8,11 @@ import (
 
 const minTokenLength = 16
 
+// Token returns a redacted representation of token safe for logs and error messages.
+// Tokens longer than 16 bytes keep the first and last four characters with the middle
+// replaced by "****"; shorter tokens are fully replaced by "****".
+// A CRC-32c checksum of the original value is appended so identical tokens can be
+// correlated in logs without exposing the secret.
 func Token(token string) string {
 	var mask bytes.Buffer
 	if len(token) > minTokenLength {

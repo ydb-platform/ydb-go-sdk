@@ -1,0 +1,4 @@
+name: GitHub Actions security baseline
+
+queries:
+  - uses: security-extended

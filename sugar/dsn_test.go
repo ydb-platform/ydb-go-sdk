@@ -54,3 +54,10 @@ func TestDSN(t *testing.T) {
 		})
 	}
 }
+
+func TestDSNWithSecureDisabled(t *testing.T) {
+	require.Equal(t, "grpc://localhost:2135/local",
+		DSN("localhost:2135", "/local", WithSecure(false)))
+	require.Equal(t, "grpc://localhost:2135/local",
+		DSN("localhost:2135", "/local", WithSecure(true), WithSecure(false)))
+}

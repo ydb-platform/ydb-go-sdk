@@ -25,6 +25,7 @@ func AlterWithMinActivePartitions(minActivePartitions int64) AlterOption {
 }
 
 // AlterWithPartitionCountLimit change partition count limit of the topic
+// Deprecated: Use AlterWithMaxActivePartitions instead.
 func AlterWithPartitionCountLimit(partitionCountLimit int64) AlterOption {
 	return withPartitionCountLimit(partitionCountLimit)
 }
@@ -160,6 +161,16 @@ func AlterConsumerResetAvailabilityPeriod(name string) AlterOption {
 // AlterWithMaxActivePartitions change max active partitions of the topic
 func AlterWithMaxActivePartitions(maxActivePartitions int64) AlterOption {
 	return alterWithMaxActivePartitions(maxActivePartitions)
+}
+
+// AlterWithSetMetricsLevel sets the metrics level for the topic.
+func AlterWithSetMetricsLevel(level uint32) AlterOption {
+	return withMetricsLevel(level)
+}
+
+// AlterWithResetMetricsLevel resets the topic metrics level back to the database default.
+func AlterWithResetMetricsLevel() AlterOption {
+	return withResetMetricsLevel{}
 }
 
 // AlterWithAutoPartitioningStrategy change auto partitioning strategy for the topic

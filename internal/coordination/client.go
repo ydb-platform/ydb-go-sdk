@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -35,7 +36,7 @@ type Client struct {
 }
 
 func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) *Client {
-	onDone := trace.CoordinationOnNew(config.Trace(), &ctx,
+	onDone := gtrace.CoordinationOnNew(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination.New"),
 	)
 	defer onDone()
@@ -96,7 +97,7 @@ func (c *Client) CreateNode(ctx context.Context, path string, config coordinatio
 		return xerrors.WithStackTrace(errNilClient)
 	}
 
-	onDone := trace.CoordinationOnCreateNode(c.config.Trace(), &ctx,
+	onDone := gtrace.CoordinationOnCreateNode(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination.(*Client).CreateNode"),
 		path,
 	)
@@ -126,7 +127,7 @@ func (c *Client) AlterNode(ctx context.Context, path string, config coordination
 		return xerrors.WithStackTrace(errNilClient)
 	}
 
-	onDone := trace.CoordinationOnAlterNode(c.config.Trace(), &ctx,
+	onDone := gtrace.CoordinationOnAlterNode(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination.(*Client).AlterNode"),
 		path,
 	)
@@ -187,7 +188,7 @@ func (c *Client) DropNode(ctx context.Context, path string) (finalErr error) {
 		return xerrors.WithStackTrace(errNilClient)
 	}
 
-	onDone := trace.CoordinationOnDropNode(c.config.Trace(), &ctx,
+	onDone := gtrace.CoordinationOnDropNode(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination.(*Client).DropNode"),
 		path,
 	)
@@ -245,7 +246,7 @@ func (c *Client) DescribeNode(
 		return nil, nil, xerrors.WithStackTrace(errNilClient)
 	}
 
-	onDone := trace.CoordinationOnDescribeNode(c.config.Trace(), &ctx,
+	onDone := gtrace.CoordinationOnDescribeNode(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination.(*Client).DescribeNode"),
 		path,
 	)
@@ -386,7 +387,7 @@ func (c *Client) Session(
 		return nil, xerrors.WithStackTrace(errNilClient)
 	}
 
-	onDone := trace.CoordinationOnSession(c.config.Trace(), &ctx,
+	onDone := gtrace.CoordinationOnSession(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination.(*Client).Session"),
 		path,
 	)
@@ -417,7 +418,7 @@ func (c *Client) Close(ctx context.Context) (finalErr error) {
 		return xerrors.WithStackTrace(errNilClient)
 	}
 
-	onDone := trace.CoordinationOnClose(c.config.Trace(), &ctx,
+	onDone := gtrace.CoordinationOnClose(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination.(*Client).Close"),
 	)
 	defer func() {

@@ -1,9 +1,17 @@
 package pool
 
-type Stats struct {
-	Limit            int
-	Index            int
-	Idle             int
-	Wait             int
-	CreateInProgress int
-}
+type (
+	dynamicStats struct {
+		Size             int
+		Idle             int
+		CreateInProgress int
+		Concurrency      int
+		InUse            int
+	}
+	Stats struct {
+		dynamicStats
+
+		Limit  int
+		WarmUp int
+	}
+)

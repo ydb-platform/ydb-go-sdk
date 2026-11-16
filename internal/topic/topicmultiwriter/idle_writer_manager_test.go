@@ -33,7 +33,7 @@ func TestIdleWriterManager_AddAndGetRemovesWriter(t *testing.T) {
 	require.Nil(t, got)
 }
 
-func TestIdleWriterManager_RemovesIdleWriterAfterTimeout(t *testing.T) {
+func TestIdleWriterManager_ClosesIdleWriterAfterTimeout(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -43,7 +43,8 @@ func TestIdleWriterManager_RemovesIdleWriterAfterTimeout(t *testing.T) {
 
 	manager := newIdleWriterManager(ctx, idleTimeout)
 
-	writer := &writerWrapper{writer: &poolTestWriter{}}
+	testWriter := &poolTestWriter{}
+	writer := &writerWrapper{writer: testWriter}
 	manager.addWriter(1, writer)
 
 	done := make(chan struct{})
@@ -59,7 +60,7 @@ func TestIdleWriterManager_RemovesIdleWriterAfterTimeout(t *testing.T) {
 			removed = !exists
 		})
 
-		return removed
+		return removed && testWriter.closed.Load()
 	}, time.Second, idleTimeout)
 
 	cancel()
@@ -69,4 +70,22 @@ func TestIdleWriterManager_RemovesIdleWriterAfterTimeout(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("idleWriterManager.run did not stop after context cancel")
 	}
+}
+
+func TestIdleWriterManager_CloseClosesAllWriters(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	manager := newIdleWriterManager(ctx, time.Minute)
+	writer1 := &poolTestWriter{}
+	writer2 := &poolTestWriter{}
+	manager.addWriter(1, &writerWrapper{writer: writer1})
+	manager.addWriter(2, &writerWrapper{writer: writer2})
+
+	require.NoError(t, manager.close(ctx))
+	require.True(t, writer1.closed.Load())
+	require.True(t, writer2.closed.Load())
+	require.Equal(t, 0, manager.getWritersCount())
 }

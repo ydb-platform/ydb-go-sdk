@@ -1,9 +1,5 @@
 package trace
 
-// tool gtrace used from ./internal/cmd/gtrace
-
-//go:generate gtrace
-
 import (
 	"context"
 	"fmt"
@@ -14,6 +10,7 @@ import (
 type (
 	// Driver specified trace of common driver activity.
 	// gtrace:gen
+	// gtrace:out internal/conn/gtrace
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	Driver struct {
 		// Driver runtime events
@@ -162,7 +159,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Call     call
+		Call     Call
 		Endpoint EndpointInfo
 		State    ConnState
 	}
@@ -172,7 +169,7 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverResolveStartInfo struct {
-		Call     call
+		Call     Call
 		Target   string
 		Resolved []string
 	}
@@ -187,7 +184,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context     *context.Context
-		Call        call
+		Call        Call
 		NeedLocalDC bool
 		Database    string
 	}
@@ -205,7 +202,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Call     call
+		Call     Call
 		Address  string
 		Database string
 	}
@@ -215,7 +212,7 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverNetReadStartInfo struct {
-		Call    call
+		Call    Call
 		Address string
 		Buffer  int
 	}
@@ -226,7 +223,7 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverNetWriteStartInfo struct {
-		Call    call
+		Call    Call
 		Address string
 		Bytes   int
 	}
@@ -242,7 +239,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 		Address string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -251,7 +248,7 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverNetCloseStartInfo struct {
-		Call    call
+		Call    Call
 		Address string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -265,7 +262,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Call     call
+		Call     Call
 		Endpoint EndpointInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -279,7 +276,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Call     call
+		Call     Call
 		Endpoint EndpointInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -293,7 +290,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Call     call
+		Call     Call
 		Endpoint EndpointInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -307,7 +304,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Call     call
+		Call     Call
 		Endpoint EndpointInfo
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -321,7 +318,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Call     call
+		Call     Call
 		Endpoint EndpointInfo
 		State    ConnState
 		Cause    error
@@ -337,7 +334,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Call     call
+		Call     Call
 		Endpoint EndpointInfo
 		State    ConnState
 	}
@@ -352,7 +349,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Call     call
+		Call     Call
 		Endpoint EndpointInfo
 		Method   Method
 	}
@@ -371,7 +368,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Call     call
+		Call     Call
 		Endpoint EndpointInfo
 		Method   Method
 	}
@@ -387,7 +384,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnStreamRecvMsgDoneInfo struct {
@@ -400,7 +397,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnStreamSendMsgDoneInfo struct {
@@ -413,7 +410,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnStreamCloseSendDoneInfo struct {
@@ -426,7 +423,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context context.Context //nolint:containedctx
-		Call    call
+		Call    Call
 		Error   error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -436,7 +433,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 		Name    string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -450,7 +447,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 		Address string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -464,7 +461,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverBalancerCloseDoneInfo struct {
@@ -477,7 +474,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverBalancerChooseEndpointDoneInfo struct {
@@ -491,7 +488,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 		Name    string
 		Event   string
 	}
@@ -506,7 +503,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverGetCredentialsDoneInfo struct {
@@ -520,7 +517,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Call     call
+		Call     Call
 		Endpoint string
 		Database string
 		Secure   bool
@@ -536,7 +533,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Call     call
+		Call     Call
 		Endpoint string
 		Database string
 		Secure   bool
@@ -552,7 +549,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnPoolNewDoneInfo struct{}
@@ -563,7 +560,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnPoolReleaseDoneInfo struct {
@@ -576,7 +573,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Call    call
+		Call    Call
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverCloseDoneInfo struct {

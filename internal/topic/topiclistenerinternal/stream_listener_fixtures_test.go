@@ -35,6 +35,8 @@ func listenerAndHandler(e fixenv.Env) listenerAndHandlerPair {
 		listener.tracer = &trace.Topic{}
 		listener.listenerID = "test-listener-id"
 		listener.sessionID = "test-session-id"
+		// Fixture builds listener without newStreamListener; init freeBytes like initVars.
+		listener.freeBytes = make(chan int, 1)
 		listener.syncCommitter = topicreadercommon.NewCommitterStopped(
 			listener.tracer,
 			sf.Context(e),

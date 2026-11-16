@@ -12,6 +12,9 @@
 *.dylib
 *.test
 *.out
+*.prof
+*.proff
+*.profile
 vendor
 changes.txt
 ./internal/cmd/gtrace/gtrace

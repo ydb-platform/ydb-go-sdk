@@ -34,4 +34,19 @@ func TestOpen(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 		assert.Regexp(t, "^context canceled at", err.Error())
 	})
+
+	t.Run("connect failure releases pool ref", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+
+		_, err := ydb.Open(ctx, "grpc://127.0.0.1:1/local",
+			ydb.WithTraceDriver(trace.Driver{
+				OnBalancerInit: func(trace.DriverBalancerInitStartInfo) func(trace.DriverBalancerInitDoneInfo) {
+					cancel()
+
+					return func(trace.DriverBalancerInitDoneInfo) {}
+				},
+			}),
+		)
+		require.Error(t, err)
+	})
 }

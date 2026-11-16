@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -14,6 +15,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
@@ -35,10 +38,12 @@ type (
 	materializedResult struct {
 		resultSets []result.Set
 		idx        int
+		closeArrow func()
 	}
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
-		closer         *ResultCloser
+		lastErr        error
+		onClose        func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
 		resultSetIndex int64
 		trace          *trace.Query
@@ -47,6 +52,14 @@ type (
 		onNextPartErr  []func(err error)
 		onTxMeta       []func(txMeta *Ydb_Query.TransactionMeta)
 		closeTimeout   time.Duration
+		// streamCancel cancels the gRPC context that backs stream.Recv(). It
+		// is wired up by execute() to point at the executeCtx CancelFunc and
+		// invoked on demand from nextPart so that a Recv blocked on the wire
+		// can be unblocked when the caller's ctx is cancelled mid-flight.
+		streamCancel       context.CancelFunc
+		arrowDecoder       arrow.Decoder
+		arrowBatches       []arrow.Batch
+		retainArrowBatches bool
 	}
 	resultOption func(s *streamResult)
 )
@@ -77,12 +90,16 @@ func (r *streamResult) ResultSets(ctx context.Context) xiter.Seq2[result.Set, er
 }
 
 func (r *materializedResult) Close(ctx context.Context) error {
+	if r.closeArrow != nil {
+		r.closeArrow()
+	}
+
 	return nil
 }
 
 func (r *materializedResult) NextResultSet(ctx context.Context) (result.Set, error) {
 	if r.idx == len(r.resultSets) {
-		return nil, xerrors.WithStackTrace(io.EOF)
+		return nil, io.EOF
 	}
 
 	defer func() {
@@ -90,6 +107,12 @@ func (r *materializedResult) NextResultSet(ctx context.Context) (result.Set, err
 	}()
 
 	return r.resultSets[r.idx], nil
+}
+
+func withArrowDecoder(decoder arrow.Decoder) resultOption {
+	return func(s *streamResult) {
+		s.arrowDecoder = decoder
+	}
 }
 
 func withStreamResultTrace(t *trace.Query) resultOption {
@@ -112,7 +135,14 @@ func withStreamResultStatsCallback(callback func(queryStats stats.QueryStats)) r
 
 func withStreamResultOnClose(onClose func()) resultOption {
 	return func(s *streamResult) {
-		s.closer.OnClose(onClose)
+		if prevOnClose := s.onClose; prevOnClose != nil {
+			s.onClose = func() {
+				prevOnClose()
+				onClose()
+			}
+		} else {
+			s.onClose = onClose
+		}
 	}
 }
 
@@ -120,6 +150,17 @@ func onNextPartErr(callback func(err error)) resultOption {
 	return func(s *streamResult) {
 		s.onNextPartErr = append(s.onNextPartErr, callback)
 	}
+}
+
+func (r *streamResult) notifyNextPartErr(ctx context.Context, err error) error {
+	if ctxErr := ctx.Err(); ctxErr != nil && !xerrors.Is(err, io.EOF) {
+		err = ctxErr
+	}
+	for _, callback := range r.onNextPartErr {
+		callback(err)
+	}
+
+	return err
 }
 
 func onTxMeta(callback func(txMeta *Ydb_Query.TransactionMeta)) resultOption {
@@ -134,6 +175,18 @@ func withStreamResultCloseTimeout(timeout time.Duration) resultOption {
 	}
 }
 
+// withStreamCancel wires a CancelFunc that nextPart invokes via
+// context.AfterFunc to unblock stream.Recv() when the caller's ctx is
+// cancelled. Typically this is the same CancelFunc that controls the gRPC
+// context the stream was opened with.
+func withStreamCancel(cancel context.CancelFunc) resultOption {
+	return func(s *streamResult) {
+		s.streamCancel = cancel
+	}
+}
+
+var nopFunc = func() {}
+
 func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
@@ -141,7 +194,6 @@ func newResult(
 ) (_ *streamResult, finalErr error) {
 	r := streamResult{
 		stream:         stream,
-		closer:         NewResultCloser(),
 		resultSetIndex: -1,
 	}
 
@@ -151,8 +203,15 @@ func newResult(
 		}
 	}
 
+	if r.onClose != nil {
+		// replace all hooks to once func
+		r.onClose = sync.OnceFunc(r.onClose)
+	} else {
+		r.onClose = nopFunc
+	}
+
 	if r.trace != nil {
-		onDone := trace.QueryOnResultNew(r.trace, &ctx,
+		onDone := gtrace.QueryOnResultNew(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.newResult"),
 		)
 		defer func() {
@@ -160,77 +219,97 @@ func newResult(
 		}()
 	}
 
-	select {
-	case <-ctx.Done():
-		return nil, xerrors.WithStackTrace(ctx.Err())
-	default:
-		part, err := r.nextPart(ctx)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
+	if err := ctx.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(r.notifyNextPartErr(ctx, err))
+	}
+
+	part, err := r.nextPart(ctx)
+	if err != nil {
+		if xerrors.Is(err, io.EOF) {
+			return nil, io.EOF
 		}
 
-		r.lastPart = part
-
-		return &r, nil
+		return nil, xerrors.WithStackTrace(err)
 	}
+
+	r.lastPart = part
+
+	return &r, nil
 }
 
+//nolint:funlen // Keep response-part lifetime and stream error handling in one place.
 func (r *streamResult) nextPart(ctx context.Context) (
-	part *Ydb_Query.ExecuteQueryResponsePart, err error,
+	part *Ydb_Query.ExecuteQueryResponsePart, finishErr error,
 ) {
+	defer func() {
+		if finishErr != nil && ctx.Err() == nil {
+			r.lastErr = finishErr
+		}
+	}()
+
 	if r.trace != nil {
-		onDone := trace.QueryOnResultNextPart(r.trace, &ctx,
+		onDone := gtrace.QueryOnResultNextPart(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).nextPart"),
 		)
 		defer func() {
-			onDone(part.GetExecStats(), err)
+			onDone(part.GetExecStats(), finishErr)
 		}()
 	}
 
-	select {
-	case <-r.closer.Done():
-		return nil, xerrors.WithStackTrace(r.closer.Err())
-	case <-ctx.Done():
-		return nil, xerrors.WithStackTrace(ctx.Err())
-	default:
-		stop := r.closer.CloseOnContextCancel(ctx)
-		defer func() {
-			stop()
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		_ = r.notifyNextPartErr(ctx, ctxErr)
 
-			if err != nil {
-				r.closer.Close(err)
-			}
-
-			err = r.closer.Err()
-		}()
-
-		part, err = nextPart(r.stream)
-		if part != nil {
-			issues := part.GetIssues()
-			if r.issuesCallback != nil && len(issues) > 0 {
-				r.issuesCallback(issues)
-			}
-		}
-		if err != nil {
-			for _, callback := range r.onNextPartErr {
-				callback(err)
-			}
-
-			return nil, xerrors.WithStackTrace(err)
-		}
-
-		if txMeta := part.GetTxMeta(); txMeta != nil {
-			for _, f := range r.onTxMeta {
-				f(txMeta)
-			}
-		}
-
-		if part.GetExecStats() != nil && r.statsCallback != nil {
-			r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
-		}
-
-		return part, nil
+		return nil, ctxErr
 	}
+
+	if r.lastErr != nil {
+		return nil, r.lastErr
+	}
+
+	// Forward ctx cancellation to the gRPC stream context so a Recv blocked
+	// waiting for the next server message unblocks if the caller cancels.
+	// AfterFunc only spawns a goroutine when ctx is actually done, so on the
+	// happy path this costs a single register+stop pair (no goroutine, no
+	// extra allocations beyond the AfterFunc node itself). The forwarding is
+	// strictly per-call: the streamResult intentionally stays decoupled from
+	// the original execute() ctx after execute returns, which keeps callers
+	// free to iterate the result with a fresh ctx (see CancelAfterExecute).
+	if r.streamCancel != nil {
+		stop := context.AfterFunc(ctx, r.streamCancel)
+		defer stop()
+	}
+
+	if !r.retainArrowBatches {
+		r.releaseArrowBatches()
+	}
+	part, err := nextPart(r.stream)
+	if part != nil {
+		issues := part.GetIssues()
+		if r.issuesCallback != nil && len(issues) > 0 {
+			r.issuesCallback(issues)
+		}
+	}
+	if err != nil {
+		err = r.notifyNextPartErr(ctx, err)
+
+		if xerrors.Is(err, io.EOF) {
+			return nil, io.EOF
+		}
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if txMeta := part.GetTxMeta(); txMeta != nil {
+		for _, f := range r.onTxMeta {
+			f(txMeta)
+		}
+	}
+
+	if part.GetExecStats() != nil && r.statsCallback != nil {
+		r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
+	}
+
+	return part, nil
 }
 
 func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
@@ -238,6 +317,10 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 ) {
 	part, err = stream.Recv()
 	if err != nil {
+		if xerrors.Is(err, io.EOF) {
+			return nil, io.EOF
+		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -245,9 +328,14 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 }
 
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
-	defer func() {
-		r.closer.Close(finalErr)
-	}()
+	defer r.onClose()
+	defer r.releaseArrowBatches()
+
+	if r.stream != nil && r.stream.Context().Err() != nil {
+		// Stream already torn down (EOF, per-call ctx cancel, or prior Close).
+		// onClose runs via defer; nothing left to drain.
+		return nil
+	}
 
 	if r.closeTimeout > 0 {
 		var cancel context.CancelFunc
@@ -255,8 +343,11 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 		defer cancel()
 	}
 
+	stop := context.AfterFunc(ctx, r.onClose)
+	defer stop()
+
 	if r.trace != nil {
-		onDone := trace.QueryOnResultClose(r.trace, &ctx,
+		onDone := gtrace.QueryOnResultClose(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).Close"),
 		)
 		defer func() {
@@ -265,60 +356,69 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	}
 
 	for {
-		select {
-		case <-ctx.Done():
-			return xerrors.WithStackTrace(ctx.Err())
-		case <-r.closer.Done():
-			return nil
-		default:
-			_, err := r.nextPart(ctx)
-			if err != nil {
-				if xerrors.Is(err, io.EOF) {
-					return nil
-				}
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return r.notifyNextPartErr(ctx, ctxErr)
+		}
 
-				return xerrors.WithStackTrace(err)
+		_, err := r.nextPart(ctx)
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				return nil
 			}
+
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return ctxErr
+			}
+
+			return xerrors.WithStackTrace(err)
 		}
 	}
 }
 
-func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
+func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishErr error) {
+	defer func() {
+		if finishErr != nil && ctx.Err() == nil {
+			r.lastErr = finishErr
+		}
+	}()
+
 	nextResultSetIndex := r.resultSetIndex + 1
 	for {
-		select {
-		case <-r.closer.Done():
-			return nil, xerrors.WithStackTrace(r.closer.Err())
-		case <-ctx.Done():
-			return nil, xerrors.WithStackTrace(ctx.Err())
-		default:
-			if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex {
-				r.resultSetIndex = resultSetIndex
-
-				return newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart), nil
-			}
-			if r.stream == nil {
-				return nil, xerrors.WithStackTrace(io.EOF)
-			}
-			part, err := r.nextPart(ctx)
-			if err != nil {
-				return nil, xerrors.WithStackTrace(err)
-			}
-			if part.GetResultSetIndex() < r.resultSetIndex {
-				r.closer.Close(nil)
-
-				if part.GetResultSetIndex() <= 0 && r.resultSetIndex > 0 {
-					return nil, xerrors.WithStackTrace(io.EOF)
-				}
-
-				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"next result set rowIndex %d less than last result set index %d: %w",
-					part.GetResultSetIndex(), r.resultSetIndex, errWrongNextResultSetIndex,
-				))
-			}
-			r.lastPart = part
-			r.resultSetIndex = part.GetResultSetIndex()
+		if err := ctx.Err(); err != nil {
+			return nil, xerrors.WithStackTrace(r.notifyNextPartErr(ctx, err))
 		}
+
+		if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex {
+			r.resultSetIndex = resultSetIndex
+			rs := newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart)
+			rs.notifyError = r.notifyNextPartErr
+			rs.decodeArrow = r.decodeArrowBatches
+
+			return rs, nil
+		}
+		if r.stream == nil {
+			return nil, io.EOF
+		}
+		part, err := r.nextPart(ctx)
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				return nil, io.EOF
+			}
+
+			return nil, xerrors.WithStackTrace(err)
+		}
+		if part.GetResultSetIndex() < r.resultSetIndex {
+			if part.GetResultSetIndex() <= 0 && r.resultSetIndex > 0 {
+				return nil, io.EOF
+			}
+
+			return nil, xerrors.WithStackTrace(fmt.Errorf(
+				"next result set rowIndex %d less than last result set index %d: %w",
+				part.GetResultSetIndex(), r.resultSetIndex, errWrongNextResultSetIndex,
+			))
+		}
+		r.lastPart = part
+		r.resultSetIndex = part.GetResultSetIndex()
 	}
 }
 
@@ -327,35 +427,36 @@ func (r *streamResult) nextPartFunc(
 	nextResultSetIndex int64,
 ) func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
 	return func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
-		select {
-		case <-ctx.Done():
-			return nil, xerrors.WithStackTrace(ctx.Err())
-		case <-r.closer.Done():
-			return nil, xerrors.WithStackTrace(r.closer.Err())
-		default:
-			if r.stream == nil {
-				return nil, xerrors.WithStackTrace(io.EOF)
-			}
-			part, err := r.nextPart(ctx)
-			if err != nil {
-				return nil, xerrors.WithStackTrace(err)
-			}
-			r.lastPart = part
-			if part.GetResultSetIndex() > nextResultSetIndex {
-				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"result set (index=%d) receive part (index=%d) for next result set: %w (%w)",
-					nextResultSetIndex, part.GetResultSetIndex(), io.EOF, errReadNextResultSet,
-				))
+		if err := ctx.Err(); err != nil {
+			return nil, xerrors.WithStackTrace(r.notifyNextPartErr(ctx, err))
+		}
+
+		if r.stream == nil {
+			return nil, io.EOF
+		}
+		part, err := r.nextPart(ctx)
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				return nil, io.EOF
 			}
 
-			return part, nil
+			return nil, xerrors.WithStackTrace(err)
 		}
+		r.lastPart = part
+		if part.GetResultSetIndex() > nextResultSetIndex {
+			return nil, xerrors.WithStackTrace(fmt.Errorf(
+				"result set (index=%d) receive part (index=%d) for next result set: %w (%w)",
+				nextResultSetIndex, part.GetResultSetIndex(), io.EOF, errReadNextResultSet,
+			))
+		}
+
+		return part, nil
 	}
 }
 
 func (r *streamResult) NextResultSet(ctx context.Context) (_ result.Set, err error) {
 	if r.trace != nil {
-		onDone := trace.QueryOnResultNextResultSet(r.trace, &ctx,
+		onDone := gtrace.QueryOnResultNextResultSet(r.trace, &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*streamResult).NextResultSet"),
 		)
 		defer func() {
@@ -380,7 +481,7 @@ func exactlyOneRowFromResult(ctx context.Context, r result.Result) (row result.R
 	switch {
 	case err == nil:
 		return nil, xerrors.WithStackTrace(ErrMoreThanOneRow)
-	case errors.Is(err, io.EOF):
+	case xerrors.Is(err, io.EOF):
 		// pass
 	default:
 		return nil, xerrors.WithStackTrace(err)
@@ -390,7 +491,7 @@ func exactlyOneRowFromResult(ctx context.Context, r result.Result) (row result.R
 	switch {
 	case err == nil:
 		return nil, xerrors.WithStackTrace(ErrMoreThanOneRow)
-	case errors.Is(err, io.EOF):
+	case xerrors.Is(err, io.EOF):
 		// pass
 	default:
 		return nil, xerrors.WithStackTrace(err)
@@ -428,7 +529,7 @@ func exactlyOneResultSetFromResult(ctx context.Context, r result.Result) (rs res
 	switch {
 	case err == nil:
 		return nil, xerrors.WithStackTrace(ErrMoreThanOneResultSet)
-	case errors.Is(err, io.EOF):
+	case xerrors.Is(err, io.EOF):
 		// pass
 	default:
 		return nil, xerrors.WithStackTrace(err)
@@ -437,7 +538,9 @@ func exactlyOneResultSetFromResult(ctx context.Context, r result.Result) (rs res
 	return MaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
 }
 
+//nolint:funlen // Group result sets and transfer Arrow batch ownership together.
 func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Result, error) {
+	r.retainArrowBatches = true
 	type resultSet struct {
 		rows    []query.Row
 		columns []*Ydb.Column
@@ -452,8 +555,20 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 			rs.columns = r.lastPart.GetResultSet().GetColumns()
 		}
 
-		for i := range r.lastPart.GetResultSet().GetRows() {
-			rs.rows = append(rs.rows, NewRow(rs.columns, r.lastPart.GetResultSet().GetRows()[i]))
+		if r.lastPart.GetResultSet().GetFormat() == Ydb.ResultSet_FORMAT_ARROW {
+			batches, err := r.decodeArrowBatches(ctx, rs.columns, r.lastPart.GetResultSet())
+			if err != nil {
+				return nil, xerrors.WithStackTrace(r.notifyNextPartErr(ctx, err))
+			}
+			for _, data := range batches {
+				for i := range data.rows {
+					rs.rows = append(rs.rows, &data.rows[i])
+				}
+			}
+		} else {
+			for i := range r.lastPart.GetResultSet().GetRows() {
+				rs.rows = append(rs.rows, NewRow(rs.columns, r.lastPart.GetResultSet().GetRows()[i]))
+			}
 		}
 		resultSetByIndex[curIndex] = rs
 
@@ -486,5 +601,6 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 
 	return &materializedResult{
 		resultSets: resultSets,
+		closeArrow: r.takeArrowBatches(),
 	}, nil
 }

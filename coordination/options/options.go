@@ -156,7 +156,7 @@ type UpdateSemaphoreOption func(c *Ydb_Coordination.SessionRequest_UpdateSemapho
 // WithDescribeOwners return a DescribeSemaphoreOption which causes server send the list of owners in the response
 // to the DescribeSemaphore request.
 func WithDescribeOwners(describeOwners bool) DescribeSemaphoreOption {
-	return func(c *Ydb_Coordination.SessionRequest_DescribeSemaphore) {
+	return func(c *DescribeSemaphoreConfig) {
 		c.IncludeOwners = describeOwners
 	}
 }
@@ -164,10 +164,70 @@ func WithDescribeOwners(describeOwners bool) DescribeSemaphoreOption {
 // WithDescribeWaiters return a DescribeSemaphoreOption which causes server send the list of waiters in the response
 // to the DescribeSemaphore request.
 func WithDescribeWaiters(describeWaiters bool) DescribeSemaphoreOption {
-	return func(c *Ydb_Coordination.SessionRequest_DescribeSemaphore) {
+	return func(c *DescribeSemaphoreConfig) {
 		c.IncludeWaiters = describeWaiters
 	}
 }
 
-// DescribeSemaphoreOption configures how we update a semaphore.
-type DescribeSemaphoreOption func(c *Ydb_Coordination.SessionRequest_DescribeSemaphore)
+// SemaphoreWatchFlag is a bit mask of semaphore fields to watch with WithSemaphoreWatch.
+type SemaphoreWatchFlag uint8
+
+const (
+	// WatchData watches semaphore data changes.
+	WatchData SemaphoreWatchFlag = 1 << iota
+	// WatchOwners watches semaphore owners changes.
+	WatchOwners
+)
+
+// SemaphoreWatchEvent describes why a one-shot semaphore watch fired.
+//
+// Exactly one of the following is expected for a delivered event:
+//   - DataChanged and/or OwnersChanged are true for a real watched change;
+//   - Lost is true for a false wake (subscription replaced, stream lost, session closed, etc.).
+type SemaphoreWatchEvent struct {
+	DataChanged   bool
+	OwnersChanged bool
+	Lost          bool
+}
+
+// WithSemaphoreWatch returns a DescribeSemaphoreOption that creates a one-shot watch for the selected semaphore
+// fields and registers oneShotHandler.
+//
+// The watch is one-shot: oneShotHandler is invoked at most once for this DescribeSemaphore call. After it runs
+// (including when SemaphoreWatchEvent.Lost is true), call DescribeSemaphore again with WithSemaphoreWatch to restore
+// the subscription. Continuous observation requires an explicit re-subscribe loop in application code.
+//
+// oneShotHandler runs on a dedicated goroutine, so it may re-subscribe by calling DescribeSemaphore directly from
+// inside the handler without deadlocking. A slow handler does not block the session, but it delays only its own
+// re-subscription.
+//
+// flags must include WatchData and/or WatchOwners; oneShotHandler must be non-nil. Otherwise the option is ignored.
+//
+// Lost may be delivered even when only WatchData or only WatchOwners was requested: it reports client/server
+// invalidation of the subscription, not a data/owners change.
+func WithSemaphoreWatch(
+	flags SemaphoreWatchFlag,
+	oneShotHandler func(event SemaphoreWatchEvent),
+) DescribeSemaphoreOption {
+	return func(c *DescribeSemaphoreConfig) {
+		if flags == 0 || oneShotHandler == nil {
+			return
+		}
+
+		c.WatchData = flags&WatchData != 0
+		c.WatchOwners = flags&WatchOwners != 0
+		c.OneShotHandler = oneShotHandler
+	}
+}
+
+// DescribeSemaphoreConfig configures a DescribeSemaphore call, including optional watch settings.
+type DescribeSemaphoreConfig struct {
+	IncludeOwners  bool
+	IncludeWaiters bool
+	WatchData      bool
+	WatchOwners    bool
+	OneShotHandler func(event SemaphoreWatchEvent)
+}
+
+// DescribeSemaphoreOption configures how we describe a semaphore.
+type DescribeSemaphoreOption func(c *DescribeSemaphoreConfig)

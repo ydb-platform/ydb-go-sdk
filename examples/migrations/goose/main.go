@@ -14,6 +14,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
+const (
+	commandVersion = "version"
+	commandStatus  = "status"
+	commandDown    = "down"
+)
+
 //go:embed schema/*.sql
 var embedMigrations embed.FS
 
@@ -66,19 +72,19 @@ func main() {
 	}()
 
 	for _, command := range []string{
-		"version",
+		commandVersion,
 		"up-by-one",
-		"status",
+		commandStatus,
 		"up",
-		"status",
-		"version",
-		"down",
-		"version",
-		"down",
-		"version",
+		commandStatus,
+		commandVersion,
+		commandDown,
+		commandVersion,
+		commandDown,
+		commandVersion,
 		"reset",
-		"version",
-		"status",
+		commandVersion,
+		commandStatus,
 	} {
 		log.Printf("try to run command `goose ydb \"%s\" %s`...", dsn, command)
 		if err := goose.RunContext(ctx, command, db, "schema"); err != nil {

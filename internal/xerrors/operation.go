@@ -173,7 +173,8 @@ func (e *operationError) Type() Type {
 		return TypeRetryable
 	case
 		Ydb.StatusIds_UNDETERMINED,
-		Ydb.StatusIds_SESSION_EXPIRED:
+		Ydb.StatusIds_SESSION_EXPIRED,
+		Ydb.StatusIds_TIMEOUT:
 		return TypeConditionallyRetryable
 	case Ydb.StatusIds_UNAUTHORIZED:
 		return TypeNonRetryable
@@ -218,7 +219,7 @@ func (e *operationError) BackoffType() backoff.Type {
 		return backoff.TypeFast
 	case Ydb.StatusIds_ABORTED:
 		if e.hasIssueCodes(IssueCodeDatashardProgramSizeLimitExceeded) {
-			return backoff.TypeNoBackoff
+			return backoff.TypeInstant
 		}
 
 		return backoff.TypeFast
@@ -227,9 +228,9 @@ func (e *operationError) BackoffType() backoff.Type {
 			return backoff.TypeSlow
 		}
 
-		return backoff.TypeNoBackoff
+		return backoff.TypeInstant
 	default:
-		return backoff.TypeNoBackoff
+		return backoff.TypeInstant
 	}
 }
 

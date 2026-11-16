@@ -74,12 +74,12 @@ func main() {
 
 	prefix = path.Join(db.Name(), prefix)
 
-	err = createTables(ctx, db.Table(), prefix)
+	err = createTables(ctx, db.Query(), prefix)
 	if err != nil {
 		panic(fmt.Errorf("create tables error: %w", err))
 	}
 
-	err = addDocument(ctx, db.Table(), prefix,
+	err = addDocument(ctx, db.Query(), prefix,
 		"https://yandex.ru/",
 		"<html><body><h1>Yandex</h1></body></html>",
 		1)
@@ -87,7 +87,7 @@ func main() {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
 
-	err = addDocument(ctx, db.Table(), prefix,
+	err = addDocument(ctx, db.Query(), prefix,
 		"https://ya.ru/",
 		"<html><body><h1>Ya</h1></body></html>",
 		2)
@@ -95,7 +95,7 @@ func main() {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
 
-	err = addDocument(ctx, db.Table(), prefix,
+	err = addDocument(ctx, db.Query(), prefix,
 		"https://mail.yandex.ru/",
 		"<html><body><h1>Mail</h1></body></html>",
 		3)
@@ -103,7 +103,7 @@ func main() {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
 
-	err = addDocument(ctx, db.Table(), prefix,
+	err = addDocument(ctx, db.Query(), prefix,
 		"https://zen.yandex.ru/",
 		"<html><body><h1>Zen</h1></body></html>",
 		4)
@@ -111,52 +111,52 @@ func main() {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://yandex.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://yandex.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://ya.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://ya.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://mail.yandex.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://mail.yandex.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://zen.yandex.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://zen.yandex.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
-	err = deleteExpired(ctx, db.Table(), prefix, 2)
+	err = deleteExpired(ctx, db.Table(), db.Query(), prefix, 2)
 	if err != nil {
 		panic(fmt.Errorf("delete expired failed: %w", err))
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://yandex.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://yandex.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://ya.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://ya.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://mail.yandex.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://mail.yandex.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://zen.yandex.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://zen.yandex.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
-	err = addDocument(ctx, db.Table(), prefix,
+	err = addDocument(ctx, db.Query(), prefix,
 		"https://yandex.ru/",
 		"<html><body><h1>Yandex</h1></body></html>",
 		3)
@@ -164,7 +164,7 @@ func main() {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
 
-	err = addDocument(ctx, db.Table(), prefix,
+	err = addDocument(ctx, db.Query(), prefix,
 		"https://ya.ru/",
 		"<html><body><h1>Ya</h1></body></html>",
 		4)
@@ -172,27 +172,27 @@ func main() {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
 
-	err = deleteExpired(ctx, db.Table(), prefix, 3)
+	err = deleteExpired(ctx, db.Table(), db.Query(), prefix, 3)
 	if err != nil {
 		panic(fmt.Errorf("delete expired failed: %w", err))
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://yandex.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://yandex.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://ya.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://ya.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://mail.yandex.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://mail.yandex.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
-	err = readDocument(ctx, db.Table(), prefix, "https://zen.yandex.ru/")
+	err = readDocument(ctx, db.Query(), prefix, "https://zen.yandex.ru/")
 	if err != nil {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}

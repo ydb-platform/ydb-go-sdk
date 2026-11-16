@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -166,6 +167,15 @@ type CreateDecoderFunc = topicreadercommon.PublicCreateDecoderFunc
 
 // WithAddDecoder add decoder for a codec.
 // It allows to set decoders fabric for custom codec and replace internal decoders.
+//
+// Replacing the decoder for topictypes.CodecRaw is discouraged because raw payloads are
+// expected to pass through unchanged. Use a user-defined codec ID in the [10000, 19999]
+// range reserved by the protocol:
+// https://github.com/ydb-platform/ydb-api-protos/blob/d9841fab/protos/ydb_topic.proto#L27
+// This link refers to commit d9841fab4f5e7851294efd4801478e5b1a100799.
+// Alternatively, decode raw messages at the application level, for example using helpers
+// from topic/topicsugar.
+// A future release will reject custom decoders for topictypes.CodecRaw with an error.
 func WithAddDecoder(codec topictypes.Codec, decoderCreate CreateDecoderFunc) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.Decoders.AddDecoder(rawtopiccommon.Codec(codec), decoderCreate)
@@ -224,6 +234,21 @@ type (
 
 	// GetPartitionStartOffsetResponse optional set offset for start reade messages for the partition
 	GetPartitionStartOffsetResponse = topicreaderinternal.PublicGetPartitionStartOffsetResponse
+
+	// StopPartitionSessionRequest describes the partition session the server
+	// is going to stop on the reader. It is passed to the OnStopPartitionSessionFunc
+	// callback. When Graceful is false, the session must not be used for commits
+	// or other session work.
+	StopPartitionSessionRequest = topicreaderinternal.PublicStopPartitionSessionRequest
+
+	// OnStopPartitionSessionResult is the callback return value for
+	// WithReaderOnStopPartitionSession. Reserved for future feedback from the
+	// user handler to the SDK.
+	OnStopPartitionSessionResult = topicreaderinternal.PublicOnStopPartitionSessionResult
+
+	// OnStopPartitionSessionFunc is the type of the callback registered via
+	// WithReaderOnStopPartitionSession.
+	OnStopPartitionSessionFunc = func(req StopPartitionSessionRequest) OnStopPartitionSessionResult
 )
 
 // WithGetPartitionStartOffset
@@ -249,7 +274,7 @@ func WithReaderGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOpti
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithReaderTrace(t trace.Topic) ReaderOption { //nolint:gocritic
 	return func(cfg *topicreaderinternal.ReaderConfig) {
-		cfg.Trace = cfg.Trace.Compose(&t)
+		cfg.Trace = gtrace.Compose(cfg.Trace, &t)
 	}
 }
 
@@ -296,5 +321,21 @@ func WithReaderSupportSplitMergePartitions(enableSupport bool) ReaderOption {
 func WithReaderLogContext(ctx context.Context) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.BaseContext = ctx
+	}
+}
+
+// WithReaderOnStopPartitionSession registers a user callback invoked when the
+// server requests a partition session stop on the reader (graceful or not).
+//
+// The callback receives a StopPartitionSessionRequest with the topic path,
+// partition ID, partition session ID, server-reported committed offset, and the
+// graceful flag. When Graceful is false, the partition session is already invalid
+// on the client for session-scoped operations such as committing messages.
+//
+// The callback is called synchronously from the reader event loop, so it must
+// return quickly.
+func WithReaderOnStopPartitionSession(f OnStopPartitionSessionFunc) ReaderOption {
+	return func(cfg *topicreaderinternal.ReaderConfig) {
+		cfg.OnStopPartitionSession = topicreaderinternal.PublicOnStopPartitionSessionFunc(f)
 	}
 }

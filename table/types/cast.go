@@ -1,121 +1,60 @@
 package types
 
-import (
-	"errors"
-	"fmt"
+import public "github.com/ydb-platform/ydb-go-sdk/v3/types"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal"
-)
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.CastTo instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var CastTo = public.CastTo
 
-var errNilValue = errors.New("nil value")
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.IsOptional instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var IsOptional = public.IsOptional
 
-// CastTo try cast value to destination type value
-func CastTo(v Value, dst any) error {
-	if v == nil {
-		return xerrors.WithStackTrace(errNilValue)
-	}
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.IsNull instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var IsNull = public.IsNull
 
-	return value.CastTo(v, dst)
-}
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.Unwrap instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var Unwrap = public.Unwrap
 
-// IsOptional checks if type is optional and returns innerType if it is.
-func IsOptional(t Type) (isOptional bool, innerType Type) {
-	if optionalType, isOptional := t.(interface {
-		IsOptional()
-		InnerType() Type
-	}); isOptional {
-		return isOptional, optionalType.InnerType()
-	}
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.ToDecimal instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var ToDecimal = public.ToDecimal
 
-	return false, nil
-}
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.ListItems instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var ListItems = public.ListItems
 
-// IsNull checks if optional value is NULL.
-// If value is not optional value - returns false
-func IsNull(v Value) bool {
-	return value.IsNull(v)
-}
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.TupleItems instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var TupleItems = public.TupleItems
 
-// Unwrap returns inner optional value
-// If value is not optional value - returns self
-func Unwrap(v Value) Value {
-	return value.Unwrap(v)
-}
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.StructFields instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var StructFields = public.StructFields
 
-// ToDecimal returns Decimal struct from abstract Value
-func ToDecimal(v Value) (*Decimal, error) {
-	if d, has := v.(decimal.Interface); has {
-		return decimal.ToDecimal(d), nil
-	}
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.VariantValue instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var VariantValue = public.VariantValue
 
-	return nil, xerrors.WithStackTrace(fmt.Errorf("value type '%s' is not decimal type", v.Type().Yql()))
-}
-
-// ListItems returns list items from abstract Value
-func ListItems(v Value) ([]Value, error) {
-	if vv, has := v.(interface {
-		ListItems() []Value
-	}); has {
-		return vv.ListItems(), nil
-	}
-
-	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get list items from '%s'", v.Type().Yql()))
-}
-
-// TupleItems returns tuple items from abstract Value
-func TupleItems(v Value) ([]Value, error) {
-	if vv, has := v.(interface {
-		TupleItems() []Value
-	}); has {
-		return vv.TupleItems(), nil
-	}
-
-	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get tuple items from '%s'", v.Type().Yql()))
-}
-
-// StructFields returns struct fields from abstract Value
-func StructFields(v Value) (map[string]Value, error) {
-	if vv, has := v.(interface {
-		StructFields() map[string]Value
-	}); has {
-		return vv.StructFields(), nil
-	}
-
-	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get struct fields from '%s'", v.Type().Yql()))
-}
-
-// VariantValue returns variant value from abstract Value
-func VariantValue(v Value) (name string, idx uint32, _ Value, _ error) {
-	if vv, has := v.(interface {
-		Variant() (name string, index uint32)
-		Value() Value
-	}); has {
-		name, idx := vv.Variant()
-
-		return name, idx, vv.Value(), nil
-	}
-
-	return "", 0, nil, xerrors.WithStackTrace(fmt.Errorf("cannot get variant value from '%s'", v.Type().Yql()))
-}
-
-// DictFields returns dict values from abstract Value
-//
-// Deprecated: use DictValues instead.
-// Will be removed after Oct 2024.
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DictValues instead.
+// Will be removed at next major release.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func DictFields(v Value) (map[Value]Value, error) {
 	return DictValues(v)
 }
 
-// DictValues returns dict values from abstract Value
-func DictValues(v Value) (map[Value]Value, error) {
-	if vv, has := v.(interface {
-		DictValues() map[Value]Value
-	}); has {
-		return vv.DictValues(), nil
-	}
-
-	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get dict values from '%s'", v.Type().Yql()))
-}
+// Deprecated: use github.com/ydb-platform/ydb-go-sdk/v3/types.DictValues instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+var DictValues = public.DictValues

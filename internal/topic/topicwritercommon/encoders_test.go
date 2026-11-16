@@ -172,6 +172,113 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 	})
 }
 
+func TestEncoderSelector_CompressMessages(t *testing.T) {
+	t.Run("ReportsSizes", func(t *testing.T) {
+		var done trace.TopicWriterCompressMessagesDoneInfo
+		tracer := &trace.Topic{
+			OnWriterCompressMessages: func(
+				trace.TopicWriterCompressMessagesStartInfo,
+			) func(trace.TopicWriterCompressMessagesDoneInfo) {
+				return func(info trace.TopicWriterCompressMessagesDoneInfo) {
+					done = info
+				}
+			},
+		}
+
+		s := NewEncoderSelector(
+			t.Context(),
+			testCommonEncoders,
+			rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
+			1,
+			tracer,
+			"",
+			"",
+		)
+
+		const payload = "hello world"
+		messages := []MessageWithDataContent{
+			NewMessageDataWithContent(PublicMessage{Data: strings.NewReader(payload)}, testCommonEncoders),
+		}
+
+		codec, err := s.CompressMessages(messages)
+		require.NoError(t, err)
+		require.Equal(t, rawtopiccommon.CodecRaw, codec)
+
+		require.NoError(t, done.Error)
+		require.Equal(t, len(payload), done.UncompressedSize)
+		require.Equal(t, len(payload), done.CompressedSize)
+	})
+
+	t.Run("ReportsErrorWithZeroSizes", func(t *testing.T) {
+		var done trace.TopicWriterCompressMessagesDoneInfo
+		tracer := &trace.Topic{
+			OnWriterCompressMessages: func(
+				trace.TopicWriterCompressMessagesStartInfo,
+			) func(trace.TopicWriterCompressMessagesDoneInfo) {
+				return func(info trace.TopicWriterCompressMessagesDoneInfo) {
+					done = info
+				}
+			},
+		}
+
+		s := NewEncoderSelector(
+			t.Context(),
+			testCommonEncoders,
+			rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
+			1,
+			tracer,
+			"",
+			"",
+		)
+
+		// pre-cache with a different codec so CodecRaw caching below fails,
+		// the same way TestCompressMessages/RawError does it.
+		mess := NewMessageDataWithContent(PublicMessage{}, testCommonEncoders)
+		_, err := mess.GetEncodedBytes(rawtopiccommon.CodecGzip)
+		require.NoError(t, err)
+
+		_, err = s.CompressMessages([]MessageWithDataContent{mess})
+		require.Error(t, err)
+
+		require.Error(t, done.Error)
+		require.Zero(t, done.UncompressedSize)
+		require.Zero(t, done.CompressedSize)
+	})
+}
+
+func TestUncompressedContentSize(t *testing.T) {
+	messages := []MessageWithDataContent{
+		NewMessageDataWithContent(PublicMessage{Data: strings.NewReader("ab")}, testCommonEncoders),
+		NewMessageDataWithContent(PublicMessage{Data: strings.NewReader("cde")}, testCommonEncoders),
+	}
+	require.NoError(t, CacheMessages(messages, rawtopiccommon.CodecRaw, 1))
+
+	require.Equal(t, 5, UncompressedContentSize(messages))
+}
+
+func TestCompressedContentSize(t *testing.T) {
+	t.Run("Ok", func(t *testing.T) {
+		messages := []MessageWithDataContent{
+			NewMessageDataWithContent(PublicMessage{Data: strings.NewReader("ab")}, testCommonEncoders),
+			NewMessageDataWithContent(PublicMessage{Data: strings.NewReader("cde")}, testCommonEncoders),
+		}
+		require.NoError(t, CacheMessages(messages, rawtopiccommon.CodecRaw, 1))
+
+		compressedSize, err := CompressedContentSize(messages, rawtopiccommon.CodecRaw)
+		require.NoError(t, err)
+		require.Equal(t, 5, compressedSize)
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		mess := NewMessageDataWithContent(PublicMessage{}, testCommonEncoders)
+		_, err := mess.GetEncodedBytes(rawtopiccommon.CodecGzip)
+		require.NoError(t, err)
+
+		_, err = CompressedContentSize([]MessageWithDataContent{mess}, rawtopiccommon.CodecRaw)
+		require.Error(t, err)
+	})
+}
+
 func TestCompressMessages(t *testing.T) {
 	t.Run("NoMessages", func(t *testing.T) {
 		require.NoError(t, CacheMessages(nil, rawtopiccommon.CodecRaw, 1))
@@ -240,6 +347,14 @@ func TestMultiEncoder(t *testing.T) {
 		return string(decompressedMsg)
 	}
 
+	t.Run("UnsupportedCodec", func(t *testing.T) {
+		var output bytes.Buffer
+		n, err := NewMultiEncoder().EncodeBytes(rawtopiccommon.Codec(10001), &output, []byte("payload"))
+		require.Error(t, err)
+		require.Zero(t, n)
+		require.Empty(t, output.Bytes())
+	})
+
 	t.Run("BuffersPool", func(t *testing.T) {
 		testMultiEncoder := NewMultiEncoder()
 
@@ -257,7 +372,7 @@ func TestMultiEncoder(t *testing.T) {
 
 	t.Run("NotResetableWriter", func(t *testing.T) {
 		testMultiEncoder := NewMultiEncoder()
-		require.Len(t, testMultiEncoder.ep, 2)
+		require.Len(t, testMultiEncoder.m, 2)
 
 		buf := &bytes.Buffer{}
 		_, err := testMultiEncoder.EncodeBytes(rawtopiccommon.CodecRaw, buf, []byte("test_data"))
@@ -272,7 +387,7 @@ func TestMultiEncoder(t *testing.T) {
 		testMultiEncoder.AddEncoder(customCodecCode, func(writer io.Writer) (io.WriteCloser, error) {
 			return gzip.NewWriter(writer), nil
 		})
-		require.Len(t, testMultiEncoder.ep, 3)
+		require.Len(t, testMultiEncoder.m, 3)
 
 		buf := &bytes.Buffer{}
 		_, err := testMultiEncoder.EncodeBytes(customCodecCode, buf, []byte("test_data_1"))

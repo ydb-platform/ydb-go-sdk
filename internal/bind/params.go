@@ -42,7 +42,7 @@ func asUUID(v any) (value.Value, bool) {
 			return value.NullValue(types.UUID), true
 		}
 
-		return value.OptionalValue(value.Uuid(*(v.(*uuid.UUID)))), true //nolint:forcetypeassert
+		return value.OptionalValue(value.Uuid(*v.(*uuid.UUID))), true //nolint:forcetypeassert
 	}
 
 	return nil, false

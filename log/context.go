@@ -2,6 +2,7 @@ package log
 
 import (
 	"context"
+	"slices"
 )
 
 type (
@@ -23,7 +24,7 @@ func LevelFromContext(ctx context.Context) Level {
 func WithNames(ctx context.Context, names ...string) context.Context {
 	// trim capacity for force allocate new memory while append and prevent data race
 	oldNames := NamesFromContext(ctx)
-	oldNames = oldNames[:len(oldNames):len(oldNames)]
+	oldNames = slices.Clip(oldNames)
 
 	return context.WithValue(ctx, ctxNamesKey{}, append(oldNames, names...))
 }
@@ -34,7 +35,7 @@ func NamesFromContext(ctx context.Context) []string {
 		return []string{}
 	}
 
-	return v[:len(v):len(v)] // prevent re
+	return slices.Clip(v) // prevent re
 }
 
 func WithFields(ctx context.Context, fields ...Field) context.Context {
@@ -54,4 +55,27 @@ func FieldsFromContext(ctx context.Context) []Field {
 
 func with(ctx context.Context, lvl Level, names ...string) context.Context {
 	return WithLevel(WithNames(ctx, names...), lvl)
+}
+
+func safeContextPtr(ctx *context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	if isNil(*ctx) {
+		return context.Background()
+	}
+
+	return *ctx
+}
+
+func withContext(ctx context.Context, lvl Level, names ...string) context.Context {
+	if isNil(ctx) {
+		return with(context.Background(), lvl, names...)
+	}
+
+	return with(ctx, lvl, names...)
+}
+
+func withFromPtr(ctx *context.Context, lvl Level, names ...string) context.Context {
+	return with(safeContextPtr(ctx), lvl, names...)
 }

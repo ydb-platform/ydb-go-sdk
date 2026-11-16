@@ -22,6 +22,8 @@ import (
 	"slo/internal/kv"
 )
 
+const autoPartitioningEnabled = "ENABLED"
+
 var (
 	readTx = table.TxControl(
 		table.BeginTx(
@@ -93,8 +95,8 @@ func NewStorage(ctx context.Context, fw *framework.Framework) (framework.Workloa
 	xe.SetTableMapper(newMapper(fw.Config.Ref, fw.Config.Ref))
 	xe.SetLogLevel(log.LOG_DEBUG)
 	xe.Dialect().SetParams(map[string]string{
-		"AUTO_PARTITIONING_BY_SIZE":              "ENABLED",
-		"AUTO_PARTITIONING_BY_LOAD":              "ENABLED",
+		"AUTO_PARTITIONING_BY_SIZE":              autoPartitioningEnabled,
+		"AUTO_PARTITIONING_BY_LOAD":              autoPartitioningEnabled,
 		"AUTO_PARTITIONING_PARTITION_SIZE_MB":    strconv.FormatUint(uint64(params.PartitionSize), 10),
 		"AUTO_PARTITIONING_MIN_PARTITIONS_COUNT": strconv.FormatUint(uint64(params.MinPartitionCount), 10),
 		"AUTO_PARTITIONING_MAX_PARTITIONS_COUNT": strconv.FormatUint(uint64(params.MaxPartitionCount), 10),

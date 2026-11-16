@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
@@ -109,6 +110,15 @@ func parseConnectionString(dataSourceName string) (opts []Option, _ error) {
 			}
 		}
 	}
+	if defaultIdempotent := info.Params.Get("go_default_idempotent"); defaultIdempotent != "" {
+		idempotent, err := strconv.ParseBool(defaultIdempotent)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(fmt.Errorf(
+				"invalid go_default_idempotent: %s", defaultIdempotent,
+			))
+		}
+		opts = append(opts, withConnectorOptions(xsql.WithDefaultIdempotent(idempotent)))
+	}
 	if info.Params.Has("go_query_bind") {
 		var binders []xsql.Option
 		queryTransformers := strings.SplitSeq(info.Params.Get("go_query_bind"), ",")
@@ -137,6 +147,15 @@ func parseConnectionString(dataSourceName string) (opts []Option, _ error) {
 			}
 		}
 		opts = append(opts, withConnectorOptions(binders...))
+	}
+	if prefetchQueryResultParts := info.Params.Get("prefetch_query_result_parts"); prefetchQueryResultParts != "" {
+		parts, err := strconv.Atoi(prefetchQueryResultParts)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(fmt.Errorf(
+				"invalid prefetch_query_result_parts: %s", prefetchQueryResultParts,
+			))
+		}
+		opts = append(opts, withConnectorOptions(WithPrefetchQueryResultParts(parts)))
 	}
 
 	return opts, nil

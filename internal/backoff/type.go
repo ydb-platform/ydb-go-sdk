@@ -7,7 +7,7 @@ type Type uint8
 
 // Binary flags that used as Type
 const (
-	TypeNoBackoff Type = 1 << iota >> 1
+	TypeInstant Type = 1 << iota >> 1
 
 	TypeFast
 	TypeSlow
@@ -17,8 +17,8 @@ const (
 
 func (b Type) String() string {
 	switch b {
-	case TypeNoBackoff:
-		return "immediately"
+	case TypeInstant:
+		return "instant"
 	case TypeFast:
 		return "fast backoff"
 	case TypeSlow:

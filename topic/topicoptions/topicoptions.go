@@ -31,6 +31,26 @@ func (mode withMeteringMode) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
 	(*topictypes.MeteringMode)(&mode).ToRaw(&req.SetMeteringMode)
 }
 
+type withMetricsLevel uint32
+
+func (level withMetricsLevel) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
+	request.MetricsLevel.HasValue = true
+	request.MetricsLevel.Value = uint32(level)
+}
+
+func (level withMetricsLevel) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+	req.SetMetricsLevel.HasValue = true
+	req.SetMetricsLevel.Value = uint32(level)
+	req.ResetMetricsLevel = false
+}
+
+type withResetMetricsLevel struct{}
+
+func (withResetMetricsLevel) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
+	req.ResetMetricsLevel = true
+	req.SetMetricsLevel.HasValue = false
+}
+
 type withMinActivePartitions int64
 
 func (minActivePartitions withMinActivePartitions) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
@@ -45,12 +65,12 @@ func (minActivePartitions withMinActivePartitions) ApplyAlterOption(req *rawtopi
 type withPartitionCountLimit int64
 
 func (partitionCountLimit withPartitionCountLimit) ApplyCreateOption(request *rawtopic.CreateTopicRequest) {
-	request.PartitioningSettings.PartitionCountLimit = int64(partitionCountLimit)
+	request.PartitioningSettings.MaxActivePartitions = int64(partitionCountLimit)
 }
 
 func (partitionCountLimit withPartitionCountLimit) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
-	req.AlterPartitionSettings.SetPartitionCountLimit.HasValue = true
-	req.AlterPartitionSettings.SetPartitionCountLimit.Value = int64(partitionCountLimit)
+	req.AlterPartitionSettings.SetMaxActivePartitions.HasValue = true
+	req.AlterPartitionSettings.SetMaxActivePartitions.Value = int64(partitionCountLimit)
 }
 
 type withRetentionPeriod time.Duration
@@ -180,6 +200,7 @@ func (consumerCodecs withConsumerWithSupportedCodecs) ApplyAlterOption(req *rawt
 	req.AlterConsumers, index = ensureAlterConsumer(req.AlterConsumers, consumerCodecs.name)
 
 	consumer := &req.AlterConsumers[index]
+	consumer.NeedSetSupportedCodecs = true
 	consumer.SetSupportedCodecs = make(rawtopiccommon.SupportedCodecs, len(consumerCodecs.codecs))
 	for i, codec := range consumerCodecs.codecs {
 		consumer.SetSupportedCodecs[i] = rawtopiccommon.Codec(codec)

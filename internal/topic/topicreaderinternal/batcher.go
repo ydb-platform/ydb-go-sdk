@@ -14,7 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xslices"
 )
 
-var errBatcherPopConcurency = xerrors.Wrap(errors.New("ydb: batch pop concurency, internal state error"))
+var errBatcherPopConcurrency = xerrors.Wrap(errors.New("ydb: batch pop concurrency, internal state error"))
 
 type batcher struct {
 	popInFlight    atomic.Int64
@@ -180,7 +180,7 @@ func (b *batcher) Pop(ctx context.Context, opts batcherGetOptions) (_ batcherMes
 	defer b.popInFlight.Add(-1)
 
 	if counter != 1 {
-		return batcherMessageOrderItem{}, xerrors.WithStackTrace(errBatcherPopConcurency)
+		return batcherMessageOrderItem{}, xerrors.WithStackTrace(errBatcherPopConcurrency)
 	}
 
 	if err = ctx.Err(); err != nil {

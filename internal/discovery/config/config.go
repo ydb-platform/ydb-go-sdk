@@ -6,6 +6,7 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -130,9 +131,13 @@ func WithMeta(meta *meta.Meta) Option {
 }
 
 // WithTrace configures discovery client calls tracing
-func WithTrace(trace trace.Discovery, opts ...trace.DiscoveryComposeOption) Option {
+func WithTrace(t trace.Discovery) Option {
 	return func(c *Config) {
-		c.trace = c.trace.Compose(&trace, opts...)
+		var opts []gtrace.DiscoveryComposeOption
+		if cb := c.PanicCallback(); cb != nil {
+			opts = append(opts, gtrace.WithDiscoveryPanicCallback(cb))
+		}
+		c.trace = gtrace.Compose(c.trace, &t, opts...)
 	}
 }
 
@@ -140,7 +145,9 @@ func WithTrace(trace trace.Discovery, opts ...trace.DiscoveryComposeOption) Opti
 //
 // If Interval is zero then the DefaultInterval is used.
 //
-// If Interval is negative, then no background discovery prepared.
+// A negative interval disables background discovery. This is supported only by
+// a single-connection balancer; other policies require periodic discovery and
+// make driver initialization fail.
 func WithInterval(interval time.Duration) Option {
 	return func(c *Config) {
 		switch {

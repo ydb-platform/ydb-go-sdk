@@ -58,6 +58,13 @@ func TestConnector_Getters(t *testing.T) {
 		require.Nil(t, connector.RetryBudget())
 	})
 
+	t.Run("DefaultIdempotentGetter", func(t *testing.T) {
+		connector := &Connector{
+			defaultIdempotent: true,
+		}
+		require.True(t, connector.DefaultIdempotent())
+	})
+
 	t.Run("BindingsGetter", func(t *testing.T) {
 		connector := &Connector{
 			bindings: nil,

@@ -9,8 +9,9 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -23,7 +24,7 @@ type Config struct {
 	trace              *trace.Driver
 	dialTimeout        time.Duration
 	connectionTTL      time.Duration
-	balancerConfig     *balancerConfig.Config
+	balancerPolicy     policy.Policy
 	secure             bool
 	endpoint           string
 	database           string
@@ -35,7 +36,6 @@ type Config struct {
 	meta               *meta.Meta
 
 	excludeGRPCCodesForPessimization []grpcCodes.Code
-	disableOptimisticUnban           bool
 }
 
 func (c *Config) Credentials() credentials.Credentials {
@@ -47,8 +47,13 @@ func (c *Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 	return c.excludeGRPCCodesForPessimization
 }
 
+// DisableOptimisticUnban reports whether optimistic unban is disabled.
+//
+// Deprecated: Optimistic unban is now always disabled (this method always returns true).
+// Will be removed after Nov 2026.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (c *Config) DisableOptimisticUnban() bool {
-	return c.disableOptimisticUnban
+	return true
 }
 
 // GrpcDialOptions reports about used grpc dialing options
@@ -69,9 +74,9 @@ func (c *Config) Meta() *meta.Meta {
 	return c.meta
 }
 
-// ConnectionTTL defines interval for parking grpc connections.
+// ConnectionTTL defines the idle interval after which a gRPC connection is parked.
 //
-// If ConnectionTTL is zero - connections are not park.
+// If ConnectionTTL is zero, connections are not parked.
 func (c *Config) ConnectionTTL() time.Duration {
 	return c.connectionTTL
 }
@@ -109,10 +114,9 @@ func (c *Config) Trace() *trace.Driver {
 	return c.trace
 }
 
-// Balancer is an optional configuration related to selected balancer.
-// That is, some balancing methods allow to be configured.
-func (c *Config) Balancer() *balancerConfig.Config {
-	return c.balancerConfig
+// Balancer returns the configured endpoint-selection policy.
+func (c *Config) Balancer() policy.Policy {
+	return c.balancerPolicy
 }
 
 type Option func(c *Config)
@@ -163,9 +167,13 @@ func WithTLSConfig(tlsConfig *tls.Config) Option {
 	}
 }
 
-func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
+func WithTrace(t trace.Driver) Option { //nolint:gocritic
 	return func(c *Config) {
-		c.trace = c.trace.Compose(&t, opts...)
+		var opts []gtrace.DriverComposeOption
+		if cb := c.PanicCallback(); cb != nil {
+			opts = append(opts, gtrace.WithDriverPanicCallback(cb))
+		}
+		c.trace = gtrace.Compose(c.trace, &t, opts...)
 	}
 }
 
@@ -176,9 +184,9 @@ func WithRetryBudget(b budget.Budget) Option {
 	}
 }
 
-func WithTraceRetry(t *trace.Retry, opts ...trace.RetryComposeOption) Option {
+func WithTraceRetry(t *trace.Retry) Option {
 	return func(c *Config) {
-		config.SetTraceRetry(&c.Common, t, opts...)
+		config.SetTraceRetry(&c.Common, t)
 	}
 }
 
@@ -213,6 +221,7 @@ func WithUserAgent(userAgent string) Option {
 	}
 }
 
+// WithConnectionTTL configures the idle interval after which gRPC connections are parked.
 func WithConnectionTTL(ttl time.Duration) Option {
 	return func(c *Config) {
 		c.connectionTTL = ttl
@@ -282,9 +291,9 @@ func WithGrpcMaxMessageSize(sizeBytes int) Option {
 	}
 }
 
-func WithBalancer(balancer *balancerConfig.Config) Option {
+func WithBalancer(policy policy.Policy) Option {
 	return func(c *Config) {
-		c.balancerConfig = balancer
+		c.balancerPolicy = policy
 	}
 }
 
@@ -324,14 +333,12 @@ func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
 	}
 }
 
-// WithDisableOptimisticUnban disables optimistic unban of nodes after a successful call
-// immediately following pessimization.
+// WithDisableOptimisticUnban
 //
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+// Deprecated: will be removed after Nov 2026.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithDisableOptimisticUnban() Option {
-	return func(c *Config) {
-		c.disableOptimisticUnban = true
-	}
+	return func(c *Config) {}
 }
 
 func New(opts ...Option) *Config {

@@ -1,0 +1,79 @@
+# End-to-end OpenTelemetry playground for ydb-go-sdk.
+#
+# Brings up a local stack — YDB, OTel Collector, Tempo, Prometheus,
+# Grafana — plus a single Go demo program (the `app` service) built
+# from this directory's Dockerfile.
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: examples/opentelemetry/Dockerfile
+    environment:
+      YDB_DSN: "grpc://ydb:2136/local"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "otel-collector:4317"
+    depends_on:
+      ydb:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    restart: on-failure
+
+  ydb:
+    image: ydbplatform/local-ydb:trunk
+    platform: linux/amd64
+    # Official-style config override: the image ENTRYPOINT is `/initialize_local_ydb`,
+    # and we pass `--config-path` as arguments to it.
+    command: ["--config-path", "/ydb_config/ydb-config.yaml"]
+    environment:
+      YDB_DEFAULT_LOG_LEVEL: NOTICE
+      GRPC_TLS_PORT: "2135"
+      GRPC_PORT: "2136"
+      MON_PORT: "8765"
+      YDB_USE_IN_MEMORY_PDISKS: "true"
+    ports:
+      - "2135:2135"
+      - "2136:2136"
+      - "8765:8765"
+    volumes:
+      - ./ydb_config:/ydb_config:ro
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "9464:9464"
+      - "13133:13133"
+      - "55679:55679"
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on: [otel-collector]
+
+  tempo:
+    image: grafana/tempo:2.4.1
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml:ro
+    ports:
+      - "3200:3200"
+    depends_on: [otel-collector]
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus, tempo]

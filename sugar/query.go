@@ -2,7 +2,6 @@ package sugar
 
 import (
 	"context"
-	"errors"
 	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
@@ -32,7 +31,7 @@ func UnmarshalRows[T any](seq xiter.Seq2[query.Row, error], opts ...scanner.Scan
 			// The function caller for every pair row, errpr in seq iterator, then call yield for outer iterator
 			// for produce T, errpr pair for output
 
-			if errors.Is(err, io.EOF) {
+			if xerrors.Is(err, io.EOF) {
 				return false
 			}
 

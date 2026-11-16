@@ -4,12 +4,10 @@ import (
 	"context"
 	"database/sql/driver"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
 var (
@@ -19,10 +17,6 @@ var (
 
 	_ interface {
 		Engine() Engine
-	} = (*Conn)(nil)
-
-	_ interface {
-		LastUsage() time.Time
 	} = (*Conn)(nil)
 
 	_ interface {
@@ -96,25 +90,6 @@ func TestConn_Engine(t *testing.T) {
 			require.Equal(t, tt.expected, conn.Engine())
 		})
 	}
-}
-
-func TestConn_LastUsage(t *testing.T) {
-	conn := &Conn{
-		lastUsage: xsync.NewLastUsage(),
-	}
-
-	// Initially should be zero time
-	lastUsage := conn.LastUsage()
-	require.False(t, lastUsage.IsZero())
-
-	// Start and stop usage
-	done := conn.lastUsage.Start()
-	time.Sleep(10 * time.Millisecond)
-	done()
-
-	// Should have updated time
-	newLastUsage := conn.LastUsage()
-	require.True(t, newLastUsage.After(lastUsage) || newLastUsage.Equal(lastUsage))
 }
 
 func TestConn_normalizePath(t *testing.T) {
