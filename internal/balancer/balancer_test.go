@@ -265,7 +265,7 @@ func TestMaxConnectionsWithNodeIDSoftLimit(t *testing.T) {
 	require.Equal(t, state.Banned, pinned.State(), "a quarantined connection must not be revived either")
 }
 
-func TestWithNodeIDBypassesP2CAndCountsRPC(t *testing.T) {
+func TestWithNodeIDCountsRPC(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	entered := make(chan struct{})
