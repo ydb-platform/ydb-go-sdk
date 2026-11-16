@@ -11,12 +11,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"strconv"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
@@ -288,8 +287,12 @@ func fillTableWeather(ctx context.Context, db *ydb.Driver) error {
 		values = append(values, value)
 	}
 
-	return db.Table().BulkUpsert(ctx, path.Join(db.Name(), "weather"),
-		table.BulkUpsertDataRows(types.ListValue(values...)),
+	return db.Query().Exec(ctx,
+		"UPSERT INTO weather SELECT * FROM AS_TABLE($rows)",
+		query.WithParameters(ydb.ParamsBuilder().
+			Param("$rows").Any(types.ListValue(values...)).
+			Build()),
+		query.WithIdempotent(),
 	)
 }
 
