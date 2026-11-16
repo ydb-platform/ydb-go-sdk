@@ -88,11 +88,10 @@ func TestNilParameterIsLiteralNull(t *testing.T) {
 
 	yql, args, err := (AutoDeclare{}).ToYdb("SELECT $val", sql.Named("val", nil))
 	require.NoError(t, err)
-	require.Equal(t, "-- bind declares\nDECLARE $val AS Null;\n\nSELECT $val", yql)
+	require.Equal(t, "-- bind declares\n$val = NULL;\n\nSELECT $val", yql)
 	bound, err := Params(args...)
 	require.NoError(t, err)
-	require.Len(t, bound, 1)
-	require.IsType(t, &Ydb.Type_NullType{}, value.ToYDB(bound[0].Value()).GetType().GetType())
+	require.Empty(t, bound)
 }
 
 func TestToValue(t *testing.T) {

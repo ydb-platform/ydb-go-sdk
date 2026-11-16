@@ -1,4 +1,4 @@
-* Fixed `nil` value passed as a `database/sql` argument now produces `NullType` instead of `Void`, allowing it to be used with optional YDB columns
+* Fixed `nil` values passed as `database/sql` arguments with `WithAutoDeclare` to bind SQL `NULL`, allowing them to be used with optional YDB columns
 
 ## v3.157.0
 * Fixed topic writer recovery from stalled initialization with a one-minute default attempt timeout and `topicoptions.WithWriterConnectTimeout` to override or disable it; the default backoff reset threshold increases from one to ten minutes
