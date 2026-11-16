@@ -1,3 +1,5 @@
+* Fixed TopicListener callback ordering across partition sessions and cancellation of buffered reads after a forced partition stop
+
 ## v3.157.0
 * Fixed topic writer recovery from stalled initialization with a one-minute default attempt timeout and `topicoptions.WithWriterConnectTimeout` to override or disable it; the default backoff reset threshold increases from one to ten minutes
 

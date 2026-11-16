@@ -2,6 +2,7 @@ package topiclistenerinternal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
@@ -9,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -30,6 +32,7 @@ type ReadBufferReleaser interface {
 
 // unifiedMessage wraps messages that PartitionWorker can handle
 type unifiedMessage struct {
+	PartitionSession *topicreadercommon.PartitionSession
 	// Only one of these should be set
 	RawServerMessage *rawtopicreader.ServerMessage
 	BatchMessage     *batchMessage
@@ -57,7 +60,7 @@ func batchReadBufferSize(batch *topicreadercommon.PublicBatch) int {
 // WorkerStoppedCallback reports why a worker stopped or needs to stop.
 type WorkerStoppedCallback func(sessionID rawtopicreader.PartitionSessionID, reason error)
 
-// PartitionWorker processes messages for a single partition
+// PartitionWorker processes messages for one topic partition across partition sessions.
 type PartitionWorker struct {
 	partitionSessionID rawtopicreader.PartitionSessionID
 	partitionSession   *topicreadercommon.PartitionSession
@@ -123,6 +126,7 @@ func (w *PartitionWorker) Start(ctx context.Context) {
 	)
 
 	w.bgWorker = background.NewWorker(ctx, "partition worker")
+	context.AfterFunc(w.bgWorker.Context(), w.partitionSession.Close)
 	w.bgWorker.Start("partition worker message loop", func(bgCtx context.Context) {
 		w.receiveMessagesLoop(bgCtx)
 	})
@@ -153,8 +157,11 @@ func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) {
 }
 
 // AddRawServerMessage sends a raw server message
-func (w *PartitionWorker) AddRawServerMessage(msg rawtopicreader.ServerMessage) {
-	w.AddUnifiedMessage(unifiedMessage{RawServerMessage: &msg})
+func (w *PartitionWorker) AddRawServerMessage(
+	session *topicreadercommon.PartitionSession,
+	msg rawtopicreader.ServerMessage,
+) {
+	w.AddUnifiedMessage(unifiedMessage{PartitionSession: session, RawServerMessage: &msg})
 }
 
 // AddMessagesBatch sends a ready batch message
@@ -249,24 +256,49 @@ func (w *PartitionWorker) processUnifiedMessage(ctx context.Context, msg unified
 		return err
 	}
 
-	switch {
-	case msg.RawServerMessage != nil:
-		return w.processRawServerMessage(ctx, *msg.RawServerMessage)
-	case msg.BatchMessage != nil:
-		return w.processBatchMessage(ctx, msg.BatchMessage)
-	default:
-		// Ignore empty messages
+	session := msg.PartitionSession
+	if msg.BatchMessage != nil {
+		session = topicreadercommon.BatchGetPartitionSession(msg.BatchMessage.Batch)
+	}
+	if session == nil {
 		return nil
 	}
+	callbackCtx := xcontext.MergeContexts(session.Context(), ctx)
+
+	var err error
+	switch {
+	case msg.RawServerMessage != nil:
+		err = w.processRawServerMessage(callbackCtx, session, *msg.RawServerMessage)
+	case msg.BatchMessage != nil:
+		select {
+		case <-session.Context().Done():
+			w.freeBatchCredit(msg)
+
+			return nil
+		default:
+		}
+		err = w.processBatchMessage(callbackCtx, msg.BatchMessage)
+	}
+	// Revocation ends this session, not the partition worker or the stream.
+	if session.Context().Err() != nil && (errors.Is(err, context.Canceled) ||
+		errors.Is(err, topicreadercommon.ErrPublicCommitSessionToExpiredSession)) {
+		return nil
+	}
+
+	return err
 }
 
 // processRawServerMessage handles raw server messages (StartPartition, StopPartition)
-func (w *PartitionWorker) processRawServerMessage(ctx context.Context, msg rawtopicreader.ServerMessage) error {
+func (w *PartitionWorker) processRawServerMessage(
+	ctx context.Context,
+	session *topicreadercommon.PartitionSession,
+	msg rawtopicreader.ServerMessage,
+) error {
 	switch m := msg.(type) {
 	case *rawtopicreader.StartPartitionSessionRequest:
-		return w.handleStartPartitionRequest(ctx, m)
+		return w.handleStartPartitionRequest(ctx, session, m)
 	case *rawtopicreader.StopPartitionSessionRequest:
-		return w.handleStopPartitionRequest(ctx, m)
+		return w.handleStopPartitionRequest(ctx, session, m)
 	default:
 		// Ignore unknown raw message types (e.g., ReadResponse which is now handled via BatchMessage)
 		return nil
@@ -294,8 +326,9 @@ func (w *PartitionWorker) callUserHandler(
 	commitHandler CommitHandler,
 	messagesCount int,
 ) error {
+	session := topicreadercommon.BatchGetPartitionSession(msg.Batch)
 	event := NewPublicReadMessages(
-		w.partitionSession.ToPublic(),
+		session.ToPublic(),
 		msg.Batch,
 		commitHandler,
 	)
@@ -306,9 +339,9 @@ func (w *PartitionWorker) callUserHandler(
 		&ctx,
 		w.listenerID,
 		"", // sessionID - not available in worker context
-		int64(w.partitionSessionID),
-		w.partitionSession.PartitionID,
-		w.partitionSession.Topic,
+		int64(session.StreamPartitionSessionID),
+		session.PartitionID,
+		session.Topic,
 		"OnReadMessages",
 		messagesCount,
 	)
@@ -327,6 +360,7 @@ func (w *PartitionWorker) callUserHandler(
 
 // processBatchMessage handles ready PublicBatch messages
 func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMessage) error {
+	session := topicreadercommon.BatchGetPartitionSession(msg.Batch)
 	// Add tracing for batch processing
 	messagesCount := 0
 	if msg.Batch != nil {
@@ -338,9 +372,9 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 		&ctx,
 		w.listenerID,
 		"", // sessionID - not available in worker context
-		int64(w.partitionSessionID),
-		w.partitionSession.PartitionID,
-		w.partitionSession.Topic,
+		int64(session.StreamPartitionSessionID),
+		session.PartitionID,
+		session.Topic,
 		"BatchMessage",
 		messagesCount,
 	)
@@ -392,10 +426,11 @@ func (w *PartitionWorker) freeBatchCredit(msg unifiedMessage) {
 // handleStartPartitionRequest processes StartPartitionSessionRequest
 func (w *PartitionWorker) handleStartPartitionRequest(
 	ctx context.Context,
+	session *topicreadercommon.PartitionSession,
 	m *rawtopicreader.StartPartitionSessionRequest,
 ) error {
 	event := NewPublicStartPartitionSessionEvent(
-		w.partitionSession.ToPublic(),
+		session.ToPublic(),
 		m.CommittedOffset.ToInt64(),
 		PublicOffsetsRange{
 			Start: m.PartitionOffsets.Start.ToInt64(),
@@ -415,6 +450,9 @@ func (w *PartitionWorker) handleStartPartitionRequest(
 		return ctx.Err()
 	case <-event.confirm.Done():
 		userResp, _ = event.confirm.Get()
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	// Build response
@@ -439,16 +477,20 @@ func (w *PartitionWorker) handleStartPartitionRequest(
 // handleStopPartitionRequest processes StopPartitionSessionRequest
 func (w *PartitionWorker) handleStopPartitionRequest(
 	ctx context.Context,
+	session *topicreadercommon.PartitionSession,
 	m *rawtopicreader.StopPartitionSessionRequest,
 ) error {
 	event := NewPublicStopPartitionSessionEvent(
-		w.partitionSession.ToPublic(),
+		session.ToPublic(),
 		m.Graceful,
 		m.CommittedOffset.ToInt64(),
 	)
 
 	if err := w.userHandler.OnStopPartitionSessionRequest(ctx, event); err != nil {
 		return xerrors.WithStackTrace(err)
+	}
+	if !m.Graceful {
+		return nil
 	}
 
 	// Wait for user confirmation
@@ -458,19 +500,19 @@ func (w *PartitionWorker) handleStopPartitionRequest(
 	case <-event.confirm.Done():
 		// pass
 	}
-
-	// Only send response if graceful
-	if m.Graceful {
-		if err := w.messageSender.flushCommits(); err != nil {
-			return xerrors.WithStackTrace(fmt.Errorf(
-				"ydb: failed to flush commits before stopping partition session: %w", err,
-			))
-		}
-		resp := &rawtopicreader.StopPartitionSessionResponse{
-			PartitionSessionID: w.partitionSession.StreamPartitionSessionID,
-		}
-		w.messageSender.SendRaw(resp)
+	if err := ctx.Err(); err != nil {
+		return err
 	}
+
+	if err := w.messageSender.flushCommits(); err != nil {
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"ydb: failed to flush commits before stopping partition session: %w", err,
+		))
+	}
+	session.Close()
+	w.messageSender.SendRaw(&rawtopicreader.StopPartitionSessionResponse{
+		PartitionSessionID: session.StreamPartitionSessionID,
+	})
 
 	return nil
 }

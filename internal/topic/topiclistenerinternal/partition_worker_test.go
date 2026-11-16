@@ -237,17 +237,15 @@ func createTestStopPartitionRequest(graceful bool) *rawtopicreader.StopPartition
 	}
 }
 
-func createTestBatch() *topicreadercommon.PublicBatch {
-	// Create a minimal test batch with correct PublicMessage fields
-	return &topicreadercommon.PublicBatch{
-		Messages: []*topicreadercommon.PublicMessage{
-			{
-				// Use the correct unexported field name for test purposes
-				UncompressedSize: 12,
-				Offset:           100, // Use int64 directly
-			},
-		},
-	}
+func createTestBatch(t *testing.T, session *topicreadercommon.PartitionSession) *topicreadercommon.PublicBatch {
+	t.Helper()
+
+	batch, err := topicreadercommon.NewBatch(session, []*topicreadercommon.PublicMessage{
+		{UncompressedSize: 12, Offset: 100},
+	})
+	require.NoError(t, err)
+
+	return batch
 }
 
 // createTestBatchWithBufferBytes returns a batch whose single message occupies size bytes in the read buffer.
@@ -372,7 +370,7 @@ func TestPartitionWorkerInterface_StartPartitionSessionFlow(t *testing.T) {
 
 	// Send start partition request
 	startReq := createTestStartPartitionRequest()
-	worker.AddRawServerMessage(startReq)
+	worker.AddRawServerMessage(worker.partitionSession, startReq)
 
 	// Signal that confirmation can proceed
 	close(confirmReady)
@@ -443,7 +441,7 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 
 		// Send graceful stop request
 		stopReq := createTestStopPartitionRequest(true)
-		worker.AddRawServerMessage(stopReq)
+		worker.AddRawServerMessage(worker.partitionSession, stopReq)
 
 		// Signal that confirmation can proceed
 		close(confirmReady)
@@ -514,7 +512,7 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 
 		// Send non-graceful stop request
 		stopReq := createTestStopPartitionRequest(false)
-		worker.AddRawServerMessage(stopReq)
+		worker.AddRawServerMessage(worker.partitionSession, stopReq)
 
 		// Signal that confirmation can proceed
 		close(confirmReady)
@@ -558,11 +556,13 @@ func TestPartitionWorkerFlushesConfirmedBatchBeforeGracefulStop(t *testing.T) {
 
 	require.NoError(t, worker.processUnifiedMessage(ctx, unifiedMessage{BatchMessage: &batchMessage{
 		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
-		Batch:                 createTestBatch(),
+		Batch:                 createTestBatch(t, worker.partitionSession),
 	}}))
 	require.Empty(t, sender.order, "Confirm must remain asynchronous until a flush boundary")
 	stopRequest := rawtopicreader.ServerMessage(createTestStopPartitionRequest(true))
-	require.NoError(t, worker.processUnifiedMessage(ctx, unifiedMessage{RawServerMessage: &stopRequest}))
+	require.NoError(t, worker.processUnifiedMessage(ctx, unifiedMessage{
+		PartitionSession: worker.partitionSession, RawServerMessage: &stopRequest,
+	}))
 	require.Equal(t, []string{"commit", "stop"}, sender.order)
 }
 
@@ -611,11 +611,8 @@ func TestPartitionWorkerInterface_BatchMessageFlow(t *testing.T) {
 	}()
 
 	// Create a test batch and send it via BatchMessage
-	testBatch := &topicreadercommon.PublicBatch{
-		Messages: []*topicreadercommon.PublicMessage{
-			// Add test messages if needed
-		},
-	}
+	testBatch, err := topicreadercommon.NewBatch(session, nil)
+	require.NoError(t, err)
 
 	metadata := rawtopiccommon.ServerMessageMetadata{
 		Status: rawydb.StatusSuccess,
@@ -627,7 +624,7 @@ func TestPartitionWorkerInterface_BatchMessageFlow(t *testing.T) {
 	xtest.WaitChannelClosed(t, processingDone)
 
 	// Wait for buffer release after batch processing
-	err := messageSender.waitForMessage(ctx)
+	err = messageSender.waitForMessage(ctx)
 	require.NoError(t, err)
 
 	require.Nil(t, stoppedErr)
@@ -680,7 +677,7 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 	}()
 
 	// Create a test batch
-	batch := createTestBatch()
+	batch := createTestBatch(t, worker.partitionSession)
 	metadata := rawtopiccommon.ServerMessageMetadata{
 		Status: rawydb.StatusSuccess,
 	}
@@ -773,8 +770,8 @@ func TestPartitionWorkerInterface_CloseFreesQueuedBatchCredits(t *testing.T) {
 		Issues: rawydb.Issues{{Message: "different metadata to prevent queue merge"}},
 	}
 
-	worker.AddMessagesBatch(metadata1, createTestBatch())
-	worker.AddMessagesBatch(metadata2, createTestBatch())
+	worker.AddMessagesBatch(metadata1, createTestBatch(t, worker.partitionSession))
+	worker.AddMessagesBatch(metadata2, createTestBatch(t, worker.partitionSession))
 
 	require.NoError(t, worker.Close(ctx, nil))
 	require.Len(t, messageSender.GetFreedBuffer(), 2)
@@ -907,7 +904,7 @@ func TestPartitionWorkerInterface_RawMessageAfterCloseDoesNotReleaseBuffer(t *te
 	)
 
 	require.NoError(t, worker.Close(ctx, nil))
-	worker.AddRawServerMessage(&rawtopicreader.StartPartitionSessionRequest{})
+	worker.AddRawServerMessage(worker.partitionSession, &rawtopicreader.StartPartitionSessionRequest{})
 
 	require.Empty(t, messageSender.GetFreedBuffer())
 }
@@ -944,7 +941,7 @@ func TestPartitionWorkerInterface_BadBatchMetadataFreesBuffer(t *testing.T) {
 		require.NoError(t, worker.Close(ctx, nil))
 	}()
 
-	batch := createTestBatch()
+	batch := createTestBatch(t, worker.partitionSession)
 	worker.AddMessagesBatch(rawtopiccommon.ServerMessageMetadata{
 		Status: rawydb.StatusInternalError,
 	}, batch)
@@ -1084,7 +1081,7 @@ func TestPartitionWorkerImpl_ContextCancellationWithQueuedBatch(t *testing.T) {
 	)
 	worker.AddMessagesBatch(
 		rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
-		createTestBatch(),
+		createTestBatch(t, worker.partitionSession),
 	)
 
 	cancel()
@@ -1138,7 +1135,7 @@ func TestPartitionWorkerImpl_PanicRecovery(t *testing.T) {
 
 	// Send start partition request that will cause panic
 	startReq := createTestStartPartitionRequest()
-	worker.AddRawServerMessage(startReq)
+	worker.AddRawServerMessage(worker.partitionSession, startReq)
 
 	// Wait for error handling using channel instead of Eventually
 	xtest.WaitChannelClosed(t, errorReceived)
