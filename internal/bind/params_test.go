@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -76,6 +77,24 @@ func (j *testJSONMarshaler) Scan(src any) error {
 	return nil
 }
 
+func TestNilParameterIsLiteralNull(t *testing.T) {
+	for _, arg := range []any{nil, testValuer{}} {
+		v, err := toValue(arg)
+		require.NoError(t, err)
+		pb := value.ToYDB(v)
+		require.IsType(t, &Ydb.Type_NullType{}, pb.GetType().GetType())
+		require.IsType(t, &Ydb.Value_NullFlagValue{}, pb.GetValue().GetValue())
+	}
+
+	yql, args, err := (AutoDeclare{}).ToYdb("SELECT $val", sql.Named("val", nil))
+	require.NoError(t, err)
+	require.Equal(t, "-- bind declares\nDECLARE $val AS Null;\n\nSELECT $val", yql)
+	bound, err := Params(args...)
+	require.NoError(t, err)
+	require.Len(t, bound, 1)
+	require.IsType(t, &Ydb.Type_NullType{}, value.ToYDB(bound[0].Value()).GetType().GetType())
+}
+
 func TestToValue(t *testing.T) {
 	for _, tt := range []struct {
 		name string
@@ -92,7 +111,7 @@ func TestToValue(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			src:  nil,
-			dst:  value.NullValue(types.Null{}),
+			dst:  value.LiteralNullValue(),
 			err:  nil,
 		},
 		{
