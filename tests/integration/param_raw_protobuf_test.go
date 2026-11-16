@@ -1,5 +1,4 @@
 //go:build integration
-// +build integration
 
 package integration
 
@@ -61,7 +60,7 @@ func TestRawProtobuf(t *testing.T) {
 			},
 		} {
 			t.Run(tt.name, func(t *testing.T) {
-				row, err := db.Query().QueryRow(scope.Ctx, "SELECT $raw;",
+				row, err := db.Query().QueryRow(scope.Ctx, "DECLARE $raw AS Uint64; SELECT $raw;",
 					query.WithParameters(ydb.ParamsBuilder().Param("$raw").FromProtobuf(raw).Build()),
 				)
 				require.NoError(t, err)
@@ -76,7 +75,7 @@ func TestRawProtobuf(t *testing.T) {
 			name string
 			arg  any
 		}{
-			{name: "TypedValue", arg: Ydb.TypedValue{Type: raw.Type, Value: raw.Value}},
+			{name: "TypedValue", arg: Ydb.TypedValue{Type: raw.GetType(), Value: raw.GetValue()}},
 			{name: "TypedValuePointer", arg: raw},
 		} {
 			t.Run(tt.name, func(t *testing.T) {
