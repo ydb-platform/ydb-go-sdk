@@ -7,7 +7,6 @@ import (
 )
 
 var (
-	errNilPool   = xerrors.Wrap(errors.New("table client required session pool"))
 	errNilClient = xerrors.Wrap(errors.New("table client is not initialized"))
 
 	// errClosedClient returned by a Client instance to indicate

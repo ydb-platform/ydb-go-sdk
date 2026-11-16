@@ -16,5 +16,9 @@ func (d *Driver) SessionPoolStats() (SessionPoolStats, error) {
 		return pool.Stats{}, err
 	}
 
+	if shared == nil {
+		return pool.Stats{}, nil
+	}
+
 	return shared.Stats(), nil
 }

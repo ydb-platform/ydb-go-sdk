@@ -1744,15 +1744,13 @@ func onResultClose(t *trace.Query, q trace.QueryResultCloseStartInfo) func(info 
 	return res
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnNew(t *trace.Query, c *context.Context, c1 trace.Call) func(limit int, _ error) {
+func QueryOnNew(t *trace.Query, c *context.Context, c1 trace.Call) func() {
 	var p trace.QueryNewStartInfo
 	p.Context = c
 	p.Call = c1
 	res := onNew(t, p)
-	return func(limit int, e error) {
+	return func() {
 		var p trace.QueryNewDoneInfo
-		p.Limit = limit
-		p.Error = e
 		res(p)
 	}
 }

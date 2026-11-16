@@ -599,9 +599,9 @@ func WithQueryConfigOption(option queryConfig.Option) Option {
 // If sizeLimit is less than or equal to zero then the default pool size limit is used.
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, d *Driver) error {
-		if sizeLimit > 0 {
-			d.sessionPoolConfig.limit = sizeLimit
-		}
+		d.tableOptions = append(d.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithPoolLimit(sizeLimit))
+		d.sessionPoolConfig.limit = sizeLimit
 
 		return nil
 	}
@@ -612,6 +612,8 @@ func WithSessionPoolSizeLimit(sizeLimit int) Option {
 // - if argument type is time.Duration - WithSessionPoolSessionUsageLimit limits max time to live of pool session
 func WithSessionPoolSessionUsageLimit[T interface{ uint64 | time.Duration }](limit T) Option {
 	return func(ctx context.Context, d *Driver) error {
+		d.tableOptions = append(d.tableOptions, tableConfig.WithSessionPoolSessionUsageLimit(limit))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionPoolSessionUsageLimit(limit))
 		switch v := any(limit).(type) {
 		case uint64:
 			d.sessionPoolConfig.itemUsageLimit = v
@@ -640,10 +642,8 @@ func WithLazyTx(lazyTx bool) Option {
 // WithSessionPoolIdleThreshold defines interval for idle sessions in the driver session pool.
 func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error {
-		if idleThreshold < 0 {
-			idleThreshold = 0
-		}
-		d.sessionPoolConfig.idleTTL = idleThreshold
+		d.tableOptions = append(d.tableOptions, tableConfig.WithIdleThreshold(idleThreshold))
+		d.sessionPoolConfig.idleTTL = max(idleThreshold, 0)
 		d.databaseSQLOptions = append(d.databaseSQLOptions,
 			xsql.WithIdleThreshold(idleThreshold),
 		)
@@ -668,9 +668,8 @@ func WithExecuteDataQueryOverQueryClient(b bool) Option {
 // If idleTimeToLive is less than or equal to zero then sessions will not be closed by idle
 func WithSessionPoolSessionIdleTimeToLive(idleThreshold time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error {
-		if idleThreshold > 0 {
-			d.sessionPoolConfig.idleTTL = idleThreshold
-		}
+		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionIdleTimeToLive(idleThreshold))
+		d.sessionPoolConfig.idleTTL = max(idleThreshold, 0)
 
 		return nil
 	}
@@ -679,9 +678,9 @@ func WithSessionPoolSessionIdleTimeToLive(idleThreshold time.Duration) Option {
 // WithSessionPoolCreateSessionTimeout set timeout for new session creation in the driver session pool
 func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error {
-		if createSessionTimeout > 0 {
-			d.sessionPoolConfig.createTimeout = createSessionTimeout
-		}
+		d.tableOptions = append(d.tableOptions, tableConfig.WithCreateSessionTimeout(createSessionTimeout))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionCreateTimeout(createSessionTimeout))
+		d.sessionPoolConfig.createTimeout = max(createSessionTimeout, 0)
 
 		return nil
 	}
@@ -690,9 +689,9 @@ func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Opt
 // WithSessionPoolDeleteTimeout set timeout to gracefully close deleting session in the driver session pool
 func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(ctx context.Context, d *Driver) error {
-		if deleteTimeout > 0 {
-			d.sessionPoolConfig.deleteTimeout = deleteTimeout
-		}
+		d.tableOptions = append(d.tableOptions, tableConfig.WithDeleteTimeout(deleteTimeout))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionDeleteTimeout(deleteTimeout))
+		d.sessionPoolConfig.deleteTimeout = max(deleteTimeout, 0)
 
 		return nil
 	}
@@ -702,9 +701,9 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 // If warmUpSessions is less than or equal to zero, pool warm-up is disabled.
 func WithSessionPoolWarmUpSessions(warmUpSessions int) Option {
 	return func(ctx context.Context, d *Driver) error {
-		if warmUpSessions > 0 {
-			d.sessionPoolConfig.warmUp = warmUpSessions
-		}
+		d.tableOptions = append(d.tableOptions, tableConfig.WithSessionPoolWarmUpSessions(warmUpSessions))
+		d.queryOptions = append(d.queryOptions, queryConfig.WithSessionPoolWarmUpSessions(warmUpSessions))
+		d.sessionPoolConfig.warmUp = max(warmUpSessions, 0)
 
 		return nil
 	}

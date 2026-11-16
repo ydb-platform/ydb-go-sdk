@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
@@ -216,27 +217,8 @@ func (c *Client) Close(ctx context.Context) error {
 		return xerrors.WithStackTrace(errNilClient)
 	}
 
-	var cancels []context.CancelFunc
-	c.closed.Change(func(old *closeState) *closeState {
-		if old.closed {
-			return old
-		}
-
-		old.closed = true
-		cancels = make([]context.CancelFunc, 0, len(old.cancels))
-		for _, cancel := range old.cancels {
-			cancels = append(cancels, cancel)
-		}
-		old.cancels = nil
-
-		return old
-	})
-	if cancels == nil {
+	if !cancelCloseContexts(c.closed) {
 		return nil
-	}
-
-	for _, cancel := range cancels {
-		cancel()
 	}
 
 	if err := c.explicitSessionPool.Close(ctx); err != nil {
@@ -289,8 +271,43 @@ func (c *Client) enter(ctx context.Context) (context.Context, context.CancelFunc
 }
 
 func (c *Client) registerCloseCancel(cancel context.CancelFunc) func() {
+	return registerCloseCancel(c.closed, cancel)
+}
+
+func (c *Client) unregisterCloseCancel(id uint64) {
+	unregisterCloseCancel(c.closed, id)
+}
+
+func cancelCloseContexts(state *xsync.Value[*closeState]) bool {
+	var cancels []context.CancelFunc
+	state.Change(func(old *closeState) *closeState {
+		if old.closed {
+			return old
+		}
+
+		old.closed = true
+		cancels = make([]context.CancelFunc, 0, len(old.cancels))
+		for _, cancel := range old.cancels {
+			cancels = append(cancels, cancel)
+		}
+		old.cancels = nil
+
+		return old
+	})
+	if cancels == nil {
+		return false
+	}
+
+	for _, cancel := range cancels {
+		cancel()
+	}
+
+	return true
+}
+
+func registerCloseCancel(state *xsync.Value[*closeState], cancel context.CancelFunc) func() {
 	var id uint64
-	c.closed.Change(func(old *closeState) *closeState {
+	state.Change(func(old *closeState) *closeState {
 		if old.closed {
 			return old
 		}
@@ -310,12 +327,12 @@ func (c *Client) registerCloseCancel(cancel context.CancelFunc) func() {
 	}
 
 	return func() {
-		c.unregisterCloseCancel(id)
+		unregisterCloseCancel(state, id)
 	}
 }
 
-func (c *Client) unregisterCloseCancel(id uint64) {
-	c.closed.Change(func(old *closeState) *closeState {
+func unregisterCloseCancel(state *xsync.Value[*closeState], id uint64) {
+	state.Change(func(old *closeState) *closeState {
 		delete(old.cancels, id)
 
 		return old
@@ -809,34 +826,31 @@ func CreateSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 	return s, nil
 }
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config, opts ...NewClientOption) (
-	_ *Client, finalErr error,
-) {
-	var clientOpts newClientOptions
-	for _, opt := range opts {
-		if opt != nil {
-			opt(&clientOpts)
-		}
-	}
-
+func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config,
+	opts ...NewClientOption,
+) (*Client, error) {
 	onDone := gtrace.QueryOnNew(cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/query.New"),
 	)
-	defer func() {
-		onDone(cfg.PoolLimit(), finalErr)
-	}()
+	defer onDone()
 
 	client := Ydb_Query_V1.NewQueryServiceClient(cc)
 
-	return newWithQueryServiceClient(ctx, client, cc, cfg, clientOpts)
+	return newWithQueryServiceClient(ctx, client, cc, cfg, opts...)
 }
 
 func newWithQueryServiceClient(ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
 	cc grpc.ClientConnInterface,
 	cfg *config.Config,
-	clientOpts newClientOptions,
-) (_ *Client, err error) {
+	opts ...NewClientOption,
+) (*Client, error) {
+	var clientOpts newClientOptions
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&clientOpts)
+		}
+	}
 	c := &Client{
 		config: cfg,
 		client: client,
@@ -844,14 +858,14 @@ func newWithQueryServiceClient(ctx context.Context,
 			cancels: make(map[uint64]context.CancelFunc),
 		}),
 	}
-
-	if clientOpts.sessionPool == nil {
-		return nil, xerrors.WithStackTrace(errNilPool)
-	}
-
-	c.explicitSessionPool = &sessionPoolAdapter{
-		shared: clientOpts.sessionPool,
-		cfg:    cfg,
+	if clientOpts.sessionPool != nil {
+		c.explicitSessionPool = &sessionPoolAdapter{shared: clientOpts.sessionPool, cfg: cfg}
+	} else {
+		explicitSessionPool, err := newExplicitSessionPool(ctx, client, cc, cfg, c.registerCloseCancel)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		c.explicitSessionPool = explicitSessionPool
 	}
 
 	implicitSessionPool, err := createImplicitSessionPool(ctx, cfg, client, cc)
@@ -864,6 +878,45 @@ func newWithQueryServiceClient(ctx context.Context,
 	c.implicitSessionPool = implicitSessionPool
 
 	return c, nil
+}
+
+func newExplicitSessionPool(ctx context.Context,
+	client Ydb_Query_V1.QueryServiceClient,
+	cc grpc.ClientConnInterface,
+	cfg *config.Config,
+	registerCloseCancel func(context.CancelFunc) func(),
+) (*pool.Pool[*Session, Session], error) {
+	return pool.New(ctx,
+		pool.WithLimit[*Session](cfg.PoolLimit()),
+		pool.WithWarmUpItems[*Session](cfg.PoolWarmUpSize()),
+		pool.WithItemUsageLimit[*Session](cfg.PoolSessionUsageLimit()),
+		pool.WithItemUsageTTL[*Session](cfg.PoolSessionUsageTTL()),
+		pool.WithTrace[*Session](poolTrace(cfg.Trace(), cfg.PoolName())),
+		pool.WithCreateItemTimeout[*Session](cfg.SessionCreateTimeout()),
+		pool.WithCloseItemTimeout[*Session](cfg.SessionDeleteTimeout()),
+		pool.WithIdleTimeToLive[*Session](cfg.SessionIdleTimeToLive()),
+		pool.WithCreateItemFunc(func(ctx context.Context) (_ *Session, err error) {
+			if !cfg.DisableSessionBalancer() {
+				ctx = meta.WithAllowFeatures(ctx, meta.HintSessionBalancer)
+			}
+
+			s, err := createSession(ctx, client,
+				WithConn(cc),
+				WithDeleteTimeout(cfg.SessionDeleteTimeout()),
+				WithPoolName(cfg.PoolName()),
+				WithRegisterCloseCancel(registerCloseCancel),
+				WithTrace(cfg.Trace()),
+			)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+
+			s.lazyTx = cfg.LazyTx()
+			s.defaultArrowDecoder = cfg.DefaultArrowDecoder()
+
+			return s, nil
+		}),
+	)
 }
 
 func poolTrace(t *trace.Query, poolName string) *pool.Trace[*Session, Session] {

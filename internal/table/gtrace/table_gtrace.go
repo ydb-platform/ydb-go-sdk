@@ -1217,15 +1217,14 @@ func onPoolStateChange(t *trace.Table, t1 trace.TablePoolStateChangeInfo) {
 	fn(t1)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TableOnInit(t *trace.Table, c *context.Context, c1 trace.Call) func(limit int, _ error) {
+func TableOnInit(t *trace.Table, c *context.Context, c1 trace.Call) func(limit int) {
 	var p trace.TableInitStartInfo
 	p.Context = c
 	p.Call = c1
 	res := onInit(t, p)
-	return func(limit int, e error) {
+	return func(limit int) {
 		var p trace.TableInitDoneInfo
 		p.Limit = limit
-		p.Error = e
 		res(p)
 	}
 }

@@ -4,61 +4,71 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
-	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	queryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	tableTrace "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type driverSessionPoolConfig struct {
-	limit           int
-	warmUp          int
-	itemUsageLimit  uint64
-	itemUsageTTL    time.Duration
-	idleTTL         time.Duration
-	createTimeout   time.Duration
-	deleteTimeout   time.Duration
-	disableBalancer bool
+	limit          int
+	warmUp         int
+	itemUsageLimit uint64
+	itemUsageTTL   time.Duration
+	idleTTL        time.Duration
+	createTimeout  time.Duration
+	deleteTimeout  time.Duration
 }
 
 func defaultDriverSessionPoolConfig() driverSessionPoolConfig {
 	return driverSessionPoolConfig{
-		limit: pool.DefaultLimit,
+		limit:         pool.DefaultLimit,
+		idleTTL:       tableConfig.DefaultSessionPoolIdleThreshold,
+		createTimeout: queryConfig.DefaultSessionCreateTimeout,
+		deleteTimeout: queryConfig.DefaultSessionDeleteTimeout,
 	}
 }
 
-func (d *Driver) sharedSessionPoolSettings(queryTrace *trace.Query) internalQuery.SharedSessionPoolConfig {
+func (d *Driver) sharedSessionPoolSettings(queryCfg *queryConfig.Config) *queryConfig.Config {
 	cfg := d.sessionPoolConfig
+	tableCfg := tableConfig.New(append([]tableConfig.Option{tableConfig.With(d.config.Common)}, d.tableOptions...)...)
 
-	limit := cfg.limit
-	if limit <= 0 {
-		limit = pool.DefaultLimit
-	}
+	return queryConfig.New(
+		queryConfig.With(queryCfg.Common),
+		queryConfig.WithPoolLimit(cfg.limit),
+		queryConfig.WithSessionPoolWarmUpSessions(cfg.warmUp),
+		queryConfig.WithSessionPoolSessionUsageLimit(cfg.itemUsageLimit),
+		queryConfig.WithSessionPoolSessionUsageLimit(cfg.itemUsageTTL),
+		queryConfig.WithSessionIdleTimeToLive(cfg.idleTTL),
+		queryConfig.WithSessionCreateTimeout(cfg.createTimeout),
+		queryConfig.WithSessionDeleteTimeout(cfg.deleteTimeout),
+		queryConfig.WithPoolName(queryCfg.PoolName()),
+		queryConfig.WithTrace(queryCfg.Trace()),
+		queryConfig.WithTrace(sharedTablePoolTrace(tableCfg.Trace())),
+	)
+}
 
-	createTimeout := cfg.createTimeout
-	if createTimeout <= 0 {
-		createTimeout = queryConfig.DefaultSessionCreateTimeout
-	}
+func sharedTablePoolTrace(t *trace.Table) *trace.Query {
+	return &trace.Query{
+		OnPoolGet: func(info trace.QueryPoolGetStartInfo) func(trace.QueryPoolGetDoneInfo) {
+			done := tableTrace.TableOnPoolGet(t, info.Context, info.Call)
 
-	deleteTimeout := cfg.deleteTimeout
-	if deleteTimeout <= 0 {
-		deleteTimeout = queryConfig.DefaultSessionDeleteTimeout
-	}
+			return func(info trace.QueryPoolGetDoneInfo) {
+				done(info.Session, info.Attempts, info.NodeHintInfo, info.Error)
+			}
+		},
+		OnPoolPut: func(info trace.QueryPoolPutStartInfo) func(trace.QueryPoolPutDoneInfo) {
+			done := tableTrace.TableOnPoolPut(t, info.Context, info.Call, info.Session)
 
-	idleTTL := cfg.idleTTL
-	if idleTTL <= 0 {
-		idleTTL = tableConfig.DefaultSessionPoolIdleThreshold
-	}
+			return func(info trace.QueryPoolPutDoneInfo) { done(info.Error) }
+		},
+		OnPoolWith: func(info trace.QueryPoolWithStartInfo) func(trace.QueryPoolWithDoneInfo) {
+			done := tableTrace.TableOnPoolWith(t, info.Context, info.Call)
 
-	return internalQuery.SharedSessionPoolConfig{
-		Limit:                  limit,
-		WarmUp:                 cfg.warmUp,
-		ItemUsageLimit:         cfg.itemUsageLimit,
-		ItemUsageTTL:           cfg.itemUsageTTL,
-		IdleTTL:                idleTTL,
-		SessionCreateTimeout:   createTimeout,
-		SessionDeleteTimeout:   deleteTimeout,
-		DisableSessionBalancer: cfg.disableBalancer,
-		Trace:                  queryTrace,
+			return func(info trace.QueryPoolWithDoneInfo) { done(info.Attempts, info.Error) }
+		},
+		OnPoolChange: func(info trace.QueryPoolChange) {
+			tableTrace.TableOnPoolStateChange(t, info.Limit, info.Idle, info.CreateInProgress, info.Concurrency, info.Size)
+		},
 	}
 }

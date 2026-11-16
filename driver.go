@@ -502,6 +502,7 @@ func (d *Driver) connect(ctx context.Context) error {
 			append(
 				[]queryConfig.Option{
 					queryConfig.With(d.config.Common),
+					queryConfig.WithPoolName(d.Name()),
 				},
 				d.queryOptions...,
 			)...,
@@ -510,7 +511,7 @@ func (d *Driver) connect(ctx context.Context) error {
 		return internalQuery.NewSharedSessionPool(
 			xcontext.ValueOnly(ctx),
 			d.metaBalancer,
-			d.sharedSessionPoolSettings(queryCfg.Trace()),
+			d.sharedSessionPoolSettings(queryCfg),
 		)
 	})
 
