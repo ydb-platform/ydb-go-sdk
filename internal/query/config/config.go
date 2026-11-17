@@ -64,6 +64,7 @@ func defaults() *Config {
 		sessionCreateTimeout: DefaultSessionCreateTimeout,
 		sessionDeleteTimeout: DefaultSessionDeleteTimeout,
 		trace:                &trace.Query{},
+		protoWireDecoding:    true,
 	}
 }
 

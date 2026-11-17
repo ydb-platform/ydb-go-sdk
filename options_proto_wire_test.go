@@ -14,12 +14,17 @@ func TestWithQueryProtoWireDecoding(t *testing.T) {
 		opts []Option
 		want bool
 	}{
-		{name: "default"},
+		{name: "default", want: true},
 		{name: "enabled", opts: []Option{WithQueryProtoWireDecoding(true)}, want: true},
 		{name: "disabled", opts: []Option{WithQueryProtoWireDecoding(false)}},
 		{
 			name: "last option wins",
 			opts: []Option{WithQueryProtoWireDecoding(true), WithQueryProtoWireDecoding(false)},
+		},
+		{
+			name: "last option enables",
+			opts: []Option{WithQueryProtoWireDecoding(false), WithQueryProtoWireDecoding(true)},
+			want: true,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

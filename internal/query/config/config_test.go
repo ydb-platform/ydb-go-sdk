@@ -27,6 +27,7 @@ func TestNew(t *testing.T) {
 		require.Equal(t, time.Duration(0), cfg.SessionIdleTimeToLive())
 		require.False(t, cfg.LazyTx())
 		require.False(t, cfg.DefaultIdempotent())
+		require.True(t, cfg.ProtoWireDecoding())
 		require.Equal(t, 0, cfg.PoolWarmUpSize())
 	})
 
