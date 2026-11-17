@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"slo/internal/framework"
 	"slo/internal/generator"
 	"slo/internal/kv"
+	"slo/internal/querywire"
 )
 
 const writeQuery = `
@@ -66,7 +68,10 @@ type db struct {
 }
 
 func NewStorage(ctx context.Context, fw *framework.Framework) (framework.Workload, error) {
-	params := kv.ParseParams(fw, "native-query", nil)
+	var protoWireDecoding *bool
+	params := kv.ParseParams(fw, "native-query", func(fs *flag.FlagSet) {
+		protoWireDecoding = querywire.RegisterFlag(fs)
+	})
 
 	connectCtx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:mnd
 	defer cancel()
@@ -75,6 +80,7 @@ func NewStorage(ctx context.Context, fw *framework.Framework) (framework.Workloa
 		fw.Config.Endpoint+fw.Config.Database,
 		ydb.WithRetryBudget(params.RetryBudget),
 		ydb.WithSessionPoolSizeLimit(params.PoolSize()),
+		querywire.Option(*protoWireDecoding),
 	)
 	if err != nil {
 		return nil, err

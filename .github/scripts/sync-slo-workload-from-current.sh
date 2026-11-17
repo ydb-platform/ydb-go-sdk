@@ -76,4 +76,12 @@ cp -a "$source_workload" "$target_slo/$workload_path"
 cp "$source_slo/go.mod" "$target_slo/go.mod"
 cp "$source_slo/go.sum" "$target_slo/go.sum"
 
+# Older SDKs accept the same workload flag but retain standard decoding.
+wire_adapter="$target_slo/internal/querywire/options.go"
+if [[ -f "$wire_adapter.stub" ]] && \
+   ! grep -q '^func WithQueryProtoWireDecoding(' "$target_dir/options.go"; then
+  cp "$wire_adapter.stub" "$wire_adapter"
+  echo "Baseline SDK has no wire-decoding option; using the standard-decoder adapter"
+fi
+
 echo "SLO workload overlay complete"

@@ -48,8 +48,14 @@ jobs:
             path: database/sql/table
           - name: database-sql-query
             path: database/sql/query
+          - name: database-sql-query-wire
+            path: database/sql/query
+            command: "-query-proto-wire-decoding=true"
           - name: native-query
             path: native/query
+          - name: native-query-wire
+            path: native/query
+            command: "-query-proto-wire-decoding=true"
           - name: native-table
             path: native/table
           - name: native-table-over-query-service

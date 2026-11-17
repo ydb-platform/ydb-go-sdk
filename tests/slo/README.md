@@ -14,7 +14,20 @@ SLO is the type of test where app based on ydb-sdk is tested against falling YDB
 
 The workload runs in a single mode: creates table, fills with initial data, runs read/write workers, then drops table.
 
-All configuration is done via environment variables.
+Environment variables configure the framework. Query workloads also accept the decoder flag below.
+
+### Query result decoding
+
+`native/query` and `database/sql/query` accept `-query-proto-wire-decoding=true` to enable
+direct protobuf wire decoding of Query Service rows. The flag defaults to `false`.
+Existing workload variants use standard protobuf decoding; the `native-query-wire` and
+`database-sql-query-wire` SLO variants enable the flag.
+
+Current and baseline images receive the same flag. When the baseline SDK predates
+`ydb.WithQueryProtoWireDecoding`, source synchronization selects a compatibility adapter:
+the baseline logs that the option is unavailable and uses standard protobuf decoding.
+The baseline still runs against its own SDK; the current image is not substituted merely
+because this option is missing.
 
 ### Run example:
 
