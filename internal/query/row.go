@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"io"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -15,7 +16,7 @@ import (
 var _ query.Row = (*Row)(nil)
 
 type Row struct {
-	data  *scanner.Data
+	data  atomic.Pointer[scanner.Data]
 	part  *wirePart
 	index int
 }
@@ -39,22 +40,26 @@ func newDecodedRow(columns []*Ydb.Column, values []value.Value) *Row {
 }
 
 func newRow(data *scanner.Data) *Row {
+	// The constructors pass fresh Data, before its lazy indexes are used.
 	r := &rowWithData{data: *data}
-	r.Row.data = &r.data
+	r.Row.data.Store(&r.data)
 
 	return &r.Row
 }
 
 func (r *Row) scannerData() *scanner.Data {
-	if r.data != nil {
-		return r.data
+	if data := r.data.Load(); data != nil {
+		return data
 	}
 
-	r.data = scanner.NewDirectData(r.part.columns, &indexedWireRow{
+	data := scanner.NewDirectData(r.part.columns, &indexedWireRow{
 		Row: r, cells: rowCells{data: r.part.rowBytes(r.index)},
 	})
+	if r.data.CompareAndSwap(nil, data) {
+		return data
+	}
 
-	return r.data
+	return r.data.Load()
 }
 
 func (r *Row) Scan(dst ...any) error {
@@ -62,7 +67,7 @@ func (r *Row) Scan(dst ...any) error {
 	if r.part != nil {
 		err = scanRowBytes(r, dst)
 	} else {
-		err = scanner.Indexed(r.data).Scan(dst...)
+		err = scanner.Indexed(r.data.Load()).Scan(dst...)
 	}
 	if err != nil {
 		return xerrors.WithStackTrace(

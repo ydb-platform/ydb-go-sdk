@@ -198,11 +198,11 @@ func TestWireRowRetainsScannerData(t *testing.T) {
 	var got uint64
 	require.NoError(t, row.Scan(&got))
 	require.Equal(t, uint64(42), got)
-	require.Nil(t, row.data, "positional scans must not create an index")
+	require.Nil(t, row.data.Load(), "positional scans must not create an index")
 	require.NoError(t, row.ScanNamed(scanner.NamedRef("id", &got)))
 	require.Equal(t, uint64(42), got)
-	require.NotNil(t, row.data, "indexed scans must retain their state on the row")
-	require.Same(t, row.data, row.scannerData())
+	require.NotNil(t, row.data.Load(), "indexed scans must retain their state on the row")
+	require.Same(t, row.data.Load(), row.scannerData())
 }
 
 func TestWireRowIndexesCellsAsTheyAreRequested(t *testing.T) {

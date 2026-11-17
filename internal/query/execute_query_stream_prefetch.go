@@ -60,6 +60,8 @@ func (p *asyncPrefetchExecuteQueryStream) pump() {
 	}
 }
 
+// Recv materializes the ordinary protobuf response, including its rows.
+// Wire consumers use RecvPart to retain the wire-decoding allocation savings.
 func (p *asyncPrefetchExecuteQueryStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 	part, wire, err := p.RecvPart()
 	if err != nil || wire == nil {

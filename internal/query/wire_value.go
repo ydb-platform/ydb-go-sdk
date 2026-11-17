@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
@@ -39,6 +40,7 @@ type rowSpan struct {
 type indexedWireRow struct {
 	*Row
 
+	mu    sync.Mutex
 	cells rowCells
 	spans []rowSpan
 }
@@ -225,6 +227,9 @@ func scanWireValueDestination(columnType *Ydb.Type, decodedType types.Type, cell
 }
 
 func (r *indexedWireRow) cell(column int) ([]byte, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if column < 0 || column >= len(r.part.columns) {
 		return nil, fmt.Errorf("wire value decoder: column %d out of range", column)
 	}
