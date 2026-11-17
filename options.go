@@ -541,7 +541,7 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 // value tree, reducing allocations. It applies to queries on [query.Client],
 // [query.Session] and [query.TxActor], including queries inside Do and DoTx,
 // and database/sql connectors using [WithQueryService] with true.
-// The default is false: rows are decoded with the standard protobuf codec.
+// The default is true. Passing false restores standard protobuf decoding.
 // Arrow results and Table Service connectors keep their existing decoding paths.
 // A per-query codec selected with [query.WithCallOptions] takes precedence;
 // that query uses the selected codec and ordinary protobuf rows.

@@ -1,4 +1,5 @@
-* Added experimental `ydb.WithQueryProtoWireDecoding(bool)` to opt into direct protobuf wire decoding of native and `database/sql` Query Service `FORMAT_VALUE` rows, reducing allocations and using lazy cell and column-name indexes for linear-time wide-row scans
+* Changed native and `database/sql` Query Service `FORMAT_VALUE` rows to use protobuf wire decoding by default; `ydb.WithQueryProtoWireDecoding(false)` restores standard protobuf decoding
+* Added experimental `ydb.WithQueryProtoWireDecoding(bool)` to configure direct protobuf wire decoding of native and `database/sql` Query Service `FORMAT_VALUE` rows, reducing allocations and using lazy cell and column-name indexes for linear-time wide-row scans
 
 ## v3.157.0
 * Fixed topic writer recovery from stalled initialization with a one-minute default attempt timeout and `topicoptions.WithWriterConnectTimeout` to override or disable it; the default backoff reset threshold increases from one to ten minutes
