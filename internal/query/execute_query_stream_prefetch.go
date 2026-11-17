@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/protobuf/proto"
 
@@ -14,6 +15,7 @@ import (
 // executeQueryPartRecv is one logical item from ExecuteQuery stream (typed Recv).
 type executeQueryPartRecv struct {
 	part *Ydb_Query.ExecuteQueryResponsePart
+	wire *wirePart
 	err  error
 }
 
@@ -44,8 +46,8 @@ func (p *asyncPrefetchExecuteQueryStream) pump() {
 	defer close(p.ch)
 	ctx := p.QueryService_ExecuteQueryClient.Context()
 	for {
-		part, err := p.QueryService_ExecuteQueryClient.Recv()
-		item := executeQueryPartRecv{part: part, err: err}
+		part, wire, err := recvQueryPart(p.QueryService_ExecuteQueryClient)
+		item := executeQueryPartRecv{part: part, wire: wire, err: err}
 
 		select {
 		case p.ch <- item:
@@ -59,13 +61,38 @@ func (p *asyncPrefetchExecuteQueryStream) pump() {
 	}
 }
 
+// Recv materializes the ordinary protobuf response, including its rows.
+// Wire consumers use RecvPart to retain the wire-decoding allocation savings.
 func (p *asyncPrefetchExecuteQueryStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-	item, ok := <-p.ch
-	if !ok {
-		return nil, io.EOF
+	part, wire, err := p.RecvPart()
+	if err != nil || wire == nil {
+		return part, err
+	}
+	materialized := new(Ydb_Query.ExecuteQueryResponsePart)
+	proto.Merge(materialized, part)
+	if resultSet := materialized.GetResultSet(); resultSet != nil {
+		rows := make([]*Ydb.Value, wire.RowCount())
+		for i := range rows {
+			rows[i] = new(Ydb.Value)
+			if err := proto.Unmarshal(wire.rowBytes(i), rows[i]); err != nil {
+				return nil, err
+			}
+		}
+		resultSet.Rows = rows
 	}
 
-	return item.part, item.err
+	return materialized, nil
+}
+
+func (p *asyncPrefetchExecuteQueryStream) RecvPart() (
+	*Ydb_Query.ExecuteQueryResponsePart, *wirePart, error,
+) {
+	item, ok := <-p.ch
+	if !ok {
+		return nil, nil, io.EOF
+	}
+
+	return item.part, item.wire, item.err
 }
 
 func (p *asyncPrefetchExecuteQueryStream) RecvMsg(m any) error {

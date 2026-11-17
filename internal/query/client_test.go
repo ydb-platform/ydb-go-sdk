@@ -31,6 +31,35 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+func TestNewRowDecoding(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		opts []config.Option
+		want Ydb_Query_V1.QueryServiceClient
+	}{
+		{name: "default", want: Ydb_Query_V1.NewQueryServiceClient(nil)},
+		{name: "enabled", opts: []config.Option{config.WithProtoWireDecoding(true)}, want: wireQueryClient{}},
+		{
+			name: "disabled",
+			opts: []config.Option{config.WithProtoWireDecoding(false)},
+			want: Ydb_Query_V1.NewQueryServiceClient(nil),
+		},
+		{
+			name: "last option wins",
+			opts: []config.Option{config.WithProtoWireDecoding(true), config.WithProtoWireDecoding(false)},
+			want: Ydb_Query_V1.NewQueryServiceClient(nil),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := New(t.Context(), nil, config.New(tt.opts...))
+			require.NoError(t, err)
+			defer client.Close(t.Context())
+
+			require.IsType(t, tt.want, client.client)
+		})
+	}
+}
+
 func TestCreateSessionDoesNotRetryNonRetryableErrorAfterAttemptContextDeadline(t *testing.T) {
 	const createSessionTimeout = 10 * time.Millisecond
 

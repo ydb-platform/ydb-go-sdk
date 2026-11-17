@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"io"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -15,11 +16,19 @@ import (
 var _ query.Row = (*Row)(nil)
 
 type Row struct {
+	data  atomic.Pointer[scanner.Data]
+	part  *wirePart
+	index int
+}
+
+type rowWithData struct {
+	Row
+
 	data scanner.Data
 }
 
 func (r *Row) Values() []value.Value {
-	return r.data.Values()
+	return r.scannerData().Values()
 }
 
 func NewRow(columns []*Ydb.Column, v *Ydb.Value) *Row {
@@ -31,11 +40,35 @@ func newDecodedRow(columns []*Ydb.Column, values []value.Value) *Row {
 }
 
 func newRow(data *scanner.Data) *Row {
-	return &Row{data: *data}
+	// The constructors pass fresh Data, before its lazy indexes are used.
+	r := &rowWithData{data: *data}
+	r.Row.data.Store(&r.data)
+
+	return &r.Row
+}
+
+func (r *Row) scannerData() *scanner.Data {
+	if data := r.data.Load(); data != nil {
+		return data
+	}
+
+	data := scanner.NewDirectData(r.part.columns, &indexedWireRow{
+		Row: r, cells: rowCells{data: r.part.rowBytes(r.index)},
+	})
+	if r.data.CompareAndSwap(nil, data) {
+		return data
+	}
+
+	return r.data.Load()
 }
 
 func (r *Row) Scan(dst ...any) error {
-	err := scanner.Indexed(&r.data).Scan(dst...)
+	var err error
+	if r.part != nil {
+		err = scanRowBytes(r, dst)
+	} else {
+		err = scanner.Indexed(r.data.Load()).Scan(dst...)
+	}
 	if err != nil {
 		return xerrors.WithStackTrace(
 			xerrors.WithStackTrace(err),
@@ -47,7 +80,7 @@ func (r *Row) Scan(dst ...any) error {
 }
 
 func (r *Row) ScanNamed(dst ...scanner.NamedDestination) error {
-	err := scanner.Named(&r.data).ScanNamed(dst...)
+	err := scanner.Named(r.scannerData()).ScanNamed(dst...)
 	if err != nil {
 		return xerrors.WithStackTrace(
 			xerrors.WithStackTrace(err),
@@ -59,7 +92,7 @@ func (r *Row) ScanNamed(dst ...scanner.NamedDestination) error {
 }
 
 func (r *Row) ScanStruct(dst any, opts ...scanner.ScanStructOption) error {
-	err := scanner.Struct(&r.data).ScanStruct(dst, opts...)
+	err := scanner.Struct(r.scannerData()).ScanStruct(dst, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(
 			xerrors.WithStackTrace(err),

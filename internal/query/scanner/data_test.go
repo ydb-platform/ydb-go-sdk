@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -53,6 +54,28 @@ func TestDirectDataScanError(t *testing.T) {
 	require.ErrorIs(t, Struct(data).ScanStruct(&struct {
 		ID int32 `sql:"id"`
 	}{}), expected)
+}
+
+func TestNamedDataRetainsFirstColumnIndex(t *testing.T) {
+	columns := []*Ydb.Column{{Name: "id"}, {Name: "other"}, {Name: "id"}}
+	values := []value.Value{value.Int32Value(1), value.Int32Value(2), value.Int32Value(3)}
+	for _, direct := range []bool{false, true} {
+		t.Run(fmt.Sprintf("direct=%v", direct), func(t *testing.T) {
+			data := NewDecodedData(columns, values)
+			if direct {
+				data = NewDirectData(columns, &mockDirectRow{values: values})
+			}
+			require.Nil(t, data.columnIndexes.Load(), "positional reads do not need a name index")
+			var got int32
+			require.NoError(t, Named(data).ScanNamed(NamedRef("id", &got)))
+			require.Equal(t, int32(1), got, "duplicate names must select the first column")
+			require.Equal(t, map[string]int{"id": 0, "other": 1}, data.columnIndexes.Load(),
+				"named scans must retain the index for later lookups")
+			require.NoError(t, Named(data).ScanNamed(NamedRef("other", &got)))
+			require.Equal(t, int32(2), got)
+			require.ErrorIs(t, Named(data).ScanNamed(NamedRef("missing", &got)), ErrColumnsNotFoundInRow)
+		})
+	}
 }
 
 type mockDirectRow struct {

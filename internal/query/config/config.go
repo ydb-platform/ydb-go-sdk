@@ -33,12 +33,17 @@ type Config struct {
 	lazyTx              bool
 	defaultIdempotent   bool
 	defaultArrowDecoder arrow.Decoder
+	protoWireDecoding   bool
 
 	trace *trace.Query
 }
 
 func (c *Config) DefaultArrowDecoder() arrow.Decoder {
 	return c.defaultArrowDecoder
+}
+
+func (c *Config) ProtoWireDecoding() bool {
+	return c.protoWireDecoding
 }
 
 func New(opts ...Option) *Config {
