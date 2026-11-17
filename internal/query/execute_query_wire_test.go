@@ -2,6 +2,8 @@ package query
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,9 +13,64 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/encoding"
 	"google.golang.org/grpc/mem"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 )
+
+func TestWireQueryStreamAcceptsProtobufTransport(t *testing.T) {
+	want := &Ydb_Query.ExecuteQueryResponsePart{
+		Status: Ydb.StatusIds_SUCCESS,
+		ResultSet: &Ydb.ResultSet{Rows: []*Ydb.Value{{Items: []*Ydb.Value{
+			{Value: &Ydb.Value_Uint64Value{Uint64Value: 42}},
+		}}}},
+	}
+	client := WireQueryClient(codecQueryClient{stream: protobufQueryStream{
+		codecQueryStream: &codecQueryStream{part: want},
+	}})
+	stream, err := client.ExecuteQuery(t.Context(), &Ydb_Query.ExecuteQueryRequest{})
+	require.NoError(t, err)
+	part, wire, err := recvQueryPart(stream)
+	require.NoError(t, err)
+	require.True(t, proto.Equal(want, part), "a transport that supplies protobuf messages must preserve its rows")
+	require.Nil(t, wire, "a transport that bypasses the wire codec must use its protobuf rows")
+}
+
+func TestWireQueryStreamMixedReceives(t *testing.T) {
+	server := &optionalWireResultServer{
+		columns: []*Ydb.Column{{Name: "id", Type: wirePrimitive(Ydb.Type_UINT64)}},
+	}
+	for _, id := range []uint64{42, 43, 44} {
+		server.rows = append(server.rows, &Ydb.Value{Items: []*Ydb.Value{
+			{Value: &Ydb.Value_Uint64Value{Uint64Value: id}},
+		}})
+	}
+	client := WireQueryClient(Ydb_Query_V1.NewQueryServiceClient(newWireResultConn(t, server)))
+	stream, err := client.ExecuteQuery(t.Context(), &Ydb_Query.ExecuteQueryRequest{})
+	require.NoError(t, err)
+	for i, want := range []uint64{42, 43, 44} {
+		if i == 1 {
+			part, err := stream.Recv()
+			require.NoError(t, err)
+			require.Len(t, part.GetResultSet().GetRows(), 1, "typed Recv must materialize protobuf rows")
+			require.Equal(t, want, part.GetResultSet().GetRows()[0].GetItems()[0].GetUint64Value())
+
+			continue
+		}
+		part, wire, err := recvQueryPart(stream)
+		require.NoError(t, err)
+		require.NotNil(t, wire)
+		require.Same(t, part, wire.Meta(), "interceptors and wire rows must share response metadata")
+		require.Empty(t, part.GetResultSet().GetRows(), "wire reads must avoid materializing protobuf rows")
+		var got uint64
+		require.NoError(t, wire.row(0, server.columns).Scan(&got))
+		require.Equal(t, want, got)
+	}
+	part, wire, err := recvQueryPart(stream)
+	require.ErrorIs(t, err, io.EOF)
+	require.Nil(t, part)
+	require.Nil(t, wire, "EOF must not return a previously captured response")
+}
 
 func TestWireQueryRespectsPerQueryCodec(t *testing.T) {
 	conn := newWireResultConn(t, &wireResultServer{})
@@ -168,6 +225,29 @@ type codecQueryStream struct {
 	Ydb_Query_V1.QueryService_ExecuteQueryClient
 
 	part *Ydb_Query.ExecuteQueryResponsePart
+}
+
+type protobufQueryStream struct {
+	*codecQueryStream
+}
+
+func (s protobufQueryStream) RecvMsg(message any) error {
+	part, ok := message.(*Ydb_Query.ExecuteQueryResponsePart)
+	if !ok {
+		return fmt.Errorf("query transport: expected protobuf response, got %T", message)
+	}
+	proto.Merge(part, s.part)
+
+	return nil
+}
+
+func (s protobufQueryStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+	part := new(Ydb_Query.ExecuteQueryResponsePart)
+	if err := s.RecvMsg(part); err != nil {
+		return nil, err
+	}
+
+	return part, nil
 }
 
 func (s *codecQueryStream) Recv() (*Ydb_Query.ExecuteQueryResponsePart, error) {

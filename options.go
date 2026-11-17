@@ -545,6 +545,8 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 // Arrow results and Table Service connectors keep their existing decoding paths.
 // A per-query codec selected with [query.WithCallOptions] takes precedence;
 // that query uses the selected codec and ordinary protobuf rows.
+// gRPC stream interceptors receive protobuf response metadata with empty Rows.
+// Disable wire decoding if an interceptor needs the protobuf rows.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithQueryProtoWireDecoding(enabled bool) Option {

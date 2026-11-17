@@ -181,11 +181,20 @@ type queryDecoderStream struct {
 }
 
 func (s queryDecoderStream) RecvMsg(message any) error {
-	if _, standard := message.(*Ydb_Query.ExecuteQueryResponsePart); standard {
-		s.observer.standard.Add(1)
-	} else {
+	if err := s.ClientStream.RecvMsg(message); err != nil {
+		return err
+	}
+	part := message.(*Ydb_Query.ExecuteQueryResponsePart)
+	if part.GetResultSet() == nil {
+		return nil
+	}
+	// SELECT 42 always returns a row. Wire decoding retains it outside the
+	// protobuf response while preserving that response for interceptors.
+	if len(part.GetResultSet().GetRows()) == 0 {
 		s.observer.wire.Add(1)
+	} else {
+		s.observer.standard.Add(1)
 	}
 
-	return s.ClientStream.RecvMsg(message)
+	return nil
 }

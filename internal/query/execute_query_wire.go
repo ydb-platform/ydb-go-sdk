@@ -33,25 +33,34 @@ func (c wireQueryClient) ExecuteQuery(ctx context.Context, request *Ydb_Query.Ex
 			return c.QueryServiceClient.ExecuteQuery(ctx, request, opts...)
 		}
 	}
-	stream, err := c.QueryServiceClient.ExecuteQuery(ctx, request, append(opts, wireQueryCodecOption())...)
+	decoder := newWireCodec()
+	stream, err := c.QueryServiceClient.ExecuteQuery(ctx, request, append(opts, grpc.ForceCodecV2(decoder))...)
 	if err != nil {
 		return nil, err
 	}
 
-	return wireQueryStream{stream}, nil
+	return wireQueryStream{QueryService_ExecuteQueryClient: stream, decoder: decoder}, nil
 }
 
 type wireQueryStream struct {
 	Ydb_Query_V1.QueryService_ExecuteQueryClient
+
+	decoder *codec
 }
 
 func (s wireQueryStream) RecvPart() (*Ydb_Query.ExecuteQueryResponsePart, *wirePart, error) {
-	var part wirePart
-	if err := s.QueryService_ExecuteQueryClient.RecvMsg(&part); err != nil {
+	var wire *wirePart
+	// RecvMsg and its interceptors keep their protobuf destination. The codec
+	// captures wire rows only during this receive; typed Recv still decodes rows.
+	// Like gRPC RecvMsg, RecvPart must not be called concurrently on one stream.
+	s.decoder.capture = &wire
+	defer func() { s.decoder.capture = nil }()
+	part, err := s.QueryService_ExecuteQueryClient.Recv()
+	if err != nil {
 		return nil, nil, err
 	}
 
-	return part.Meta(), &part, nil
+	return part, wire, nil
 }
 
 // Recv returns the ordinary protobuf view. Wire consumers must use RecvPart.
@@ -70,8 +79,4 @@ func recvQueryPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 	part, err := stream.Recv()
 
 	return part, nil, err
-}
-
-func wireQueryCodecOption() grpc.CallOption {
-	return grpc.ForceCodecV2(newWireCodec())
 }
