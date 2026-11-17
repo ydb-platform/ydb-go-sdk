@@ -19,6 +19,7 @@ type Data struct {
 	values        []*Ydb.Value
 	decodedValues []value.Value
 	direct        DirectRow
+	columnIndexes map[string]int
 }
 
 func NewData(columns []*Ydb.Column, values []*Ydb.Value) *Data {
@@ -36,11 +37,17 @@ func NewDirectData(columns []*Ydb.Column, direct DirectRow) *Data {
 	return &Data{columns: columns, direct: direct}
 }
 
-func (d Data) columnIndex(name string) (int, error) {
-	for i := range d.columns {
-		if d.columns[i].GetName() == name {
-			return i, nil
+func (d *Data) columnIndex(name string) (int, error) {
+	if d.columnIndexes == nil {
+		d.columnIndexes = make(map[string]int, len(d.columns))
+		for i, column := range d.columns {
+			if _, exists := d.columnIndexes[column.GetName()]; !exists {
+				d.columnIndexes[column.GetName()] = i
+			}
 		}
+	}
+	if index, exists := d.columnIndexes[name]; exists {
+		return index, nil
 	}
 
 	return 0, xerrors.WithStackTrace(fmt.Errorf("'%s': %w", name, ErrColumnsNotFoundInRow))

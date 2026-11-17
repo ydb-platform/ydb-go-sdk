@@ -36,6 +36,13 @@ type rowSpan struct {
 	end   uint32
 }
 
+type indexedWireRow struct {
+	*Row
+
+	cells rowCells
+	spans []rowSpan
+}
+
 // Meta returns the standard response metadata without materializing Rows.
 func (p *wirePart) Meta() *Ydb_Query.ExecuteQueryResponsePart { return p.meta }
 
@@ -178,7 +185,7 @@ func scanRowBytes(r *Row, dst []any) error {
 	return nil
 }
 
-func (r *Row) ColumnValue(column int) value.Value {
+func (r *indexedWireRow) ColumnValue(column int) value.Value {
 	cell, err := r.cell(column)
 	if err != nil {
 		return nil
@@ -191,7 +198,7 @@ func (r *Row) ColumnValue(column int) value.Value {
 	return v
 }
 
-func (r *Row) ScanColumn(column int, dst any) error {
+func (r *indexedWireRow) ScanColumn(column int, dst any) error {
 	cell, err := r.cell(column)
 	if err != nil {
 		return err
@@ -216,19 +223,23 @@ func scanWireValueDestination(columnType *Ydb.Type, decodedType types.Type, cell
 	return value.CastTo(v, dst)
 }
 
-func (r *Row) cell(column int) ([]byte, error) {
+func (r *indexedWireRow) cell(column int) ([]byte, error) {
 	if column < 0 || column >= len(r.part.columns) {
 		return nil, fmt.Errorf("wire value decoder: column %d out of range", column)
 	}
-	cells := rowCells{data: r.part.rowBytes(r.index)}
-	index := 0
-	for cells.Next() {
-		if index == column {
-			return cells.Cell(), nil
-		}
-		index++
+	row := r.part.rowBytes(r.index)
+	for len(r.spans) <= column && r.cells.Err() == nil && r.cells.Next() {
+		end := len(row) - len(r.cells.data)
+		r.spans = append(r.spans, rowSpan{
+			start: uint32(end - len(r.cells.Cell())), end: uint32(end),
+		})
 	}
-	if err := cells.Err(); err != nil {
+	if column < len(r.spans) {
+		span := r.spans[column]
+
+		return row[span.start:span.end], nil
+	}
+	if err := r.cells.Err(); err != nil {
 		return nil, err
 	}
 

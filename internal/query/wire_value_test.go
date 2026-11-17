@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wirevalue"
 )
 
 func TestDecodeWireValuePartScansBenchmarkRows(t *testing.T) {
@@ -184,6 +185,86 @@ func TestWireValueRowOtherScannersAndFallback(t *testing.T) {
 	var fromValues uint64
 	require.NoError(t, value.CastTo(values[0], &fromValues))
 	require.Equal(t, uint64(5), fromValues)
+}
+
+func TestWireRowRetainsScannerData(t *testing.T) {
+	columns := []*Ydb.Column{{Name: "id", Type: wirePrimitive(Ydb.Type_UINT64)}}
+	frame, err := proto.Marshal(&Ydb.Value{Items: []*Ydb.Value{
+		{Value: &Ydb.Value_Uint64Value{Uint64Value: 42}},
+	}})
+	require.NoError(t, err)
+	part := &wirePart{frame: frame, rows: []rowSpan{{end: uint32(len(frame))}}}
+	row := part.row(0, columns)
+	var got uint64
+	require.NoError(t, row.Scan(&got))
+	require.Equal(t, uint64(42), got)
+	require.Nil(t, row.data, "positional scans must not create an index")
+	require.NoError(t, row.ScanNamed(scanner.NamedRef("id", &got)))
+	require.Equal(t, uint64(42), got)
+	require.NotNil(t, row.data, "indexed scans must retain their state on the row")
+	require.Same(t, row.data, row.scannerData())
+}
+
+func TestWireRowIndexesCellsAsTheyAreRequested(t *testing.T) {
+	columns := make([]*Ydb.Column, 4)
+	for i := range columns {
+		columns[i] = &Ydb.Column{Name: fmt.Sprintf("column_%d", i), Type: wirePrimitive(Ydb.Type_UINT64)}
+	}
+	frame, err := proto.Marshal(&Ydb.Value{Items: []*Ydb.Value{
+		{Value: &Ydb.Value_Uint64Value{Uint64Value: 1}},
+		{Value: &Ydb.Value_Uint64Value{Uint64Value: 2}},
+		{Value: &Ydb.Value_Uint64Value{Uint64Value: 3}},
+	}})
+	require.NoError(t, err)
+	frame = append(frame, 0xff) // The fourth column has a malformed tag.
+	part := &wirePart{frame: frame, rows: []rowSpan{{end: uint32(len(frame))}}}
+	row := &indexedWireRow{Row: part.row(0, columns), cells: rowCells{data: frame}}
+	var got uint64
+	require.NoError(t, row.ScanColumn(1, &got))
+	require.Equal(t, uint64(2), got)
+	require.Len(t, row.spans, 2, "only the requested prefix should be indexed")
+	remaining := row.cells.data
+
+	require.NoError(t, row.ScanColumn(0, &got))
+	require.Equal(t, uint64(1), got)
+	require.Equal(t, remaining, row.cells.data, "cached columns must not advance the iterator")
+	require.NoError(t, row.ScanColumn(2, &got))
+	require.Equal(t, uint64(3), got)
+	require.Len(t, row.spans, 3)
+
+	require.Error(t, row.ScanColumn(3, &got))
+	parseErr := row.cells.Err()
+	require.Error(t, parseErr, "the iterator must retain the malformed suffix error")
+	require.ErrorIs(t, row.ScanColumn(3, &got), parseErr)
+	require.NoError(t, row.ScanColumn(0, &got))
+	require.Equal(t, uint64(1), got, "a malformed suffix must not invalidate cached cells")
+}
+
+func TestWireRowIndexSkipsUnknownFieldsAndPreservesMissingCells(t *testing.T) {
+	columns := []*Ydb.Column{
+		{Name: "first", Type: wirePrimitive(Ydb.Type_UINT64)},
+		{Name: "second", Type: wirePrimitive(Ydb.Type_UINT64)},
+		{Name: "missing", Type: wirePrimitive(Ydb.Type_UINT64)},
+	}
+	frame := protowire.AppendTag(nil, 200, protowire.VarintType)
+	frame = protowire.AppendVarint(frame, 9)
+	for _, v := range []uint64{11, 22} {
+		cell, err := proto.Marshal(&Ydb.Value{Value: &Ydb.Value_Uint64Value{Uint64Value: v}})
+		require.NoError(t, err)
+		frame = protowire.AppendTag(frame, wirevalue.ValueItemsField, wirevalue.ValueItemsWireType)
+		frame = protowire.AppendBytes(frame, cell)
+		frame = protowire.AppendTag(frame, 200, protowire.BytesType)
+		frame = protowire.AppendBytes(frame, []byte("unknown"))
+	}
+	part := &wirePart{frame: frame, rows: []rowSpan{{end: uint32(len(frame))}}}
+	row := part.row(0, columns)
+	var got uint64
+	require.NoError(t, row.ScanNamed(scanner.NamedRef("second", &got)))
+	require.Equal(t, uint64(22), got)
+	require.ErrorContains(t, row.ScanNamed(scanner.NamedRef("missing", &got)), "missing column 2")
+	require.ErrorContains(t, row.ScanNamed(scanner.NamedRef("missing", &got)), "missing column 2")
+	require.NoError(t, row.ScanNamed(scanner.NamedRef("first", &got)))
+	require.Equal(t, uint64(11), got)
 }
 
 func TestWireValueRowScansComplexTypesWithoutProtobufValues(t *testing.T) {

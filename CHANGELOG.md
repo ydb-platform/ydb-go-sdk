@@ -1,4 +1,4 @@
-* Added experimental `ydb.WithQueryProtoWireDecoding(bool)` to opt into direct protobuf wire decoding of native Query Service `FORMAT_VALUE` rows, reducing allocations
+* Added experimental `ydb.WithQueryProtoWireDecoding(bool)` to opt into direct protobuf wire decoding of native Query Service `FORMAT_VALUE` rows, reducing allocations and using lazy cell and column-name indexes for linear-time wide-row scans
 
 ## v3.156.1
 * Reduced custom topic encoder allocations by sharing pools across writers that reuse the same `topicoptions.WithWriterAddEncoder` option.

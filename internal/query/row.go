@@ -50,7 +50,11 @@ func (r *Row) scannerData() *scanner.Data {
 		return r.data
 	}
 
-	return scanner.NewDirectData(r.part.columns, r)
+	r.data = scanner.NewDirectData(r.part.columns, &indexedWireRow{
+		Row: r, cells: rowCells{data: r.part.rowBytes(r.index)},
+	})
+
+	return r.data
 }
 
 func (r *Row) Scan(dst ...any) error {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	publicquery "github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
@@ -240,6 +242,85 @@ func TestQueryPreservesScannedOptionalValues(t *testing.T) {
 					}, got, "scanning the second row must preserve the first row's values")
 				})
 			}
+		}
+	}
+}
+
+func TestQueryWideRowsRemainReadableAfterClose(t *testing.T) {
+	const width = 16
+	server := &optionalWireResultServer{columns: make([]*Ydb.Column, width)}
+	fields := make([]reflect.StructField, width)
+	for column := range server.columns {
+		name := fmt.Sprintf("column_%d", column)
+		server.columns[column] = &Ydb.Column{Name: name, Type: wirePrimitive(Ydb.Type_UINT64)}
+		fields[width-column-1] = reflect.StructField{
+			Name: fmt.Sprintf("Column%d", column),
+			Type: reflect.TypeFor[uint64](),
+			Tag:  reflect.StructTag(fmt.Sprintf(`sql:"%s"`, name)),
+		}
+	}
+	for row := range 2 {
+		items := make([]*Ydb.Value, width)
+		for column := range items {
+			items[column] = &Ydb.Value{Value: &Ydb.Value_Uint64Value{Uint64Value: uint64(row*width + column + 1)}}
+		}
+		server.rows = append(server.rows, &Ydb.Value{Items: items})
+	}
+	structType := reflect.StructOf(fields)
+	conn := newWireResultConn(t, server)
+	for _, wire := range []bool{false, true} {
+		for _, prefetch := range []int{0, 2} {
+			t.Run(fmt.Sprintf("wire=%v/prefetch=%d", wire, prefetch), func(t *testing.T) {
+				ctx := t.Context()
+				client := Ydb_Query_V1.NewQueryServiceClient(conn)
+				if wire {
+					client = WireQueryClient(client)
+				}
+				result, err := execute(ctx, "session", client, "SELECT wide rows",
+					options.ExecuteSettings(options.WithResponsePartPrefetch(prefetch)), options.ResultSetsTypeOrdered)
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, result.Close(ctx)) })
+				rs, err := result.NextResultSet(ctx)
+				require.NoError(t, err)
+				var saved []publicquery.Row
+				for rowIndex := range server.rows {
+					row, err := rs.NextRow(ctx)
+					require.NoError(t, err)
+					var last uint64
+					require.NoError(t, row.ScanNamed(scanner.NamedRef(server.columns[width-1].GetName(), &last)))
+					require.Equal(t, uint64((rowIndex+1)*width), last)
+					saved = append(saved, row)
+				}
+				_, err = rs.NextRow(ctx)
+				require.ErrorIs(t, err, io.EOF)
+				require.NoError(t, result.Close(ctx))
+
+				for rowIndex, row := range saved {
+					want := make([]uint64, width)
+					got := make([]uint64, width)
+					named := make([]scanner.NamedDestination, width)
+					for column := range want {
+						want[column] = uint64(rowIndex*width + column + 1)
+						named[width-column-1] = scanner.NamedRef(server.columns[column].GetName(), &got[column])
+					}
+					require.NoError(t, row.ScanNamed(named...))
+					require.Equal(t, want, got)
+
+					dst := reflect.New(structType)
+					require.NoError(t, row.ScanStruct(dst.Interface()))
+					for column := range got {
+						got[column] = dst.Elem().Field(width - column - 1).Uint()
+					}
+					require.Equal(t, want, got)
+
+					values := row.Values()
+					require.Len(t, values, width)
+					for column := range got {
+						require.NoError(t, value.CastTo(values[column], &got[column]))
+					}
+					require.Equal(t, want, got)
+				}
+			})
 		}
 	}
 }

@@ -2,6 +2,7 @@ package query
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -40,6 +41,101 @@ func BenchmarkQueryRows(b *testing.B) {
 				})
 			}
 		}
+	}
+}
+
+func BenchmarkQueryWideRows(b *testing.B) {
+	for _, width := range []int{16, 128, 1024} {
+		frame := benchmarkWideRowsFrame(b, width)
+		for _, mode := range []string{"scan", "named", "struct", "values"} {
+			for _, decoder := range []string{"protobuf", "wire"} {
+				b.Run(fmt.Sprintf("columns=%d/%s/%s", width, mode, decoder), func(b *testing.B) {
+					read := benchmarkWideRowReader(width, mode)
+					want := uint64(width * (width + 1) / 2)
+					b.SetBytes(int64(len(frame)))
+					b.ReportAllocs()
+					b.ResetTimer()
+					for i := 0; i < b.N; i++ {
+						row := benchmarkDecodeRows(b, frame, decoder, mode)[0]
+						got, err := read(row)
+						if err != nil {
+							b.Fatal(err)
+						}
+						if got != want {
+							b.Fatalf("checksum = %d, want %d", got, want)
+						}
+						benchmarkRowChecksum = got
+					}
+				})
+			}
+		}
+	}
+}
+
+func benchmarkWideRowsFrame(b *testing.B, width int) []byte {
+	b.Helper()
+	columns := make([]*Ydb.Column, width)
+	items := make([]*Ydb.Value, width)
+	for column := range columns {
+		columns[column] = &Ydb.Column{
+			Name: fmt.Sprintf("column_%d", column),
+			Type: wirePrimitive(Ydb.Type_UINT64),
+		}
+		items[column] = &Ydb.Value{Value: &Ydb.Value_Uint64Value{Uint64Value: uint64(column + 1)}}
+	}
+	frame, err := proto.Marshal(&Ydb_Query.ExecuteQueryResponsePart{ResultSet: &Ydb.ResultSet{
+		Columns: columns,
+		Rows:    []*Ydb.Value{{Items: items}},
+	}})
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	return frame
+}
+
+func benchmarkWideRowReader(width int, mode string) func(*Row) (uint64, error) {
+	values := make([]uint64, width)
+	refs := make([]any, width)
+	named := make([]scanner.NamedDestination, width)
+	fields := make([]reflect.StructField, width)
+	for column := range values {
+		name := fmt.Sprintf("column_%d", column)
+		refs[column] = &values[column]
+		named[width-column-1] = scanner.NamedRef(name, &values[column])
+		fields[width-column-1] = reflect.StructField{
+			Name: fmt.Sprintf("Column%d", column),
+			Type: reflect.TypeFor[uint64](),
+			Tag:  reflect.StructTag(fmt.Sprintf(`sql:"%s"`, name)),
+		}
+	}
+	structDst := reflect.New(reflect.StructOf(fields))
+
+	return func(row *Row) (uint64, error) {
+		var err error
+		switch mode {
+		case "scan":
+			err = row.Scan(refs...)
+		case "named":
+			err = row.ScanNamed(named...)
+		case "struct":
+			err = row.ScanStruct(structDst.Interface())
+			for column := range values {
+				values[column] = structDst.Elem().Field(width - column - 1).Uint()
+			}
+		case "values":
+			for column, v := range row.Values() {
+				if err = value.CastTo(v, &values[column]); err != nil {
+					return 0, err
+				}
+			}
+		}
+		var checksum uint64
+		for _, v := range values {
+			checksum += v
+		}
+
+		return checksum, err
 	}
 }
 
