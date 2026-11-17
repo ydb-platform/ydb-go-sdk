@@ -6,7 +6,9 @@ import (
 	"context"
 	"slices"
 	"sync"
+	"sync/atomic"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -36,6 +38,8 @@ type GrpcStopper struct {
 	pause        *grpcPause
 	recvPause    empty.Chan
 	streamStop   empty.Chan
+
+	forceTopicPartitionStops atomic.Bool
 
 	// onRecvMsg can hold a real server response before the SDK receives it.
 	// Set it before opening streams.
@@ -106,6 +110,13 @@ func (l *GrpcStopper) StopOnce() {
 		close(l.streamStop)
 	}
 	l.streamStop = make(empty.Chan)
+}
+
+// ForceTopicPartitionStops acknowledges real graceful Topic stops before the SDK
+// finishes its callbacks, then delivers those stops as forced. YDB still performs
+// the partition reassignment on the existing read stream.
+func (l *GrpcStopper) ForceTopicPartitionStops() {
+	l.forceTopicPartitionStops.Store(true)
 }
 
 // PauseRecv holds received stream messages until the returned function is called.
@@ -360,9 +371,38 @@ func (g *GrpcStopperStream) RecvMsg(m any) error {
 	if err := g.stopper.waitRecv(g.Context(), stopChannel, g.streamStop); err != nil {
 		return err
 	}
+	if g.stopper.forceTopicPartitionStops.Load() {
+		if err := g.forceTopicPartitionStop(m); err != nil {
+			return err
+		}
+	}
 	if g.stopper.onRecvMsg != nil {
 		return g.stopper.onRecvMsg(g.Context(), m)
 	}
+
+	return nil
+}
+
+func (g *GrpcStopperStream) forceTopicPartitionStop(message any) error {
+	response, ok := message.(*Ydb_Topic.StreamReadMessage_FromServer)
+	if !ok || response.GetStopPartitionSessionRequest() == nil {
+		return nil
+	}
+	stop := response.GetStopPartitionSessionRequest()
+	if !stop.GetGraceful() {
+		return nil
+	}
+	if err := g.SendMsg(&Ydb_Topic.StreamReadMessage_FromClient{
+		ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_StopPartitionSessionResponse{
+			StopPartitionSessionResponse: &Ydb_Topic.StreamReadMessage_StopPartitionSessionResponse{
+				PartitionSessionId: stop.GetPartitionSessionId(),
+				Graceful:           stop.GetGraceful(),
+			},
+		},
+	}); err != nil {
+		return err
+	}
+	stop.Graceful = false
 
 	return nil
 }

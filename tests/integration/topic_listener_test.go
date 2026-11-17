@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -33,118 +32,85 @@ import (
 
 const listenerReconnectSetupTimeout = time.Second
 
-func TestTopicListenerRebalanceWaitsForOldPartitionCallback(t *testing.T) {
+func TestTopicListenerDoesNotReadOldSessionAfterNewStart(t *testing.T) {
 	scope := newScope(t)
+	// Two partitions make YDB assign one to the competing reader during rebalance.
+	const partitionCount = 2
+
 	stopper := NewGrpcStopper(status.Error(codes.Canceled, "stream interrupted"))
-	var readStream grpc.ClientStream
-	stopper.onRecvMsg = func(_ context.Context, message any) error {
-		response, ok := message.(*Ydb_Topic.StreamReadMessage_FromServer)
-		if !ok || response.GetStopPartitionSessionRequest() == nil ||
-			!response.GetStopPartitionSessionRequest().GetGraceful() {
-			return nil
-		}
-		stop := response.GetStopPartitionSessionRequest()
-		// Revoke the lease while Read is still running. The stopper serializes
-		// this acknowledgement with SDK sends; YDB performs the reassignment.
-		if err := readStream.SendMsg(&Ydb_Topic.StreamReadMessage_FromClient{
-			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_StopPartitionSessionResponse{
-				StopPartitionSessionResponse: &Ydb_Topic.StreamReadMessage_StopPartitionSessionResponse{
-					PartitionSessionId: stop.GetPartitionSessionId(),
-				},
-			},
-		}); err != nil {
-			return err
-		}
-		stop.Graceful = false
-
-		return nil
-	}
-	scope.Driver(ydb.With(config.WithGrpcOptions(grpc.WithStreamInterceptor(func(
-		ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string,
-		streamer grpc.Streamer, opts ...grpc.CallOption,
-	) (grpc.ClientStream, error) {
-		stream, err := stopper.StreamClientInterceptor(ctx, desc, cc, method, streamer, opts...)
-		if method == Ydb_Topic_V1.TopicService_StreamRead_FullMethodName {
-			readStream = stream
-		}
-
-		return stream, err
-	}))))
-	topic := scope.TopicPath(topicoptions.CreateWithMinActivePartitions(2), topicoptions.CreateWithMaxActivePartitions(2))
-	type callback struct {
-		kind    string
-		session topiclistener.PartitionSession
-	}
-	callbacks := make(chan callback, 16)
-	reads := make(chan struct{}, 2)
-	listener := scope.TopicListener(&TestTopicListener_Handler{
+	responses := listenerReadResponses(stopper)
+	scope.Driver(ydb.With(config.WithGrpcOptions(grpc.WithStreamInterceptor(stopper.StreamClientInterceptor))))
+	topic := scope.TopicPath(
+		topicoptions.CreateWithMinActivePartitions(partitionCount),
+		topicoptions.CreateWithMaxActivePartitions(partitionCount),
+	)
+	callbacks := make(chan listenerSessionCallback, 16)
+	reads := make(chan struct{}, partitionCount)
+	releaseReads := make(chan struct{})
+	var releaseOnce sync.Once
+	var starts atomic.Int32
+	listener, err := scope.Driver().Topic().StartListener(scope.TopicConsumerName(), &TestTopicListener_Handler{
 		onStartPartitionSessionRequest: func(_ context.Context, event *topiclistener.EventStartPartitionSession) error {
-			callbacks <- callback{kind: "start", session: event.PartitionSession}
+			callbacks <- listenerSessionCallback{kind: "start", session: event.PartitionSession}
+			if starts.Add(1) > partitionCount {
+				releaseOnce.Do(func() { close(releaseReads) })
+			}
 			event.Confirm()
 
 			return nil
 		},
 		onReadMessages: func(ctx context.Context, event *topiclistener.ReadMessages) error {
-			reads <- struct{}{}
-			<-ctx.Done()
-			callbacks <- callback{kind: "finished", session: event.PartitionSession}
+			if event.Batch.Messages[0].Offset == 0 {
+				reads <- struct{}{}
+				select {
+				case <-ctx.Done():
+				case <-releaseReads:
+				}
+			} else {
+				callbacks <- listenerSessionCallback{kind: "read", session: event.PartitionSession}
+			}
 
 			return nil
 		},
 		onStopPartitionSessionRequest: func(_ context.Context, event *topiclistener.EventStopPartitionSession) error {
-			callbacks <- callback{kind: "stop", session: event.PartitionSession}
-			event.Confirm()
+			callbacks <- listenerSessionCallback{kind: "stop", session: event.PartitionSession}
 
 			return nil
 		},
-	})
-	for range 2 {
-		require.Equal(t, "start", xtest.Receive(t, callbacks, "the initial partition session").kind)
+	}, topicoptions.ReadTopic(topic))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = listener.Close(context.Background()) })
+	initialSessions := make(map[int64]topiclistener.PartitionSession)
+	for range partitionCount {
+		initial := xtest.Receive(t, callbacks, "the initial partition session")
+		initialSessions[initial.session.PartitionID] = initial.session
 	}
-	for partition := range int64(2) {
+	var writers []*topicwriter.Writer
+	for partition := range int64(partitionCount) {
 		writer, err := scope.Driver().Topic().StartWriter(topic, topicoptions.WithWriterPartitionID(partition),
 			topicoptions.WithWriterWaitServerAck(true))
 		require.NoError(t, err)
-		require.NoError(t, writer.Write(scope.Ctx, topicwriter.Message{Data: strings.NewReader("message")}))
-		require.NoError(t, writer.Close(scope.Ctx))
+		writers = append(writers, writer)
+		require.NoError(t, writer.Write(scope.Ctx, topicwriter.Message{Data: strings.NewReader("1")}))
+		_ = xtest.Receive(t, responses, "the first message for each partition")
 	}
-	for range 2 {
+	for range partitionCount {
 		_ = xtest.Receive(t, reads, "a blocked read callback for each partition")
 	}
+	for _, writer := range writers {
+		require.NoError(t, writer.Write(scope.Ctx, topicwriter.Message{Data: strings.NewReader("2")}))
+		_ = xtest.Receive(t, responses, "the second message queued behind the blocked read")
+		require.NoError(t, writer.Close(scope.Ctx))
+	}
+
 	readSessionID := listener.ReadSessionID()
 
-	// Move one partition to another reader, then return it to the original live stream.
-	competitor, err := scope.driverNamed("competitor").Topic().StartReader(
-		scope.TopicConsumerName(), topicoptions.ReadTopic(topic))
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = competitor.Close(context.Background()) })
-	replayed, err := competitor.ReadMessage(scope.Ctx)
-	require.NoError(t, err)
-	data, err := io.ReadAll(replayed)
-	require.NoError(t, err)
-	require.Equal(t, "message", string(data))
-	require.Zero(t, replayed.Offset)
-	require.NoError(t, competitor.Close(scope.Ctx))
+	stopper.ForceTopicPartitionStops()
+	partition := reassignPartitionBackToListener(scope, topic)
 
-	finished := xtest.Receive(t, callbacks, "completion of the old read before its replacement starts")
-	require.Equal(t, "finished", finished.kind, "a replacement Start must not overtake the old Read callback")
-	require.Equal(t, replayed.Topic(), finished.session.TopicPath)
-	require.Equal(t, replayed.PartitionID(), finished.session.PartitionID)
-	for {
-		next := xtest.Receive(t, callbacks, "the replacement partition session")
-		if next.kind == "stop" {
-			require.Equal(t, finished.session, next.session)
-
-			continue
-		}
-		require.Equal(t, "start", next.kind)
-		require.Equal(t, finished.session.TopicPath, next.session.TopicPath)
-		require.Equal(t, finished.session.PartitionID, next.session.PartitionID)
-		require.NotEqual(t, finished.session.PartitionSessionID, next.session.PartitionSessionID)
-
-		break
-	}
-	require.Equal(t, readSessionID, listener.ReadSessionID(), "the partition must restart without reconnecting")
+	got := collectSessionReplacementCallbacks(t, callbacks, initialSessions[partition])
+	require.Equal(t, []string{"start new"}, got)
+	require.Equal(t, readSessionID, listener.ReadSessionID())
 }
 
 func TestTopicListener(t *testing.T) {
@@ -880,6 +846,53 @@ func TestTopicListenerCommitOffsetWithoutSessionIDReconnectsListener(t *testing.
 	)
 	require.NoError(t, err)
 	require.EqualValues(t, firstMsg.nextOffset, desc.Partitions[0].PartitionConsumerStats.CommittedOffset)
+}
+
+type listenerSessionCallback struct {
+	kind    string
+	session topiclistener.PartitionSession
+}
+
+func reassignPartitionBackToListener(scope *scopeT, topic string) int64 {
+	scope.t.Helper()
+
+	competitor, err := scope.driverNamed("competitor").Topic().StartReader(
+		scope.TopicConsumerName(), topicoptions.ReadTopic(topic))
+	scope.Require.NoError(err)
+	scope.t.Cleanup(func() { _ = competitor.Close(context.Background()) })
+	replayed, err := competitor.ReadMessage(scope.Ctx)
+	scope.Require.NoError(err)
+	scope.Require.NoError(competitor.Close(scope.Ctx))
+
+	return replayed.PartitionID()
+}
+
+func collectSessionReplacementCallbacks(
+	t *testing.T,
+	callbacks <-chan listenerSessionCallback,
+	oldSession topiclistener.PartitionSession,
+) []string {
+	t.Helper()
+
+	var got []string
+	var started, stopped bool
+	for !started || !stopped {
+		next := xtest.Receive(t, callbacks, "the replacement Start and old session Stop")
+		if next.session.TopicPath != oldSession.TopicPath || next.session.PartitionID != oldSession.PartitionID {
+			continue
+		}
+		switch {
+		case next.kind == "start":
+			started = true
+			got = append(got, "start new")
+		case next.kind == "read" && next.session == oldSession:
+			got = append(got, "read old")
+		case next.kind == "stop" && next.session == oldSession:
+			stopped = true
+		}
+	}
+
+	return got
 }
 
 // listenerReadResponses reports topic responses containing data before passing them to the SDK.
