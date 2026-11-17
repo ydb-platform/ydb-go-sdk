@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicmultiwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwritercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -272,6 +273,21 @@ func WithWriterSetAutoSeqNo(val bool) WriterOption {
 // if enabled - Message.CreatedAt field must be zero
 func WithWriterSetAutoCreatedAt(val bool) WriterOption {
 	return topicwriterinternal.WithAutosetCreatedTime(val)
+}
+
+// WithWriterConnectTimeout sets the timeout for one attempt to connect and initialize a writer stream.
+// The timeout stops after initialization and does not limit the lifetime of an established stream.
+//
+// Zero inherits the Topic client's operation timeout, falling back to one minute when that timeout is zero.
+// A negative timeout disables this limit, including an inherited operation timeout.
+//
+// This option does not limit the total time spent reconnecting; use [WithWriterStartTimeout] for that.
+func WithWriterConnectTimeout(timeout time.Duration) WriterOption {
+	if timeout < 0 {
+		timeout = value.InfiniteDuration
+	}
+
+	return topicwriterinternal.WithConnectTimeout(timeout)
 }
 
 // WithWriterStartTimeout mean timeout for connect to writer stream and work some time without errors
