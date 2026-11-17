@@ -48,14 +48,8 @@ jobs:
             path: database/sql/table
           - name: database-sql-query
             path: database/sql/query
-          - name: database-sql-query-wire
-            path: database/sql/query
-            command: "-query-proto-wire-decoding=true"
           - name: native-query
             path: native/query
-          - name: native-query-wire
-            path: native/query
-            command: "-query-proto-wire-decoding=true"
           - name: native-table
             path: native/table
           - name: native-table-over-query-service
@@ -171,22 +165,15 @@ jobs:
 
       - name: Sync baseline workload sources
         run: |
-          current_slo="$GITHUB_WORKSPACE/current/tests/slo"
-          baseline_slo="$GITHUB_WORKSPACE/baseline/tests/slo"
-          workload_path="${{ matrix.sdk.path }}"
+          SYNC="$GITHUB_WORKSPACE/current/.github/scripts/sync-slo-workload-from-current.sh"
+          chmod +x "$SYNC"
 
           # Keep workload code (and shared internal helpers) on current so baseline
           # runs the same workload against the baseline SDK via tests/slo/go.mod replace.
-          rm -rf "$baseline_slo/internal" "$baseline_slo/$workload_path"
-          cp -a "$current_slo/internal" "$baseline_slo/internal"
-          cp -a "$current_slo/$workload_path" "$baseline_slo/$workload_path"
-          cp "$current_slo/go.mod" "$current_slo/go.sum" "$baseline_slo/"
-
-          # Older SDKs accept the same workload flag but retain standard decoding.
-          if ! grep -q '^func WithQueryProtoWireDecoding(' "$GITHUB_WORKSPACE/baseline/options.go"; then
-            cp "$current_slo/internal/querywire/options.go.stub" "$baseline_slo/internal/querywire/options.go"
-            echo "Baseline SDK has no wire-decoding option; using the standard-decoder adapter"
-          fi
+          bash "$SYNC" \
+            --target "$GITHUB_WORKSPACE/baseline" \
+            --source "$GITHUB_WORKSPACE/current" \
+            --workload-path "${{ matrix.sdk.path }}"
 
       - name: Build baseline workload image
         id: build-baseline
