@@ -275,7 +275,7 @@ func (l *GrpcStopper) StreamClientInterceptor(
 
 	stream, err := streamer(ctx, desc, cc, method, opts...)
 	if stream != nil {
-		stream = GrpcStopperStream{
+		stream = &GrpcStopperStream{
 			ClientStream: stream,
 			stopper:      l,
 			method:       method,
@@ -324,22 +324,33 @@ func (l *GrpcStopper) interceptWithSignals(stopChannel, streamStop empty.Chan, c
 type GrpcStopperStream struct {
 	grpc.ClientStream
 
+	sendMu     sync.Mutex
 	stopper    *GrpcStopper
 	method     string
 	streamStop empty.Chan
 }
 
-func (g GrpcStopperStream) CloseSend() error {
-	return g.stopper.interceptWithSignals(g.stopper.stopSignal(g.method), g.streamStop, g.ClientStream.CloseSend)
+func (g *GrpcStopperStream) CloseSend() error {
+	return g.stopper.interceptWithSignals(g.stopper.stopSignal(g.method), g.streamStop, func() error {
+		g.sendMu.Lock()
+		defer g.sendMu.Unlock()
+
+		return g.ClientStream.CloseSend()
+	})
 }
 
-func (g GrpcStopperStream) SendMsg(m any) error {
+func (g *GrpcStopperStream) SendMsg(m any) error {
 	return g.stopper.interceptWithSignals(
-		g.stopper.stopSignal(g.method), g.streamStop, func() error { return g.ClientStream.SendMsg(m) },
+		g.stopper.stopSignal(g.method), g.streamStop, func() error {
+			g.sendMu.Lock()
+			defer g.sendMu.Unlock()
+
+			return g.ClientStream.SendMsg(m)
+		},
 	)
 }
 
-func (g GrpcStopperStream) RecvMsg(m any) error {
+func (g *GrpcStopperStream) RecvMsg(m any) error {
 	stopChannel := g.stopper.stopSignal(g.method)
 	if err := g.stopper.interceptWithSignals(
 		stopChannel, g.streamStop, func() error { return g.ClientStream.RecvMsg(m) },
