@@ -185,14 +185,15 @@ func scanRowBytes(r *Row, dst []any) error {
 	return nil
 }
 
+// ColumnValue follows [value.FromYDB] and panics if a value cannot be decoded.
 func (r *indexedWireRow) ColumnValue(column int) value.Value {
 	cell, err := r.cell(column)
 	if err != nil {
-		return nil
+		panic(fmt.Errorf("scan error on column index %d: %w", column, err))
 	}
 	v, err := value.FromWire(r.part.columnTypes[column], cell)
 	if err != nil {
-		return nil
+		panic(fmt.Errorf("scan error on column index %d: %w", column, err))
 	}
 
 	return v

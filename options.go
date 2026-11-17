@@ -542,6 +542,8 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 // [query.Session] and [query.TxActor], including queries inside Do and DoTx.
 // The default is false: rows are decoded with the standard protobuf codec.
 // Arrow results and database/sql connectors keep their existing decoding paths.
+// A per-query codec selected with [query.WithCallOptions] takes precedence;
+// that query uses the selected codec and ordinary protobuf rows.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithQueryProtoWireDecoding(enabled bool) Option {

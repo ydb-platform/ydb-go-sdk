@@ -1,13 +1,49 @@
 package value
 
 import (
+	"fmt"
+	"math"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 )
+
+func TestFromWireRejectsOutOfRangeVariantIndex(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		typeOf types.Type
+	}{
+		{name: "tuple", typeOf: types.NewVariantTuple(types.Int32)},
+		{name: "struct", typeOf: types.NewVariantStruct(types.StructField{Name: "value", T: types.Int32})},
+	} {
+		for _, index := range []uint32{1, 1 << 31, math.MaxUint32} {
+			t.Run(fmt.Sprintf("%s/index=%d", tt.name, index), func(t *testing.T) {
+				data, err := proto.Marshal(&Ydb.Value{
+					VariantIndex: index,
+					Value: &Ydb.Value_NestedValue{NestedValue: &Ydb.Value{
+						Value: &Ydb.Value_Int32Value{Int32Value: 42},
+					}},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := FromWire(tt.typeOf, data)
+				if err == nil || !strings.Contains(err.Error(), "variant "+tt.name+" index") ||
+					!strings.Contains(err.Error(), "out of range") {
+					t.Fatalf("FromWire() = %v, %v; want a variant index out-of-range error", got, err)
+				}
+				if got != nil {
+					t.Fatalf("FromWire() value = %v, want nil", got)
+				}
+			})
+		}
+	}
+}
 
 func TestFromWireMatchesProtobufForValueTypes(t *testing.T) {
 	for name, original := range wireTestValues() {

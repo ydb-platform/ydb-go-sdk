@@ -108,7 +108,7 @@ func compositeFromWire(t types.Type, cell wirevalue.Cell) (Value, error) {
 
 func variantTupleFromWire(t *types.VariantTuple, cell wirevalue.Cell) (Value, error) {
 	index := int(cell.VariantIndex())
-	if index >= len(t.Tuple.InnerTypes()) {
+	if index < 0 || index >= len(t.Tuple.InnerTypes()) {
 		return nil, fmt.Errorf("variant tuple index %d out of range", index)
 	}
 	inner, err := cell.Nested()
@@ -125,7 +125,7 @@ func variantTupleFromWire(t *types.VariantTuple, cell wirevalue.Cell) (Value, er
 
 func variantStructFromWire(t *types.VariantStruct, cell wirevalue.Cell) (Value, error) {
 	index := int(cell.VariantIndex())
-	if index >= len(t.Struct.Fields()) {
+	if index < 0 || index >= len(t.Struct.Fields()) {
 		return nil, fmt.Errorf("variant struct index %d out of range", index)
 	}
 	field := t.Struct.Field(index)
