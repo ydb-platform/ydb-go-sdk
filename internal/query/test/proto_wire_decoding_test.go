@@ -34,6 +34,14 @@ func TestQueryProtoWireDecoding(t *testing.T) {
 				ydb.WithQueryProtoWireDecoding(false),
 			},
 		},
+		{
+			name: "last_option_enables",
+			options: []ydb.Option{
+				ydb.WithQueryProtoWireDecoding(false),
+				ydb.WithQueryProtoWireDecoding(true),
+			},
+			wire: true,
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			for _, prefetch := range []int{0, 2} {
@@ -86,17 +94,44 @@ func TestQueryProtoWireDecoding(t *testing.T) {
 					})
 
 					t.Run("database_sql", func(t *testing.T) {
-						observer.check(t, false, func() {
-							connector, err := ydb.Connector(db, ydb.WithQueryService(true),
-								ydb.WithPrefetchQueryResultParts(prefetch))
-							require.NoError(t, err)
-							sqlDB := sql.OpenDB(connector)
-							defer func() { require.NoError(t, sqlDB.Close()) }()
+						connector, err := ydb.Connector(db, ydb.WithQueryService(true),
+							ydb.WithPrefetchQueryResultParts(prefetch))
+						require.NoError(t, err)
+						sqlDB := sql.OpenDB(connector)
+						defer func() { require.NoError(t, sqlDB.Close()) }()
 
-							var got int32
-							require.NoError(t, sqlDB.QueryRowContext(t.Context(), `SELECT 42`).Scan(&got))
-							require.Equal(t, int32(42), got)
+						t.Run("QueryRow", func(t *testing.T) {
+							observer.check(t, tt.wire, func() {
+								var got int32
+								require.NoError(t, sqlDB.QueryRowContext(t.Context(), `SELECT 42`).Scan(&got))
+								require.Equal(t, int32(42), got)
+							})
 						})
+						t.Run("PreparedTransaction", func(t *testing.T) {
+							observer.check(t, tt.wire, func() {
+								tx, err := sqlDB.BeginTx(t.Context(), nil)
+								require.NoError(t, err)
+								defer func() { require.NoError(t, tx.Rollback()) }()
+								stmt, err := tx.PrepareContext(t.Context(), `SELECT 42`)
+								require.NoError(t, err)
+								defer func() { require.NoError(t, stmt.Close()) }()
+								var got int32
+								require.NoError(t, stmt.QueryRowContext(t.Context()).Scan(&got))
+								require.Equal(t, int32(42), got)
+							})
+						})
+					})
+					t.Run("database_sql_table_service", func(t *testing.T) {
+						queryCalls, tableCalls := server.ExecuteQueryCalls(), server.ExecuteDataQueryCalls()
+						connector, err := ydb.Connector(db, ydb.WithQueryService(false))
+						require.NoError(t, err)
+						sqlDB := sql.OpenDB(connector)
+						defer func() { require.NoError(t, sqlDB.Close()) }()
+						var got int32
+						require.NoError(t, sqlDB.QueryRowContext(t.Context(), `SELECT 42`).Scan(&got))
+						require.Equal(t, int32(42), got)
+						require.Equal(t, queryCalls, server.ExecuteQueryCalls())
+						require.Greater(t, server.ExecuteDataQueryCalls(), tableCalls)
 					})
 				})
 			}
