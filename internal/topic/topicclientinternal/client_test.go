@@ -30,15 +30,23 @@ func TestCommitOffsetErrors(t *testing.T) {
 		}}),
 	)
 	expiredWithoutIssuesErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_SESSION_EXPIRED))
+	expiredConsumerErr := xerrors.Operation(
+		xerrors.WithStatusCode(Ydb.StatusIds_SESSION_EXPIRED),
+		xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{
+			IssueCode: 500004,
+			Message:   "request to deleted read rule",
+		}}),
+	)
 	badSessionErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION))
 	badRequestErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_REQUEST))
 
 	for _, tt := range []struct {
-		name      string
-		noRetry   bool
-		results   []error
-		wantErr   error
-		wantCalls int
+		name        string
+		noRetry     bool
+		noSessionID bool
+		results     []error
+		wantErr     error
+		wantCalls   int
 	}{
 		{
 			name: "expired session", results: []error{expiredErr},
@@ -47,6 +55,11 @@ func TestCommitOffsetErrors(t *testing.T) {
 		{
 			name: "expired session without auto retry", noRetry: true,
 			results: []error{expiredWithoutIssuesErr},
+			wantErr: topicreader.ErrCommitToExpiredSession, wantCalls: 1,
+		},
+		{
+			name: "expired consumer without session ID", noSessionID: true,
+			results: []error{expiredConsumerErr},
 			wantErr: topicreader.ErrCommitToExpiredSession, wantCalls: 1,
 		},
 		{
@@ -83,18 +96,21 @@ func TestCommitOffsetErrors(t *testing.T) {
 			client := New(ctx, conn, nil, func(cfg *topic.Config) {
 				config.SetAutoRetry(&cfg.Common, !tt.noRetry)
 			})
-			err := client.CommitOffset(ctx, "topic", 0, "consumer", 1,
-				topicoptions.WithCommitOffsetReadSessionID("expired-session"),
-			)
+			var opts []topicoptions.CommitOffsetOption
+			if !tt.noSessionID {
+				opts = append(opts, topicoptions.WithCommitOffsetReadSessionID("expired-session"))
+			}
+			err := client.CommitOffset(ctx, "topic", 0, "consumer", 1, opts...)
 			require.Equal(t, tt.wantCalls, calls)
-			require.Equal(t, xerrors.Is(tt.wantErr, topicreader.ErrCommitToExpiredSession),
-				xerrors.Is(err, topicreader.ErrCommitToExpiredSession))
 			if tt.wantErr == nil {
 				require.NoError(t, err)
 
 				return
 			}
 			require.ErrorIs(t, err, tt.wantErr)
+			if !xerrors.Is(tt.wantErr, topicreader.ErrCommitToExpiredSession) {
+				require.NotErrorIs(t, err, topicreader.ErrCommitToExpiredSession)
+			}
 			require.ErrorContains(t, err, tt.results[len(tt.results)-1].Error())
 			if tt.wantCalls == 1 {
 				require.False(t, retry.Check(err).MustRetry(true))

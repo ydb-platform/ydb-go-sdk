@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
@@ -289,70 +291,97 @@ func TestTopicCommitOffsetWithoutSessionIDReconnectsReader(t *testing.T) {
 }
 
 func TestTopicCommitOffsetWithExpiredSessionID(t *testing.T) {
-	scope := newScope(t)
-	ctx := scope.Ctx
+	for _, tt := range []struct {
+		name           string
+		transportError bool
+	}{
+		{name: "no transport error"},
+		{name: "transport error before expired response", transportError: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			scope := newScope(t)
+			ctx := scope.Ctx
 
-	err := scope.TopicWriter().Write(ctx, topicwriter.Message{Data: strings.NewReader("msg0")})
-	require.NoError(t, err)
+			err := scope.TopicWriter().Write(ctx, topicwriter.Message{Data: strings.NewReader("msg0")})
+			require.NoError(t, err)
 
-	oldReader := scope.TopicReader()
-	_, err = oldReader.ReadMessage(ctx)
-	require.NoError(t, err)
-	expiredSessionID := oldReader.ReadSessionID()
-	require.NotEmpty(t, expiredSessionID)
-	require.NoError(t, oldReader.Close(ctx))
+			oldReader := scope.TopicReader()
+			_, err = oldReader.ReadMessage(ctx)
+			require.NoError(t, err)
+			expiredSessionID := oldReader.ReadSessionID()
+			require.NotEmpty(t, expiredSessionID)
+			require.NoError(t, oldReader.Close(ctx))
 
-	reader, err := scope.Driver().Topic().StartReader(
-		scope.TopicConsumerName(), topicoptions.ReadTopic(scope.TopicPath()),
-	)
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, reader.Close(ctx)) })
+			reader, err := scope.Driver().Topic().StartReader(
+				scope.TopicConsumerName(), topicoptions.ReadTopic(scope.TopicPath()),
+			)
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, reader.Close(ctx)) })
 
-	msg, err := reader.ReadMessage(ctx)
-	require.NoError(t, err)
-	sessionID := reader.ReadSessionID()
-	require.NotEmpty(t, sessionID)
-	require.NotEqual(t, expiredSessionID, sessionID)
+			msg, err := reader.ReadMessage(ctx)
+			require.NoError(t, err)
+			sessionID := reader.ReadSessionID()
+			require.NotEmpty(t, sessionID)
+			require.NotEqual(t, expiredSessionID, sessionID)
 
-	// Let the server reject the stale session, then cancel any unexpected retry.
-	commitCtx, cancelCommit := context.WithCancel(ctx)
-	defer cancelCommit()
-	var calls atomic.Int32
-	interceptor := func(
-		ctx context.Context, method string, req, reply any,
-		cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption,
-	) error {
-		if method == "/Ydb.Topic.V1.TopicService/CommitOffset" && calls.Add(1) > 1 {
-			cancelCommit()
+			// Let the server reject the stale session, then cancel any unexpected retry.
+			commitCtx, cancelCommit := context.WithCancel(ctx)
+			defer cancelCommit()
+			var expiredResponseSeen, unexpectedRetry, injectTransportError atomic.Bool
+			injectTransportError.Store(tt.transportError)
+			interceptor := func(
+				ctx context.Context, method string, req, reply any,
+				cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption,
+			) error {
+				if method != "/Ydb.Topic.V1.TopicService/CommitOffset" {
+					return invoker(ctx, method, req, reply, cc, opts...)
+				}
+				if expiredResponseSeen.Load() {
+					unexpectedRetry.Store(true)
+					cancelCommit()
 
-			return commitCtx.Err()
-		}
+					return commitCtx.Err()
+				}
+				if injectTransportError.Swap(false) {
+					return grpcStatus.Error(codes.Unavailable, "transport error before the expired-session response")
+				}
 
-		return invoker(ctx, method, req, reply, cc, opts...)
+				callErr := invoker(ctx, method, req, reply, cc, opts...)
+				if callErr == nil {
+					operation := reply.(*Ydb_Topic.CommitOffsetResponse).GetOperation()
+					if operation.GetReady() && operation.GetStatus() == Ydb.StatusIds_SESSION_EXPIRED {
+						expiredResponseSeen.Store(true)
+					}
+				}
+
+				return callErr
+			}
+			db := scope.NonCachingDriver(ydb.With(config.WithGrpcOptions(
+				grpc.WithChainUnaryInterceptor(interceptor),
+			)))
+			t.Cleanup(func() { require.NoError(t, db.Close(ctx)) })
+
+			err = db.Topic().CommitOffset(
+				commitCtx, scope.TopicPath(), msg.PartitionID(), scope.TopicConsumerName(), msg.Offset+1,
+				topicoptions.WithCommitOffsetReadSessionID(expiredSessionID),
+			)
+			require.True(t, expiredResponseSeen.Load(), "server must reject the expired session: %v", err)
+			require.False(t, unexpectedRetry.Load(), "expired session must not be retried: %v", err)
+			require.ErrorIs(t, err, topicreader.ErrCommitToExpiredSession)
+
+			desc, err := scope.Driver().Topic().DescribeTopicConsumer(
+				ctx, scope.TopicPath(), scope.TopicConsumerName(), topicoptions.IncludeConsumerStats(),
+			)
+			require.NoError(t, err)
+			require.EqualValues(t, 0, desc.Partitions[0].PartitionConsumerStats.CommittedOffset)
+
+			err = scope.TopicWriter().Write(ctx, topicwriter.Message{Data: strings.NewReader("msg1")})
+			require.NoError(t, err)
+
+			next, err := reader.ReadMessage(ctx)
+			require.NoError(t, err)
+			require.Equal(t, msg.Offset+1, next.Offset)
+			require.Equal(t, sessionID, reader.ReadSessionID())
+		})
 	}
-	db := scope.NonCachingDriver(ydb.With(config.WithGrpcOptions(
-		grpc.WithChainUnaryInterceptor(interceptor),
-	)))
-	t.Cleanup(func() { require.NoError(t, db.Close(ctx)) })
-
-	err = db.Topic().CommitOffset(
-		commitCtx, scope.TopicPath(), msg.PartitionID(), scope.TopicConsumerName(), msg.Offset+1,
-		topicoptions.WithCommitOffsetReadSessionID(expiredSessionID),
-	)
-	require.EqualValues(t, 1, calls.Load(), "expired session must not be retried: %v", err)
-	require.ErrorIs(t, err, topicreader.ErrCommitToExpiredSession)
-
-	desc, err := scope.Driver().Topic().DescribeTopicConsumer(
-		ctx, scope.TopicPath(), scope.TopicConsumerName(), topicoptions.IncludeConsumerStats(),
-	)
-	require.NoError(t, err)
-	require.EqualValues(t, 0, desc.Partitions[0].PartitionConsumerStats.CommittedOffset)
-
-	err = scope.TopicWriter().Write(ctx, topicwriter.Message{Data: strings.NewReader("msg1")})
-	require.NoError(t, err)
-
-	next, err := reader.ReadMessage(ctx)
-	require.NoError(t, err)
-	require.Equal(t, msg.Offset+1, next.Offset)
-	require.Equal(t, sessionID, reader.ReadSessionID())
 }

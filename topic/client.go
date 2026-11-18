@@ -35,6 +35,7 @@ type Client interface {
 	// to avoid interrupting the current read session. Without it, the server will interrupt
 	// the active read session for this partition, causing the reader to reconnect.
 	// An expired read session returns [topicreader.ErrCommitToExpiredSession] without retrying.
+	// For this error, the server status and issues are retained only in the error text.
 	//
 	// Server behavior for notable offset values:
 	//

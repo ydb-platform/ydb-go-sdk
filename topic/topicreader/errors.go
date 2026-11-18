@@ -25,6 +25,8 @@ var errConcurrencyCallCommit = fmt.Errorf(
 	"%w; possibly, you have commit operations from concurrent goroutines", ErrConcurrencyCall,
 )
 
-// ErrCommitToExpiredSession it is not fatal error and reader can continue work
-// client side must check error with errors.Is
+// ErrCommitToExpiredSession reports an expired session during a commit.
+// It can be returned by [Reader.Commit] or by the topic client's CommitOffset method.
+// A [Reader] can continue working after [Reader.Commit] returns this error.
+// Use [errors.Is] to check for it.
 var ErrCommitToExpiredSession = topicreadercommon.ErrPublicCommitSessionToExpiredSession
