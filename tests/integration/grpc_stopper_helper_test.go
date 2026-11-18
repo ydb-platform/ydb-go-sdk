@@ -4,52 +4,13 @@ package integration
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"sync"
-	"testing"
 
-	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 )
-
-func TestGrpcStopperUnaryCallHook(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	serverErr := errors.New("server response")
-	stopper := NewGrpcStopper(errors.New("stopped"))
-	var attempts int
-	stopper.onUnaryCall = func(callCtx context.Context, method string) error {
-		if method != "commit" {
-			return nil
-		}
-		attempts++
-		if attempts == 2 {
-			cancel()
-
-			return callCtx.Err()
-		}
-
-		return nil
-	}
-	var forwarded int
-	invoker := func(context.Context, string, any, any, *grpc.ClientConn, ...grpc.CallOption) error {
-		forwarded++
-
-		return serverErr
-	}
-
-	err := stopper.UnaryClientInterceptor(ctx, "commit", nil, nil, nil, invoker)
-	require.ErrorIs(t, err, serverErr)
-
-	err = stopper.UnaryClientInterceptor(ctx, "commit", nil, nil, nil, invoker)
-	require.ErrorIs(t, err, context.Canceled)
-	require.Equal(t, 1, forwarded, "the hook must prevent the second request from being sent")
-	require.Equal(t, 2, attempts)
-}
 
 // GrpcStopper interrupts gRPC calls with stopError between Stop and Start.
 // Pause holds unary requests and responses, and stream creation, until Start.
@@ -75,10 +36,6 @@ type GrpcStopper struct {
 	pause        *grpcPause
 	recvPause    empty.Chan
 	streamStop   empty.Chan
-
-	// onUnaryCall can observe or reject unary attempts before invoking gRPC.
-	// Set it before opening the driver; calls may invoke it concurrently.
-	onUnaryCall func(context.Context, string) error
 
 	// onRecvMsg can hold a real server response before the SDK receives it.
 	// Set it before opening streams.
@@ -290,11 +247,6 @@ func (l *GrpcStopper) UnaryClientInterceptor(
 	stopChannel := l.stopSignal(method)
 	if err := l.wait(ctx, method, stopChannel); err != nil {
 		return err
-	}
-	if l.onUnaryCall != nil {
-		if err := l.onUnaryCall(ctx, method); err != nil {
-			return err
-		}
 	}
 
 	return l.intercept(method, func() error {
