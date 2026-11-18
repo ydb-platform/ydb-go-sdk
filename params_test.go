@@ -152,6 +152,17 @@ func TestParams(t *testing.T) {
 		pb, err := params.ToYDB()
 		require.NoError(t, err)
 		require.Equal(t, fmt.Sprint(exp), fmt.Sprint(pb))
+		t.Run("FromProtobuf", func(t *testing.T) {
+			params := ydb.ParamsBuilder().
+				Param("$a").FromProtobuf(a).
+				Param("$b").FromProtobuf(b).
+				Param("$c").FromProtobuf(c).
+				Param("$d").FromProtobuf(d).
+				Build()
+			pb, err := params.ToYDB()
+			require.NoError(t, err)
+			require.Equal(t, fmt.Sprint(exp), fmt.Sprint(pb))
+		})
 		t.Run("Raw", func(t *testing.T) {
 			params := makeParamsUsingRawProtobuf(t)
 			pb, err := params.ToYDB()
