@@ -19,6 +19,7 @@ import (
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
@@ -285,4 +286,73 @@ func TestTopicCommitOffsetWithoutSessionIDReconnectsReader(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.EqualValues(t, msg0.Offset+1, desc.Partitions[0].PartitionConsumerStats.CommittedOffset)
+}
+
+func TestTopicCommitOffsetWithExpiredSessionID(t *testing.T) {
+	scope := newScope(t)
+	ctx := scope.Ctx
+
+	err := scope.TopicWriter().Write(ctx, topicwriter.Message{Data: strings.NewReader("msg0")})
+	require.NoError(t, err)
+
+	oldReader := scope.TopicReader()
+	_, err = oldReader.ReadMessage(ctx)
+	require.NoError(t, err)
+	expiredSessionID := oldReader.ReadSessionID()
+	require.NotEmpty(t, expiredSessionID)
+	require.NoError(t, oldReader.Close(ctx))
+
+	reader, err := scope.Driver().Topic().StartReader(
+		scope.TopicConsumerName(), topicoptions.ReadTopic(scope.TopicPath()),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, reader.Close(ctx)) })
+
+	msg, err := reader.ReadMessage(ctx)
+	require.NoError(t, err)
+	sessionID := reader.ReadSessionID()
+	require.NotEmpty(t, sessionID)
+	require.NotEqual(t, expiredSessionID, sessionID)
+
+	// Let the server reject the stale session, then cancel any unexpected retry.
+	commitCtx, cancelCommit := context.WithCancel(ctx)
+	defer cancelCommit()
+	var calls atomic.Int32
+	interceptor := func(
+		ctx context.Context, method string, req, reply any,
+		cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption,
+	) error {
+		if method == "/Ydb.Topic.V1.TopicService/CommitOffset" && calls.Add(1) > 1 {
+			cancelCommit()
+
+			return commitCtx.Err()
+		}
+
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
+	db := scope.NonCachingDriver(ydb.With(config.WithGrpcOptions(
+		grpc.WithChainUnaryInterceptor(interceptor),
+	)))
+	t.Cleanup(func() { require.NoError(t, db.Close(ctx)) })
+
+	err = db.Topic().CommitOffset(
+		commitCtx, scope.TopicPath(), msg.PartitionID(), scope.TopicConsumerName(), msg.Offset+1,
+		topicoptions.WithCommitOffsetReadSessionID(expiredSessionID),
+	)
+	require.EqualValues(t, 1, calls.Load(), "expired session must not be retried: %v", err)
+	require.ErrorIs(t, err, topicreader.ErrCommitToExpiredSession)
+
+	desc, err := scope.Driver().Topic().DescribeTopicConsumer(
+		ctx, scope.TopicPath(), scope.TopicConsumerName(), topicoptions.IncludeConsumerStats(),
+	)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, desc.Partitions[0].PartitionConsumerStats.CommittedOffset)
+
+	err = scope.TopicWriter().Write(ctx, topicwriter.Message{Data: strings.NewReader("msg1")})
+	require.NoError(t, err)
+
+	next, err := reader.ReadMessage(ctx)
+	require.NoError(t, err)
+	require.Equal(t, msg.Offset+1, next.Offset)
+	require.Equal(t, sessionID, reader.ReadSessionID())
 }

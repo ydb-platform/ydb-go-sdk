@@ -3,8 +3,10 @@ package topicclientinternal
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
@@ -253,9 +255,17 @@ func (c *Client) CommitOffset(
 	}
 
 	call := func(ctx context.Context) error {
-		return c.rawClient.CommitOffset(
+		err := c.rawClient.CommitOffset(
 			ctx, c.defaultOperationParams, path, partitionID, consumer, offset, options.ReadSessionID,
 		)
+		if xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_EXPIRED) {
+			// Keep diagnostics as text: unwrapping the operation error would make it retryable again.
+			return xerrors.WithStackTrace(fmt.Errorf(
+				"%w: %s", topicreadercommon.ErrPublicCommitSessionToExpiredSession, err.Error(),
+			))
+		}
+
+		return err
 	}
 
 	if c.cfg.AutoRetry() {

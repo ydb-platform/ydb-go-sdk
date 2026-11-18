@@ -31,9 +31,10 @@ type Client interface {
 	// CommitOffset commits the processed offset for a consumer on a partition.
 	// This call is not tied to an active read session.
 	//
-	// Use topicoptions.WithCommitOffsetReadSessionID (from reader.ReadSessionID()) to avoid
-	// interrupting the current read session. Without it, the server will interrupt the active
-	// read session for this partition, causing the reader to reconnect.
+	// Use [topicoptions.WithCommitOffsetReadSessionID] with [topicreader.Reader.ReadSessionID]
+	// to avoid interrupting the current read session. Without it, the server will interrupt
+	// the active read session for this partition, causing the reader to reconnect.
+	// An expired read session returns [topicreader.ErrCommitToExpiredSession] without retrying.
 	//
 	// Server behavior for notable offset values:
 	//
