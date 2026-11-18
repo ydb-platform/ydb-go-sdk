@@ -318,20 +318,18 @@ func TestTopicCommitOffsetWithExpiredSessionID(t *testing.T) {
 	commitCtx, cancelCommit := context.WithCancel(ctx)
 	defer cancelCommit()
 	var calls atomic.Int32
-	interceptor := func(
-		ctx context.Context, method string, req, reply any,
-		cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption,
-	) error {
+	stopper := NewGrpcStopper(context.Canceled)
+	stopper.onUnaryCall = func(callCtx context.Context, method string) error {
 		if method == "/Ydb.Topic.V1.TopicService/CommitOffset" && calls.Add(1) > 1 {
 			cancelCommit()
 
-			return commitCtx.Err()
+			return callCtx.Err()
 		}
 
-		return invoker(ctx, method, req, reply, cc, opts...)
+		return nil
 	}
 	db := scope.NonCachingDriver(ydb.With(config.WithGrpcOptions(
-		grpc.WithChainUnaryInterceptor(interceptor),
+		grpc.WithChainUnaryInterceptor(stopper.UnaryClientInterceptor),
 	)))
 	t.Cleanup(func() { require.NoError(t, db.Close(ctx)) })
 
