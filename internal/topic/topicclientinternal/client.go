@@ -258,7 +258,7 @@ func (c *Client) CommitOffset(
 		err := c.rawClient.CommitOffset(
 			ctx, c.defaultOperationParams, path, partitionID, consumer, offset, options.ReadSessionID,
 		)
-		if xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_EXPIRED) {
+		if options.ReadSessionID != "" && xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_EXPIRED) {
 			return xerrors.WithStackTrace(fmt.Errorf(
 				"%w: %s", topicreadercommon.ErrPublicCommitSessionToExpiredSession, err.Error(),
 			))

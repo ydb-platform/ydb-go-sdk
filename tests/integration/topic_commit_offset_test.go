@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -83,10 +84,9 @@ func TestTopicCommitOffsetBoundaryOffsets(t *testing.T) {
 	}
 }
 
-// TestTopicCommitOffsetRetryOnTransportErrors verifies that CommitOffset retries
-// automatically on transient gRPC errors (Unavailable, Cancelled) and eventually
-// succeeds. Mirrors the Python SDK test_commit_offset_retry_on_ydb_errors pattern.
-func TestTopicCommitOffsetRetryOnTransportErrors(t *testing.T) {
+// TestTopicCommitOffsetRetryWithoutSessionID verifies that CommitOffset without
+// a read session ID retries transport errors and SESSION_EXPIRED, then persists the offset.
+func TestTopicCommitOffsetRetryWithoutSessionID(t *testing.T) {
 	scope := newScope(t)
 	ctx := scope.Ctx
 
@@ -96,8 +96,7 @@ func TestTopicCommitOffsetRetryOnTransportErrors(t *testing.T) {
 	msg, err := scope.TopicReader().ReadMessage(ctx)
 	require.NoError(t, err)
 
-	// Interceptor that fails the first two CommitOffset gRPC calls with retryable
-	// transport errors, then lets subsequent calls through.
+	// Fail with retryable transport and operation errors before calling the server.
 	var callCount atomic.Int32
 	interceptor := func(
 		ctx context.Context,
@@ -118,6 +117,12 @@ func TestTopicCommitOffsetRetryOnTransportErrors(t *testing.T) {
 			return grpcStatus.Error(codes.Unavailable, "service temporarily unavailable")
 		case 2:
 			return grpcStatus.Error(codes.Canceled, "operation was cancelled")
+		case 3:
+			reply.(*Ydb_Topic.CommitOffsetResponse).Operation = &Ydb_Operations.Operation{
+				Ready: true, Status: Ydb.StatusIds_SESSION_EXPIRED,
+			}
+
+			return nil
 		default:
 			return invoker(ctx, method, req, reply, cc, opts...)
 		}
@@ -137,7 +142,13 @@ func TestTopicCommitOffsetRetryOnTransportErrors(t *testing.T) {
 		msg.Offset+1,
 	)
 	require.NoError(t, err)
-	require.EqualValues(t, 3, callCount.Load())
+	require.EqualValues(t, 4, callCount.Load())
+
+	desc, err := scope.Driver().Topic().DescribeTopicConsumer(
+		ctx, scope.TopicPath(), scope.TopicConsumerName(), topicoptions.IncludeConsumerStats(),
+	)
+	require.NoError(t, err)
+	require.EqualValues(t, msg.Offset+1, desc.Partitions[0].PartitionConsumerStats.CommittedOffset)
 }
 
 // TestTopicCommitOffsetPersistsOnServer verifies that CommitOffset actually persists

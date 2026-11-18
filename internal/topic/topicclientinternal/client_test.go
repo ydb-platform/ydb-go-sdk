@@ -22,6 +22,9 @@ import (
 )
 
 func TestCommitOffsetErrors(t *testing.T) {
+	withSessionID := []topicoptions.CommitOffsetOption{
+		topicoptions.WithCommitOffsetReadSessionID("expired-session"),
+	}
 	expiredErr := xerrors.Operation(
 		xerrors.WithStatusCode(Ydb.StatusIds_SESSION_EXPIRED),
 		xerrors.WithIssues([]*Ydb_Issue.IssueMessage{{
@@ -41,36 +44,46 @@ func TestCommitOffsetErrors(t *testing.T) {
 	badRequestErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_REQUEST))
 
 	for _, tt := range []struct {
-		name        string
-		noRetry     bool
-		noSessionID bool
-		results     []error
-		wantErr     error
-		wantCalls   int
+		name      string
+		opts      []topicoptions.CommitOffsetOption
+		noRetry   bool
+		results   []error
+		wantErr   error
+		wantCalls int
+		wantRetry bool
 	}{
 		{
-			name: "expired session", results: []error{expiredErr},
+			name: "expired session", opts: withSessionID, results: []error{expiredErr},
 			wantErr: topicreader.ErrCommitToExpiredSession, wantCalls: 1,
 		},
 		{
-			name: "expired session without auto retry", noRetry: true,
+			name: "expired session without auto retry", opts: withSessionID, noRetry: true,
 			results: []error{expiredWithoutIssuesErr},
 			wantErr: topicreader.ErrCommitToExpiredSession, wantCalls: 1,
 		},
 		{
-			name: "expired consumer without session ID", noSessionID: true,
-			results: []error{expiredConsumerErr},
-			wantErr: topicreader.ErrCommitToExpiredSession, wantCalls: 1,
+			name:    "expired consumer without session ID retries",
+			results: []error{expiredConsumerErr}, wantCalls: 2,
 		},
 		{
-			name: "bad session still retries", results: []error{badSessionErr}, wantCalls: 2,
+			name:    "explicitly empty session ID still retries",
+			opts:    []topicoptions.CommitOffsetOption{topicoptions.WithCommitOffsetReadSessionID("")},
+			results: []error{expiredErr}, wantCalls: 2,
 		},
 		{
-			name: "bad request stays unchanged", results: []error{badRequestErr},
+			name: "without session ID or auto retry", noRetry: true,
+			results: []error{expiredErr}, wantErr: expiredErr, wantCalls: 1, wantRetry: true,
+		},
+		{
+			name: "bad session still retries", opts: withSessionID, results: []error{badSessionErr}, wantCalls: 2,
+		},
+		{
+			name: "bad request stays unchanged", opts: withSessionID, results: []error{badRequestErr},
 			wantErr: badRequestErr, wantCalls: 1,
 		},
 		{
-			name: "expired session stops ongoing retries", results: []error{badSessionErr, expiredErr},
+			name: "expired session stops ongoing retries", opts: withSessionID,
+			results: []error{badSessionErr, expiredErr},
 			wantErr: topicreader.ErrCommitToExpiredSession, wantCalls: 2,
 		},
 	} {
@@ -96,11 +109,7 @@ func TestCommitOffsetErrors(t *testing.T) {
 			client := New(ctx, conn, nil, func(cfg *topic.Config) {
 				config.SetAutoRetry(&cfg.Common, !tt.noRetry)
 			})
-			var opts []topicoptions.CommitOffsetOption
-			if !tt.noSessionID {
-				opts = append(opts, topicoptions.WithCommitOffsetReadSessionID("expired-session"))
-			}
-			err := client.CommitOffset(ctx, "topic", 0, "consumer", 1, opts...)
+			err := client.CommitOffset(ctx, "topic", 0, "consumer", 1, tt.opts...)
 			require.Equal(t, tt.wantCalls, calls)
 			if tt.wantErr == nil {
 				require.NoError(t, err)
@@ -113,7 +122,7 @@ func TestCommitOffsetErrors(t *testing.T) {
 			}
 			require.ErrorContains(t, err, tt.results[len(tt.results)-1].Error())
 			if tt.wantCalls == 1 {
-				require.False(t, retry.Check(err).MustRetry(true))
+				require.Equal(t, tt.wantRetry, retry.Check(err).MustRetry(true))
 			}
 		})
 	}

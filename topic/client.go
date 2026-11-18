@@ -34,7 +34,8 @@ type Client interface {
 	// Use [topicoptions.WithCommitOffsetReadSessionID] with [topicreader.Reader.ReadSessionID]
 	// to avoid interrupting the current read session. Without it, the server will interrupt
 	// the active read session for this partition, causing the reader to reconnect.
-	// An expired read session returns [topicreader.ErrCommitToExpiredSession] without retrying.
+	// With a non-empty read session ID, SESSION_EXPIRED returns
+	// [topicreader.ErrCommitToExpiredSession] without automatic retries.
 	// For this error, the server status and issues are retained only in the error text.
 	//
 	// Server behavior for notable offset values:

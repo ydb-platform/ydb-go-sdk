@@ -26,7 +26,8 @@ var errConcurrencyCallCommit = fmt.Errorf(
 )
 
 // ErrCommitToExpiredSession reports an expired session during a commit.
-// It can be returned by [Reader.Commit] or by the topic client's CommitOffset method.
+// It can be returned by [Reader.Commit]. The topic client's CommitOffset method
+// also returns it when a non-empty read session ID is supplied.
 // A [Reader] can continue working after [Reader.Commit] returns this error.
 // Use [errors.Is] to check for it.
 var ErrCommitToExpiredSession = topicreadercommon.ErrPublicCommitSessionToExpiredSession
