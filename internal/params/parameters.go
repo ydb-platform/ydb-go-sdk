@@ -461,6 +461,7 @@ func (p *Parameter) Raw(pb *Ydb.TypedValue) Builder {
 }
 
 // FromProtobuf makes value from raw protobuf
+// The protobuf message is retained without copying.
 func (p *Parameter) FromProtobuf(pb *Ydb.TypedValue) Builder {
 	p.value = value.FromProtobuf(pb)
 

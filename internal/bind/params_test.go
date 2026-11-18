@@ -77,6 +77,40 @@ func (j *testJSONMarshaler) Scan(src any) error {
 	return nil
 }
 
+func TestRawProtobufParametersRejectMissingFields(t *testing.T) {
+	typ := &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}}
+	val := &Ydb.Value{Value: &Ydb.Value_Uint64Value{Uint64Value: 123}}
+	for _, tt := range []struct {
+		name string
+		arg  any
+	}{
+		{name: "NilPointer", arg: (*Ydb.TypedValue)(nil)},
+		{name: "EmptyValue", arg: Ydb.TypedValue{}},
+		{name: "EmptyPointer", arg: &Ydb.TypedValue{}},
+		{name: "MissingTypeValue", arg: Ydb.TypedValue{Value: val}},
+		{name: "MissingTypePointer", arg: &Ydb.TypedValue{Value: val}},
+		{name: "MissingValueValue", arg: Ydb.TypedValue{Type: typ}},
+		{name: "MissingValuePointer", arg: &Ydb.TypedValue{Type: typ}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Run("Params", func(t *testing.T) {
+				var err error
+				require.NotPanics(t, func() {
+					_, err = Params(sql.Named("raw", tt.arg))
+				})
+				require.ErrorContains(t, err, "Type and Value must be non-nil")
+			})
+			t.Run("AutoDeclare", func(t *testing.T) {
+				var err error
+				require.NotPanics(t, func() {
+					_, _, err = (AutoDeclare{}).ToYdb("SELECT $raw", sql.Named("raw", tt.arg))
+				})
+				require.ErrorContains(t, err, "Type and Value must be non-nil")
+			})
+		})
+	}
+}
+
 func TestToValue(t *testing.T) {
 	for _, tt := range []struct {
 		name string

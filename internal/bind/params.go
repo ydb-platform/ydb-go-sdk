@@ -314,8 +314,12 @@ func toValue(v any) (_ value.Value, err error) {
 	case value.Value:
 		return x, nil
 	case Ydb.TypedValue:
-		return value.FromProtobuf(&x), nil
+		return toValue(&x)
 	case *Ydb.TypedValue:
+		if x.GetType() == nil || x.GetValue() == nil {
+			return nil, xerrors.WithStackTrace(fmt.Errorf("invalid %T: Type and Value must be non-nil", x))
+		}
+
 		return value.FromProtobuf(x), nil
 	}
 

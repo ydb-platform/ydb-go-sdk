@@ -25,19 +25,17 @@ func CastTo(v Value, dst any) error {
 
 		return nil
 	case **Ydb.Value:
-		*x = v.toYDB()
+		*x = proto.CloneOf(v.toYDB())
 
 		return nil
 	case *Ydb.TypedValue:
-		x.Type = v.Type().ToYDB()
-		x.Value = v.toYDB()
+		pb := ToYDB(v)
+		proto.Reset(x)
+		proto.Merge(x, pb)
 
 		return nil
 	case **Ydb.TypedValue:
-		*x = &Ydb.TypedValue{
-			Type:  v.Type().ToYDB(),
-			Value: v.toYDB(),
-		}
+		*x = proto.CloneOf(ToYDB(v))
 
 		return nil
 	default:
