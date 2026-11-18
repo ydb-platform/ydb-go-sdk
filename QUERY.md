@@ -39,12 +39,19 @@ and to `database/sql` Query Service connectors, including prepared statements an
 transactions. It preserves the result format and row APIs. Arrow results and
 Table Service connectors keep their existing decoding paths.
 
-gRPC stream interceptors receive the ordinary protobuf query response and can
-inspect or update its metadata, including truncation flags and execution statistics.
-With wire decoding enabled, row data is retained separately, so `ResultSet.Rows`
-is empty in those callbacks. Interceptors that inspect protobuf rows should disable
-wire decoding. Typed internal `Recv()` still materializes protobuf rows and preserves
-metadata changes made by interceptors, including with prefetch enabled.
+With wire decoding enabled, the protobuf response exposed to gRPC stream
+interceptors and statistics handlers is not a data-access or transformation API
+for result rows. `ResultSet.Rows` is empty even when the query returns rows.
+Do not use the response protobuf in these callbacks to read, count, modify or
+replace result rows: protobuf row edits are not applied to the retained wire data.
+Read values through `Scan`, `ScanNamed`, `ScanStruct` or `Values`, count rows while
+iterating the result, and transform values after reading them.
+
+Response metadata, including status, issues, truncation flags and execution
+statistics, remains available to these callbacks. Synchronous metadata changes
+made by a stream interceptor after the underlying `RecvMsg` returns are preserved.
+If existing callbacks require a complete protobuf response with materialized rows,
+disable wire decoding with `ydb.WithQueryProtoWireDecoding(false)`.
 
 Arrow requires server support and the `EnableArrowResultSetFormat` feature.
 `query.WithResultFormatArrow` and the driver default option are experimental. Format selection
