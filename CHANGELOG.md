@@ -1,3 +1,5 @@
+* Fixed `topic.Client.CommitOffset` retrying commits with an expired non-empty read session ID; it now returns `topicreader.ErrCommitToExpiredSession`
+
 ## v3.157.1
 * Changed endpoint selection to compare two random candidates by unfinished RPC count within the best available priority bucket, preserving existing balancer configuration and node affinity
 

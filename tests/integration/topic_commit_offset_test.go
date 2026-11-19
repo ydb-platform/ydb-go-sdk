@@ -7,18 +7,24 @@ import (
 	"context"
 	"io"
 	"math"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
@@ -80,10 +86,9 @@ func TestTopicCommitOffsetBoundaryOffsets(t *testing.T) {
 	}
 }
 
-// TestTopicCommitOffsetRetryOnTransportErrors verifies that CommitOffset retries
-// automatically on transient gRPC errors (Unavailable, Cancelled) and eventually
-// succeeds. Mirrors the Python SDK test_commit_offset_retry_on_ydb_errors pattern.
-func TestTopicCommitOffsetRetryOnTransportErrors(t *testing.T) {
+// TestTopicCommitOffsetRetryWithoutSessionID verifies that CommitOffset without
+// a read session ID retries transport errors and SESSION_EXPIRED, then persists the offset.
+func TestTopicCommitOffsetRetryWithoutSessionID(t *testing.T) {
 	scope := newScope(t)
 	ctx := scope.Ctx
 
@@ -93,8 +98,7 @@ func TestTopicCommitOffsetRetryOnTransportErrors(t *testing.T) {
 	msg, err := scope.TopicReader().ReadMessage(ctx)
 	require.NoError(t, err)
 
-	// Interceptor that fails the first two CommitOffset gRPC calls with retryable
-	// transport errors, then lets subsequent calls through.
+	// Fail with retryable transport and operation errors before calling the server.
 	var callCount atomic.Int32
 	interceptor := func(
 		ctx context.Context,
@@ -115,6 +119,12 @@ func TestTopicCommitOffsetRetryOnTransportErrors(t *testing.T) {
 			return grpcStatus.Error(codes.Unavailable, "service temporarily unavailable")
 		case 2:
 			return grpcStatus.Error(codes.Canceled, "operation was cancelled")
+		case 3:
+			reply.(*Ydb_Topic.CommitOffsetResponse).Operation = &Ydb_Operations.Operation{
+				Ready: true, Status: Ydb.StatusIds_SESSION_EXPIRED,
+			}
+
+			return nil
 		default:
 			return invoker(ctx, method, req, reply, cc, opts...)
 		}
@@ -134,7 +144,13 @@ func TestTopicCommitOffsetRetryOnTransportErrors(t *testing.T) {
 		msg.Offset+1,
 	)
 	require.NoError(t, err)
-	require.EqualValues(t, 3, callCount.Load())
+	require.EqualValues(t, 4, callCount.Load())
+
+	desc, err := scope.Driver().Topic().DescribeTopicConsumer(
+		ctx, scope.TopicPath(), scope.TopicConsumerName(), topicoptions.IncludeConsumerStats(),
+	)
+	require.NoError(t, err)
+	require.EqualValues(t, msg.Offset+1, desc.Partitions[0].PartitionConsumerStats.CommittedOffset)
 }
 
 // TestTopicCommitOffsetPersistsOnServer verifies that CommitOffset actually persists
@@ -285,4 +301,104 @@ func TestTopicCommitOffsetWithoutSessionIDReconnectsReader(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.EqualValues(t, msg0.Offset+1, desc.Partitions[0].PartitionConsumerStats.CommittedOffset)
+}
+
+func TestTopicCommitOffsetWithExpiredSessionID(t *testing.T) {
+	if version.Lt(os.Getenv("YDB_VERSION"), "25.1.2") {
+		t.Skip("requires CommitOffset read_session_id support (YDB 25.1.2+)")
+	}
+
+	for _, tt := range []struct {
+		name           string
+		transportError bool
+	}{
+		{name: "no transport error"},
+		{name: "transport error before expired response", transportError: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			scope := newScope(t)
+			ctx := scope.Ctx
+
+			err := scope.TopicWriter().Write(ctx, topicwriter.Message{Data: strings.NewReader("msg0")})
+			require.NoError(t, err)
+
+			oldReader := scope.TopicReader()
+			_, err = oldReader.ReadMessage(ctx)
+			require.NoError(t, err)
+			expiredSessionID := oldReader.ReadSessionID()
+			require.NotEmpty(t, expiredSessionID)
+			require.NoError(t, oldReader.Close(ctx))
+
+			reader, err := scope.Driver().Topic().StartReader(
+				scope.TopicConsumerName(), topicoptions.ReadTopic(scope.TopicPath()),
+			)
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, reader.Close(ctx)) })
+
+			msg, err := reader.ReadMessage(ctx)
+			require.NoError(t, err)
+			sessionID := reader.ReadSessionID()
+			require.NotEmpty(t, sessionID)
+			require.NotEqual(t, expiredSessionID, sessionID)
+
+			// Let the server reject the stale session, then cancel any unexpected retry.
+			commitCtx, cancelCommit := context.WithCancel(ctx)
+			defer cancelCommit()
+			var expiredResponseSeen, unexpectedRetry, injectTransportError atomic.Bool
+			injectTransportError.Store(tt.transportError)
+			interceptor := func(
+				ctx context.Context, method string, req, reply any,
+				cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption,
+			) error {
+				if method != "/Ydb.Topic.V1.TopicService/CommitOffset" {
+					return invoker(ctx, method, req, reply, cc, opts...)
+				}
+				if expiredResponseSeen.Load() {
+					unexpectedRetry.Store(true)
+					cancelCommit()
+
+					return commitCtx.Err()
+				}
+				if injectTransportError.Swap(false) {
+					return grpcStatus.Error(codes.Unavailable, "transport error before the expired-session response")
+				}
+
+				callErr := invoker(ctx, method, req, reply, cc, opts...)
+				if callErr == nil {
+					operation := reply.(*Ydb_Topic.CommitOffsetResponse).GetOperation()
+					if operation.GetReady() && operation.GetStatus() == Ydb.StatusIds_SESSION_EXPIRED {
+						expiredResponseSeen.Store(true)
+					}
+				}
+
+				return callErr
+			}
+			db := scope.NonCachingDriver(ydb.With(config.WithGrpcOptions(
+				grpc.WithChainUnaryInterceptor(interceptor),
+			)))
+			t.Cleanup(func() { require.NoError(t, db.Close(ctx)) })
+
+			err = db.Topic().CommitOffset(
+				commitCtx, scope.TopicPath(), msg.PartitionID(), scope.TopicConsumerName(), msg.Offset+1,
+				topicoptions.WithCommitOffsetReadSessionID(expiredSessionID),
+			)
+			require.True(t, expiredResponseSeen.Load(), "server must reject the expired session: %v", err)
+			require.False(t, unexpectedRetry.Load(), "expired session must not be retried: %v", err)
+			require.ErrorIs(t, err, topicreader.ErrCommitToExpiredSession)
+
+			desc, err := scope.Driver().Topic().DescribeTopicConsumer(
+				ctx, scope.TopicPath(), scope.TopicConsumerName(), topicoptions.IncludeConsumerStats(),
+			)
+			require.NoError(t, err)
+			require.EqualValues(t, 0, desc.Partitions[0].PartitionConsumerStats.CommittedOffset)
+
+			err = scope.TopicWriter().Write(ctx, topicwriter.Message{Data: strings.NewReader("msg1")})
+			require.NoError(t, err)
+
+			next, err := reader.ReadMessage(ctx)
+			require.NoError(t, err)
+			require.Equal(t, msg.Offset+1, next.Offset)
+			require.Equal(t, sessionID, reader.ReadSessionID())
+		})
+	}
 }
