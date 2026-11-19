@@ -7,6 +7,7 @@ import (
 	"context"
 	"io"
 	"math"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -21,6 +22,7 @@ import (
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
@@ -302,6 +304,10 @@ func TestTopicCommitOffsetWithoutSessionIDReconnectsReader(t *testing.T) {
 }
 
 func TestTopicCommitOffsetWithExpiredSessionID(t *testing.T) {
+	if version.Lt(os.Getenv("YDB_VERSION"), "25.1.2") {
+		t.Skip("requires CommitOffset read_session_id support (YDB 25.1.2+)")
+	}
+
 	for _, tt := range []struct {
 		name           string
 		transportError bool
