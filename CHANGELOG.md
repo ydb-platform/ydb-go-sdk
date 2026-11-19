@@ -1,3 +1,5 @@
+* Fixed TopicListener callback ordering across partition sessions and cancellation of buffered reads after a forced partition stop
+
 ## v3.157.1
 * Changed endpoint selection to compare two random candidates by unfinished RPC count within the best available priority bucket, preserving existing balancer configuration and node affinity
 

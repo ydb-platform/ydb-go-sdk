@@ -7,10 +7,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 )
 
-// EventHandler methods will be called sequentially by partition,
-// but can be called in parallel for different partitions.
-// Callbacks must return when their context is canceled; reconnect and WaitStop
-// wait for active callbacks to finish.
+// EventHandler methods are called sequentially for each topic and partition,
+// including across partition sessions. Different topic partitions can run in parallel.
+// A forced partition stop cancels the session context and discards its buffered
+// messages without committing them. Callbacks must return when their context is
+// canceled; the next session's callbacks, reconnect, and WaitStop wait for them to finish.
 // You should include topiclistener.BaseHandler into your struct for the interface implementation
 // It allows to extend the interface in the future without broke compatibility.
 //
