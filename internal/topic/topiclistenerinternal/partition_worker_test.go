@@ -656,7 +656,7 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 	}
 
 	worker := NewPartitionWorker(
-		123,
+		session.StreamPartitionSessionID,
 		session,
 		messageSender,
 		mockHandler,
@@ -689,7 +689,7 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 	xtest.WaitChannelClosed(t, errorReceived)
 
 	// Verify error contains user handler error using atomic access
-	require.Equal(t, int64(123), stoppedSessionID.Load())
+	require.Equal(t, session.StreamPartitionSessionID.ToInt64(), stoppedSessionID.Load())
 	errPtr := stoppedErr.Load()
 	require.NotNil(t, errPtr)
 	require.Contains(t, (*errPtr).Error(), "user handler error")
@@ -1111,7 +1111,7 @@ func TestPartitionWorkerImpl_PanicRecovery(t *testing.T) {
 	}
 
 	worker := NewPartitionWorker(
-		123,
+		session.StreamPartitionSessionID,
 		session,
 		messageSender,
 		mockHandler,
@@ -1141,7 +1141,7 @@ func TestPartitionWorkerImpl_PanicRecovery(t *testing.T) {
 	xtest.WaitChannelClosed(t, errorReceived)
 
 	// Verify panic recovery
-	require.Equal(t, int64(123), stoppedSessionID.Load())
+	require.Equal(t, session.StreamPartitionSessionID.ToInt64(), stoppedSessionID.Load())
 	errPtr := stoppedErr.Load()
 	require.NotNil(t, errPtr)
 	require.Contains(t, (*errPtr).Error(), "partition worker panic")

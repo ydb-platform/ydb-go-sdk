@@ -15,6 +15,78 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+func TestPartitionWorkerStopCallbackReportsFailedSuccessorSession(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		batch bool
+		panic bool
+	}{
+		{name: "start error"},
+		{name: "start panic", panic: true},
+		{name: "read error", batch: true},
+		{name: "read panic", batch: true, panic: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := xtest.Context(t)
+			firstSession := createTestPartitionSession()
+			secondSession := createTestPartitionSession()
+			secondSession.StreamPartitionSessionID++
+			t.Cleanup(firstSession.Close)
+			t.Cleanup(secondSession.Close)
+			handlerErr := errors.New("successor session failed")
+			fail := func() error {
+				if test.panic {
+					panic(handlerErr)
+				}
+
+				return handlerErr
+			}
+			handler := NewMockEventHandler(gomock.NewController(t))
+			firstStart := handler.EXPECT().OnStartPartitionSessionRequest(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, event *PublicEventStartPartitionSession) error {
+					event.Confirm()
+
+					return nil
+				})
+			if test.batch {
+				handler.EXPECT().OnReadMessages(gomock.Any(), gomock.Any()).After(firstStart.Call).
+					DoAndReturn(func(context.Context, *PublicReadMessages) error { return fail() })
+			} else {
+				handler.EXPECT().OnStartPartitionSessionRequest(gomock.Any(), gomock.Any()).After(firstStart.Call).
+					DoAndReturn(func(context.Context, *PublicEventStartPartitionSession) error { return fail() })
+			}
+			type stoppedWorker struct {
+				sessionID rawtopicreader.PartitionSessionID
+				err       error
+			}
+			stopped := make(chan stoppedWorker, 1)
+			worker := NewPartitionWorker(firstSession.StreamPartitionSessionID, firstSession,
+				newMockMessageSender(), handler,
+				func(sessionID rawtopicreader.PartitionSessionID, err error) {
+					stopped <- stoppedWorker{sessionID: sessionID, err: err}
+				}, &trace.Topic{}, "test-listener")
+			worker.Start(ctx)
+			t.Cleanup(func() { require.NoError(t, worker.Close(ctx, nil)) })
+			worker.AddRawServerMessage(firstSession, createTestStartPartitionRequest())
+			if test.batch {
+				worker.AddMessagesBatch(rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+					createTestBatch(t, secondSession))
+			} else {
+				worker.AddRawServerMessage(secondSession, createTestStartPartitionRequest())
+			}
+
+			got := xtest.Receive(t, stopped, "the worker failure in its successor session")
+			if test.panic {
+				require.ErrorContains(t, got.err, "partition worker panic: "+handlerErr.Error())
+			} else {
+				require.ErrorIs(t, got.err, handlerErr)
+			}
+			require.Equal(t, secondSession.StreamPartitionSessionID, got.sessionID,
+				"the stop callback must identify the failed session, rather than the worker's creating session")
+		})
+	}
+}
+
 func TestPartitionWorkerReadContextLivesUntilSessionStops(t *testing.T) {
 	session := createTestPartitionSession()
 	handler := NewMockEventHandler(gomock.NewController(t))

@@ -88,6 +88,43 @@ func TestStreamListenerReusesWorkerOnlyForTheSameTopicAndPartition(t *testing.T)
 	require.Len(t, listener.workers, 3, "one worker must serve each distinct topic and partition")
 }
 
+func TestStreamListenerWorkerStopReportsCurrentSession(t *testing.T) {
+	e := fixenv.New(t)
+	ctx := sf.Context(e)
+	listener := StreamListener(e)
+	starts := make(chan *PublicEventStartPartitionSession, 2)
+	EventHandlerMock(e).EXPECT().OnStartPartitionSessionRequest(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, event *PublicEventStartPartitionSession) error {
+			event.Confirm()
+			starts <- event
+
+			return nil
+		}).Times(2)
+
+	firstStart := createTestStartPartitionRequest()
+	firstStart.PartitionSession.PartitionSessionID = 100
+	require.NoError(t, listener.routeMessage(ctx, firstStart))
+	xtest.Receive(t, starts, "the original session")
+	secondStart := createTestStartPartitionRequest()
+	secondStart.PartitionSession.PartitionSessionID = 101
+	require.NoError(t, listener.routeMessage(ctx, secondStart))
+	xtest.Receive(t, starts, "the successor session on the same worker")
+	firstSession, err := listener.sessions.Get(100)
+	require.NoError(t, err)
+	secondSession, err := listener.sessions.Get(101)
+	require.NoError(t, err)
+
+	worker := listener.createWorkerForPartition(secondSession)
+	worker.messageQueue.Close()
+	xtest.WaitChannelClosed(t, listener.background.StopDone())
+	require.NoError(t, listener.Close(ctx, ErrUserCloseTopic))
+	require.ErrorIs(t, listener.background.CloseReason(), errPartitionQueueClosed)
+	require.Contains(t, listener.background.CloseReason().Error(), "partitionSession=101",
+		"the shutdown reason must identify the session most recently processed by the shared worker")
+	require.ErrorIs(t, firstSession.Context().Err(), context.Canceled)
+	require.ErrorIs(t, secondSession.Context().Err(), context.Canceled)
+}
+
 func TestStreamListenerForcedStopInterruptsPendingGracefulConfirmation(t *testing.T) {
 	e := fixenv.New(t)
 	ctx := sf.Context(e)

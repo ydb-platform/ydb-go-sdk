@@ -628,16 +628,17 @@ func (l *streamListener) SendRaw(msg rawtopicreader.ClientMessage) {
 
 // onWorkerStopped handles worker stopped notifications
 func (l *streamListener) onWorkerStopped(
-	session *topicreadercommon.PartitionSession,
+	key partitionKey,
+	sessionID rawtopicreader.PartitionSessionID,
 	reason error,
 ) {
 	l.m.WithLock(func() {
-		delete(l.workers, partitionKey{topic: session.Topic, id: session.PartitionID})
+		delete(l.workers, key)
 	})
 	l.goClose(l.background.Context(), reason)
 
 	// Remove corresponding session
-	_, _ = l.sessions.Remove(session.StreamPartitionSessionID)
+	_, _ = l.sessions.Remove(sessionID)
 }
 
 // createWorkerForPartition creates a new PartitionWorker for the given session
@@ -661,8 +662,8 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 			session,
 			l,
 			l.handler,
-			func(_ rawtopicreader.PartitionSessionID, reason error) {
-				l.onWorkerStopped(session, reason)
+			func(sessionID rawtopicreader.PartitionSessionID, reason error) {
+				l.onWorkerStopped(key, sessionID, reason)
 				closeOnce.Do(func() {
 					// The callback can run in the worker goroutine, so join it elsewhere.
 					go func() {

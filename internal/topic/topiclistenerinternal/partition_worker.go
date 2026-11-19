@@ -38,6 +38,14 @@ type unifiedMessage struct {
 	BatchMessage     *batchMessage
 }
 
+func (m unifiedMessage) partitionSession() *topicreadercommon.PartitionSession {
+	if m.BatchMessage != nil {
+		return topicreadercommon.BatchGetPartitionSession(m.BatchMessage.Batch)
+	}
+
+	return m.PartitionSession
+}
+
 // batchMessage represents a ready PublicBatch message with metadata
 type batchMessage struct {
 	ServerMessageMetadata rawtopiccommon.ServerMessageMetadata
@@ -57,7 +65,7 @@ func batchReadBufferSize(batch *topicreadercommon.PublicBatch) int {
 	return size
 }
 
-// WorkerStoppedCallback reports why a worker stopped or needs to stop.
+// WorkerStoppedCallback reports why a worker stopped and its last processed session.
 type WorkerStoppedCallback func(sessionID rawtopicreader.PartitionSessionID, reason error)
 
 // PartitionWorker processes messages for one topic partition across partition sessions.
@@ -189,10 +197,12 @@ func (w *PartitionWorker) Close(ctx context.Context, reason error) error {
 
 // receiveMessagesLoop is the main message processing loop
 func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
+	session := w.partitionSession
+	sessionID := w.partitionSessionID
 	defer func() {
 		if r := recover(); r != nil {
 			reason := xerrors.WithStackTrace(fmt.Errorf("ydb: partition worker panic: %v", r))
-			w.onStopped(w.partitionSessionID, reason)
+			w.onStopped(sessionID, reason)
 		}
 	}()
 
@@ -208,20 +218,20 @@ func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
 			if ctx.Err() == context.Canceled {
 				reason := xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 					"graceful shutdown PartitionWorker: topic=%s, partition=%d, partitionSession=%d",
-					w.partitionSession.Topic,
-					w.partitionSession.PartitionID,
-					w.partitionSessionID,
+					session.Topic,
+					session.PartitionID,
+					sessionID,
 				)))
-				w.onStopped(w.partitionSessionID, reason)
+				w.onStopped(sessionID, reason)
 			} else {
 				reason := xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 					"partition worker message queue context error: topic=%s, partition=%d, partitionSession=%d: %w",
-					w.partitionSession.Topic,
-					w.partitionSession.PartitionID,
-					w.partitionSessionID,
+					session.Topic,
+					session.PartitionID,
+					sessionID,
 					err,
 				)))
-				w.onStopped(w.partitionSessionID, reason)
+				w.onStopped(sessionID, reason)
 			}
 
 			return
@@ -230,18 +240,22 @@ func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
 			// Queue was closed - this is a normal stop reason during shutdown
 			reason := xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 				"partition worker message queue closed: topic=%s, partition=%d, partitionSession=%d: %w",
-				w.partitionSession.Topic,
-				w.partitionSession.PartitionID,
-				w.partitionSessionID,
+				session.Topic,
+				session.PartitionID,
+				sessionID,
 				errPartitionQueueClosed,
 			)))
-			w.onStopped(w.partitionSessionID, reason)
+			w.onStopped(sessionID, reason)
 
 			return
 		}
 
+		if messageSession := msg.partitionSession(); messageSession != nil {
+			session = messageSession
+			sessionID = session.StreamPartitionSessionID
+		}
 		if err := w.processUnifiedMessage(ctx, msg); err != nil {
-			w.onStopped(w.partitionSessionID, err)
+			w.onStopped(sessionID, err)
 
 			return
 		}
@@ -256,10 +270,7 @@ func (w *PartitionWorker) processUnifiedMessage(ctx context.Context, msg unified
 		return err
 	}
 
-	session := msg.PartitionSession
-	if msg.BatchMessage != nil {
-		session = topicreadercommon.BatchGetPartitionSession(msg.BatchMessage.Batch)
-	}
+	session := msg.partitionSession()
 	if session == nil {
 		return nil
 	}
