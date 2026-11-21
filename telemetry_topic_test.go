@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"testing"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
+	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topiclistener"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
@@ -36,14 +38,6 @@ func TestTopicPartitionSessionMetricPublicSurface(t *testing.T) {
 			db, err := ydb.Open(ctx, "grpc://"+address+"/local",
 				ydb.WithAnonymousCredentials(), ydb.WithBalancer(balancers.SingleConn()), ydb.WithMeter(meter))
 			require.NoError(t, err)
-			t.Cleanup(func() {
-				cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cleanupCancel()
-				require.NoError(t, db.Close(cleanupCtx))
-			})
-			child, err := db.With(ctx)
-			require.NoError(t, err)
-
 			var closeResources []func(context.Context) error
 			t.Cleanup(func() {
 				cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -53,7 +47,10 @@ func TestTopicPartitionSessionMetricPublicSurface(t *testing.T) {
 						require.NoError(t, closeResource(cleanupCtx))
 					}
 				}
+				require.NoError(t, db.Close(cleanupCtx))
 			})
+			child, err := db.With(ctx)
+			require.NoError(t, err)
 			for i, driver := range []*ydb.Driver{db, child} {
 				name := []string{"parent", "child"}[i]
 				if listener {
@@ -89,19 +86,14 @@ func TestTopicPartitionSessionMetricPublicSurface(t *testing.T) {
 			// Independent native gauge series register before admission.
 			assertPartitionSessionMetric(ctx, t, collect, address, map[string]int64{"parent": 0, "child": 0})
 			for range 2 {
-				var session *metricReadSession
 				select {
-				case session = <-service.sessions:
-				case <-ctx.Done():
-					t.Fatal(ctx.Err())
-				}
-				select {
-				case session.start <- struct{}{}:
-				case <-ctx.Done():
-					t.Fatal(ctx.Err())
-				}
-				select {
-				case <-session.confirmed:
+				case session := <-service.sessions:
+					close(session.start)
+					select {
+					case <-session.confirmed:
+					case <-ctx.Done():
+						t.Fatal(ctx.Err())
+					}
 				case <-ctx.Done():
 					t.Fatal(ctx.Err())
 				}
@@ -180,8 +172,7 @@ type metricTopicServer struct {
 }
 
 type metricReadSession struct {
-	start     chan struct{}
-	confirmed chan struct{}
+	start, confirmed chan struct{}
 }
 
 func (s *metricTopicServer) StreamRead(stream Ydb_Topic_V1.TopicService_StreamReadServer) error {
@@ -236,4 +227,48 @@ func (s *metricTopicServer) StreamRead(stream Ydb_Topic_V1.TopicService_StreamRe
 			close(session.confirmed)
 		}
 	}
+}
+
+type observedMetric struct {
+	Descriptor telemetry.Descriptor
+	Points     []observedPoint
+}
+
+type observedPoint struct {
+	Value      int64
+	Attributes []telemetry.Attribute
+}
+
+func newMetricMeter() (telemetry.Meter, func(context.Context) ([]observedMetric, error)) {
+	type registration struct {
+		descriptor telemetry.Descriptor
+		callback   telemetry.Int64GaugeCallback
+	}
+	registrations := make(map[*registration]struct{})
+	meter := func(desc telemetry.Descriptor, callback telemetry.Int64GaugeCallback) (func() error, error) {
+		reg := &registration{desc, callback}
+		registrations[reg] = struct{}{}
+
+		return func() error {
+			delete(registrations, reg)
+
+			return nil
+		}, nil
+	}
+	collect := func(ctx context.Context) ([]observedMetric, error) {
+		var metrics []observedMetric
+		for reg := range registrations {
+			data := observedMetric{Descriptor: reg.descriptor}
+			if err := reg.callback(ctx, func(value int64, attrs ...telemetry.Attribute) {
+				data.Points = append(data.Points, observedPoint{Value: value, Attributes: slices.Clone(attrs)})
+			}); err != nil {
+				return nil, err
+			}
+			metrics = append(metrics, data)
+		}
+
+		return metrics, nil
+	}
+
+	return meter, collect
 }

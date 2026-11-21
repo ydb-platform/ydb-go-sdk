@@ -58,11 +58,11 @@ func TestPartitionSessionCountTracksCurrentStream(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestReaderMetricRegistrationFailure(t *testing.T) {
+func TestReaderMetricRegistrationFailureDoesNotConnect(t *testing.T) {
 	failure := errors.New("registration failed")
 	reader, err := NewReader(nil,
 		func(context.Context, int64, *trace.Topic) (topicreadercommon.RawTopicReaderStream, error) {
-			return nil, errors.New("unexpected connection")
+			panic("reader connected after failed metric registration")
 		}, "consumer", []topicreadercommon.PublicReadSelector{{Path: "topic"}},
 		func(cfg *ReaderConfig) {
 			cfg.Metrics.Meter = func(telemetry.Descriptor, telemetry.Int64GaugeCallback) (func() error, error) {

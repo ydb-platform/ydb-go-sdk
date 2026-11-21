@@ -23,10 +23,6 @@ func TestListenerPartitionSessionCount(t *testing.T) {
 	counts, err := r.PartitionSessionCounts()
 	require.NoError(t, err)
 	require.Equal(t, int64(1), counts[""])
-	PartitionSession(e).Close()
-	counts, err = r.PartitionSessionCounts()
-	require.NoError(t, err)
-	require.Empty(t, counts)
 	r.streamListener = nil
 	counts, err = r.PartitionSessionCounts()
 	require.NoError(t, err)

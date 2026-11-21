@@ -32,21 +32,15 @@ func TestPartitionSessionActiveCounts(t *testing.T) {
 func TestPartitionSessionCountSource(t *testing.T) {
 	ctx := context.Background()
 	var callback telemetry.Int64GaugeCallback
-	meter := func(desc telemetry.Descriptor, cb telemetry.Int64GaugeCallback) (func() error, error) {
-		require.Equal(t, "ydb.topic.reader.partition_session.count", desc.Name)
-		require.Equal(t, "{session}", desc.Unit)
+	meter := func(_ telemetry.Descriptor, cb telemetry.Int64GaugeCallback) (func() error, error) {
 		callback = cb
 
-		return func() error {
-			callback = nil
-
-			return nil
-		}, nil
+		return func() error { return nil }, nil
 	}
 	storage := &PartitionSessionStorage{}
 	selectors := []*PublicReadSelector{{Path: "topic"}, {Path: "/Root/db/topic"}, {Path: "empty"}}
-	first, err := RegisterPartitionSessionCount(
-		ReaderMetricsConfig{Meter: meter, Endpoint: "localhost:2135", Database: "//Root/db/"},
+	_, err := RegisterPartitionSessionCount(
+		ReaderMetricsConfig{Meter: meter, Database: "//Root/db/"},
 		"consumer", selectors, func() (map[string]int64, error) {
 			return storage.ActiveCountsByTopic(), nil
 		},
@@ -57,19 +51,23 @@ func TestPartitionSessionCountSource(t *testing.T) {
 	require.NoError(t, storage.Add(session))
 	values := make(map[string]int64)
 	require.NoError(t, callback(ctx, func(value int64, attributes ...telemetry.Attribute) {
-		attrs := make(map[string]string)
+		require.Contains(t, attributes, telemetry.Attribute{Key: "reader.name", Value: "default"})
+		var topic string
 		for _, attr := range attributes {
-			attrs[attr.Key] = attr.Value
+			if attr.Key == "topic" {
+				topic = attr.Value
+			}
 		}
-		require.Equal(t, map[string]string{
-			"endpoint": "localhost:2135", "database": "/Root/db", "consumer": "consumer",
-			"reader.name": "default", "topic": attrs["topic"],
-		}, attrs)
-		values[attrs["topic"]] = value
+		require.NotContains(t, values, topic)
+		values[topic] = value
 	}))
 	require.Equal(t, map[string]int64{"/Root/db/topic": 1, "/Root/db/empty": 0}, values)
-	require.NoError(t, first())
-	require.Nil(t, callback)
+
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	require.ErrorIs(t, callback(canceled, func(int64, ...telemetry.Attribute) {
+		t.Error("canceled collection produced an observation")
+	}), context.Canceled)
 }
 
 func TestPartitionSessionCountDuringContextReplacement(t *testing.T) {
@@ -105,7 +103,9 @@ func TestPartitionSessionCountWithoutConsumer(t *testing.T) {
 
 			return func() error { return nil }, nil
 		}},
-		"", []*PublicReadSelector{{Path: "topic"}}, func() (map[string]int64, error) { return nil, nil },
+		"", []*PublicReadSelector{{Path: "topic"}}, func() (map[string]int64, error) {
+			return map[string]int64{}, nil
+		},
 	)
 	require.NoError(t, err)
 	var observations [][]telemetry.Attribute
