@@ -214,7 +214,7 @@ func setupTopicReaderLocalBufferMessages(t *trace.Topic, config Config) {
 		"messages",
 		topicReaderLocalBufferMessagesName,
 		topicReaderLocalBufferMessagesUnit,
-		topicMessageLabels,
+		topicStreamLabels,
 	)
 	if config.Details()&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) == 0 {
 		return
@@ -224,7 +224,7 @@ func setupTopicReaderLocalBufferMessages(t *trace.Topic, config Config) {
 			return
 		}
 		addGauge(
-			localBufferMessages.With(messageLabels(info.ReaderInfo, info.Topic)),
+			localBufferMessages.With(streamLabels(info.ReaderInfo)),
 			float64(info.MessagesDelta),
 		)
 	}

@@ -57,7 +57,7 @@ func TestTopicReaderMetricDescriptorsAndLegacyNames(t *testing.T) {
 		},
 		{
 			name: "ydb.topic.reader.local_buffer.messages", legacyName: "custom.topic.reader.local_buffer.messages",
-			unit: "{message}", kind: "gauge", labels: []string{"endpoint", "database", "topic", "consumer", "reader.name"},
+			unit: "{message}", kind: "gauge", labels: []string{"endpoint", "database", "consumer", "reader.name"},
 		},
 		{
 			name: "ydb.topic.reader.credit_balance_bytes", legacyName: "custom.topic.reader.credit_balance_bytes",
@@ -347,7 +347,7 @@ func TestTopicReaderGaugesApplyDeltasWithoutSet(t *testing.T) {
 	})
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
 		ReaderInfo: readerInfo,
-		Topic:      "/topic", MessagesDelta: -2,
+		Topic:      "/other", MessagesDelta: -2,
 	})
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{MessagesDelta: 0})
 	tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
@@ -364,7 +364,7 @@ func TestTopicReaderGaugesApplyDeltasWithoutSet(t *testing.T) {
 	require.Equal(t, []float64{100, -40}, capture.adds["topic.reader.credit_balance_bytes"])
 	require.Empty(t, capture.sets)
 	require.Equal(t, float64(3), registry.value("topic.reader.local_buffer.messages", map[string]string{
-		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
+		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",
 	}))
 	require.Equal(t, float64(60), registry.value("topic.reader.credit_balance_bytes", map[string]string{
 		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",

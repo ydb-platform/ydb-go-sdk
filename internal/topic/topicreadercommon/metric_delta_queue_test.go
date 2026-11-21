@@ -43,6 +43,28 @@ func TestCreditBalanceSerializesConcurrentObservers(t *testing.T) {
 	require.Equal(t, int32(1), maxCallbacksInFlight.Load())
 }
 
+func TestCreditBalanceCloseCompensatesConcurrentChanges(t *testing.T) {
+	var balance CreditBalance
+	var total atomic.Int64
+	emit := func(delta int) { total.Add(int64(delta)) }
+	balance.Change(1, emit)
+	var workers sync.WaitGroup
+	start := make(chan struct{})
+	for range 8 {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			<-start
+			balance.Change(1, emit)
+		}()
+	}
+	close(start)
+	balance.Finalize(emit)
+	workers.Wait()
+	balance.Finalize(emit)
+	require.Zero(t, total.Load())
+}
+
 func TestCreditBalanceCanRecoverAfterObserverPanic(t *testing.T) {
 	var balance CreditBalance
 	require.Panics(t, func() {
