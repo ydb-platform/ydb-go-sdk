@@ -533,7 +533,6 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 			// pass
 		}
 	}
-	r.discardBatches(r.batcher.DrainPartitionSession(session))
 
 	return nil
 }
@@ -967,7 +966,6 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 	closeErr = r.committer.Close(ctx, reason)
 
 	batcherErr := r.batcher.Close(reason)
-	r.discardBatches(r.batcher.Drain())
 	r.finalizeLocalBuffer()
 	if closeErr == nil {
 		closeErr = batcherErr
@@ -986,16 +984,6 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 	}
 
 	return closeErr
-}
-
-func (r *topicStreamReaderImpl) discardBatches(items []batcherMessageOrderItem) {
-	for i := range items {
-		if !items[i].IsBatch() {
-			continue
-		}
-		batch := items[i].Batch
-		r.releaseLocalBufferForBatch(batch)
-	}
 }
 
 func (r *topicStreamReaderImpl) onCommitResponse(msg *rawtopicreader.CommitOffsetResponse) error {

@@ -185,6 +185,23 @@ func TestTopicStreamReader_LocalBufferTracksQueueAndDelivery(t *testing.T) {
 	require.True(t, observedDeliveredOrder)
 }
 
+func TestTopicStreamReader_CloseReleasesUnreadBatch(t *testing.T) {
+	e := newTopicReaderTestEnv(t)
+	var deltas []int
+	e.reader.cfg.Trace = &trace.Topic{OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
+		deltas = append(deltas, info.MessagesDelta)
+	}}
+	e.reader.releaseLocalBufferForBatch(nil)
+	e.reader.releaseLocalBufferForBatch(&topicreadercommon.PublicBatch{})
+	require.Empty(t, deltas)
+	require.NoError(t, e.reader.onReadResponse(readerMetricResponse(&e, 50)))
+	e.reader.batcher.FlushPartitionSession(e.partitionSession)
+	require.NoError(t, e.reader.CloseWithError(e.ctx, errors.New("close with unread data")))
+	require.Equal(t, []int{1, -1}, deltas)
+	require.Empty(t, e.reader.batcher.messages)
+	require.Empty(t, e.reader.batcher.sessionsForFlush)
+}
+
 func TestTopicStreamReader_LocalBufferRollbackAfterFinalization(t *testing.T) {
 	e := newTopicReaderTestEnv(t)
 	var localDeltas []int

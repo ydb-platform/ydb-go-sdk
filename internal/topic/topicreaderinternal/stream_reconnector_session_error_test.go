@@ -216,6 +216,8 @@ func TestReaderReconnectorSessionErrorDoesNotPropagateSuppressedReconnectReason(
 }
 
 func TestReaderReconnectorSessionErrorSkipsCancellationAndClose(t *testing.T) {
+	require.True(t, suppressReaderSessionError(context.Background(), nil))
+
 	events := make(chan trace.TopicReaderSessionErrorInfo, 4)
 	reconnector := &readerReconnector{
 		tracer:     sessionErrorTestTracer(events),
