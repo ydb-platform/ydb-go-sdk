@@ -1,5 +1,4 @@
-* Added experimental `ydb.WithMeter` with direct backend callback registration and `ydb.topic.reader.partition_session.count` for topic readers and listeners
-* Added experimental callback-based observable int64 gauge registration with a backend-independent `telemetry.Meter` function
+* Added experimental `ydb.WithMeter` and `telemetry.Meter` to expose the `ydb.topic.reader.partition_session.count` gauge for topic readers and listeners through an application-owned backend
 
 ## v3.155.1
 * Fixed resource leaks after failed driver initialization and in nested `Driver.With` calls
