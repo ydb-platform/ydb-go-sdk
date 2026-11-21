@@ -3,7 +3,6 @@ package topicreadercommon
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
@@ -14,17 +13,6 @@ type partitionSessionCommitMetrics struct {
 	tracer     *trace.Topic
 	readerInfo ReaderInfo
 	tracker    *CommitMessageTracker
-	closed     atomic.Bool
-}
-
-func (m *partitionSessionCommitMetrics) close() {
-	if m == nil || !m.closed.CompareAndSwap(false, true) {
-		return
-	}
-
-	if m.tracker != nil {
-		m.tracker.Close()
-	}
 }
 
 // SetupCommitMetrics enables commit range trace events and acknowledgement
@@ -44,12 +32,11 @@ func (s *PartitionSession) SetupCommitMetrics(tracer *trace.Topic, readerInfo Re
 		return
 	}
 
-	metrics := &partitionSessionCommitMetrics{
+	s.commitMetrics = &partitionSessionCommitMetrics{
 		tracer:     tracer,
 		readerInfo: readerInfo,
+		tracker:    NewCommitMessageTracker(s.CommittedOffset()),
 	}
-	metrics.tracker = NewCommitMessageTracker(s.CommittedOffset())
-	s.commitMetrics = metrics
 }
 
 func commitRangeMessageCount(start, end rawtopiccommon.Offset) int {
@@ -65,23 +52,11 @@ func commitRangeMessageCount(start, end rawtopiccommon.Offset) int {
 // before making the commit visible to a sender.
 func RegisterCommitQueued(commitRange CommitRange) int {
 	session := commitRange.PartitionSession
-	if session == nil {
-		return 0
-	}
-	if session.commitMetrics == nil {
+	if session == nil || session.commitMetrics == nil {
 		return 0
 	}
 
-	metrics := session.commitMetrics
-	if metrics.closed.Load() {
-		return 0
-	}
-	messagesCount := commitRangeMessageCount(commitRange.CommitOffsetStart, commitRange.CommitOffsetEnd)
-	if metrics.tracker != nil {
-		messagesCount = metrics.tracker.Queue(commitRange.CommitOffsetStart, commitRange.CommitOffsetEnd)
-	}
-
-	return messagesCount
+	return session.commitMetrics.tracker.Queue(commitRange.CommitOffsetStart, commitRange.CommitOffsetEnd)
 }
 
 // TraceCommitQueued records an accepted commit and emits its queued event.
@@ -102,13 +77,10 @@ func TraceCommitQueuedAfterRegistration(ctx context.Context, commitRange CommitR
 	}
 
 	metrics := session.commitMetrics
-	if messagesCount <= 0 || metrics.tracer.OnReaderCommitQueued == nil {
+	if messagesCount <= 0 {
 		return
 	}
 
-	// The metric consumer only needs MessagesCount. Keep range boundaries
-	// private to the tracker instead of allocating another representation for
-	// every trace callback.
 	gtrace.TopicOnReaderCommitQueued(
 		metrics.tracer,
 		&ctx,
@@ -124,19 +96,11 @@ func TraceCommitQueuedAfterRegistration(ctx context.Context, commitRange CommitR
 // returns only the newly completed range span. The caller must perform this
 // before publishing the committed offset or waking commit waiters.
 func RegisterCommitAcknowledged(session *PartitionSession, exclusiveOffset rawtopiccommon.Offset) int {
-	if session == nil {
-		return 0
-	}
-	if session.commitMetrics == nil || session.commitMetrics.tracker == nil {
+	if session == nil || session.commitMetrics == nil {
 		return 0
 	}
 
-	metrics := session.commitMetrics
-	if metrics.closed.Load() {
-		return 0
-	}
-
-	return metrics.tracker.Acknowledge(exclusiveOffset)
+	return session.commitMetrics.tracker.Acknowledge(exclusiveOffset)
 }
 
 // CommitMessageTracker tracks accepted commit ranges until the server
