@@ -1,24 +1,9 @@
 package metrics
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/trace"
+import (
+	"strings"
 
-const (
-	topicReaderReceivedMessagesName    = "ydb.topic.reader.received.messages"
-	topicReaderReceivedMessagesUnit    = "{message}"
-	topicReaderDeliveredMessagesName   = "ydb.topic.reader.delivered.messages"
-	topicReaderDeliveredMessagesUnit   = "{message}"
-	topicReaderReceivedBytesName       = "ydb.topic.reader.received.bytes"
-	topicReaderReceivedBytesUnit       = "By"
-	topicReaderSessionErrorsName       = "ydb.topic.reader.session.errors"
-	topicReaderSessionErrorsUnit       = "{error}"
-	topicReaderCommitQueuedName        = "ydb.topic.reader.commit.queued"
-	topicReaderCommitQueuedUnit        = "{message}"
-	topicReaderCommitAcknowledgedName  = "ydb.topic.reader.commit.acknowledged"
-	topicReaderCommitAcknowledgedUnit  = "{message}"
-	topicReaderLocalBufferMessagesName = "ydb.topic.reader.local_buffer.messages"
-	topicReaderLocalBufferMessagesUnit = "{message}"
-	topicReaderCreditBalanceBytesName  = "ydb.topic.reader.credit_balance_bytes"
-	topicReaderCreditBalanceBytesUnit  = "By"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
@@ -30,89 +15,110 @@ var (
 	}
 )
 
-func topic(config Config) (t trace.Topic) {
-	readerConfig := config.
-		WithSystem("topic").
-		WithSystem("reader")
+type topicVectors struct {
+	received, delivered, bytes, errors, queued, acknowledged CounterVec
+	local, credit                                            GaugeVec
+}
 
-	setupTopicReaderReceivedMessages(&t, readerConfig)
-	setupTopicReaderDeliveredMessages(&t, readerConfig)
-	setupTopicReaderReceivedBytes(&t, readerConfig)
-	setupTopicReaderSessionErrors(&t, readerConfig)
-	setupTopicReaderCommitQueued(&t, readerConfig)
-	setupTopicReaderCommitAcknowledged(&t, readerConfig)
-	setupTopicReaderLocalBufferMessages(&t, readerConfig)
-	setupTopicReaderCreditBalanceBytes(&t, readerConfig)
+func registerTopicVectors(reader Config) (v topicVectors) {
+	const messageUnit = "{message}"
+	const byteUnit = "By"
+	for _, metric := range []struct {
+		name, unit string
+		labels     []string
+		counter    *CounterVec
+		gauge      *GaugeVec
+	}{
+		{"ydb.topic.reader.received.messages", messageUnit, topicMessageLabels, &v.received, nil},
+		{"ydb.topic.reader.delivered.messages", messageUnit, topicMessageLabels, &v.delivered, nil},
+		{"ydb.topic.reader.received.bytes", byteUnit, topicStreamLabels, &v.bytes, nil},
+		{"ydb.topic.reader.session.errors", "{error}", topicSessionErrorLabels, &v.errors, nil},
+		{"ydb.topic.reader.commit.queued", messageUnit, topicMessageLabels, &v.queued, nil},
+		{"ydb.topic.reader.commit.acknowledged", messageUnit, topicMessageLabels, &v.acknowledged, nil},
+		{"ydb.topic.reader.local_buffer.messages", messageUnit, topicStreamLabels, nil, &v.local},
+		{"ydb.topic.reader.credit_balance_bytes", byteUnit, topicStreamLabels, nil, &v.credit},
+	} {
+		path := strings.TrimPrefix(metric.name, "ydb.topic.reader.")
+		system, name, ok := strings.Cut(path, ".")
+		if !ok {
+			system, name = "", path
+		}
+		if metric.counter != nil {
+			*metric.counter = topicCounter(reader, system, name, metric.name, metric.unit, metric.labels)
+		} else {
+			*metric.gauge = topicGauge(reader, system, name, metric.name, metric.unit, metric.labels)
+		}
+	}
+
+	return v
+}
+
+func topic(config Config) (t trace.Topic) {
+	reader := config.WithSystem("topic").WithSystem("reader")
+	vectors := registerTopicVectors(reader)
+	messageEnabled := func(info trace.TopicReaderInfo) bool {
+		return topicMetricEnabled(reader.Details(), info.Listener, trace.TopicReaderMessageEvents)
+	}
+	if reader.Details()&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) != 0 {
+		t.OnReaderMessagesReceived = func(info trace.TopicReaderMessagesReceivedInfo) {
+			if messageEnabled(info.ReaderInfo) {
+				addCounter(vectors.received.With(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
+			}
+		}
+		t.OnReaderMessagesDelivered = func(info trace.TopicReaderMessagesDeliveredInfo) {
+			if messageEnabled(info.ReaderInfo) {
+				addCounter(vectors.delivered.With(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
+			}
+		}
+		t.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
+			if messageEnabled(info.ReaderInfo) {
+				addGauge(vectors.credit.With(streamLabels(info.ReaderInfo)), float64(info.BytesDelta))
+			}
+		}
+		t.OnReaderLocalBufferChanged = func(info trace.TopicReaderLocalBufferChangedInfo) {
+			if messageEnabled(info.ReaderInfo) {
+				addGauge(vectors.local.With(streamLabels(info.ReaderInfo)), float64(info.MessagesDelta))
+			}
+		}
+	}
+
+	streamEnabled := func(info trace.TopicReaderInfo) bool {
+		return topicMetricEnabled(reader.Details(), info.Listener, trace.TopicReaderStreamEvents)
+	}
+	if reader.Details()&(trace.TopicReaderStreamEvents|trace.TopicListenerStreamEvents) != 0 {
+		t.OnReaderCommitQueued = func(info trace.TopicReaderCommitQueuedInfo) {
+			if streamEnabled(info.ReaderInfo) {
+				addCounterWithAdd(vectors.queued.With(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
+			}
+		}
+		t.OnReaderCommittedNotify = func(info trace.TopicReaderCommittedNotifyInfo) {
+			if streamEnabled(info.ReaderInfo) && info.MessagesCount > 0 {
+				addCounterWithAdd(vectors.acknowledged.With(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
+			}
+		}
+		t.OnReaderSessionError = func(info trace.TopicReaderSessionErrorInfo) {
+			if !streamEnabled(info.ReaderInfo) {
+				return
+			}
+			labels := streamLabels(info.ReaderInfo)
+			labels["retry_decision"] = info.RetryDecision
+			labels["status_code"] = info.StatusCode
+			labels["error.type"] = info.ErrorType
+			addCounter(vectors.errors.With(labels), 1)
+		}
+	}
+	vectors.setReceivedBytesHooks(&t, reader.Details())
 
 	return t
 }
 
-func setupTopicReaderReceivedMessages(t *trace.Topic, config Config) {
-	messages := topicCounter(
-		config,
-		"received",
-		"messages",
-		topicReaderReceivedMessagesName,
-		topicReaderReceivedMessagesUnit,
-		topicMessageLabels,
-	)
-	if config.Details()&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) == 0 {
-		return
-	}
-	t.OnReaderMessagesReceived = func(info trace.TopicReaderMessagesReceivedInfo) {
-		if !topicMetricEnabled(config.Details(), info.ReaderInfo.Listener, trace.TopicReaderMessageEvents) {
-			return
+func (vectors *topicVectors) setReceivedBytesHooks(t *trace.Topic, details trace.Details) {
+	recordBytes := func(info trace.TopicReaderInfo, count int) {
+		if count > 0 {
+			addCounterWithAdd(vectors.bytes.With(streamLabels(info)), count)
 		}
-		addCounter(
-			messages.With(messageLabels(info.ReaderInfo, info.Topic)),
-			info.MessagesCount,
-		)
 	}
-}
-
-func setupTopicReaderDeliveredMessages(t *trace.Topic, config Config) {
-	deliveredMessages := topicCounter(
-		config,
-		"delivered",
-		"messages",
-		topicReaderDeliveredMessagesName,
-		topicReaderDeliveredMessagesUnit,
-		topicMessageLabels,
-	)
-	if config.Details()&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) == 0 {
-		return
-	}
-	t.OnReaderMessagesDelivered = func(info trace.TopicReaderMessagesDeliveredInfo) {
-		if !topicMetricEnabled(config.Details(), info.ReaderInfo.Listener, trace.TopicReaderMessageEvents) {
-			return
-		}
-		addCounter(
-			deliveredMessages.With(messageLabels(info.ReaderInfo, info.Topic)),
-			info.MessagesCount,
-		)
-	}
-}
-
-func setupTopicReaderReceivedBytes(t *trace.Topic, config Config) {
-	receivedBytes := topicCounter(
-		config,
-		"received",
-		"bytes",
-		topicReaderReceivedBytesName,
-		topicReaderReceivedBytesUnit,
-		topicStreamLabels,
-	)
-	recordBytes := func(readerInfo trace.TopicReaderInfo, bytes int) {
-		if bytes <= 0 {
-			return
-		}
-		addCounterWithAdd(
-			receivedBytes.With(streamLabels(readerInfo)),
-			bytes,
-		)
-	}
-
-	if config.Details()&trace.TopicReaderMessageEvents != 0 {
+	if details&trace.TopicReaderMessageEvents != 0 {
 		t.OnReaderReceiveDataResponse = func(
 			info trace.TopicReaderReceiveDataResponseStartInfo,
 		) func(trace.TopicReaderReceiveDataResponseDoneInfo) {
@@ -124,132 +130,13 @@ func setupTopicReaderReceivedBytes(t *trace.Topic, config Config) {
 		}
 	}
 
-	if config.Details()&trace.TopicListenerStreamEvents != 0 {
+	if details&trace.TopicListenerStreamEvents != 0 {
 		t.OnListenerReceiveMessage = func(info trace.TopicListenerReceiveMessageInfo) {
 			if info.Error != nil {
 				return
 			}
 			recordBytes(info.ReaderInfo, info.BytesSize)
 		}
-	}
-}
-
-func setupTopicReaderSessionErrors(t *trace.Topic, config Config) {
-	sessionErrors := topicCounter(
-		config,
-		"session",
-		"errors",
-		topicReaderSessionErrorsName,
-		topicReaderSessionErrorsUnit,
-		topicSessionErrorLabels,
-	)
-	if config.Details()&(trace.TopicReaderStreamEvents|trace.TopicListenerStreamEvents) == 0 {
-		return
-	}
-	t.OnReaderSessionError = func(info trace.TopicReaderSessionErrorInfo) {
-		if !topicMetricEnabled(config.Details(), info.ReaderInfo.Listener, trace.TopicReaderStreamEvents) {
-			return
-		}
-		labels := streamLabels(info.ReaderInfo)
-		labels["retry_decision"] = info.RetryDecision
-		labels["status_code"] = info.StatusCode
-		labels["error.type"] = info.ErrorType
-		addCounter(sessionErrors.With(labels), 1)
-	}
-}
-
-func setupTopicReaderCommitQueued(t *trace.Topic, config Config) {
-	commitQueued := topicCounter(
-		config,
-		"commit",
-		"queued",
-		topicReaderCommitQueuedName,
-		topicReaderCommitQueuedUnit,
-		topicMessageLabels,
-	)
-	if config.Details()&(trace.TopicReaderStreamEvents|trace.TopicListenerStreamEvents) == 0 {
-		return
-	}
-	t.OnReaderCommitQueued = func(info trace.TopicReaderCommitQueuedInfo) {
-		if !topicMetricEnabled(config.Details(), info.ReaderInfo.Listener, trace.TopicReaderStreamEvents) {
-			return
-		}
-		addCounterWithAdd(
-			commitQueued.With(messageLabels(info.ReaderInfo, info.Topic)),
-			info.MessagesCount,
-		)
-	}
-}
-
-func setupTopicReaderCommitAcknowledged(t *trace.Topic, config Config) {
-	commitAcknowledged := topicCounter(
-		config,
-		"commit",
-		"acknowledged",
-		topicReaderCommitAcknowledgedName,
-		topicReaderCommitAcknowledgedUnit,
-		topicMessageLabels,
-	)
-	if config.Details()&(trace.TopicReaderStreamEvents|trace.TopicListenerStreamEvents) == 0 {
-		return
-	}
-	t.OnReaderCommittedNotify = func(info trace.TopicReaderCommittedNotifyInfo) {
-		if !topicMetricEnabled(config.Details(), info.ReaderInfo.Listener, trace.TopicReaderStreamEvents) {
-			return
-		}
-		if info.MessagesCount <= 0 {
-			return
-		}
-		addCounterWithAdd(
-			commitAcknowledged.With(messageLabels(info.ReaderInfo, info.Topic)),
-			info.MessagesCount,
-		)
-	}
-}
-
-func setupTopicReaderLocalBufferMessages(t *trace.Topic, config Config) {
-	localBufferMessages := topicGauge(
-		config,
-		"local_buffer",
-		"messages",
-		topicReaderLocalBufferMessagesName,
-		topicReaderLocalBufferMessagesUnit,
-		topicStreamLabels,
-	)
-	if config.Details()&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) == 0 {
-		return
-	}
-	t.OnReaderLocalBufferChanged = func(info trace.TopicReaderLocalBufferChangedInfo) {
-		if !topicMetricEnabled(config.Details(), info.ReaderInfo.Listener, trace.TopicReaderMessageEvents) {
-			return
-		}
-		addGauge(
-			localBufferMessages.With(streamLabels(info.ReaderInfo)),
-			float64(info.MessagesDelta),
-		)
-	}
-}
-
-func setupTopicReaderCreditBalanceBytes(t *trace.Topic, config Config) {
-	creditBalanceBytes := topicGauge(
-		config,
-		"",
-		"credit_balance_bytes",
-		topicReaderCreditBalanceBytesName,
-		topicReaderCreditBalanceBytesUnit,
-		topicStreamLabels,
-	)
-	if config.Details()&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) == 0 {
-		return
-	}
-	t.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
-		if !topicMetricEnabled(config.Details(), info.ReaderInfo.Listener, trace.TopicReaderMessageEvents) {
-			return
-		}
-		addGauge(
-			creditBalanceBytes.With(streamLabels(info.ReaderInfo)),
-			float64(info.BytesDelta),
-		)
 	}
 }
 
