@@ -3,6 +3,7 @@ package topicreadercommon
 import (
 	"context"
 	"path"
+	"slices"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 )
@@ -32,9 +33,13 @@ func RegisterPartitionSessionCount(
 	attributes := []telemetry.Attribute{
 		{Key: "endpoint", Value: cfg.Endpoint},
 		{Key: "database", Value: database},
-		{Key: "consumer", Value: consumer},
 		{Key: "reader.name", Value: name},
 	}
+	if consumer != "" {
+		attributes = append(attributes, telemetry.Attribute{Key: "consumer", Value: consumer})
+	}
+	// Every observation appends its topic, so spare capacity must not be shared.
+	attributes = slices.Clip(attributes)
 
 	return cfg.Meter(telemetry.Descriptor{
 		Name:        "ydb.topic.reader.partition_session.count",

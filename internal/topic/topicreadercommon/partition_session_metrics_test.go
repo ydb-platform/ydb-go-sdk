@@ -96,3 +96,45 @@ func TestPartitionSessionCountDuringContextReplacement(t *testing.T) {
 	session.Close()
 	require.Empty(t, storage.ActiveCountsByTopic())
 }
+
+func TestPartitionSessionCountWithoutConsumer(t *testing.T) {
+	var callback telemetry.Int64GaugeCallback
+	_, err := RegisterPartitionSessionCount(
+		ReaderMetricsConfig{Meter: func(_ telemetry.Descriptor, cb telemetry.Int64GaugeCallback) (func() error, error) {
+			callback = cb
+
+			return func() error { return nil }, nil
+		}},
+		"", []*PublicReadSelector{{Path: "topic"}}, func() (map[string]int64, error) { return nil, nil },
+	)
+	require.NoError(t, err)
+	var observations [][]telemetry.Attribute
+	require.NoError(t, callback(context.Background(), func(_ int64, attrs ...telemetry.Attribute) {
+		observations = append(observations, attrs)
+	}))
+	require.Len(t, observations, 1)
+	for _, attr := range observations[0] {
+		require.NotEqual(t, "consumer", attr.Key)
+	}
+}
+
+func TestPartitionSessionCountObservationsAreIndependent(t *testing.T) {
+	var callback telemetry.Int64GaugeCallback
+	_, err := RegisterPartitionSessionCount(
+		ReaderMetricsConfig{Meter: func(_ telemetry.Descriptor, cb telemetry.Int64GaugeCallback) (func() error, error) {
+			callback = cb
+
+			return func() error { return nil }, nil
+		}},
+		"consumer", []*PublicReadSelector{{Path: "first"}, {Path: "second"}}, func() (map[string]int64, error) {
+			return map[string]int64{}, nil
+		},
+	)
+	require.NoError(t, err)
+	var observations [][]telemetry.Attribute
+	require.NoError(t, callback(context.Background(), func(_ int64, attrs ...telemetry.Attribute) {
+		observations = append(observations, attrs)
+	}))
+	require.Len(t, observations, 2)
+	require.NotEqual(t, observations[0], observations[1])
+}
