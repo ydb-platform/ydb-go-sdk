@@ -177,9 +177,10 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 
 	d.ctxCancel()
 
-	var issues []error
 	d.mtx.Lock()
 	defer d.mtx.Unlock()
+
+	d.ctxCancel()
 
 	defer func() {
 		for _, onClose := range d.onClose {
@@ -210,6 +211,7 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 		d.pool.RemoveRef,
 	)
 
+	var issues []error
 	for _, f := range closes {
 		if err := f(ctx); err != nil {
 			issues = append(issues, err)
