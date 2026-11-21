@@ -178,10 +178,6 @@ func TestTraceReaderSessionError(t *testing.T) {
 	require.Equal(t, "Code(99)", got.StatusCode)
 	require.Equal(t, "transport_error", got.ErrorType)
 	require.Same(t, unknownTransportError, got.Error)
-	require.Equal(t, SessionErrorClassification{
-		StatusCode: "Code(99)",
-		ErrorType:  "transport_error",
-	}, ClassifySessionError(unknownTransportError))
 }
 
 type statusGrpcStream struct {

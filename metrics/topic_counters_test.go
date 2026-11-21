@@ -198,6 +198,13 @@ func TestTopicReaderCountersRecordLabeledValues(t *testing.T) {
 		"ydb.topic.reader.commit.acknowledged": {1},
 		"ydb.topic.reader.session.errors":      {1},
 	}, capture.adds)
+	other := trace.TopicReaderInfo{Endpoint: "other", Database: "/other", ReaderName: "second"}
+	messageTracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
+		ReaderInfo: other, Topic: "/other/topic", MessagesCount: 2,
+	})
+	require.Equal(t, float64(2), registry.value("ydb.topic.reader.received.messages", map[string]string{
+		"endpoint": "other", "database": "/other", "topic": "/other/topic", "consumer": "", "reader.name": "second",
+	}))
 	require.Equal(t, float64(4), registry.value("ydb.topic.reader.received.messages", messageLabels))
 	require.Equal(t, float64(3), registry.value("ydb.topic.reader.delivered.messages", messageLabels))
 	require.Equal(t, float64(2), registry.value("ydb.topic.reader.commit.queued", messageLabels))

@@ -81,6 +81,10 @@ func TestTopicListenerSessionErrorUsesRetryDecisionOnce(t *testing.T) {
 }
 
 func TestTopicListenerSessionErrorSuppressesExpectedTermination(t *testing.T) {
+	var unconfigured TopicListenerReconnector
+	unconfigured.traceSessionError(context.Background(), errors.New("stream stopped"), "stop")
+	require.True(t, suppressListenerSessionError(context.Background(), nil))
+
 	var events []trace.TopicReaderSessionErrorInfo
 	cfg := NewStreamListenerConfig()
 	cfg.Tracer = &trace.Topic{

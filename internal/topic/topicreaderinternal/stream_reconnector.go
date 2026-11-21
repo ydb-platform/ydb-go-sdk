@@ -347,9 +347,7 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 					return
 				}
 			} else {
-				if request.reportSessionError {
-					r.traceSessionStop(ctx, stopRetryReason)
-				}
+				r.traceSessionStopIf(ctx, stopRetryReason, request.reportSessionError)
 				_ = r.CloseWithError(ctx, stopRetryReason)
 				logCtx := r.logContext
 				gtrace.TopicOnReaderReconnect(r.tracer, &logCtx, request.reason)(stopRetryReason)
