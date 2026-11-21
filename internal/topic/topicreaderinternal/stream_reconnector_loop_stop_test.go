@@ -87,7 +87,7 @@ func TestReaderReconnectorLoopStopsAfterAdmittedRetry(t *testing.T) {
 				cancel()
 				admissionCtx = cancelledCtx
 			}
-			reconnector.fireReconnectOnRetryableErrorWithContext(admissionCtx, stream, retryErr)
+			reconnector.fireReconnectOnRetryableError(admissionCtx, stream, retryErr)
 
 			select {
 			case <-loopDone:

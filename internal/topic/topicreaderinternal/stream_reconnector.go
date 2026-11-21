@@ -200,7 +200,7 @@ func (r *readerReconnector) readWithReconnections(
 		stream, err := r.stream(ctx)
 		switch {
 		case r.isRetriableError(err):
-			r.fireReconnectOnRetryableErrorWithContext(ctx, stream, err)
+			r.fireReconnectOnRetryableError(ctx, stream, err)
 			runtime.Gosched()
 
 			continue
@@ -214,7 +214,7 @@ func (r *readerReconnector) readWithReconnections(
 
 		res, err := read(ctx, stream)
 		if r.isRetriableError(err) {
-			r.fireReconnectOnRetryableErrorWithContext(ctx, stream, err)
+			r.fireReconnectOnRetryableError(ctx, stream, err)
 			runtime.Gosched()
 
 			continue
@@ -237,7 +237,7 @@ func (r *readerReconnector) Commit(
 	}
 
 	err = stream.Commit(ctx, commitRange)
-	r.fireReconnectOnRetryableError(stream, err)
+	r.fireReconnectOnRetryableError(r.background.Context(), stream, err)
 
 	return err
 }
@@ -347,7 +347,9 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 					return
 				}
 			} else {
-				r.traceSessionStopIf(ctx, stopRetryReason, request.reportSessionError)
+				if request.reportSessionError {
+					r.traceSessionStop(ctx, stopRetryReason)
+				}
 				_ = r.CloseWithError(ctx, stopRetryReason)
 				logCtx := r.logContext
 				gtrace.TopicOnReaderReconnect(r.tracer, &logCtx, request.reason)(stopRetryReason)
@@ -427,7 +429,7 @@ func (r *readerReconnector) reconnect(
 		})
 	default:
 		// unretriable error
-		r.traceSessionStopIf(ctx, err, true)
+		r.traceSessionStop(ctx, err)
 		_ = r.CloseWithError(ctx, err)
 	}
 
@@ -517,11 +519,7 @@ func (r *readerReconnector) WaitInit(ctx context.Context) error {
 	}
 }
 
-func (r *readerReconnector) fireReconnectOnRetryableError(stream batchedStreamReader, err error) {
-	r.fireReconnectOnRetryableErrorWithContext(r.background.Context(), stream, err)
-}
-
-func (r *readerReconnector) fireReconnectOnRetryableErrorWithContext(
+func (r *readerReconnector) fireReconnectOnRetryableError(
 	ctx context.Context,
 	stream batchedStreamReader,
 	err error,
@@ -645,7 +643,7 @@ func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, er
 			reader = r.streamVal
 			err = r.streamErr
 		})
-		r.fireReconnectOnRetryableErrorWithContext(ctx, reader, err)
+		r.fireReconnectOnRetryableError(ctx, reader, err)
 
 		return reader, err
 	}
