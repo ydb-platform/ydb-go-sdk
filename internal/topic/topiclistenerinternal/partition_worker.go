@@ -65,11 +65,10 @@ type PartitionWorker struct {
 		MessageSender
 		CommitHandler
 	}
-	readBufferReleaser   ReadBufferReleaser
-	reserveLocalBufferFn func(topic string, messagesCount int) bool
-	releaseLocalBufferFn func(topic string, messagesCount int)
-	userHandler          EventHandler
-	onStopped            WorkerStoppedCallback
+	readBufferReleaser ReadBufferReleaser
+	onLocalBufferDelta func(topic string, delta int) bool
+	userHandler        EventHandler
+	onStopped          WorkerStoppedCallback
 
 	// Tracing and logging fields
 	tracer     *trace.Topic
@@ -93,8 +92,6 @@ func NewPartitionWorker[T interface {
 	onStopped WorkerStoppedCallback,
 	tracer *trace.Topic,
 	listenerID string,
-	reserveLocalBuffer func(topic string, messagesCount int) bool,
-	releaseLocalBuffer func(topic string, messagesCount int),
 ) *PartitionWorker {
 	// Validate required parameters
 	if userHandler == nil {
@@ -102,17 +99,15 @@ func NewPartitionWorker[T interface {
 	}
 
 	return &PartitionWorker{
-		partitionSessionID:   sessionID,
-		partitionSession:     session,
-		messageSender:        messageSender,
-		readBufferReleaser:   messageSender,
-		reserveLocalBufferFn: reserveLocalBuffer,
-		releaseLocalBufferFn: releaseLocalBuffer,
-		userHandler:          userHandler,
-		onStopped:            onStopped,
-		tracer:               tracer,
-		listenerID:           listenerID,
-		messageQueue:         xsync.NewUnboundedChan[unifiedMessage](),
+		partitionSessionID: sessionID,
+		partitionSession:   session,
+		messageSender:      messageSender,
+		readBufferReleaser: messageSender,
+		userHandler:        userHandler,
+		onStopped:          onStopped,
+		tracer:             tracer,
+		listenerID:         listenerID,
+		messageQueue:       xsync.NewUnboundedChan[unifiedMessage](),
 	}
 }
 
@@ -149,7 +144,7 @@ func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) bool {
 
 	reserved := false
 	if msg.BatchMessage != nil {
-		reserved = w.reserveLocalBuffer(localBufferTopic, localBufferMessages)
+		reserved = w.changeLocalBuffer(localBufferTopic, localBufferMessages)
 	}
 
 	accepted := w.messageQueue.SendWithMerge(msg, func(last, next unifiedMessage) (unifiedMessage, bool) {
@@ -170,7 +165,7 @@ func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) bool {
 	})
 	if !accepted {
 		if reserved {
-			w.releaseLocalBuffer(localBufferTopic, localBufferMessages)
+			w.changeLocalBuffer(localBufferTopic, -localBufferMessages)
 		}
 		w.freeBatchCredit(msg)
 	}
@@ -397,7 +392,7 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 			return
 		}
 		localBufferReleased = true
-		w.releaseLocalBuffer(batchTopic, messagesCount)
+		w.changeLocalBuffer(batchTopic, -messagesCount)
 	}
 	defer releaseLocalBuffer()
 
@@ -440,7 +435,7 @@ func (w *PartitionWorker) releaseQueuedBatch(msg unifiedMessage) {
 		if session := topicreadercommon.BatchGetPartitionSession(batch); session != nil {
 			topic = session.Topic
 		}
-		w.releaseLocalBuffer(topic, len(batch.Messages))
+		w.changeLocalBuffer(topic, -len(batch.Messages))
 	}
 	w.freeBatchCredit(msg)
 }
@@ -457,19 +452,8 @@ func (w *PartitionWorker) freeBatchCredit(msg unifiedMessage) {
 	}
 }
 
-func (w *PartitionWorker) reserveLocalBuffer(topic string, messagesCount int) bool {
-	if messagesCount == 0 || w.reserveLocalBufferFn == nil {
-		return false
-	}
-
-	return w.reserveLocalBufferFn(topic, messagesCount)
-}
-
-func (w *PartitionWorker) releaseLocalBuffer(topic string, messagesCount int) {
-	if messagesCount == 0 || w.releaseLocalBufferFn == nil {
-		return
-	}
-	w.releaseLocalBufferFn(topic, messagesCount)
+func (w *PartitionWorker) changeLocalBuffer(topic string, delta int) bool {
+	return delta != 0 && w.onLocalBufferDelta != nil && w.onLocalBufferDelta(topic, delta)
 }
 
 // handleStartPartitionRequest processes StartPartitionSessionRequest

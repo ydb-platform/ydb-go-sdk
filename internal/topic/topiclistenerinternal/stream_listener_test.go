@@ -55,8 +55,6 @@ func TestStreamListener_MessagesReceivedTrace(t *testing.T) {
 		func(rawtopicreader.PartitionSessionID, error) {},
 		listener.tracer,
 		listener.listenerID,
-		nil,
-		nil,
 	)
 	listener.workers[session.StreamPartitionSessionID] = worker
 

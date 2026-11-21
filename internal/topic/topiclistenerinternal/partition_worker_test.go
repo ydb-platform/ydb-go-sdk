@@ -335,8 +335,6 @@ func TestPartitionWorkerInterface_MessagesDeliveredTraceBeforeHandlerPanic(t *te
 			events = append(events, info)
 		}},
 		"test-listener",
-		nil,
-		nil,
 	)
 	worker.Start(ctx)
 	defer func() {
@@ -392,8 +390,6 @@ func TestPartitionWorkerInterface_MergedBatchMessagesDeliveredOnce(t *testing.T)
 			events = append(events, info)
 		}},
 		"test-listener",
-		nil,
-		nil,
 	)
 	metadata := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
 	require.True(t, worker.AddMessagesBatch(metadata, createTestBatchRange(t, session, 0, 2)))
@@ -423,7 +419,7 @@ func TestPartitionWorkerBatchMergeFailureKeepsBatchesSeparate(t *testing.T) {
 	worker := NewPartitionWorker(456, session, newMockMessageSender(),
 		NewMockEventHandler(gomock.NewController(t)),
 		func(_ rawtopicreader.PartitionSessionID, reason error) { stopped <- reason },
-		&trace.Topic{}, "test-listener", nil, nil)
+		&trace.Topic{}, "test-listener")
 	metadata := rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}
 	worker.AddMessagesBatch(metadata, first)
 	worker.AddMessagesBatch(metadata, second)
@@ -466,8 +462,6 @@ func TestPartitionWorkerInterface_StartPartitionSessionFlow(t *testing.T) {
 		onStopped,
 		&trace.Topic{},
 		"test-listener",
-		nil,
-		nil,
 	)
 
 	// Set up mock expectations with deterministic coordination
@@ -539,8 +533,6 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 			onStopped,
 			&trace.Topic{},
 			"test-listener",
-			nil,
-			nil,
 		)
 
 		// Set up mock expectations with deterministic coordination
@@ -611,8 +603,6 @@ func TestPartitionWorkerInterface_StopPartitionSessionFlow(t *testing.T) {
 			onStopped,
 			&trace.Topic{},
 			"test-listener",
-			nil,
-			nil,
 		)
 
 		// Set up mock expectations with deterministic coordination
@@ -682,8 +672,6 @@ func TestPartitionWorkerFlushesConfirmedBatchBeforeGracefulStop(t *testing.T) {
 		func(rawtopicreader.PartitionSessionID, error) {},
 		&trace.Topic{},
 		"test-listener",
-		nil,
-		nil,
 	)
 
 	require.NoError(t, worker.processUnifiedMessage(ctx, unifiedMessage{BatchMessage: &batchMessage{
@@ -719,8 +707,6 @@ func TestPartitionWorkerInterface_BatchMessageFlow(t *testing.T) {
 		onStopped,
 		&trace.Topic{},
 		"test-listener",
-		nil,
-		nil,
 	)
 
 	// Set up mock expectations with deterministic coordination
@@ -803,8 +789,6 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 			events = append(events, info)
 		}},
 		"test-listener",
-		nil,
-		nil,
 	)
 	worker.readerInfo = topicreadercommon.ReaderInfo{
 		Endpoint: "configured:2135",
@@ -877,8 +861,6 @@ func TestPartitionWorkerInterface_HandlerMutationDoesNotChangeFreedBuffer(t *tes
 		func(rawtopicreader.PartitionSessionID, error) {},
 		&trace.Topic{},
 		"test-listener",
-		nil,
-		nil,
 	)
 	worker.Start(ctx)
 	defer func() {
@@ -918,8 +900,6 @@ func TestPartitionWorkerInterface_CloseFreesQueuedBatchCredits(t *testing.T) {
 		onStopped,
 		&trace.Topic{},
 		"test-listener",
-		nil,
-		nil,
 	)
 
 	worker.Start(ctx)
@@ -975,8 +955,6 @@ func TestPartitionWorkerInterface_UserHandlerErrorFreesQueuedBatches(t *testing.
 		onStopped,
 		&trace.Topic{},
 		"test-listener",
-		nil,
-		nil,
 	)
 
 	worker.Start(ctx)
@@ -1029,8 +1007,6 @@ func TestPartitionWorkerInterface_BatchAfterHandlerErrorFreesBuffer(t *testing.T
 		onStopped,
 		&trace.Topic{},
 		"test-listener",
-		nil,
-		nil,
 	)
 
 	worker.Start(ctx)
@@ -1067,8 +1043,6 @@ func TestPartitionWorkerInterface_RawMessageAfterCloseDoesNotReleaseBuffer(t *te
 		func(rawtopicreader.PartitionSessionID, error) {},
 		&trace.Topic{},
 		"test-listener",
-		nil,
-		nil,
 	)
 
 	require.NoError(t, worker.Close(ctx, nil))
@@ -1102,8 +1076,6 @@ func TestPartitionWorkerInterface_BadBatchMetadataFreesBuffer(t *testing.T) {
 		onStopped,
 		&trace.Topic{},
 		"test-listener",
-		nil,
-		nil,
 	)
 
 	worker.Start(ctx)
@@ -1136,13 +1108,17 @@ func TestPartitionWorkerCanceledBatchReleasesBufferCredits(t *testing.T) {
 		func(rawtopicreader.PartitionSessionID, error) {},
 		&trace.Topic{},
 		"test-listener",
-		func(_ string, count int) bool {
-			reserved += count
+	)
+	worker.onLocalBufferDelta = func(_ string, delta int) bool {
+		if delta > 0 {
+			reserved += delta
 
 			return true
-		},
-		func(_ string, count int) { released += count },
-	)
+		}
+		released -= delta
+
+		return false
+	}
 	require.True(t, worker.AddMessagesBatch(
 		rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess}, batch,
 	))
@@ -1155,6 +1131,11 @@ func TestPartitionWorkerCanceledBatchReleasesBufferCredits(t *testing.T) {
 	require.Equal(t, 1, reserved)
 	require.Equal(t, reserved, released)
 	require.Equal(t, []int{42}, messageSender.GetFreedBuffer())
+
+	worker.messageQueue.Close()
+	require.False(t, worker.AddMessagesBatch(rawtopiccommon.ServerMessageMetadata{}, batch))
+	require.Equal(t, 2, reserved)
+	require.Equal(t, reserved, released)
 }
 
 // Note: CommitMessage processing has been moved to streamListener
@@ -1194,8 +1175,6 @@ func TestPartitionWorkerImpl_QueueClosureHandling(t *testing.T) {
 		onStopped,
 		&trace.Topic{},
 		"test-listener",
-		nil,
-		nil,
 	)
 
 	worker.Start(ctx)
@@ -1251,8 +1230,6 @@ func TestPartitionWorkerImpl_ContextCancellation(t *testing.T) {
 		onStopped,
 		&trace.Topic{},
 		"test-listener",
-		nil,
-		nil,
 	)
 
 	// Create a context that we can cancel
@@ -1289,8 +1266,6 @@ func TestPartitionWorkerImpl_ContextCancellationWithQueuedBatch(t *testing.T) {
 		func(rawtopicreader.PartitionSessionID, error) {},
 		&trace.Topic{},
 		"test-listener",
-		nil,
-		nil,
 	)
 	worker.AddMessagesBatch(
 		rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
@@ -1331,8 +1306,6 @@ func TestPartitionWorkerImpl_PanicRecovery(t *testing.T) {
 		onStopped,
 		&trace.Topic{},
 		"test-listener",
-		nil,
-		nil,
 	)
 
 	// Set up mock to panic
@@ -1384,8 +1357,6 @@ func TestPartitionWorkerImpl_MessageTypeHandling(t *testing.T) {
 		onStopped,
 		&trace.Topic{},
 		"test-listener",
-		nil,
-		nil,
 	)
 
 	worker.Start(ctx)

@@ -473,20 +473,17 @@ func (l *streamListener) localBufferTrackingEnabled() bool {
 	return l.cfg != nil && l.tracer != nil && l.tracer.OnReaderLocalBufferChanged != nil
 }
 
-func (l *streamListener) reserveLocalBuffer(topic string, messagesCount int) bool {
-	if messagesCount <= 0 || !l.localBufferTrackingEnabled() {
+// changeLocalBuffer reports whether a positive delta reserved messages.
+func (l *streamListener) changeLocalBuffer(topic string, delta int) bool {
+	if !l.localBufferTrackingEnabled() {
 		return false
 	}
-
-	return l.localBufferBalance.Reserve(topic, messagesCount, l.traceLocalBufferDelta)
-}
-
-func (l *streamListener) releaseLocalBuffer(topic string, messagesCount int) {
-	if messagesCount <= 0 || !l.localBufferTrackingEnabled() {
-		return
+	if delta > 0 {
+		return l.localBufferBalance.Reserve(topic, delta, l.traceLocalBufferDelta)
 	}
+	l.localBufferBalance.Release(topic, -delta, l.traceLocalBufferDelta)
 
-	l.localBufferBalance.Release(topic, messagesCount, l.traceLocalBufferDelta)
+	return false
 }
 
 func (l *streamListener) finalizeLocalBuffer() {
@@ -783,9 +780,8 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 		},
 		l.tracer,
 		l.listenerID,
-		l.reserveLocalBuffer,
-		l.releaseLocalBuffer,
 	)
+	worker.onLocalBufferDelta = l.changeLocalBuffer
 	worker.readerInfo = l.cfg.ReaderInfo
 
 	// Register and start under the same lock so shutdown cannot wait for an unstarted worker.

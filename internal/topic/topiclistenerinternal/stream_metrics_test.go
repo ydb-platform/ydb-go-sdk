@@ -203,9 +203,8 @@ func TestStreamListener_LocalBufferRollbackAfterFinalization(t *testing.T) {
 		listener.onWorkerStopped,
 		listener.tracer,
 		listener.listenerID,
-		listener.reserveLocalBuffer,
-		listener.releaseLocalBuffer,
 	)
+	worker.onLocalBufferDelta = listener.changeLocalBuffer
 	worker.readerInfo = listener.cfg.ReaderInfo
 	listener.m.WithLock(func() {
 		listener.workers[session.StreamPartitionSessionID] = worker
@@ -351,9 +350,9 @@ func TestStreamListener_MetricBalancesArePerStreamForSameReaderName(t *testing.T
 		}
 
 		listener1.changeCreditBalance(10)
-		require.True(t, listener1.reserveLocalBuffer("/topic", 2))
+		require.True(t, listener1.changeLocalBuffer("/topic", 2))
 		listener2.changeCreditBalance(10)
-		require.True(t, listener2.reserveLocalBuffer("/topic", 2))
+		require.True(t, listener2.changeLocalBuffer("/topic", 2))
 		require.Equal(t, 10, listenerMetricDelta(t, listener1Credits))
 		require.Equal(t, 2, listenerMetricDelta(t, listener1Locals))
 		require.Equal(t, 10, listenerMetricDelta(t, listener2Credits))
