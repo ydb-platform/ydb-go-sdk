@@ -23,7 +23,6 @@ defer reader.Close(ctx)
 
 The application owns the provider, collection and export. See the
 [OpenTelemetry adapter example](../examples/telemetryotel/otel.go).
-An [example Prometheus adapter](../examples/telemetryprometheus/prometheus.go) is also available.
 
 | Attribute | Value |
 | --- | --- |
