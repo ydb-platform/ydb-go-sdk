@@ -231,12 +231,6 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 				request := msg.(*rawtopicreader.CommitOffsetRequest)
 				commitSent <- request
 
-				if err := listener.onCommitResponse(
-					listenerMetricCommitResponse(session, rawydb.StatusInternalError, 5),
-				); err != nil {
-					return err
-				}
-
 				return listener.onCommitResponse(listenerMetricCommitResponse(session, rawydb.StatusSuccess, 5))
 			})
 

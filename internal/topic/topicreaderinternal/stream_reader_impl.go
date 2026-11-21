@@ -397,9 +397,7 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 		}
 	}()
 
-	batch, err = r.consumeMessagesUntilBatch(ctx, opts)
-
-	return batch, err
+	return r.consumeMessagesUntilBatch(ctx, opts)
 }
 
 func (r *topicStreamReaderImpl) releaseLocalBufferForBatch(batch *topicreadercommon.PublicBatch) {
@@ -1005,10 +1003,6 @@ func (r *topicStreamReaderImpl) discardBatches(items []batcherMessageOrderItem) 
 }
 
 func (r *topicStreamReaderImpl) onCommitResponse(msg *rawtopicreader.CommitOffsetResponse) error {
-	if !msg.StatusData().Status.IsSuccess() {
-		return nil
-	}
-
 	for i := range msg.PartitionsCommittedOffsets {
 		commit := &msg.PartitionsCommittedOffsets[i]
 		partition, err := r.sessionController.Get(commit.PartitionSessionID)

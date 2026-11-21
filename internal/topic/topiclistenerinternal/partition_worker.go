@@ -101,7 +101,7 @@ func NewPartitionWorker[T interface {
 		panic("userHandler cannot be nil")
 	}
 
-	worker := &PartitionWorker{
+	return &PartitionWorker{
 		partitionSessionID:   sessionID,
 		partitionSession:     session,
 		messageSender:        messageSender,
@@ -114,8 +114,6 @@ func NewPartitionWorker[T interface {
 		listenerID:           listenerID,
 		messageQueue:         xsync.NewUnboundedChan[unifiedMessage](),
 	}
-
-	return worker
 }
 
 // Start begins processing messages for this partition
@@ -154,7 +152,22 @@ func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) bool {
 		reserved = w.reserveLocalBuffer(localBufferTopic, localBufferMessages)
 	}
 
-	accepted := w.messageQueue.SendWithMerge(msg, w.tryMergeMessages)
+	accepted := w.messageQueue.SendWithMerge(msg, func(last, next unifiedMessage) (unifiedMessage, bool) {
+		if last.BatchMessage == nil || next.BatchMessage == nil ||
+			!last.BatchMessage.ServerMessageMetadata.Equals(&next.BatchMessage.ServerMessageMetadata) {
+			return next, false
+		}
+
+		merged, err := topicreadercommon.BatchAppend(last.BatchMessage.Batch, next.BatchMessage.Batch)
+		if err != nil {
+			return next, false
+		}
+
+		return unifiedMessage{BatchMessage: &batchMessage{
+			ServerMessageMetadata: last.BatchMessage.ServerMessageMetadata,
+			Batch:                 merged,
+		}}, true
+	})
 	if !accepted {
 		if reserved {
 			w.releaseLocalBuffer(localBufferTopic, localBufferMessages)
@@ -189,7 +202,6 @@ func (w *PartitionWorker) Close(ctx context.Context, reason error) error {
 	if w.bgWorker != nil {
 		return w.bgWorker.Close(ctx, reason)
 	}
-	w.freeBufferedBatchCredits()
 
 	return nil
 }
@@ -458,23 +470,6 @@ func (w *PartitionWorker) releaseLocalBuffer(topic string, messagesCount int) {
 		return
 	}
 	w.releaseLocalBufferFn(topic, messagesCount)
-}
-
-func (w *PartitionWorker) tryMergeMessages(last, next unifiedMessage) (unifiedMessage, bool) {
-	if last.BatchMessage == nil || next.BatchMessage == nil ||
-		!last.BatchMessage.ServerMessageMetadata.Equals(&next.BatchMessage.ServerMessageMetadata) {
-		return next, false
-	}
-
-	merged, err := topicreadercommon.BatchAppend(last.BatchMessage.Batch, next.BatchMessage.Batch)
-	if err != nil {
-		return next, false
-	}
-
-	return unifiedMessage{BatchMessage: &batchMessage{
-		ServerMessageMetadata: last.BatchMessage.ServerMessageMetadata,
-		Batch:                 merged,
-	}}, true
 }
 
 // handleStartPartitionRequest processes StartPartitionSessionRequest

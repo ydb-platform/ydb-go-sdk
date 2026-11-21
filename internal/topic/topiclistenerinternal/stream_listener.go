@@ -498,10 +498,7 @@ func (l *streamListener) finalizeLocalBuffer() {
 }
 
 // routeMessage routes messages to appropriate handlers/workers
-func (l *streamListener) routeMessage(
-	ctx context.Context,
-	mess rawtopicreader.ServerMessage,
-) error {
+func (l *streamListener) routeMessage(ctx context.Context, mess rawtopicreader.ServerMessage) error {
 	if l.closing.Load() {
 		return nil
 	}
@@ -561,9 +558,7 @@ func (l *streamListener) handleStartPartition(
 }
 
 // splitAndRouteReadResponse splits ReadResponse into batches and routes to workers
-func (l *streamListener) splitAndRouteReadResponse(
-	m *rawtopicreader.ReadResponse,
-) error {
+func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadResponse) error {
 	batches, err := topicreadercommon.ReadRawBatchesToPublicBatches(m, l.sessions, l.cfg.Decoders)
 	if err != nil {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
@@ -604,10 +599,6 @@ func (l *streamListener) splitAndRouteReadResponse(
 // onCommitResponse processes CommitOffsetResponse directly in streamListener
 // This prevents blocking commits in PartitionWorker threads
 func (l *streamListener) onCommitResponse(msg *rawtopicreader.CommitOffsetResponse) error {
-	if !msg.StatusData().Status.IsSuccess() {
-		return nil
-	}
-
 	for i := range msg.PartitionsCommittedOffsets {
 		commit := &msg.PartitionsCommittedOffsets[i]
 

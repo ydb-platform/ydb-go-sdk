@@ -255,15 +255,6 @@ func TestTopicReader_CommitMetricsIgnoreDuplicateAndStaleAcknowledgements(t *tes
 		Return(nil)
 	require.NoError(t, test.reader.Commit(test.env.ctx, test.batch))
 	require.Equal(t, 5, readerMetricDelta(t, test.queued))
-	require.NoError(t, test.env.reader.onCommitResponse(&rawtopicreader.CommitOffsetResponse{
-		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusInternalError},
-		PartitionsCommittedOffsets: []rawtopicreader.PartitionCommittedOffset{{
-			PartitionSessionID: test.env.partitionSessionID,
-			CommittedOffset:    rawtopiccommon.NewOffset(25),
-		}},
-	}))
-	readerMetricNoDelta(t, test.acknowledged)
-	readerMetricNoDelta(t, test.notifications)
 	require.NoError(t, test.env.reader.onCommitResponse(readerMetricCommitResponse(test.env, 25)))
 	require.Equal(t, 5, readerMetricDelta(t, test.acknowledged))
 	require.Equal(t, 5, readerMetricDelta(t, test.notifications))

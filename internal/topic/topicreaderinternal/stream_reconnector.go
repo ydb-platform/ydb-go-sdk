@@ -305,7 +305,7 @@ func (r *readerReconnector) start() {
 	r.background.Start("reconnector-loop", r.reconnectionLoop)
 
 	// start first connection
-	r.reconnectFromBadStream <- newReconnectRequest(nil)
+	r.reconnectFromBadStream <- newReconnectRequest(nil, nil)
 }
 
 func (r *readerReconnector) initChannelsAndClock() {
@@ -431,7 +431,7 @@ func (r *readerReconnector) reconnect(
 		sendReason := err
 		r.background.Start("ydb topic reader send reconnect message", func(ctx context.Context) {
 			select {
-			case r.reconnectFromBadStream <- newReconnectRequestWithReport(oldReader, sendReason, true):
+			case r.reconnectFromBadStream <- newReconnectRequest(oldReader, sendReason):
 				{
 					logCtx := r.logContext
 					gtrace.TopicOnReaderReconnectRequest(r.tracer, &logCtx, err, true)
@@ -686,8 +686,8 @@ type reconnectRequest struct {
 	reportSessionError bool
 }
 
-func newReconnectRequest(oldReader batchedStreamReader) reconnectRequest {
-	return newReconnectRequestWithReport(oldReader, nil, true)
+func newReconnectRequest(oldReader batchedStreamReader, reason error) reconnectRequest {
+	return newReconnectRequestWithReport(oldReader, reason, true)
 }
 
 func newReconnectRequestWithReport(

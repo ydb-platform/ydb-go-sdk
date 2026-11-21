@@ -74,7 +74,7 @@ func TestReaderReconnectorLoopStopsAfterAdmittedRetry(t *testing.T) {
 			case <-loopCtx.Done():
 				t.Fatal("reconnection loop did not start")
 			}
-			reconnector.reconnectFromBadStream <- newReconnectRequest(nil)
+			reconnector.reconnectFromBadStream <- newReconnectRequest(nil, nil)
 			waitCtx, cancelWait := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancelWait()
 			require.NoError(t, reconnector.WaitInit(waitCtx))

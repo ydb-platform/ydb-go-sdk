@@ -347,13 +347,14 @@ func (c *Client) StartReader(
 		return c.rawClient.StreamRead(ctx, readerID, tracer)
 	}
 
-	opts = append([]topicoptions.ReaderOption{
+	defaultOpts := []topicoptions.ReaderOption{
 		topicoptions.WithCommonConfig(c.cfg.Common),
 		topicreaderinternal.WithCredentials(c.cred),
 		topicreaderinternal.WithReaderInfo(c.readerInfo(consumer)),
 		topicreaderinternal.WithTrace(c.cfg.Trace),
 		topicoptions.WithReaderStartTimeout(topic.DefaultStartTimeout),
-	}, opts...)
+	}
+	opts = append(defaultOpts, opts...)
 
 	internalReader, err := topicreaderinternal.NewReader(&c.rawClient, connector, consumer, readSelectors, opts...)
 	if err != nil {
