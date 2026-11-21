@@ -88,10 +88,6 @@ type topicStreamReaderConfig struct {
 	EnableSplitMergeSupport         bool
 }
 
-type localBufferBatchReleaser interface {
-	releaseLocalBufferForBatch(batch *topicreadercommon.PublicBatch)
-}
-
 func newTopicStreamReaderConfig() topicStreamReaderConfig {
 	return topicStreamReaderConfig{
 		BaseContext:             context.Background(),
@@ -239,12 +235,11 @@ func (r *topicStreamReaderImpl) PopMessagesBatchTx(
 		return nil, err
 	}
 
-	if err = r.commitWithTransaction(ctx, tx, batch); err == nil {
-		return batch, nil
+	if err = r.commitWithTransaction(ctx, tx, batch); err != nil {
+		return nil, err
 	}
-	r.releaseLocalBufferForBatch(batch)
 
-	return nil, err
+	return batch, nil
 }
 
 // commitWithTransaction prepares a batch of messages to be committed within a YDB transaction.
@@ -394,6 +389,7 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 	defer func() {
 		if err == nil {
 			r.freeBufferFromMessages(batch)
+			r.releaseLocalBufferForBatch(batch)
 		}
 	}()
 

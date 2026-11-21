@@ -212,37 +212,19 @@ func (r *readerReconnector) readWithReconnections(
 			// pass
 		}
 
-		res, retry, err := r.readOnce(ctx, stream, read)
-		if retry {
+		res, err := read(ctx, stream)
+		if r.isRetriableError(err) {
+			r.fireReconnectOnRetryableErrorWithContext(ctx, stream, err)
+			runtime.Gosched()
+
 			continue
+		}
+		if err != nil {
+			r.traceSessionStopAfterRead(ctx, stream, err)
 		}
 
 		return res, err
 	}
-}
-
-func (r *readerReconnector) readOnce(
-	ctx context.Context,
-	stream batchedStreamReader,
-	read func(context.Context, batchedStreamReader) (*topicreadercommon.PublicBatch, error),
-) (*topicreadercommon.PublicBatch, bool, error) {
-	res, err := read(ctx, stream)
-	if r.isRetriableError(err) {
-		r.fireReconnectOnRetryableErrorWithContext(ctx, stream, err)
-		runtime.Gosched()
-
-		return nil, true, err
-	}
-	if err == nil && res != nil {
-		if releaser, ok := stream.(localBufferBatchReleaser); ok {
-			releaser.releaseLocalBufferForBatch(res)
-		}
-	}
-	if err != nil {
-		r.traceSessionStopAfterRead(ctx, stream, err)
-	}
-
-	return res, false, err
 }
 
 func (r *readerReconnector) Commit(
