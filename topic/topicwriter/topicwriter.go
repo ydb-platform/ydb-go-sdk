@@ -81,8 +81,9 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 	return w.inner.Write(ctx, messages)
 }
 
-// WaitInit waits until the reader is initialized
-// or an error occurs, return PublicInitialInfo and err
+// WaitInit waits until the writer is initialized or an error occurs. For a
+// multi-partition writer, it waits for topic metadata and partition routing;
+// the first write to each partition initializes that partition's session.
 func (w *Writer) WaitInit(ctx context.Context) (err error) {
 	return w.inner.WaitInit(ctx)
 }

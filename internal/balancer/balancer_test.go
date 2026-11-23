@@ -298,6 +298,7 @@ func TestWithNodeIDCountsRPC(t *testing.T) {
 		endpoint.New("127.0.0.1:2", endpoint.WithID(2), endpoint.WithLocation("local")),
 		endpoint.New("127.0.0.1:3", endpoint.WithID(3), endpoint.WithLocation("remote")),
 	}, "")
+	b.connections().elector.rand = &electorDrawsRand{t: t}
 	pinnedCtx := userBalancers.WithNodeID(conn.WithoutWrapping(ctx), 3)
 	target, err := b.nextConn(pinnedCtx)
 	require.NoError(t, err)
