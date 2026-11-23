@@ -79,7 +79,7 @@ func TestWithObservabilityBuildInfoChains(t *testing.T) {
 
 func TestWithMeterBuildInfoChain(t *testing.T) {
 	meter := func(telemetry.Descriptor, telemetry.Int64GaugeCallback) (func() error, error) {
-		return nil, nil
+		return func() error { return nil }, nil
 	}
 
 	for _, tt := range []struct {
