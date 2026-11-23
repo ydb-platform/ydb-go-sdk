@@ -1,8 +1,8 @@
 # Topic reader and listener metrics
 
-Readers and listeners share eight instruments. All carry `endpoint`, `database`, `consumer` and `reader.name`. The endpoint is the configured authority and the database is the normalized path. Omitted or empty reader and listener names become `default`. Readers with identical labels share a series.
+Readers and listeners share eight instruments. All carry `endpoint`, `database` and `reader.name`. The endpoint is the configured authority and the database is the normalized path. Omitted or empty reader and listener names become `default`. Readers with identical labels share a series.
 
-**Known contract deviation:** when there is no consumer, the registry still receives `consumer=""`. The contract calls for omitting that attribute.
+`consumer` is present only when reading with a consumer.
 
 | Instrument | Unit | Additional labels | What it measures |
 | --- | --- | --- | --- |

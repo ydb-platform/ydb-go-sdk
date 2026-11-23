@@ -203,7 +203,7 @@ func TestTopicReaderCountersRecordLabeledValues(t *testing.T) {
 		ReaderInfo: other, Topic: "/other/topic", MessagesCount: 2,
 	})
 	require.Equal(t, float64(2), registry.value("ydb.topic.reader.received.messages", map[string]string{
-		"endpoint": "other", "database": "/other", "topic": "/other/topic", "consumer": "", "reader.name": "second",
+		"endpoint": "other", "database": "/other", "topic": "/other/topic", "reader.name": "second",
 	}))
 	require.Equal(t, float64(4), registry.value("ydb.topic.reader.received.messages", messageLabels))
 	require.Equal(t, float64(3), registry.value("ydb.topic.reader.delivered.messages", messageLabels))
@@ -531,6 +531,8 @@ type strictCounterVec struct {
 
 func (v strictCounterVec) With(labels map[string]string) Counter {
 	v.t.Helper()
+	consumer, present := labels["consumer"]
+	require.Equal(v.t, consumer != "", present)
 	require.Equal(v.t, v.labelNames, labelNameSetFromValues(labels))
 
 	return strictCounter{}
@@ -547,6 +549,8 @@ type strictGaugeVec struct {
 
 func (v strictGaugeVec) With(labels map[string]string) Gauge {
 	v.t.Helper()
+	consumer, present := labels["consumer"]
+	require.Equal(v.t, consumer != "", present)
 	require.Equal(v.t, v.labelNames, labelNameSetFromValues(labels))
 
 	return strictGauge{}
