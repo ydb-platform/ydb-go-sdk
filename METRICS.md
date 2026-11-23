@@ -17,7 +17,7 @@ Readers and listeners share eight instruments. All carry `endpoint`, `database` 
 
 The first six instruments are cumulative counters. The two gauges apply signed deltas in stream order and compensate the outstanding balance on close.
 
-Each queued range counts its half-open span, including gaps. Duplicate submissions count separately. An acknowledgement completes only the fully covered prefix in admission order. Backward acknowledgements add zero. An equal watermark can complete a newly queued range ending there.
+Each queued range counts its half-open span, including gaps. Duplicate submissions count separately. Ranges ending below the committed watermark are excluded from both counters. An acknowledgement completes every fully covered pending range, regardless of admission order. Backward acknowledgements add zero. An equal watermark can complete a newly queued range ending there.
 
 Session errors carry the transport or YDB status name and an error type of `transport_error`, `ydb_error` or `unknown`. Unknown gRPC codes use `Code(n)`, unknown YDB codes use their number and unspecified status uses `unknown`. An idle pull reader can first report a stored terminal stream failure as `stop` on close. This check uses only the default retry policy and excludes context errors. It does not invoke a custom retry callback.
 

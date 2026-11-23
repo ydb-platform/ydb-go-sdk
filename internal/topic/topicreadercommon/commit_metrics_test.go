@@ -132,7 +132,7 @@ func TestPublicMessageBuilderPreservesCommitRangeBoundaries(t *testing.T) {
 	require.Equal(t, 6, RegisterCommitQueued(GetCommitRange(message)))
 }
 
-func TestCommitTraceUsesRangeCountsAndFIFOAcknowledgements(t *testing.T) {
+func TestCommitTraceUsesRangeCountsAndCoveredRangesAcknowledgements(t *testing.T) {
 	var queued []trace.TopicReaderCommitQueuedInfo
 	tracer := &trace.Topic{
 		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
@@ -337,9 +337,8 @@ func TestCommitterQueueTraceCanReenterLazyRequest(t *testing.T) {
 func TestCommitMessageTrackerCountsRangeLengths(t *testing.T) {
 	tracker := NewCommitMessageTracker(10)
 
-	// An already completed range still reports its accepted span, but it is not
-	// retained for a later acknowledgement.
-	require.Equal(t, 9, tracker.Queue(0, 9))
+	// A range below the watermark cannot receive a fresh acknowledgement.
+	require.Zero(t, tracker.Queue(0, 9))
 	require.Zero(t, tracker.Acknowledge(10))
 
 	require.Equal(t, 4, tracker.Queue(10, 14))
@@ -348,13 +347,13 @@ func TestCommitMessageTrackerCountsRangeLengths(t *testing.T) {
 	require.Equal(t, 8, tracker.Acknowledge(14))
 	require.Zero(t, tracker.Acknowledge(14))
 	require.Zero(t, tracker.Acknowledge(13))
-	require.Equal(t, 3, tracker.Queue(10, 13))
+	require.Zero(t, tracker.Queue(10, 13))
 	require.Zero(t, tracker.Acknowledge(14))
 	require.Equal(t, 4, tracker.Queue(10, 14))
 	require.Equal(t, 4, tracker.Acknowledge(14))
 }
 
-func TestCommitMessageTrackerHandlesFIFOAndEqualWatermark(t *testing.T) {
+func TestCommitMessageTrackerHandlesCoveredRangesAndEqualWatermark(t *testing.T) {
 	tracker := NewCommitMessageTracker(10)
 
 	require.Equal(t, 4, tracker.Queue(10, 14))
@@ -367,13 +366,12 @@ func TestCommitMessageTrackerHandlesFIFOAndEqualWatermark(t *testing.T) {
 	require.Zero(t, tracker.Acknowledge(14))
 	require.Equal(t, 4, tracker.Acknowledge(18))
 
-	// FIFO completion deliberately preserves head-of-line behavior for ranges
-	// admitted out of offset order.
+	// A higher pending range must not hide a fully covered lower range.
 	tracker = NewCommitMessageTracker(0)
 	require.Equal(t, 10, tracker.Queue(10, 20))
 	require.Equal(t, 10, tracker.Queue(0, 10))
-	require.Zero(t, tracker.Acknowledge(10))
-	require.Equal(t, 20, tracker.Acknowledge(20))
+	require.Equal(t, 10, tracker.Acknowledge(10))
+	require.Equal(t, 10, tracker.Acknowledge(20))
 }
 
 func TestCommitMessageTrackerRejectsInvalidRangesAndCloses(t *testing.T) {

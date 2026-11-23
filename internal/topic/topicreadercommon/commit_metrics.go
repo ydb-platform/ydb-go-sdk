@@ -106,9 +106,8 @@ func RegisterCommitAcknowledged(session *PartitionSession, exclusiveOffset rawto
 // CommitMessageTracker tracks accepted commit ranges until the server
 // acknowledges them.
 //
-// The acknowledgement offset is an exclusive upper bound. Ranges are kept in
-// admission order so an acknowledgement only completes a prefix, matching
-// the commit request semantics. Queue and Acknowledge are safe to call
+// The acknowledgement offset is an exclusive upper bound. Each fully covered submission counts once.
+// Queue and Acknowledge are safe to call
 // concurrently. The tracker does not emit metrics; callers use their returned
 // counts for that purpose.
 type CommitMessageTracker struct {
@@ -145,11 +144,8 @@ func (t *CommitMessageTracker) Queue(start, end rawtopiccommon.Offset) int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.closed {
+	if t.closed || end < t.committedOffset {
 		return 0
-	}
-	if end < t.committedOffset {
-		return count
 	}
 
 	t.pending = append(t.pending, commitMetricRange{end: end, count: count})
@@ -158,7 +154,7 @@ func (t *CommitMessageTracker) Queue(start, end rawtopiccommon.Offset) int {
 }
 
 // Acknowledge advances the exclusive committed offset and returns the sum of
-// the ranges at the head of the queue newly covered by it. Backward
+// all pending ranges fully covered by it. Backward
 // acknowledgements return zero; an equal acknowledgement can complete ranges
 // admitted at the current watermark.
 func (t *CommitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset) int {
@@ -169,22 +165,19 @@ func (t *CommitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset
 		return 0
 	}
 
-	if exclusiveOffset > t.committedOffset {
-		t.committedOffset = exclusiveOffset
-	}
-
+	t.committedOffset = exclusiveOffset
 	var acknowledged int
-	completed := 0
-	for completed < len(t.pending) && t.pending[completed].end <= t.committedOffset {
-		acknowledged += t.pending[completed].count
-		completed++
-	}
-
-	if completed > 0 {
-		t.pending = t.pending[completed:]
-		if len(t.pending) == 0 {
-			t.pending = nil
+	pending := t.pending[:0]
+	for _, r := range t.pending {
+		if r.end <= exclusiveOffset {
+			acknowledged += r.count
+		} else {
+			pending = append(pending, r)
 		}
+	}
+	t.pending = pending
+	if len(pending) == 0 {
+		t.pending = nil
 	}
 
 	return acknowledged
