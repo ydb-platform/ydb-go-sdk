@@ -26,7 +26,7 @@ The application owns the provider, collection and export. See the
 
 | Attribute | Value |
 | --- | --- |
-| `reader.name` | Resource name (`default` when empty). Listeners use `topicoptions.WithListenerName`. |
+| `reader.name` | Resource name (`default` when empty). Listeners use `topicoptions.WithListenerReaderName`. |
 | `topic` | Absolute normalized path of the selected topic. |
 | `consumer` | Consumer name. Omitted for consumerless reads. |
 | `endpoint` | Configured endpoint authority. |

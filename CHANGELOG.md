@@ -1,4 +1,4 @@
-* Added experimental `ydb.WithMeter` and `telemetry.Meter` to expose the `ydb.topic.reader.partition_session.count` gauge for topic readers and listeners through an application-owned backend
+* Added experimental `ydb.WithMeter` and `telemetry.Meter` to expose the `ydb.topic.reader.partition_session.count` gauge through an application-owned backend, with `topicoptions.WithReaderName` and `topicoptions.WithListenerReaderName` to set the `reader.name` attribute
 
 ## v3.155.1
 * Fixed resource leaks after failed driver initialization and in nested `Driver.With` calls

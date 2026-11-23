@@ -11,10 +11,10 @@ import (
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type ListenerOption func(cfg *topiclistenerinternal.StreamListenerConfig)
 
-// WithListenerName sets the reader.name metric attribute. Empty means "default".
+// WithListenerReaderName sets the reader.name metric attribute. Empty means "default".
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func WithListenerName(name string) ListenerOption {
+func WithListenerReaderName(name string) ListenerOption {
 	return func(cfg *topiclistenerinternal.StreamListenerConfig) {
 		cfg.Metrics.Name = name
 	}

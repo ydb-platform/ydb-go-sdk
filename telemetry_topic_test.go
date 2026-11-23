@@ -56,7 +56,7 @@ func TestTopicPartitionSessionMetricPublicSurface(t *testing.T) {
 				if listener {
 					resource, startErr := driver.Topic().StartListener(
 						"consumer", topiclistener.BaseHandler{}, topicoptions.ReadTopic("topic"),
-						topicoptions.WithListenerName(name),
+						topicoptions.WithListenerReaderName(name),
 					)
 					require.NoError(t, startErr)
 					closeResources = append(closeResources, resource.Close)
