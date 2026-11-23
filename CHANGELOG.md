@@ -1,3 +1,4 @@
+* Fixed experimental Query Service wire decoding to preserve connection-level custom gRPC codecs and merge repeated nested protobuf messages without losing values
 * Added experimental `ydb.WithQueryProtoWireDecoding(bool)` to opt into direct protobuf wire decoding of native and `database/sql` Query Service `FORMAT_VALUE` rows, reducing allocations and using lazy cell and column-name indexes for linear-time wide-row scans while preserving protobuf response metadata for gRPC stream interceptors
 
 ## v3.157.0

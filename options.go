@@ -543,8 +543,8 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 // and database/sql connectors using [WithQueryService] with true.
 // The default is false: rows are decoded with the standard protobuf codec.
 // Arrow results and Table Service connectors keep their existing decoding paths.
-// A per-query codec selected with [query.WithCallOptions] takes precedence;
-// that query uses the selected codec and ordinary protobuf rows.
+// Custom codecs and content subtypes configured through [config.WithGrpcOptions]
+// or [query.WithCallOptions] take precedence and retain ordinary protobuf rows.
 //
 // With wire decoding enabled, gRPC stream interceptors and statistics handlers
 // receive response metadata without materialized protobuf rows. Reading,

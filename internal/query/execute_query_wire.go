@@ -7,6 +7,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
 
 type wireQueryClient struct {
@@ -24,17 +26,11 @@ func (c wireQueryClient) ExecuteQuery(ctx context.Context, request *Ydb_Query.Ex
 	if request.GetResultSetFormat() == Ydb.ResultSet_FORMAT_ARROW {
 		return c.QueryServiceClient.ExecuteQuery(ctx, request, opts...)
 	}
-	for _, opt := range opts {
-		switch opt.(type) {
-		case grpc.ForceCodecCallOption, *grpc.ForceCodecCallOption,
-			grpc.ForceCodecV2CallOption, *grpc.ForceCodecV2CallOption,
-			grpc.CustomCodecCallOption, *grpc.CustomCodecCallOption,
-			grpc.ContentSubtypeCallOption, *grpc.ContentSubtypeCallOption:
-			return c.QueryServiceClient.ExecuteQuery(ctx, request, opts...)
-		}
+	if conn.HasCodecCallOption(opts...) {
+		return c.QueryServiceClient.ExecuteQuery(ctx, request, opts...)
 	}
 	decoder := newWireCodec()
-	stream, err := c.QueryServiceClient.ExecuteQuery(ctx, request, append(opts, grpc.ForceCodecV2(decoder))...)
+	stream, err := c.QueryServiceClient.ExecuteQuery(conn.WithFallbackCodec(ctx, decoder), request, opts...)
 	if err != nil {
 		return nil, err
 	}

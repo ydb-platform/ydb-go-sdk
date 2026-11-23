@@ -16,11 +16,16 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/proto"
 
+	internalconn "github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wirevalue"
 	publicquery "github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
@@ -325,7 +330,53 @@ func TestQueryWideRowsRemainReadableAfterClose(t *testing.T) {
 	}
 }
 
+func TestQueryMergesRepeatedNestedValueMessages(t *testing.T) {
+	var data []byte
+	for _, item := range []int32{1, 2} {
+		fragment, err := proto.Marshal(value.ToYDB(value.ListValue(value.Int32Value(item))).GetValue())
+		require.NoError(t, err)
+		data = protowire.AppendTag(data, wirevalue.ValueNestedField, wirevalue.ValueNestedWireType)
+		data = protowire.AppendBytes(data, fragment)
+	}
+	cell := new(Ydb.Value)
+	cell.ProtoReflect().SetUnknown(data)
+	server := &optionalWireResultServer{
+		columns: []*Ydb.Column{{Name: "items", Type: types.NewOptional(types.NewList(types.Int32)).ToYDB()}},
+		rows:    []*Ydb.Value{{Items: []*Ydb.Value{cell}}},
+	}
+	conn := newWireResultConn(t, server)
+	for _, wire := range []bool{false, true} {
+		for _, prefetch := range []int{0, 2} {
+			t.Run(fmt.Sprintf("wire=%v/prefetch=%d", wire, prefetch), func(t *testing.T) {
+				client := Ydb_Query_V1.NewQueryServiceClient(conn)
+				if wire {
+					client = WireQueryClient(client)
+				}
+				ctx := t.Context()
+				result, err := execute(ctx, "session", client, "SELECT items",
+					options.ExecuteSettings(options.WithResponsePartPrefetch(prefetch)), options.ResultSetsTypeOrdered)
+				require.NoError(t, err)
+				defer func() { require.NoError(t, result.Close(ctx)) }()
+				set, err := result.NextResultSet(ctx)
+				require.NoError(t, err)
+				row, err := set.NextRow(ctx)
+				require.NoError(t, err)
+				require.Equal(t, wire, row.(*Row).part != nil, "row storage must match the selected decoder")
+				values := row.Values()
+				require.Len(t, values, 1)
+				require.Equal(t, "Just([1,2])", values[0].Yql())
+			})
+		}
+	}
+}
+
 func newWireResultConn(t *testing.T, queryServer Ydb_Query_V1.QueryServiceServer) *grpc.ClientConn {
+	t.Helper()
+
+	return newQueryResultConn(t, queryServer, grpc.WithChainStreamInterceptor(internalconn.FallbackCodecStreamInterceptor))
+}
+
+func newQueryResultConn(t *testing.T, queryServer Ydb_Query_V1.QueryServiceServer, opts ...grpc.DialOption) *grpc.ClientConn {
 	t.Helper()
 	listener := bufconn.Listen(1 << 20)
 	server := grpc.NewServer()
@@ -336,8 +387,9 @@ func newWireResultConn(t *testing.T, queryServer Ydb_Query_V1.QueryServiceServer
 	dialer := func(context.Context, string) (net.Conn, error) {
 		return listener.Dial()
 	}
-	conn, err := grpc.NewClient("passthrough:///bufnet", grpc.WithContextDialer(dialer),
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient("passthrough:///bufnet", append([]grpc.DialOption{
+		grpc.WithContextDialer(dialer), grpc.WithTransportCredentials(insecure.NewCredentials()),
+	}, opts...)...)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
 

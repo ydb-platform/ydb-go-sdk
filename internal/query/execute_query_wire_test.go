@@ -36,6 +36,18 @@ func TestWireQueryStreamAcceptsProtobufTransport(t *testing.T) {
 	require.Nil(t, wire, "a transport that bypasses the wire codec must use its protobuf rows")
 }
 
+func TestWireQueryStreamWithoutTransportHookPreservesDefaultCodec(t *testing.T) {
+	codec := rewritingQueryCodec{CodecV2: encoding.GetCodecV2("proto"), id: 9001}
+	conn := newQueryResultConn(t, &wireResultServer{}, grpc.WithDefaultCallOptions(grpc.ForceCodecV2(codec)))
+	client := WireQueryClient(Ydb_Query_V1.NewQueryServiceClient(conn))
+	stream, err := client.ExecuteQuery(t.Context(), &Ydb_Query.ExecuteQueryRequest{})
+	require.NoError(t, err)
+	part, wire, err := recvQueryPart(stream)
+	require.NoError(t, err)
+	require.Nil(t, wire, "a transport without the fallback hook must keep ordinary protobuf decoding")
+	require.Equal(t, uint64(9001), part.GetResultSet().GetRows()[0].GetItems()[0].GetUint64Value())
+}
+
 func TestWireQueryStreamMixedReceives(t *testing.T) {
 	server := &optionalWireResultServer{
 		columns: []*Ydb.Column{{Name: "id", Type: wirePrimitive(Ydb.Type_UINT64)}},
