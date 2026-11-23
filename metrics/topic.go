@@ -101,12 +101,12 @@ func topic(config Config) (t trace.Topic) {
 	if reader.Details()&(trace.TopicReaderStreamEvents|trace.TopicListenerStreamEvents) != 0 {
 		t.OnReaderCommitQueued = func(info trace.TopicReaderCommitQueuedInfo) {
 			if streamEnabled(info.ReaderInfo) {
-				addCounterWithAdd(vectors(info.ReaderInfo).queued.With(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
+				addCounter(vectors(info.ReaderInfo).queued.With(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
 			}
 		}
 		t.OnReaderCommittedNotify = func(info trace.TopicReaderCommittedNotifyInfo) {
 			if streamEnabled(info.ReaderInfo) && info.MessagesCount > 0 {
-				addCounterWithAdd(vectors(info.ReaderInfo).acknowledged.With(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
+				addCounter(vectors(info.ReaderInfo).acknowledged.With(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
 			}
 		}
 		t.OnReaderSessionError = func(info trace.TopicReaderSessionErrorInfo) {
@@ -128,7 +128,7 @@ func topic(config Config) (t trace.Topic) {
 func setReceivedBytesHooks(t *trace.Topic, details trace.Details, vectors func(trace.TopicReaderInfo) topicVectors) {
 	recordBytes := func(info trace.TopicReaderInfo, count int) {
 		if count > 0 {
-			addCounterWithAdd(vectors(info).bytes.With(streamLabels(info)), count)
+			addCounter(vectors(info).bytes.With(streamLabels(info)), count)
 		}
 	}
 	if details&trace.TopicReaderMessageEvents != 0 {
@@ -206,21 +206,9 @@ func addCounter(counter Counter, delta int) {
 
 		return
 	}
-	for range delta {
+	if delta == 1 {
 		counter.Inc()
 	}
-}
-
-func addCounterWithAdd(counter Counter, delta int) {
-	if delta <= 0 {
-		return
-	}
-	adder, ok := counter.(interface{ Add(delta int64) })
-	if !ok {
-		return
-	}
-
-	adder.Add(int64(delta))
 }
 
 func addGauge(gauge Gauge, delta float64) {

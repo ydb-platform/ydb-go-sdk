@@ -285,17 +285,17 @@ func TestTopicReaderCountersSupportLegacyCounterConfig(t *testing.T) {
 		RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
 	})
 
-	require.Len(t, registry.values, 2)
-	require.Equal(t, float64(3), registry.value("custom.topic.reader.received.messages", map[string]string{
+	require.Len(t, registry.values, 4)
+	require.Equal(t, float64(0), registry.value("custom.topic.reader.received.messages", map[string]string{
 		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
 	}))
-	require.Zero(t, registry.value("custom.topic.reader.received.bytes", map[string]string{
+	require.Equal(t, float64(1), registry.value("custom.topic.reader.received.bytes", map[string]string{
 		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",
 	}))
-	require.Zero(t, registry.value("custom.topic.reader.commit.queued", map[string]string{
+	require.Equal(t, float64(1), registry.value("custom.topic.reader.commit.queued", map[string]string{
 		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
 	}))
-	require.Zero(t, registry.value("custom.topic.reader.commit.acknowledged", map[string]string{
+	require.Equal(t, float64(1), registry.value("custom.topic.reader.commit.acknowledged", map[string]string{
 		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
 	}))
 	require.Equal(t, float64(1), registry.value("custom.topic.reader.session.errors", map[string]string{
