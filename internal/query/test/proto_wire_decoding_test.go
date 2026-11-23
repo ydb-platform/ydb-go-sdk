@@ -156,7 +156,10 @@ func TestQueryProtoWireDecodingRespectsDriverCodec(t *testing.T) {
 	}{
 		{name: "ForceCodecV2", dial: grpc.WithDefaultCallOptions(grpc.ForceCodecV2(codec))},
 		{name: "ForceCodec", dial: grpc.WithDefaultCallOptions(grpc.ForceCodec(queryResultCodecV1{codec}))},
-		{name: "legacy", dial: grpc.WithCodec(queryResultLegacyCodec{queryResultCodecV1{codec}})}, //nolint:staticcheck,nolintlint
+		{
+			name: "legacy",
+			dial: grpc.WithCodec(queryResultLegacyCodec{queryResultCodecV1{codec}}), //nolint:staticcheck,nolintlint
+		},
 		{name: "registered_subtype", dial: grpc.WithDefaultCallOptions(grpc.CallContentSubtype(codecName))},
 		{name: "stream_interceptor", dial: grpc.WithStreamInterceptor(interceptor)},
 		{name: "chained_stream_interceptor", dial: grpc.WithChainStreamInterceptor(interceptor)},
@@ -241,6 +244,7 @@ const codecName = "query-driver-codec-test"
 
 type rewritingQueryResultCodec struct {
 	encoding.CodecV2
+
 	value int32
 }
 

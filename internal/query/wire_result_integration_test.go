@@ -376,7 +376,9 @@ func newWireResultConn(t *testing.T, queryServer Ydb_Query_V1.QueryServiceServer
 	return newQueryResultConn(t, queryServer, grpc.WithChainStreamInterceptor(internalconn.FallbackCodecStreamInterceptor))
 }
 
-func newQueryResultConn(t *testing.T, queryServer Ydb_Query_V1.QueryServiceServer, opts ...grpc.DialOption) *grpc.ClientConn {
+func newQueryResultConn(t *testing.T, queryServer Ydb_Query_V1.QueryServiceServer,
+	opts ...grpc.DialOption,
+) *grpc.ClientConn {
 	t.Helper()
 	listener := bufconn.Listen(1 << 20)
 	server := grpc.NewServer()

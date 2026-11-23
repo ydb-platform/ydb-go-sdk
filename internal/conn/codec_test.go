@@ -31,7 +31,7 @@ func TestFallbackCodecPreservesConfiguredCodec(t *testing.T) {
 			}
 			cc := newCodecTestConn(t, opts...)
 			ctx := WithFallbackCodec(t.Context(), responseBodyCodec{CodecV2: protobuf, body: "fallback"})
-			require.Equal(t, want, receiveCodecBody(t, ctx, cc), "the selected codec must decode the response")
+			require.Equal(t, want, receiveCodecBody(ctx, t, cc), "the selected codec must decode the response")
 		})
 	}
 }
@@ -51,7 +51,7 @@ func TestFallbackCodecPreservesReusableCallOptions(t *testing.T) {
 		FallbackCodecStreamInterceptor,
 	))
 	ctx := WithFallbackCodec(t.Context(), responseBodyCodec{CodecV2: encoding.GetCodecV2("proto"), body: "fallback"})
-	require.Equal(t, "fallback", receiveCodecBody(t, ctx, cc))
+	require.Equal(t, "fallback", receiveCodecBody(ctx, t, cc))
 	require.Equal(t, sentinel, backing[1], "selecting a fallback must not mutate the caller's options backing array")
 }
 
@@ -77,7 +77,7 @@ func newCodecTestConn(t *testing.T, opts ...grpc.DialOption) *grpc.ClientConn {
 	return cc
 }
 
-func receiveCodecBody(t *testing.T, ctx context.Context, cc *grpc.ClientConn) string {
+func receiveCodecBody(ctx context.Context, t *testing.T, cc *grpc.ClientConn) string {
 	t.Helper()
 	stream, err := grpc_testing.NewTestServiceClient(cc).FullDuplexCall(ctx)
 	require.NoError(t, err)
@@ -93,6 +93,7 @@ func receiveCodecBody(t *testing.T, ctx context.Context, cc *grpc.ClientConn) st
 
 type responseBodyCodec struct {
 	encoding.CodecV2
+
 	body string
 }
 
@@ -103,5 +104,6 @@ func (c responseBodyCodec) Unmarshal(data mem.BufferSlice, dst any) error {
 	if response, ok := dst.(*grpc_testing.StreamingOutputCallResponse); ok {
 		response.Payload = &grpc_testing.Payload{Body: []byte(c.body)}
 	}
+
 	return nil
 }
