@@ -1,5 +1,18 @@
 * Added topic reader and listener metrics for message flow, session errors, commit progress, and buffers, with `topicoptions.WithListenerReaderName` for listener identity. See [METRICS.md](METRICS.md).
 
+## v3.157.1
+* Changed endpoint selection to compare two random candidates by unfinished RPC count within the best available priority bucket, preserving existing balancer configuration and node affinity
+
+## v3.157.0
+* Fixed topic writer recovery from stalled initialization with a one-minute default attempt timeout and `topicoptions.WithWriterConnectTimeout` to override or disable it; the default backoff reset threshold increases from one to ten minutes
+
+## v3.156.1
+* Reduced custom topic encoder allocations by sharing pools across writers that reuse the same `topicoptions.WithWriterAddEncoder` option.
+
+## v3.156.0
+* Fixed topic multi-writer write cancellation and error reporting during partition splits
+* Changed topic multi-writer initialization to improve startup performance for topics with many partitions
+
 ## v3.155.1
 * Fixed resource leaks after failed driver initialization and in nested `Driver.With` calls
 

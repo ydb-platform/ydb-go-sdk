@@ -62,7 +62,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p benchmark-results/sdk benchmark-results/integration
+          mkdir -p benchmark-results/sdk benchmark-results/integration benchmark-results/arrow
           run_benchmarks() {
             local revision="$1" suite="$2"
             shift 2
@@ -80,8 +80,10 @@ jobs:
           export HIDE_APPLICATION_OUTPUT=1
           run_benchmarks master integration -tags integration -run '^$' -bench . -count=10 -benchmem -cpu=2 -timeout=90m ./tests/integration/...
           run_benchmarks pr integration -tags integration -run '^$' -bench . -count=10 -benchmem -cpu=2 -timeout=90m ./tests/integration/...
+          run_benchmarks master arrow -C tests/integration/arrow -tags integration -run '^$' -bench . -count=10 -benchmem -cpu=2 -timeout=90m ./...
+          run_benchmarks pr arrow -C tests/integration/arrow -tags integration -run '^$' -bench . -count=10 -benchmem -cpu=2 -timeout=90m ./...
           for revision in master pr; do
-            cat "benchmark-results/sdk/$revision.txt" "benchmark-results/integration/$revision.txt" > "benchmark-results/$revision.txt"
+            cat "benchmark-results/sdk/$revision.txt" "benchmark-results/integration/$revision.txt" "benchmark-results/arrow/$revision.txt" > "benchmark-results/$revision.txt"
           done
 
       - name: Compare benchmarks
