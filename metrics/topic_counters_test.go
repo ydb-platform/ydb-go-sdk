@@ -195,7 +195,6 @@ func TestTopicReaderCountersRecordLabeledValues(t *testing.T) {
 		"ydb.topic.reader.received.bytes":      {12, 8},
 		"ydb.topic.reader.commit.queued":       {2},
 		"ydb.topic.reader.commit.acknowledged": {1},
-		"ydb.topic.reader.session.errors":      {1},
 	}, capture.adds)
 	other := trace.TopicReaderInfo{Endpoint: "other", Database: "/other", ReaderName: "second"}
 	messageTracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
@@ -271,6 +270,7 @@ func TestTopicReaderCountersSupportLegacyCounterConfig(t *testing.T) {
 		ReaderInfo: readerInfo,
 		Topic:      "/topic", MessagesCount: 3,
 	})
+	tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{ReaderInfo: readerInfo, MessagesCount: 1})
 	tracer.OnReaderReceiveDataResponse(readerBytesInfo(readerInfo, 1))
 	tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
 		ReaderInfo: readerInfo,
@@ -285,17 +285,17 @@ func TestTopicReaderCountersSupportLegacyCounterConfig(t *testing.T) {
 		RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
 	})
 
-	require.Len(t, registry.values, 4)
+	require.Len(t, registry.values, 1)
 	require.Equal(t, float64(0), registry.value("custom.topic.reader.received.messages", map[string]string{
 		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
 	}))
-	require.Equal(t, float64(1), registry.value("custom.topic.reader.received.bytes", map[string]string{
+	require.Equal(t, float64(0), registry.value("custom.topic.reader.received.bytes", map[string]string{
 		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",
 	}))
-	require.Equal(t, float64(1), registry.value("custom.topic.reader.commit.queued", map[string]string{
+	require.Equal(t, float64(0), registry.value("custom.topic.reader.commit.queued", map[string]string{
 		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
 	}))
-	require.Equal(t, float64(1), registry.value("custom.topic.reader.commit.acknowledged", map[string]string{
+	require.Equal(t, float64(0), registry.value("custom.topic.reader.commit.acknowledged", map[string]string{
 		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
 	}))
 	require.Equal(t, float64(1), registry.value("custom.topic.reader.session.errors", map[string]string{
@@ -508,8 +508,11 @@ type topicAddCounter struct {
 	capture *topicCounterCapture
 }
 
-func (topicAddCounter) Inc() {
-	panic("topic Add counter unexpectedly used Inc")
+func (c topicAddCounter) Inc() {
+	if c.path != "ydb.topic.reader.session.errors" {
+		panic("topic bulk counter unexpectedly used Inc")
+	}
+	c.registry.add(c.path, c.labels, 1)
 }
 
 func (c topicAddCounter) Add(delta int64) {

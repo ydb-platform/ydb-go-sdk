@@ -107,7 +107,7 @@ func topic(config Config) (t trace.Topic) {
 			labels["retry_decision"] = info.RetryDecision
 			labels["status_code"] = info.StatusCode
 			labels["error.type"] = info.ErrorType
-			addCounter(vectors.errors(labels), 1)
+			vectors.errors(labels).Inc()
 		}
 	}
 	setReceivedBytesHooks(&t, reader.Details(), vectors)
@@ -206,8 +206,8 @@ func addCounter(counter Counter, delta int) {
 
 		return
 	}
-	if delta == 1 {
-		counter.Inc()
+	if adder, ok := counter.(interface{ Add(delta float64) }); ok {
+		adder.Add(float64(delta))
 	}
 }
 
