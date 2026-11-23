@@ -522,7 +522,7 @@ func TestTopicReaderReconnectorReconnectWithError(t *testing.T) {
 		tracer:    &trace.Topic{},
 	}
 	reconnector.initChannelsAndClock()
-	err := reconnector.reconnect(ctx, errors.New("test-reconnect"), nil, true)
+	err := reconnector.reconnect(ctx, errors.New("test-reconnect"), nil)
 	require.ErrorIs(t, err, testErr)
 	require.ErrorIs(t, reconnector.streamErr, testErr)
 }

@@ -109,7 +109,7 @@ func TestReaderReconnectorSessionErrorReportsAdmittedRetries(t *testing.T) {
 
 	// A request for a stream that has already been replaced is stale and does
 	// not count as a retry decision.
-	reconnectErr := reconnector.reconnect(context.Background(), retryErr, nil, true)
+	reconnectErr := reconnector.reconnect(context.Background(), retryErr, nil)
 	require.ErrorIs(t, reconnectErr, errReconnectRequestOutdated)
 	select {
 	case event := <-events:
@@ -119,7 +119,7 @@ func TestReaderReconnectorSessionErrorReportsAdmittedRetries(t *testing.T) {
 
 	// The fresh request reaches the connection attempt, so it is a real retry
 	// decision and is reported once.
-	reconnectErr = reconnector.reconnect(context.Background(), retryErr, stream, true)
+	reconnectErr = reconnector.reconnect(context.Background(), retryErr, stream)
 	require.NoError(t, reconnectErr)
 	select {
 	case event := <-events:
@@ -131,7 +131,8 @@ func TestReaderReconnectorSessionErrorReportsAdmittedRetries(t *testing.T) {
 	}
 }
 
-func TestReaderReconnectorSessionErrorDoesNotPropagateSuppressedReconnectReason(t *testing.T) {
+func TestReaderReconnectorReportsConnectorOutcomeAfterRetry(t *testing.T) {
+	streamErr := xerrors.Retryable(grpcStatus.Error(grpcCodes.Unavailable, "previous stream failed"))
 	t.Run("terminal connector failure still stops", func(t *testing.T) {
 		connectErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED))
 		events := make(chan trace.TopicReaderSessionErrorInfo, 2)
@@ -146,7 +147,11 @@ func TestReaderReconnectorSessionErrorDoesNotPropagateSuppressedReconnectReason(
 		}
 		reconnector.initChannelsAndClock()
 
-		err := reconnector.reconnect(context.Background(), context.DeadlineExceeded, nil, false)
+		err := reconnector.reconnect(context.Background(), streamErr, nil)
+		require.NotEmpty(t, events)
+		admitted := <-events
+		require.Equal(t, "retry", admitted.RetryDecision)
+		require.ErrorIs(t, admitted.Error, streamErr)
 		require.ErrorIs(t, err, connectErr)
 		select {
 		case event := <-events:
@@ -183,7 +188,11 @@ func TestReaderReconnectorSessionErrorDoesNotPropagateSuppressedReconnectReason(
 		}
 		reconnector.initChannelsAndClock()
 
-		err := reconnector.reconnect(context.Background(), context.DeadlineExceeded, nil, false)
+		err := reconnector.reconnect(context.Background(), streamErr, nil)
+		require.NotEmpty(t, events)
+		admitted := <-events
+		require.Equal(t, "retry", admitted.RetryDecision)
+		require.ErrorIs(t, admitted.Error, streamErr)
 		require.ErrorIs(t, err, retryErr)
 		var request reconnectRequest
 		select {
@@ -191,14 +200,13 @@ func TestReaderReconnectorSessionErrorDoesNotPropagateSuppressedReconnectReason(
 		case <-time.After(time.Second):
 			t.Fatal("retry connector failure did not enqueue a reconnect request")
 		}
-		require.True(t, request.reportSessionError)
+		require.True(t, request.reportStop)
 		require.ErrorIs(t, request.reason, retryErr)
 
 		require.NoError(t, reconnector.reconnect(
 			context.Background(),
 			request.reason,
 			request.oldReader,
-			request.reportSessionError,
 		))
 		select {
 		case event := <-events:
