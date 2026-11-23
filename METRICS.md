@@ -1,6 +1,6 @@
 # Topic reader and listener metrics
 
-Readers and listeners share eight instruments. All carry `endpoint`, `database` and `reader.name`. The endpoint is the configured authority and the database is the normalized path. Omitted or empty reader and listener names become `default`. Readers with identical labels share a series.
+Readers and listeners share eight instruments. All carry `endpoint`, `database` and `reader.name`. The endpoint is the configured authority and the database is the normalized path. Use `topicoptions.WithReaderName` for pull readers and `topicoptions.WithListenerReaderName` for listeners. Omitted or empty reader and listener names become `default`. Readers with identical labels share a series.
 
 `consumer` is present only when reading with a consumer.
 

@@ -110,7 +110,7 @@ func newNameTestListener(
 	cfg.Consumer = "consumer"
 	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "/topic"}}
 	if len(names) != 0 {
-		WithListenerName(names[0])(&cfg)
+		WithListenerReaderName(names[0])(&cfg)
 	}
 	reconnector, err := topiclistenerinternal.NewTopicListenerReconnector(
 		nameTestTopicClient{}, &cfg, nil,
