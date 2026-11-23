@@ -70,7 +70,6 @@ func newStreamListener(
 	config *StreamListenerConfig,
 	sessionIDCounter *atomic.Int64,
 ) (*streamListener, error) {
-	config.ReaderInfo.Listener = true
 	// Generate unique listener ID
 	listenerIDRand, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
 	if err != nil {
@@ -229,9 +228,6 @@ func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	l.sessions = &topicreadercommon.PartitionSessionStorage{}
 	l.sessionIDCounter = sessionIDCounter
 	l.workers = make(map[rawtopicreader.PartitionSessionID]*PartitionWorker)
-	if l.cfg == nil {
-		l.cfg = &StreamListenerConfig{}
-	}
 }
 
 func (l *streamListener) initStream(ctx context.Context, client TopicClient) error {
@@ -439,18 +435,10 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 }
 
 func (l *streamListener) changeCreditBalance(delta int) {
-	if l.cfg == nil {
-		return
-	}
-
 	l.creditBalance.Change(delta, l.traceCreditDelta)
 }
 
 func (l *streamListener) finalizeCreditBalance() {
-	if l.cfg == nil {
-		return
-	}
-
 	l.creditBalance.Finalize(l.traceCreditDelta)
 }
 
@@ -471,18 +459,10 @@ func (l *streamListener) traceLocalBufferDelta(delta int) {
 
 // changeLocalBuffer reports whether a positive delta reserved messages.
 func (l *streamListener) changeLocalBuffer(delta int) bool {
-	if l.cfg == nil {
-		return false
-	}
-
 	return l.localBufferBalance.ChangeBuffer(delta, l.traceLocalBufferDelta)
 }
 
 func (l *streamListener) finalizeLocalBuffer() {
-	if l.cfg == nil {
-		return
-	}
-
 	l.localBufferBalance.Finalize(l.traceLocalBufferDelta)
 }
 

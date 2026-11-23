@@ -753,7 +753,7 @@ func TestStreamListener_ReadResponseReturnsCreditWhenWorkerMissing(t *testing.T)
 }
 
 func TestStreamListener_CollectPendingFreeBytesCoalesces(t *testing.T) {
-	listener := &streamListener{}
+	listener := &streamListener{cfg: &StreamListenerConfig{}}
 	listener.initVars(&atomic.Int64{})
 	listener.freeBytes = make(chan int, 3)
 

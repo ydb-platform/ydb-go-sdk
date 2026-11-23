@@ -26,7 +26,7 @@ func listenerAndHandler(e fixenv.Env) listenerAndHandlerPair {
 	f := func() (*fixenv.GenericResult[listenerAndHandlerPair], error) {
 		handler := NewMockEventHandler(MockController(e))
 
-		listener := &streamListener{}
+		listener := &streamListener{cfg: &StreamListenerConfig{}}
 		listener.initVars(&atomic.Int64{})
 		listener.stream = StreamMock(e)
 		listener.streamClose = func(cause error) {}
