@@ -308,9 +308,6 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 				h2(t)
 			}
 		}
-		if h1 == nil && h2 == nil {
-			ret.OnReaderCommitQueued = nil
-		}
 	}
 	{
 		h1 := lhs.OnReaderSessionError
@@ -329,9 +326,6 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 			if h2 != nil {
 				h2(t)
 			}
-		}
-		if h1 == nil && h2 == nil {
-			ret.OnReaderSessionError = nil
 		}
 	}
 	{
@@ -759,9 +753,6 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 				h2(t)
 			}
 		}
-		if h1 == nil && h2 == nil {
-			ret.OnReaderMessagesReceived = nil
-		}
 	}
 	{
 		h1 := lhs.OnReaderMessagesDelivered
@@ -780,9 +771,6 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 			if h2 != nil {
 				h2(t)
 			}
-		}
-		if h1 == nil && h2 == nil {
-			ret.OnReaderMessagesDelivered = nil
 		}
 	}
 	{
@@ -803,9 +791,6 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 				h2(t)
 			}
 		}
-		if h1 == nil && h2 == nil {
-			ret.OnReaderLocalBufferChanged = nil
-		}
 	}
 	{
 		h1 := lhs.OnReaderCreditBalanceChanged
@@ -824,9 +809,6 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 			if h2 != nil {
 				h2(t)
 			}
-		}
-		if h1 == nil && h2 == nil {
-			ret.OnReaderCreditBalanceChanged = nil
 		}
 	}
 	{

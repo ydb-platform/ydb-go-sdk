@@ -467,11 +467,6 @@ func (w *Writer) composeHook(hook Hook, t1, t2, dst string) {
 		w.line(h2, ` := `, t2, `.`, hook.Name)
 		w.code(dst, ` = `)
 		w.composeHookCall(hook.Func, h1, h2)
-		if hook.Optional {
-			w.line(`if `, h1, ` == nil && `, h2, ` == nil {`)
-			w.block(func() { w.line(dst, ` = nil`) })
-			w.line(`}`)
-		}
 	})
 	w.line(`}`)
 }

@@ -63,12 +63,10 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderCommittedNotify func(TopicReaderCommittedNotifyInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		// gtrace:optional
 		// Setting this callback enables commit message counting for OnReaderCommittedNotify.
 		// If it is unset, OnReaderCommittedNotify.MessagesCount is zero.
 		OnReaderCommitQueued func(TopicReaderCommitQueuedInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		// gtrace:optional
 		// Reports the reconnect decision, which can first become known during Close.
 		OnReaderSessionError func(TopicReaderSessionErrorInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -130,17 +128,13 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderReceiveDataResponse func(TopicReaderReceiveDataResponseStartInfo) func(TopicReaderReceiveDataResponseDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		// gtrace:optional
 		// Reports each batch accepted by a listener worker, after routing.
 		OnReaderMessagesReceived func(TopicReaderMessagesReceivedInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		// gtrace:optional
 		OnReaderMessagesDelivered func(TopicReaderMessagesDeliveredInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		// gtrace:optional
 		OnReaderLocalBufferChanged func(TopicReaderLocalBufferChangedInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		// gtrace:optional
 		OnReaderCreditBalanceChanged func(TopicReaderCreditBalanceChangedInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderReadMessages func(TopicReaderReadMessagesStartInfo) func(TopicReaderReadMessagesDoneInfo)

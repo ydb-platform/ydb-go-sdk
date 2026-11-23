@@ -25,7 +25,7 @@ func PublicWithTrace(t trace.Topic) Option { //nolint:gocritic
 		if cb := c.PanicCallback(); cb != nil {
 			opts = append(opts, gtrace.WithTopicPanicCallback(cb))
 		}
-		c.Trace = gtrace.Compose(c.Trace, &t, opts...)
+		c.Trace = gtrace.ComposeReader(c.Trace, &t, opts...)
 	}
 }
 

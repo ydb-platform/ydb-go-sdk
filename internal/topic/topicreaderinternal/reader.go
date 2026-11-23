@@ -309,7 +309,7 @@ func WithReaderInfo(readerInfo topicreadercommon.ReaderInfo) PublicReaderOption 
 
 func WithTrace(tracer *trace.Topic) PublicReaderOption {
 	return func(cfg *ReaderConfig) {
-		cfg.Trace = gtrace.Compose(cfg.Trace, tracer)
+		cfg.Trace = gtrace.ComposeReader(cfg.Trace, tracer)
 	}
 }
 

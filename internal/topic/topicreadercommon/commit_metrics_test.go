@@ -80,10 +80,10 @@ func TestSetupCommitMetricsRequiresQueuedTrace(t *testing.T) {
 		{name: "nil", tracer: nil},
 		{name: "empty", tracer: &trace.Topic{}},
 		{name: "log only old notify", tracer: &logOnlyTrace},
-		{name: "composed empty", tracer: gtrace.Compose(&trace.Topic{}, &trace.Topic{})},
+		{name: "composed empty", tracer: gtrace.ComposeReader(&trace.Topic{}, &trace.Topic{})},
 		{
 			name:   "composed log only old notify",
-			tracer: gtrace.Compose(&logOnlyTrace, &trace.Topic{}),
+			tracer: gtrace.ComposeReader(&logOnlyTrace, &trace.Topic{}),
 		},
 	}
 	for _, test := range tests {
