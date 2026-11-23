@@ -1,3 +1,5 @@
+* Fixed panic in `decimal.Format` and `decimal.Decimal.String` for a zero value with zero scale
+
 ## v3.157.1
 * Changed endpoint selection to compare two random candidates by unfinished RPC count within the best available priority bucket, preserving existing balancer configuration and node affinity
 
