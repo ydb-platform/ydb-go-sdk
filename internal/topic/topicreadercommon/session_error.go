@@ -63,7 +63,7 @@ func TraceReaderSessionError(
 	retryDecision string,
 	err error,
 ) {
-	if tracer == nil || tracer.OnReaderSessionError == nil || err == nil {
+	if tracer == nil || err == nil {
 		return
 	}
 

@@ -58,17 +58,22 @@ func registerTopicVectors(reader Config, withConsumer bool) (v topicVectors) {
 	return v
 }
 
-func topic(config Config) (t trace.Topic) {
-	reader := config.WithSystem("topic").WithSystem("reader")
+func topicVectorSelector(reader Config) func(trace.TopicReaderInfo) topicVectors {
 	named := registerTopicVectors(reader, true)
 	consumerless := sync.OnceValue(func() topicVectors { return registerTopicVectors(reader, false) })
-	vectors := func(info trace.TopicReaderInfo) topicVectors {
+
+	return func(info trace.TopicReaderInfo) topicVectors {
 		if info.Consumer == "" {
 			return consumerless()
 		}
 
 		return named
 	}
+}
+
+func topic(config Config) (t trace.Topic) {
+	reader := config.WithSystem("topic").WithSystem("reader")
+	vectors := topicVectorSelector(reader)
 	messageEnabled := func(info trace.TopicReaderInfo) bool {
 		return topicMetricEnabled(reader.Details(), info.Listener, trace.TopicReaderMessageEvents)
 	}
@@ -106,7 +111,8 @@ func topic(config Config) (t trace.Topic) {
 		}
 		t.OnReaderCommittedNotify = func(info trace.TopicReaderCommittedNotifyInfo) {
 			if streamEnabled(info.ReaderInfo) && info.MessagesCount > 0 {
-				addCounter(vectors(info.ReaderInfo).acknowledged.With(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
+				labels := messageLabels(info.ReaderInfo, info.Topic)
+				addCounter(vectors(info.ReaderInfo).acknowledged.With(labels), info.MessagesCount)
 			}
 		}
 		t.OnReaderSessionError = func(info trace.TopicReaderSessionErrorInfo) {

@@ -1109,7 +1109,7 @@ func TestPartitionWorkerCanceledBatchReleasesBufferCredits(t *testing.T) {
 		&trace.Topic{},
 		"test-listener",
 	)
-	worker.onLocalBufferDelta = func(_ string, delta int) bool {
+	worker.onLocalBufferDelta = func(delta int) bool {
 		if delta > 0 {
 			reserved += delta
 

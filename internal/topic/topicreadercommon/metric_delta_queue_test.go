@@ -9,7 +9,7 @@ import (
 )
 
 func TestCreditBalanceSerializesConcurrentObservers(t *testing.T) {
-	var balance CreditBalance
+	var balance MetricBalance
 	var workers sync.WaitGroup
 	var callbacks atomic.Int32
 	var callbacksInFlight atomic.Int32
@@ -44,7 +44,7 @@ func TestCreditBalanceSerializesConcurrentObservers(t *testing.T) {
 }
 
 func TestCreditBalanceCloseCompensatesConcurrentChanges(t *testing.T) {
-	var balance CreditBalance
+	var balance MetricBalance
 	var total atomic.Int64
 	emit := func(delta int) { total.Add(int64(delta)) }
 	balance.Change(1, emit)
@@ -66,7 +66,7 @@ func TestCreditBalanceCloseCompensatesConcurrentChanges(t *testing.T) {
 }
 
 func TestCreditBalanceCanRecoverAfterObserverPanic(t *testing.T) {
-	var balance CreditBalance
+	var balance MetricBalance
 	require.Panics(t, func() {
 		balance.Change(1, func(int) { panic("observer failed") })
 	})
@@ -75,63 +75,63 @@ func TestCreditBalanceCanRecoverAfterObserverPanic(t *testing.T) {
 	require.Equal(t, []int{-1}, deltas)
 }
 
-func TestLocalBufferBalanceTracksAndFinalizesTopicDeltas(t *testing.T) {
-	var events []metricDelta
-	emit := func(topic string, delta int) {
-		events = append(events, metricDelta{topic: topic, delta: delta})
+func TestBufferBalanceTracksAndFinalizesReaderDeltas(t *testing.T) {
+	var events []int
+	emit := func(delta int) {
+		events = append(events, delta)
 	}
-	var balance LocalBufferBalance
+	var balance MetricBalance
 	balance.Finalize(nil)
-	balance.Release("missing", 1, emit)
-	require.False(t, balance.Reserve("ignored", 0, emit))
-	require.False(t, balance.Reserve("ignored", 1, nil))
-	var empty LocalBufferBalance
+	balance.ChangeBuffer(-1, emit)
+	require.False(t, balance.ChangeBuffer(0, emit))
+	require.False(t, balance.ChangeBuffer(1, nil))
+	var empty MetricBalance
 	empty.Finalize(emit)
 	empty.Finalize(emit)
-	require.False(t, empty.Reserve("late", 1, emit))
-	empty.Release("late", 1, emit)
+	require.False(t, empty.ChangeBuffer(1, emit))
+	empty.ChangeBuffer(-1, emit)
 	require.Empty(t, events)
 
-	require.True(t, balance.Reserve("topic-a", 3, emit))
-	balance.Release("topic-a", 3, nil)
-	balance.Release("topic-a", 0, emit)
-	require.True(t, balance.Reserve("topic-b", 2, emit))
-	balance.Release("missing", 1, emit)
-	balance.Release("topic-a", 4, emit)
-	balance.Release("topic-a", 1, emit)
-	balance.Release("topic-b", 2, emit)
-	require.Equal(t, []metricDelta{
-		{topic: "topic-a", delta: 3},
-		{topic: "topic-b", delta: 2},
-		{topic: "topic-a", delta: -1},
-		{topic: "topic-b", delta: -2},
+	require.True(t, balance.ChangeBuffer(3, emit))
+	balance.ChangeBuffer(-3, nil)
+	balance.ChangeBuffer(0, emit)
+	require.True(t, balance.ChangeBuffer(2, emit))
+	balance.ChangeBuffer(-6, emit)
+	balance.ChangeBuffer(-7, emit)
+	balance.ChangeBuffer(-1, emit)
+	balance.ChangeBuffer(-2, emit)
+	require.Equal(t, []int{
+		3,
+		2,
+		-1,
+		-2,
 	}, events)
 
 	balance.Finalize(emit)
 	balance.Finalize(emit)
-	require.False(t, balance.Reserve("topic-a", 1, emit))
-	balance.Release("topic-a", 1, emit)
-	require.Equal(t, []metricDelta{
-		{topic: "topic-a", delta: 3},
-		{topic: "topic-b", delta: 2},
-		{topic: "topic-a", delta: -1},
-		{topic: "topic-b", delta: -2},
-		{topic: "topic-a", delta: -2},
+	require.False(t, balance.ChangeBuffer(1, emit))
+	balance.ChangeBuffer(-1, emit)
+	require.Equal(t, []int{
+		3,
+		2,
+		-1,
+		-2,
+		-2,
 	}, events)
 
-	var zeroBalance LocalBufferBalance
-	require.True(t, zeroBalance.Reserve("drained", 1, emit))
-	zeroBalance.Release("drained", 1, emit)
+	var zeroBalance MetricBalance
+	require.True(t, zeroBalance.ChangeBuffer(1, emit))
+	zeroBalance.ChangeBuffer(-1, emit)
 	zeroBalance.Finalize(emit)
 	zeroBalance.Finalize(emit)
-	require.Equal(t, []metricDelta{
-		{topic: "topic-a", delta: 3},
-		{topic: "topic-b", delta: 2},
-		{topic: "topic-a", delta: -1},
-		{topic: "topic-b", delta: -2},
-		{topic: "topic-a", delta: -2},
-		{topic: "drained", delta: 1},
-		{topic: "drained", delta: -1},
+	require.Equal(t, []int{
+		3,
+		2,
+		-1,
+		-2,
+		-2,
+		1,
+		-1,
 	}, events)
 }
 
@@ -142,7 +142,7 @@ func TestCreditBalanceCompactsConsumedPrefixDuringReentrantEmission(t *testing.T
 		maxCapacity    = 1_024
 	)
 
-	var balance CreditBalance
+	var balance MetricBalance
 	observations := make([]int, 0, totalEvents)
 	nestedCallbackCalled := false
 	maxObservedCapacity := cap(balance.pending)

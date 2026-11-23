@@ -345,9 +345,9 @@ func TestTopicStreamReader_MetricBalancesArePerStreamForSameReaderName(t *testin
 	events2 := newEvents(e2.reader)
 
 	e1.reader.changeCreditBalance(10)
-	require.True(t, e1.reader.reserveLocalBuffer("/topic", 2))
+	require.True(t, e1.reader.reserveLocalBuffer(2))
 	e2.reader.changeCreditBalance(10)
-	require.True(t, e2.reader.reserveLocalBuffer("/topic", 2))
+	require.True(t, e2.reader.reserveLocalBuffer(2))
 	require.Equal(t, 10, readerMetricDelta(t, events1.credits))
 	require.Equal(t, 2, readerMetricDelta(t, events1.locals))
 	require.Equal(t, 10, readerMetricDelta(t, events2.credits))

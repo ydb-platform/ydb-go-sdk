@@ -194,7 +194,9 @@ func (tx *failingMaterializeTransaction) UnLazy(context.Context) error {
 	return tx.err
 }
 
-func onAcceptedMessages(observe func(trace.TopicReaderMessagesReceivedInfo)) func(trace.TopicReaderReceiveDataResponseStartInfo) func(trace.TopicReaderReceiveDataResponseDoneInfo) {
+func onAcceptedMessages(
+	observe func(trace.TopicReaderMessagesReceivedInfo),
+) func(trace.TopicReaderReceiveDataResponseStartInfo) func(trace.TopicReaderReceiveDataResponseDoneInfo) {
 	return func(start trace.TopicReaderReceiveDataResponseStartInfo) func(trace.TopicReaderReceiveDataResponseDoneInfo) {
 		return func(done trace.TopicReaderReceiveDataResponseDoneInfo) {
 			for topic, count := range done.AcceptedMessages {

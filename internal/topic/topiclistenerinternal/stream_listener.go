@@ -50,8 +50,8 @@ type streamListener struct {
 
 	freeBytes chan int
 
-	creditBalance      topicreadercommon.CreditBalance
-	localBufferBalance topicreadercommon.LocalBufferBalance
+	creditBalance      topicreadercommon.MetricBalance
+	localBufferBalance topicreadercommon.MetricBalance
 	closing            atomic.Bool
 	tracer             *trace.Topic
 	shutdownDone       empty.Chan
@@ -439,7 +439,7 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 }
 
 func (l *streamListener) changeCreditBalance(delta int) {
-	if l.tracer == nil || l.tracer.OnReaderCreditBalanceChanged == nil {
+	if l.cfg == nil {
 		return
 	}
 
@@ -447,7 +447,7 @@ func (l *streamListener) changeCreditBalance(delta int) {
 }
 
 func (l *streamListener) finalizeCreditBalance() {
-	if l.tracer == nil || l.tracer.OnReaderCreditBalanceChanged == nil {
+	if l.cfg == nil {
 		return
 	}
 
@@ -462,32 +462,24 @@ func (l *streamListener) traceCreditDelta(delta int) {
 	)
 }
 
-func (l *streamListener) traceLocalBufferDelta(_ string, delta int) {
+func (l *streamListener) traceLocalBufferDelta(delta int) {
 	traceCtx := l.background.Context()
 	gtrace.TopicOnReaderLocalBufferChanged(
 		l.tracer, &traceCtx, l.cfg.ReaderInfo, delta,
 	)
 }
 
-func (l *streamListener) localBufferTrackingEnabled() bool {
-	return l.cfg != nil && l.tracer != nil && l.tracer.OnReaderLocalBufferChanged != nil
-}
-
 // changeLocalBuffer reports whether a positive delta reserved messages.
-func (l *streamListener) changeLocalBuffer(topic string, delta int) bool {
-	if !l.localBufferTrackingEnabled() {
+func (l *streamListener) changeLocalBuffer(delta int) bool {
+	if l.cfg == nil {
 		return false
 	}
-	if delta > 0 {
-		return l.localBufferBalance.Reserve(topic, delta, l.traceLocalBufferDelta)
-	}
-	l.localBufferBalance.Release(topic, -delta, l.traceLocalBufferDelta)
 
-	return false
+	return l.localBufferBalance.ChangeBuffer(delta, l.traceLocalBufferDelta)
 }
 
 func (l *streamListener) finalizeLocalBuffer() {
-	if !l.localBufferTrackingEnabled() {
+	if l.cfg == nil {
 		return
 	}
 

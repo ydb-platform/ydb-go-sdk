@@ -58,8 +58,8 @@ type topicStreamReaderImpl struct {
 	readConnectionID string
 	readerID         int64
 
-	creditBalance      topicreadercommon.CreditBalance
-	localBufferBalance topicreadercommon.LocalBufferBalance
+	creditBalance      topicreadercommon.MetricBalance
+	localBufferBalance topicreadercommon.MetricBalance
 
 	m       xsync.RWMutex
 	err     error
@@ -400,7 +400,7 @@ func (r *topicStreamReaderImpl) releaseLocalBufferForBatch(batch *topicreadercom
 	if batch == nil || len(batch.Messages) == 0 {
 		return
 	}
-	r.releaseLocalBuffer(batch.Topic(), len(batch.Messages))
+	r.releaseLocalBuffer(len(batch.Messages))
 }
 
 func (r *topicStreamReaderImpl) consumeMessagesUntilBatch(
@@ -815,18 +815,10 @@ func (r *topicStreamReaderImpl) freeBufferFromMessages(batch *topicreadercommon.
 }
 
 func (r *topicStreamReaderImpl) changeCreditBalance(delta int) {
-	if r.cfg.Trace == nil || r.cfg.Trace.OnReaderCreditBalanceChanged == nil {
-		return
-	}
-
 	r.creditBalance.Change(delta, r.traceCreditDelta)
 }
 
 func (r *topicStreamReaderImpl) finalizeCreditBalance() {
-	if r.cfg.Trace == nil || r.cfg.Trace.OnReaderCreditBalanceChanged == nil {
-		return
-	}
-
 	r.creditBalance.Finalize(r.traceCreditDelta)
 }
 
@@ -838,38 +830,30 @@ func (r *topicStreamReaderImpl) traceCreditDelta(delta int) {
 	)
 }
 
-func (r *topicStreamReaderImpl) traceLocalBufferDelta(_ string, delta int) {
+func (r *topicStreamReaderImpl) traceLocalBufferDelta(delta int) {
 	traceCtx := r.cfg.BaseContext
 	gtrace.TopicOnReaderLocalBufferChanged(
 		r.cfg.Trace, &traceCtx, r.cfg.ReaderInfo, delta,
 	)
 }
 
-func (r *topicStreamReaderImpl) localBufferTrackingEnabled() bool {
-	return r.cfg.Trace != nil && r.cfg.Trace.OnReaderLocalBufferChanged != nil
-}
-
-func (r *topicStreamReaderImpl) reserveLocalBuffer(topic string, messagesCount int) bool {
-	if messagesCount <= 0 || !r.localBufferTrackingEnabled() {
+func (r *topicStreamReaderImpl) reserveLocalBuffer(messagesCount int) bool {
+	if messagesCount <= 0 {
 		return false
 	}
 
-	return r.localBufferBalance.Reserve(topic, messagesCount, r.traceLocalBufferDelta)
+	return r.localBufferBalance.ChangeBuffer(messagesCount, r.traceLocalBufferDelta)
 }
 
-func (r *topicStreamReaderImpl) releaseLocalBuffer(topic string, messagesCount int) {
-	if messagesCount <= 0 || !r.localBufferTrackingEnabled() {
+func (r *topicStreamReaderImpl) releaseLocalBuffer(messagesCount int) {
+	if messagesCount <= 0 {
 		return
 	}
 
-	r.localBufferBalance.Release(topic, messagesCount, r.traceLocalBufferDelta)
+	r.localBufferBalance.ChangeBuffer(-messagesCount, r.traceLocalBufferDelta)
 }
 
 func (r *topicStreamReaderImpl) finalizeLocalBuffer() {
-	if !r.localBufferTrackingEnabled() {
-		return
-	}
-
 	r.localBufferBalance.Finalize(r.traceLocalBufferDelta)
 }
 
@@ -916,10 +900,10 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 		topic := batches[i].Topic()
 		messagesCount := len(batches[i].Messages)
 
-		reserved := r.reserveLocalBuffer(topic, messagesCount)
+		reserved := r.reserveLocalBuffer(messagesCount)
 		if err := r.batcher.PushBatches(batches[i]); err != nil {
 			if reserved {
-				r.releaseLocalBuffer(topic, messagesCount)
+				r.releaseLocalBuffer(messagesCount)
 			}
 
 			return err

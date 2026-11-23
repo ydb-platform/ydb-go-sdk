@@ -27,7 +27,7 @@ func TestStreamListenerLocalBufferEventsKeepOrderDuringClose(t *testing.T) {
 			observations = append(observations, balance)
 		},
 	})
-	reader.changeLocalBuffer("topic", 1)
+	reader.changeLocalBuffer(1)
 	require.Equal(t, []int{1, 0}, observations)
 }
 
