@@ -2466,7 +2466,7 @@ func TopicOnReaderSentDataRequest(t *trace.Topic, c *context.Context, readerConn
 	onReaderSentDataRequest(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderReceiveDataResponse(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, readerConnectionID string, localBufferSizeAfterReceive int, dataResponse trace.TopicReaderDataResponseInfo) func(error) {
+func TopicOnReaderReceiveDataResponse(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, readerConnectionID string, localBufferSizeAfterReceive int, dataResponse trace.TopicReaderDataResponseInfo) func(acceptedMessages map[string]int, _ error) {
 	var p trace.TopicReaderReceiveDataResponseStartInfo
 	p.Context = c
 	p.ReaderInfo = readerInfo
@@ -2474,8 +2474,9 @@ func TopicOnReaderReceiveDataResponse(t *trace.Topic, c *context.Context, reader
 	p.LocalBufferSizeAfterReceive = localBufferSizeAfterReceive
 	p.DataResponse = dataResponse
 	res := onReaderReceiveDataResponse(t, p)
-	return func(e error) {
+	return func(acceptedMessages map[string]int, e error) {
 		var p trace.TopicReaderReceiveDataResponseDoneInfo
+		p.AcceptedMessages = acceptedMessages
 		p.Error = e
 		res(p)
 	}

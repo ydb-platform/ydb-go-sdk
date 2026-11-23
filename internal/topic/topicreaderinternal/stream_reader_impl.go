@@ -902,8 +902,9 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 		resCapacity,
 		msg,
 	)
+	var accepted map[string]int
 	defer func() {
-		onDone(err)
+		onDone(accepted, err)
 	}()
 
 	batches, err2 := topicreadercommon.ReadRawBatchesToPublicBatches(msg, &r.sessionController, r.cfg.Decoders)
@@ -924,14 +925,10 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 			return err
 		}
 
-		traceCtx := r.cfg.BaseContext
-		gtrace.TopicOnReaderMessagesReceived(
-			r.cfg.Trace,
-			&traceCtx,
-			r.cfg.ReaderInfo,
-			topic,
-			messagesCount,
-		)
+		if accepted == nil {
+			accepted = make(map[string]int)
+		}
+		accepted[topic] += messagesCount
 	}
 
 	return nil

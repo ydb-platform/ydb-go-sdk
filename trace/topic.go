@@ -69,12 +69,14 @@ type (
 		OnReaderCommitQueued func(TopicReaderCommitQueuedInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		// gtrace:optional
+		// Reports the reconnect decision, which can first become known during Close.
 		OnReaderSessionError func(TopicReaderSessionErrorInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderClose func(TopicReaderCloseStartInfo) func(TopicReaderCloseDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderInit func(TopicReaderInitStartInfo) func(TopicReaderInitDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// Reports a raw stream failure before retry admission or a terminal decision.
 		OnReaderError func(TopicReaderErrorInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderUpdateToken func(
@@ -129,6 +131,7 @@ type (
 		OnReaderReceiveDataResponse func(TopicReaderReceiveDataResponseStartInfo) func(TopicReaderReceiveDataResponseDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		// gtrace:optional
+		// Reports each batch accepted by a listener worker, after routing.
 		OnReaderMessagesReceived func(TopicReaderMessagesReceivedInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		// gtrace:optional
@@ -187,6 +190,7 @@ type (
 		OnListenerInit func(TopicListenerInitStartInfo) func(TopicListenerInitDoneInfo)
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// Reports a wire receive before routing; a response can feed several workers or none.
 		OnListenerReceiveMessage func(TopicListenerReceiveMessageInfo)
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -345,7 +349,9 @@ type (
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderReceiveDataResponseDoneInfo struct {
-		Error error
+		// AcceptedMessages counts successful buffer pushes by topic, including partial responses.
+		AcceptedMessages map[string]int
+		Error            error
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
