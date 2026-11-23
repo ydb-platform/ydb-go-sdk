@@ -60,6 +60,7 @@ func TestTopicPartitionSessionMetricPublicSurface(t *testing.T) {
 					)
 					require.NoError(t, startErr)
 					closeResources = append(closeResources, resource.Close)
+					require.NoError(t, resource.WaitInit(ctx))
 				} else {
 					resource, startErr := driver.Topic().StartReader(
 						"consumer", topicoptions.ReadTopic("topic"), topicoptions.WithReaderName(name),
@@ -81,6 +82,7 @@ func TestTopicPartitionSessionMetricPublicSurface(t *testing.T) {
 
 						return resource.Close(ctx)
 					})
+					require.NoError(t, resource.WaitInit(ctx))
 				}
 			}
 			// Independent native gauge series register before admission.
