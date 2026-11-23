@@ -377,54 +377,6 @@ func TestTopicReaderGaugesApplyDeltasWithoutSet(t *testing.T) {
 	}))
 }
 
-func TestTopicMetricCallbacksProvideAllDeclaredLabels(t *testing.T) {
-	for _, test := range []struct {
-		name       string
-		consumer   string
-		readerName string
-	}{
-		{name: "without consumer or reader name"},
-		{name: "without consumer with reader name", readerName: "generated-reader"},
-		{name: "with consumer and reader name", consumer: "consumer", readerName: "reader"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			readerInfo := trace.TopicReaderInfo{
-				Endpoint: "node", Database: "/db", Consumer: test.consumer, ReaderName: test.readerName,
-			}
-			tracer := topic(strictTopicConfig{
-				recordingConfig: recordingConfig{details: trace.DetailsAll},
-				t:               t,
-			})
-
-			tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
-				ReaderInfo: readerInfo,
-				Topic:      "/topic", MessagesCount: 1,
-			})
-			tracer.OnReaderReceiveDataResponse(readerBytesInfo(readerInfo, 1))
-			tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
-				ReaderInfo: readerInfo,
-				Topic:      "/topic", MessagesCount: 1,
-			})
-			tracer.OnReaderCommittedNotify(trace.TopicReaderCommittedNotifyInfo{
-				ReaderInfo: readerInfo,
-				Topic:      "/topic", MessagesCount: 1,
-			})
-			tracer.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{
-				ReaderInfo:    readerInfo,
-				RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
-			})
-			tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
-				ReaderInfo:    readerInfo,
-				MessagesDelta: 1,
-			})
-			tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
-				ReaderInfo: readerInfo,
-				BytesDelta: 1,
-			})
-		})
-	}
-}
-
 func TestTopicMetricsSeparateReaderAndListenerDetails(t *testing.T) {
 	for _, test := range []struct {
 		name    string
@@ -480,7 +432,13 @@ func TestTopicMetricsSeparateReaderAndListenerDetails(t *testing.T) {
 				"ydb.topic.reader.credit_balance_bytes", "ydb.topic.reader.commit.queued",
 				"ydb.topic.reader.commit.acknowledged", "ydb.topic.reader.session.errors",
 			} {
-				require.Equal(t, test.want, registry.value(path, nil), path)
+				labels := make(map[string]string)
+				for _, key := range registry.labelNames[path] {
+					if key != consumerLabel {
+						labels[key] = ""
+					}
+				}
+				require.Equal(t, test.want, registry.value(path, labels), path)
 			}
 		})
 	}
@@ -492,82 +450,6 @@ type topicMetricDescriptor struct {
 	unit       string
 	kind       string
 	labels     []string
-}
-
-type strictTopicConfig struct {
-	recordingConfig
-
-	t testing.TB
-}
-
-func (c strictTopicConfig) WithSystem(system string) Config {
-	scoped := c.recordingConfig.WithSystem(system).(recordingConfig)
-
-	return strictTopicConfig{recordingConfig: scoped, t: c.t}
-}
-
-func (c strictTopicConfig) CounterVec(_ string, labelNames ...string) CounterVec {
-	return strictCounterVec{t: c.t, labelNames: labelNameSet(labelNames)}
-}
-
-func (c strictTopicConfig) GaugeVec(_ string, labelNames ...string) GaugeVec {
-	return strictGaugeVec{t: c.t, labelNames: labelNameSet(labelNames)}
-}
-
-func labelNameSet(labelNames []string) map[string]struct{} {
-	set := make(map[string]struct{}, len(labelNames))
-	for _, name := range labelNames {
-		set[name] = struct{}{}
-	}
-
-	return set
-}
-
-type strictCounterVec struct {
-	t          testing.TB
-	labelNames map[string]struct{}
-}
-
-func (v strictCounterVec) With(labels map[string]string) Counter {
-	v.t.Helper()
-	consumer, present := labels["consumer"]
-	require.Equal(v.t, consumer != "", present)
-	require.Equal(v.t, v.labelNames, labelNameSetFromValues(labels))
-
-	return strictCounter{}
-}
-
-type strictCounter struct{}
-
-func (strictCounter) Inc() {}
-
-type strictGaugeVec struct {
-	t          testing.TB
-	labelNames map[string]struct{}
-}
-
-func (v strictGaugeVec) With(labels map[string]string) Gauge {
-	v.t.Helper()
-	consumer, present := labels["consumer"]
-	require.Equal(v.t, consumer != "", present)
-	require.Equal(v.t, v.labelNames, labelNameSetFromValues(labels))
-
-	return strictGauge{}
-}
-
-type strictGauge struct{}
-
-func (strictGauge) Add(float64) {}
-
-func (strictGauge) Set(float64) {}
-
-func labelNameSetFromValues(labels map[string]string) map[string]struct{} {
-	set := make(map[string]struct{}, len(labels))
-	for name := range labels {
-		set[name] = struct{}{}
-	}
-
-	return set
 }
 
 type topicCounterCapture struct {

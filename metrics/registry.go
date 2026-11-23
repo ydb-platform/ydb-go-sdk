@@ -31,6 +31,8 @@ type Registry interface {
 // The name passed to CounterVecWithDescriptor is used as a complete instrument
 // name by implementations that support this capability. Registries that do
 // not implement RegistryWithDescriptors continue to use Registry.CounterVec.
+// With on the returned vector may receive a subset of the declared label names.
+// An omitted name means the attribute is absent, not an empty string.
 // This capability is intentionally additive so existing Registry and Config
 // implementations remain valid.
 type RegistryWithDescriptors interface {
@@ -43,6 +45,8 @@ type RegistryWithDescriptors interface {
 // The name passed to GaugeVecWithDescriptor is used as a complete instrument
 // name by implementations that support this capability. Registries that do
 // not implement RegistryWithGaugeDescriptors continue to use Registry.GaugeVec.
+// With on the returned vector may receive a subset of the declared label names.
+// An omitted name means the attribute is absent, not an empty string.
 // This capability is intentionally additive so existing Registry and Config
 // implementations remain valid.
 type RegistryWithGaugeDescriptors interface {

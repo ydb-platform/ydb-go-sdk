@@ -1,9 +1,7 @@
 package metrics
 
 import (
-	"slices"
 	"strings"
-	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -17,19 +15,21 @@ var (
 	}
 )
 
+type topicBinding[T any] func(map[string]string) T
+
 type topicVectors struct {
-	received, delivered, bytes, errors, queued, acknowledged CounterVec
-	local, credit                                            GaugeVec
+	received, delivered, bytes, errors, queued, acknowledged topicBinding[Counter]
+	local, credit                                            topicBinding[Gauge]
 }
 
-func registerTopicVectors(reader Config, withConsumer bool) (v topicVectors) {
+func registerTopicVectors(reader Config) (v topicVectors) {
 	const messageUnit = "{message}"
 	const byteUnit = "By"
 	for _, metric := range []struct {
 		name, unit string
 		labels     []string
-		counter    *CounterVec
-		gauge      *GaugeVec
+		counter    *topicBinding[Counter]
+		gauge      *topicBinding[Gauge]
 	}{
 		{"ydb.topic.reader.received.messages", messageUnit, topicMessageLabels, &v.received, nil},
 		{"ydb.topic.reader.delivered.messages", messageUnit, topicMessageLabels, &v.delivered, nil},
@@ -40,9 +40,6 @@ func registerTopicVectors(reader Config, withConsumer bool) (v topicVectors) {
 		{"ydb.topic.reader.local_buffer.messages", messageUnit, topicStreamLabels, nil, &v.local},
 		{"ydb.topic.reader.credit_balance_bytes", byteUnit, topicStreamLabels, nil, &v.credit},
 	} {
-		if !withConsumer {
-			metric.labels = slices.DeleteFunc(slices.Clone(metric.labels), func(key string) bool { return key == consumerLabel })
-		}
 		path := strings.TrimPrefix(metric.name, "ydb.topic.reader.")
 		system, name, ok := strings.Cut(path, ".")
 		if !ok {
@@ -58,44 +55,31 @@ func registerTopicVectors(reader Config, withConsumer bool) (v topicVectors) {
 	return v
 }
 
-func topicVectorSelector(reader Config) func(trace.TopicReaderInfo) topicVectors {
-	named := registerTopicVectors(reader, true)
-	consumerless := sync.OnceValue(func() topicVectors { return registerTopicVectors(reader, false) })
-
-	return func(info trace.TopicReaderInfo) topicVectors {
-		if info.Consumer == "" {
-			return consumerless()
-		}
-
-		return named
-	}
-}
-
 func topic(config Config) (t trace.Topic) {
 	reader := config.WithSystem("topic").WithSystem("reader")
-	vectors := topicVectorSelector(reader)
+	vectors := registerTopicVectors(reader)
 	messageEnabled := func(info trace.TopicReaderInfo) bool {
 		return topicMetricEnabled(reader.Details(), info.Listener, trace.TopicReaderMessageEvents)
 	}
 	if reader.Details()&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) != 0 {
 		t.OnReaderMessagesReceived = func(info trace.TopicReaderMessagesReceivedInfo) {
 			if messageEnabled(info.ReaderInfo) {
-				addCounter(vectors(info.ReaderInfo).received.With(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
+				addCounter(vectors.received(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
 			}
 		}
 		t.OnReaderMessagesDelivered = func(info trace.TopicReaderMessagesDeliveredInfo) {
 			if messageEnabled(info.ReaderInfo) {
-				addCounter(vectors(info.ReaderInfo).delivered.With(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
+				addCounter(vectors.delivered(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
 			}
 		}
 		t.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
 			if messageEnabled(info.ReaderInfo) {
-				addGauge(vectors(info.ReaderInfo).credit.With(streamLabels(info.ReaderInfo)), float64(info.BytesDelta))
+				addGauge(vectors.credit(streamLabels(info.ReaderInfo)), float64(info.BytesDelta))
 			}
 		}
 		t.OnReaderLocalBufferChanged = func(info trace.TopicReaderLocalBufferChangedInfo) {
 			if messageEnabled(info.ReaderInfo) {
-				addGauge(vectors(info.ReaderInfo).local.With(streamLabels(info.ReaderInfo)), float64(info.MessagesDelta))
+				addGauge(vectors.local(streamLabels(info.ReaderInfo)), float64(info.MessagesDelta))
 			}
 		}
 	}
@@ -106,13 +90,13 @@ func topic(config Config) (t trace.Topic) {
 	if reader.Details()&(trace.TopicReaderStreamEvents|trace.TopicListenerStreamEvents) != 0 {
 		t.OnReaderCommitQueued = func(info trace.TopicReaderCommitQueuedInfo) {
 			if streamEnabled(info.ReaderInfo) {
-				addCounter(vectors(info.ReaderInfo).queued.With(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
+				addCounter(vectors.queued(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
 			}
 		}
 		t.OnReaderCommittedNotify = func(info trace.TopicReaderCommittedNotifyInfo) {
 			if streamEnabled(info.ReaderInfo) && info.MessagesCount > 0 {
 				labels := messageLabels(info.ReaderInfo, info.Topic)
-				addCounter(vectors(info.ReaderInfo).acknowledged.With(labels), info.MessagesCount)
+				addCounter(vectors.acknowledged(labels), info.MessagesCount)
 			}
 		}
 		t.OnReaderSessionError = func(info trace.TopicReaderSessionErrorInfo) {
@@ -123,7 +107,7 @@ func topic(config Config) (t trace.Topic) {
 			labels["retry_decision"] = info.RetryDecision
 			labels["status_code"] = info.StatusCode
 			labels["error.type"] = info.ErrorType
-			addCounter(vectors(info.ReaderInfo).errors.With(labels), 1)
+			addCounter(vectors.errors(labels), 1)
 		}
 	}
 	setReceivedBytesHooks(&t, reader.Details(), vectors)
@@ -131,10 +115,10 @@ func topic(config Config) (t trace.Topic) {
 	return t
 }
 
-func setReceivedBytesHooks(t *trace.Topic, details trace.Details, vectors func(trace.TopicReaderInfo) topicVectors) {
+func setReceivedBytesHooks(t *trace.Topic, details trace.Details, vectors topicVectors) {
 	recordBytes := func(info trace.TopicReaderInfo, count int) {
 		if count > 0 {
-			addCounter(vectors(info).bytes.With(streamLabels(info)), count)
+			addCounter(vectors.bytes(streamLabels(info)), count)
 		}
 	}
 	if details&trace.TopicReaderMessageEvents != 0 {
@@ -147,7 +131,7 @@ func setReceivedBytesHooks(t *trace.Topic, details trace.Details, vectors func(t
 
 			return func(done trace.TopicReaderReceiveDataResponseDoneInfo) {
 				for topic, count := range done.AcceptedMessages {
-					addCounter(vectors(info.ReaderInfo).received.With(messageLabels(info.ReaderInfo, topic)), count)
+					addCounter(vectors.received(messageLabels(info.ReaderInfo, topic)), count)
 				}
 			}
 		}
@@ -163,24 +147,38 @@ func setReceivedBytesHooks(t *trace.Topic, details trace.Details, vectors func(t
 	}
 }
 
-func topicCounter(readerConfig Config, legacySystem, legacyName, name, unit string, labels []string) CounterVec {
+func topicCounter(
+	readerConfig Config, legacySystem, legacyName, name, unit string, labels []string,
+) topicBinding[Counter] {
 	if registry, ok := readerConfig.(RegistryWithDescriptors); ok {
-		return registry.CounterVecWithDescriptor(name, unit, labels...)
+		return descriptorBinding(registry.CounterVecWithDescriptor(name, unit, labels...).With)
 	}
 
-	return readerConfig.WithSystem(legacySystem).CounterVec(legacyName, labels...)
+	return readerConfig.WithSystem(legacySystem).CounterVec(legacyName, labels...).With
 }
 
-func topicGauge(readerConfig Config, legacySystem, legacyName, name, unit string, labels []string) GaugeVec {
+func topicGauge(
+	readerConfig Config, legacySystem, legacyName, name, unit string, labels []string,
+) topicBinding[Gauge] {
 	if registry, ok := readerConfig.(RegistryWithGaugeDescriptors); ok {
-		return registry.GaugeVecWithDescriptor(name, unit, labels...)
+		return descriptorBinding(registry.GaugeVecWithDescriptor(name, unit, labels...).With)
 	}
 
 	if legacySystem == "" {
-		return readerConfig.GaugeVec(legacyName, labels...)
+		return readerConfig.GaugeVec(legacyName, labels...).With
 	}
 
-	return readerConfig.WithSystem(legacySystem).GaugeVec(legacyName, labels...)
+	return readerConfig.WithSystem(legacySystem).GaugeVec(legacyName, labels...).With
+}
+
+func descriptorBinding[T any](bind topicBinding[T]) topicBinding[T] {
+	return func(labels map[string]string) T {
+		if labels[consumerLabel] == "" {
+			delete(labels, consumerLabel)
+		}
+
+		return bind(labels)
+	}
 }
 
 func messageLabels(readerInfo trace.TopicReaderInfo, topic string) map[string]string {
@@ -191,16 +189,12 @@ func messageLabels(readerInfo trace.TopicReaderInfo, topic string) map[string]st
 }
 
 func streamLabels(readerInfo trace.TopicReaderInfo) map[string]string {
-	labels := map[string]string{
+	return map[string]string{
+		consumerLabel:   readerInfo.Consumer,
 		endpointLabel:   readerInfo.Endpoint,
 		databaseLabel:   readerInfo.Database,
 		readerNameLabel: readerInfo.ReaderName,
 	}
-	if readerInfo.Consumer != "" {
-		labels[consumerLabel] = readerInfo.Consumer
-	}
-
-	return labels
 }
 
 func addCounter(counter Counter, delta int) {
