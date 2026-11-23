@@ -838,10 +838,10 @@ func (r *topicStreamReaderImpl) traceCreditDelta(delta int) {
 	)
 }
 
-func (r *topicStreamReaderImpl) traceLocalBufferDelta(topic string, delta int) {
+func (r *topicStreamReaderImpl) traceLocalBufferDelta(_ string, delta int) {
 	traceCtx := r.cfg.BaseContext
 	gtrace.TopicOnReaderLocalBufferChanged(
-		r.cfg.Trace, &traceCtx, r.cfg.ReaderInfo, topic, delta,
+		r.cfg.Trace, &traceCtx, r.cfg.ReaderInfo, delta,
 	)
 }
 

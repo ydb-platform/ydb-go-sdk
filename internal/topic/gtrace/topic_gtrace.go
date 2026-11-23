@@ -2499,11 +2499,10 @@ func TopicOnReaderMessagesDelivered(t *trace.Topic, c *context.Context, readerIn
 	onReaderMessagesDelivered(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderLocalBufferChanged(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, topic string, messagesDelta int) {
+func TopicOnReaderLocalBufferChanged(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, messagesDelta int) {
 	var p trace.TopicReaderLocalBufferChangedInfo
 	p.Context = c
 	p.ReaderInfo = readerInfo
-	p.Topic = topic
 	p.MessagesDelta = messagesDelta
 	onReaderLocalBufferChanged(t, p)
 }

@@ -349,12 +349,12 @@ func TestTopicReaderGaugesApplyDeltasWithoutSet(t *testing.T) {
 	}
 
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
-		ReaderInfo: readerInfo,
-		Topic:      "/topic", MessagesDelta: 5,
+		ReaderInfo:    readerInfo,
+		MessagesDelta: 5,
 	})
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
-		ReaderInfo: readerInfo,
-		Topic:      "/other", MessagesDelta: -2,
+		ReaderInfo:    readerInfo,
+		MessagesDelta: -2,
 	})
 	tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{MessagesDelta: 0})
 	tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
@@ -415,8 +415,8 @@ func TestTopicMetricCallbacksProvideAllDeclaredLabels(t *testing.T) {
 				RetryDecision: "retry", StatusCode: "UNAVAILABLE", ErrorType: "transport_error",
 			})
 			tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
-				ReaderInfo: readerInfo,
-				Topic:      "/topic", MessagesDelta: 1,
+				ReaderInfo:    readerInfo,
+				MessagesDelta: 1,
 			})
 			tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
 				ReaderInfo: readerInfo,

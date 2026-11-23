@@ -368,7 +368,6 @@ type (
 	TopicReaderLocalBufferChangedInfo struct {
 		Context       *context.Context
 		ReaderInfo    TopicReaderInfo
-		Topic         string
 		MessagesDelta int
 	}
 

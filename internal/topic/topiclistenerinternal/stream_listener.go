@@ -462,10 +462,10 @@ func (l *streamListener) traceCreditDelta(delta int) {
 	)
 }
 
-func (l *streamListener) traceLocalBufferDelta(topic string, delta int) {
+func (l *streamListener) traceLocalBufferDelta(_ string, delta int) {
 	traceCtx := l.background.Context()
 	gtrace.TopicOnReaderLocalBufferChanged(
-		l.tracer, &traceCtx, l.cfg.ReaderInfo, topic, delta,
+		l.tracer, &traceCtx, l.cfg.ReaderInfo, delta,
 	)
 }
 
