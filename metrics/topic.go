@@ -129,11 +129,7 @@ func setReceivedBytesHooks(t *trace.Topic, details trace.Details, vectors topicV
 				recordBytes(info.ReaderInfo, info.DataResponse.GetBytesSize())
 			}
 
-			return func(done trace.TopicReaderReceiveDataResponseDoneInfo) {
-				for topic, count := range done.AcceptedMessages {
-					addCounter(vectors.received(messageLabels(info.ReaderInfo, topic)), count)
-				}
-			}
+			return nil
 		}
 	}
 

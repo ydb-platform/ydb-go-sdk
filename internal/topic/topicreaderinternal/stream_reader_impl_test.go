@@ -38,9 +38,9 @@ func TestTopicStreamReaderImpl_MessagesReceivedTraceUsesConfiguredEndpoint(t *te
 
 	var events []trace.TopicReaderMessagesReceivedInfo
 	e.reader.cfg.Trace = &trace.Topic{
-		OnReaderReceiveDataResponse: onAcceptedMessages(func(info trace.TopicReaderMessagesReceivedInfo) {
+		OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
 			events = append(events, info)
-		}),
+		},
 	}
 
 	require.NoError(t, e.reader.onReadResponse(readerMetricResponseWithOffsets(&e, 2, 1, 2)))
@@ -76,9 +76,9 @@ func TestTopicStreamReaderImpl_MessagesReceivedTraceSnapshotsBatchBeforeHandoff(
 
 		events := make(chan trace.TopicReaderMessagesReceivedInfo, 1)
 		e.reader.cfg.Trace = &trace.Topic{
-			OnReaderReceiveDataResponse: onAcceptedMessages(func(info trace.TopicReaderMessagesReceivedInfo) {
+			OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
 				events <- info
-			}),
+			},
 		}
 
 		readResponse := readerMetricResponseWithOffsets(&e, 2, 1, 2)

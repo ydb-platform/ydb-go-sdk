@@ -52,8 +52,7 @@ func exerciseTopicLabels(tracer trace.Topic, readerInfo trace.TopicReaderInfo) {
 		ReaderInfo: readerInfo,
 		Topic:      "/topic", MessagesCount: 1,
 	})
-	done := tracer.OnReaderReceiveDataResponse(readerBytesInfo(readerInfo, 1))
-	done(trace.TopicReaderReceiveDataResponseDoneInfo{AcceptedMessages: map[string]int{"/topic": 1}})
+	tracer.OnReaderReceiveDataResponse(readerBytesInfo(readerInfo, 1))
 	tracer.OnListenerReceiveMessage(listenerBytesInfo(readerInfo, 1, nil))
 	tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{
 		ReaderInfo: readerInfo, Topic: "/topic", MessagesCount: 1,

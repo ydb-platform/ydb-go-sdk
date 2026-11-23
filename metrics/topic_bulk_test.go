@@ -14,8 +14,8 @@ func TestTopicBulkCountersUseFloatAdd(t *testing.T) {
 		counters:        make(map[string]*floatCounter),
 	}
 	tracer := topic(cfg)
-	done := tracer.OnReaderReceiveDataResponse(readerBytesInfo(trace.TopicReaderInfo{}, 128))
-	done(trace.TopicReaderReceiveDataResponseDoneInfo{AcceptedMessages: map[string]int{"topic": 5}})
+	tracer.OnReaderReceiveDataResponse(readerBytesInfo(trace.TopicReaderInfo{}, 128))
+	tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{Topic: "topic", MessagesCount: 5})
 	tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{MessagesCount: 4})
 	tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{MessagesCount: 3})
 	tracer.OnReaderCommittedNotify(trace.TopicReaderCommittedNotifyInfo{MessagesCount: 2})

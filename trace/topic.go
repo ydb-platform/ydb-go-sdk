@@ -128,7 +128,7 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderReceiveDataResponse func(TopicReaderReceiveDataResponseStartInfo) func(TopicReaderReceiveDataResponseDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		// Reports each batch accepted by a listener worker, after routing.
+		// Reports messages accepted by a pull buffer or listener worker, grouped by topic.
 		OnReaderMessagesReceived func(TopicReaderMessagesReceivedInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderMessagesDelivered func(TopicReaderMessagesDeliveredInfo)
@@ -343,9 +343,7 @@ type (
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderReceiveDataResponseDoneInfo struct {
-		// AcceptedMessages counts successful buffer pushes by topic, including partial responses.
-		AcceptedMessages map[string]int
-		Error            error
+		Error error
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

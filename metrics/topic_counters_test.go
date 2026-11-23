@@ -167,8 +167,8 @@ func TestTopicReaderCountersRecordLabeledValues(t *testing.T) {
 		"retry_decision": "retry", "status_code": "UNAVAILABLE", "error.type": "transport_error",
 	}
 
-	messageTracer.OnReaderReceiveDataResponse(readerBytesInfo(readerInfo, 0))(trace.TopicReaderReceiveDataResponseDoneInfo{
-		AcceptedMessages: map[string]int{"/topic": 4},
+	messageTracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
+		ReaderInfo: readerInfo, Topic: "/topic", MessagesCount: 4,
 	})
 	messageTracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{
 		ReaderInfo: readerInfo,

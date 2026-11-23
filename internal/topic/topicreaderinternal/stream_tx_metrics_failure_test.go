@@ -24,9 +24,9 @@ func TestTopicStreamReader_PopMessagesBatchTxReleasesBufferWhenMaterializationFa
 		OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
 			localDeltas <- info.MessagesDelta
 		},
-		OnReaderReceiveDataResponse: onAcceptedMessages(func(info trace.TopicReaderMessagesReceivedInfo) {
+		OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
 			received <- info.MessagesCount
-		}),
+		},
 		OnReaderMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
 			delivered <- info.MessagesCount
 		},
@@ -192,16 +192,4 @@ func (tx *failingMaterializeTransaction) UnLazy(context.Context) error {
 	}
 
 	return tx.err
-}
-
-func onAcceptedMessages(
-	observe func(trace.TopicReaderMessagesReceivedInfo),
-) func(trace.TopicReaderReceiveDataResponseStartInfo) func(trace.TopicReaderReceiveDataResponseDoneInfo) {
-	return func(start trace.TopicReaderReceiveDataResponseStartInfo) func(trace.TopicReaderReceiveDataResponseDoneInfo) {
-		return func(done trace.TopicReaderReceiveDataResponseDoneInfo) {
-			for topic, count := range done.AcceptedMessages {
-				observe(trace.TopicReaderMessagesReceivedInfo{ReaderInfo: start.ReaderInfo, Topic: topic, MessagesCount: count})
-			}
-		}
-	}
 }
