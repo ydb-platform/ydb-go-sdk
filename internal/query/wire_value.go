@@ -82,15 +82,15 @@ func (p *wirePart) row(index int, columns []*Ydb.Column) *Row {
 // decodeWirePart copies and decodes a FORMAT_VALUE response part.
 func decodeWirePart(data []byte) (*wirePart, error) {
 	// A row may outlive the next RecvMsg, so the part must own its wire bytes.
-	return decodeOwnedPart(bytes.Clone(data))
+	return decodeOwnedPart(bytes.Clone(data), new(Ydb_Query.ExecuteQueryResponsePart))
 }
 
-func decodeOwnedPart(frame []byte) (*wirePart, error) {
+func decodeOwnedPart(frame []byte, meta *Ydb_Query.ExecuteQueryResponsePart) (*wirePart, error) {
 	// Row offsets must fit in rowSpan's uint32 fields.
 	if uint(len(frame)) > math.MaxUint32 {
 		return nil, fmt.Errorf("wire value decoder: response part exceeds 4 GiB")
 	}
-	part := &wirePart{meta: new(Ydb_Query.ExecuteQueryResponsePart), frame: frame}
+	part := &wirePart{meta: meta, frame: frame}
 	metadata := make([]byte, 0, 256)
 	offset := 0
 	for len(frame) > 0 {

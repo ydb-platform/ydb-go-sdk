@@ -122,9 +122,7 @@ func TestArrowYQLAliases(t *testing.T) {
 func TestArrowYQLTypes(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Minute)
 	defer cancel()
-	baselineDB, err := ydb.Open(ctx, connectionString(),
-		ydb.WithAnonymousCredentials(), ydb.WithQueryProtoWireDecoding(false),
-	)
+	baselineDB, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials())
 	if err != nil {
 		t.Fatal(err)
 	}

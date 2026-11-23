@@ -541,10 +541,17 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 // value tree, reducing allocations. It applies to queries on [query.Client],
 // [query.Session] and [query.TxActor], including queries inside Do and DoTx,
 // and database/sql connectors using [WithQueryService] with true.
-// The default is true. Passing false restores standard protobuf decoding.
+// The default is false: rows are decoded with the standard protobuf codec.
 // Arrow results and Table Service connectors keep their existing decoding paths.
 // A per-query codec selected with [query.WithCallOptions] takes precedence;
 // that query uses the selected codec and ordinary protobuf rows.
+//
+// With wire decoding enabled, gRPC stream interceptors and statistics handlers
+// receive response metadata without materialized protobuf rows. Reading,
+// counting, modifying or replacing result rows through that protobuf response
+// is unsupported. Use [query.Row] scanning methods and [query.Row.Values] to
+// access result data, and count rows while iterating the result.
+// Disable wire decoding if existing callbacks require complete protobuf rows.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithQueryProtoWireDecoding(enabled bool) Option {

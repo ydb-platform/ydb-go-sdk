@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/protobuf/proto"
 
@@ -67,10 +68,20 @@ func (p *asyncPrefetchExecuteQueryStream) Recv() (*Ydb_Query.ExecuteQueryRespons
 	if err != nil || wire == nil {
 		return part, err
 	}
-	part = new(Ydb_Query.ExecuteQueryResponsePart)
-	err = proto.Unmarshal(wire.frame, part)
+	materialized := new(Ydb_Query.ExecuteQueryResponsePart)
+	proto.Merge(materialized, part)
+	if resultSet := materialized.GetResultSet(); resultSet != nil {
+		rows := make([]*Ydb.Value, wire.RowCount())
+		for i := range rows {
+			rows[i] = new(Ydb.Value)
+			if err := proto.Unmarshal(wire.rowBytes(i), rows[i]); err != nil {
+				return nil, err
+			}
+		}
+		resultSet.Rows = rows
+	}
 
-	return part, err
+	return materialized, nil
 }
 
 func (p *asyncPrefetchExecuteQueryStream) RecvPart() (

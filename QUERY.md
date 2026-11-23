@@ -29,17 +29,29 @@ account for this when producing application side effects. See the
 | Arrow through `query.WithResultFormatArrow(ipc.NewReader)` | Evaluate for larger results when retaining `Scan`, `ScanNamed`, `ScanStruct` and `Values` is useful | Rows refer to retained column batches. The decoder scans requested cells directly; `Values` and fallback conversions create owned `types.Value` objects on demand. |
 | Raw Arrow through `Session.QueryArrow` | Column processing that can consume Arrow batches directly | Avoids conversion to SDK rows. The application reads IPC, manages Arrow resources, and keeps borrowed column data within the batch lifetime. |
 
-Native and `database/sql` Query Service `Ydb.Value` results decode rows directly
-from protobuf wire data by default, with fewer allocations. Pass the experimental
-`ydb.WithQueryProtoWireDecoding(false)` option to `ydb.Open` to restore standard
-protobuf decoding. Supported scalar destinations use direct scans; other destinations
-use the existing SDK value constructors and conversions without an intermediate
-protobuf value tree.
-This applies to Client, Session and TxActor queries, including `Do` and `DoTx`;
-it preserves the result format and row APIs. `database/sql` connectors using
-`ydb.WithQueryService(true)` inherit the driver's decoder selection, including
-prepared statements and transactions. Arrow results and Table Service connectors
-keep their existing decoding paths.
+Native Query Service `Ydb.Value` results use standard protobuf decoding by default.
+Pass the experimental `ydb.WithQueryProtoWireDecoding(true)` option to `ydb.Open`
+to decode rows directly from protobuf wire data with fewer allocations. Supported
+scalar destinations use direct scans; other destinations use the existing SDK
+value constructors and conversions without an intermediate protobuf value tree.
+This applies to Client, Session and TxActor queries, including `Do` and `DoTx`,
+and to `database/sql` Query Service connectors, including prepared statements and
+transactions. It preserves the result format and row APIs. Arrow results and
+Table Service connectors keep their existing decoding paths.
+
+With wire decoding enabled, the protobuf response exposed to gRPC stream
+interceptors and statistics handlers is not a data-access or transformation API
+for result rows. `ResultSet.Rows` is empty even when the query returns rows.
+Do not use the response protobuf in these callbacks to read, count, modify or
+replace result rows: protobuf row edits are not applied to the retained wire data.
+Read values through `Scan`, `ScanNamed`, `ScanStruct` or `Values`, count rows while
+iterating the result, and transform values after reading them.
+
+Response metadata, including status, issues, truncation flags and execution
+statistics, remains available to these callbacks. Synchronous metadata changes
+made by a stream interceptor after the underlying `RecvMsg` returns are preserved.
+If existing callbacks require a complete protobuf response with materialized rows,
+disable wire decoding with `ydb.WithQueryProtoWireDecoding(false)`.
 
 Arrow requires server support and the `EnableArrowResultSetFormat` feature.
 `query.WithResultFormatArrow` and the driver default option are experimental. Format selection

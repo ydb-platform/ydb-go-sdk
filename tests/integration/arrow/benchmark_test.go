@@ -23,9 +23,7 @@ import (
 func BenchmarkFormats(b *testing.B) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	db, err := ydb.Open(ctx, connectionString(),
-		ydb.WithAnonymousCredentials(), ydb.WithQueryProtoWireDecoding(false),
-	)
+	db, err := ydb.Open(ctx, connectionString(), ydb.WithAnonymousCredentials())
 	if err != nil {
 		b.Fatal(err)
 	}
