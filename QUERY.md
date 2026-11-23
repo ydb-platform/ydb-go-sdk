@@ -39,6 +39,11 @@ and to `database/sql` Query Service connectors, including prepared statements an
 transactions. It preserves the result format and row APIs. Arrow results and
 Table Service connectors keep their existing decoding paths.
 
+Custom gRPC codecs and content subtypes configured with
+`config.WithGrpcOptions(grpc.WithDefaultCallOptions(...))` or
+`query.WithCallOptions(...)` take precedence over wire decoding. Those calls use
+the selected codec and retain ordinary protobuf rows.
+
 With wire decoding enabled, the protobuf response exposed to gRPC stream
 interceptors and statistics handlers is not a data-access or transformation API
 for result rows. `ResultSet.Rows` is empty even when the query returns rows.

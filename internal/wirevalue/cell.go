@@ -5,10 +5,12 @@ package wirevalue
 import (
 	"math"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/proto"
 )
 
-// Cell views one encoded YDB Value and borrows the response part's bytes.
+// Cell views one encoded YDB Value. Its bytes may alias the response part.
 type Cell struct {
 	raw     []byte
 	bytes   []byte
@@ -18,7 +20,7 @@ type Cell struct {
 	kind    protowire.Number
 }
 
-// Parse reads a cell without constructing a protobuf message tree.
+// Parse reads a cell, normalizing repeated message fields when necessary.
 func Parse(data []byte) (Cell, error) {
 	cell := Cell{raw: data}
 	f := fields{data: data}
@@ -30,6 +32,16 @@ func Parse(data []byte) (Cell, error) {
 		case f.number == ValueHigh128Field && f.kind == ValueHigh128WireType:
 			cell.high128, _ = protowire.ConsumeFixed64(f.value)
 		case scalarField(f.number, f.kind):
+			if f.number == ValueNestedField && cell.kind == ValueNestedField {
+				// Repeated message fields merge, including the active oneof arm.
+				// Keep protobuf allocation on this uncommon encoding only.
+				merged, err := normalizeMessage(data, new(Ydb.Value))
+				if err != nil {
+					return Cell{}, err
+				}
+
+				return Parse(merged)
+			}
 			cell.kind = f.number
 			switch f.kind {
 			case protowire.VarintType:
@@ -46,6 +58,14 @@ func Parse(data []byte) (Cell, error) {
 	}
 
 	return cell, f.err
+}
+
+func normalizeMessage(data []byte, message proto.Message) ([]byte, error) {
+	if err := proto.Unmarshal(data, message); err != nil {
+		return nil, err
+	}
+
+	return proto.Marshal(message)
 }
 
 func scalarField(number protowire.Number, kind protowire.Type) bool {
@@ -186,15 +206,26 @@ func (p Pairs) Err() error { return p.fields.err }
 
 func parsePair(data []byte) (key, payload Cell, err error) {
 	f := fields{data: data}
+	var keySeen, payloadSeen bool
 	for f.next() {
 		if f.kind != protowire.BytesType {
 			continue
 		}
+		if f.number == PairKeyField && keySeen || f.number == PairPayloadField && payloadSeen {
+			merged, err := normalizeMessage(data, new(Ydb.ValuePair))
+			if err != nil {
+				return Cell{}, Cell{}, err
+			}
+
+			return parsePair(merged)
+		}
 		v, _ := protowire.ConsumeBytes(f.value)
 		switch f.number {
 		case PairKeyField:
+			keySeen = true
 			key, err = Parse(v)
 		case PairPayloadField:
+			payloadSeen = true
 			payload, err = Parse(v)
 		}
 		if err != nil {

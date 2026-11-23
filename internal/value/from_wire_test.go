@@ -1,6 +1,7 @@
 package value
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"reflect"
@@ -12,6 +13,160 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 )
+
+func TestFromWireMergesRepeatedNestedMessages(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		fragments []*Ydb.Value
+		want      string
+	}{
+		{name: "merge", fragments: []*Ydb.Value{nestedWireList(1), nestedWireList(2)}, want: "Just([1,2])"},
+		{
+			name: "another oneof arm resets the message",
+			fragments: []*Ydb.Value{
+				nestedWireList(1), ToYDB(Int32Value(0)).GetValue(), nestedWireList(2),
+			},
+			want: "Just([2])",
+		},
+		{
+			name:      "independent field preserves the message",
+			fragments: []*Ydb.Value{nestedWireList(1), {High_128: 1}, nestedWireList(2)},
+			want:      "Just([1,2])",
+		},
+		{name: "empty first message", fragments: []*Ydb.Value{nestedWireList(), nestedWireList(2)}, want: "Just([2])"},
+		{name: "empty last message", fragments: []*Ydb.Value{nestedWireList(1), nestedWireList()}, want: "Just([1])"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			data := marshalWireFragments(t, tt.fragments...)
+			original := bytes.Clone(data)
+			var pb Ydb.Value
+			if err := proto.Unmarshal(data, &pb); err != nil {
+				t.Fatal(err)
+			}
+			typeOf := types.NewOptional(types.NewList(types.Int32))
+			want := FromYDB(typeOf.ToYDB(), &pb)
+			got, err := FromWire(typeOf, data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Yql() != tt.want || !reflect.DeepEqual(got, want) {
+				t.Fatalf("FromWire() = %s, want %s (protobuf: %s)", got.Yql(), tt.want, want.Yql())
+			}
+			if !bytes.Equal(data, original) {
+				t.Fatal("FromWire modified the response bytes")
+			}
+		})
+	}
+}
+
+func TestFromWireMergesRepeatedPairMessages(t *testing.T) {
+	key := ToYDB(TextValue("key")).GetValue()
+	payload := ToYDB(TextValue("value")).GetValue()
+	for _, tt := range []struct {
+		name      string
+		fragments []*Ydb.ValuePair
+		want      Value
+	}{
+		{
+			name: "payload",
+			fragments: []*Ydb.ValuePair{
+				{Key: key, Payload: nestedWireList(1).GetNestedValue()},
+				{Payload: nestedWireList(2).GetNestedValue()},
+			},
+			want: DictValue(DictValueField{K: TextValue("key"), V: ListValue(Int32Value(1), Int32Value(2))}),
+		},
+		{
+			name: "key interleaved with payload",
+			fragments: []*Ydb.ValuePair{
+				{Key: nestedWireList(1).GetNestedValue()},
+				{Payload: payload},
+				{Key: nestedWireList(2).GetNestedValue()},
+			},
+			want: DictValue(DictValueField{K: TupleValue(Int32Value(1), Int32Value(2)), V: TextValue("value")}),
+		},
+		{
+			name: "empty last payload",
+			fragments: []*Ydb.ValuePair{
+				{Key: key, Payload: nestedWireList(1).GetNestedValue()},
+				{Payload: new(Ydb.Value)},
+			},
+			want: DictValue(DictValueField{K: TextValue("key"), V: ListValue(Int32Value(1))}),
+		},
+		{
+			name: "empty last key",
+			fragments: []*Ydb.ValuePair{
+				{Key: nestedWireList(1, 2).GetNestedValue(), Payload: payload},
+				{Key: new(Ydb.Value)},
+			},
+			want: DictValue(DictValueField{K: TupleValue(Int32Value(1), Int32Value(2)), V: TextValue("value")}),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			pair := new(Ydb.ValuePair)
+			pair.ProtoReflect().SetUnknown(marshalWireFragments(t, tt.fragments...))
+			data := marshalWireFragments(t, &Ydb.Value{Pairs: []*Ydb.ValuePair{pair}})
+			original := bytes.Clone(data)
+			var pb Ydb.Value
+			if err := proto.Unmarshal(data, &pb); err != nil {
+				t.Fatal(err)
+			}
+			typeOf := tt.want.Type()
+			want := FromYDB(typeOf.ToYDB(), &pb)
+			got, err := FromWire(typeOf, data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, tt.want) || !reflect.DeepEqual(got, want) {
+				t.Fatalf("FromWire() = %s, want %s (protobuf: %s)", got.Yql(), tt.want.Yql(), want.Yql())
+			}
+			if !bytes.Equal(data, original) {
+				t.Fatal("FromWire modified the response bytes")
+			}
+		})
+	}
+}
+
+func TestFromWireRejectsMalformedRepeatedMessages(t *testing.T) {
+	malformed := new(Ydb.Value)
+	malformed.ProtoReflect().SetUnknown([]byte{0xff})
+	nested := &Ydb.Value{Value: &Ydb.Value_NestedValue{NestedValue: malformed}}
+	pair := new(Ydb.ValuePair)
+	pair.ProtoReflect().SetUnknown(marshalWireFragments(t,
+		&Ydb.ValuePair{Key: ToYDB(TextValue("key")).GetValue(), Payload: new(Ydb.Value)},
+		&Ydb.ValuePair{Payload: malformed},
+	))
+	for _, tt := range []struct {
+		name   string
+		typeOf types.Type
+		data   []byte
+	}{
+		{
+			name:   "first nested body",
+			typeOf: types.NewOptional(types.NewList(types.Int32)),
+			data:   marshalWireFragments(t, nested, nestedWireList(1)),
+		},
+		{
+			name:   "last nested body",
+			typeOf: types.NewOptional(types.NewList(types.Int32)),
+			data:   marshalWireFragments(t, nestedWireList(1), nested),
+		},
+		{
+			name:   "pair payload body",
+			typeOf: types.NewDict(types.Text, types.NewList(types.Int32)),
+			data:   marshalWireFragments(t, &Ydb.Value{Pairs: []*Ydb.ValuePair{pair}}),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := proto.Unmarshal(tt.data, new(Ydb.Value)); err == nil {
+				t.Fatal("protobuf accepted the malformed fixture")
+			}
+			got, err := FromWire(tt.typeOf, tt.data)
+			if err == nil {
+				t.Fatalf("FromWire() = %v, nil; want a wire-format error", got)
+			}
+		})
+	}
+}
 
 func TestFromWireRejectsOutOfRangeVariantIndex(t *testing.T) {
 	for _, tt := range []struct {
@@ -69,6 +224,29 @@ func TestFromWireMatchesProtobufForValueTypes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func marshalWireFragments[M proto.Message](t *testing.T, fragments ...M) []byte {
+	t.Helper()
+	var data []byte
+	for _, fragment := range fragments {
+		encoded, err := proto.Marshal(fragment)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data = append(data, encoded...)
+	}
+
+	return data
+}
+
+func nestedWireList(items ...int32) *Ydb.Value {
+	values := make([]Value, len(items))
+	for i, item := range items {
+		values[i] = Int32Value(item)
+	}
+
+	return &Ydb.Value{Value: &Ydb.Value_NestedValue{NestedValue: ToYDB(ListValue(values...)).GetValue()}}
 }
 
 func wireTestValues() map[string]Value {
