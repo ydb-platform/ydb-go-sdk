@@ -9,6 +9,7 @@ on:
     branches:
       - master
       - release-*
+      - wire-query-rows
   workflow_dispatch:
     inputs:
       github_issue:
