@@ -37,20 +37,13 @@ func TestReaderReconnectorSessionErrorReportsInitialTerminalFailure(t *testing.T
 	defer cancel()
 	require.ErrorIs(t, reconnector.WaitInit(waitCtx), connectErr)
 
-	select {
-	case event := <-events:
-		require.Equal(t, "stop", event.RetryDecision)
-		require.Equal(t, "UNAUTHORIZED", event.StatusCode)
-		require.Equal(t, "ydb_error", event.ErrorType)
-	case <-time.After(time.Second):
-		t.Fatal("initial terminal session error event was not emitted")
-	}
-
-	select {
-	case event := <-events:
-		t.Fatalf("unexpected duplicate initial session error event: %+v", event)
-	case <-time.After(20 * time.Millisecond):
-	}
+	require.NoError(t, reconnector.CloseWithError(context.Background(), errReaderClosed))
+	require.True(t, reconnector.stopSessionErrorReported.Load())
+	require.Len(t, events, 1)
+	event := <-events
+	require.Equal(t, "stop", event.RetryDecision)
+	require.Equal(t, "UNAUTHORIZED", event.StatusCode)
+	require.Equal(t, "ydb_error", event.ErrorType)
 }
 
 func TestReaderReconnectorSessionErrorReportsFatalReadOnce(t *testing.T) {
