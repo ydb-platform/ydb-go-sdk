@@ -37,7 +37,7 @@ func TestNewRowDecoding(t *testing.T) {
 		opts []config.Option
 		want Ydb_Query_V1.QueryServiceClient
 	}{
-		{name: "default", want: Ydb_Query_V1.NewQueryServiceClient(nil)},
+		{name: "default", want: wireQueryClient{}},
 		{name: "enabled", opts: []config.Option{config.WithProtoWireDecoding(true)}, want: wireQueryClient{}},
 		{
 			name: "disabled",

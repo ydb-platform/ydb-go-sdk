@@ -27,7 +27,7 @@ func TestQueryProtoWireDecoding(t *testing.T) {
 		options []ydb.Option
 		wire    bool
 	}{
-		{name: "default"},
+		{name: "default", wire: true},
 		{name: "enabled", options: []ydb.Option{ydb.WithQueryProtoWireDecoding(true)}, wire: true},
 		{name: "disabled", options: []ydb.Option{ydb.WithQueryProtoWireDecoding(false)}},
 		{

@@ -36,14 +36,14 @@ func TestClientRowDecoding(t *testing.T) {
 		opts []config.Option
 		wire bool
 	}{
-		{name: "default"},
+		{name: "default", wire: true},
 		{name: "enabled", opts: []config.Option{config.WithProtoWireDecoding(true)}, wire: true},
 		{name: "disabled", opts: []config.Option{config.WithProtoWireDecoding(false)}},
 		{
 			name: "last option wins",
 			opts: []config.Option{config.WithProtoWireDecoding(true), config.WithProtoWireDecoding(false)},
 		},
-		{name: "implicit default", opts: []config.Option{config.AllowImplicitSessions()}},
+		{name: "implicit default", opts: []config.Option{config.AllowImplicitSessions()}, wire: true},
 		{
 			name: "implicit enabled",
 			opts: []config.Option{config.AllowImplicitSessions(), config.WithProtoWireDecoding(true)},
