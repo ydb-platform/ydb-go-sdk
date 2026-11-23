@@ -136,6 +136,7 @@ func assertPartitionSessionMetric(
 				"endpoint": endpoint, "database": "/local", "topic": "/local/topic",
 				"consumer": "consumer", "reader.name": name,
 			}, attributes)
+			require.NotContains(t, values, name, "duplicate series")
 			values[name] = point.Value
 		}
 	}
