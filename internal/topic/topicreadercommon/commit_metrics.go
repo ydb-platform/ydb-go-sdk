@@ -132,9 +132,8 @@ func NewCommitMessageTracker(committedOffset rawtopiccommon.Offset) *CommitMessa
 }
 
 // Queue records a submitted commit range and returns its offset span. Ranges
-// ending before the committed watermark are already complete and are not
-// retained. A range ending exactly at the watermark is retained so an equal
-// acknowledgement can complete it.
+// ending at or before the committed watermark are already complete; they
+// need no new ACK and must not contribute to either counter.
 func (t *CommitMessageTracker) Queue(start, end rawtopiccommon.Offset) int {
 	count := commitRangeMessageCount(start, end)
 	if count == 0 {
@@ -144,7 +143,7 @@ func (t *CommitMessageTracker) Queue(start, end rawtopiccommon.Offset) int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.closed || end < t.committedOffset {
+	if t.closed || end <= t.committedOffset {
 		return 0
 	}
 
@@ -154,14 +153,13 @@ func (t *CommitMessageTracker) Queue(start, end rawtopiccommon.Offset) int {
 }
 
 // Acknowledge advances the exclusive committed offset and returns the sum of
-// all pending ranges fully covered by it. Backward
-// acknowledgements return zero; an equal acknowledgement can complete ranges
-// admitted at the current watermark.
+// all pending ranges fully covered by it. Equal and backward
+// acknowledgements cannot complete any new range.
 func (t *CommitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset) int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.closed || exclusiveOffset < t.committedOffset {
+	if t.closed || exclusiveOffset <= t.committedOffset {
 		return 0
 	}
 

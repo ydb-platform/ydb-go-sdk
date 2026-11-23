@@ -349,8 +349,8 @@ func TestCommitMessageTrackerCountsRangeLengths(t *testing.T) {
 	require.Zero(t, tracker.Acknowledge(13))
 	require.Zero(t, tracker.Queue(10, 13))
 	require.Zero(t, tracker.Acknowledge(14))
-	require.Equal(t, 4, tracker.Queue(10, 14))
-	require.Equal(t, 4, tracker.Acknowledge(14))
+	require.Zero(t, tracker.Queue(10, 14))
+	require.Zero(t, tracker.Acknowledge(14))
 }
 
 func TestCommitMessageTrackerHandlesCoveredRangesAndEqualWatermark(t *testing.T) {
@@ -358,10 +358,9 @@ func TestCommitMessageTrackerHandlesCoveredRangesAndEqualWatermark(t *testing.T)
 
 	require.Equal(t, 4, tracker.Queue(10, 14))
 	require.Equal(t, 4, tracker.Acknowledge(14))
-	// An end equal to the current watermark is admitted and completed by an
-	// equal acknowledgement, as in the .NET request ledger.
-	require.Equal(t, 4, tracker.Queue(10, 14))
-	require.Equal(t, 4, tracker.Acknowledge(14))
+	// A submission already covered by the watermark needs no second ACK.
+	require.Zero(t, tracker.Queue(10, 14))
+	require.Zero(t, tracker.Acknowledge(14))
 	require.Equal(t, 4, tracker.Queue(14, 18))
 	require.Zero(t, tracker.Acknowledge(14))
 	require.Equal(t, 4, tracker.Acknowledge(18))
