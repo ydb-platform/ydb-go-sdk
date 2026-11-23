@@ -3,6 +3,8 @@ package ydb
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/observability"
 	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 )
 
@@ -13,9 +15,19 @@ import (
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithMeter(meter telemetry.Meter) Option {
-	return func(_ context.Context, d *Driver) error {
+	return func(ctx context.Context, d *Driver) error {
 		d.meter = meter
+		if meter == nil {
+			return nil
+		}
 
-		return nil
+		buildInfo := config.WithBuildInfo(observability.MetricsChainName, observability.MetricsChainVersion)
+
+		return With(func(cfg *config.Config) {
+			// Config options run after driver options, including any WithMeter(nil) override.
+			if d.meter != nil {
+				buildInfo(cfg)
+			}
+		})(ctx, d)
 	}
 }
