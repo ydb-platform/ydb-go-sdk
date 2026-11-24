@@ -116,6 +116,8 @@ jobs:
 
       - name: Determine baseline commit
         id: baseline
+        env:
+          CURRENT_REF: ${{ github.head_ref || github.ref_name }}
         run: |
           cd current
           if [[ -n "${{ inputs.baseline_ref }}" ]]; then
@@ -138,6 +140,11 @@ jobs:
             else
               BASELINE_REF="${BASELINE:0:7}"
             fi
+          fi
+          # Both workloads label their metrics with their ref. Equal refs (a fork
+          # branch named like the baseline) merge them into one series.
+          if [ "$BASELINE_REF" = "$CURRENT_REF" ]; then
+            BASELINE_REF="${BASELINE_REF}@${BASELINE:0:7}"
           fi
           echo "ref=$BASELINE_REF" >> $GITHUB_OUTPUT
 
