@@ -80,6 +80,16 @@ func TestRedisGlobToRE2Match(t *testing.T) {
 			in:   `\\`,
 			out:  `^\\$`,
 		},
+		{
+			name: "non-ASCII literal with character class",
+			in:   "ключ[12]",
+			out:  "^ключ[12]$",
+		},
+		{
+			name: "escaped non-ASCII literal with character class",
+			in:   `\й[12]`,
+			out:  "^й[12]$",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := redisGlobToRE2Match(tc.in)
