@@ -1,10 +1,6 @@
 package metrics
 
-import (
-	"strings"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-)
+import "github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 var (
 	topicMessageLabels      = []string{endpointLabel, databaseLabel, "topic", consumerLabel, readerNameLabel}
@@ -22,37 +18,47 @@ type topicVectors struct {
 	local, credit                                            topicBinding[Gauge]
 }
 
-func registerTopicVectors(reader Config) (v topicVectors) {
+func registerTopicVectors(reader Config) topicVectors {
 	const messageUnit = "{message}"
 	const byteUnit = "By"
-	for _, metric := range []struct {
-		name, unit string
-		labels     []string
-		counter    *topicBinding[Counter]
-		gauge      *topicBinding[Gauge]
-	}{
-		{"ydb.topic.reader.received.messages", messageUnit, topicMessageLabels, &v.received, nil},
-		{"ydb.topic.reader.delivered.messages", messageUnit, topicMessageLabels, &v.delivered, nil},
-		{"ydb.topic.reader.received.bytes", byteUnit, topicStreamLabels, &v.bytes, nil},
-		{"ydb.topic.reader.session.errors", "{error}", topicSessionErrorLabels, &v.errors, nil},
-		{"ydb.topic.reader.commit.queued", messageUnit, topicMessageLabels, &v.queued, nil},
-		{"ydb.topic.reader.commit.acknowledged", messageUnit, topicMessageLabels, &v.acknowledged, nil},
-		{"ydb.topic.reader.local_buffer.messages", messageUnit, topicStreamLabels, nil, &v.local},
-		{"ydb.topic.reader.credit_balance_bytes", byteUnit, topicStreamLabels, nil, &v.credit},
-	} {
-		path := strings.TrimPrefix(metric.name, "ydb.topic.reader.")
-		system, name, ok := strings.Cut(path, ".")
-		if !ok {
-			system, name = "", path
+	counter := func(scope, name, unit string, labels []string) topicBinding[Counter] {
+		if registry, ok := reader.(RegistryWithDescriptors); ok {
+			return descriptorBinding(registry.CounterVecWithDescriptor(topicMetricName(scope, name), unit, labels...).With)
 		}
-		if metric.counter != nil {
-			*metric.counter = topicCounter(reader, system, name, metric.name, metric.unit, metric.labels)
-		} else {
-			*metric.gauge = topicGauge(reader, system, name, metric.name, metric.unit, metric.labels)
+
+		return reader.WithSystem(scope).CounterVec(name, labels...).With
+	}
+	gauge := func(scope, name, unit string, labels []string) topicBinding[Gauge] {
+		if registry, ok := reader.(RegistryWithGaugeDescriptors); ok {
+			return descriptorBinding(registry.GaugeVecWithDescriptor(topicMetricName(scope, name), unit, labels...).With)
 		}
+		config := reader
+		if scope != "" {
+			config = reader.WithSystem(scope)
+		}
+
+		return config.GaugeVec(name, labels...).With
 	}
 
-	return v
+	return topicVectors{
+		received:     counter("received", "messages", messageUnit, topicMessageLabels),
+		delivered:    counter("delivered", "messages", messageUnit, topicMessageLabels),
+		bytes:        counter("received", "bytes", byteUnit, topicStreamLabels),
+		errors:       counter("session", "errors", "{error}", topicSessionErrorLabels),
+		queued:       counter("commit", "queued", messageUnit, topicMessageLabels),
+		acknowledged: counter("commit", "acknowledged", messageUnit, topicMessageLabels),
+		local:        gauge("local_buffer", "messages", messageUnit, topicStreamLabels),
+		credit:       gauge("", "credit_balance_bytes", byteUnit, topicStreamLabels),
+	}
+}
+
+func topicMetricName(scope, name string) string {
+	const prefix = "ydb.topic.reader."
+	if scope == "" {
+		return prefix + name
+	}
+
+	return prefix + scope + "." + name
 }
 
 func topic(config Config) (t trace.Topic) {
@@ -141,30 +147,6 @@ func setReceivedBytesHooks(t *trace.Topic, details trace.Details, vectors topicV
 			recordBytes(info.ReaderInfo, info.BytesSize)
 		}
 	}
-}
-
-func topicCounter(
-	readerConfig Config, legacySystem, legacyName, name, unit string, labels []string,
-) topicBinding[Counter] {
-	if registry, ok := readerConfig.(RegistryWithDescriptors); ok {
-		return descriptorBinding(registry.CounterVecWithDescriptor(name, unit, labels...).With)
-	}
-
-	return readerConfig.WithSystem(legacySystem).CounterVec(legacyName, labels...).With
-}
-
-func topicGauge(
-	readerConfig Config, legacySystem, legacyName, name, unit string, labels []string,
-) topicBinding[Gauge] {
-	if registry, ok := readerConfig.(RegistryWithGaugeDescriptors); ok {
-		return descriptorBinding(registry.GaugeVecWithDescriptor(name, unit, labels...).With)
-	}
-
-	if legacySystem == "" {
-		return readerConfig.GaugeVec(legacyName, labels...).With
-	}
-
-	return readerConfig.WithSystem(legacySystem).GaugeVec(legacyName, labels...).With
 }
 
 func descriptorBinding[T any](bind topicBinding[T]) topicBinding[T] {
