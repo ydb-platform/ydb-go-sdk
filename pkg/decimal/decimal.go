@@ -219,7 +219,9 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 
 			return inf, nil
 		}
-		integral--
+		if !dot && v.Cmp(zero) > 0 { // leading zeros do not take integral digits
+			integral--
+		}
 	}
 	//nolint:nestif
 	if len(s) > 0 { // Characters remaining.

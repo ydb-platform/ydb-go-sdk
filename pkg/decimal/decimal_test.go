@@ -322,6 +322,27 @@ func TestParse(t *testing.T) {
 			expected:  big.NewInt(0).Neg(Inf()),
 		},
 		{
+			name:      "leading zeros are not counted as integral digits",
+			s:         "010",
+			precision: 2,
+			scale:     0,
+			expected:  big.NewInt(10),
+		},
+		{
+			name:      "negative with leading zeros and fraction",
+			s:         "-0010.5",
+			precision: 3,
+			scale:     1,
+			expected:  big.NewInt(-105),
+		},
+		{
+			name:      "leading zero does not hide integral overflow",
+			s:         "05",
+			precision: 1,
+			scale:     1,
+			expected:  Inf(),
+		},
+		{
 			name:      "rounding up when digit > 5",
 			s:         "1.236",
 			precision: 22,
