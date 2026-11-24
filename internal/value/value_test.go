@@ -1938,6 +1938,22 @@ func TestDate32Value(t *testing.T) {
 		require.NotNil(t, v)
 		require.Equal(t, types.Date32, v.Type())
 	})
+
+	t.Run("FromTimeBeforeEpoch", func(t *testing.T) {
+		for _, tt := range []struct {
+			t   time.Time
+			exp int32
+		}{
+			{t: time.Date(1970, 1, 1, 12, 0, 0, 0, time.UTC), exp: 0},
+			{t: time.Date(1969, 12, 31, 0, 0, 0, 0, time.UTC), exp: -1},
+			{t: time.Date(1969, 12, 31, 12, 0, 0, 0, time.UTC), exp: -1},
+			{t: time.Date(1969, 12, 30, 23, 59, 59, 0, time.UTC), exp: -2},
+		} {
+			v := Date32ValueFromTime(tt.t)
+			require.Equal(t, Date32Value(tt.exp), v)
+			require.Equal(t, fmt.Sprintf("Date32(%q)", tt.t.Format(LayoutDate)), v.Yql())
+		}
+	})
 }
 
 func TestDatetime64Value(t *testing.T) {
