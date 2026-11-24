@@ -385,6 +385,13 @@ func TestTopicCommitOffsetWithExpiredSessionID(t *testing.T) {
 			require.True(t, expiredResponseSeen.Load(), "server must reject the expired session: %v", err)
 			require.False(t, unexpectedRetry.Load(), "expired session must not be retried: %v", err)
 			require.ErrorIs(t, err, topicreader.ErrCommitToExpiredSession)
+			require.True(t, ydb.IsOperationError(err, Ydb.StatusIds_SESSION_EXPIRED),
+				"expired-session error must preserve the server operation: %v", err)
+			var issueMessages []string
+			ydb.IterateByIssues(err, func(message string, _ Ydb.StatusIds_StatusCode, _ uint32) {
+				issueMessages = append(issueMessages, message)
+			})
+			require.NotEmpty(t, issueMessages, "server issues must remain accessible")
 
 			desc, err := scope.Driver().Topic().DescribeTopicConsumer(
 				ctx, scope.TopicPath(), scope.TopicConsumerName(), topicoptions.IncludeConsumerStats(),

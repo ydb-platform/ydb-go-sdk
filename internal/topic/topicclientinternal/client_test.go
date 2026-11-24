@@ -62,6 +62,11 @@ func TestCommitOffsetErrors(t *testing.T) {
 			wantErr: topicreader.ErrCommitToExpiredSession, wantCalls: 1,
 		},
 		{
+			name: "expired session with issues without auto retry", opts: withSessionID, noRetry: true,
+			results: []error{expiredErr},
+			wantErr: topicreader.ErrCommitToExpiredSession, wantCalls: 1,
+		},
+		{
 			name:    "expired consumer without session ID retries",
 			results: []error{expiredConsumerErr}, wantCalls: 2,
 		},
@@ -117,13 +122,14 @@ func TestCommitOffsetErrors(t *testing.T) {
 				return
 			}
 			require.ErrorIs(t, err, tt.wantErr)
+			originalErr := tt.results[len(tt.results)-1]
+			require.ErrorIs(t, err, originalErr, "the original operation must remain accessible")
+			require.Equal(t, xerrors.OperationError(originalErr), xerrors.OperationError(err))
 			if !xerrors.Is(tt.wantErr, topicreader.ErrCommitToExpiredSession) {
 				require.NotErrorIs(t, err, topicreader.ErrCommitToExpiredSession)
 			}
-			require.ErrorContains(t, err, tt.results[len(tt.results)-1].Error())
-			if tt.wantCalls == 1 {
-				require.Equal(t, tt.wantRetry, retry.Check(err).MustRetry(true))
-			}
+			require.ErrorContains(t, err, originalErr.Error())
+			require.Equal(t, tt.wantRetry, retry.Check(err).MustRetry(true))
 		})
 	}
 }

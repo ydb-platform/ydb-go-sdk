@@ -36,7 +36,7 @@ type Client interface {
 	// the active read session for this partition, causing the reader to reconnect.
 	// With a non-empty read session ID, SESSION_EXPIRED returns
 	// [topicreader.ErrCommitToExpiredSession] without automatic retries.
-	// For this error, the server status and issues are retained only in the error text.
+	// This error wraps the original operation error, preserving the server status and issues.
 	//
 	// Server behavior for notable offset values:
 	//
