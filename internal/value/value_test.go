@@ -1778,6 +1778,18 @@ func TestZeroValue(t *testing.T) {
 		require.Equal(t, "0", v.Yql())
 	})
 
+	t.Run("WidePrimitive", func(t *testing.T) {
+		for _, tt := range []types.Type{types.Date32, types.Datetime64, types.Timestamp64, types.Interval64} {
+			require.Equal(t, tt, ZeroValue(tt).Type())
+		}
+	})
+
+	t.Run("ConstructedEmptyTypes", func(t *testing.T) {
+		for _, tt := range []types.Type{types.NewVoid(), types.NewEmptyList(), types.NewEmptyDict()} {
+			require.Equal(t, tt, ZeroValue(tt).Type())
+		}
+	})
+
 	t.Run("Optional", func(t *testing.T) {
 		v := ZeroValue(types.NewOptional(types.Int32))
 		require.NotNil(t, v)
