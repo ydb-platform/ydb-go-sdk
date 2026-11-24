@@ -1,3 +1,4 @@
+## v3.157.3
 * Fixed `topic.Client.CommitOffset` retrying commits with an expired non-empty read session ID; it now returns `topicreader.ErrCommitToExpiredSession` while preserving the original operation error, server status, and issues
 
 ## v3.157.2
