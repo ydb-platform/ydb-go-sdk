@@ -3230,7 +3230,7 @@ func ZeroValue(t types.Type) Value {
 		}
 	case *types.Dict:
 		return &dictValue{
-			t: t.ValueType(),
+			t: t,
 		}
 	case *types.EmptyDict:
 		return &dictValue{
