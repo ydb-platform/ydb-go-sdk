@@ -300,7 +300,7 @@ func Format(x *big.Int, precision, scale uint32, trimTrailingZeros bool) string 
 		d := int(digit.Int64())
 		if d != 0 || scale == 0 || pos > 0 {
 			const numbers = "0123456789"
-			if d != 0 {
+			if d != 0 || scale == 0 { // scale == 0: integer part, its zeros are significant
 				trimTrailingZeros = false
 			}
 			if !trimTrailingZeros {
