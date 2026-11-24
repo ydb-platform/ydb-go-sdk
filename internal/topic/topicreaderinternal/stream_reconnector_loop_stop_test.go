@@ -16,6 +16,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -81,13 +82,19 @@ func TestReaderReconnectorLoopStopsAfterAdmittedRetry(t *testing.T) {
 			require.Equal(t, int32(1), connectAttempts.Load())
 
 			fakeClock.Advance(time.Hour)
-			admissionCtx := context.Background()
-			if !reportSessionError {
-				cancelledCtx, cancel := context.WithCancel(admissionCtx)
+			if reportSessionError {
+				reconnector.fireReconnectOnRetryableError(stream, retryErr)
+			} else {
+				caller, cancel := context.WithCancel(waitCtx)
+				_, err := reconnector.readWithReconnections(caller,
+					func(context.Context, batchedStreamReader) (*topicreadercommon.PublicBatch, error) {
+						cancel()
+
+						return nil, retryErr
+					})
 				cancel()
-				admissionCtx = cancelledCtx
+				require.ErrorIs(t, err, context.Canceled)
 			}
-			reconnector.fireReconnectOnRetryableError(admissionCtx, stream, retryErr)
 
 			select {
 			case <-loopDone:
@@ -100,31 +107,23 @@ func TestReaderReconnectorLoopStopsAfterAdmittedRetry(t *testing.T) {
 			require.ErrorIs(t, reconnector.background.CloseReason(), retryErr)
 			require.NoError(t, reconnector.CloseWithError(waitCtx, errReaderClosed))
 
-			if reportSessionError {
-				select {
-				case event := <-events:
-					require.Equal(t, "stop", event.RetryDecision)
-					require.ErrorIs(t, event.Error, retryErr)
-					require.Equal(t, "Unavailable", event.StatusCode)
-					require.Equal(t, "transport_error", event.ErrorType)
-					require.Equal(t, "endpoint", event.ReaderInfo.Endpoint)
-					require.Equal(t, "/database", event.ReaderInfo.Database)
-					require.Equal(t, "consumer", event.ReaderInfo.Consumer)
-					require.Equal(t, "reader", event.ReaderInfo.ReaderName)
-				default:
-					t.Fatal("retry stop session error was not emitted")
-				}
-				select {
-				case event := <-events:
-					t.Fatalf("unexpected duplicate retry stop session error event: %+v", event)
-				default:
-				}
-			} else {
-				select {
-				case event := <-events:
-					t.Fatalf("suppressed retry stop session error event: %+v", event)
-				default:
-				}
+			select {
+			case event := <-events:
+				require.Equal(t, "stop", event.RetryDecision)
+				require.ErrorIs(t, event.Error, retryErr)
+				require.Equal(t, "Unavailable", event.StatusCode)
+				require.Equal(t, "transport_error", event.ErrorType)
+				require.Equal(t, "endpoint", event.ReaderInfo.Endpoint)
+				require.Equal(t, "/database", event.ReaderInfo.Database)
+				require.Equal(t, "consumer", event.ReaderInfo.Consumer)
+				require.Equal(t, "reader", event.ReaderInfo.ReaderName)
+			default:
+				t.Fatal("retry stop session error was not emitted")
+			}
+			select {
+			case event := <-events:
+				t.Fatalf("unexpected duplicate retry stop session error event: %+v", event)
+			default:
 			}
 		})
 	}

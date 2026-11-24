@@ -458,7 +458,7 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 		stream := NewMockbatchedStreamReader(mc)
 		reconnector.initChannelsAndClock()
 
-		reconnector.fireReconnectOnRetryableError(reconnector.background.Context(), stream, nil)
+		reconnector.fireReconnectOnRetryableError(stream, nil)
 		select {
 		case <-reconnector.reconnectFromBadStream:
 			t.Fatal()
@@ -466,7 +466,7 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 			// OK
 		}
 
-		reconnector.fireReconnectOnRetryableError(reconnector.background.Context(), stream, xerrors.Wrap(errors.New("test")))
+		reconnector.fireReconnectOnRetryableError(stream, xerrors.Wrap(errors.New("test")))
 		select {
 		case <-reconnector.reconnectFromBadStream:
 			t.Fatal()
@@ -475,7 +475,7 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 		}
 
 		testErr := errors.New("test")
-		reconnector.fireReconnectOnRetryableError(reconnector.background.Context(), stream, xerrors.Retryable(testErr))
+		reconnector.fireReconnectOnRetryableError(stream, xerrors.Retryable(testErr))
 		res := <-reconnector.reconnectFromBadStream
 		require.Equal(t, stream, res.oldReader)
 		require.ErrorIs(t, res.reason, testErr)
@@ -503,7 +503,7 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 
 		// write skipped
 		reconnector.fireReconnectOnRetryableError(
-			reconnector.background.Context(), stream, xerrors.Retryable(errors.New("test")),
+			stream, xerrors.Retryable(errors.New("test")),
 		)
 		res := <-reconnector.reconnectFromBadStream
 		require.Nil(t, res.oldReader)

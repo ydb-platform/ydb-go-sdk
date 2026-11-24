@@ -193,7 +193,6 @@ func TestReaderReconnectorReportsConnectorOutcomeAfterRetry(t *testing.T) {
 		case <-time.After(time.Second):
 			t.Fatal("retry connector failure did not enqueue a reconnect request")
 		}
-		require.True(t, request.reportStop)
 		require.ErrorIs(t, request.reason, retryErr)
 
 		require.NoError(t, reconnector.reconnect(
