@@ -42,7 +42,7 @@ func WithSessionStartTimeout(timeout time.Duration) SessionOption {
 // If this is not set, the client uses the default time 1 second.
 func WithSessionStopTimeout(timeout time.Duration) SessionOption {
 	return func(c *CreateSessionOptions) {
-		c.SessionStartTimeout = timeout
+		c.SessionStopTimeout = timeout
 	}
 }
 
