@@ -694,6 +694,13 @@ func (r *topicStreamReaderImpl) getRestBufferBytes() int {
 
 //nolint:funlen
 func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
+	// CloseSend and worker cancellation do not drain Recv. Only its owner
+	// knows when an in-flight final commit response can no longer be processed.
+	defer func() {
+		for _, session := range r.sessionController.GetAll() {
+			topicreadercommon.CommitMessageTracker(session).Close()
+		}
+	}()
 	ctx, cancel := xcontext.WithCancel(ctx)
 	defer cancel()
 
@@ -1116,6 +1123,7 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequest(m *rawtopicreader.
 	session.SetNoMoreMessages()
 	if !m.Graceful {
 		session.Close()
+		topicreadercommon.CommitMessageTracker(session).Close()
 	}
 
 	return r.batcher.PushRawMessage(session, m)

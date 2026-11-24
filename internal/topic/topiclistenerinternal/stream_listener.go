@@ -180,6 +180,7 @@ func (l *streamListener) finishClose(cleanupCtx context.Context, reason error, d
 	if l.sessions != nil {
 		for _, session := range l.sessions.GetAll() {
 			session.Close()
+			topicreadercommon.CommitMessageTracker(session).Close()
 		}
 	}
 
@@ -540,6 +541,7 @@ func (l *streamListener) handleStartPartition(
 	if worker == nil {
 		_, _ = l.sessions.Remove(session.StreamPartitionSessionID)
 		session.Close()
+		topicreadercommon.CommitMessageTracker(session).Close()
 
 		return nil
 	}
