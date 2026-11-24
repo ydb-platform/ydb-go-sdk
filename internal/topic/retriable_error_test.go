@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
 func TestCheckRetryMode(t *testing.T) {
@@ -230,6 +231,12 @@ func TestCheckRetryMode(t *testing.T) {
 			resBackoff, stopReason := RetryDecision(test.err, test.settings, test.duration)
 			require.Equal(t, test.resBackoff, resBackoff)
 			require.Equal(t, test.resRetriable, stopReason == nil)
+			if stopReason != nil {
+				require.False(t, retry.Check(stopReason).MustRetry(true))
+				if test.err != nil {
+					require.ErrorIs(t, stopReason, test.err)
+				}
+			}
 		})
 	}
 }
