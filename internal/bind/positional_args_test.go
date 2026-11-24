@@ -148,6 +148,27 @@ SELECT 1`,
 SELECT 1`,
 		},
 		{
+			sql: "SELECT '�' AS a, ? AS b",
+			args: []any{
+				100,
+			},
+			yql: "-- origin query with positional args replacement\nSELECT '�' AS a, $p0 AS b",
+			params: []any{
+				table.ValueParam("$p0", types.Int32Value(100)),
+			},
+		},
+		{
+			sql: "SELECT '\xff' AS a, ? AS b -- \xff\n, `�`, \"�\" /* � */",
+			args: []any{
+				100,
+			},
+			yql: "-- origin query with positional args replacement\n" +
+				"SELECT '\xff' AS a, $p0 AS b -- \xff\n, `�`, \"�\" /* � */",
+			params: []any{
+				table.ValueParam("$p0", types.Int32Value(100)),
+			},
+		},
+		{
 			sql: "SELECT ?, ?",
 			args: []any{
 				1,

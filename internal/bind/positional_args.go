@@ -109,6 +109,10 @@ func positionalArgsStateFn(l *sqlLexer) stateFn {
 				return multilineCommentState
 			}
 		case utf8.RuneError:
+			if width > 0 { // not the end of input: U+FFFD itself or an invalid byte
+				continue
+			}
+
 			if l.pos-l.start > 0 {
 				l.parts = append(l.parts, l.src[l.start:l.pos])
 				l.start = l.pos

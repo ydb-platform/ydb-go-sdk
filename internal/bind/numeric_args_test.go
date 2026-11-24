@@ -224,6 +224,26 @@ SELECT 1`,
 SELECT 1`,
 		},
 		{
+			sql: "SELECT '�' AS a, $1 AS b",
+			args: []any{
+				100,
+			},
+			yql: "-- origin query with numeric args replacement\nSELECT '�' AS a, $p0 AS b",
+			params: []any{
+				table.ValueParam("$p0", types.Int32Value(100)),
+			},
+		},
+		{
+			sql: "SELECT '\xff' AS a, \xff, $1 AS b",
+			args: []any{
+				100,
+			},
+			yql: "-- origin query with numeric args replacement\nSELECT '\xff' AS a, \xff, $p0 AS b",
+			params: []any{
+				table.ValueParam("$p0", types.Int32Value(100)),
+			},
+		},
+		{
 			sql: "SELECT $1, $2",
 			args: []any{
 				1,
