@@ -14,6 +14,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -520,24 +521,108 @@ func TestMultiEncoderEncodeWriterToWithoutCopy(t *testing.T) {
 	}
 }
 
-func BenchmarkMultiEncoderEncode(b *testing.B) {
+type recordingEncoder struct {
+	calls *[]string
+}
+
+func (r recordingEncoder) Write(p []byte) (int, error) {
+	*r.calls = append(*r.calls, "write")
+
+	return len(p), nil
+}
+
+func (r recordingEncoder) Close() error {
+	*r.calls = append(*r.calls, "close")
+
+	return nil
+}
+
+func newRecordingMultiEncoder(calls *[]string) *MultiEncoder {
 	encoder := NewMultiEncoder()
+	encoder.AddEncoder(rawtopiccommon.CodecLzop, func(io.Writer) (io.WriteCloser, error) {
+		*calls = append(*calls, "create")
+
+		return recordingEncoder{calls: calls}, nil
+	})
+
+	return encoder
+}
+
+type failingWriterTo struct{}
+
+func (failingWriterTo) Read([]byte) (int, error) {
+	return 0, errors.New("read")
+}
+
+func (failingWriterTo) WriteTo(io.Writer) (int64, error) {
+	return 0, errors.New("source failed")
+}
+
+func TestMultiEncoderEncodeClosesEncoderOnSourceError(t *testing.T) {
+	var calls []string
+	_, err := newRecordingMultiEncoder(&calls).Encode(rawtopiccommon.CodecLzop, &bytes.Buffer{}, failingWriterTo{})
+	require.EqualError(t, err, "source failed")
+	created, closed := 0, 0
+	for _, call := range calls {
+		switch call {
+		case "create":
+			created++
+		case "close":
+			closed++
+		}
+	}
+	require.Equal(t, created, closed, "every created encoder is closed: %v", calls)
+}
+
+func TestMultiEncoderEncodeEmptyDataWritesBeforeClose(t *testing.T) {
+	for name, source := range map[string]io.Reader{
+		"bytes.Reader":   &bytes.Reader{},
+		"bytes.Buffer":   &bytes.Buffer{},
+		"strings.Reader": strings.NewReader(""),
+		"io.Reader":      readerOnly{&bytes.Reader{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var calls []string
+			n, err := newRecordingMultiEncoder(&calls).Encode(rawtopiccommon.CodecLzop, &bytes.Buffer{}, source)
+			require.NoError(t, err)
+			require.Zero(t, n)
+			require.Equal(t, []string{"create", "write", "close"}, calls)
+		})
+	}
+}
+
+func BenchmarkMultiEncoderEncode(b *testing.B) {
 	for _, size := range []int{4 << 10, 256 << 10} {
 		data := encodeTestPayload(size)
+		str := string(data)
+		sources := []struct {
+			name  string
+			reset func() io.Reader
+		}{
+			{"bytes.Reader", func() io.Reader { return bytes.NewReader(data) }},
+			{"strings.Reader", func() io.Reader { return strings.NewReader(str) }},
+		}
 		for _, codec := range []rawtopiccommon.Codec{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip} {
-			b.Run(fmt.Sprintf("codec=%v/size=%dKiB", codec, size>>10), func(b *testing.B) {
-				var target bytes.Buffer
-				source := bytes.NewReader(data)
-				b.SetBytes(int64(size))
-				b.ReportAllocs()
-				for b.Loop() {
-					target.Reset()
-					source.Reset(data)
-					if _, err := encoder.Encode(codec, &target, source); err != nil {
-						b.Fatal(err)
-					}
+			for _, source := range sources {
+				for _, pool := range []string{"warm", "cold"} {
+					name := fmt.Sprintf("codec=%v/size=%dKiB/source=%s/pool=%s", codec, size>>10, source.name, pool)
+					b.Run(name, func(b *testing.B) {
+						encoder := NewMultiEncoder()
+						var target bytes.Buffer
+						b.SetBytes(int64(size))
+						b.ReportAllocs()
+						for b.Loop() {
+							if pool == "cold" {
+								encoder.bp = xsync.Pool[bytes.Buffer]{New: func() *bytes.Buffer { return &bytes.Buffer{} }}
+							}
+							target.Reset()
+							if _, err := encoder.Encode(codec, &target, source.reset()); err != nil {
+								b.Fatal(err)
+							}
+						}
+					})
 				}
-			})
+			}
 		}
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -46,6 +47,10 @@ func (e *Encoder) EncodeBytes(target io.Writer, data []byte) (int, error) {
 func (e *Encoder) EncodeFrom(target io.Writer, source io.WriterTo) (int, error) {
 	return e.encode(target, func(enc io.Writer) (int, error) {
 		n, err := source.WriteTo(enc)
+		if err == nil && n == 0 {
+			// keep the Write before Close that EncodeBytes does for empty data
+			_, err = enc.Write(nil)
+		}
 
 		return int(n), err
 	})
@@ -57,10 +62,12 @@ func (e *Encoder) encode(target io.Writer, write func(enc io.Writer) (int, error
 		return 0, err
 	}
 	n, err := write(enc)
-	if err == nil {
-		err = enc.Close()
-	}
 	if err != nil {
+		_ = enc.Close()
+
+		return 0, err
+	}
+	if err = enc.Close(); err != nil {
 		return 0, err
 	}
 	if reusable, ok := enc.(PublicResetableWriter); ok {
@@ -115,20 +122,42 @@ func (e *MultiEncoder) AddSharedEncoder(codec rawtopiccommon.Codec, encoder *Enc
 }
 
 func (e *MultiEncoder) Encode(codec rawtopiccommon.Codec, target io.Writer, source io.Reader) (int, error) {
-	if wt, ok := source.(io.WriterTo); ok {
+	switch src := source.(type) {
+	case *strings.Reader:
+		// strings.Reader.WriteTo would convert the whole string to a new []byte
+		// for writers without WriteString, so copy it into a pooled buffer instead.
+		return e.encodeBuffered(codec, target, func(buf *bytes.Buffer) error {
+			buf.Grow(src.Len())
+			_, err := src.WriteTo(buf)
+
+			return err
+		})
+	case io.WriterTo:
 		encoder, ok := e.m[codec]
 		if !ok {
 			return 0, errUnexpectedEncodeCodec(codec)
 		}
 
-		return encoder.EncodeFrom(target, wt)
-	}
+		return encoder.EncodeFrom(target, src)
+	default:
+		return e.encodeBuffered(codec, target, func(buf *bytes.Buffer) error {
+			_, err := buf.ReadFrom(src)
 
+			return err
+		})
+	}
+}
+
+func (e *MultiEncoder) encodeBuffered(
+	codec rawtopiccommon.Codec,
+	target io.Writer,
+	fill func(buf *bytes.Buffer) error,
+) (int, error) {
 	buf := e.bp.GetOrNew()
 	defer e.bp.Put(buf)
 
 	buf.Reset()
-	if _, err := buf.ReadFrom(source); err != nil {
+	if err := fill(buf); err != nil {
 		return 0, err
 	}
 
