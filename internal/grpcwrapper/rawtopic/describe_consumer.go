@@ -96,7 +96,7 @@ func (ps *PartitionStats) FromProto(proto *Ydb_Topic.PartitionStats) error {
 	}
 	ps.StoreSizeBytes = proto.GetStoreSizeBytes()
 	ps.LastWriteTime.MustFromProto(proto.GetLastWriteTime())
-	ps.MaxWriteTimeLag.ToProto()
+	ps.MaxWriteTimeLag.MustFromProto(proto.GetMaxWriteTimeLag())
 	ps.BytesWritten.MustFromProto(proto.GetBytesWritten())
 
 	return nil
