@@ -1,4 +1,3 @@
-* Reduced Query Service row allocations and restored allocation-free column-name lookup for standard protobuf rows; wire-decoded rows share a lazy name index per response part
 * Fixed experimental Query Service wire decoding to preserve connection-level custom gRPC codecs, merge repeated nested protobuf messages without losing values, and match standard protobuf scalar defaults when a response carries a mismatched value field
 * Added experimental `ydb.WithQueryProtoWireDecoding(bool)` to opt into direct protobuf wire decoding of native and `database/sql` Query Service `FORMAT_VALUE` rows, reducing allocations and using lazy cell and column-name indexes for linear-time wide-row scans while preserving protobuf response metadata for gRPC stream interceptors
 
