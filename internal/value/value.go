@@ -3117,7 +3117,7 @@ func YSONValue(v []byte) ysonValue {
 	return v
 }
 
-//nolint:funlen
+//nolint:funlen,gocyclo
 func zeroPrimitiveValue(t types.Primitive) Value {
 	switch t {
 	case types.Bool:
