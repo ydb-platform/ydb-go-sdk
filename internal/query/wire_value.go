@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
@@ -27,7 +28,7 @@ type wirePart struct {
 	rows        []rowSpan
 	rowObjects  []wireRow
 	columns     []*Ydb.Column
-	columnTypes []types.Type
+	columnTypes []atomic.Value
 	indexOnce   sync.Once
 	columnIndex map[string]int
 }
@@ -80,13 +81,20 @@ func (p *wirePart) rowBytes(index int) []byte {
 	return p.frame[span.start:span.end]
 }
 
+func (p *wirePart) columnType(index int) types.Type {
+	if t, ok := p.columnTypes[index].Load().(types.Type); ok {
+		return t
+	}
+	t := types.TypeFromYDB(p.columns[index].GetType())
+	p.columnTypes[index].Store(t)
+
+	return t
+}
+
 func (p *wirePart) row(index int, columns []*Ydb.Column) *wireRow {
 	if p.rowObjects == nil {
 		p.columns = columns
-		p.columnTypes = make([]types.Type, len(columns))
-		for i, column := range columns {
-			p.columnTypes[i] = types.TypeFromYDB(column.GetType())
-		}
+		p.columnTypes = make([]atomic.Value, len(columns))
 		p.rowObjects = make([]wireRow, len(p.rows))
 		for i := range p.rowObjects {
 			p.rowObjects[i] = wireRow{part: p, index: i}
@@ -188,7 +196,7 @@ func scanRowBytes(r *wireRow, dst []any) error {
 	for cells.Next() {
 		if index < len(dst) {
 			columnType := columns[index].GetType()
-			if err := scanWireValueDestination(columnType, r.part.columnTypes[index], cells.Cell(), dst[index]); err != nil {
+			if err := scanWireValueDestination(columnType, r.part.columnType(index), cells.Cell(), dst[index]); err != nil {
 				return fmt.Errorf("scan error on column index %d: %w", index, err)
 			}
 		}
@@ -210,7 +218,7 @@ func (r *indexedWireRow) ColumnValue(column int) value.Value {
 	if err != nil {
 		panic(fmt.Errorf("scan error on column index %d: %w", column, err))
 	}
-	v, err := value.FromWire(r.part.columnTypes[column], cell)
+	v, err := value.FromWire(r.part.columnType(column), cell)
 	if err != nil {
 		panic(fmt.Errorf("scan error on column index %d: %w", column, err))
 	}
@@ -224,7 +232,7 @@ func (r *indexedWireRow) ScanColumn(column int, dst any) error {
 		return err
 	}
 
-	return scanWireValueDestination(r.part.columns[column].GetType(), r.part.columnTypes[column], cell, dst)
+	return scanWireValueDestination(r.part.columns[column].GetType(), r.part.columnType(column), cell, dst)
 }
 
 func scanWireValueDestination(columnType *Ydb.Type, decodedType types.Type, cell []byte, dst any) error {
@@ -339,12 +347,18 @@ func scanOptionalCell(primitive Ydb.Type_PrimitiveTypeId, cell wirevalue.Cell, d
 			return assignOptional(dst, cell.Float64())
 		}
 	case Ydb.Type_UTF8:
-		if cell.Kind() == wirevalue.ValueTextField {
-			return assignOptional(dst, string(cell.Bytes()))
+		if p, ok := dst.(**string); ok && p != nil && cell.Kind() == wirevalue.ValueTextField {
+			v := string(cell.Bytes())
+			*p = &v
+
+			return true
 		}
 	case Ydb.Type_STRING:
-		if cell.Kind() == wirevalue.ValueBytesField {
-			return assignOptional(dst, bytes.Clone(cell.Bytes()))
+		if p, ok := dst.(**[]byte); ok && p != nil && cell.Kind() == wirevalue.ValueBytesField {
+			v := bytes.Clone(cell.Bytes())
+			*p = &v
+
+			return true
 		}
 	}
 

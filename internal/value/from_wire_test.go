@@ -223,6 +223,38 @@ func TestFromWireRejectsMalformedRepeatedMessages(t *testing.T) {
 	}
 }
 
+func TestFromWireVariantRequiresNestedValue(t *testing.T) {
+	empty := &Ydb.Value{Value: &Ydb.Value_NestedValue{NestedValue: new(Ydb.Value)}}
+	scalar := ToYDB(Int32Value(42)).GetValue()
+	for name, schema := range map[string]types.Type{
+		"tuple":  types.NewVariantTuple(types.Int32),
+		"struct": types.NewVariantStruct(types.StructField{Name: "value", T: types.Int32}),
+	} {
+		for _, tt := range []struct {
+			name string
+			data []byte
+		}{
+			{name: "missing"},
+			{name: "scalar", data: marshalWireFragments(t, scalar)},
+			{name: "overwritten", data: marshalWireFragments(t, empty, scalar)},
+		} {
+			t.Run(name+"/"+tt.name, func(t *testing.T) {
+				got, err := FromWire(schema, tt.data)
+				if err == nil || got != nil {
+					t.Fatalf("FromWire() = %v, %v; want nil and an error for missing nested_value", got, err)
+				}
+			})
+		}
+		t.Run(name+"/empty nested value", func(t *testing.T) {
+			got, err := FromWire(schema, marshalWireFragments(t, empty))
+			want := FromYDB(schema.ToYDB(), empty)
+			if err != nil || !reflect.DeepEqual(got, want) {
+				t.Fatalf("FromWire() = %v, %v; want %v", got, err, want)
+			}
+		})
+	}
+}
+
 func TestFromWireRejectsOutOfRangeVariantIndex(t *testing.T) {
 	for _, tt := range []struct {
 		name   string

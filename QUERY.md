@@ -44,13 +44,16 @@ Custom gRPC codecs and content subtypes configured with
 `query.WithCallOptions(...)` take precedence over wire decoding. Those calls use
 the selected codec and retain ordinary protobuf rows.
 
-With wire decoding enabled, the protobuf response exposed to gRPC stream
-interceptors and statistics handlers is not a data-access or transformation API
-for result rows. `ResultSet.Rows` is empty even when the query returns rows.
-Do not use the response protobuf in these callbacks to read, count, modify or
-replace result rows: protobuf row edits are not applied to the retained wire data.
-Read values through `Scan`, `ScanNamed`, `ScanStruct` or `Values`, count rows while
-iterating the result, and transform values after reading them.
+With wire decoding enabled, gRPC stream interceptors and statistics handlers
+see different row representations depending on the receive destination. When
+an interceptor forwards the SDK's destination to `RecvMsg`, `ResultSet.Rows`
+is empty and the SDK retains the rows separately. When an interceptor reads
+ahead into its own protobuf destination, gRPC materializes the rows in that
+message. A single stream can contain both kinds of response.
+
+Use `Scan`, `ScanNamed`, `ScanStruct` or `Values` to read rows, count rows while
+iterating the result, and transform values after reading them. An interceptor
+cannot rely on `ResultSet.Rows` to read, count or replace rows across the stream.
 
 Response metadata, including status, issues, truncation flags and execution
 statistics, remains available to these callbacks. Synchronous metadata changes

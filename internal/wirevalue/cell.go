@@ -3,7 +3,9 @@ package wirevalue
 //go:generate go run ../cmd/gwirefields
 
 import (
+	"errors"
 	"math"
+	"unicode/utf8"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/protobuf/encoding/protowire"
@@ -32,9 +34,9 @@ func Parse(data []byte) (Cell, error) {
 		case f.number == ValueHigh128Field && f.kind == ValueHigh128WireType:
 			cell.high128, _ = protowire.ConsumeFixed64(f.value)
 		case scalarField(f.number, f.kind):
-			if f.number == ValueNestedField && cell.kind == ValueNestedField {
-				// Repeated message fields merge, including the active oneof arm.
-				// Keep protobuf allocation on this uncommon encoding only.
+			if cell.kind == ValueNestedField {
+				// Protobuf validates the prior nested message even when the next
+				// oneof arm replaces it, and merges consecutive nested messages.
 				merged, err := normalizeMessage(data, new(Ydb.Value))
 				if err != nil {
 					return Cell{}, err
@@ -53,6 +55,9 @@ func Parse(data []byte) (Cell, error) {
 				cell.number, _ = protowire.ConsumeFixed64(f.value)
 			case protowire.BytesType:
 				cell.bytes, _ = protowire.ConsumeBytes(f.value)
+				if f.number == ValueTextField && !utf8.Valid(cell.bytes) {
+					return Cell{}, errors.New("text_value contains invalid UTF-8")
+				}
 			}
 		}
 	}
@@ -127,8 +132,14 @@ func (c Cell) High128() uint64 { return c.high128 }
 // VariantIndex returns the selected variant member.
 func (c Cell) VariantIndex() uint32 { return c.variant }
 
-// Nested parses the nested_value field.
-func (c Cell) Nested() (Cell, error) { return Parse(c.bytes) }
+// Nested parses the nested_value field if it is the active oneof arm.
+func (c Cell) Nested() (Cell, error) {
+	if c.kind != ValueNestedField {
+		return Cell{}, errors.New("missing nested_value")
+	}
+
+	return Parse(c.bytes)
+}
 
 // Items iterates list, tuple, or struct members without allocating a slice.
 func (c Cell) Items() Items { return Items{fields: fields{data: c.raw}} }

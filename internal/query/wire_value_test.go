@@ -2,6 +2,7 @@ package query
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -238,6 +239,19 @@ func TestWireRowsSelectFirstDuplicateColumn(t *testing.T) {
 	}
 }
 
+func TestWireRowDefersUnknownTypeUntilAccess(t *testing.T) {
+	frame, err := proto.Marshal(&Ydb.Value{Items: []*Ydb.Value{{}}})
+	require.NoError(t, err)
+	part := &wirePart{frame: frame, rows: []rowSpan{{end: uint32(len(frame))}}}
+	var row *wireRow
+	require.NotPanics(t, func() {
+		row = part.row(0, []*Ydb.Column{{Name: "future", Type: wirePrimitive(1000000)}})
+	})
+	for range 2 {
+		require.PanicsWithValue(t, "ydb: unexpected type 1000000", func() { row.Values() })
+	}
+}
+
 func TestWireRowIndexesCellsAsTheyAreRequested(t *testing.T) {
 	columns := make([]*Ydb.Column, 4)
 	for i := range columns {
@@ -342,6 +356,32 @@ func TestWireValueRowScansComplexTypesWithoutProtobufValues(t *testing.T) {
 	}
 }
 
+func TestOptionalScanDoesNotCopyPayloadForFallback(t *testing.T) {
+	payload := strings.Repeat("x", 1024)
+	for _, tt := range []struct {
+		primitive Ydb.Type_PrimitiveTypeId
+		source    value.Value
+		dst       any
+	}{
+		{Ydb.Type_UTF8, value.TextValue(payload), new(string)},
+		{Ydb.Type_STRING, value.BytesValue([]byte(payload)), new([]byte)},
+	} {
+		t.Run(tt.primitive.String(), func(t *testing.T) {
+			data, err := proto.Marshal(value.ToYDB(tt.source).GetValue())
+			require.NoError(t, err)
+			cell, err := wirevalue.Parse(data)
+			require.NoError(t, err)
+
+			allocs := testing.AllocsPerRun(100, func() {
+				if scanOptionalCell(tt.primitive, cell, tt.dst) {
+					t.Fatal("expected fallback for single-pointer destination")
+				}
+			})
+			require.Zero(t, allocs, "declining a destination should not copy the payload")
+		})
+	}
+}
+
 func TestScanWireOptionalDestinationPreservesValues(t *testing.T) {
 	t.Run("Int32", func(t *testing.T) {
 		testWireOptionalDestination[int32](t, value.Int32Value(1), value.Int32Value(2))
@@ -376,6 +416,7 @@ func testWireOptionalDestination[T any](t *testing.T, first, second value.Value)
 		require.NoError(t, err)
 		require.NoError(t, value.CastTo(source, &want))
 		require.NoError(t, scanWireValueDestination(typed.GetType(), source.Type(), cell, &got))
+		clear(cell)
 		savedGot = append(savedGot, got)
 		savedWant = append(savedWant, want)
 		require.Equal(t, savedWant, savedGot, "scanning %s must preserve previously scanned values", source.Yql())

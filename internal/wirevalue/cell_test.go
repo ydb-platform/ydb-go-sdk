@@ -1,11 +1,39 @@
 package wirevalue
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 )
+
+func TestParseValidatesTextFields(t *testing.T) {
+	field := func(number protowire.Number, data []byte) []byte {
+		return protowire.AppendBytes(protowire.AppendTag(nil, number, protowire.BytesType), data)
+	}
+	bad := field(ValueTextField, []byte{0xff})
+	good := field(ValueTextField, []byte("π"))
+	for _, tt := range []struct {
+		name string
+		data []byte
+	}{
+		{name: "invalid text", data: bad},
+		{name: "invalid text overwritten", data: append(bytes.Clone(bad), good...)},
+		{name: "invalid nested text overwritten", data: append(field(ValueNestedField, bad), good...)},
+		{name: "valid multibyte text", data: good},
+		{name: "arbitrary binary data", data: field(ValueBytesField, []byte{0xff})},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			wantErr := proto.Unmarshal(tt.data, new(Ydb.Value))
+			cell, err := Parse(tt.data)
+			if (err == nil) != (wantErr == nil) {
+				t.Fatalf("Parse() = %v, %v; protobuf error = %v", cell, err, wantErr)
+			}
+		})
+	}
+}
 
 func TestCellReadsNestedValuesAndPairs(t *testing.T) {
 	want := &Ydb.Value{

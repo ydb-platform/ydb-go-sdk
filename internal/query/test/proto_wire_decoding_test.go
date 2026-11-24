@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"os/exec"
 	"sync/atomic"
 	"testing"
 
@@ -198,6 +200,48 @@ func TestQueryProtoWireDecodingRespectsDriverCodec(t *testing.T) {
 			}
 		})
 	}
+}
+
+const registeredProtoCodecEnv = "YDB_GO_SDK_TEST_REGISTERED_PROTO_CODEC"
+
+// gRPC's global codec registry can only be changed during initialization.
+func TestMain(m *testing.M) {
+	version := os.Getenv(registeredProtoCodecEnv)
+	codec := rewritingQueryResultCodec{CodecV2: encoding.GetCodecV2("proto"), value: 9001}
+	switch version {
+	case "V1":
+		encoding.RegisterCodec(queryResultCodecV1{codec})
+	case "V2":
+		encoding.RegisterCodecV2(codec)
+	}
+	m.Run()
+}
+
+func TestQueryProtoWireDecodingRespectsRegisteredProtoCodec(t *testing.T) {
+	if os.Getenv(registeredProtoCodecEnv) == "" {
+		runTest := "-test.run=^" + t.Name() + "$"
+		for _, version := range []string{"V1", "V2"} {
+			t.Run(version, func(t *testing.T) {
+				cmd := exec.CommandContext(t.Context(), os.Args[0], runTest)
+				cmd.Env = append(os.Environ(), registeredProtoCodecEnv+"="+version)
+				output, err := cmd.CombinedOutput()
+				require.NoError(t, err, "%s", output)
+			})
+		}
+
+		return
+	}
+	server := mock.Server(t)
+	db, err := ydb.Open(t.Context(), server.ConnString(),
+		ydb.WithAnonymousCredentials(), ydb.WithQueryProtoWireDecoding(true),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close(t.Context())) })
+	row, err := db.Query().QueryRow(t.Context(), "SELECT 42")
+	require.NoError(t, err)
+	var got int32
+	require.NoError(t, row.Scan(&got))
+	require.Equal(t, int32(9001), got)
 }
 
 func TestQueryProtoWireDecodingRespectsQueryCodecOverride(t *testing.T) {

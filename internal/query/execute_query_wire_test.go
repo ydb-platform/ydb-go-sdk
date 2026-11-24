@@ -36,6 +36,24 @@ func TestWireQueryStreamAcceptsProtobufTransport(t *testing.T) {
 	require.Nil(t, wire, "a transport that bypasses the wire codec must use its protobuf rows")
 }
 
+func TestWireQueryClientKeepsRegisteredCodecStream(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		protobuf encoding.CodecV2
+	}{
+		{name: "registered V1 leaves no V2", protobuf: nil},
+		{name: "registered V2", protobuf: rewritingQueryCodec{CodecV2: encoding.GetCodecV2("proto")}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			stream := &codecQueryStream{}
+			client := newWireQueryClient(codecQueryClient{stream: stream}, tt.protobuf)
+			got, err := client.ExecuteQuery(t.Context(), &Ydb_Query.ExecuteQueryRequest{})
+			require.NoError(t, err)
+			require.Equal(t, stream, got, "the selected codec must retain its protobuf stream")
+		})
+	}
+}
+
 func TestWireQueryStreamWithoutTransportHookPreservesDefaultCodec(t *testing.T) {
 	codec := rewritingQueryCodec{CodecV2: encoding.GetCodecV2("proto"), id: 9001}
 	conn := newQueryResultConn(t, &wireResultServer{}, grpc.WithDefaultCallOptions(grpc.ForceCodecV2(codec)))

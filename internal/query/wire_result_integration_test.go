@@ -80,6 +80,32 @@ func TestClientRowDecoding(t *testing.T) {
 	}
 }
 
+func TestQueryRowScansKnownColumnBesideUnknownType(t *testing.T) {
+	conn := newWireResultConn(t, &optionalWireResultServer{
+		columns: []*Ydb.Column{
+			{Name: "id", Type: types.Uint64.ToYDB()},
+			{Name: "future", Type: wirePrimitive(1000000)},
+		},
+		rows: []*Ydb.Value{{Items: []*Ydb.Value{
+			{Value: &Ydb.Value_Uint64Value{Uint64Value: 42}}, {},
+		}}},
+	})
+	for _, wire := range []bool{false, true} {
+		t.Run(fmt.Sprintf("wire=%t", wire), func(t *testing.T) {
+			ctx := t.Context()
+			client, err := New(ctx, conn, config.New(config.WithProtoWireDecoding(wire)))
+			require.NoError(t, err)
+			defer client.Close(ctx)
+
+			row, err := client.QueryRow(ctx, "SELECT id, future")
+			require.NoError(t, err)
+			var id uint64
+			require.NoError(t, row.ScanNamed(scanner.NamedRef("id", &id)))
+			require.Equal(t, uint64(42), id)
+		})
+	}
+}
+
 func TestQueryMismatchedScalarPayloadsMatchProtobuf(t *testing.T) {
 	conn := newWireResultConn(t, &optionalWireResultServer{
 		columns: []*Ydb.Column{
@@ -385,6 +411,41 @@ func TestQueryWideRowsRemainReadableAfterClose(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestQueryWireScanRejectsInvalidText(t *testing.T) {
+	cell := new(Ydb.Value)
+	tag := protowire.AppendTag(nil, wirevalue.ValueTextField, wirevalue.ValueTextWireType)
+	cell.ProtoReflect().SetUnknown(protowire.AppendBytes(tag, []byte{0xff}))
+	conn := newWireResultConn(t, &optionalWireResultServer{
+		columns: []*Ydb.Column{{Name: "text", Type: types.NewOptional(types.Text).ToYDB()}},
+		rows:    []*Ydb.Value{{Items: []*Ydb.Value{cell}}},
+	})
+	ctx := t.Context()
+	client, err := New(ctx, conn, config.New(config.WithProtoWireDecoding(true)))
+	require.NoError(t, err)
+	defer client.Close(ctx)
+	row, err := client.QueryRow(ctx, "SELECT text")
+	require.NoError(t, err)
+	var text *string
+	require.ErrorContains(t, row.Scan(&text), "invalid UTF-8")
+	require.Nil(t, text)
+}
+
+func TestQueryWireScanRejectsVariantWithoutNestedValue(t *testing.T) {
+	conn := newWireResultConn(t, &optionalWireResultServer{
+		columns: []*Ydb.Column{{Name: "choice", Type: types.NewVariantTuple(types.Int32).ToYDB()}},
+		rows:    []*Ydb.Value{{Items: []*Ydb.Value{value.ToYDB(value.Int32Value(42)).GetValue()}}},
+	})
+	ctx := t.Context()
+	client, err := New(ctx, conn, config.New(config.WithProtoWireDecoding(true)))
+	require.NoError(t, err)
+	defer client.Close(ctx)
+	row, err := client.QueryRow(ctx, "SELECT choice")
+	require.NoError(t, err)
+	var choice value.Value
+	require.ErrorContains(t, row.Scan(&choice), "nested_value")
+	require.Nil(t, choice)
 }
 
 func TestQueryMergesRepeatedNestedValueMessages(t *testing.T) {

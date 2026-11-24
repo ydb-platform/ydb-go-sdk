@@ -547,11 +547,11 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 // or [query.WithCallOptions] take precedence and retain ordinary protobuf rows.
 //
 // With wire decoding enabled, gRPC stream interceptors and statistics handlers
-// receive response metadata without materialized protobuf rows. Reading,
-// counting, modifying or replacing result rows through that protobuf response
-// is unsupported. Use [query.Row] scanning methods and [query.Row.Values] to
-// access result data, and count rows while iterating the result.
-// Disable wire decoding if existing callbacks require complete protobuf rows.
+// see empty protobuf rows when a receive uses the SDK's destination. A receive
+// into an interceptor's own buffer materializes the rows in that buffer.
+// Use [query.Row] scanning methods and [query.Row.Values] to access result
+// data, and count rows while iterating the result. Disable wire decoding if
+// callbacks need materialized protobuf rows for every response.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithQueryProtoWireDecoding(enabled bool) Option {

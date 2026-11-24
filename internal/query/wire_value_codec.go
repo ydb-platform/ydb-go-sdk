@@ -1,6 +1,8 @@
 package query
 
 import (
+	"sync/atomic"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc/encoding"
 	"google.golang.org/grpc/mem"
@@ -8,12 +10,12 @@ import (
 
 type codec struct {
 	protobuf encoding.CodecV2
-	capture  **wirePart
+	capture  atomic.Pointer[wireReceive]
 }
 
-// newWireCodec returns a per-call protobuf codec that can capture wire rows.
-func newWireCodec() *codec {
-	return &codec{protobuf: encoding.GetCodecV2("proto")}
+type wireReceive struct {
+	part Ydb_Query.ExecuteQueryResponsePart
+	wire *wirePart
 }
 
 func (c *codec) Name() string { return "proto" }
@@ -23,14 +25,14 @@ func (c *codec) Marshal(v any) (mem.BufferSlice, error) {
 }
 
 func (c *codec) Unmarshal(data mem.BufferSlice, v any) error {
-	if part, ok := v.(*Ydb_Query.ExecuteQueryResponsePart); ok && c.capture != nil {
+	if capture := c.capture.Load(); capture != nil && v == &capture.part {
 		frame := make([]byte, data.Len())
 		data.CopyTo(frame)
-		decoded, err := decodeOwnedPart(frame, part)
+		decoded, err := decodeOwnedPart(frame, &capture.part)
 		if err != nil {
 			return err
 		}
-		*c.capture = decoded
+		capture.wire = decoded
 
 		return nil
 	}

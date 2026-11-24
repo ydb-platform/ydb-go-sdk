@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -114,6 +116,73 @@ func TestQueryProtoWireInterceptorObservesAndUpdatesStatistics(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestQueryProtoWireInterceptorBuffersNextPart(t *testing.T) {
+	parts := interceptedQueryParts()
+	second := proto.CloneOf(parts[0])
+	second.ResultSet.Rows[0].Items[0].Value = &Ydb.Value_Int32Value{Int32Value: 43}
+	server := mock.Server(t, mock.WithExecuteQueryParts(parts[0], second, parts[1]))
+	intercept := func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn,
+		method string, streamer grpc.Streamer, opts ...grpc.CallOption,
+	) (grpc.ClientStream, error) {
+		stream, err := streamer(ctx, desc, cc, method, opts...)
+		if err != nil || method != Ydb_Query_V1.QueryService_ExecuteQuery_FullMethodName {
+			return stream, err
+		}
+
+		return &bufferNextPartStream{ClientStream: stream}, nil
+	}
+	for _, wire := range []bool{false, true} {
+		t.Run(fmt.Sprintf("wire=%t", wire), func(t *testing.T) {
+			db, err := ydb.Open(t.Context(), server.ConnString(), ydb.WithAnonymousCredentials(),
+				ydb.WithQueryProtoWireDecoding(wire),
+				ydb.With(config.WithGrpcOptions(grpc.WithChainStreamInterceptor(intercept))),
+			)
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, db.Close(t.Context())) })
+			result, err := db.Query().Query(t.Context(), "SELECT value")
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, result.Close(t.Context())) })
+			rs, err := result.NextResultSet(t.Context())
+			require.NoError(t, err)
+			for _, want := range []int32{42, 43} {
+				row, err := rs.NextRow(t.Context())
+				require.NoError(t, err)
+				var got int32
+				require.NoError(t, row.Scan(&got))
+				require.Equal(t, want, got)
+			}
+			_, err = rs.NextRow(t.Context())
+			require.ErrorIs(t, err, io.EOF)
+		})
+	}
+}
+
+type bufferNextPartStream struct {
+	grpc.ClientStream
+
+	pending    *Ydb_Query.ExecuteQueryResponsePart
+	pendingErr error
+}
+
+func (s *bufferNextPartStream) RecvMsg(dst any) error {
+	if s.pending != nil {
+		if s.pendingErr != nil {
+			return s.pendingErr
+		}
+		proto.Merge(dst.(*Ydb_Query.ExecuteQueryResponsePart), s.pending)
+		s.pending = nil
+
+		return nil
+	}
+	if err := s.ClientStream.RecvMsg(dst); err != nil {
+		return err
+	}
+	s.pending = new(Ydb_Query.ExecuteQueryResponsePart)
+	s.pendingErr = s.ClientStream.RecvMsg(s.pending)
+
+	return nil
 }
 
 func openInterceptedQuery(t *testing.T, wire bool, parts []*Ydb_Query.ExecuteQueryResponsePart,
