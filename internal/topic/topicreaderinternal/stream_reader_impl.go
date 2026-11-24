@@ -894,13 +894,17 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 	)
 	defer func() { onDone(err) }()
 
+	observeReceipt := r.cfg.Trace != nil && r.cfg.Trace.OnReaderMessagesReceived != nil
 	var accepted map[string]int
-	defer func() {
-		for topic, count := range accepted {
-			ctx := r.cfg.BaseContext
-			gtrace.TopicOnReaderMessagesReceived(r.cfg.Trace, &ctx, r.cfg.ReaderInfo, topic, count)
-		}
-	}()
+	if observeReceipt {
+		accepted = make(map[string]int)
+		defer func() {
+			for topic, count := range accepted {
+				ctx := r.cfg.BaseContext
+				gtrace.TopicOnReaderMessagesReceived(r.cfg.Trace, &ctx, r.cfg.ReaderInfo, topic, count)
+			}
+		}()
+	}
 
 	batches, err2 := topicreadercommon.ReadRawBatchesToPublicBatches(msg, &r.sessionController, r.cfg.Decoders)
 	if err2 != nil {
@@ -908,7 +912,10 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 	}
 
 	for i := range batches {
-		topic := batches[i].Topic()
+		var topic string
+		if observeReceipt {
+			topic = batches[i].Topic()
+		}
 		messagesCount := len(batches[i].Messages)
 
 		reserved := r.reserveLocalBuffer(messagesCount)
@@ -920,10 +927,9 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 			return err
 		}
 
-		if accepted == nil {
-			accepted = make(map[string]int)
+		if observeReceipt {
+			accepted[topic] += messagesCount
 		}
-		accepted[topic] += messagesCount
 	}
 
 	return nil

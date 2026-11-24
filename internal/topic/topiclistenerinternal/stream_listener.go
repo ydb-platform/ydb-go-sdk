@@ -558,11 +558,16 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 			"ydb: failed to convert raw batches to public batches: %w", err)))
 	}
 
+	observeReceipt := l.tracer != nil && l.tracer.OnReaderMessagesReceived != nil
 	// Route each batch to its partition worker
 	for _, batch := range batches {
 		partitionSession := topicreadercommon.BatchGetPartitionSession(batch)
-		topic := batch.Topic()
-		messagesCount := len(batch.Messages)
+		var topic string
+		var messagesCount int
+		if observeReceipt {
+			topic = batch.Topic()
+			messagesCount = len(batch.Messages)
+		}
 		accepted := false
 		routed := l.routeToWorker(partitionSession, func(worker *PartitionWorker) {
 			accepted = worker.AddMessagesBatch(m.ServerMessageMetadata, batch)
@@ -574,7 +579,7 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 
 			continue
 		}
-		if accepted {
+		if observeReceipt && accepted {
 			traceCtx := l.background.Context()
 			gtrace.TopicOnReaderMessagesReceived(
 				l.tracer,
