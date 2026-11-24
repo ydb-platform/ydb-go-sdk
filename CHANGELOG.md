@@ -1,3 +1,5 @@
+* Fixed the YQL literal of negative `Decimal` values with an absolute value below 0.1, where the minus sign was written inside the digits (for example `.0000000-5` instead of `-.000000005`)
+
 ## v3.157.3
 * Fixed `topic.Client.CommitOffset` retrying commits with an expired non-empty read session ID; it now returns `topicreader.ErrCommitToExpiredSession` while preserving the original operation error, server status, and issues
 

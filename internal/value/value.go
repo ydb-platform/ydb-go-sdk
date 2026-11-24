@@ -709,7 +709,13 @@ func (v *decimalValue) Yql() string {
 	buffer.WriteString(v.innerType.Name())
 	buffer.WriteByte('(')
 	buffer.WriteByte('"')
-	s := decimal.FromBytes(v.value[:], v.innerType.Precision()).String()
+	x := decimal.FromBytes(v.value[:], v.innerType.Precision())
+	if x.Sign() < 0 {
+		// the sign is not a digit: write it first and pad only the digits
+		buffer.WriteByte('-')
+		x.Neg(x)
+	}
+	s := x.String()
 	if len(s) < int(v.innerType.Scale()) {
 		s = strings.Repeat("0", int(v.innerType.Scale())-len(s)) + s
 	}
