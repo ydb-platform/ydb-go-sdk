@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"reflect"
 	"sort"
@@ -558,7 +559,8 @@ func Date32Value(v int32) date32Value {
 }
 
 func Date32ValueFromTime(t time.Time) date32Value {
-	return date32Value(uint64(t.Unix() / 24 / 60 / 60))
+	// floor, not truncation: a time before the epoch belongs to the earlier day
+	return date32Value(math.Floor(float64(t.Unix()) / 24 / 60 / 60))
 }
 
 type datetimeValue uint32

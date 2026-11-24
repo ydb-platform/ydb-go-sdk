@@ -1,3 +1,5 @@
+* Fixed `Date32` value built from a `time.Time` before the Unix epoch with a non-midnight time of day: it was rounded to the next day (for example `1969-12-31T12:00:00Z` became `1970-01-01`)
+
 ## v3.157.4
 * Fixed panic in `decimal.Format` and `decimal.Decimal.String` for a zero value with zero scale
 * Fixed the YQL literal of negative `Decimal` values with an absolute value below 0.1, where the minus sign was written inside the digits (for example `.0000000-5` instead of `-.000000005`)
