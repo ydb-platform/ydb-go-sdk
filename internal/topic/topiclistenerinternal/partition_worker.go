@@ -420,15 +420,7 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 	// Credit is tied to read/processing, not commit (protocol separates these; same as reader).
 	batchSize := batchReadBufferSize(msg.Batch)
 	defer w.readBufferReleaser.ReadBufferRelease(batchSize)
-	localBufferReleased := false
-	releaseLocalBuffer := func() {
-		if localBufferReleased {
-			return
-		}
-		localBufferReleased = true
-		w.changeLocalBuffer(-messagesCount)
-	}
-	defer releaseLocalBuffer()
+	w.changeLocalBuffer(-messagesCount)
 
 	// Check for errors in the metadata
 	if err := w.validateBatchMetadata(msg); err != nil {
@@ -436,8 +428,6 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 
 		return err
 	}
-
-	releaseLocalBuffer()
 
 	// Call user handler with tracing
 	if err := w.callUserHandler(ctx, msg, w.messageSender, messagesCount); err != nil {
