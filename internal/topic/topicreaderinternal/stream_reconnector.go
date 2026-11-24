@@ -606,7 +606,10 @@ func (r *readerReconnector) traceSessionStopAfterRead(
 
 	if streamErrer, ok := stream.(streamErrorer); ok {
 		streamErr := streamErrer.streamError()
-		if streamErr == nil || r.isRetriableError(streamErr) {
+		if !errors.Is(readErr, streamErr) {
+			// A transaction-local error may coincide with a separate stream failure.
+			r.traceStoredStreamStop(ctx, streamErr)
+
 			return
 		}
 		readErr = streamErr
