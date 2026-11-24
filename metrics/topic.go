@@ -64,10 +64,13 @@ func topicMetricName(scope, name string) string {
 func topic(config Config) (t trace.Topic) {
 	reader := config.WithSystem("topic").WithSystem("reader")
 	vectors := registerTopicVectors(reader)
+	// Snapshot details when installing the hooks: disabled hooks stay nil, and
+	// a stream's closing gauge delta uses the same mask as its reservation.
+	details := reader.Details()
 	messageEnabled := func(info trace.TopicReaderInfo) bool {
-		return topicMetricEnabled(reader.Details(), info.Listener, trace.TopicReaderMessageEvents)
+		return topicMetricEnabled(details, info.Listener, trace.TopicReaderMessageEvents)
 	}
-	if reader.Details()&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) != 0 {
+	if details&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) != 0 {
 		t.OnReaderMessagesReceived = func(info trace.TopicReaderMessagesReceivedInfo) {
 			if messageEnabled(info.ReaderInfo) {
 				addCounter(vectors.received(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
@@ -91,9 +94,9 @@ func topic(config Config) (t trace.Topic) {
 	}
 
 	streamEnabled := func(info trace.TopicReaderInfo) bool {
-		return topicMetricEnabled(reader.Details(), info.Listener, trace.TopicReaderStreamEvents)
+		return topicMetricEnabled(details, info.Listener, trace.TopicReaderStreamEvents)
 	}
-	if reader.Details()&(trace.TopicReaderStreamEvents|trace.TopicListenerStreamEvents) != 0 {
+	if details&(trace.TopicReaderStreamEvents|trace.TopicListenerStreamEvents) != 0 {
 		t.OnReaderCommitQueued = func(info trace.TopicReaderCommitQueuedInfo) {
 			if streamEnabled(info.ReaderInfo) {
 				addCounter(vectors.queued(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
@@ -116,7 +119,7 @@ func topic(config Config) (t trace.Topic) {
 			vectors.errors(labels).Inc()
 		}
 	}
-	setReceivedBytesHooks(&t, reader.Details(), vectors)
+	setReceivedBytesHooks(&t, details, vectors)
 
 	return t
 }
