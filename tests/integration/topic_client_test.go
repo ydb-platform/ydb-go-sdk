@@ -251,6 +251,7 @@ func TestTopicDescribePartitionStats(t *testing.T) {
 	}
 
 	topicDesc.Partitions[0].PartitionStats.LastWriteTime = nil
+	topicDesc.Partitions[0].PartitionStats.MaxWriteTimeLag = nil
 	bw := &topicDesc.Partitions[0].PartitionStats.BytesWritten
 	sign := func(x int64) int64 {
 		if x > 0 {
