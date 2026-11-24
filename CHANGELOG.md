@@ -1,3 +1,5 @@
+* Fixed `topic.Client.Create` not sending operation params (sync operation mode, `ydb.WithOperationTimeout` and `ydb.WithOperationCancelAfter` values) in the create topic request
+
 ## v3.157.4
 * Fixed panic in `decimal.Format` and `decimal.Decimal.String` for a zero value with zero scale
 * Fixed the YQL literal of negative `Decimal` values with an absolute value below 0.1, where the minus sign was written inside the digits (for example `.0000000-5` instead of `-.000000005`)
