@@ -44,6 +44,7 @@ func TestUnmarshallResultSet(t *testing.T) {
 
 type resultStub struct {
 	query.Result
+
 	rs  query.ResultSet
 	err error
 }
@@ -54,6 +55,7 @@ func (r resultStub) NextResultSet(context.Context) (query.ResultSet, error) {
 
 type resultSetStub struct {
 	query.ResultSet
+
 	err error
 }
 
