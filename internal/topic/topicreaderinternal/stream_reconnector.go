@@ -41,6 +41,7 @@ type readerReconnector struct {
 	streamVal                  batchedStreamReader
 	streamContextCancel        context.CancelCauseFunc
 	streamErr                  error
+	terminalErr                error
 	initErr                    error
 	tracer                     *trace.Topic
 	readerInfo                 topicreadercommon.ReaderInfo
@@ -246,6 +247,11 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, reason error) er
 	var closeErr error
 	var streamError error
 	r.closeOnce.Do(func() {
+		r.m.WithRLock(func() {
+			if r.terminalErr != nil {
+				reason = r.terminalErr
+			}
+		})
 		closeErr = r.background.Close(ctx, reason)
 
 		// Get references under lock
@@ -347,8 +353,7 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 					return
 				}
 			} else {
-				r.traceSessionStopIf(ctx, stopRetryReason, request.reportStop)
-				_ = r.CloseWithError(ctx, stopRetryReason)
+				r.stopFromLoop(ctx, stopRetryReason, request.reportStop)
 				logCtx := r.logContext
 				gtrace.TopicOnReaderReconnect(r.tracer, &logCtx, request.reason)(stopRetryReason)
 
@@ -424,8 +429,7 @@ func (r *readerReconnector) reconnect(
 		})
 	default:
 		// unretriable error
-		r.traceSessionStop(ctx, err)
-		_ = r.CloseWithError(ctx, err)
+		r.stopFromLoop(ctx, err, true)
 	}
 
 	r.m.WithLock(func() {
@@ -550,6 +554,19 @@ func (r *readerReconnector) traceSessionRetry(ctx context.Context, err error) {
 
 func (r *readerReconnector) traceSessionStop(ctx context.Context, err error) {
 	r.traceSessionStopIf(ctx, err, true)
+}
+
+func (r *readerReconnector) stopFromLoop(ctx context.Context, reason error, report bool) {
+	r.m.WithLock(func() { r.terminalErr = reason })
+
+	// Either the callback or its continuation may close the reader. Both run
+	// outside the worker; the worker waits for cancellation, not for Close.
+	go func() {
+		defer r.handlePanic()
+		r.traceSessionStopIf(ctx, reason, report)
+		_ = r.CloseWithError(context.WithoutCancel(ctx), reason)
+	}()
+	<-r.background.Done()
 }
 
 func (r *readerReconnector) traceSessionStopIf(ctx context.Context, err error, report bool) {

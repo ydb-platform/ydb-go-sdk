@@ -98,6 +98,7 @@ func TestReaderReconnectorLoopStopsAfterAdmittedRetry(t *testing.T) {
 			require.Equal(t, int32(1), connectAttempts.Load(), "reconnection continued after retry decision requested stop")
 			require.Empty(t, reconnector.reconnectFromBadStream)
 			require.ErrorIs(t, reconnector.background.CloseReason(), retryErr)
+			require.NoError(t, reconnector.CloseWithError(waitCtx, errReaderClosed))
 
 			if reportSessionError {
 				select {
