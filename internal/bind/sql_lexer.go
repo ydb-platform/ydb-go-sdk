@@ -40,6 +40,10 @@ func backtickState(l *sqlLexer) stateFn {
 			}
 			l.pos += width
 		case utf8.RuneError:
+			if width > 0 { // not the end of input: U+FFFD itself or an invalid byte
+				continue
+			}
+
 			if l.pos-l.start > 0 {
 				l.parts = append(l.parts, l.src[l.start:l.pos])
 				l.start = l.pos
@@ -63,6 +67,10 @@ func singleQuoteState(l *sqlLexer) stateFn {
 			}
 			l.pos += width
 		case utf8.RuneError:
+			if width > 0 { // not the end of input: U+FFFD itself or an invalid byte
+				continue
+			}
+
 			if l.pos-l.start > 0 {
 				l.parts = append(l.parts, l.src[l.start:l.pos])
 				l.start = l.pos
@@ -86,6 +94,10 @@ func doubleQuoteState(l *sqlLexer) stateFn {
 			}
 			l.pos += width
 		case utf8.RuneError:
+			if width > 0 { // not the end of input: U+FFFD itself or an invalid byte
+				continue
+			}
+
 			if l.pos-l.start > 0 {
 				l.parts = append(l.parts, l.src[l.start:l.pos])
 				l.start = l.pos
@@ -108,6 +120,10 @@ func oneLineCommentState(l *sqlLexer) stateFn {
 		case '\n', '\r':
 			return l.rawStateFn
 		case utf8.RuneError:
+			if width > 0 { // not the end of input: U+FFFD itself or an invalid byte
+				continue
+			}
+
 			if l.pos-l.start > 0 {
 				l.parts = append(l.parts, l.src[l.start:l.pos])
 				l.start = l.pos
@@ -143,6 +159,10 @@ func multilineCommentState(l *sqlLexer) stateFn {
 			l.nested--
 
 		case utf8.RuneError:
+			if width > 0 { // not the end of input: U+FFFD itself or an invalid byte
+				continue
+			}
+
 			if l.pos-l.start > 0 {
 				l.parts = append(l.parts, l.src[l.start:l.pos])
 				l.start = l.pos
