@@ -683,6 +683,12 @@ func TestOptionalValueCastTo(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("NullToNonPointer", func(t *testing.T) {
+		dst := "stale"
+		require.NoError(t, NullValue(types.Text).castTo(&dst))
+		require.Empty(t, dst)
+	})
 }
 
 func TestNullable(t *testing.T) {
