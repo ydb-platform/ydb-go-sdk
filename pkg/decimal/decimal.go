@@ -212,14 +212,14 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 		v.Mul(v, ten)
 		v.Add(v, big.NewInt(int64(c-'0')))
 
-		if !dot && v.Cmp(zero) > 0 && integral == 0 {
-			if neg {
-				return neginf, nil
-			}
-
-			return inf, nil
-		}
 		if !dot && v.Cmp(zero) > 0 { // leading zeros do not take integral digits
+			if integral == 0 {
+				if neg {
+					return neginf, nil
+				}
+
+				return inf, nil
+			}
 			integral--
 		}
 	}
