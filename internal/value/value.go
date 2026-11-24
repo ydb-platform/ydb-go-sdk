@@ -1846,8 +1846,8 @@ func (v *optionalValue) castTo(dst any) error {
 
 	if inner.Kind() != reflect.Pointer {
 		if v.value == nil {
-			if ptr.CanAddr() {
-				ptr.SetZero()
+			if inner.CanSet() {
+				inner.SetZero()
 			}
 
 			return nil
