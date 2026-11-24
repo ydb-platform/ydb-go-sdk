@@ -443,11 +443,15 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 }
 
 func (l *streamListener) changeCreditBalance(delta int) {
-	l.creditBalance.Change(delta, l.traceCreditDelta)
+	if l.tracer != nil && l.tracer.OnReaderCreditBalanceChanged != nil {
+		l.creditBalance.Change(delta, l.traceCreditDelta)
+	}
 }
 
 func (l *streamListener) finalizeCreditBalance() {
-	l.creditBalance.Finalize(l.traceCreditDelta)
+	if l.tracer != nil && l.tracer.OnReaderCreditBalanceChanged != nil {
+		l.creditBalance.Finalize(l.traceCreditDelta)
+	}
 }
 
 func (l *streamListener) traceCreditDelta(delta int) {
@@ -467,11 +471,17 @@ func (l *streamListener) traceLocalBufferDelta(delta int) {
 
 // changeLocalBuffer reports whether a positive delta reserved messages.
 func (l *streamListener) changeLocalBuffer(delta int) bool {
+	if l.tracer == nil || l.tracer.OnReaderLocalBufferChanged == nil {
+		return false
+	}
+
 	return l.localBufferBalance.ChangeBuffer(delta, l.traceLocalBufferDelta)
 }
 
 func (l *streamListener) finalizeLocalBuffer() {
-	l.localBufferBalance.Finalize(l.traceLocalBufferDelta)
+	if l.tracer != nil && l.tracer.OnReaderLocalBufferChanged != nil {
+		l.localBufferBalance.Finalize(l.traceLocalBufferDelta)
+	}
 }
 
 // routeMessage routes messages to appropriate handlers/workers

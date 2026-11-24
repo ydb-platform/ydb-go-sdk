@@ -1295,14 +1295,14 @@ type streamEnv struct {
 	t                       testing.TB
 	reader                  *topicStreamReaderImpl
 	stopReadEvents          empty.Chan
-	stopReadEventsCloseOnce sync.Once
+	stopReadEventsCloseOnce *sync.Once
 	stream                  *MockRawTopicReaderStream
 	partitionSessionID      partitionSessionID
 	mc                      *gomock.Controller
 	partitionSession        *topicreadercommon.PartitionSession
 	initialBufferSizeBytes  int64
 
-	m                          xsync.Mutex
+	m                          *xsync.Mutex
 	messagesFromServerToClient chan testStreamResult
 	nextMessageNeedCallback    func()
 }
@@ -1356,6 +1356,8 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 		initialBufferSizeBytes:     initialBufferSizeBytes,
 		reader:                     reader,
 		stopReadEvents:             make(empty.Chan),
+		stopReadEventsCloseOnce:    new(sync.Once),
+		m:                          new(xsync.Mutex),
 		stream:                     stream,
 		messagesFromServerToClient: make(chan testStreamResult),
 		partitionSession:           session,
@@ -1391,7 +1393,6 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 		}
 	})
 
-	//nolint:govet
 	return env
 }
 

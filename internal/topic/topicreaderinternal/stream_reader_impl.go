@@ -815,11 +815,15 @@ func (r *topicStreamReaderImpl) freeBufferFromMessages(batch *topicreadercommon.
 }
 
 func (r *topicStreamReaderImpl) changeCreditBalance(delta int) {
-	r.creditBalance.Change(delta, r.traceCreditDelta)
+	if r.cfg.Trace != nil && r.cfg.Trace.OnReaderCreditBalanceChanged != nil {
+		r.creditBalance.Change(delta, r.traceCreditDelta)
+	}
 }
 
 func (r *topicStreamReaderImpl) finalizeCreditBalance() {
-	r.creditBalance.Finalize(r.traceCreditDelta)
+	if r.cfg.Trace != nil && r.cfg.Trace.OnReaderCreditBalanceChanged != nil {
+		r.creditBalance.Finalize(r.traceCreditDelta)
+	}
 }
 
 func (r *topicStreamReaderImpl) traceCreditDelta(delta int) {
@@ -838,7 +842,7 @@ func (r *topicStreamReaderImpl) traceLocalBufferDelta(delta int) {
 }
 
 func (r *topicStreamReaderImpl) reserveLocalBuffer(messagesCount int) bool {
-	if messagesCount <= 0 {
+	if messagesCount <= 0 || r.cfg.Trace == nil || r.cfg.Trace.OnReaderLocalBufferChanged == nil {
 		return false
 	}
 
@@ -846,7 +850,7 @@ func (r *topicStreamReaderImpl) reserveLocalBuffer(messagesCount int) bool {
 }
 
 func (r *topicStreamReaderImpl) releaseLocalBuffer(messagesCount int) {
-	if messagesCount <= 0 {
+	if messagesCount <= 0 || r.cfg.Trace == nil || r.cfg.Trace.OnReaderLocalBufferChanged == nil {
 		return
 	}
 
@@ -854,7 +858,9 @@ func (r *topicStreamReaderImpl) releaseLocalBuffer(messagesCount int) {
 }
 
 func (r *topicStreamReaderImpl) finalizeLocalBuffer() {
-	r.localBufferBalance.Finalize(r.traceLocalBufferDelta)
+	if r.cfg.Trace != nil && r.cfg.Trace.OnReaderLocalBufferChanged != nil {
+		r.localBufferBalance.Finalize(r.traceLocalBufferDelta)
+	}
 }
 
 func (r *topicStreamReaderImpl) updateTokenLoop(ctx context.Context) {
