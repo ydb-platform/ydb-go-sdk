@@ -37,11 +37,26 @@ func NewEncoder(create PublicCreateEncoderFunc) *Encoder {
 }
 
 func (e *Encoder) EncodeBytes(target io.Writer, data []byte) (int, error) {
+	return e.encode(target, func(enc io.Writer) (int, error) {
+		return enc.Write(data)
+	})
+}
+
+// EncodeFrom compresses the data of source without copying it into an intermediate buffer.
+func (e *Encoder) EncodeFrom(target io.Writer, source io.WriterTo) (int, error) {
+	return e.encode(target, func(enc io.Writer) (int, error) {
+		n, err := source.WriteTo(enc)
+
+		return int(n), err
+	})
+}
+
+func (e *Encoder) encode(target io.Writer, write func(enc io.Writer) (int, error)) (int, error) {
 	enc, err := e.newWriter(target)
 	if err != nil {
 		return 0, err
 	}
-	n, err := enc.Write(data)
+	n, err := write(enc)
 	if err == nil {
 		err = enc.Close()
 	}
@@ -100,6 +115,15 @@ func (e *MultiEncoder) AddSharedEncoder(codec rawtopiccommon.Codec, encoder *Enc
 }
 
 func (e *MultiEncoder) Encode(codec rawtopiccommon.Codec, target io.Writer, source io.Reader) (int, error) {
+	if wt, ok := source.(io.WriterTo); ok {
+		encoder, ok := e.m[codec]
+		if !ok {
+			return 0, errUnexpectedEncodeCodec(codec)
+		}
+
+		return encoder.EncodeFrom(target, wt)
+	}
+
 	buf := e.bp.GetOrNew()
 	defer e.bp.Put(buf)
 
@@ -116,7 +140,14 @@ func (e *MultiEncoder) EncodeBytes(codec rawtopiccommon.Codec, target io.Writer,
 		return encoder.EncodeBytes(target, data)
 	}
 
-	return 0, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)))
+	return 0, errUnexpectedEncodeCodec(codec)
+}
+
+func errUnexpectedEncodeCodec(codec rawtopiccommon.Codec) error {
+	return xerrors.WithStackTrace(
+		xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)),
+		xerrors.WithSkipDepth(1),
+	)
 }
 
 func (e *MultiEncoder) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {

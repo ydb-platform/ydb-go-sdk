@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -428,4 +429,115 @@ func TestMultiEncoder(t *testing.T) {
 			require.Equal(t, string(testMsg), decompressGzip(buf))
 		}
 	})
+}
+
+type readerOnly struct {
+	r io.Reader
+}
+
+func (r readerOnly) Read(p []byte) (int, error) {
+	return r.r.Read(p)
+}
+
+func encodeTestPayload(size int) []byte {
+	data := make([]byte, size)
+	for i := range data {
+		data[i] = "0123456789abcdef {}\":,\n"[(i*7+i/13)%23]
+	}
+
+	return data
+}
+
+func TestMultiEncoderEncodeSources(t *testing.T) {
+	encoder := NewMultiEncoder()
+	for _, size := range []int{0, 1, 511, 512, 513, 32*1024 + 7, 300_000} {
+		data := encodeTestPayload(size)
+		for _, codec := range []rawtopiccommon.Codec{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip} {
+			var want bytes.Buffer
+			_, err := encoder.EncodeBytes(codec, &want, data)
+			require.NoError(t, err)
+
+			sources := map[string]io.Reader{
+				"bytes.Reader":   bytes.NewReader(data),
+				"bytes.Buffer":   bytes.NewBuffer(bytes.Clone(data)),
+				"strings.Reader": strings.NewReader(string(data)),
+				"io.Reader":      readerOnly{bytes.NewReader(data)},
+			}
+			for name, source := range sources {
+				t.Run(fmt.Sprintf("%v/%d/%s", codec, size, name), func(t *testing.T) {
+					var got bytes.Buffer
+					n, err := encoder.Encode(codec, &got, source)
+					require.NoError(t, err)
+					require.Equal(t, size, n)
+					require.Equal(t, want.Bytes(), got.Bytes())
+				})
+			}
+		}
+	}
+}
+
+func TestMultiEncoderEncodeUnsupportedCodec(t *testing.T) {
+	for name, source := range map[string]io.Reader{
+		"WriterTo": bytes.NewReader([]byte("payload")),
+		"Reader":   readerOnly{bytes.NewReader([]byte("payload"))},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var output bytes.Buffer
+			n, err := NewMultiEncoder().Encode(rawtopiccommon.Codec(10001), &output, source)
+			require.Error(t, err)
+			require.Zero(t, n)
+			require.Empty(t, output.Bytes())
+		})
+	}
+}
+
+type writerToOnly struct {
+	data []byte
+}
+
+func (w writerToOnly) Read([]byte) (int, error) {
+	return 0, errors.New("the source must be written with WriteTo, not copied with Read")
+}
+
+func (w writerToOnly) WriteTo(target io.Writer) (int64, error) {
+	n, err := target.Write(w.data)
+
+	return int64(n), err
+}
+
+func TestMultiEncoderEncodeWriterToWithoutCopy(t *testing.T) {
+	encoder := NewMultiEncoder()
+	data := encodeTestPayload(1000)
+	for _, codec := range []rawtopiccommon.Codec{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip} {
+		var want, got bytes.Buffer
+		_, err := encoder.EncodeBytes(codec, &want, data)
+		require.NoError(t, err)
+
+		n, err := encoder.Encode(codec, &got, writerToOnly{data: data})
+		require.NoError(t, err)
+		require.Equal(t, len(data), n)
+		require.Equal(t, want.Bytes(), got.Bytes())
+	}
+}
+
+func BenchmarkMultiEncoderEncode(b *testing.B) {
+	encoder := NewMultiEncoder()
+	for _, size := range []int{4 << 10, 256 << 10} {
+		data := encodeTestPayload(size)
+		for _, codec := range []rawtopiccommon.Codec{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip} {
+			b.Run(fmt.Sprintf("codec=%v/size=%dKiB", codec, size>>10), func(b *testing.B) {
+				var target bytes.Buffer
+				source := bytes.NewReader(data)
+				b.SetBytes(int64(size))
+				b.ReportAllocs()
+				for b.Loop() {
+					target.Reset()
+					source.Reset(data)
+					if _, err := encoder.Encode(codec, &target, source); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+		}
+	}
 }
