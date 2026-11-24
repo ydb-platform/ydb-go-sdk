@@ -1,5 +1,10 @@
-* Fixed experimental Query Service wire decoding to preserve connection-level custom gRPC codecs, merge repeated nested protobuf messages without losing values, and match standard protobuf scalar defaults when a response carries a mismatched value field
 * Added experimental `ydb.WithQueryProtoWireDecoding(bool)` to opt into direct protobuf wire decoding of native and `database/sql` Query Service `FORMAT_VALUE` rows, reducing allocations and using lazy cell and column-name indexes for linear-time wide-row scans while preserving protobuf response metadata for gRPC stream interceptors
+
+## v3.157.3
+* Fixed `topic.Client.CommitOffset` retrying commits with an expired non-empty read session ID; it now returns `topicreader.ErrCommitToExpiredSession` while preserving the original operation error, server status, and issues
+
+## v3.157.2
+* Fixed TopicListener callback ordering across partition sessions and cancellation of buffered reads after a forced partition stop
 
 ## v3.157.1
 * Changed endpoint selection to compare two random candidates by unfinished RPC count within the best available priority bucket, preserving existing balancer configuration and node affinity
