@@ -2,6 +2,7 @@ package options_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -69,4 +70,14 @@ func TestDescribeIncludeOptions(t *testing.T) {
 	options.WithDescribeWaiters(true)(cfg)
 	require.True(t, cfg.IncludeOwners)
 	require.True(t, cfg.IncludeWaiters)
+}
+
+func TestWithSessionStopTimeout(t *testing.T) {
+	cfg := &options.CreateSessionOptions{
+		SessionStartTimeout: time.Second,
+		SessionStopTimeout:  time.Second,
+	}
+	options.WithSessionStopTimeout(3 * time.Second)(cfg)
+	require.Equal(t, 3*time.Second, cfg.SessionStopTimeout)
+	require.Equal(t, time.Second, cfg.SessionStartTimeout)
 }
