@@ -591,6 +591,22 @@ func TestFormat(t *testing.T) {
 			expected:          "123",
 		},
 		{
+			name:              "integer with zero scale and trim keeps integer zeros",
+			x:                 big.NewInt(100),
+			precision:         22,
+			scale:             0,
+			trimTrailingZeros: true,
+			expected:          "100",
+		},
+		{
+			name:              "trim keeps integer zeros and drops fractional zeros",
+			x:                 big.NewInt(10000000000),
+			precision:         22,
+			scale:             9,
+			trimTrailingZeros: true,
+			expected:          "10",
+		},
+		{
 			name:      "negative number",
 			x:         big.NewInt(-123456000000),
 			precision: 22,
