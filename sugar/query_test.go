@@ -1,6 +1,9 @@
 package sugar_test
 
 import (
+	"context"
+	"errors"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -37,6 +40,65 @@ func TestUnmarshallResultSet(t *testing.T) {
 	require.EqualValues(t, "my string 1", v[0].Str)
 	require.EqualValues(t, 456, v[1].ID)
 	require.EqualValues(t, "my string 2", v[1].Str)
+}
+
+type resultStub struct {
+	query.Result
+
+	rs  query.ResultSet
+	err error
+}
+
+func (r resultStub) NextResultSet(context.Context) (query.ResultSet, error) {
+	return r.rs, r.err
+}
+
+type resultSetStub struct {
+	query.ResultSet
+
+	err error
+}
+
+func (rs resultSetStub) NextRow(context.Context) (query.Row, error) {
+	return nil, rs.err
+}
+
+func TestResultErr(t *testing.T) {
+	errBroken := errors.New("stream broken")
+	for _, tc := range []struct {
+		name          string
+		r             query.Result
+		nextResultSet bool
+		err           error
+	}{
+		{
+			name: "no more result sets",
+			r:    resultStub{err: io.EOF},
+		},
+		{
+			name: "NextResultSet failed",
+			r:    resultStub{err: errBroken},
+			err:  errBroken,
+		},
+		{
+			name:          "no more rows",
+			r:             resultStub{rs: resultSetStub{err: io.EOF}},
+			nextResultSet: true,
+		},
+		{
+			name:          "NextRow failed",
+			r:             resultStub{rs: resultSetStub{err: errBroken}},
+			nextResultSet: true,
+			err:           errBroken,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			res := sugar.Result(tc.r)
+			require.Equal(t, tc.nextResultSet, res.NextResultSet(context.Background()))
+			require.False(t, res.NextRow())
+			require.ErrorIs(t, res.Err(), tc.err)
+		})
+	}
 }
 
 type rowTestStruct struct {

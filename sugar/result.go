@@ -15,16 +15,21 @@ type result struct {
 	r   query.Result
 	rs  query.ResultSet
 	row query.Row
+	err error
 }
 
 func (r *result) NextResultSet(ctx context.Context) bool {
 	var err error
 	r.rs, err = r.r.NextResultSet(ctx)
-	if err != nil && xerrors.Is(err, io.EOF) {
+	if err != nil {
+		if !xerrors.Is(err, io.EOF) {
+			r.err = err
+		}
+
 		return false
 	}
 
-	return err == nil && r.rs != nil
+	return r.rs != nil
 }
 
 func (r *result) NextRow() bool {
@@ -34,7 +39,11 @@ func (r *result) NextRow() bool {
 
 	var err error
 	r.row, err = r.rs.NextRow(context.Background())
-	if err != nil && xerrors.Is(err, io.EOF) {
+	if err != nil {
+		if !xerrors.Is(err, io.EOF) {
+			r.err = err
+		}
+
 		return false
 	}
 
@@ -64,7 +73,7 @@ func (r *result) ScanStruct(dst any) error {
 }
 
 func (r *result) Err() error {
-	return nil
+	return r.err
 }
 
 func (r *result) Close() error {
