@@ -409,6 +409,13 @@ func toValue(v any) (_ value.Value, err error) {
 			v := reflect.ValueOf(x)
 			// Special handling for byte slices ([]byte and type aliases)
 			if v.Type().Elem().Kind() == reflect.Uint8 {
+				if kind == reflect.Array {
+					// reflect.Value.Bytes panics on an unaddressable array
+					addressable := reflect.New(v.Type()).Elem()
+					addressable.Set(v)
+					v = addressable
+				}
+
 				return value.BytesValue(v.Bytes()), nil
 			}
 			list := make([]value.Value, v.Len())

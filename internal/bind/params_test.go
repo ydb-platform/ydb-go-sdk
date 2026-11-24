@@ -373,6 +373,18 @@ func TestToValue(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
+			src:  [4]byte{1, 2, 3, 4},
+			dst:  value.BytesValue([]byte{1, 2, 3, 4}),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			src:  func(v [4]byte) *[4]byte { return &v }([4]byte{1, 2, 3, 4}),
+			dst:  value.OptionalValue(value.BytesValue([]byte{1, 2, 3, 4})),
+			err:  nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
 			src:  [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
 			dst:  nil,
 			err:  value.ErrIssue1501BadUUID,
