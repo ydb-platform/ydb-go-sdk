@@ -32,6 +32,11 @@ func extractSelectorNames(selectors []*topicreadercommon.PublicReadSelector) []s
 	return result
 }
 
+type partitionKey struct {
+	topic string
+	id    int64
+}
+
 type streamListener struct {
 	cfg *StreamListenerConfig
 
@@ -58,7 +63,7 @@ type streamListener struct {
 	shutdownErr        error
 
 	m              xsync.Mutex
-	workers        map[rawtopicreader.PartitionSessionID]*PartitionWorker
+	workers        map[partitionKey]*PartitionWorker
 	workerCloseWG  sync.WaitGroup
 	messagesToSend []rawtopicreader.ClientMessage
 }
@@ -227,7 +232,10 @@ func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	l.freeBytes = make(chan int, 1)
 	l.sessions = &topicreadercommon.PartitionSessionStorage{}
 	l.sessionIDCounter = sessionIDCounter
-	l.workers = make(map[rawtopicreader.PartitionSessionID]*PartitionWorker)
+	l.workers = make(map[partitionKey]*PartitionWorker)
+	if l.cfg == nil {
+		l.cfg = &StreamListenerConfig{}
+	}
 }
 
 func (l *streamListener) initStream(ctx context.Context, client TopicClient) error {
@@ -476,9 +484,15 @@ func (l *streamListener) routeMessage(ctx context.Context, mess rawtopicreader.S
 	case *rawtopicreader.StartPartitionSessionRequest:
 		return l.handleStartPartition(ctx, m)
 	case *rawtopicreader.StopPartitionSessionRequest:
-		l.routeToWorker(m.PartitionSessionID, func(worker *PartitionWorker) {
-			worker.AddRawServerMessage(m)
-		})
+		if session, err := l.sessions.Get(m.PartitionSessionID); err == nil {
+			session.SetNoMoreMessages()
+			if !m.Graceful {
+				session.Close()
+			}
+			l.routeToWorker(session, func(worker *PartitionWorker) {
+				worker.AddRawServerMessage(session, m)
+			})
+		}
 
 		return nil
 	case *rawtopicreader.ReadResponse:
@@ -521,7 +535,7 @@ func (l *streamListener) handleStartPartition(
 	}
 
 	// Send StartPartition message to the worker
-	worker.AddRawServerMessage(m)
+	worker.AddRawServerMessage(session, m)
 
 	return nil
 }
@@ -540,7 +554,7 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 		topic := batch.Topic()
 		messagesCount := len(batch.Messages)
 		accepted := false
-		routed := l.routeToWorker(partitionSession.StreamPartitionSessionID, func(worker *PartitionWorker) {
+		routed := l.routeToWorker(partitionSession, func(worker *PartitionWorker) {
 			accepted = worker.AddMessagesBatch(m.ServerMessageMetadata, batch)
 		})
 		if !routed {
@@ -571,17 +585,11 @@ func (l *streamListener) onCommitResponse(msg *rawtopicreader.CommitOffsetRespon
 	for i := range msg.PartitionsCommittedOffsets {
 		commit := &msg.PartitionsCommittedOffsets[i]
 
-		var worker *PartitionWorker
-		l.m.WithLock(func() {
-			worker = l.workers[commit.PartitionSessionID]
-		})
-
-		if worker == nil {
+		session, err := l.sessions.Get(commit.PartitionSessionID)
+		if err != nil {
 			// Session not found - this can happen during shutdown, log but don't fail
 			continue
 		}
-
-		session := worker.partitionSession
 
 		// Update committed offset in the session
 		messagesCount := topicreadercommon.RegisterCommitAcknowledged(session, commit.CommittedOffset)
@@ -707,68 +715,64 @@ func (l *streamListener) SendRaw(msg rawtopicreader.ClientMessage) {
 
 // onWorkerStopped handles worker stopped notifications
 func (l *streamListener) onWorkerStopped(
+	key partitionKey,
 	sessionID rawtopicreader.PartitionSessionID,
 	reason error,
 ) {
 	l.m.WithLock(func() {
-		delete(l.workers, sessionID)
+		delete(l.workers, key)
 	})
 	l.goClose(l.background.Context(), reason)
 
 	// Remove corresponding session
-	for _, session := range l.sessions.GetAll() {
-		if session.StreamPartitionSessionID == sessionID {
-			_, _ = l.sessions.Remove(session.StreamPartitionSessionID)
-
-			break
-		}
-	}
+	_, _ = l.sessions.Remove(sessionID)
 }
 
 // createWorkerForPartition creates a new PartitionWorker for the given session
 func (l *streamListener) createWorkerForPartition(session *topicreadercommon.PartitionSession) *PartitionWorker {
 	var worker *PartitionWorker
 	var closeOnce sync.Once
-	started := false
-	worker = NewPartitionWorker(
-		session.StreamPartitionSessionID,
-		session,
-		l,
-		l.handler,
-		func(sessionID rawtopicreader.PartitionSessionID, reason error) {
-			l.onWorkerStopped(sessionID, reason)
-			closeOnce.Do(func() {
-				// The callback can run in the worker goroutine, so join it elsewhere.
-				go func() {
-					err := worker.Close(context.Background(), reason)
-					l.m.WithLock(func() {
-						if err != nil {
-							l.shutdownErr = errors.Join(l.shutdownErr, err)
-						}
-					})
-					l.workerCloseWG.Done()
-				}()
-			})
-		},
-		l.tracer,
-		l.listenerID,
-	)
-	worker.onLocalBufferDelta = l.changeLocalBuffer
-	worker.readerInfo = l.cfg.ReaderInfo
-
-	// Register and start under the same lock so shutdown cannot wait for an unstarted worker.
+	// Reuse the partition's FIFO across sessions. Registration and startup share
+	// the shutdown lock so Close cannot wait for an unstarted worker.
 	l.m.WithLock(func() {
 		if l.closing.Load() {
 			return
 		}
-		l.workers[session.StreamPartitionSessionID] = worker
+		key := partitionKey{topic: session.Topic, id: session.PartitionID}
+		if worker = l.workers[key]; worker != nil {
+			context.AfterFunc(worker.bgWorker.Context(), session.Close)
+
+			return
+		}
+		worker = NewPartitionWorker(
+			session.StreamPartitionSessionID,
+			session,
+			l,
+			l.handler,
+			func(sessionID rawtopicreader.PartitionSessionID, reason error) {
+				l.onWorkerStopped(key, sessionID, reason)
+				closeOnce.Do(func() {
+					// The callback can run in the worker goroutine, so join it elsewhere.
+					go func() {
+						err := worker.Close(context.Background(), reason)
+						l.m.WithLock(func() {
+							if err != nil {
+								l.shutdownErr = errors.Join(l.shutdownErr, err)
+							}
+						})
+						l.workerCloseWG.Done()
+					}()
+				})
+			},
+			l.tracer,
+			l.listenerID,
+		)
+		worker.onLocalBufferDelta = l.changeLocalBuffer
+		worker.readerInfo = l.cfg.ReaderInfo
+		l.workers[key] = worker
 		l.workerCloseWG.Add(1)
 		worker.Start(l.background.Context())
-		started = true
 	})
-	if !started {
-		return nil
-	}
 
 	return worker
 }
@@ -776,13 +780,13 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 // routeToWorker routes a message to the appropriate worker.
 // It returns false if the worker was not found (caller may need to free buffer credit).
 func (l *streamListener) routeToWorker(
-	partitionSessionID rawtopicreader.PartitionSessionID,
+	session *topicreadercommon.PartitionSession,
 	routeFunc func(*PartitionWorker),
 ) bool {
 	// Find worker by session
 	var targetWorker *PartitionWorker
 	l.m.WithLock(func() {
-		targetWorker = l.workers[partitionSessionID]
+		targetWorker = l.workers[partitionKey{topic: session.Topic, id: session.PartitionID}]
 	})
 
 	if targetWorker != nil {

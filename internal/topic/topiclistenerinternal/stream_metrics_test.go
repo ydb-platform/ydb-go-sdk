@@ -200,14 +200,14 @@ func TestStreamListener_LocalBufferRollbackAfterFinalization(t *testing.T) {
 		session,
 		listener,
 		listener.handler,
-		listener.onWorkerStopped,
+		func(rawtopicreader.PartitionSessionID, error) {},
 		listener.tracer,
 		listener.listenerID,
 	)
 	worker.onLocalBufferDelta = listener.changeLocalBuffer
 	worker.readerInfo = listener.cfg.ReaderInfo
 	listener.m.WithLock(func() {
-		listener.workers[session.StreamPartitionSessionID] = worker
+		listener.workers[partitionKey{topic: session.Topic, id: session.PartitionID}] = worker
 	})
 
 	require.NoError(t, listener.splitAndRouteReadResponse(listenerMetricResponse(session, 50)))
