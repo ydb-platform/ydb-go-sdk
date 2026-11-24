@@ -29,6 +29,7 @@ type CreateTopicRequest struct {
 
 func (req *CreateTopicRequest) ToProto() *Ydb_Topic.CreateTopicRequest {
 	proto := &Ydb_Topic.CreateTopicRequest{
+		OperationParams:      req.OperationParams.ToProto(),
 		Path:                 req.Path,
 		PartitioningSettings: req.PartitioningSettings.ToProto(),
 	}
