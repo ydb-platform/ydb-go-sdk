@@ -1538,6 +1538,16 @@ func TestSQLNullTypes(t *testing.T) {
 			src:      sql.Null[[]byte]{V: nil, Valid: false},
 			expected: value.NullValue(types.Bytes),
 		},
+		{
+			name:     "sql.Null[uuid.UUID] valid",
+			src:      sql.Null[uuid.UUID]{V: uuid.UUID{1, 2, 3}, Valid: true},
+			expected: value.OptionalValue(value.Uuid(uuid.UUID{1, 2, 3})),
+		},
+		{
+			name:     "sql.Null[uuid.UUID] invalid",
+			src:      sql.Null[uuid.UUID]{V: uuid.UUID{}, Valid: false},
+			expected: value.NullValue(types.UUID),
+		},
 	}
 
 	for _, tt := range tests {

@@ -195,6 +195,8 @@ func toType(v any) (_ types.Type, err error) { //nolint:funlen,gocyclo
 		return types.Bytes, nil
 	case string:
 		return types.Text, nil
+	case uuid.UUID:
+		return types.UUID, nil
 	case [16]byte:
 		return nil, xerrors.Wrap(value.ErrIssue1501BadUUID)
 	case time.Time:
