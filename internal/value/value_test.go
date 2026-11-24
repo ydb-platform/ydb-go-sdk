@@ -1810,6 +1810,7 @@ func TestZeroValue(t *testing.T) {
 	t.Run("Dict", func(t *testing.T) {
 		v := ZeroValue(types.NewDict(types.Int32, types.Text))
 		require.NotNil(t, v)
+		require.Equal(t, "Dict<Int32,Utf8>", v.Type().Yql())
 	})
 
 	t.Run("EmptyDict", func(t *testing.T) {
