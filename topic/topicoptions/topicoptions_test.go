@@ -154,6 +154,32 @@ func TestAlterConsumerWithSupportedCodecsSetsCodecs(t *testing.T) {
 	)
 }
 
+func TestAlterAutoPartitioningWriteSpeedOptionsDoNotSetStrategy(t *testing.T) {
+	// Altering a write speed property must not send set_strategy,
+	// otherwise the server replaces the topic's existing auto partitioning strategy.
+	for _, opt := range []AlterOption{
+		AlterWithAutoPartitioningWriteSpeedStabilizationWindow(time.Minute),
+		AlterWithAutoPartitioningWriteSpeedUpUtilizationPercent(80),
+		AlterWithAutoPartitioningWriteSpeedDownUtilizationPercent(20),
+	} {
+		req := &rawtopic.AlterTopicRequest{}
+		opt.ApplyAlterOption(req)
+
+		proto := req.ToProto().GetAlterPartitioningSettings().GetAlterAutoPartitioningSettings()
+		require.NotNil(t, proto.GetSetPartitionWriteSpeed())
+		require.Nil(t, proto.SetStrategy)
+	}
+}
+
+func TestAlterWithAutoPartitioningStrategySetsStrategy(t *testing.T) {
+	req := &rawtopic.AlterTopicRequest{}
+	AlterWithAutoPartitioningStrategy(topictypes.AutoPartitioningStrategyDisabled).ApplyAlterOption(req)
+
+	proto := req.ToProto().GetAlterPartitioningSettings().GetAlterAutoPartitioningSettings()
+	require.NotNil(t, proto.SetStrategy)
+	require.Equal(t, int32(topictypes.AutoPartitioningStrategyDisabled), int32(proto.GetSetStrategy()))
+}
+
 func TestEqualCreateOptions(t *testing.T) {
 	for _, tt := range []struct {
 		lhs []CreateOption

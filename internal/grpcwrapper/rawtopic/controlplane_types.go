@@ -172,12 +172,15 @@ func (s *AlterAutoPartitioningSettings) ToProto() *Ydb_Topic.AlterAutoPartitioni
 	if s == nil {
 		return nil
 	}
-	strategy := s.SetStrategy.ToProto()
-
-	return &Ydb_Topic.AlterAutoPartitioningSettings{
-		SetStrategy:            &strategy,
+	proto := &Ydb_Topic.AlterAutoPartitioningSettings{
 		SetPartitionWriteSpeed: s.SetPartitionWriteSpeed.ToProto(),
 	}
+	if s.SetStrategy != AutoPartitioningStrategyUnspecified {
+		strategy := s.SetStrategy.ToProto()
+		proto.SetStrategy = &strategy
+	}
+
+	return proto
 }
 
 type AlterAutoPartitioningWriteSpeedStrategy struct {
