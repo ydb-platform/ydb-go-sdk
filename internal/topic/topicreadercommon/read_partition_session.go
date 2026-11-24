@@ -63,14 +63,8 @@ func (s *PartitionSession) SetContext(ctx context.Context) {
 }
 
 func (s *PartitionSession) Close() {
-	s.Retire()
-	s.ctxCancel()
-}
-
-// Retire ends partition ownership without canceling the callback context.
-// A listener can still receive a forced notification after a graceful stop.
-func (s *PartitionSession) Retire() {
 	s.retired.Store(true)
+	s.ctxCancel()
 }
 
 func (s *PartitionSession) CommittedOffset() rawtopiccommon.Offset {
