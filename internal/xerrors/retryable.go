@@ -152,6 +152,32 @@ type unretryableError struct {
 	error
 }
 
+func (e unretryableError) Code() int32 {
+	var err Error
+	if As(e.error, &err) {
+		return err.Code()
+	}
+
+	return -1
+}
+
+func (e unretryableError) Name() string {
+	var err Error
+	if As(e.error, &err) {
+		return "unretryable/" + err.Name()
+	}
+
+	return "unretryable/CUSTOM"
+}
+
+func (e unretryableError) Type() Type {
+	return TypeNonRetryable
+}
+
+func (e unretryableError) BackoffType() backoff.Type {
+	return backoff.TypeInstant
+}
+
 func (e unretryableError) Unwrap() error {
 	return e.error
 }
