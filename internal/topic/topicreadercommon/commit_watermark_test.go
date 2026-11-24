@@ -25,18 +25,37 @@ func TestCommitMessageTrackerInterleavedSubmissions(t *testing.T) {
 	require.EqualValues(t, 5, tracker.Acknowledge(1024))
 }
 
+func TestCommitMessageTrackerWideSpans(t *testing.T) {
+	var queued []trace.TopicReaderCommitQueuedInfo
+	session := newCommitMetricsTestSession(t, &trace.Topic{
+		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
+			queued = append(queued, info)
+		},
+	})
+	const width int64 = 1 << 32
+	r := CommitRange{PartitionSession: session, CommitOffsetEnd: 1 << 32}
+	TraceCommitQueued(session.Context(), r)
+	c := NewCommitterStopped(&trace.Topic{}, session.Context(), CommitModeAsync, nil)
+	t.Cleanup(func() { require.NoError(t, c.Close(context.Background(), errors.New("test complete"))) })
+	c.NewCommitRequest(r).Confirm()
+	require.Len(t, queued, 2)
+	require.Equal(t, width, queued[0].MessagesCount)
+	require.Equal(t, width, queued[1].MessagesCount)
+	require.Equal(t, 2*width, RegisterCommitAcknowledged(session, r.CommitOffsetEnd))
+}
+
 func TestCommitAtWatermarkDoesNotAwaitAnotherMetricAck(t *testing.T) {
 	for _, mode := range []string{"async", "confirm", "wait"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx := context.Background()
-			var queued int
+			var queued int64
 			tracer := &trace.Topic{OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
 				queued += info.MessagesCount
 			}}
 			session := newCommitMetricsTestSession(t, tracer)
 			r := CommitRange{PartitionSession: session, CommitOffsetStart: 0, CommitOffsetEnd: 5}
 			TraceCommitQueued(ctx, r)
-			require.Equal(t, 5, RegisterCommitAcknowledged(session, 5))
+			require.Equal(t, int64(5), RegisterCommitAcknowledged(session, 5))
 			session.SetCommittedOffsetForward(5)
 			var sent []rawtopicreader.ClientMessage
 			c := NewCommitterStopped(&trace.Topic{}, ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
@@ -61,7 +80,7 @@ func TestCommitAtWatermarkDoesNotAwaitAnotherMetricAck(t *testing.T) {
 				require.Equal(t, int64(5), sent[0].(*rawtopicreader.CommitOffsetRequest).CommitOffsets[0].Offsets[0].End.ToInt64())
 			}
 			// No new server response is required for an already covered range.
-			require.Equal(t, 5, queued)
+			require.Equal(t, int64(5), queued)
 			require.Zero(t, RegisterCommitAcknowledged(session, 6))
 		})
 	}

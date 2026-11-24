@@ -74,7 +74,7 @@ func TestCommitterOnCommitNotifyOnlyWakesWaiters(t *testing.T) {
 		CommitOffsetStart: 1,
 		CommitOffsetEnd:   2,
 	}
-	require.Equal(t, 1, RegisterCommitQueued(commitRange))
+	require.Equal(t, int64(1), RegisterCommitQueued(commitRange))
 
 	committer := NewCommitterStopped(&trace.Topic{}, context.Background(), CommitModeSync, nil)
 	waiter := newCommitWaiter(session, 2)
@@ -91,7 +91,7 @@ func TestCommitterOnCommitNotifyOnlyWakesWaiters(t *testing.T) {
 	require.Zero(t, notified)
 	// ACK registration belongs to the stream caller and remains available after
 	// the waiter notification.
-	require.Equal(t, 1, RegisterCommitAcknowledged(session, 2))
+	require.Equal(t, int64(1), RegisterCommitAcknowledged(session, 2))
 }
 
 func TestCommitterFlushWaitsForConcurrentFlush(t *testing.T) {

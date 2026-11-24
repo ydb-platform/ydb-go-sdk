@@ -36,7 +36,7 @@ func TestCommitRangeBoundariesSurviveBatchOperationsAndPublicMutation(t *testing
 	require.NoError(t, err)
 	require.Equal(t, rawtopiccommon.Offset(0), GetCommitRange(batch).CommitOffsetStart)
 	require.Equal(t, rawtopiccommon.Offset(15), GetCommitRange(batch).CommitOffsetEnd)
-	require.Equal(t, 15, RegisterCommitQueued(GetCommitRange(batch)))
+	require.Equal(t, int64(15), RegisterCommitQueued(GetCommitRange(batch)))
 
 	batch.Messages[0].Offset = 100
 	batch.Messages[1].Offset = 101
@@ -129,7 +129,7 @@ func TestPublicMessageBuilderPreservesCommitRangeBoundaries(t *testing.T) {
 		Build()
 	require.Equal(t, rawtopiccommon.Offset(21), GetCommitRange(message).CommitOffsetStart)
 	require.Equal(t, rawtopiccommon.Offset(27), GetCommitRange(message).CommitOffsetEnd)
-	require.Equal(t, 6, RegisterCommitQueued(GetCommitRange(message)))
+	require.Equal(t, int64(6), RegisterCommitQueued(GetCommitRange(message)))
 }
 
 func TestCommitTraceUsesRangeCountsAndCoveredRangesAcknowledgements(t *testing.T) {
@@ -148,9 +148,9 @@ func TestCommitTraceUsesRangeCountsAndCoveredRangesAcknowledgements(t *testing.T
 	TraceCommitQueued(session.Context(), second)
 	TraceCommitQueued(session.Context(), overlapping)
 	require.Len(t, queued, 3)
-	require.Equal(t, 6, queued[0].MessagesCount)
-	require.Equal(t, 6, queued[1].MessagesCount)
-	require.Equal(t, 6, queued[2].MessagesCount)
+	require.Equal(t, int64(6), queued[0].MessagesCount)
+	require.Equal(t, int64(6), queued[1].MessagesCount)
+	require.Equal(t, int64(6), queued[2].MessagesCount)
 	require.Equal(t, "endpoint", queued[0].ReaderInfo.Endpoint)
 	require.Equal(t, "database", queued[0].ReaderInfo.Database)
 	require.Equal(t, "consumer", queued[0].ReaderInfo.Consumer)
@@ -159,10 +159,10 @@ func TestCommitTraceUsesRangeCountsAndCoveredRangesAcknowledgements(t *testing.T
 	require.Equal(t, int64(2), queued[0].PartitionSessionID)
 
 	require.Zero(t, RegisterCommitAcknowledged(session, 14))
-	require.Equal(t, 12, RegisterCommitAcknowledged(session, 16))
+	require.Equal(t, int64(12), RegisterCommitAcknowledged(session, 16))
 	require.Zero(t, RegisterCommitAcknowledged(session, 16))
 	require.Zero(t, RegisterCommitAcknowledged(session, 19))
-	require.Equal(t, 6, RegisterCommitAcknowledged(session, 20))
+	require.Equal(t, int64(6), RegisterCommitAcknowledged(session, 20))
 	session.Close()
 	TraceCommitQueued(session.Context(), first)
 	require.Len(t, queued, 3)
@@ -180,11 +180,11 @@ func TestQueuedRegistrationPrecedesTraceEmission(t *testing.T) {
 	commitRange := GetCommitRange(message)
 
 	messagesCount := RegisterCommitQueued(commitRange)
-	require.Equal(t, 1, messagesCount)
-	require.Equal(t, 1, RegisterCommitAcknowledged(session, 11))
+	require.Equal(t, int64(1), messagesCount)
+	require.Equal(t, int64(1), RegisterCommitAcknowledged(session, 11))
 	require.Zero(t, queued)
 
-	TraceCommitQueuedAfterRegistration(session.Context(), commitRange, messagesCount)
+	traceCommitQueued(session.Context(), commitRange, messagesCount)
 	require.Equal(t, 1, queued)
 	require.Zero(t, RegisterCommitAcknowledged(session, 11))
 }
@@ -196,8 +196,8 @@ func TestCommitAcknowledgedRegistrationStopsAfterClose(t *testing.T) {
 	message := NewPublicMessageBuilder().PartitionSession(session).Offset(10).Build()
 	commitRange := GetCommitRange(message)
 
-	require.Equal(t, 1, RegisterCommitQueued(commitRange))
-	require.Equal(t, 1, RegisterCommitAcknowledged(session, 11))
+	require.Equal(t, int64(1), RegisterCommitQueued(commitRange))
+	require.Equal(t, int64(1), RegisterCommitAcknowledged(session, 11))
 	session.SetCommittedOffsetForward(11)
 	session.Close()
 	require.Zero(t, RegisterCommitAcknowledged(session, 12))
@@ -331,7 +331,7 @@ func TestCommitterQueueTraceCanReenterLazyRequest(t *testing.T) {
 	require.Equal(t, int32(1), sends.Load())
 	queuedInfo := xtest.Receive(t, queued, "queued commit metric")
 	require.Empty(t, queued)
-	require.Equal(t, 1, queuedInfo.MessagesCount)
+	require.Equal(t, int64(1), queuedInfo.MessagesCount)
 }
 
 func TestCommitMessageTrackerCountsRangeLengths(t *testing.T) {
@@ -341,10 +341,10 @@ func TestCommitMessageTrackerCountsRangeLengths(t *testing.T) {
 	require.Zero(t, tracker.Queue(0, 9))
 	require.Zero(t, tracker.Acknowledge(10))
 
-	require.Equal(t, 4, tracker.Queue(10, 14))
-	require.Equal(t, 4, tracker.Queue(10, 14))
+	require.Equal(t, int64(4), tracker.Queue(10, 14))
+	require.Equal(t, int64(4), tracker.Queue(10, 14))
 	require.Zero(t, tracker.Acknowledge(12))
-	require.Equal(t, 8, tracker.Acknowledge(14))
+	require.Equal(t, int64(8), tracker.Acknowledge(14))
 	require.Zero(t, tracker.Acknowledge(14))
 	require.Zero(t, tracker.Acknowledge(13))
 	require.Zero(t, tracker.Queue(10, 13))
@@ -356,21 +356,21 @@ func TestCommitMessageTrackerCountsRangeLengths(t *testing.T) {
 func TestCommitMessageTrackerHandlesCoveredRangesAndEqualWatermark(t *testing.T) {
 	tracker := newCommitMessageTracker(10)
 
-	require.Equal(t, 4, tracker.Queue(10, 14))
-	require.Equal(t, 4, tracker.Acknowledge(14))
+	require.Equal(t, int64(4), tracker.Queue(10, 14))
+	require.Equal(t, int64(4), tracker.Acknowledge(14))
 	// A submission already covered by the watermark needs no second ACK.
 	require.Zero(t, tracker.Queue(10, 14))
 	require.Zero(t, tracker.Acknowledge(14))
-	require.Equal(t, 4, tracker.Queue(14, 18))
+	require.Equal(t, int64(4), tracker.Queue(14, 18))
 	require.Zero(t, tracker.Acknowledge(14))
-	require.Equal(t, 4, tracker.Acknowledge(18))
+	require.Equal(t, int64(4), tracker.Acknowledge(18))
 
 	// A higher pending range must not hide a fully covered lower range.
 	tracker = newCommitMessageTracker(0)
-	require.Equal(t, 10, tracker.Queue(10, 20))
-	require.Equal(t, 10, tracker.Queue(0, 10))
-	require.Equal(t, 10, tracker.Acknowledge(10))
-	require.Equal(t, 10, tracker.Acknowledge(20))
+	require.Equal(t, int64(10), tracker.Queue(10, 20))
+	require.Equal(t, int64(10), tracker.Queue(0, 10))
+	require.Equal(t, int64(10), tracker.Acknowledge(10))
+	require.Equal(t, int64(10), tracker.Acknowledge(20))
 }
 
 func TestCommitMessageTrackerRejectsInvalidRangesAndCloses(t *testing.T) {
@@ -380,7 +380,7 @@ func TestCommitMessageTrackerRejectsInvalidRangesAndCloses(t *testing.T) {
 	require.Zero(t, tracker.Queue(2, 1))
 	require.Zero(t, tracker.Acknowledge(0))
 	require.Zero(t, tracker.Acknowledge(1))
-	require.Equal(t, 1, tracker.Queue(10, 11))
+	require.Equal(t, int64(1), tracker.Queue(10, 11))
 	tracker.Close()
 	tracker.Close()
 
@@ -406,7 +406,7 @@ func TestCommitMessageTrackerConcurrentQueueAcknowledgeClose(t *testing.T) {
 
 			for i := range messagesPerWorker {
 				startOffset := rawtopiccommon.Offset(worker*messagesPerWorker + i + 1)
-				queued.Add(int64(tracker.Queue(startOffset, startOffset+1)))
+				queued.Add(tracker.Queue(startOffset, startOffset+1))
 			}
 		}()
 	}
@@ -420,7 +420,7 @@ func TestCommitMessageTrackerConcurrentQueueAcknowledgeClose(t *testing.T) {
 	for range workers {
 		go func() {
 			defer acknowledgeWG.Done()
-			acknowledged.Add(int64(tracker.Acknowledge(workers*messagesPerWorker + 1)))
+			acknowledged.Add(tracker.Acknowledge(workers*messagesPerWorker + 1))
 		}()
 	}
 	xtest.WaitGroup(t, &acknowledgeWG)
@@ -435,14 +435,14 @@ func TestCommitMessageTrackerConcurrentQueueAcknowledgeClose(t *testing.T) {
 		go func() {
 			defer lateWG.Done()
 			<-lateStart
-			lateQueued.Add(int64(tracker.Queue(1, 2)))
+			lateQueued.Add(tracker.Queue(1, 2))
 		}()
 	}
 	for range workers {
 		go func() {
 			defer lateWG.Done()
 			<-lateStart
-			lateAcknowledged.Add(int64(tracker.Acknowledge(workers*messagesPerWorker + 2)))
+			lateAcknowledged.Add(tracker.Acknowledge(workers*messagesPerWorker + 2))
 		}()
 	}
 	closeWG.Add(1)

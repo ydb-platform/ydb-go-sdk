@@ -249,8 +249,8 @@ func TestTopicReader_CommitMetricsRegisterBeforeSynchronousAckAndClose(t *testin
 	require.Equal(t, test.env.partitionSessionID, request.CommitOffsets[0].PartitionSessionID)
 	require.Equal(t, rawtopiccommon.NewOffset(20), request.CommitOffsets[0].Offsets[0].Start)
 	require.Equal(t, rawtopiccommon.NewOffset(25), request.CommitOffsets[0].Offsets[0].End)
-	require.Equal(t, 5, readerMetricDelta(t, test.queued))
-	require.Equal(t, 5, readerMetricDelta(t, test.acknowledged))
+	require.Equal(t, int64(5), readerMetricDelta(t, test.queued))
+	require.Equal(t, int64(5), readerMetricDelta(t, test.acknowledged))
 	select {
 	case committedOffset := <-committedOffsets:
 		require.Equal(t, int64(25), committedOffset)
@@ -271,10 +271,10 @@ func TestTopicReader_CommitMetricsIgnoreDuplicateAndStaleAcknowledgements(t *tes
 	test.env.stream.EXPECT().Send(gomock.AssignableToTypeOf(&rawtopicreader.CommitOffsetRequest{})).
 		Return(nil)
 	require.NoError(t, test.reader.Commit(test.env.ctx, test.batch))
-	require.Equal(t, 5, readerMetricDelta(t, test.queued))
+	require.Equal(t, int64(5), readerMetricDelta(t, test.queued))
 	require.NoError(t, test.env.reader.onCommitResponse(readerMetricCommitResponse(test.env, 25)))
-	require.Equal(t, 5, readerMetricDelta(t, test.acknowledged))
-	require.Equal(t, 5, readerMetricDelta(t, test.notifications))
+	require.Equal(t, int64(5), readerMetricDelta(t, test.acknowledged))
+	require.Equal(t, int64(5), readerMetricDelta(t, test.notifications))
 
 	// Direct calls provide a processing barrier for duplicate and stale ACKs.
 	require.NoError(t, test.env.reader.onCommitResponse(readerMetricCommitResponse(test.env, 25)))
@@ -292,7 +292,7 @@ func TestTopicReader_CommitNotifyWithoutQueuedTracing(t *testing.T) {
 		Consumer:   "consumer",
 		ReaderName: "reader",
 	}
-	notifications := make(chan int, 1)
+	notifications := make(chan int64, 1)
 	e.reader.cfg.Trace = &trace.Topic{
 		OnReaderCommittedNotify: func(info trace.TopicReaderCommittedNotifyInfo) {
 			notifications <- info.MessagesCount
@@ -422,9 +422,9 @@ type readerCommitMetricsTest struct {
 	env           *streamEnv
 	reader        *Reader
 	batch         *topicreadercommon.PublicBatch
-	queued        chan int
-	acknowledged  chan int
-	notifications chan int
+	queued        chan int64
+	acknowledged  chan int64
+	notifications chan int64
 }
 
 func newReaderCommitMetricsTest(t *testing.T) *readerCommitMetricsTest {
@@ -437,9 +437,9 @@ func newReaderCommitMetricsTest(t *testing.T) *readerCommitMetricsTest {
 		Consumer:   "consumer",
 		ReaderName: "reader",
 	}
-	queued := make(chan int, 4)
-	acknowledged := make(chan int, 4)
-	notifications := make(chan int, 8)
+	queued := make(chan int64, 4)
+	acknowledged := make(chan int64, 4)
+	notifications := make(chan int64, 8)
 	e.reader.cfg.Trace = &trace.Topic{
 		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
 			queued <- info.MessagesCount
@@ -526,7 +526,7 @@ func readerMetricCommitRequest(
 	}
 }
 
-func readerMetricDelta(t *testing.T, deltas <-chan int) int {
+func readerMetricDelta[T int | int64](t *testing.T, deltas <-chan T) T {
 	t.Helper()
 
 	select {
@@ -539,7 +539,7 @@ func readerMetricDelta(t *testing.T, deltas <-chan int) int {
 	}
 }
 
-func readerMetricNoDelta(t *testing.T, deltas <-chan int) {
+func readerMetricNoDelta[T int | int64](t *testing.T, deltas <-chan T) {
 	t.Helper()
 
 	select {

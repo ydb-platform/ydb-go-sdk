@@ -240,9 +240,9 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 		require.Equal(t, rawtopiccommon.NewOffset(0), request.CommitOffsets[0].Offsets[0].Start)
 		require.Equal(t, rawtopiccommon.NewOffset(5), request.CommitOffsets[0].Offsets[0].End)
 		// The wire range is checked above as [0, 5), so its span is five.
-		require.Equal(t, 5, listenerMetricDelta(t, queued))
-		require.Equal(t, 5, listenerMetricDelta(t, acknowledged))
-		require.Equal(t, 5, listenerMetricDelta(t, notifications))
+		require.Equal(t, int64(5), listenerMetricDelta(t, queued))
+		require.Equal(t, int64(5), listenerMetricDelta(t, acknowledged))
+		require.Equal(t, int64(5), listenerMetricDelta(t, notifications))
 		require.NoError(t, listener.onCommitResponse(listenerMetricCommitResponse(session, rawydb.StatusSuccess, 5)))
 		require.Zero(t, listenerMetricDelta(t, notifications))
 		require.NoError(t, listener.onCommitResponse(listenerMetricCommitResponse(session, rawydb.StatusSuccess, 4)))
@@ -272,9 +272,9 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 
 		event := NewPublicReadMessages(session.ToPublic(), batch, listener)
 		require.NoError(t, event.ConfirmWithAck(ctx))
-		require.Equal(t, 5, listenerMetricDelta(t, queued))
-		require.Equal(t, 5, listenerMetricDelta(t, acknowledged))
-		require.Equal(t, 5, listenerMetricDelta(t, notifications))
+		require.Equal(t, int64(5), listenerMetricDelta(t, queued))
+		require.Equal(t, int64(5), listenerMetricDelta(t, acknowledged))
+		require.Equal(t, int64(5), listenerMetricDelta(t, notifications))
 		require.NoError(t, listener.Close(ctx, errors.New("test close")))
 		topicreadercommon.TraceCommitQueued(ctx, topicreadercommon.GetCommitRange(batch))
 		listenerMetricNoDelta(t, queued)
@@ -298,7 +298,7 @@ func TestStreamListener_CommitNotifyWithoutQueuedTracing(t *testing.T) {
 			Listener:   true,
 		},
 	}
-	notifications := make(chan int, 1)
+	notifications := make(chan int64, 1)
 	listener.tracer = &trace.Topic{
 		OnReaderCommittedNotify: func(info trace.TopicReaderCommittedNotifyInfo) {
 			notifications <- info.MessagesCount
@@ -466,7 +466,7 @@ func TestStreamListenerStartCommitOverridePreservesSessionOffsets(t *testing.T) 
 func setupListenerCommitMetrics(
 	t *testing.T,
 	listener *streamListener,
-) (queued, acknowledged, notifications chan int) {
+) (queued, acknowledged, notifications chan int64) {
 	t.Helper()
 
 	t.Cleanup(func() {
@@ -481,9 +481,9 @@ func setupListenerCommitMetrics(
 			ReaderName: "reader",
 		},
 	}
-	queued = make(chan int, 4)
-	acknowledged = make(chan int, 4)
-	notifications = make(chan int, 8)
+	queued = make(chan int64, 4)
+	acknowledged = make(chan int64, 4)
+	notifications = make(chan int64, 8)
 	listener.tracer = &trace.Topic{
 		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
 			queued <- info.MessagesCount
@@ -603,7 +603,7 @@ func listenerMetricCommitResponse(
 	}
 }
 
-func listenerMetricDelta(t *testing.T, deltas <-chan int) int {
+func listenerMetricDelta[T int | int64](t *testing.T, deltas <-chan T) T {
 	t.Helper()
 
 	select {
@@ -616,7 +616,7 @@ func listenerMetricDelta(t *testing.T, deltas <-chan int) int {
 	}
 }
 
-func listenerMetricNoDelta(t *testing.T, deltas <-chan int) {
+func listenerMetricNoDelta[T int | int64](t *testing.T, deltas <-chan T) {
 	t.Helper()
 
 	select {

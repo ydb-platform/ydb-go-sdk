@@ -113,7 +113,7 @@ func (c *Committer) Commit(ctx context.Context, commitRange CommitRange) error {
 
 func (c *Committer) pushCommit(commitRange CommitRange) (commitWaiter, error) {
 	var resErr error
-	var messagesCount int
+	var messagesCount int64
 	waiter := newCommitWaiter(commitRange.PartitionSession, commitRange.CommitOffsetEnd)
 	c.m.WithLock(func() {
 		if err := c.backgroundWorker.Context().Err(); err != nil {
@@ -136,7 +136,7 @@ func (c *Committer) pushCommit(commitRange CommitRange) (commitWaiter, error) {
 	if commitRange.PartitionSession != nil {
 		traceCtx = commitRange.PartitionSession.Context()
 	}
-	TraceCommitQueuedAfterRegistration(traceCtx, commitRange, messagesCount)
+	traceCommitQueued(traceCtx, commitRange, messagesCount)
 
 	select {
 	case c.commitLoopSignal <- struct{}{}:
@@ -161,7 +161,7 @@ func (c *Committer) pushRequest(request *commitRequest) int {
 	}
 
 	var resErr error
-	var messagesCount int
+	var messagesCount int64
 	c.m.WithLock(func() {
 		if err := c.backgroundWorker.Context().Err(); err != nil {
 			resErr = err
@@ -183,7 +183,11 @@ func (c *Committer) pushRequest(request *commitRequest) int {
 	default:
 	}
 
-	return messagesCount
+	if messagesCount == 0 {
+		return 0
+	}
+
+	return 1
 }
 
 func (c *Committer) pushCommitsLoop(ctx context.Context) {

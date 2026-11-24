@@ -40,18 +40,18 @@ func (s *PartitionSession) SetupCommitMetrics(tracer *trace.Topic, readerInfo Re
 	}
 }
 
-func commitRangeMessageCount(start, end rawtopiccommon.Offset) int {
+func commitRangeMessageCount(start, end rawtopiccommon.Offset) int64 {
 	if end <= start {
 		return 0
 	}
 
-	return int(end - start)
+	return int64(end - start)
 }
 
 // RegisterCommitQueued records an accepted commit and returns its range span.
 // Callers that need to synchronize admission with another lock must call this
 // before making the commit visible to a sender.
-func RegisterCommitQueued(commitRange CommitRange) int {
+func RegisterCommitQueued(commitRange CommitRange) int64 {
 	session := commitRange.PartitionSession
 	if session == nil || session.commitMetrics == nil {
 		return 0
@@ -69,13 +69,18 @@ func RegisterCommitQueued(commitRange CommitRange) int {
 // caller-owned admission lock is held.
 func TraceCommitQueued(ctx context.Context, commitRange CommitRange) {
 	messagesCount := RegisterCommitQueued(commitRange)
-	TraceCommitQueuedAfterRegistration(ctx, commitRange, messagesCount)
+	traceCommitQueued(ctx, commitRange, messagesCount)
 }
 
-// TraceCommitQueuedAfterRegistration emits the queued event after the caller
-// has registered the commit with RegisterCommitQueued. The callback runs
-// outside the caller's admission lock.
-func TraceCommitQueuedAfterRegistration(ctx context.Context, commitRange CommitRange, messagesCount int) {
+// TraceCommitQueuedAfterRegistration emits the lazy request's event outside its
+// startOnce. The admission result is a flag, not a protocol offset span.
+func TraceCommitQueuedAfterRegistration(ctx context.Context, commitRange CommitRange, registered int) {
+	if registered != 0 {
+		traceCommitQueued(ctx, commitRange, int64(commitRange.CommitOffsetEnd-commitRange.CommitOffsetStart))
+	}
+}
+
+func traceCommitQueued(ctx context.Context, commitRange CommitRange, messagesCount int64) {
 	session := commitRange.PartitionSession
 	if session == nil || session.commitMetrics == nil {
 		return
@@ -100,7 +105,7 @@ func TraceCommitQueuedAfterRegistration(ctx context.Context, commitRange CommitR
 // RegisterCommitAcknowledged records a successful commit acknowledgement and
 // returns only the newly completed range span. It publishes the new watermark
 // before returning, so callers may now wake commit waiters.
-func RegisterCommitAcknowledged(session *PartitionSession, exclusiveOffset rawtopiccommon.Offset) int {
+func RegisterCommitAcknowledged(session *PartitionSession, exclusiveOffset rawtopiccommon.Offset) int64 {
 	if session == nil {
 		return 0
 	}
@@ -145,14 +150,14 @@ const (
 type commitMetricRange struct {
 	key   uint64 // representative key for the shared high bits
 	shift int    // bit position of this radix digit
-	sum   int
-	count [radixSize]int
+	sum   int64
+	count [radixSize]int64
 	child [radixSize]*commitMetricRange
 }
 
 // Each level indexes one hex digit of the exclusive end. Adjacent commits
 // share a leaf; sparse offsets branch only at digits where their keys differ.
-func (r *commitMetricRange) insert(key uint64, count int) *commitMetricRange {
+func (r *commitMetricRange) insert(key uint64, count int64) *commitMetricRange {
 	if r == nil {
 		r = &commitMetricRange{key: key}
 	} else if width := bits.Len64(key ^ r.key); width > r.shift+radixBits {
@@ -172,7 +177,7 @@ func (r *commitMetricRange) insert(key uint64, count int) *commitMetricRange {
 }
 
 // Drop covered slots as units. Only the boundary slot can be partly covered.
-func (r *commitMetricRange) acknowledge(key uint64) (*commitMetricRange, int) {
+func (r *commitMetricRange) acknowledge(key uint64) (*commitMetricRange, int64) {
 	if r == nil {
 		return nil, 0
 	}
@@ -183,7 +188,7 @@ func (r *commitMetricRange) acknowledge(key uint64) (*commitMetricRange, int) {
 		return r, 0
 	}
 	i := (key >> r.shift) % radixSize
-	covered := 0
+	var covered int64
 	for j := range i {
 		covered += r.count[j]
 		r.count[j], r.child[j] = 0, nil
@@ -205,7 +210,7 @@ func (r *commitMetricRange) acknowledge(key uint64) (*commitMetricRange, int) {
 // Queue records a submitted commit range and returns its offset span. Ranges
 // ending at or before the committed watermark are already complete; they
 // need no new ACK and must not contribute to either counter.
-func (t *commitMessageTracker) Queue(start, end rawtopiccommon.Offset) int {
+func (t *commitMessageTracker) Queue(start, end rawtopiccommon.Offset) int64 {
 	count := commitRangeMessageCount(start, end)
 	if count == 0 {
 		return 0
@@ -226,11 +231,11 @@ func (t *commitMessageTracker) Queue(start, end rawtopiccommon.Offset) int {
 // Acknowledge advances the exclusive committed offset and returns the sum of
 // all pending ranges fully covered by it. Equal and backward
 // acknowledgements cannot complete any new range.
-func (t *commitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset) int {
+func (t *commitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset) int64 {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	var acknowledged int
+	var acknowledged int64
 	t.pending, acknowledged = t.pending.acknowledge(uint64(exclusiveOffset) ^ (1 << 63))
 
 	t.session.SetCommittedOffsetForward(exclusiveOffset)

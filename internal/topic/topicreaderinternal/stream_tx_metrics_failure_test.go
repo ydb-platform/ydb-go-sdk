@@ -17,8 +17,8 @@ func TestTopicStreamReader_PopMessagesBatchTxReleasesBufferWhenMaterializationFa
 	localDeltas := make(chan int, 4)
 	received := make(chan int, 1)
 	delivered := make(chan int, 1)
-	queued := make(chan int, 1)
-	acknowledged := make(chan int, 1)
+	queued := make(chan int64, 1)
+	acknowledged := make(chan int64, 1)
 	sessionErrors := make(chan trace.TopicReaderSessionErrorInfo, 4)
 	e.reader.cfg.Trace = &trace.Topic{
 		OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {

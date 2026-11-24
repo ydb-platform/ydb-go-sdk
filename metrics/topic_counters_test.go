@@ -3,6 +3,7 @@ package metrics
 import (
 	"bytes"
 	"errors"
+	"math"
 	"strings"
 	"testing"
 
@@ -130,8 +131,8 @@ func TestTopicReaderCountersIgnoreNonPositiveDeltas(t *testing.T) {
 		tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{MessagesCount: count})
 		tracer.OnReaderReceiveDataResponse(readerBytesInfo(trace.TopicReaderInfo{}, count))
 		tracer.OnListenerReceiveMessage(listenerBytesInfo(trace.TopicReaderInfo{}, count, nil))
-		tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{MessagesCount: count})
-		tracer.OnReaderCommittedNotify(trace.TopicReaderCommittedNotifyInfo{MessagesCount: count})
+		tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{MessagesCount: int64(count)})
+		tracer.OnReaderCommittedNotify(trace.TopicReaderCommittedNotifyInfo{MessagesCount: int64(count)})
 	}
 	tracer.OnListenerReceiveMessage(listenerBytesInfo(trace.TopicReaderInfo{}, 10, errors.New("receive failed")))
 	require.Empty(t, capture.adds)
@@ -321,18 +322,18 @@ func TestTopicReaderCountersUseInt64AddForLargeDeltas(t *testing.T) {
 	tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
 		ReaderInfo:    readerInfo,
 		Topic:         "/topic",
-		MessagesCount: largeDelta,
+		MessagesCount: math.MaxInt64,
 	})
 	tracer.OnReaderCommittedNotify(trace.TopicReaderCommittedNotifyInfo{
 		ReaderInfo:    readerInfo,
 		Topic:         "/topic",
-		MessagesCount: largeDelta,
+		MessagesCount: math.MaxInt64,
 	})
 
 	require.Equal(t, map[string][]int64{
 		"ydb.topic.reader.received.bytes":      {int64(largeDelta)},
-		"ydb.topic.reader.commit.queued":       {int64(largeDelta)},
-		"ydb.topic.reader.commit.acknowledged": {int64(largeDelta)},
+		"ydb.topic.reader.commit.queued":       {math.MaxInt64},
+		"ydb.topic.reader.commit.acknowledged": {math.MaxInt64},
 	}, capture.adds)
 }
 
@@ -417,10 +418,10 @@ func TestTopicMetricsSeparateReaderAndListenerDetails(t *testing.T) {
 					ReaderInfo: readerInfo, BytesDelta: count,
 				})
 				tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
-					ReaderInfo: readerInfo, MessagesCount: count,
+					ReaderInfo: readerInfo, MessagesCount: int64(count),
 				})
 				tracer.OnReaderCommittedNotify(trace.TopicReaderCommittedNotifyInfo{
-					ReaderInfo: readerInfo, MessagesCount: count,
+					ReaderInfo: readerInfo, MessagesCount: int64(count),
 				})
 				for range count {
 					tracer.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{ReaderInfo: readerInfo})

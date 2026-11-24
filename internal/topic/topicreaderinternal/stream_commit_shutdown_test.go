@@ -22,7 +22,7 @@ func TestTopicReaderFinalCommitAcknowledgement(t *testing.T) {
 			e.reader.cfg.Trace = &trace.Topic{
 				OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {},
 				OnReaderCommittedNotify: func(info trace.TopicReaderCommittedNotifyInfo) {
-					received <- int64(info.MessagesCount)
+					received <- info.MessagesCount
 				},
 			}
 			e.partitionSession.SetupCommitMetrics(e.reader.cfg.Trace, e.reader.cfg.ReaderInfo)

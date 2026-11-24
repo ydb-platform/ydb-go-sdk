@@ -13,7 +13,7 @@ func TestAsyncCommitAfterTransactionCompletion(t *testing.T) {
 	e := newTopicReaderTestEnv(t)
 	var queued int64
 	e.partitionSession.SetupCommitMetrics(&trace.Topic{OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
-		queued += int64(info.MessagesCount)
+		queued += info.MessagesCount
 	}}, e.reader.cfg.ReaderInfo)
 	message := topicreadercommon.NewPublicMessageBuilder().PartitionSession(e.partitionSession).Offset(20).Build()
 	batch, err := topicreadercommon.NewBatch(e.partitionSession, []*topicreadercommon.PublicMessage{message})

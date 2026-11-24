@@ -193,7 +193,7 @@ func streamLabels(readerInfo trace.TopicReaderInfo) map[string]string {
 	}
 }
 
-func addCounter(counter Counter, delta int) {
+func addCounter[T int | int64](counter Counter, delta T) {
 	if delta <= 0 {
 		return
 	}

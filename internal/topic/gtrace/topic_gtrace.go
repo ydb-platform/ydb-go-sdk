@@ -2253,7 +2253,7 @@ func TopicOnReaderSendCommitMessage(t *trace.Topic, c *context.Context, commitsI
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderCommittedNotify(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, readerConnectionID string, topic string, partitionID int64, partitionSessionID int64, committedOffset int64, messagesCount int) {
+func TopicOnReaderCommittedNotify(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, readerConnectionID string, topic string, partitionID int64, partitionSessionID int64, committedOffset int64, messagesCount int64) {
 	var p trace.TopicReaderCommittedNotifyInfo
 	p.Context = c
 	p.ReaderInfo = readerInfo
@@ -2266,7 +2266,7 @@ func TopicOnReaderCommittedNotify(t *trace.Topic, c *context.Context, readerInfo
 	onReaderCommittedNotify(t, p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderCommitQueued(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, topic string, partitionID int64, partitionSessionID int64, messagesCount int) {
+func TopicOnReaderCommitQueued(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, topic string, partitionID int64, partitionSessionID int64, messagesCount int64) {
 	var p trace.TopicReaderCommitQueuedInfo
 	p.Context = c
 	p.ReaderInfo = readerInfo

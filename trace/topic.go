@@ -308,7 +308,7 @@ type (
 		PartitionSessionID int64
 		CommittedOffset    int64
 		// MessagesCount is zero when commit tracking is disabled by leaving OnReaderCommitQueued unset.
-		MessagesCount int
+		MessagesCount int64
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -393,7 +393,7 @@ type (
 		Topic              string
 		PartitionID        int64
 		PartitionSessionID int64
-		MessagesCount      int
+		MessagesCount      int64
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
