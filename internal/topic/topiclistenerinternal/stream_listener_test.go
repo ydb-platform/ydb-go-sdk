@@ -351,7 +351,7 @@ func TestStreamListenerMergeFailureKeepsBatchesSeparate(t *testing.T) {
 		},
 	)
 	worker := listener.createWorkerForPartition(session)
-	worker.AddRawServerMessage(&rawtopicreader.StartPartitionSessionRequest{})
+	worker.AddRawServerMessage(worker.partitionSession, &rawtopicreader.StartPartitionSessionRequest{})
 	xtest.WaitChannelClosed(t, entered)
 	first, err := topicreadercommon.NewBatch(session, nil)
 	require.NoError(t, err)
@@ -971,7 +971,7 @@ func TestStreamListenerBlockedSendBoundsPendingCommits(t *testing.T) {
 	enqueue := func() {
 		worker.AddMessagesBatch(metadata, createTestBatchWithBufferBytes(t, 1))
 		// Keep adjacent batches separate so each one creates its own commit request.
-		worker.AddRawServerMessage(&rawtopicreader.InitResponse{})
+		worker.AddRawServerMessage(worker.partitionSession, &rawtopicreader.InitResponse{})
 	}
 
 	enqueue()

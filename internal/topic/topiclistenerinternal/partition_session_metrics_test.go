@@ -4,16 +4,16 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/rekby/fixenv"
+	"github.com/rekby/fixenv/sf"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestListenerPartitionSessionCount(t *testing.T) {
@@ -46,15 +46,13 @@ func TestListenerMetricRegistrationFailureDoesNotConnect(t *testing.T) {
 func TestListenerPartitionSessionCountAfterProtocolStop(t *testing.T) {
 	for _, graceful := range []bool{true, false} {
 		t.Run(map[bool]string{true: "graceful", false: "forced"}[graceful], func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			storage := &topicreadercommon.PartitionSessionStorage{}
-			session := topicreadercommon.NewPartitionSession(ctx, "topic", 1, 1, "", 1, 1, 0)
-			t.Cleanup(session.Close)
-			require.NoError(t, storage.Add(session))
-			reconnector := &TopicListenerReconnector{streamListener: &streamListener{sessions: storage}}
+			e := fixenv.New(t)
+			ctx := sf.Context(e)
+			stream := StreamListener(e)
+			t.Cleanup(func() { require.NoError(t, stream.Close(xtest.Context(t), ErrUserCloseTopic)) })
+			reconnector := &TopicListenerReconnector{streamListener: stream}
 			var callback telemetry.Int64GaugeCallback
-			meter := func(_ telemetry.Descriptor, cb telemetry.Int64GaugeCallback) (func() error, error) {
+			stream.cfg.Metrics.Meter = func(_ telemetry.Descriptor, cb telemetry.Int64GaugeCallback) (func() error, error) {
 				callback = cb
 
 				return func() error {
@@ -64,7 +62,7 @@ func TestListenerPartitionSessionCountAfterProtocolStop(t *testing.T) {
 				}, nil
 			}
 			reg, err := topicreadercommon.RegisterPartitionSessionCount(
-				topicreadercommon.ReaderMetricsConfig{Meter: meter}, "consumer",
+				stream.cfg.Metrics, "consumer",
 				[]*topicreadercommon.PublicReadSelector{{Path: "topic"}}, reconnector.PartitionSessionCounts,
 			)
 			require.NoError(t, err)
@@ -79,66 +77,76 @@ func TestListenerPartitionSessionCountAfterProtocolStop(t *testing.T) {
 				return values[0]
 			}
 
-			handler := NewMockEventHandler(gomock.NewController(t))
+			handler := EventHandlerMock(e)
+			starts := make(chan *PublicEventStartPartitionSession, 2)
+			handler.EXPECT().OnStartPartitionSessionRequest(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, event *PublicEventStartPartitionSession) error {
+					starts <- event
+
+					return nil
+				}).Times(2)
 			events := make(chan *PublicEventStopPartitionSession, 1)
+			lateForced := make(chan error, 1)
 			handler.EXPECT().OnStopPartitionSessionRequest(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(_ context.Context, event *PublicEventStopPartitionSession) error {
 					events <- event
 
 					return nil
-				}).Times(2)
-			sender := newMockMessageSender()
-			worker := NewPartitionWorker(session.StreamPartitionSessionID, session, sender, handler,
-				nil, &trace.Topic{}, "listener")
-			done := make(chan error, 1)
-			go func() {
-				done <- worker.processRawServerMessage(ctx, &rawtopicreader.StopPartitionSessionRequest{
-					PartitionSessionID: session.StreamPartitionSessionID, Graceful: graceful,
 				})
-			}()
-			var event *PublicEventStopPartitionSession
-			select {
-			case event = <-events:
-			case <-ctx.Done():
-				t.Fatal(ctx.Err())
+			handler.EXPECT().OnStopPartitionSessionRequest(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, _ *PublicEventStopPartitionSession) error {
+					lateForced <- ctx.Err()
+
+					return nil
+				})
+
+			first := createTestStartPartitionRequest()
+			first.PartitionSession.PartitionSessionID = 100
+			first.PartitionSession.Path = "topic"
+			require.NoError(t, stream.routeMessage(ctx, first))
+			start := xtest.Receive(t, starts, "start request")
+			require.Equal(t, int64(1), metricValue(), "an assigned session counts before the handler confirms it")
+			start.Confirm()
+			xtest.Receive(t, stream.hasNewMessagesToSend, "start acknowledgement")
+			require.Equal(t, int64(1), metricValue())
+
+			require.NoError(t, stream.routeMessage(ctx, &rawtopicreader.StopPartitionSessionRequest{
+				PartitionSessionID: first.PartitionSession.PartitionSessionID, Graceful: graceful,
+			}))
+			if !graceful {
+				require.Equal(t, int64(0), metricValue(), "forced revocation takes effect at routing")
 			}
+			event := xtest.Receive(t, events, "stop notification")
 			if graceful {
 				require.Equal(t, int64(1), metricValue())
+				event.Confirm()
+				xtest.Receive(t, stream.hasNewMessagesToSend, "graceful stop acknowledgement")
 			} else {
 				require.Equal(t, int64(0), metricValue())
-			}
-			event.Confirm()
-			select {
-			case err = <-done:
-				require.NoError(t, err)
-			case <-ctx.Done():
-				t.Fatal(ctx.Err())
+				event.Confirm()
 			}
 			require.Equal(t, int64(0), metricValue())
 
-			// A later forced notification still reaches the callback after a
-			// completed stop; retirement must not cancel that callback context.
-			go func() {
-				done <- worker.processRawServerMessage(ctx, &rawtopicreader.StopPartitionSessionRequest{
-					PartitionSessionID: session.StreamPartitionSessionID,
-				})
-			}()
-			select {
-			case event = <-events:
-				event.Confirm()
-			case <-ctx.Done():
-				t.Fatal(ctx.Err())
-			}
-			select {
-			case err = <-done:
-				require.NoError(t, err)
-			case <-ctx.Done():
-				t.Fatal(ctx.Err())
-			}
-			replacement := topicreadercommon.NewPartitionSession(ctx, "topic", 2, 1, "", 2, 2, 0)
-			t.Cleanup(replacement.Close)
-			require.NoError(t, storage.Add(replacement))
+			replacement := createTestStartPartitionRequest()
+			replacement.PartitionSession = first.PartitionSession
+			replacement.PartitionSession.PartitionSessionID++
+			require.NoError(t, stream.routeMessage(ctx, replacement))
+			start = xtest.Receive(t, starts, "replacement start")
 			require.Equal(t, int64(1), metricValue())
+			start.Confirm()
+			xtest.Receive(t, stream.hasNewMessagesToSend, "replacement acknowledgement")
+			require.Equal(t, int64(1), metricValue())
+
+			// A late forced notification still reaches the callback with the
+			// revoked session's context and must not retire its successor.
+			require.NoError(t, stream.routeMessage(ctx, &rawtopicreader.StopPartitionSessionRequest{
+				PartitionSessionID: first.PartitionSession.PartitionSessionID,
+			}))
+			require.ErrorIs(t, xtest.Receive(t, lateForced, "late forced notification"), context.Canceled)
+			require.Equal(t, int64(1), metricValue())
+
+			require.NoError(t, stream.Close(ctx, ErrUserCloseTopic))
+			require.Equal(t, int64(0), metricValue())
 		})
 	}
 }
