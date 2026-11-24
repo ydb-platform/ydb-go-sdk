@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 var benchmarkRowChecksum uint64
@@ -94,7 +95,7 @@ func benchmarkWideRowsFrame(b *testing.B, width int) []byte {
 	return frame
 }
 
-func benchmarkWideRowReader(width int, mode string) func(*Row) (uint64, error) {
+func benchmarkWideRowReader(width int, mode string) func(query.Row) (uint64, error) {
 	values := make([]uint64, width)
 	refs := make([]any, width)
 	named := make([]scanner.NamedDestination, width)
@@ -111,7 +112,7 @@ func benchmarkWideRowReader(width int, mode string) func(*Row) (uint64, error) {
 	}
 	structDst := reflect.New(reflect.StructOf(fields))
 
-	return func(row *Row) (uint64, error) {
+	return func(row query.Row) (uint64, error) {
 		var err error
 		switch mode {
 		case "scan":
@@ -139,7 +140,7 @@ func benchmarkWideRowReader(width int, mode string) func(*Row) (uint64, error) {
 	}
 }
 
-func benchmarkDecodeRows(b *testing.B, frame []byte, decoder, mode string) []*Row {
+func benchmarkDecodeRows(b *testing.B, frame []byte, decoder, mode string) []query.Row {
 	b.Helper()
 	if decoder == "wire" {
 		part, err := decodeWirePart(frame)
@@ -149,7 +150,7 @@ func benchmarkDecodeRows(b *testing.B, frame []byte, decoder, mode string) []*Ro
 		if mode == "decode" {
 			return nil
 		}
-		rows := make([]*Row, part.RowCount())
+		rows := make([]query.Row, part.RowCount())
 		for j := range rows {
 			rows[j] = part.row(j, part.Meta().GetResultSet().GetColumns())
 		}
@@ -164,7 +165,7 @@ func benchmarkDecodeRows(b *testing.B, frame []byte, decoder, mode string) []*Ro
 		return nil
 	}
 	rs := part.GetResultSet()
-	rows := make([]*Row, len(rs.GetRows()))
+	rows := make([]query.Row, len(rs.GetRows()))
 	for j, row := range rs.GetRows() {
 		rows[j] = NewRow(rs.GetColumns(), row)
 	}
@@ -195,7 +196,7 @@ func benchmarkRowsFrame(b *testing.B, count int) []byte {
 	return frame
 }
 
-func benchmarkReadRow(row *Row, mode string) (uint64, error) {
+func benchmarkReadRow(row query.Row, mode string) (uint64, error) {
 	var id uint64
 	var count uint32
 	switch mode {

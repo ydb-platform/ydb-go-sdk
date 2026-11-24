@@ -18,6 +18,52 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
+func TestSQLWireMismatchedScalarPayloadsMatchProtobuf(t *testing.T) {
+	part := &Ydb_Query.ExecuteQueryResponsePart{
+		Status: Ydb.StatusIds_SUCCESS,
+		ResultSet: &Ydb.ResultSet{
+			Columns: []*Ydb.Column{
+				{Name: "active", Type: types.Bool.ToYDB()},
+				{Name: "label", Type: types.Text.ToYDB()},
+				{Name: "optional", Type: types.NewOptional(types.Bool).ToYDB()},
+			},
+			Rows: []*Ydb.Value{{Items: []*Ydb.Value{
+				{Value: &Ydb.Value_Uint64Value{Uint64Value: 1}},
+				{Value: &Ydb.Value_BytesValue{BytesValue: []byte("wrong arm")}},
+				{Value: &Ydb.Value_Uint64Value{Uint64Value: 1}},
+			}}},
+		},
+	}
+	for _, wire := range []bool{false, true} {
+		for _, prefetch := range []int{0, 2} {
+			t.Run(fmt.Sprintf("wire=%v/prefetch=%d", wire, prefetch), func(t *testing.T) {
+				server := mock.Server(t, mock.WithExecuteQueryParts(part))
+				observer := &queryDecoderObserver{}
+				db, err := ydb.Open(t.Context(), server.ConnString(),
+					ydb.WithAnonymousCredentials(), ydb.WithQueryProtoWireDecoding(wire),
+					ydb.With(config.WithGrpcOptions(grpc.WithChainStreamInterceptor(observer.intercept))),
+				)
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, db.Close(t.Context())) })
+				connector, err := ydb.Connector(db, ydb.WithQueryService(true), ydb.WithPrefetchQueryResultParts(prefetch))
+				require.NoError(t, err)
+				sqlDB := sql.OpenDB(connector)
+				t.Cleanup(func() { require.NoError(t, sqlDB.Close()) })
+				observer.check(t, wire, func() {
+					var active bool
+					var label string
+					var optional *bool
+					err := sqlDB.QueryRowContext(t.Context(), "SELECT active, label, optional").Scan(&active, &label, &optional)
+					require.NoError(t, err)
+					require.False(t, active)
+					require.Empty(t, label)
+					require.Equal(t, new(bool), optional)
+				})
+			})
+		}
+	}
+}
+
 func TestSQLWireDecodingPreservesValuesAcrossParts(t *testing.T) {
 	firstTime := time.Date(2026, time.November, 17, 12, 0, 0, 123000, time.UTC)
 	lastTime := firstTime.Add(time.Second)

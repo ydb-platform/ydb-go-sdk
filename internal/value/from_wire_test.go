@@ -14,6 +14,61 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 )
 
+func TestFromWireScalarsMatchProtobufFields(t *testing.T) {
+	for name, original := range wireTestValues() {
+		typeOf := original.Type()
+		switch typeOf.(type) {
+		case types.Primitive, *types.Decimal, *types.PgType:
+		default:
+			continue
+		}
+		for _, tt := range []struct {
+			name      string
+			fragments []*Ydb.Value
+		}{
+			{name: "empty", fragments: []*Ydb.Value{{}}},
+			{name: "bool", fragments: []*Ydb.Value{ToYDB(BoolValue(true)).GetValue()}},
+			{name: "int32", fragments: []*Ydb.Value{ToYDB(Int32Value(-32)).GetValue()}},
+			{name: "uint32", fragments: []*Ydb.Value{ToYDB(Uint32Value(32)).GetValue()}},
+			{name: "int64", fragments: []*Ydb.Value{ToYDB(Int64Value(-64)).GetValue()}},
+			{name: "uint64", fragments: []*Ydb.Value{ToYDB(Uint64Value(64)).GetValue()}},
+			{name: "float", fragments: []*Ydb.Value{ToYDB(FloatValue(1.25)).GetValue()}},
+			{name: "double", fragments: []*Ydb.Value{ToYDB(DoubleValue(2.5)).GetValue()}},
+			{name: "text", fragments: []*Ydb.Value{ToYDB(TextValue("[]")).GetValue()}},
+			{name: "bytes", fragments: []*Ydb.Value{ToYDB(BytesValue([]byte("[]"))).GetValue()}},
+			{name: "low128", fragments: []*Ydb.Value{ToYDB(UUIDFromYDBPair(1, 2)).GetValue()}},
+			{name: "null", fragments: []*Ydb.Value{{Value: &Ydb.Value_NullFlagValue{NullFlagValue: 7}}}},
+			{name: "nested", fragments: []*Ydb.Value{nestedWireList(1)}},
+			{
+				name:      "text overwritten by number",
+				fragments: []*Ydb.Value{ToYDB(TextValue("[]")).GetValue(), ToYDB(Uint64Value(1)).GetValue()},
+			},
+			{
+				name:      "number overwritten by text",
+				fragments: []*Ydb.Value{ToYDB(BoolValue(true)).GetValue(), ToYDB(TextValue("[]")).GetValue()},
+			},
+		} {
+			t.Run(name+"/"+tt.name, func(t *testing.T) {
+				fragments := append([]*Ydb.Value{{High_128: 17, VariantIndex: 3}}, tt.fragments...)
+				fragments = append(fragments, &Ydb.Value{High_128: 42, VariantIndex: 4})
+				data := marshalWireFragments(t, fragments...)
+				var pb Ydb.Value
+				if err := proto.Unmarshal(data, &pb); err != nil {
+					t.Fatal(err)
+				}
+				want, wantErr := fromYDB(typeOf.ToYDB(), &pb)
+				got, err := FromWire(typeOf, data)
+				if (err == nil) != (wantErr == nil) {
+					t.Fatalf("FromWire() error = %v, protobuf error = %v", err, wantErr)
+				}
+				if err == nil && !reflect.DeepEqual(got, want) {
+					t.Fatalf("FromWire() = %s, want %s", got.Yql(), want.Yql())
+				}
+			})
+		}
+	}
+}
+
 func TestFromWireMergesRepeatedNestedMessages(t *testing.T) {
 	for _, tt := range []struct {
 		name      string

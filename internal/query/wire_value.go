@@ -25,9 +25,11 @@ type wirePart struct {
 	meta        *Ydb_Query.ExecuteQueryResponsePart
 	frame       []byte
 	rows        []rowSpan
-	rowObjects  []Row
+	rowObjects  []wireRow
 	columns     []*Ydb.Column
 	columnTypes []types.Type
+	indexOnce   sync.Once
+	columnIndex map[string]int
 }
 
 var _ operation.Status = (*wirePart)(nil)
@@ -38,11 +40,26 @@ type rowSpan struct {
 }
 
 type indexedWireRow struct {
-	*Row
+	*wireRow
 
 	mu    sync.Mutex
 	cells rowCells
 	spans []rowSpan
+}
+
+func (r *indexedWireRow) ColumnIndex(name string) (int, bool) {
+	p := r.part
+	p.indexOnce.Do(func() {
+		p.columnIndex = make(map[string]int, len(p.columns))
+		for index, column := range p.columns {
+			if _, exists := p.columnIndex[column.GetName()]; !exists {
+				p.columnIndex[column.GetName()] = index
+			}
+		}
+	})
+	index, found := p.columnIndex[name]
+
+	return index, found
 }
 
 // Meta returns the standard response metadata without materializing Rows.
@@ -63,16 +80,16 @@ func (p *wirePart) rowBytes(index int) []byte {
 	return p.frame[span.start:span.end]
 }
 
-func (p *wirePart) row(index int, columns []*Ydb.Column) *Row {
+func (p *wirePart) row(index int, columns []*Ydb.Column) *wireRow {
 	if p.rowObjects == nil {
 		p.columns = columns
 		p.columnTypes = make([]types.Type, len(columns))
 		for i, column := range columns {
 			p.columnTypes[i] = types.TypeFromYDB(column.GetType())
 		}
-		p.rowObjects = make([]Row, len(p.rows))
+		p.rowObjects = make([]wireRow, len(p.rows))
 		for i := range p.rowObjects {
-			p.rowObjects[i] = Row{part: p, index: i}
+			p.rowObjects[i] = wireRow{part: p, index: i}
 		}
 	}
 
@@ -161,10 +178,10 @@ func stripWireValueRows(data []byte, part *wirePart, base int) ([]byte, error) {
 	return metadata, nil
 }
 
-func scanRowBytes(r *Row, dst []any) error {
+func scanRowBytes(r *wireRow, dst []any) error {
 	columns := r.part.columns
 	if len(dst) != len(columns) {
-		return scanner.Indexed(r.scannerData()).Scan(dst...)
+		return scanner.Indexed(&r.scannerRow().data).Scan(dst...)
 	}
 	cells := rowCells{data: r.part.rowBytes(r.index)}
 	index := 0

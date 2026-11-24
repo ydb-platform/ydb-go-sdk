@@ -87,6 +87,25 @@ func scalarField(number protowire.Number, kind protowire.Type) bool {
 // Kind returns the field containing the scalar or nested value.
 func (c Cell) Kind() protowire.Number { return c.kind }
 
+// Number returns the requested numeric field, or zero if that oneof arm is unset.
+func (c Cell) Number(field protowire.Number) uint64 {
+	if c.kind != field {
+		return 0
+	}
+
+	return c.number
+}
+
+// BytesFor returns the requested bytes or text field without copying,
+// or nil if that oneof arm is unset.
+func (c Cell) BytesFor(field protowire.Number) []byte {
+	if c.kind != field {
+		return nil
+	}
+
+	return c.bytes
+}
+
 // Uint64 returns the raw integer or float bits.
 func (c Cell) Uint64() uint64 { return c.number }
 

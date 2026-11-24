@@ -202,7 +202,40 @@ func TestWireRowRetainsScannerData(t *testing.T) {
 	require.NoError(t, row.ScanNamed(scanner.NamedRef("id", &got)))
 	require.Equal(t, uint64(42), got)
 	require.NotNil(t, row.data.Load(), "indexed scans must retain their state on the row")
-	require.Same(t, row.data.Load(), row.scannerData())
+	require.Same(t, row.data.Load(), row.scannerRow())
+}
+
+func TestWireRowsSelectFirstDuplicateColumn(t *testing.T) {
+	columns := []*Ydb.Column{
+		{Name: "id", Type: wirePrimitive(Ydb.Type_UINT64)},
+		{Name: "other", Type: wirePrimitive(Ydb.Type_UINT64)},
+		{Name: "id", Type: wirePrimitive(Ydb.Type_UINT64)},
+	}
+	frame, err := proto.Marshal(&Ydb_Query.ExecuteQueryResponsePart{ResultSet: &Ydb.ResultSet{
+		Columns: columns,
+		Rows: []*Ydb.Value{
+			value.ToYDB(value.TupleValue(value.Uint64Value(1), value.Uint64Value(2), value.Uint64Value(3))).GetValue(),
+			value.ToYDB(value.TupleValue(value.Uint64Value(4), value.Uint64Value(5), value.Uint64Value(6))).GetValue(),
+		},
+	}})
+	require.NoError(t, err)
+	part, err := decodeWirePart(frame)
+	require.NoError(t, err)
+	for index := 0; index < part.RowCount(); index++ {
+		row := part.row(index, columns)
+		var id, other uint64
+		require.NoError(t, row.ScanNamed(scanner.NamedRef("other", &other), scanner.NamedRef("id", &id)))
+		require.Equal(t, uint64(index*3+1), id)
+		require.Equal(t, uint64(index*3+2), other)
+		var dst struct {
+			ID    uint64 `sql:"id"`
+			Other uint64 `sql:"other"`
+		}
+		require.NoError(t, row.ScanStruct(&dst))
+		require.Equal(t, id, dst.ID)
+		require.Equal(t, other, dst.Other)
+		require.ErrorIs(t, row.ScanNamed(scanner.NamedRef("missing", &id)), scanner.ErrColumnsNotFoundInRow)
+	}
 }
 
 func TestWireRowIndexesCellsAsTheyAreRequested(t *testing.T) {
@@ -218,7 +251,7 @@ func TestWireRowIndexesCellsAsTheyAreRequested(t *testing.T) {
 	require.NoError(t, err)
 	frame = append(frame, 0xff) // The fourth column has a malformed tag.
 	part := &wirePart{frame: frame, rows: []rowSpan{{end: uint32(len(frame))}}}
-	row := &indexedWireRow{Row: part.row(0, columns), cells: rowCells{data: frame}}
+	row := &indexedWireRow{wireRow: part.row(0, columns), cells: rowCells{data: frame}}
 	var got uint64
 	require.NoError(t, row.ScanColumn(1, &got))
 	require.Equal(t, uint64(2), got)

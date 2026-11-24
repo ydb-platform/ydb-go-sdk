@@ -117,7 +117,7 @@ func TestWireQueryRespectsPerQueryCodec(t *testing.T) {
 			var got uint64
 			require.NoError(t, row.Scan(&got))
 			require.Equal(t, uint64(9001), got, "the per-query codec must determine the decoded result")
-			require.Nil(t, row.(*Row).part, "custom codecs must use the ordinary protobuf row path")
+			require.IsType(t, &Row{}, row, "custom codecs must use the ordinary protobuf row path")
 		})
 	}
 }
@@ -168,7 +168,7 @@ func TestWireQueryRespectsRegisteredCodecSelection(t *testing.T) {
 	var got uint64
 	require.NoError(t, row.Scan(&got))
 	require.Equal(t, uint64(9002), got, "the registered per-query codec must determine the decoded result")
-	require.Nil(t, row.(*Row).part)
+	require.IsType(t, &Row{}, row)
 }
 
 type rewritingQueryCodec struct {

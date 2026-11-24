@@ -69,13 +69,70 @@ func TestClientRowDecoding(t *testing.T) {
 						var got uint64
 						require.NoError(t, row.Scan(&got))
 						require.Equal(t, want, got)
-						require.Equal(t, tt.wire, row.(*Row).part != nil, "row storage must match the selected decoder")
+						_, wire := row.(*wireRow)
+						require.Equal(t, tt.wire, wire, "row storage must match the selected decoder")
 					}
 					_, err = rs.NextRow(ctx)
 					require.ErrorIs(t, err, io.EOF)
 				})
 			}
 		})
+	}
+}
+
+func TestQueryMismatchedScalarPayloadsMatchProtobuf(t *testing.T) {
+	conn := newWireResultConn(t, &optionalWireResultServer{
+		columns: []*Ydb.Column{
+			{Name: "active", Type: types.Bool.ToYDB()},
+			{Name: "label", Type: types.Text.ToYDB()},
+			{Name: "optional", Type: types.NewOptional(types.Bool).ToYDB()},
+		},
+		rows: []*Ydb.Value{{Items: []*Ydb.Value{
+			{Value: &Ydb.Value_Uint64Value{Uint64Value: 1}},
+			{Value: &Ydb.Value_BytesValue{BytesValue: []byte("wrong arm")}},
+			{Value: &Ydb.Value_Uint64Value{Uint64Value: 1}},
+		}}},
+	})
+	type destination struct {
+		Active   bool   `sql:"active"`
+		Label    string `sql:"label"`
+		Optional *bool  `sql:"optional"`
+	}
+	for _, wire := range []bool{false, true} {
+		for _, prefetch := range []int{0, 2} {
+			t.Run(fmt.Sprintf("wire=%v/prefetch=%d", wire, prefetch), func(t *testing.T) {
+				ctx := t.Context()
+				client, err := New(ctx, conn, config.New(config.WithProtoWireDecoding(wire)))
+				require.NoError(t, err)
+				defer client.Close(ctx)
+				row, err := client.QueryRow(ctx, "SELECT active, label, optional", options.WithResponsePartPrefetch(prefetch))
+				require.NoError(t, err)
+				for _, scan := range []struct {
+					name string
+					scan func(*destination) error
+				}{
+					{name: "Scan", scan: func(dst *destination) error {
+						return row.Scan(&dst.Active, &dst.Label, &dst.Optional)
+					}},
+					{name: "ScanNamed", scan: func(dst *destination) error {
+						return row.ScanNamed(scanner.NamedRef("active", &dst.Active),
+							scanner.NamedRef("label", &dst.Label), scanner.NamedRef("optional", &dst.Optional))
+					}},
+					{name: "ScanStruct", scan: func(dst *destination) error { return row.ScanStruct(dst) }},
+				} {
+					t.Run(scan.name, func(t *testing.T) {
+						var got destination
+						require.NoError(t, scan.scan(&got))
+						require.Equal(t, destination{Optional: new(bool)}, got)
+					})
+				}
+				want := []value.Value{value.BoolValue(false), value.TextValue(""), value.OptionalValue(value.BoolValue(false))}
+				require.Equal(t, want, row.Values())
+				got := make([]value.Value, len(want))
+				require.NoError(t, row.Scan(&got[0], &got[1], &got[2]))
+				require.Equal(t, want, got)
+			})
+		}
 	}
 }
 
@@ -95,7 +152,7 @@ func TestExecuteQueryUsesWireRowsAcrossParts(t *testing.T) {
 			for _, want := range []uint64{42, 43} {
 				row, err := rs.NextRow(ctx)
 				require.NoError(t, err)
-				require.IsType(t, &Row{}, row)
+				require.IsType(t, &wireRow{}, row)
 				var got uint64
 				require.NoError(t, row.Scan(&got))
 				require.Equal(t, want, got)
@@ -361,7 +418,8 @@ func TestQueryMergesRepeatedNestedValueMessages(t *testing.T) {
 				require.NoError(t, err)
 				row, err := set.NextRow(ctx)
 				require.NoError(t, err)
-				require.Equal(t, wire, row.(*Row).part != nil, "row storage must match the selected decoder")
+				_, isWire := row.(*wireRow)
+				require.Equal(t, wire, isWire, "row storage must match the selected decoder")
 				values := row.Values()
 				require.Len(t, values, 1)
 				require.Equal(t, "Just([1,2])", values[0].Yql())

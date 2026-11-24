@@ -13,6 +13,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
@@ -59,6 +60,34 @@ func TestRowScan(t *testing.T) {
 			require.ErrorContains(t, err, "cast failed 'Int32(42)' to '*bool' destination")
 			require.ErrorContains(t, err, "github.com/ydb-platform/ydb-go-sdk/v3/internal/query.(*Row)."+tt.method+"(")
 			require.ErrorContains(t, err, "github.com/ydb-platform/ydb-go-sdk/v3/internal/query.TestRowScan.func")
+		})
+	}
+}
+
+func TestRowNamedScanAllocations(t *testing.T) {
+	columns := []*Ydb.Column{{Name: "id", Type: types.Int32.ToYDB()}}
+	values := []value.Value{value.Int32Value(42)}
+	pb := value.ToYDB(value.TupleValue(values...)).GetValue()
+	for _, tt := range []struct {
+		name string
+		row  func() *Row
+	}{
+		{name: "protobuf", row: func() *Row { return NewRow(columns, pb) }},
+		{name: "decoded", row: func() *Row { return newDecodedRow(columns, values) }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var got int32
+			destinations := []scanner.NamedDestination{scanner.NamedRef("id", &got)}
+			allocations := testing.AllocsPerRun(100, func() {
+				benchmarkRow = tt.row()
+				if err := benchmarkRow.ScanNamed(destinations...); err != nil {
+					t.Fatal(err)
+				}
+			})
+			require.Equal(t, int32(42), got)
+			if allocations > 1 {
+				t.Fatalf("row construction and named scan allocate %.0f times, want at most 1", allocations)
+			}
 		})
 	}
 }

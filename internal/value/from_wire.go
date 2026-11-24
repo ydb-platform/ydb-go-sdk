@@ -3,6 +3,7 @@ package value
 import (
 	"bytes"
 	"fmt"
+	"math"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wirevalue"
@@ -53,7 +54,8 @@ func FromCell(t types.Type, cell wirevalue.Cell) (Value, error) {
 
 		return TaggedValue(t, v), nil
 	case *types.Decimal:
-		return DecimalValue(BigEndianUint128(cell.High128(), cell.Uint64()), t.Precision(), t.Scale()), nil
+		return DecimalValue(BigEndianUint128(cell.High128(), cell.Number(wirevalue.ValueLow128Field)),
+			t.Precision(), t.Scale()), nil
 	case types.Void:
 		return VoidValue(), nil
 	case types.Null:
@@ -66,7 +68,7 @@ func FromCell(t types.Type, cell wirevalue.Cell) (Value, error) {
 		if cell.Kind() == wirevalue.ValueNullField {
 			return PgNullValue(t.OID), nil
 		}
-		v := PgValue(t.OID, string(cell.Bytes()))
+		v := PgValue(t.OID, string(cell.BytesFor(wirevalue.ValueTextField)))
 
 		return &v, nil
 	default:
@@ -238,69 +240,73 @@ func setFromWire(t *types.Set, cell wirevalue.Cell) (Value, error) {
 func primitiveFromWire(t types.Primitive, cell wirevalue.Cell) (Value, error) {
 	switch t {
 	case types.Bool:
-		return BoolValue(cell.Uint64() != 0), nil
+		return BoolValue(cell.Number(wirevalue.ValueBoolField) != 0), nil
 	case types.Int8:
-		return Int8Value(int8(cell.Uint32())), nil
+		return Int8Value(int8(cell.Number(wirevalue.ValueInt32Field))), nil
 	case types.Int16:
-		return Int16Value(int16(cell.Uint32())), nil
+		return Int16Value(int16(cell.Number(wirevalue.ValueInt32Field))), nil
 	case types.Int32:
-		return Int32Value(int32(cell.Uint32())), nil
+		return Int32Value(int32(cell.Number(wirevalue.ValueInt32Field))), nil
 	case types.Int64:
-		return Int64Value(int64(cell.Uint64())), nil
+		return Int64Value(int64(cell.Number(wirevalue.ValueInt64Field))), nil
 	case types.Uint8:
-		return Uint8Value(uint8(cell.Uint32())), nil
+		return Uint8Value(uint8(cell.Number(wirevalue.ValueUint32Field))), nil
 	case types.Uint16:
-		return Uint16Value(uint16(cell.Uint32())), nil
+		return Uint16Value(uint16(cell.Number(wirevalue.ValueUint32Field))), nil
 	case types.Uint32:
-		return Uint32Value(cell.Uint32()), nil
+		return Uint32Value(uint32(cell.Number(wirevalue.ValueUint32Field))), nil
 	case types.Uint64:
-		return Uint64Value(cell.Uint64()), nil
+		return Uint64Value(cell.Number(wirevalue.ValueUint64Field)), nil
 	case types.Date:
-		return DateValue(cell.Uint32()), nil
+		return DateValue(uint32(cell.Number(wirevalue.ValueUint32Field))), nil
 	case types.Date32:
-		return Date32Value(int32(cell.Uint32())), nil
+		return Date32Value(int32(cell.Number(wirevalue.ValueInt32Field))), nil
 	case types.Datetime:
-		return DatetimeValue(cell.Uint32()), nil
+		return DatetimeValue(uint32(cell.Number(wirevalue.ValueUint32Field))), nil
 	case types.Datetime64:
-		return Datetime64Value(int64(cell.Uint64())), nil
+		return Datetime64Value(int64(cell.Number(wirevalue.ValueInt64Field))), nil
 	case types.Timestamp:
-		return TimestampValue(cell.Uint64()), nil
+		return TimestampValue(cell.Number(wirevalue.ValueUint64Field)), nil
 	case types.Timestamp64:
-		return Timestamp64Value(int64(cell.Uint64())), nil
+		return Timestamp64Value(int64(cell.Number(wirevalue.ValueInt64Field))), nil
 	case types.Interval:
-		return IntervalValue(int64(cell.Uint64())), nil
+		return IntervalValue(int64(cell.Number(wirevalue.ValueInt64Field))), nil
 	case types.Interval64:
-		return Interval64Value(int64(cell.Uint64())), nil
+		return Interval64Value(int64(cell.Number(wirevalue.ValueInt64Field))), nil
 	case types.Float:
-		return FloatValue(cell.Float32()), nil
+		return FloatValue(math.Float32frombits(uint32(cell.Number(wirevalue.ValueFloatField)))), nil
 	case types.Double:
-		return DoubleValue(cell.Float64()), nil
+		return DoubleValue(math.Float64frombits(cell.Number(wirevalue.ValueDoubleField))), nil
 	case types.Text:
-		return TextValue(string(cell.Bytes())), nil
+		return TextValue(string(cell.BytesFor(wirevalue.ValueTextField))), nil
 	case types.Bytes:
-		return BytesValue(bytes.Clone(cell.Bytes())), nil
+		return BytesValue(bytes.Clone(cell.BytesFor(wirevalue.ValueBytesField))), nil
 	case types.YSON:
+		if cell.Kind() != wirevalue.ValueTextField && cell.Kind() != wirevalue.ValueBytesField {
+			return primitiveValueFromYDB(t, nil)
+		}
+
 		return YSONValue(bytes.Clone(cell.Bytes())), nil
 	case types.JSON:
-		return JSONValue(string(cell.Bytes())), nil
+		return JSONValue(string(cell.BytesFor(wirevalue.ValueTextField))), nil
 	case types.JSONDocument:
-		return JSONDocumentValue(string(cell.Bytes())), nil
+		return JSONDocumentValue(string(cell.BytesFor(wirevalue.ValueTextField))), nil
 	case types.DyNumber:
-		return DyNumberValue(string(cell.Bytes())), nil
+		return DyNumberValue(string(cell.BytesFor(wirevalue.ValueTextField))), nil
 	case types.TzDate:
-		return TzDateValue(string(cell.Bytes())), nil
+		return TzDateValue(string(cell.BytesFor(wirevalue.ValueTextField))), nil
 	case types.TzDatetime:
-		return TzDatetimeValue(string(cell.Bytes())), nil
+		return TzDatetimeValue(string(cell.BytesFor(wirevalue.ValueTextField))), nil
 	case types.TzTimestamp:
-		return TzTimestampValue(string(cell.Bytes())), nil
+		return TzTimestampValue(string(cell.BytesFor(wirevalue.ValueTextField))), nil
 	case types.TzDate32:
-		return TzDate32Value(string(cell.Bytes())), nil
+		return TzDate32Value(string(cell.BytesFor(wirevalue.ValueTextField))), nil
 	case types.TzDatetime64:
-		return TzDatetime64Value(string(cell.Bytes())), nil
+		return TzDatetime64Value(string(cell.BytesFor(wirevalue.ValueTextField))), nil
 	case types.TzTimestamp64:
-		return TzTimestamp64Value(string(cell.Bytes())), nil
+		return TzTimestamp64Value(string(cell.BytesFor(wirevalue.ValueTextField))), nil
 	case types.UUID:
-		return UUIDFromYDBPair(cell.High128(), cell.Uint64()), nil
+		return UUIDFromYDBPair(cell.High128(), cell.Number(wirevalue.ValueLow128Field)), nil
 	default:
 
 		return nil, fmt.Errorf("unsupported YDB primitive %v", t)

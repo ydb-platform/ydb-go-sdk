@@ -2,7 +2,6 @@ package scanner
 
 import (
 	"fmt"
-	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -20,7 +19,6 @@ type Data struct {
 	values        []*Ydb.Value
 	decodedValues []value.Value
 	direct        DirectRow
-	columnIndexes atomic.Value // map[string]int, immutable after publication
 }
 
 func NewData(columns []*Ydb.Column, values []*Ydb.Value) *Data {
@@ -39,18 +37,16 @@ func NewDirectData(columns []*Ydb.Column, direct DirectRow) *Data {
 }
 
 func (d *Data) columnIndex(name string) (int, error) {
-	indexes, _ := d.columnIndexes.Load().(map[string]int)
-	if indexes == nil {
-		indexes = make(map[string]int, len(d.columns))
-		for i, column := range d.columns {
-			if _, exists := indexes[column.GetName()]; !exists {
-				indexes[column.GetName()] = i
+	if indexed, ok := d.direct.(interface{ ColumnIndex(name string) (int, bool) }); ok {
+		if index, found := indexed.ColumnIndex(name); found {
+			return index, nil
+		}
+	} else {
+		for index, column := range d.columns {
+			if column.GetName() == name {
+				return index, nil
 			}
 		}
-		d.columnIndexes.Store(indexes)
-	}
-	if index, exists := indexes[name]; exists {
-		return index, nil
 	}
 
 	return 0, xerrors.WithStackTrace(fmt.Errorf("'%s': %w", name, ErrColumnsNotFoundInRow))
