@@ -2,6 +2,7 @@ package topicreadercommon
 
 import (
 	"context"
+	"math/bits"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -114,13 +115,73 @@ type CommitMessageTracker struct {
 	mu sync.Mutex
 
 	committedOffset rawtopiccommon.Offset
-	pending         []commitMetricRange
+	pending         *commitMetricRange
 	closed          bool
 }
 
+const (
+	radixBits = 4
+	radixSize = 1 << radixBits
+)
+
 type commitMetricRange struct {
-	end   rawtopiccommon.Offset
-	count int
+	key   uint64 // representative key for the shared high bits
+	shift int    // bit position of this radix digit
+	sum   int
+	count [radixSize]int
+	child [radixSize]*commitMetricRange
+}
+
+// Each level indexes one hex digit of the exclusive end. Adjacent commits
+// share a leaf; sparse offsets branch only at digits where their keys differ.
+func (r *commitMetricRange) insert(key uint64, count int) *commitMetricRange {
+	if r == nil {
+		r = &commitMetricRange{key: key}
+	} else if width := bits.Len64(key ^ r.key); width > r.shift+radixBits {
+		parent := &commitMetricRange{key: key, shift: (width - 1) / radixBits * radixBits, sum: r.sum}
+		i := (r.key >> parent.shift) % radixSize
+		parent.child[i], parent.count[i] = r, r.sum
+		r = parent
+	}
+	i := (key >> r.shift) % radixSize
+	if r.shift != 0 {
+		r.child[i] = r.child[i].insert(key, count)
+	}
+	r.count[i] += count
+	r.sum += count
+
+	return r
+}
+
+// Drop covered slots as units. Only the boundary slot can be partly covered.
+func (r *commitMetricRange) acknowledge(key uint64) (*commitMetricRange, int) {
+	if r == nil {
+		return nil, 0
+	}
+	switch prefix, boundary := r.key>>(r.shift+radixBits), key>>(r.shift+radixBits); {
+	case prefix < boundary:
+		return nil, r.sum
+	case prefix > boundary:
+		return r, 0
+	}
+	i := (key >> r.shift) % radixSize
+	covered := 0
+	for j := range i {
+		covered += r.count[j]
+		r.count[j], r.child[j] = 0, nil
+	}
+	count := r.count[i]
+	if r.shift != 0 {
+		r.child[i], count = r.child[i].acknowledge(key)
+	}
+	r.count[i] -= count
+	covered += count
+	r.sum -= covered
+	if r.sum == 0 {
+		return nil, covered
+	}
+
+	return r, covered
 }
 
 // NewCommitMessageTracker creates a tracker with the initial exclusive
@@ -147,7 +208,7 @@ func (t *CommitMessageTracker) Queue(start, end rawtopiccommon.Offset) int {
 		return 0
 	}
 
-	t.pending = append(t.pending, commitMetricRange{end: end, count: count})
+	t.pending = t.pending.insert(uint64(end)^(1<<63), count)
 
 	return count
 }
@@ -165,18 +226,7 @@ func (t *CommitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset
 
 	t.committedOffset = exclusiveOffset
 	var acknowledged int
-	pending := t.pending[:0]
-	for _, r := range t.pending {
-		if r.end <= exclusiveOffset {
-			acknowledged += r.count
-		} else {
-			pending = append(pending, r)
-		}
-	}
-	t.pending = pending
-	if len(pending) == 0 {
-		t.pending = nil
-	}
+	t.pending, acknowledged = t.pending.acknowledge(uint64(exclusiveOffset) ^ (1 << 63))
 
 	return acknowledged
 }
