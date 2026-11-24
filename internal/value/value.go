@@ -3117,7 +3117,7 @@ func YSONValue(v []byte) ysonValue {
 	return v
 }
 
-//nolint:funlen
+//nolint:funlen,gocyclo
 func zeroPrimitiveValue(t types.Primitive) Value {
 	switch t {
 	case types.Bool:
@@ -3156,14 +3156,26 @@ func zeroPrimitiveValue(t types.Primitive) Value {
 	case types.Date:
 		return DateValue(0)
 
+	case types.Date32:
+		return Date32Value(0)
+
 	case types.Datetime:
 		return DatetimeValue(0)
+
+	case types.Datetime64:
+		return Datetime64Value(0)
 
 	case types.Timestamp:
 		return TimestampValue(0)
 
+	case types.Timestamp64:
+		return Timestamp64Value(0)
+
 	case types.Interval:
 		return IntervalValue(0)
+
+	case types.Interval64:
+		return Interval64Value(0)
 
 	case types.Text:
 		return TextValue("")
@@ -3217,10 +3229,10 @@ func ZeroValue(t types.Type) Value {
 	case types.Optional:
 		return NullValue(t.InnerType())
 
-	case *types.Void:
+	case types.Void, *types.Void:
 		return VoidValue()
 
-	case *types.List, *types.EmptyList:
+	case *types.List, types.EmptyList, *types.EmptyList:
 		return &listValue{
 			t: t,
 		}
@@ -3232,7 +3244,7 @@ func ZeroValue(t types.Type) Value {
 		return &dictValue{
 			t: t.ValueType(),
 		}
-	case *types.EmptyDict:
+	case types.EmptyDict, *types.EmptyDict:
 		return &dictValue{
 			t: t,
 		}
