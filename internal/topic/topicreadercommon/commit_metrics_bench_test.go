@@ -11,7 +11,7 @@ func BenchmarkCommitMessageTrackerIncrementalAck(b *testing.B) {
 	for _, n := range []rawtopiccommon.Offset{10000, 30000} {
 		b.Run(fmt.Sprintf("ranges=%d", n), func(b *testing.B) {
 			for range b.N {
-				tracker := NewCommitMessageTracker(0)
+				tracker := newCommitMessageTracker(0)
 				for i := range n {
 					tracker.Queue(i, i+1)
 				}
@@ -21,4 +21,11 @@ func BenchmarkCommitMessageTrackerIncrementalAck(b *testing.B) {
 			}
 		})
 	}
+}
+
+func newCommitMessageTracker(offset rawtopiccommon.Offset) *commitMessageTracker {
+	session := &PartitionSession{}
+	session.SetInitialCommitOffset(offset)
+
+	return &commitMessageTracker{session: session}
 }

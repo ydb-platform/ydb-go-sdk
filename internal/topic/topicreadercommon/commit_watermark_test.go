@@ -12,7 +12,7 @@ import (
 )
 
 func TestCommitMessageTrackerInterleavedSubmissions(t *testing.T) {
-	tracker := NewCommitMessageTracker(0)
+	tracker := newCommitMessageTracker(0)
 	require.EqualValues(t, 2, tracker.Queue(1022, 1024))
 	require.EqualValues(t, 1, tracker.Queue(16, 17))
 	require.EqualValues(t, 8, tracker.Queue(8, 16))

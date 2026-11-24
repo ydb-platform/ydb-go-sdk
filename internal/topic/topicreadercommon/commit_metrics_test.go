@@ -335,7 +335,7 @@ func TestCommitterQueueTraceCanReenterLazyRequest(t *testing.T) {
 }
 
 func TestCommitMessageTrackerCountsRangeLengths(t *testing.T) {
-	tracker := NewCommitMessageTracker(10)
+	tracker := newCommitMessageTracker(10)
 
 	// A range below the watermark cannot receive a fresh acknowledgement.
 	require.Zero(t, tracker.Queue(0, 9))
@@ -354,7 +354,7 @@ func TestCommitMessageTrackerCountsRangeLengths(t *testing.T) {
 }
 
 func TestCommitMessageTrackerHandlesCoveredRangesAndEqualWatermark(t *testing.T) {
-	tracker := NewCommitMessageTracker(10)
+	tracker := newCommitMessageTracker(10)
 
 	require.Equal(t, 4, tracker.Queue(10, 14))
 	require.Equal(t, 4, tracker.Acknowledge(14))
@@ -366,7 +366,7 @@ func TestCommitMessageTrackerHandlesCoveredRangesAndEqualWatermark(t *testing.T)
 	require.Equal(t, 4, tracker.Acknowledge(18))
 
 	// A higher pending range must not hide a fully covered lower range.
-	tracker = NewCommitMessageTracker(0)
+	tracker = newCommitMessageTracker(0)
 	require.Equal(t, 10, tracker.Queue(10, 20))
 	require.Equal(t, 10, tracker.Queue(0, 10))
 	require.Equal(t, 10, tracker.Acknowledge(10))
@@ -374,7 +374,7 @@ func TestCommitMessageTrackerHandlesCoveredRangesAndEqualWatermark(t *testing.T)
 }
 
 func TestCommitMessageTrackerRejectsInvalidRangesAndCloses(t *testing.T) {
-	tracker := NewCommitMessageTracker(0)
+	tracker := newCommitMessageTracker(0)
 
 	require.Zero(t, tracker.Queue(0, 0))
 	require.Zero(t, tracker.Queue(2, 1))
@@ -394,7 +394,7 @@ func TestCommitMessageTrackerConcurrentQueueAcknowledgeClose(t *testing.T) {
 		messagesPerWorker = 64
 	)
 
-	tracker := NewCommitMessageTracker(0)
+	tracker := newCommitMessageTracker(0)
 	start := make(chan struct{})
 	var queueWG sync.WaitGroup
 	var queued atomic.Int64

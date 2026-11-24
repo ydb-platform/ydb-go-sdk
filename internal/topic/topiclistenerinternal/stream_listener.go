@@ -610,7 +610,6 @@ func (l *streamListener) onCommitResponse(msg *rawtopicreader.CommitOffsetRespon
 
 		// Update committed offset in the session
 		messagesCount := topicreadercommon.RegisterCommitAcknowledged(session, commit.CommittedOffset)
-		session.SetCommittedOffsetForward(commit.CommittedOffset)
 
 		// Notify the syncCommitter about the commit
 		l.syncCommitter.OnCommitNotify(session, commit.CommittedOffset)

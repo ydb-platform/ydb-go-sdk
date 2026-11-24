@@ -36,7 +36,7 @@ func (s *PartitionSession) SetupCommitMetrics(tracer *trace.Topic, readerInfo Re
 	s.commitMetrics = &partitionSessionCommitMetrics{
 		tracer:     tracer,
 		readerInfo: readerInfo,
-		tracker:    NewCommitMessageTracker(s.CommittedOffset()),
+		tracker:    &commitMessageTracker{session: s},
 	}
 }
 
@@ -98,10 +98,15 @@ func TraceCommitQueuedAfterRegistration(ctx context.Context, commitRange CommitR
 }
 
 // RegisterCommitAcknowledged records a successful commit acknowledgement and
-// returns only the newly completed range span. The caller must perform this
-// before publishing the committed offset or waking commit waiters.
+// returns only the newly completed range span. It publishes the new watermark
+// before returning, so callers may now wake commit waiters.
 func RegisterCommitAcknowledged(session *PartitionSession, exclusiveOffset rawtopiccommon.Offset) int {
-	if session == nil || session.commitMetrics == nil {
+	if session == nil {
+		return 0
+	}
+	if session.commitMetrics == nil {
+		session.SetCommittedOffsetForward(exclusiveOffset)
+
 		return 0
 	}
 
@@ -127,9 +132,9 @@ func CommitMessageTracker(session *PartitionSession) *commitMessageTracker {
 type commitMessageTracker struct {
 	mu sync.Mutex
 
-	committedOffset rawtopiccommon.Offset
-	pending         *commitMetricRange
-	closed          bool
+	session *PartitionSession
+	pending *commitMetricRange
+	closed  bool
 }
 
 const (
@@ -197,14 +202,6 @@ func (r *commitMetricRange) acknowledge(key uint64) (*commitMetricRange, int) {
 	return r, covered
 }
 
-// NewCommitMessageTracker creates a tracker with the initial exclusive
-// committed offset.
-func NewCommitMessageTracker(committedOffset rawtopiccommon.Offset) *commitMessageTracker {
-	return &commitMessageTracker{
-		committedOffset: committedOffset,
-	}
-}
-
 // Queue records a submitted commit range and returns its offset span. Ranges
 // ending at or before the committed watermark are already complete; they
 // need no new ACK and must not contribute to either counter.
@@ -217,7 +214,7 @@ func (t *commitMessageTracker) Queue(start, end rawtopiccommon.Offset) int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.closed || end <= t.committedOffset {
+	if t.closed || end <= t.session.CommittedOffset() {
 		return 0
 	}
 
@@ -233,13 +230,10 @@ func (t *commitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.closed || exclusiveOffset <= t.committedOffset {
-		return 0
-	}
-
-	t.committedOffset = exclusiveOffset
 	var acknowledged int
 	t.pending, acknowledged = t.pending.acknowledge(uint64(exclusiveOffset) ^ (1 << 63))
+
+	t.session.SetCommittedOffsetForward(exclusiveOffset)
 
 	return acknowledged
 }

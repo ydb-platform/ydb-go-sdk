@@ -999,7 +999,6 @@ func (r *topicStreamReaderImpl) onCommitResponse(msg *rawtopicreader.CommitOffse
 			return fmt.Errorf("ydb: can't found session on commit response: %w", err)
 		}
 		messagesCount := topicreadercommon.RegisterCommitAcknowledged(partition, commit.CommittedOffset)
-		partition.SetCommittedOffsetForward(commit.CommittedOffset)
 
 		logCtx := r.cfg.BaseContext
 		gtrace.TopicOnReaderCommittedNotify(
