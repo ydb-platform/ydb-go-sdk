@@ -632,7 +632,8 @@ func redisGlobToRE2Match(glob string) (string, error) {
 	i := 0
 	for i < len(glob) {
 		if glob[i] == '\\' && i+1 < len(glob) {
-			b.WriteString(regexp.QuoteMeta(string(glob[i+1])))
+			// slice, not string(byte): a byte conversion would re-encode each byte of a multi-byte rune
+			b.WriteString(regexp.QuoteMeta(glob[i+1 : i+2]))
 			i += 2
 
 			continue
@@ -668,7 +669,7 @@ func redisGlobToRE2Match(glob string) (string, error) {
 			}
 			i = end + 1
 		default:
-			b.WriteString(regexp.QuoteMeta(string(glob[i])))
+			b.WriteString(regexp.QuoteMeta(glob[i : i+1]))
 			i++
 		}
 	}
