@@ -76,6 +76,7 @@ jobs:
       OS: ubuntu-latest
       GO: ${{ matrix.go-version }}
       YDB_VERSION: ${{ matrix.ydb-version }}
+      YDB_STRICT_SERIALIZABLE_ENABLED: ${{ matrix.ydb-version == 'edge' && '1' || '0' }}
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_CONNECTION_STRING_SECURE: grpcs://localhost:2135/local
       YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
@@ -84,6 +85,19 @@ jobs:
     steps:
       - name: Show YDB version
         run: docker exec ydb /ydbd -V
+      - name: Enable strict serializable isolation
+        if: matrix.ydb-version == 'edge'
+        run: |
+          docker exec -i ydb bash -ec 'cat > /tmp/strict-serializable.pb.txt
+          /ydbd -s localhost:2136 admin console configs update /tmp/strict-serializable.pb.txt' <<'PROTO'
+          Actions {
+            AddConfigItem {
+              ConfigItem {
+                Config { TableServiceConfig { EnableStrictSerializableIsolation: true } }
+              }
+            }
+          }
+          PROTO
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Install Go
@@ -200,22 +214,3 @@ jobs:
           name: experiment
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  strict-serializable-integration:
-    if: >-
-      github.event_name != 'schedule' &&
-      !contains(github.event.pull_request.labels.*.name, 'no tests') &&
-      !contains(github.event.pull_request.labels.*.name, 'no integration tests')
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Install Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.26.x
-          cache: true
-      - name: Run StrictSerializableRW integration tests
-        run: bash .github/scripts/strict-serializable-integration.sh
