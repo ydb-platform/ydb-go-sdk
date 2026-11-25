@@ -1,4 +1,4 @@
-* Added `ydb.WithGrpcChannelShutdownTimeout` to close connections to removed endpoints before the next discovery update, with a default delay of 1 minute and 59 seconds.
+* Added `ydb.WithGrpcChannelShutdownTimeout` to close connections to endpoints removed by discovery, with a default timeout of 1 minute and 59 seconds. A non-positive timeout leaves connection closing to discovery updates.
 
 ## v3.157.5
 * Removed the copy of `topicwriter.Message.Data` into an intermediate growing buffer before compression: `bytes.Reader` and `bytes.Buffer` data is written straight into the compressor, a `strings.Reader` is copied into a presized pooled buffer
