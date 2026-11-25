@@ -32,8 +32,11 @@ The application owns the provider, collection and export. See the
 | `endpoint` | Configured endpoint authority. |
 | `database` | Normalized database path. |
 
-The gauge counts SDK-owned sessions on the current stream from admission through
-graceful stop confirmation. Forced stops retire sessions immediately. Selected
+The gauge counts SDK-owned sessions on the current stream from admission until
+the SDK closes the session locally. On a graceful stop the session is closed
+right before the SDK sends the stop response; a listener first waits for the
+handler to confirm the stop and flushes pending commits. Forced stops retire
+sessions immediately. Selected
 topics with no active sessions report zero until the resource closes.
 
 Close readers and listeners before closing their driver. Each resource
