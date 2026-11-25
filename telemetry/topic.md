@@ -41,5 +41,6 @@ handler to confirm the stop and flushes pending commits. Forced stops retire
 sessions immediately. Selected
 topics with no active sessions report zero until the resource closes.
 
-Close readers and listeners before closing their driver. Each resource
-unregisters its callback before stream teardown.
+Close readers and listeners before closing their driver. Close disables new
+observations and schedules unregister without waiting for the backend, so it
+can run during or from inside a collection. An in-flight callback may finish.

@@ -2,11 +2,15 @@ package topicreadercommon
 
 import (
 	"context"
+	"errors"
 	"path"
 	"slices"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 )
+
+var errNilMetricUnregister = errors.New("ydb: telemetry Meter returned a nil unregister function")
 
 type ReaderMetricsConfig struct {
 	Meter    telemetry.Meter
@@ -20,7 +24,7 @@ func RegisterPartitionSessionCount(
 	consumer string,
 	selectors []*PublicReadSelector,
 	counts func() (map[string]int64, error),
-) (func() error, error) {
+) (func(), error) {
 	name := cfg.Name
 	if name == "" {
 		name = "default"
@@ -41,7 +45,7 @@ func RegisterPartitionSessionCount(
 	// Every observation appends its topic, so spare capacity must not be shared.
 	attributes = slices.Clip(attributes)
 
-	return cfg.Meter(telemetry.Descriptor{
+	return registerGauge(cfg.Meter, telemetry.Descriptor{
 		Name:        "ydb.topic.reader.partition_session.count",
 		Unit:        "{session}",
 		Description: "Number of SDK-owned active topic partition sessions.",
@@ -66,6 +70,36 @@ func RegisterPartitionSessionCount(
 
 		return nil
 	})
+}
+
+func registerGauge(
+	meter telemetry.Meter, desc telemetry.Descriptor, collect telemetry.Int64GaugeCallback,
+) (func(), error) {
+	var closed atomic.Bool
+	unregister, err := meter(desc, func(ctx context.Context, observe func(int64, ...telemetry.Attribute)) error {
+		if closed.Load() {
+			return nil
+		}
+
+		return collect(ctx, observe)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if unregister == nil {
+		closed.Store(true)
+
+		return nil, errNilMetricUnregister
+	}
+
+	return func() {
+		if closed.CompareAndSwap(false, true) {
+			// A collecting backend may wait for Close before it unlocks unregister.
+			go func() {
+				_ = unregister() // Deferred cleanup errors are reported by the backend.
+			}()
+		}
+	}, nil
 }
 
 func metricTopicPath(database, topic string) string {

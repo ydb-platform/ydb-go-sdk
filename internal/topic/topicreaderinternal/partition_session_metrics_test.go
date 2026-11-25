@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -72,4 +73,23 @@ func TestReaderMetricRegistrationFailureDoesNotConnect(t *testing.T) {
 	)
 	require.ErrorIs(t, err, failure)
 	require.Nil(t, reader.reader)
+}
+
+func TestReaderRejectsNilMetricUnregister(t *testing.T) {
+	reader, err := NewReader(nil,
+		func(context.Context, int64, *trace.Topic) (topicreadercommon.RawTopicReaderStream, error) {
+			return nil, errors.New("no server")
+		}, "consumer", []topicreadercommon.PublicReadSelector{{Path: "topic"}},
+		func(cfg *ReaderConfig) {
+			cfg.Metrics.Meter = func(telemetry.Descriptor, telemetry.Int64GaugeCallback) (func() error, error) {
+				var unregister func() error
+
+				return unregister, nil
+			}
+		},
+	)
+	if err == nil {
+		require.NoError(t, reader.Close(xtest.Context(t)))
+	}
+	require.ErrorContains(t, err, "nil unregister")
 }

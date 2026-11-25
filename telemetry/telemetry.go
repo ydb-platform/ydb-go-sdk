@@ -24,7 +24,12 @@ type Attribute struct {
 type Int64GaugeCallback func(ctx context.Context, observe func(int64, ...Attribute)) error
 
 // Meter directly registers a gauge and its callback with a metrics backend.
-// On success it returns a non-nil, idempotent unregister function. On failure
-// it must not retain the callback. The backend owns unregister synchronization.
+// On success it must return a non-nil, idempotent unregister function; a nil
+// function is a registration error. On failure it must not retain the callback.
+// Closing a resource disables its callback and schedules unregister without
+// waiting, so Close can run during collection. A collection already observing
+// the resource may finish. Unregister can run concurrently with collection and
+// registration; the backend owns synchronization and must report cleanup errors
+// itself if needed, since they are not returned by Close.
 // Nil disables observable metrics.
 type Meter func(Descriptor, Int64GaugeCallback) (func() error, error)

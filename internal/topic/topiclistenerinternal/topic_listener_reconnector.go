@@ -35,11 +35,11 @@ type TopicListenerReconnector struct {
 	connectionIDCounter atomic.Int64
 	closing             atomic.Bool
 
-	m                sync.Mutex
-	streamListener   *streamListener
-	streamCloseErr   error
-	stopErr          error
-	unregisterMetric func() error
+	m              sync.Mutex
+	streamListener *streamListener
+	streamCloseErr error
+	stopErr        error
+	closeMetric    func()
 }
 
 func NewTopicListenerReconnector(
@@ -62,7 +62,7 @@ func NewTopicListenerReconnector(
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		res.unregisterMetric = registration
+		res.closeMetric = registration
 	}
 	res.background.Start("connection", res.run)
 
@@ -85,8 +85,8 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 		return errTopicListenerClosed
 	}
 	var closeErrors []error
-	if lr.unregisterMetric != nil {
-		closeErrors = append(closeErrors, lr.unregisterMetric())
+	if lr.closeMetric != nil {
+		lr.closeMetric()
 	}
 	err := lr.background.Close(ctx, reason)
 	if !errors.Is(err, background.ErrAlreadyClosed) {

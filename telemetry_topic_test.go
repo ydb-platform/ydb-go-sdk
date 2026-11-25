@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -248,17 +249,24 @@ func newMetricMeter() (telemetry.Meter, func(context.Context) ([]observedMetric,
 		callback   telemetry.Int64GaugeCallback
 	}
 	registrations := make(map[*registration]struct{})
+	var mu sync.Mutex
 	meter := func(desc telemetry.Descriptor, callback telemetry.Int64GaugeCallback) (func() error, error) {
+		mu.Lock()
+		defer mu.Unlock()
 		reg := &registration{desc, callback}
 		registrations[reg] = struct{}{}
 
 		return func() error {
+			mu.Lock()
+			defer mu.Unlock()
 			delete(registrations, reg)
 
 			return nil
 		}, nil
 	}
 	collect := func(ctx context.Context) ([]observedMetric, error) {
+		mu.Lock()
+		defer mu.Unlock()
 		var metrics []observedMetric
 		for reg := range registrations {
 			data := observedMetric{Descriptor: reg.descriptor}
@@ -267,7 +275,9 @@ func newMetricMeter() (telemetry.Meter, func(context.Context) ([]observedMetric,
 			}); err != nil {
 				return nil, err
 			}
-			metrics = append(metrics, data)
+			if len(data.Points) != 0 {
+				metrics = append(metrics, data)
+			}
 		}
 
 		return metrics, nil

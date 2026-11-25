@@ -117,7 +117,7 @@ func TestListenerPartitionSessionCountAfterProtocolStop(t *testing.T) {
 				[]*topicreadercommon.PublicReadSelector{{Path: "topic"}}, reconnector.PartitionSessionCounts,
 			)
 			require.NoError(t, err)
-			t.Cleanup(func() { require.NoError(t, reg()) })
+			t.Cleanup(reg)
 			metricValue := func() int64 {
 				var values []int64
 				require.NoError(t, callback(ctx, func(value int64, _ ...telemetry.Attribute) {
