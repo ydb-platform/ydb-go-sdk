@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -43,6 +44,63 @@ func TestReaderSessionErrorPanicPreservesInitError(t *testing.T) {
 	}
 	require.ErrorIs(t, reader.WaitInit(ctx), connectErr)
 	require.NoError(t, reader.Close(ctx))
+}
+
+func TestReaderCloseFromWorkerTrace(t *testing.T) {
+	for _, hook := range []string{"first-credit", "messages-received"} {
+		t.Run(hook, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			ready := make(chan struct{})
+			result := make(chan error, 1)
+			var reader *topicreader.Reader
+			closeReader := func() {
+				<-ready
+				err := reader.Close(ctx)
+				defer func() { result <- err }()
+				if err == nil {
+					panic("observer panic after worker was joined")
+				}
+			}
+			var tracer trace.Topic
+			stream := &readerCloseStream{messages: make(chan rawtopicreader.ServerMessage, 3), closed: make(chan struct{})}
+			stream.messages <- &rawtopicreader.InitResponse{SessionID: "session"}
+			if hook == "first-credit" {
+				tracer.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
+					if info.BytesDelta > 0 {
+						closeReader()
+					}
+				}
+			} else {
+				tracer.OnReaderMessagesReceived = func(trace.TopicReaderMessagesReceivedInfo) { closeReader() }
+				stream.messages <- &rawtopicreader.StartPartitionSessionRequest{
+					PartitionSession: rawtopicreader.PartitionSession{PartitionSessionID: 1, Path: "/topic"},
+				}
+				stream.messages <- &rawtopicreader.ReadResponse{
+					PartitionData: []rawtopicreader.PartitionData{{
+						PartitionSessionID: 1,
+						Batches:            []rawtopicreader.Batch{{MessageData: []rawtopicreader.MessageData{{}}}},
+					}},
+				}
+			}
+			internalReader, err := topicreaderinternal.NewReader(nil,
+				func(context.Context, int64, *trace.Topic) (topicreadercommon.RawTopicReaderStream, error) {
+					return stream, nil
+				}, "consumer", []topicreadercommon.PublicReadSelector{{Path: "/topic"}},
+				topicoptions.WithReaderStartTimeout(time.Minute),
+				topicoptions.WithReaderTrace(tracer),
+			)
+			require.NoError(t, err)
+			reader = topicreader.NewReader(internalReader)
+			close(ready)
+			select {
+			case err := <-result:
+				require.NoError(t, err)
+			case <-ctx.Done():
+				t.Fatal("worker trace did not return from Reader.Close")
+			}
+		})
+	}
 }
 
 func TestReaderCloseFromTerminalSessionError(t *testing.T) {
@@ -124,4 +182,26 @@ func TestReaderCloseFromRetrySessionError(t *testing.T) {
 	}
 	require.ErrorContains(t, reader.WaitInit(ctx), "ydb: reader closed")
 	require.NoError(t, reader.Close(ctx))
+}
+
+type readerCloseStream struct {
+	messages chan rawtopicreader.ServerMessage
+	closed   chan struct{}
+}
+
+func (s *readerCloseStream) Recv() (rawtopicreader.ServerMessage, error) {
+	select {
+	case msg := <-s.messages:
+		return msg, nil
+	case <-s.closed:
+		return nil, context.Canceled
+	}
+}
+
+func (*readerCloseStream) Send(rawtopicreader.ClientMessage) error { return nil }
+
+func (s *readerCloseStream) CloseSend() error {
+	close(s.closed)
+
+	return nil
 }

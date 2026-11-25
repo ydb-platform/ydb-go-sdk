@@ -1,6 +1,7 @@
 package topicreaderinternal
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -24,5 +25,14 @@ func BenchmarkReaderBalanceWithoutObservers(b *testing.B) {
 		reader.releaseLocalBuffer(1)
 		reader.changeCreditBalance(1024)
 		reader.changeCreditBalance(-1024)
+	}
+}
+
+func BenchmarkReaderCreditWithObserver(b *testing.B) {
+	reader := topicStreamReaderImpl{cfg: newTopicStreamReaderConfig(), ctx: context.Background()}
+	reader.cfg.Trace.OnReaderCreditBalanceChanged = func(trace.TopicReaderCreditBalanceChangedInfo) {}
+	b.ReportAllocs()
+	for b.Loop() {
+		reader.changeCreditBalance(1)
 	}
 }
