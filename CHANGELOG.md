@@ -1,4 +1,6 @@
 * Added experimental `ydb.WithMeter` and `telemetry.Meter` to expose the `ydb.topic.reader.partition_session.count` gauge through an application-owned backend, with `topicoptions.WithReaderName` and `topicoptions.WithListenerReaderName` to set the `reader.name` attribute
+
+## v3.157.5
 * Removed the copy of `topicwriter.Message.Data` into an intermediate growing buffer before compression: `bytes.Reader` and `bytes.Buffer` data is written straight into the compressor, a `strings.Reader` is copied into a presized pooled buffer
 ## v3.157.4
 * Fixed panic in `decimal.Format` and `decimal.Decimal.String` for a zero value with zero scale
