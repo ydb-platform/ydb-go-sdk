@@ -38,6 +38,7 @@ func Meter(meter metric.Meter) telemetry.Meter {
 		registry = &gaugeRegistry{gauges: make(map[gaugeKey]*gaugeRegistration)}
 		identity = nil
 	}
+
 	return func(desc telemetry.Descriptor, callback telemetry.Int64GaugeCallback) (func() error, error) {
 		key := gaugeKey{meter: identity, name: desc.Name}
 		registry.mu.Lock()
