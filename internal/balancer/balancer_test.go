@@ -1716,6 +1716,58 @@ func TestClusterDiscoveryAttemptReturnsLocalDCDetectorError(t *testing.T) {
 	require.ErrorIs(t, err, expectedErr)
 }
 
+func TestClusterDiscoveryKeepsNearestDCWhenRefreshProbeFails(t *testing.T) {
+	ctx := t.Context()
+	clock := clockwork.NewFakeClock()
+	p := userBalancers.WithMaxConnections(userBalancers.PreferNearestDC(userBalancers.RandomChoice()), 2)
+	cfg := config.New(config.WithBalancer(p))
+	pool := conn.NewPool(ctx, cfg)
+	defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
+
+	endpoints := []endpoint.Endpoint{
+		endpoint.New("node1:2135", endpoint.WithID(1), endpoint.WithLocation("near")),
+		endpoint.New("node2:2135", endpoint.WithID(2), endpoint.WithLocation("near")),
+		endpoint.New("node3:2135", endpoint.WithID(3), endpoint.WithLocation("far")),
+	}
+	var probeErr error
+	b := &Balancer{
+		driverConfig:       cfg,
+		discoveryConfig:    discoveryConfig.New(discoveryConfig.WithClock(clock)),
+		policy:             p,
+		pool:               pool,
+		random:             noShuffleRand{},
+		endpointCloseDelay: time.Minute,
+		discover: func(context.Context, *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
+			return endpoints, "", nil
+		},
+		localDCDetector: func(context.Context, []endpoint.Endpoint) (string, error) {
+			return "near", probeErr
+		},
+	}
+	defer func() { require.NoError(t, b.Close(ctx)) }()
+
+	require.NoError(t, b.clusterDiscoveryAttempt(ctx, nil))
+	require.ElementsMatch(t, []uint32{1, 2}, activeNodeIDs(b))
+	surviving := connByNodeID(b, 1)
+	removed := connByNodeID(b, 2)
+	require.NotNil(t, surviving)
+	require.NotNil(t, removed)
+
+	probeErr = errors.New("local DC probe failed")
+	endpoints = []endpoint.Endpoint{endpoints[0], endpoints[2]}
+	require.ErrorIs(t, b.clusterDiscoveryAttempt(ctx, nil), probeErr)
+
+	selected, err := b.nextConn(ctx)
+	require.NoError(t, err)
+	require.Same(t, surviving, selected)
+	require.Equal(t, []uint32{1}, activeNodeIDs(b))
+
+	clock.Advance(time.Minute)
+	require.Eventually(t, func() bool {
+		return removed.State() == state.Destroyed
+	}, time.Second, 10*time.Millisecond)
+}
+
 func TestPolicyUsesFreshDiscoveryEndpointBeforePoolGet(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.New()
@@ -1904,7 +1956,7 @@ func TestNextAvailableConnStopsWhenBalancerClosesDuringSelection(t *testing.T) {
 }
 
 func TestNextAvailableConnStopsWhenElectionSnapshotIsEmpty(t *testing.T) {
-	connections := newConnectionsStateWithPriorities(nil, nil, nil, nil)
+	connections := newConnectionsStateWithPriorities(nil, nil, nil, nil, "")
 	balancer := &Balancer{}
 	balancer.connectionsState.Store(connections)
 
@@ -1936,6 +1988,7 @@ func TestNextConnReturnsNoEndpointsWhenElectionSnapshotIsEmpty(t *testing.T) {
 		[]policy.EndpointPriority{{Key: connection.Endpoint().Key()}},
 		nil,
 		nil,
+		"",
 	)
 	balancer := &Balancer{driverConfig: config.New()}
 	balancer.connectionsState.Store(connections)
@@ -2866,6 +2919,8 @@ func TestBalancerDiscoveryDefaultCloseDelayAfterFullReplacement(t *testing.T) {
 	dialWhoAmI(t, b, 1)
 	dialWhoAmI(t, b, 2)
 	old := b.connections().All()
+	oldNode2 := connByNodeID(b, 2)
+	require.NotNil(t, oldNode2)
 
 	server.setNodeIDs([]uint32{3, 4})
 	require.NoError(t, b.clusterDiscoveryAttemptWithDial(ctx))
@@ -2884,6 +2939,7 @@ func TestBalancerDiscoveryDefaultCloseDelayAfterFullReplacement(t *testing.T) {
 		t.Fatal("the default timeout did not start closing the old connections")
 	}
 
+	server.setNodeIDs([]uint32{2, 3, 4})
 	discoveryDone := make(chan error, 1)
 	go func() {
 		discoveryDone <- b.clusterDiscoveryAttemptWithDial(ctx)
@@ -2895,11 +2951,18 @@ func TestBalancerDiscoveryDefaultCloseDelayAfterFullReplacement(t *testing.T) {
 		t.Fatal("closing the old connection blocked discovery")
 	}
 
+	newNode2 := connByNodeID(b, 2)
+	require.NotNil(t, newNode2)
+	require.NotSame(t, oldNode2, newNode2, "the expired connection must not be reused")
+	require.Eventually(t, func() bool {
+		return oldNode2.State() == state.Destroyed
+	}, time.Second, 10*time.Millisecond, "the first close must not delay closing the other channel")
+
 	resumeClose()
 	require.Eventually(t, func() bool {
 		return old[0].State() == state.Destroyed && old[1].State() == state.Destroyed
 	}, time.Second, 10*time.Millisecond)
-	require.ElementsMatch(t, []uint32{3, 4}, activeNodeIDs(b))
+	require.ElementsMatch(t, []uint32{2, 3, 4}, activeNodeIDs(b))
 }
 
 func TestBalancerDiscoveryEndpointCloseDelayAfterRediscovery(t *testing.T) {

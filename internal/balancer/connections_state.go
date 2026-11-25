@@ -14,8 +14,9 @@ type connectionsState struct {
 	connByNodeID map[uint32]conn.Conn
 	elector      *endpointElector
 
-	all        []conn.Conn
-	quarantine []conn.Conn
+	all          []conn.Conn
+	quarantine   []conn.Conn
+	selfLocation string
 }
 
 func newConnectionsStateWithPriorities(
@@ -23,6 +24,7 @@ func newConnectionsStateWithPriorities(
 	priorities []policy.EndpointPriority,
 	quarantine []conn.Conn,
 	rand xrand.Rand,
+	selfLocation string,
 ) *connectionsState {
 	connectionsByKey := make(map[endpoint.Key]conn.Conn, len(connections))
 	for _, connection := range connections {
@@ -32,6 +34,7 @@ func newConnectionsStateWithPriorities(
 		connByNodeID: connsToNodeIDMap(connections),
 		all:          append([]conn.Conn(nil), connections...),
 		quarantine:   quarantine,
+		selfLocation: selfLocation,
 	}
 	result.elector = newEndpointElector(priorities, connectionsByKey, rand)
 

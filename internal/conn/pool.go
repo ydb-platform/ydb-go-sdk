@@ -95,14 +95,19 @@ func (p *Pool) get(e endpoint.Endpoint) *connValue {
 // Put decrements the connection use count. When the count reaches zero, the gRPC
 // connection is closed and the entry is removed from the pool.
 func (p *Pool) Put(ctx context.Context, c Conn) {
-	cc, ok := c.(*conn)
-	if !ok || cc == nil {
-		return
-	}
-
-	if !p.tryPut(cc) {
+	if cc := p.ReleaseConn(c); cc != nil {
 		_ = cc.Close(ctx)
 	}
+}
+
+// ReleaseConn releases a pool reference and returns the connection if the caller must close it.
+func (p *Pool) ReleaseConn(c Conn) closer.Closer {
+	cc, ok := c.(*conn)
+	if !ok || cc == nil || p.tryPut(cc) {
+		return nil
+	}
+
+	return cc
 }
 
 func (p *Pool) tryPut(c *conn) bool {

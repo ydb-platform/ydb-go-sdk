@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
@@ -230,8 +231,8 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 	if b.policy.DetectsNearestDC() {
 		nearestDC, detectErr := b.localDCDetector(ctx, endpoints)
 		if detectErr != nil {
-			if b.endpointCloseDelay > 0 && b.connections() != nil {
-				b.applyDiscoveredEndpoints(ctx, endpoints, location)
+			if previous := b.connections(); b.endpointCloseDelay > 0 && previous != nil {
+				b.applyDiscoveredEndpoints(ctx, endpoints, previous.selfLocation)
 			}
 
 			return xerrors.WithStackTrace(detectErr)
@@ -309,12 +310,20 @@ func (b *Balancer) scheduleEndpointClose(
 			return
 		}
 		connections := b.takePendingEndpointClose()
-		b.endpointClosures.Add(1)
+		closing := make([]closer.Closer, 0, len(connections))
+		for _, cc := range connections {
+			if released := b.pool.ReleaseConn(cc); released != nil {
+				closing = append(closing, released)
+			}
+		}
+		b.endpointClosures.Add(len(closing))
 		b.closeMu.Unlock()
 
-		defer b.endpointClosures.Done()
-		for _, cc := range connections {
-			b.pool.Put(closeCtx, cc)
+		for _, cc := range closing {
+			go func() {
+				defer b.endpointClosures.Done()
+				_ = cc.Close(closeCtx)
+			}()
 		}
 	})
 	b.pendingClose = pending
@@ -397,7 +406,7 @@ func (b *Balancer) applyDiscoveredEndpoints(
 		b.lastDiscovered = append(b.lastDiscovered[:0], endpoints...)
 	}
 	b.connectionsState.Store(newConnectionsStateWithPriorities(
-		connections, selectedPriorities, quarantine, nil,
+		connections, selectedPriorities, quarantine, nil, selfLocation,
 	))
 }
 
@@ -820,7 +829,7 @@ func (b *Balancer) tryAddPinnedConnection(nodeID uint32) (connection, rejected c
 		Excluded: true,
 	})
 	b.connectionsState.Store(newConnectionsStateWithPriorities(
-		connections, priorities, current.quarantine, current.elector.rand,
+		connections, priorities, current.quarantine, current.elector.rand, current.selfLocation,
 	))
 
 	return connection, nil
