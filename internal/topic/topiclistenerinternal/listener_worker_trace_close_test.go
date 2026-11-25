@@ -49,13 +49,12 @@ func TestTopicListenerCloseFromWorkerTrace(t *testing.T) {
 				sent := make(chan struct{})
 				handler = retireAfterCredit{sent: sent}
 				tracer.OnListenerCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
-					if info.BytesDelta < 0 {
-						closeListener()
-					}
-				}
-				tracer.OnListenerSendDataRequest = func(info trace.TopicListenerSendDataRequestInfo) {
-					if info.MessageType == "ReadRequest" {
+					if info.BytesDelta > 0 {
+						// Retire after the positive delta is observed, so compensation
+						// cannot be coalesced into that same pending event.
 						close(sent)
+					} else if info.BytesDelta < 0 {
+						closeListener()
 					}
 				}
 			}
