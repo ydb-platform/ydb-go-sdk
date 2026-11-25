@@ -104,12 +104,7 @@ func (p *wirePart) row(index int, columns []*Ydb.Column) *wireRow {
 	return &p.rowObjects[index]
 }
 
-// decodeWirePart copies and decodes a FORMAT_VALUE response part.
-func decodeWirePart(data []byte) (*wirePart, error) {
-	// A row may outlive the next RecvMsg, so the part must own its wire bytes.
-	return decodeOwnedPart(bytes.Clone(data), new(Ydb_Query.ExecuteQueryResponsePart))
-}
-
+// decodeOwnedPart takes ownership of frame. Rows can reference it after the next RecvMsg.
 func decodeOwnedPart(frame []byte, meta *Ydb_Query.ExecuteQueryResponsePart) (*wirePart, error) {
 	// Row offsets must fit in rowSpan's uint32 fields.
 	if uint(len(frame)) > math.MaxUint32 {
@@ -300,6 +295,7 @@ func (c *rowCells) Next() bool {
 		value := c.data[tagLen : tagLen+valueLen]
 		c.data = c.data[tagLen+valueLen:]
 		if field == wirevalue.ValueItemsField && wireType == wirevalue.ValueItemsWireType {
+			// ConsumeFieldValue validated the length prefix and payload above.
 			c.cell, _ = protowire.ConsumeBytes(value)
 
 			return true

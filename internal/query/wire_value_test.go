@@ -1,6 +1,7 @@
 package query
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"testing"
@@ -425,6 +426,10 @@ func testWireOptionalDestination[T any](t *testing.T, first, second value.Value)
 
 func wirePrimitive(id Ydb.Type_PrimitiveTypeId) *Ydb.Type {
 	return &Ydb.Type{Type: &Ydb.Type_TypeId{TypeId: id}}
+}
+
+func decodeWirePart(data []byte) (*wirePart, error) {
+	return decodeOwnedPart(bytes.Clone(data), new(Ydb_Query.ExecuteQueryResponsePart))
 }
 
 func wireOptional(id Ydb.Type_PrimitiveTypeId) *Ydb.Type {

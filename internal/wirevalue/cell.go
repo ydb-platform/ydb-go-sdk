@@ -155,6 +155,8 @@ type fields struct {
 	err    error
 }
 
+// On success, value contains one complete field payload validated for kind.
+// Callers can consume it with the matching protowire function without checking its length again.
 func (f *fields) next() bool {
 	if len(f.data) == 0 || f.err != nil {
 		return false

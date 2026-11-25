@@ -21,6 +21,7 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -39,11 +40,21 @@ func TestSessionCorePreservesRowDecoding(t *testing.T) {
 			if tt.wire {
 				client = WireQueryClient(client)
 			}
-			core, err := Open(t.Context(), client, WithConn(cc))
+			ctx := t.Context()
+			decorated := struct {
+				Ydb_Query_V1.QueryServiceClient
+			}{client}
+			c, err := newWithQueryServiceClient(ctx, decorated, cc, config.New(config.WithProtoWireDecoding(tt.wire)))
 			require.NoError(t, err)
-			defer core.Close(t.Context())
+			defer c.Close(ctx)
 
-			require.IsType(t, client, core.Client, "binding the session to its node must preserve row decoding")
+			row, err := c.QueryRow(ctx, "SELECT id FROM test LIMIT 1")
+			require.NoError(t, err)
+			var id uint64
+			require.NoError(t, row.Scan(&id))
+			require.Equal(t, uint64(42), id)
+			_, wire := row.(*wireRow)
+			require.Equal(t, tt.wire, wire, "binding the session to its node must preserve row decoding")
 		})
 	}
 }

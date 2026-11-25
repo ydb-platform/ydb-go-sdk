@@ -852,6 +852,7 @@ func newWithQueryServiceClient(ctx context.Context,
 
 			s, err := createSession(ctx, client,
 				WithConn(cc),
+				withProtoWireDecoding(cfg.ProtoWireDecoding()),
 				WithDeleteTimeout(cfg.SessionDeleteTimeout()),
 				WithPoolName(cfg.PoolName()),
 				WithRegisterCloseCancel(c.registerCloseCancel),

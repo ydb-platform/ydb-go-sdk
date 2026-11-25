@@ -42,11 +42,12 @@ type (
 		SetStatus(code Status)
 	}
 	sessionCore struct {
-		cc             grpc.ClientConnInterface
-		Client         Ydb_Query_V1.QueryServiceClient
-		Trace          *trace.Query
-		closed         atomic.Bool
-		closedReported atomic.Bool
+		cc                grpc.ClientConnInterface
+		protoWireDecoding bool
+		Client            Ydb_Query_V1.QueryServiceClient
+		Trace             *trace.Query
+		closed            atomic.Bool
+		closedReported    atomic.Bool
 
 		deleteTimeout  time.Duration
 		id             string
@@ -127,6 +128,12 @@ func WithConn(cc grpc.ClientConnInterface) Option {
 	}
 }
 
+func withProtoWireDecoding(enabled bool) Option {
+	return func(c *sessionCore) {
+		c.protoWireDecoding = enabled
+	}
+}
+
 func OnChangeStatus(onChangeStatus func(status Status)) Option {
 	return func(c *sessionCore) {
 		c.onChangeStatus = append(c.onChangeStatus, onChangeStatus)
@@ -196,7 +203,7 @@ func Open(
 				return meta.WithTrailerCallback(balancerContext.WithNodeID(ctx, core.NodeID()), core.checkCloseHint)
 			}),
 		)
-		if _, ok := client.(wireQueryClient); ok {
+		if core.protoWireDecoding {
 			core.Client = WireQueryClient(core.Client)
 		}
 	}
