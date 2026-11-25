@@ -1337,8 +1337,10 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	const testClientSessionID = 115
 	const testSessionComitted = 20
 
+	// Like sessions started by the server, the session is a child of the
+	// stream context, so the stream teardown closes it.
 	session := topicreadercommon.NewPartitionSession(
-		ctx,
+		reader.ctx,
 		"/test",
 		testPartitionID,
 		reader.readerID,

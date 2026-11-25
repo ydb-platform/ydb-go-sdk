@@ -956,9 +956,6 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 	if !isFirstClose {
 		return nil
 	}
-	for _, session := range r.sessionController.GetAll() {
-		session.Close()
-	}
 	r.finalizeCreditBalance()
 
 	closeErr = r.committer.Close(ctx, reason)
