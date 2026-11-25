@@ -68,9 +68,7 @@ func TraceReaderSessionError(
 	}
 
 	classification := ClassifySessionError(err)
-	callbackDone := make(chan any, 1)
-	go func(traceCtx context.Context) {
-		defer func() { callbackDone <- recover() }()
+	waitForSessionTrace(ctx, func(traceCtx context.Context) {
 		gtrace.TopicOnReaderSessionError(
 			tracer,
 			&traceCtx,
@@ -80,7 +78,15 @@ func TraceReaderSessionError(
 			classification.ErrorType,
 			err,
 		)
-	}(ctx)
+	})
+}
+
+func waitForSessionTrace(ctx context.Context, callback func(context.Context)) {
+	callbackDone := make(chan any, 1)
+	go func() {
+		defer func() { callbackDone <- recover() }()
+		callback(ctx)
+	}()
 
 	// Close cancels the worker before joining it. Stop waiting on cancellation
 	// so a callback that calls Close does not wait on itself. After that point

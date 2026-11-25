@@ -30,5 +30,9 @@ func ComposeReader(lhs, rhs *trace.Topic, opts ...TopicComposeOption) *trace.Top
 		t.OnReaderSessionError = nil
 	}
 
+	if lhs.OnReaderCommittedNotify == nil && rhs.OnReaderCommittedNotify == nil {
+		t.OnReaderCommittedNotify = nil
+	}
+
 	return t
 }

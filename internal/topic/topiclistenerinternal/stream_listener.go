@@ -47,7 +47,6 @@ type streamListener struct {
 	listenerID  string
 
 	background       background.Worker
-	reconnectorDone  <-chan struct{}
 	sessions         *topicreadercommon.PartitionSessionStorage
 	sessionIDCounter *atomic.Int64
 
@@ -56,6 +55,7 @@ type streamListener struct {
 
 	freeBytes chan int
 
+	closeTrace         func()
 	creditBalance      topicreadercommon.MetricBalance
 	localBufferBalance topicreadercommon.MetricBalance
 	closing            atomic.Bool
@@ -87,7 +87,6 @@ func newStreamListener(
 		cfg:              config,
 		handler:          eventListener,
 		background:       *background.NewWorker(xcontext.ValueOnly(connectionCtx), "topic reader stream listener"),
-		reconnectorDone:  connectionCtx.Done(),
 		sessionIDCounter: sessionIDCounter,
 		listenerID:       listenerID,
 		tracer:           config.Tracer,
@@ -123,6 +122,7 @@ func newStreamListener(
 		},
 	)
 
+	res.tracer, res.closeTrace = topicreadercommon.StreamTrace(res.tracer, config.ReaderInfo, res.closeOnTracePanic)
 	res.startBackground()
 	select {
 	case res.freeBytes <- config.BufferSize:
@@ -130,6 +130,10 @@ func newStreamListener(
 	}
 
 	return res, nil
+}
+
+func (l *streamListener) closeOnTracePanic(err error) {
+	l.goClose(l.background.Context(), xerrors.WithStackTrace(err))
 }
 
 func (l *streamListener) Close(ctx context.Context, reason error) error {
@@ -157,7 +161,6 @@ func (l *streamListener) finishClose(cleanupCtx context.Context, reason error, d
 	closeDone := gtrace.TopicOnListenerClose(l.tracer, &logCtx, l.listenerID, l.sessionID, reason)
 
 	var resErrors []error
-	l.finalizeBalances(reason)
 
 	if l.streamClose != nil {
 		l.streamClose(reason)
@@ -170,6 +173,11 @@ func (l *streamListener) finishClose(cleanupCtx context.Context, reason error, d
 	// Canceling the listener also stops each partition worker. Its callback
 	// closes the worker asynchronously, because it may run in the worker itself.
 	l.workerCloseWG.Wait()
+	l.finalizeCreditBalance()
+	l.finalizeLocalBuffer()
+	if l.closeTrace != nil {
+		l.closeTrace()
+	}
 
 	if l.syncCommitter != nil {
 		if err := l.syncCommitter.Close(cleanupCtx, reason); err != nil &&
@@ -445,48 +453,7 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 
 func (l *streamListener) changeCreditBalance(delta int) {
 	if l.tracer != nil && l.tracer.OnReaderCreditBalanceChanged != nil {
-		l.runWorkerTrace(func() { l.creditBalance.Change(delta, l.traceCreditDelta) })
-	}
-}
-
-// Wait for delivery unless Close is joining this worker. Buffered completion
-// also consumes late panics when there is no longer a worker to re-panic on.
-func (l *streamListener) runWorkerTrace(callback func()) bool {
-	return waitForWorkerTrace(l.background.Done(), callback)
-}
-
-func waitForWorkerTrace(stop <-chan struct{}, callback func()) bool {
-	done := make(chan any, 1)
-	go func() {
-		defer func() { done <- recover() }()
-		callback()
-	}()
-	select {
-	case p := <-done:
-		if p != nil {
-			panic(p)
-		}
-
-		return true
-	case <-stop:
-		return false
-	}
-}
-
-func (l *streamListener) finalizeBalances(reason error) {
-	if l.tracer == nil || (l.tracer.OnReaderCreditBalanceChanged == nil && l.tracer.OnReaderLocalBufferChanged == nil) {
-		return
-	}
-	finalize := func() {
-		l.finalizeCreditBalance()
-		l.finalizeLocalBuffer()
-	}
-	// During autonomous retirement the reconnector joins finishClose, before
-	// the stream workers are canceled. Public Close cancels the reconnector.
-	if !errors.Is(reason, ErrUserCloseTopic) && l.reconnectorDone != nil {
-		waitForWorkerTrace(l.reconnectorDone, finalize)
-	} else {
-		finalize()
+		l.creditBalance.Change(delta, l.traceCreditDelta)
 	}
 }
 
@@ -517,11 +484,7 @@ func (l *streamListener) changeLocalBuffer(delta int) bool {
 		return false
 	}
 
-	var reserved bool
-
-	return l.runWorkerTrace(func() {
-		reserved = l.localBufferBalance.ChangeBuffer(delta, l.traceLocalBufferDelta)
-	}) && reserved
+	return l.localBufferBalance.ChangeBuffer(delta, l.traceLocalBufferDelta)
 }
 
 func (l *streamListener) finalizeLocalBuffer() {
@@ -626,10 +589,14 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 			continue
 		}
 		if observeReceipt && accepted {
-			l.runWorkerTrace(func() {
-				traceCtx := l.background.Context()
-				gtrace.TopicOnReaderMessagesReceived(l.tracer, &traceCtx, l.cfg.ReaderInfo, topic, messagesCount)
-			})
+			traceCtx := l.background.Context()
+			gtrace.TopicOnReaderMessagesReceived(
+				l.tracer,
+				&traceCtx,
+				l.cfg.ReaderInfo,
+				topic,
+				messagesCount,
+			)
 		}
 	}
 
@@ -655,15 +622,18 @@ func (l *streamListener) onCommitResponse(msg *rawtopicreader.CommitOffsetRespon
 		l.syncCommitter.OnCommitNotify(session, commit.CommittedOffset)
 
 		// Emit trace event - use partition context instead of background
-		if l.tracer != nil && l.tracer.OnReaderCommittedNotify != nil {
-			l.runWorkerTrace(func() {
-				logCtx := session.Context()
-				gtrace.TopicOnReaderCommittedNotify(
-					l.tracer, &logCtx, l.cfg.ReaderInfo, l.listenerID, session.Topic, session.PartitionID,
-					session.StreamPartitionSessionID.ToInt64(), commit.CommittedOffset.ToInt64(), messagesCount,
-				)
-			})
-		}
+		logCtx := session.Context()
+		gtrace.TopicOnReaderCommittedNotify(
+			l.tracer,
+			&logCtx,
+			l.cfg.ReaderInfo,
+			l.listenerID,
+			session.Topic,
+			session.PartitionID,
+			session.StreamPartitionSessionID.ToInt64(),
+			commit.CommittedOffset.ToInt64(),
+			messagesCount,
+		)
 	}
 
 	return nil
@@ -817,7 +787,7 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 					}()
 				})
 			},
-			l.partitionWorkerTrace(),
+			l.tracer,
 			l.listenerID,
 		)
 		worker.onLocalBufferDelta = l.changeLocalBuffer
@@ -828,19 +798,6 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 	})
 
 	return worker
-}
-
-func (l *streamListener) partitionWorkerTrace() *trace.Topic {
-	if l.tracer == nil || l.tracer.OnReaderMessagesDelivered == nil {
-		return l.tracer
-	}
-	tracer := *l.tracer
-	delivered := tracer.OnReaderMessagesDelivered
-	tracer.OnReaderMessagesDelivered = func(info trace.TopicReaderMessagesDeliveredInfo) {
-		l.runWorkerTrace(func() { delivered(info) })
-	}
-
-	return &tracer
 }
 
 // routeToWorker routes a message to the appropriate worker.

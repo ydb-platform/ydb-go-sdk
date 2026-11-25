@@ -134,6 +134,28 @@ func (c *UnboundedChan[T]) DrainBuffered() []T {
 	return drained
 }
 
+// Range consumes the FIFO until closed and drained. Its single consumer swaps
+// batches under the mutex and invokes callbacks without holding the queue lock.
+func (c *UnboundedChan[T]) Range(yield func(T)) {
+	var batch []T
+	for {
+		c.mutex.Lock()
+		batch, c.buffer = c.buffer, batch[:0]
+		closed := c.closed
+		c.mutex.Unlock()
+		for _, msg := range batch {
+			yield(msg)
+		}
+		clear(batch)
+		if closed {
+			return
+		}
+		if len(batch) == 0 {
+			<-c.signal
+		}
+	}
+}
+
 // Close closes the channel.
 // After closing, Send and SendWithMerge operations will be ignored,
 // and Receive will return (zero_value, false) once the buffer is empty.

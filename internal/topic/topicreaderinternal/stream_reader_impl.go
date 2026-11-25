@@ -58,6 +58,7 @@ type topicStreamReaderImpl struct {
 	readConnectionID string
 	readerID         int64
 
+	closeTrace         func()
 	creditBalance      topicreadercommon.MetricBalance
 	localBufferBalance topicreadercommon.MetricBalance
 
@@ -140,7 +141,12 @@ func newTopicStreamReader(
 	if err = reader.initSession(); err != nil {
 		return nil, err
 	}
+	reader.startTrace()
 	if err = reader.startBackgroundWorkers(); err != nil {
+		if reader.closeTrace != nil {
+			reader.closeTrace()
+		}
+
 		return nil, err
 	}
 
@@ -184,6 +190,12 @@ func newTopicStreamReaderStopped(
 	res.batchTxStorage = newBatchTxStorage(cfg.Consumer)
 
 	return res
+}
+
+func (r *topicStreamReaderImpl) startTrace() {
+	r.cfg.Trace, r.closeTrace = topicreadercommon.StreamTrace(r.cfg.Trace, r.cfg.ReaderInfo, func(err error) {
+		_ = r.CloseWithError(context.Background(), xerrors.WithStackTrace(err))
+	})
 }
 
 func (r *topicStreamReaderImpl) ReadSessionID() string {
@@ -399,6 +411,12 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 func (r *topicStreamReaderImpl) releaseLocalBufferForBatch(batch *topicreadercommon.PublicBatch) {
 	if batch == nil || len(batch.Messages) == 0 {
 		return
+	}
+	if r.closeTrace != nil && r.cfg.Trace.OnReaderLocalBufferChanged != nil {
+		// Application reads aren't joined by backgroundWorkers. Finish their last
+		// enqueue before shutdown seals the FIFO.
+		r.m.RLock()
+		defer r.m.RUnlock()
 	}
 	r.releaseLocalBuffer(len(batch.Messages))
 }
@@ -816,31 +834,7 @@ func (r *topicStreamReaderImpl) freeBufferFromMessages(batch *topicreadercommon.
 
 func (r *topicStreamReaderImpl) changeCreditBalance(delta int) {
 	if r.cfg.Trace != nil && r.cfg.Trace.OnReaderCreditBalanceChanged != nil {
-		r.runWorkerTrace(func() { r.creditBalance.Change(delta, r.traceCreditDelta) })
-	}
-}
-
-// Wait for normal delivery, but not for an observer that is joining this worker
-// in Close. A late panic has no waiting worker; its buffered result is discarded.
-func (r *topicStreamReaderImpl) runWorkerTrace(callback func()) bool {
-	return waitForWorkerTrace(r.ctx.Done(), callback)
-}
-
-func waitForWorkerTrace(stop <-chan struct{}, callback func()) bool {
-	done := make(chan any, 1)
-	go func() {
-		defer func() { done <- recover() }()
-		callback()
-	}()
-	select {
-	case p := <-done:
-		if p != nil {
-			panic(p)
-		}
-
-		return true
-	case <-stop:
-		return false
+		r.creditBalance.Change(delta, r.traceCreditDelta)
 	}
 }
 
@@ -870,11 +864,7 @@ func (r *topicStreamReaderImpl) reserveLocalBuffer(messagesCount int) bool {
 		return false
 	}
 
-	var reserved bool
-
-	return r.runWorkerTrace(func() {
-		reserved = r.localBufferBalance.ChangeBuffer(messagesCount, r.traceLocalBufferDelta)
-	}) && reserved
+	return r.localBufferBalance.ChangeBuffer(messagesCount, r.traceLocalBufferDelta)
 }
 
 func (r *topicStreamReaderImpl) releaseLocalBuffer(messagesCount int) {
@@ -928,10 +918,8 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 		accepted = make(map[string]int)
 		defer func() {
 			for topic, count := range accepted {
-				r.runWorkerTrace(func() {
-					ctx := r.cfg.BaseContext
-					gtrace.TopicOnReaderMessagesReceived(r.cfg.Trace, &ctx, r.cfg.ReaderInfo, topic, count)
-				})
+				ctx := r.cfg.BaseContext
+				gtrace.TopicOnReaderMessagesReceived(r.cfg.Trace, &ctx, r.cfg.ReaderInfo, topic, count)
 			}
 		}()
 	}
@@ -951,7 +939,7 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 		reserved := r.reserveLocalBuffer(messagesCount)
 		if err := r.batcher.PushBatches(batches[i]); err != nil {
 			if reserved {
-				r.runWorkerTrace(func() { r.releaseLocalBuffer(messagesCount) })
+				r.releaseLocalBuffer(messagesCount)
 			}
 
 			return err
@@ -986,16 +974,9 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 	if !isFirstClose {
 		return nil
 	}
-	if r.cfg.Trace != nil && r.cfg.Trace.OnReaderCreditBalanceChanged != nil {
-		waitForWorkerTrace(ctx.Done(), r.finalizeCreditBalance)
-	}
-
 	closeErr = r.committer.Close(ctx, reason)
 
 	batcherErr := r.batcher.Close(reason)
-	if r.cfg.Trace != nil && r.cfg.Trace.OnReaderLocalBufferChanged != nil {
-		waitForWorkerTrace(ctx.Done(), r.finalizeLocalBuffer)
-	}
 	if closeErr == nil {
 		closeErr = batcherErr
 	}
@@ -1007,12 +988,37 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 	}
 
 	// close background workers after r.stream.CloseSend
-	bgCloseErr := r.backgroundWorkers.Close(ctx, reason)
+	bgCloseErr := r.joinAndFinalize(ctx, reason)
 	if closeErr == nil {
 		closeErr = bgCloseErr
 	}
 
 	return closeErr
+}
+
+func (r *topicStreamReaderImpl) joinAndFinalize(ctx context.Context, reason error) error {
+	if r.closeTrace == nil {
+		err := r.backgroundWorkers.Close(ctx, reason)
+		r.finalizeCreditBalance()
+		r.finalizeLocalBuffer()
+
+		return err
+	}
+	// Close may be initiated by a receive worker with its own canceled context.
+	// Join elsewhere before sealing the FIFO so its last submissions aren't lost.
+	stopped := make(chan error, 1)
+	go func() {
+		err := r.backgroundWorkers.Close(context.WithoutCancel(ctx), reason)
+		r.finalizeCreditBalance()
+		r.m.WithLock(func() { r.finalizeLocalBuffer(); r.closeTrace() })
+		stopped <- err
+	}()
+	select {
+	case err := <-stopped:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (r *topicStreamReaderImpl) onCommitResponse(msg *rawtopicreader.CommitOffsetResponse) error {
@@ -1024,16 +1030,18 @@ func (r *topicStreamReaderImpl) onCommitResponse(msg *rawtopicreader.CommitOffse
 		}
 		messagesCount := topicreadercommon.RegisterCommitAcknowledged(partition, commit.CommittedOffset)
 
-		if r.cfg.Trace != nil && r.cfg.Trace.OnReaderCommittedNotify != nil {
-			r.runWorkerTrace(func() {
-				logCtx := r.cfg.BaseContext
-				gtrace.TopicOnReaderCommittedNotify(
-					r.cfg.Trace, &logCtx, r.cfg.ReaderInfo, r.readConnectionID, partition.Topic,
-					partition.PartitionID, partition.StreamPartitionSessionID.ToInt64(),
-					commit.CommittedOffset.ToInt64(), messagesCount,
-				)
-			})
-		}
+		logCtx := r.cfg.BaseContext
+		gtrace.TopicOnReaderCommittedNotify(
+			r.cfg.Trace,
+			&logCtx,
+			r.cfg.ReaderInfo,
+			r.readConnectionID,
+			partition.Topic,
+			partition.PartitionID,
+			partition.StreamPartitionSessionID.ToInt64(),
+			commit.CommittedOffset.ToInt64(),
+			messagesCount,
+		)
 
 		r.committer.OnCommitNotify(partition, commit.CommittedOffset)
 	}
