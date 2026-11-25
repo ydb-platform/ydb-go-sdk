@@ -6,6 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/querytimestamp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -17,6 +18,9 @@ const (
 
 type Config struct {
 	config.Common
+
+	database         string
+	databaseIdentity *querytimestamp.Identity
 
 	poolLimit             int
 	poolName              string
@@ -37,6 +41,14 @@ type Config struct {
 	trace *trace.Query
 }
 
+func (c *Config) Database() string {
+	return c.database
+}
+
+func (c *Config) DatabaseIdentity() *querytimestamp.Identity {
+	return c.databaseIdentity
+}
+
 func (c *Config) DefaultArrowDecoder() arrow.Decoder {
 	return c.defaultArrowDecoder
 }
@@ -48,6 +60,7 @@ func New(opts ...Option) *Config {
 			opt(c)
 		}
 	}
+	c.databaseIdentity = querytimestamp.NewIdentity(c.database)
 
 	return c
 }

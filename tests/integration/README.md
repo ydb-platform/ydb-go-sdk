@@ -11,3 +11,9 @@ Arrow tests and benchmarks live in a [separate Go module](arrow/README.md) so
 Apache Arrow Go is not a dependency of the SDK module. Run them from
 `tests/integration/arrow`; `go test -tags integration ./tests/integration`
 does not include nested modules.
+
+StrictSerializableRW tests require a YDB nightly server with
+`TableServiceConfig.EnableStrictSerializableIsolation` enabled. Run them locally
+with `bash .github/scripts/strict-serializable-integration.sh` from the repository
+root. The script starts and removes its own Docker containers. Set
+`YDB_STRICT_TEST_PORT` if port 2136 is already in use.

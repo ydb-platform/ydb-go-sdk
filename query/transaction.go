@@ -80,6 +80,11 @@ func SerializableReadWriteTxControl(opts ...tx.ControlOption) *TransactionContro
 	return tx.SerializableReadWriteTxControl(opts...)
 }
 
+// StrictSerializableReadWriteTxControl selects strict serializable read-write mode.
+func StrictSerializableReadWriteTxControl(opts ...tx.ControlOption) *TransactionControl {
+	return tx.StrictSerializableReadWriteTxControl(opts...)
+}
+
 // OnlineReadOnlyTxControl returns online read-only transaction control
 func OnlineReadOnlyTxControl(opts ...tx.OnlineReadOnlyOption) *TransactionControl {
 	return TxControl(
@@ -120,6 +125,12 @@ func WithDefaultTxMode() TransactionOption {
 
 func WithSerializableReadWrite() TransactionOption {
 	return tx.WithSerializableReadWrite()
+}
+
+// WithStrictSerializableReadWrite selects strict serializable read-write mode for Query Service.
+// Applying this option to Table API settings panics because Table API has no corresponding mode.
+func WithStrictSerializableReadWrite() TransactionOption {
+	return tx.WithStrictSerializableReadWrite()
 }
 
 func WithSnapshotReadOnly() TransactionOption {
