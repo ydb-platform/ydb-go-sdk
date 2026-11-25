@@ -6,24 +6,44 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
 
-// Meter connects SDK gauge registration directly to an OTel meter.
+type gaugeKey struct {
+	meter metric.Meter
+	name  string
+}
+
+type gaugeRegistry struct {
+	mu     sync.Mutex
+	gauges map[gaugeKey]*gaugeRegistration
+}
+
+var sharedGauges = gaugeRegistry{gauges: make(map[gaugeKey]*gaugeRegistration)}
+
+// Meter connects SDK gauge registration directly to an OTel meter. Adapters
+// wrapping the same comparable meter (including SDK meters) share registrations.
+// For a non-comparable meter implementation, share the returned adapter instead.
 func Meter(meter metric.Meter) telemetry.Meter {
-	var mu sync.Mutex
-	gauges := make(map[string]*gaugeRegistration)
-
+	registry := &sharedGauges
+	identity := meter
+	if !reflect.ValueOf(meter).Comparable() {
+		registry = &gaugeRegistry{gauges: make(map[gaugeKey]*gaugeRegistration)}
+		identity = nil
+	}
 	return func(desc telemetry.Descriptor, callback telemetry.Int64GaugeCallback) (func() error, error) {
-		mu.Lock()
-		defer mu.Unlock()
+		key := gaugeKey{meter: identity, name: desc.Name}
+		registry.mu.Lock()
+		defer registry.mu.Unlock()
 
-		entry := gauges[desc.Name]
+		entry := registry.gauges[key]
 		if entry == nil {
 			gauge, err := meter.Int64ObservableGauge(desc.Name,
 				metric.WithDescription(desc.Description), metric.WithUnit(desc.Unit))
@@ -40,7 +60,7 @@ func Meter(meter metric.Meter) telemetry.Meter {
 				return nil, fmt.Errorf("register OTel gauge %q: %w", desc.Name, err)
 			}
 			entry.registration = reg
-			gauges[desc.Name] = entry
+			registry.gauges[key] = entry
 		} else {
 			entry.mu.Lock()
 			entry.callbacks[&callback] = struct{}{}
@@ -48,25 +68,36 @@ func Meter(meter metric.Meter) telemetry.Meter {
 		}
 
 		return sync.OnceValue(func() error {
-			mu.Lock()
-			defer mu.Unlock()
+			if reg := registry.detach(key, entry, &callback); reg != nil {
+				// OTel may wait for collection; neither adapter lock is held.
+				if err := reg.Unregister(); err != nil {
+					err = fmt.Errorf("unregister OTel gauge %q: %w", desc.Name, err)
+					otel.Handle(err)
 
-			entry.mu.Lock()
-			delete(entry.callbacks, &callback)
-			remaining := len(entry.callbacks)
-			entry.mu.Unlock()
-			if remaining != 0 {
-				return nil
-			}
-			delete(gauges, desc.Name)
-			// OTel may wait for collection; do not hold the callback-set mutex here.
-			if err := entry.registration.Unregister(); err != nil {
-				return fmt.Errorf("unregister OTel gauge %q: %w", desc.Name, err)
+					return err
+				}
 			}
 
 			return nil
 		}), nil
 	}
+}
+
+func (r *gaugeRegistry) detach(
+	key gaugeKey, entry *gaugeRegistration, callback *telemetry.Int64GaugeCallback,
+) metric.Registration {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+
+	delete(entry.callbacks, callback)
+	if len(entry.callbacks) != 0 {
+		return nil
+	}
+	delete(r.gauges, key)
+
+	return entry.registration
 }
 
 type gaugeRegistration struct {

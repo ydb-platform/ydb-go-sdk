@@ -24,7 +24,8 @@ defer reader.Close(ctx)
 The application owns the provider, collection and export. See the
 [OpenTelemetry adapter example](../examples/telemetryotel/otel.go).
 Different resources can observe the same attribute set, and the backend must
-sum their observations within one collection.
+sum their observations within one collection. The example adapter shares
+registrations across adapters wrapping the same OpenTelemetry SDK meter.
 
 | Attribute | Value |
 | --- | --- |
