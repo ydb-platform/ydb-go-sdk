@@ -60,7 +60,7 @@ func TestPerCallCtx_CancelBeforeRecvReturnsImmediately(t *testing.T) {
 
 		_, _, err = r.nextPart(callCtx)
 		require.ErrorIs(t, err, context.Canceled)
-		require.NoError(t, r.lastErr)
+		require.NoError(t, r.lastErr.Get())
 		require.NoError(t, executeCtx.Err())
 	})
 }
@@ -83,7 +83,7 @@ func TestPerCallCtx_DeadlineExceededBeforeRecvDoesNotPoisonLastErr(t *testing.T)
 
 		_, _, err = r.nextPart(callCtx)
 		require.ErrorIs(t, err, context.DeadlineExceeded)
-		require.NoError(t, r.lastErr)
+		require.NoError(t, r.lastErr.Get())
 		require.NoError(t, executeCtx.Err())
 
 		require.NoError(t, r.Close(t.Context()))
@@ -142,7 +142,7 @@ func TestPerCallCtx_CancelWhileRecvBlockedDoesNotCancelExecuteStream(t *testing.
 		case <-time.After(time.Second):
 			t.Fatal("nextPart still blocked after executeCancel (Close shutdown hook)")
 		}
-		require.NoError(t, r.lastErr)
+		require.NoError(t, r.lastErr.Get())
 	})
 }
 

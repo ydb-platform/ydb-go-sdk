@@ -50,7 +50,7 @@ func TestStreamResult_PerCallCtxCancelDoesNotRunExecuteOnCloseEarly(t *testing.T
 		require.ErrorIs(t, err, context.Canceled)
 		require.EqualValues(t, 0, onCloseCalls.Load(),
 			"per-call ctx cancel must not run executeCancel shutdown hook")
-		require.NoError(t, r.lastErr)
+		require.NoError(t, r.lastErr.Get())
 	})
 }
 

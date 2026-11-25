@@ -23,6 +23,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -42,7 +43,7 @@ type (
 	}
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
-		lastErr        error
+		lastErr        xsync.Value[error]
 		onClose        func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
 		lastWirePart   *wirePart
@@ -238,14 +239,26 @@ func newResult(
 	return &r, nil
 }
 
+func (r *streamResult) rememberError(ctx context.Context, err error) {
+	if err == nil || ctx.Err() != nil {
+		return
+	}
+	r.lastErr.Change(func(previous error) error {
+		// Close and iteration can observe the terminal RPC error and EOF concurrently.
+		if previous != nil && errors.Is(err, io.EOF) {
+			return previous
+		}
+
+		return err
+	})
+}
+
 //nolint:funlen // Keep response-part lifetime and stream error handling in one place.
 func (r *streamResult) nextPart(ctx context.Context) (
 	part *Ydb_Query.ExecuteQueryResponsePart, wire *wirePart, finishErr error,
 ) {
 	defer func() {
-		if finishErr != nil && ctx.Err() == nil {
-			r.lastErr = finishErr
-		}
+		r.rememberError(ctx, finishErr)
 	}()
 
 	if r.trace != nil {
@@ -263,8 +276,8 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		return nil, nil, ctxErr
 	}
 
-	if r.lastErr != nil {
-		return nil, nil, r.lastErr
+	if err := r.lastErr.Get(); err != nil {
+		return nil, nil, err
 	}
 
 	// Forward ctx cancellation to the gRPC stream context so a Recv blocked
@@ -385,9 +398,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 
 func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishErr error) {
 	defer func() {
-		if finishErr != nil && ctx.Err() == nil {
-			r.lastErr = finishErr
-		}
+		r.rememberError(ctx, finishErr)
 	}()
 
 	nextResultSetIndex := r.resultSetIndex + 1

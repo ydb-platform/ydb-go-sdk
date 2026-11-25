@@ -615,7 +615,7 @@ func TestExecute(t *testing.T) {
 
 			_, _, err = r.nextPart(callCtx)
 			require.ErrorIs(t, err, context.Canceled)
-			require.NoError(t, r.lastErr)
+			require.NoError(t, r.lastErr.Get())
 
 			require.NoError(t, r.Close(t.Context()))
 		})

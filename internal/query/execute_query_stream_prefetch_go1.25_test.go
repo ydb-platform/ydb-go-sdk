@@ -5,6 +5,7 @@ package query
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 	"testing/synctest"
 
@@ -62,5 +63,53 @@ func TestCancelPrefetchWithFullQueue(t *testing.T) {
 		_, err = stream.Recv()
 		require.ErrorIs(t, err, context.Canceled)
 		require.EqualValues(t, 2, next, "cancellation must unblock the producer while the queue is full")
+	})
+}
+
+func TestPrefetchConcurrentClosePreservesTerminalError(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		transport, finish := context.WithCancel(ctx)
+		defer finish()
+		release := make(chan struct{})
+		terminal := errors.New("terminal query error")
+		inner := &testExecuteQueryStream{ctx: transport, recv: func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+			if transport.Err() == nil {
+				finish()
+
+				return testSingleRowStreamPart(), nil
+			}
+			<-release
+
+			return nil, terminal
+		}}
+		r, err := newResult(ctx, wrapExecuteQueryStreamWithAsyncPrefetch(ctx, inner, 1), withStreamResultOnClose(cancel))
+		require.NoError(t, err)
+		rs, err := r.NextResultSet(t.Context())
+		require.NoError(t, err)
+		_, err = rs.NextRow(t.Context())
+		require.NoError(t, err)
+
+		rowDone := make(chan error, 1)
+		go func() {
+			_, err := rs.NextRow(t.Context())
+			rowDone <- err
+		}()
+		synctest.Wait()
+		closeDone := make(chan error, 1)
+		go func() { closeDone <- r.Close(t.Context()) }()
+		synctest.Wait()
+		close(release)
+
+		rowErr, closeErr := <-rowDone, <-closeDone
+		if errors.Is(rowErr, io.EOF) {
+			require.ErrorIs(t, closeErr, terminal)
+		} else {
+			require.ErrorIs(t, rowErr, terminal)
+			require.NoError(t, closeErr)
+		}
+		_, err = r.NextResultSet(t.Context())
+		require.ErrorIs(t, err, terminal)
 	})
 }
