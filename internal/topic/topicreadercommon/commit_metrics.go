@@ -2,7 +2,6 @@ package topicreadercommon
 
 import (
 	"context"
-	"math/bits"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -138,73 +137,15 @@ type commitMessageTracker struct {
 	mu sync.Mutex
 
 	session *PartitionSession
-	pending *commitMetricRange
+	// pending is a binary min-heap ordered by end, so an acknowledgement
+	// visits only the ranges it completes, whatever the submission order.
+	pending []commitMetricRange
 	closed  bool
 }
 
-const (
-	radixBits = 4
-	radixSize = 1 << radixBits
-)
-
 type commitMetricRange struct {
-	key   uint64 // representative key for the shared high bits
-	shift int    // bit position of this radix digit
-	sum   int64
-	count [radixSize]int64
-	child [radixSize]*commitMetricRange
-}
-
-// Each level indexes one hex digit of the exclusive end. Adjacent commits
-// share a leaf; sparse offsets branch only at digits where their keys differ.
-func (r *commitMetricRange) insert(key uint64, count int64) *commitMetricRange {
-	if r == nil {
-		r = &commitMetricRange{key: key}
-	} else if width := bits.Len64(key ^ r.key); width > r.shift+radixBits {
-		parent := &commitMetricRange{key: key, shift: (width - 1) / radixBits * radixBits, sum: r.sum}
-		i := (r.key >> parent.shift) % radixSize
-		parent.child[i], parent.count[i] = r, r.sum
-		r = parent
-	}
-	i := (key >> r.shift) % radixSize
-	if r.shift != 0 {
-		r.child[i] = r.child[i].insert(key, count)
-	}
-	r.count[i] += count
-	r.sum += count
-
-	return r
-}
-
-// Drop covered slots as units. Only the boundary slot can be partly covered.
-func (r *commitMetricRange) acknowledge(key uint64) (*commitMetricRange, int64) {
-	if r == nil {
-		return nil, 0
-	}
-	switch prefix, boundary := r.key>>(r.shift+radixBits), key>>(r.shift+radixBits); {
-	case prefix < boundary:
-		return nil, r.sum
-	case prefix > boundary:
-		return r, 0
-	}
-	i := (key >> r.shift) % radixSize
-	var covered int64
-	for j := range i {
-		covered += r.count[j]
-		r.count[j], r.child[j] = 0, nil
-	}
-	count := r.count[i]
-	if r.shift != 0 {
-		r.child[i], count = r.child[i].acknowledge(key)
-	}
-	r.count[i] -= count
-	covered += count
-	r.sum -= covered
-	if r.sum == 0 {
-		return nil, covered
-	}
-
-	return r, covered
+	end   rawtopiccommon.Offset
+	count int64
 }
 
 // Queue records a submitted commit range and returns its offset span. Ranges
@@ -223,7 +164,15 @@ func (t *commitMessageTracker) Queue(start, end rawtopiccommon.Offset) int64 {
 		return 0
 	}
 
-	t.pending = t.pending.insert(uint64(end)^(1<<63), count)
+	t.pending = append(t.pending, commitMetricRange{end: end, count: count})
+	for i := len(t.pending) - 1; i > 0; {
+		parent := (i - 1) / 2
+		if t.pending[parent].end <= t.pending[i].end {
+			break
+		}
+		t.pending[parent], t.pending[i] = t.pending[i], t.pending[parent]
+		i = parent
+	}
 
 	return count
 }
@@ -236,11 +185,34 @@ func (t *commitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset
 	defer t.mu.Unlock()
 
 	var acknowledged int64
-	t.pending, acknowledged = t.pending.acknowledge(uint64(exclusiveOffset) ^ (1 << 63))
+	for len(t.pending) > 0 && t.pending[0].end <= exclusiveOffset {
+		acknowledged += t.pending[0].count
+		t.popPending()
+	}
 
 	t.session.SetCommittedOffsetForward(exclusiveOffset)
 
 	return acknowledged
+}
+
+// popPending removes the pending range with the smallest end.
+func (t *commitMessageTracker) popPending() {
+	pending := t.pending
+	last := len(pending) - 1
+	pending[0] = pending[last]
+	pending = pending[:last]
+	for i := 0; ; {
+		child := 2*i + 1
+		if child+1 < last && pending[child+1].end < pending[child].end {
+			child++
+		}
+		if child >= last || pending[i].end <= pending[child].end {
+			break
+		}
+		pending[i], pending[child] = pending[child], pending[i]
+		i = child
+	}
+	t.pending = pending
 }
 
 // Close marks the tracker terminal and releases all pending ranges.

@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -23,6 +24,23 @@ func TestCommitMessageTrackerInterleavedSubmissions(t *testing.T) {
 	require.EqualValues(t, 2, tracker.Acknowledge(512))
 	require.EqualValues(t, 3, tracker.Queue(512, 515))
 	require.EqualValues(t, 5, tracker.Acknowledge(1024))
+}
+
+func TestCommitMessageTrackerScatteredSubmissions(t *testing.T) {
+	const (
+		ranges = 1000
+		step   = 8
+	)
+	tracker := newCommitMessageTracker(0)
+	for i := range ranges {
+		// 7919 is coprime with the range count, so every range is submitted once, far from its neighbors.
+		end := rawtopiccommon.Offset(i*7919%ranges + 1)
+		require.EqualValues(t, 1, tracker.Queue(end-1, end))
+	}
+	for end := rawtopiccommon.Offset(step); end <= ranges; end += step {
+		require.EqualValues(t, step, tracker.Acknowledge(end), "acknowledged offset %d", end)
+	}
+	require.Empty(t, tracker.pending)
 }
 
 func TestCommitMessageTrackerWideSpans(t *testing.T) {
