@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 	"testing"
 
@@ -13,6 +15,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -428,4 +431,223 @@ func TestMultiEncoder(t *testing.T) {
 			require.Equal(t, string(testMsg), decompressGzip(buf))
 		}
 	})
+}
+
+type readerOnly struct {
+	r io.Reader
+}
+
+func (r readerOnly) Read(p []byte) (int, error) {
+	return r.r.Read(p)
+}
+
+func encodeTestPayload(size int) []byte {
+	data := make([]byte, size)
+	for i := range data {
+		data[i] = "0123456789abcdef {}\":,\n"[(i*7+i/13)%23]
+	}
+
+	return data
+}
+
+func TestMultiEncoderEncodeSources(t *testing.T) {
+	encoder := NewMultiEncoder()
+	for _, size := range []int{0, 1, 511, 512, 513, 32*1024 + 7, 300_000} {
+		data := encodeTestPayload(size)
+		for _, codec := range []rawtopiccommon.Codec{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip} {
+			var want bytes.Buffer
+			_, err := encoder.EncodeBytes(codec, &want, data)
+			require.NoError(t, err)
+
+			sources := map[string]io.Reader{
+				"bytes.Reader":   bytes.NewReader(data),
+				"bytes.Buffer":   bytes.NewBuffer(bytes.Clone(data)),
+				"strings.Reader": strings.NewReader(string(data)),
+				"io.Reader":      readerOnly{bytes.NewReader(data)},
+			}
+			for name, source := range sources {
+				t.Run(fmt.Sprintf("%v/%d/%s", codec, size, name), func(t *testing.T) {
+					var got bytes.Buffer
+					n, err := encoder.Encode(codec, &got, source)
+					require.NoError(t, err)
+					require.Equal(t, size, n)
+					require.Equal(t, want.Bytes(), got.Bytes())
+				})
+			}
+		}
+	}
+}
+
+func TestMultiEncoderEncodeUnsupportedCodec(t *testing.T) {
+	for name, source := range map[string]io.Reader{
+		"WriterTo": bytes.NewReader([]byte("payload")),
+		"Reader":   readerOnly{bytes.NewReader([]byte("payload"))},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var output bytes.Buffer
+			n, err := NewMultiEncoder().Encode(rawtopiccommon.Codec(10001), &output, source)
+			require.Error(t, err)
+			require.Zero(t, n)
+			require.Empty(t, output.Bytes())
+		})
+	}
+}
+
+type capturingEncoder struct {
+	written *[][]byte
+}
+
+func (c capturingEncoder) Write(p []byte) (int, error) {
+	*c.written = append(*c.written, p)
+
+	return len(p), nil
+}
+
+func (c capturingEncoder) Close() error {
+	return nil
+}
+
+func TestMultiEncoderEncodeBytesSourcesWithoutCopy(t *testing.T) {
+	data := encodeTestPayload(1000)
+	for name, source := range map[string]io.Reader{
+		"bytes.Reader": bytes.NewReader(data),
+		"bytes.Buffer": bytes.NewBuffer(data),
+	} {
+		t.Run(name, func(t *testing.T) {
+			var written [][]byte
+			encoder := NewMultiEncoder()
+			encoder.AddEncoder(rawtopiccommon.CodecLzop, func(io.Writer) (io.WriteCloser, error) {
+				return capturingEncoder{written: &written}, nil
+			})
+			n, err := encoder.Encode(rawtopiccommon.CodecLzop, &bytes.Buffer{}, source)
+			require.NoError(t, err)
+			require.Equal(t, len(data), n)
+			require.Len(t, written, 1)
+			require.Same(t, &data[0], &written[0][0], "the encoder must get the source's own bytes")
+		})
+	}
+}
+
+type recordingEncoder struct {
+	calls    *[]string
+	writeErr error
+}
+
+func (r recordingEncoder) Write(p []byte) (int, error) {
+	*r.calls = append(*r.calls, "write")
+	if r.writeErr != nil {
+		return 0, r.writeErr
+	}
+
+	return len(p), nil
+}
+
+func (r recordingEncoder) Close() error {
+	*r.calls = append(*r.calls, "close")
+
+	return nil
+}
+
+func newRecordingMultiEncoder(calls *[]string) *MultiEncoder {
+	return newFailingRecordingMultiEncoder(calls, nil)
+}
+
+func newFailingRecordingMultiEncoder(calls *[]string, writeErr error) *MultiEncoder {
+	encoder := NewMultiEncoder()
+	encoder.AddEncoder(rawtopiccommon.CodecLzop, func(io.Writer) (io.WriteCloser, error) {
+		*calls = append(*calls, "create")
+
+		return recordingEncoder{calls: calls, writeErr: writeErr}, nil
+	})
+
+	return encoder
+}
+
+func TestMultiEncoderEncodeClosesEncoderOnWriteError(t *testing.T) {
+	for name, source := range map[string]func() io.Reader{
+		"bytes.Reader": func() io.Reader { return bytes.NewReader([]byte("payload")) },
+		"io.Reader":    func() io.Reader { return readerOnly{bytes.NewReader([]byte("payload"))} },
+	} {
+		t.Run(name, func(t *testing.T) {
+			var calls []string
+			encoder := newFailingRecordingMultiEncoder(&calls, errors.New("encoder failed"))
+			_, err := encoder.Encode(rawtopiccommon.CodecLzop, &bytes.Buffer{}, source())
+			require.EqualError(t, err, "encoder failed")
+			require.Equal(t, []string{"create", "write", "close"}, calls)
+		})
+	}
+}
+
+func TestMultiEncoderEncodeEmptyDataWritesBeforeClose(t *testing.T) {
+	for name, source := range map[string]io.Reader{
+		"bytes.Reader":   &bytes.Reader{},
+		"bytes.Buffer":   &bytes.Buffer{},
+		"strings.Reader": strings.NewReader(""),
+		"io.Reader":      readerOnly{&bytes.Reader{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var calls []string
+			n, err := newRecordingMultiEncoder(&calls).Encode(rawtopiccommon.CodecLzop, &bytes.Buffer{}, source)
+			require.NoError(t, err)
+			require.Zero(t, n)
+			require.Equal(t, []string{"create", "write", "close"}, calls)
+		})
+	}
+}
+
+func TestMultiEncoderEncodeWritesOncePerMessage(t *testing.T) {
+	for name, source := range map[string]func() io.Reader{
+		"bytes.Reader":         func() io.Reader { return bytes.NewReader([]byte("payload")) },
+		"bytes.Buffer":         func() io.Reader { return bytes.NewBufferString("payload") },
+		"strings.Reader":       func() io.Reader { return strings.NewReader("payload") },
+		"net.Buffers":          func() io.Reader { return &net.Buffers{[]byte("pay"), []byte("load")} },
+		"net.Buffers with nil": func() io.Reader { return &net.Buffers{nil} },
+		"io.MultiReader": func() io.Reader {
+			return io.MultiReader(strings.NewReader("pay"), strings.NewReader("load"))
+		},
+		"io.NopCloser of string": func() io.Reader { return io.NopCloser(strings.NewReader("payload")) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			var calls []string
+			_, err := newRecordingMultiEncoder(&calls).Encode(rawtopiccommon.CodecLzop, &bytes.Buffer{}, source())
+			require.NoError(t, err)
+			require.Equal(t, []string{"create", "write", "close"}, calls)
+		})
+	}
+}
+
+func BenchmarkMultiEncoderEncode(b *testing.B) {
+	for _, size := range []int{4 << 10, 256 << 10} {
+		data := encodeTestPayload(size)
+		str := string(data)
+		sources := []struct {
+			name  string
+			reset func() io.Reader
+		}{
+			{"bytes.Reader", func() io.Reader { return bytes.NewReader(data) }},
+			{"strings.Reader", func() io.Reader { return strings.NewReader(str) }},
+		}
+		for _, codec := range []rawtopiccommon.Codec{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip} {
+			for _, source := range sources {
+				for _, pool := range []string{"warm", "cold"} {
+					name := fmt.Sprintf("codec=%v/size=%dKiB/source=%s/pool=%s", codec, size>>10, source.name, pool)
+					b.Run(name, func(b *testing.B) {
+						encoder := NewMultiEncoder()
+						var target bytes.Buffer
+						b.SetBytes(int64(size))
+						b.ReportAllocs()
+						for b.Loop() {
+							if pool == "cold" {
+								encoder.bp = xsync.Pool[bytes.Buffer]{New: func() *bytes.Buffer { return &bytes.Buffer{} }}
+							}
+							target.Reset()
+							if _, err := encoder.Encode(codec, &target, source.reset()); err != nil {
+								b.Fatal(err)
+							}
+						}
+					})
+				}
+			}
+		}
+	}
 }
