@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -69,6 +71,11 @@ func (s *streamWrapper) RecvMsg(m any) error {
 	return err
 }
 
+type pendingEndpointClose struct {
+	connections []conn.Conn
+	timer       clockwork.Timer
+}
+
 type Balancer struct {
 	driverConfig      *config.Config
 	policy            policy.Policy
@@ -86,8 +93,10 @@ type Balancer struct {
 	random           xrand.Rand
 	lastDiscovered   []endpoint.Endpoint
 
-	closeMu sync.Mutex
-	closed  bool
+	endpointCloseDelay time.Duration
+	closeMu            sync.Mutex
+	closed             bool
+	pendingClose       *pendingEndpointClose
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -218,10 +227,15 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 	}
 
 	if b.policy.DetectsNearestDC() {
-		location, err = b.localDCDetector(ctx, endpoints)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
+		nearestDC, detectErr := b.localDCDetector(ctx, endpoints)
+		if detectErr != nil {
+			if b.endpointCloseDelay > 0 && b.connections() != nil {
+				b.applyDiscoveredEndpoints(ctx, endpoints, location)
+			}
+
+			return xerrors.WithStackTrace(detectErr)
 		}
+		location = nearestDC
 	}
 	b.applyDiscoveredEndpoints(ctx, endpoints, location)
 
@@ -251,6 +265,54 @@ func nextState(ctx context.Context, pool interface {
 	}
 
 	return active, newActive
+}
+
+// takePendingEndpointClose transfers the queued pool references with closeMu held.
+func (b *Balancer) takePendingEndpointClose() []conn.Conn {
+	pending := b.pendingClose
+	if pending == nil {
+		return nil
+	}
+	b.pendingClose = nil
+	pending.timer.Stop()
+
+	return pending.connections
+}
+
+func (b *Balancer) scheduleEndpointClose(
+	ctx context.Context, quarantine []conn.Conn, priorities []policy.EndpointPriority,
+) []conn.Conn {
+	discovered := make(map[endpoint.Key]struct{}, len(priorities))
+	for _, priority := range priorities {
+		discovered[priority.Key] = struct{}{}
+	}
+	pending := &pendingEndpointClose{}
+	remaining := xslices.Filter(quarantine, func(cc conn.Conn) bool {
+		if _, ok := discovered[cc.Endpoint().Key()]; ok {
+			return true
+		}
+		pending.connections = append(pending.connections, cc)
+
+		return false
+	})
+	if len(pending.connections) == 0 {
+		return quarantine
+	}
+
+	closeCtx := xcontext.ValueOnly(ctx)
+	pending.timer = b.discoveryConfig.Clock().AfterFunc(b.endpointCloseDelay, func() {
+		b.closeMu.Lock()
+		defer b.closeMu.Unlock()
+
+		if b.pendingClose == pending {
+			for _, cc := range b.takePendingEndpointClose() {
+				b.pool.Put(closeCtx, cc)
+			}
+		}
+	})
+	b.pendingClose = pending
+
+	return remaining
 }
 
 // releaseStateConns releases connections from state
@@ -319,12 +381,19 @@ func (b *Balancer) applyDiscoveredEndpoints(
 		)
 	}()
 
+	if b.pendingClose != nil {
+		quarantine = slices.Concat(quarantine, b.takePendingEndpointClose())
+	}
+
 	info := policy.Info{SelfLocation: selfLocation}
 	priorities := b.policy.Prioritize(info, endpoints)
 	selectedEndpoints, selectedPriorities = selectActiveEndpoints(
 		active, quarantine, previousPriorities, endpoints, priorities, b.policy.MaxConnections(), b.random,
 	)
 	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selectedEndpoints)
+	if b.endpointCloseDelay > 0 && len(quarantine) > 0 {
+		quarantine = b.scheduleEndpointClose(ctx, quarantine, priorities)
+	}
 
 	if b.policy.MaxConnections() > 0 {
 		b.lastDiscovered = append(b.lastDiscovered[:0], endpoints...)
@@ -346,6 +415,7 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	b.lastDiscovered = nil
 
 	oldState := b.connectionsState.Swap(nil)
+	pendingClose := b.takePendingEndpointClose()
 
 	discoveryRepeater := b.discoveryRepeater
 	b.discoveryRepeater = nil
@@ -367,6 +437,9 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	}
 
 	b.releaseStateConns(ctx, oldState)
+	for _, cc := range pendingClose {
+		b.pool.Put(ctx, cc)
+	}
 
 	if discoveryCC != nil {
 		_ = discoveryCC.Close()
@@ -439,6 +512,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		)...),
 		localDCDetector: detectLocalDC,
 	}
+	b.endpointCloseDelay = b.discoveryConfig.EndpointCloseDelay()
 	defer func(created *Balancer) {
 		if finalErr != nil {
 			_ = created.Close(context.WithoutCancel(ctx))

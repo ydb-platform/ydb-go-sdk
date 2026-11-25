@@ -1,3 +1,5 @@
+* Added `ydb.WithDiscoveryEndpointCloseDelay` to close connections to removed endpoints before the next discovery update.
+
 ## v3.157.5
 * Removed the copy of `topicwriter.Message.Data` into an intermediate growing buffer before compression: `bytes.Reader` and `bytes.Buffer` data is written straight into the compressor, a `strings.Reader` is copied into a presized pooled buffer
 ## v3.157.4

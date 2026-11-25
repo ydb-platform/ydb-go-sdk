@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
@@ -22,6 +23,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
@@ -2566,6 +2569,7 @@ func startDynamicDiscoveryServer(tb testing.TB, nodeIDs []uint32) *dynamicDiscov
 
 	statsHandler := &serverConnStats{active: &server.activeConns}
 	server.grpcServer = grpc.NewServer(grpc.StatsHandler(statsHandler))
+	grpc_health_v1.RegisterHealthServer(server.grpcServer, health.NewServer())
 
 	Ydb_Discovery_V1.RegisterDiscoveryServiceServer(
 		server.grpcServer,
@@ -2821,6 +2825,76 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	}, time.Second, 10*time.Millisecond, "balancer close must close remaining active connections")
 
 	require.Equal(t, 1, events.closedCount(node2))
+}
+
+func TestBalancerDiscoveryEndpointCloseDelayAfterRediscovery(t *testing.T) {
+	const delay = 5 * time.Second
+
+	ctx := t.Context()
+	clock := clockwork.NewFakeClock()
+	server := startDynamicDiscoveryServer(t, []uint32{1})
+	cfg := config.New(
+		config.WithEndpoint(server.endpoint()),
+		config.WithDatabase("/local"),
+		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		config.WithBalancer(userBalancers.PreferNearestDCWithFallBack(userBalancers.RandomChoice())),
+	)
+	pool := conn.NewPool(ctx, cfg)
+	defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
+
+	b, err := New(ctx, cfg, pool,
+		discoveryConfig.WithInterval(time.Hour),
+		discoveryConfig.WithClock(clock),
+		discoveryConfig.WithEndpointCloseDelay(delay),
+	)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, b.Close(ctx)) }()
+
+	streamCtx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	watch, err := grpc_health_v1.NewHealthClient(b).Watch(
+		endpoint.WithNodeID(conn.WithoutWrapping(streamCtx), 1), &grpc_health_v1.HealthCheckRequest{},
+	)
+	require.NoError(t, err)
+	_, err = watch.Recv()
+	require.NoError(t, err)
+	connection := connByNodeID(b, 1)
+	require.NotNil(t, connection)
+
+	server.setNodeIDs(nil)
+	require.ErrorIs(t, b.clusterDiscoveryAttemptWithDial(ctx), ErrNoEndpoints)
+	require.Empty(t, activeNodeIDs(b))
+	clock.Advance(delay - time.Second)
+
+	server.setNodeIDs([]uint32{1})
+	require.NoError(t, b.clusterDiscoveryAttemptWithDial(ctx))
+	require.Same(t, connection, connByNodeID(b, 1))
+
+	server.setNodeIDs(nil)
+	require.ErrorIs(t, b.clusterDiscoveryAttemptWithDial(ctx), ErrNoEndpoints)
+	clock.Advance(time.Second)
+	require.Never(t, func() bool {
+		return connection.State() != state.Online
+	}, 20*time.Millisecond, time.Millisecond, "the first removal's deadline must leave the connection open")
+
+	clock.Advance(delay - time.Second)
+	require.Eventually(t, func() bool {
+		return connection.State() == state.Destroyed
+	}, time.Second, 10*time.Millisecond, "the second removal must close the connection after the configured delay")
+	_, err = watch.Recv()
+	require.Error(t, err, "closing the connection must terminate an active stream")
+	require.NoError(t, streamCtx.Err())
+
+	server.setNodeIDs([]uint32{1})
+	require.NoError(t, b.clusterDiscoveryAttemptWithDial(ctx))
+	replacement := connByNodeID(b, 1)
+	require.NotNil(t, replacement)
+
+	server.setNodeIDs(nil)
+	require.ErrorIs(t, b.clusterDiscoveryAttemptWithDial(ctx), ErrNoEndpoints)
+	require.NotEqual(t, state.Destroyed, replacement.State())
+	require.ErrorIs(t, b.clusterDiscoveryAttemptWithDial(ctx), ErrNoEndpoints)
+	require.Equal(t, state.Destroyed, replacement.State(), "discovery must still close the connection before the timer")
 }
 
 func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {

@@ -25,8 +25,9 @@ type Config struct {
 	addressMutator func(address string) string
 	clock          clockwork.Clock
 
-	interval time.Duration
-	trace    *trace.Discovery
+	interval           time.Duration
+	endpointCloseDelay time.Duration
+	trace              *trace.Discovery
 }
 
 func New(opts ...Option) *Config {
@@ -61,6 +62,10 @@ func (c *Config) Clock() clockwork.Clock {
 
 func (c *Config) Interval() time.Duration {
 	return c.interval
+}
+
+func (c *Config) EndpointCloseDelay() time.Duration {
+	return c.endpointCloseDelay
 }
 
 func (c *Config) Endpoint() string {
@@ -158,5 +163,11 @@ func WithInterval(interval time.Duration) Option {
 		default:
 			c.interval = interval
 		}
+	}
+}
+
+func WithEndpointCloseDelay(delay time.Duration) Option {
+	return func(c *Config) {
+		c.endpointCloseDelay = delay
 	}
 }
