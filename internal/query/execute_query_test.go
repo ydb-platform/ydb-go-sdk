@@ -613,9 +613,9 @@ func TestExecute(t *testing.T) {
 			callCtx, callCancel := context.WithCancel(t.Context())
 			callCancel()
 
-			_, err = r.nextPart(callCtx)
+			_, _, err = r.nextPart(callCtx)
 			require.ErrorIs(t, err, context.Canceled)
-			require.NoError(t, r.lastErr)
+			require.NoError(t, r.lastErr.Get())
 
 			require.NoError(t, r.Close(t.Context()))
 		})
@@ -666,7 +666,7 @@ func TestExecute(t *testing.T) {
 
 			iterDone := make(chan error, 1)
 			go func() {
-				_, err := r.nextPart(callCtx)
+				_, _, err := r.nextPart(callCtx)
 				iterDone <- err
 			}()
 

@@ -536,6 +536,28 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 	}
 }
 
+// WithQueryProtoWireDecoding enables direct decoding of Query Service
+// FORMAT_VALUE rows from protobuf wire data without an intermediate protobuf
+// value tree, reducing allocations. It applies to queries on [query.Client],
+// [query.Session] and [query.TxActor], including queries inside Do and DoTx,
+// and database/sql connectors using [WithQueryService] with true.
+// The default is false: rows are decoded with the standard protobuf codec.
+// Arrow results and Table Service connectors keep their existing decoding paths.
+// Custom codecs and content subtypes configured through [config.WithGrpcOptions]
+// or [query.WithCallOptions] take precedence and retain ordinary protobuf rows.
+//
+// With wire decoding enabled, gRPC stream interceptors and statistics handlers
+// see empty protobuf rows when a receive uses the SDK's destination. A receive
+// into an interceptor's own buffer materializes the rows in that buffer.
+// Use [query.Row] scanning methods and [query.Row.Values] to access result
+// data, and count rows while iterating the result. Disable wire decoding if
+// callbacks need materialized protobuf rows for every response.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithQueryProtoWireDecoding(enabled bool) Option {
+	return WithQueryConfigOption(queryConfig.WithProtoWireDecoding(enabled))
+}
+
 // WithQueryDefaultResultFormatArrow selects Arrow as the default Query Service
 // result format while preserving the ordinary row and scan APIs. It applies to
 // Query, QueryRow and QueryResultSet on query.Client, query.Session and query.TxActor,

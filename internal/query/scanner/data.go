@@ -36,17 +36,23 @@ func NewDirectData(columns []*Ydb.Column, direct DirectRow) *Data {
 	return &Data{columns: columns, direct: direct}
 }
 
-func (d Data) columnIndex(name string) (int, error) {
-	for i := range d.columns {
-		if d.columns[i].GetName() == name {
-			return i, nil
+func (d *Data) columnIndex(name string) (int, error) {
+	if indexed, ok := d.direct.(interface{ ColumnIndex(name string) (int, bool) }); ok {
+		if index, found := indexed.ColumnIndex(name); found {
+			return index, nil
+		}
+	} else {
+		for index, column := range d.columns {
+			if column.GetName() == name {
+				return index, nil
+			}
 		}
 	}
 
 	return 0, xerrors.WithStackTrace(fmt.Errorf("'%s': %w", name, ErrColumnsNotFoundInRow))
 }
 
-func (d Data) scanByIndex(index int, dst any) error {
+func (d *Data) scanByIndex(index int, dst any) error {
 	if d.direct != nil {
 		return d.direct.ScanColumn(index, dst)
 	}
@@ -54,7 +60,7 @@ func (d Data) scanByIndex(index int, dst any) error {
 	return value.CastTo(d.seekByIndex(index), dst)
 }
 
-func (d Data) seekByIndex(idx int) value.Value {
+func (d *Data) seekByIndex(idx int) value.Value {
 	if d.direct != nil {
 		return d.direct.ColumnValue(idx)
 	}
@@ -65,7 +71,7 @@ func (d Data) seekByIndex(idx int) value.Value {
 	return value.FromYDB(d.columns[idx].GetType(), d.values[idx])
 }
 
-func (d Data) Values() []value.Value {
+func (d *Data) Values() []value.Value {
 	values := make([]value.Value, len(d.columns))
 
 	for idx := range values {

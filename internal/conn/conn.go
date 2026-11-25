@@ -197,6 +197,7 @@ func (c *conn) dial(ctx context.Context) (cc grpcClientConnInterface, err error)
 	if overrideHost := c.endpoint.OverrideHost(); overrideHost != "" {
 		dialOpts = append(dialOpts, grpc.WithAuthority(overrideHost))
 	}
+	dialOpts = append(dialOpts, grpc.WithChainStreamInterceptor(FallbackCodecStreamInterceptor))
 
 	//nolint:staticcheck,nolintlint
 	cc, err = grpc.DialContext(ctx, address, dialOpts...)

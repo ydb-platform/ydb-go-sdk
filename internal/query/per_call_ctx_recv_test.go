@@ -58,9 +58,9 @@ func TestPerCallCtx_CancelBeforeRecvReturnsImmediately(t *testing.T) {
 		callCtx, callCancel := context.WithCancel(t.Context())
 		callCancel()
 
-		_, err = r.nextPart(callCtx)
+		_, _, err = r.nextPart(callCtx)
 		require.ErrorIs(t, err, context.Canceled)
-		require.NoError(t, r.lastErr)
+		require.NoError(t, r.lastErr.Get())
 		require.NoError(t, executeCtx.Err())
 	})
 }
@@ -81,9 +81,9 @@ func TestPerCallCtx_DeadlineExceededBeforeRecvDoesNotPoisonLastErr(t *testing.T)
 		defer cancel()
 		<-callCtx.Done()
 
-		_, err = r.nextPart(callCtx)
+		_, _, err = r.nextPart(callCtx)
 		require.ErrorIs(t, err, context.DeadlineExceeded)
-		require.NoError(t, r.lastErr)
+		require.NoError(t, r.lastErr.Get())
 		require.NoError(t, executeCtx.Err())
 
 		require.NoError(t, r.Close(t.Context()))
@@ -117,7 +117,7 @@ func TestPerCallCtx_CancelWhileRecvBlockedDoesNotCancelExecuteStream(t *testing.
 
 		done := make(chan error, 1)
 		go func() {
-			_, err := r.nextPart(callCtx)
+			_, _, err := r.nextPart(callCtx)
 			done <- err
 		}()
 
@@ -142,7 +142,7 @@ func TestPerCallCtx_CancelWhileRecvBlockedDoesNotCancelExecuteStream(t *testing.
 		case <-time.After(time.Second):
 			t.Fatal("nextPart still blocked after executeCancel (Close shutdown hook)")
 		}
-		require.NoError(t, r.lastErr)
+		require.NoError(t, r.lastErr.Get())
 	})
 }
 
@@ -175,7 +175,7 @@ func TestPerCallCtx_CloseUnblocksConcurrentBlockedNextPart(t *testing.T) {
 
 		iterDone := make(chan error, 1)
 		go func() {
-			_, err := r.nextPart(callCtx)
+			_, _, err := r.nextPart(callCtx)
 			iterDone <- err
 		}()
 
@@ -305,7 +305,7 @@ func TestPerCallCtx_CloseDrainsAfterBlockedIterationCanceled(t *testing.T) {
 
 		iterDone := make(chan struct{})
 		go func() {
-			_, _ = r.nextPart(callCtx)
+			_, _, _ = r.nextPart(callCtx)
 			close(iterDone)
 		}()
 
