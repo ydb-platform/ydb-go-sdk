@@ -28,6 +28,13 @@ func BenchmarkFormats(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer db.Close(ctx)
+	protoWireDB, err := ydb.Open(ctx, connectionString(),
+		ydb.WithAnonymousCredentials(), ydb.WithQueryProtoWireDecoding(true),
+	)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer protoWireDB.Close(ctx)
 	if err := db.Query().Exec(ctx, `CREATE TABLE query_arrow_benchmark (
   id Uint64 NOT NULL, score Int32, active Bool, amount Double, name Utf8, payload String, PRIMARY KEY(id)
 );`); err != nil {
@@ -63,54 +70,59 @@ func BenchmarkFormats(b *testing.B) {
 	}
 	arrowOption := query.WithResultFormatArrow(ipc.NewReader)
 	err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
-		for _, size := range []int{1, 10, 100, 1000, 10000} {
-			sql := fmt.Sprintf(
-				"SELECT id,score,active,amount,name,payload FROM query_arrow_benchmark WHERE id < %d ORDER BY id;", size,
-			)
-			count, expected, err := consumeRows(ctx, s, sql, nil)
-			if err != nil {
-				return err
-			}
-			if count != size {
-				return fmt.Errorf("fixture rows=%d, want %d", count, size)
-			}
-			b.Logf("rows=%d checksum=%016x", size, expected)
-			for _, variant := range []string{"Query", "QueryArrow", "WithResultFormatArrow"} {
-				b.Run(fmt.Sprintf("%d/%s", size, variant), func(b *testing.B) {
-					run := func() (int, uint64, error) {
-						if variant == "QueryArrow" {
-							return consumeArrow(ctx, s, sql)
-						}
-						var opts []query.ExecuteOption
-						if variant == "WithResultFormatArrow" {
-							opts = append(opts, arrowOption)
-						}
+		return protoWireDB.Query().Do(ctx, func(ctx context.Context, protoWireSession query.Session) error {
+			for _, size := range []int{1, 10, 100, 1000, 10000} {
+				sql := fmt.Sprintf(
+					"SELECT id,score,active,amount,name,payload FROM query_arrow_benchmark WHERE id < %d ORDER BY id;", size,
+				)
+				count, expected, err := consumeRows(ctx, s, sql, nil)
+				if err != nil {
+					return err
+				}
+				if count != size {
+					return fmt.Errorf("fixture rows=%d, want %d", count, size)
+				}
+				b.Logf("rows=%d checksum=%016x", size, expected)
+				for _, variant := range []string{"Query", "QueryProtoWireDecoding", "QueryArrow", "WithResultFormatArrow"} {
+					b.Run(fmt.Sprintf("%d/%s", size, variant), func(b *testing.B) {
+						run := func() (int, uint64, error) {
+							if variant == "QueryArrow" {
+								return consumeArrow(ctx, s, sql)
+							}
+							if variant == "QueryProtoWireDecoding" {
+								return consumeRows(ctx, protoWireSession, sql, nil)
+							}
+							var opts []query.ExecuteOption
+							if variant == "WithResultFormatArrow" {
+								opts = append(opts, arrowOption)
+							}
 
-						return consumeRows(ctx, s, sql, opts)
-					}
-					for range 10 {
-						n, h, err := run()
-						if err != nil || n != size || h != expected {
-							b.Fatalf("warmup: rows=%d checksum=%016x err=%v", n, h, err)
+							return consumeRows(ctx, s, sql, opts)
 						}
-					}
-					b.ReportAllocs()
-					b.ResetTimer()
-					startCPU := processCPU(b)
-					for i := 0; i < b.N; i++ {
-						n, h, err := run()
-						if err != nil || n != size || h != expected {
-							b.Fatalf("rows=%d checksum=%016x err=%v", n, h, err)
+						for range 10 {
+							n, h, err := run()
+							if err != nil || n != size || h != expected {
+								b.Fatalf("warmup: rows=%d checksum=%016x err=%v", n, h, err)
+							}
 						}
-					}
-					cpu := processCPU(b) - startCPU
-					b.StopTimer()
-					b.ReportMetric(float64(cpu.Nanoseconds())/float64(b.N), "cpu-ns/op")
-				})
+						b.ReportAllocs()
+						b.ResetTimer()
+						startCPU := processCPU(b)
+						for i := 0; i < b.N; i++ {
+							n, h, err := run()
+							if err != nil || n != size || h != expected {
+								b.Fatalf("rows=%d checksum=%016x err=%v", n, h, err)
+							}
+						}
+						cpu := processCPU(b) - startCPU
+						b.StopTimer()
+						b.ReportMetric(float64(cpu.Nanoseconds())/float64(b.N), "cpu-ns/op")
+					})
+				}
 			}
-		}
 
-		return nil
+			return nil
+		})
 	})
 	if err != nil {
 		b.Fatal(err)

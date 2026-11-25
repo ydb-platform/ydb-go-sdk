@@ -1,7 +1,12 @@
 * Fixed OAuth2 token exchange following redirects and potentially disclosing subject and actor tokens; redirecting token endpoints must be configured with their final URL
 
+## v3.158.0
+* Fixed Query Service response prefetch losing the final row or terminal error when a gRPC interceptor reads ahead, including delivery of buffered statistics on close
+* Added experimental `ydb.WithQueryProtoWireDecoding(bool)` to opt into direct protobuf wire decoding of native and `database/sql` Query Service `FORMAT_VALUE` rows, reducing allocations and using lazy cell and column-name indexes for linear-time wide-row scans while preserving protobuf response metadata for gRPC stream interceptors
+
 ## v3.157.5
 * Removed the copy of `topicwriter.Message.Data` into an intermediate growing buffer before compression: `bytes.Reader` and `bytes.Buffer` data is written straight into the compressor, a `strings.Reader` is copied into a presized pooled buffer
+
 ## v3.157.4
 * Fixed panic in `decimal.Format` and `decimal.Decimal.String` for a zero value with zero scale
 * Fixed the YQL literal of negative `Decimal` values with an absolute value below 0.1, where the minus sign was written inside the digits (for example `.0000000-5` instead of `-.000000005`)
