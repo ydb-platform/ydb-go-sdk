@@ -19,6 +19,8 @@ type Attribute struct {
 // Int64GaugeCallback observes current values without I/O or SDK mutation.
 // It must honor cancellation and support concurrent calls. Observations are
 // valid for this invocation only; the backend owns collection and aggregation.
+// Different resources can observe the same attribute set, and the backend must
+// sum their observations within one collection.
 type Int64GaugeCallback func(ctx context.Context, observe func(int64, ...Attribute)) error
 
 // Meter directly registers a gauge and its callback with a metrics backend.
