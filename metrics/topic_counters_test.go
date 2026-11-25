@@ -118,6 +118,14 @@ func TestTopicReaderMetricsHonorDetailsGroups(t *testing.T) {
 	require.NotNil(t, streamEvents.OnReaderSessionError)
 
 	listenerEvents := topic(recordingConfig{registry: newRecordingRegistry(), details: trace.TopicListenerStreamEvents})
+	require.Nil(t, listenerEvents.OnReaderMessagesReceived)
+	require.NotNil(t, listenerEvents.OnListenerMessagesReceived)
+	require.Nil(t, listenerEvents.OnReaderMessagesDelivered)
+	require.NotNil(t, listenerEvents.OnListenerMessagesDelivered)
+	require.Nil(t, listenerEvents.OnReaderCreditBalanceChanged)
+	require.NotNil(t, listenerEvents.OnListenerCreditBalanceChanged)
+	require.Nil(t, listenerEvents.OnReaderLocalBufferChanged)
+	require.NotNil(t, listenerEvents.OnListenerLocalBufferChanged)
 	require.Nil(t, listenerEvents.OnReaderReceiveDataResponse)
 	require.NotNil(t, listenerEvents.OnListenerReceiveMessage)
 	require.Nil(t, listenerEvents.OnReaderCommitQueued)
@@ -391,7 +399,7 @@ func TestTopicMetricsSeparateReaderAndListenerDetails(t *testing.T) {
 		want    float64
 	}{
 		{"reader", trace.TopicReaderEvents, 1},
-		{"listener", trace.TopicListenerEvents, 10},
+		{"listener", trace.TopicListenerStreamEvents, 10},
 		{"both", trace.TopicEvents, 11},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -406,23 +414,41 @@ func TestTopicMetricsSeparateReaderAndListenerDetails(t *testing.T) {
 					count = 10
 				}
 				readerInfo := trace.TopicReaderInfo{Listener: listener}
-				tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
-					ReaderInfo: readerInfo, MessagesCount: count,
-				})
-				tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{
-					ReaderInfo: readerInfo, MessagesCount: count,
-				})
+				received := tracer.OnReaderMessagesReceived
+				delivered := tracer.OnReaderMessagesDelivered
+				credit := tracer.OnReaderCreditBalanceChanged
+				local := tracer.OnReaderLocalBufferChanged
+				if listener {
+					received = tracer.OnListenerMessagesReceived
+					delivered = tracer.OnListenerMessagesDelivered
+					credit = tracer.OnListenerCreditBalanceChanged
+					local = tracer.OnListenerLocalBufferChanged
+				}
+				if received != nil {
+					received(trace.TopicReaderMessagesReceivedInfo{
+						ReaderInfo: readerInfo, MessagesCount: count,
+					})
+				}
+				if delivered != nil {
+					delivered(trace.TopicReaderMessagesDeliveredInfo{
+						ReaderInfo: readerInfo, MessagesCount: count,
+					})
+				}
 				if listener && tracer.OnListenerReceiveMessage != nil {
 					tracer.OnListenerReceiveMessage(listenerBytesInfo(readerInfo, count, nil))
 				} else if !listener && tracer.OnReaderReceiveDataResponse != nil {
 					tracer.OnReaderReceiveDataResponse(readerBytesInfo(readerInfo, count))
 				}
-				tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{
-					ReaderInfo: readerInfo, MessagesDelta: count,
-				})
-				tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
-					ReaderInfo: readerInfo, BytesDelta: count,
-				})
+				if local != nil {
+					local(trace.TopicReaderLocalBufferChangedInfo{
+						ReaderInfo: readerInfo, MessagesDelta: count,
+					})
+				}
+				if credit != nil {
+					credit(trace.TopicReaderCreditBalanceChangedInfo{
+						ReaderInfo: readerInfo, BytesDelta: count,
+					})
+				}
 				queued := trace.TopicReaderCommitQueuedInfo{ReaderInfo: readerInfo, MessagesCount: int64(count)}
 				if listener && tracer.OnListenerCommitQueued != nil {
 					tracer.OnListenerCommitQueued(queued)

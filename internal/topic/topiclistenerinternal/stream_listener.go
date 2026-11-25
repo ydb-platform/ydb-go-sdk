@@ -452,20 +452,20 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 }
 
 func (l *streamListener) changeCreditBalance(delta int) {
-	if l.tracer != nil && l.tracer.OnReaderCreditBalanceChanged != nil {
+	if l.tracer != nil && l.tracer.OnListenerCreditBalanceChanged != nil {
 		l.creditBalance.Change(delta, l.traceCreditDelta)
 	}
 }
 
 func (l *streamListener) finalizeCreditBalance() {
-	if l.tracer != nil && l.tracer.OnReaderCreditBalanceChanged != nil {
+	if l.tracer != nil && l.tracer.OnListenerCreditBalanceChanged != nil {
 		l.creditBalance.Finalize(l.traceCreditDelta)
 	}
 }
 
 func (l *streamListener) traceCreditDelta(delta int) {
 	logCtx := l.background.Context()
-	gtrace.TopicOnReaderCreditBalanceChanged(
+	gtrace.TopicOnListenerCreditBalanceChanged(
 		l.tracer, &logCtx,
 		l.cfg.ReaderInfo, delta,
 	)
@@ -473,14 +473,14 @@ func (l *streamListener) traceCreditDelta(delta int) {
 
 func (l *streamListener) traceLocalBufferDelta(delta int) {
 	traceCtx := l.background.Context()
-	gtrace.TopicOnReaderLocalBufferChanged(
+	gtrace.TopicOnListenerLocalBufferChanged(
 		l.tracer, &traceCtx, l.cfg.ReaderInfo, delta,
 	)
 }
 
 // changeLocalBuffer reports whether a positive delta reserved messages.
 func (l *streamListener) changeLocalBuffer(delta int) bool {
-	if l.tracer == nil || l.tracer.OnReaderLocalBufferChanged == nil {
+	if l.tracer == nil || l.tracer.OnListenerLocalBufferChanged == nil {
 		return false
 	}
 
@@ -488,7 +488,7 @@ func (l *streamListener) changeLocalBuffer(delta int) bool {
 }
 
 func (l *streamListener) finalizeLocalBuffer() {
-	if l.tracer != nil && l.tracer.OnReaderLocalBufferChanged != nil {
+	if l.tracer != nil && l.tracer.OnListenerLocalBufferChanged != nil {
 		l.localBufferBalance.Finalize(l.traceLocalBufferDelta)
 	}
 }
@@ -567,7 +567,7 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 			"ydb: failed to convert raw batches to public batches: %w", err)))
 	}
 
-	observeReceipt := l.tracer != nil && l.tracer.OnReaderMessagesReceived != nil
+	observeReceipt := l.tracer != nil && l.tracer.OnListenerMessagesReceived != nil
 	// Route each batch to its partition worker
 	for _, batch := range batches {
 		partitionSession := topicreadercommon.BatchGetPartitionSession(batch)
@@ -590,7 +590,7 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 		}
 		if observeReceipt && accepted {
 			traceCtx := l.background.Context()
-			gtrace.TopicOnReaderMessagesReceived(
+			gtrace.TopicOnListenerMessagesReceived(
 				l.tracer,
 				&traceCtx,
 				l.cfg.ReaderInfo,

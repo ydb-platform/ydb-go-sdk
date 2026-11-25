@@ -329,7 +329,7 @@ func TestPartitionWorkerInterface_MessagesDeliveredTraceBeforeHandlerPanic(t *te
 		func(_ rawtopicreader.PartitionSessionID, err error) {
 			workerStopped <- err
 		},
-		&trace.Topic{OnReaderMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
+		&trace.Topic{OnListenerMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
 			events = append(events, info)
 		}},
 		"test-listener",
@@ -383,7 +383,7 @@ func TestPartitionWorkerInterface_MergedBatchMessagesDeliveredOnce(t *testing.T)
 		messageSender,
 		mockHandler,
 		func(rawtopicreader.PartitionSessionID, error) {},
-		&trace.Topic{OnReaderMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
+		&trace.Topic{OnListenerMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
 			*info.Context = context.Background()
 			events = append(events, info)
 		}},
@@ -782,7 +782,7 @@ func TestPartitionWorkerInterface_UserHandlerError(t *testing.T) {
 		messageSender,
 		mockHandler,
 		onStopped,
-		&trace.Topic{OnReaderMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
+		&trace.Topic{OnListenerMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
 			events = append(events, info)
 		}},
 		"test-listener",

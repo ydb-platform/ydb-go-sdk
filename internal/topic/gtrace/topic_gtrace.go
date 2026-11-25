@@ -1548,6 +1548,82 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 			}
 		}
 	}
+	{
+		h1 := lhs.OnListenerMessagesReceived
+		h2 := rhs.OnListenerMessagesReceived
+		ret.OnListenerMessagesReceived = func(t trace.TopicReaderMessagesReceivedInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
+		h1 := lhs.OnListenerMessagesDelivered
+		h2 := rhs.OnListenerMessagesDelivered
+		ret.OnListenerMessagesDelivered = func(t trace.TopicReaderMessagesDeliveredInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
+		h1 := lhs.OnListenerCreditBalanceChanged
+		h2 := rhs.OnListenerCreditBalanceChanged
+		ret.OnListenerCreditBalanceChanged = func(t trace.TopicReaderCreditBalanceChangedInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
+	{
+		h1 := lhs.OnListenerLocalBufferChanged
+		h2 := rhs.OnListenerLocalBufferChanged
+		ret.OnListenerLocalBufferChanged = func(t trace.TopicReaderLocalBufferChangedInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
 	return &ret
 }
 func onReaderStart(t *trace.Topic, info trace.TopicReaderStartInfo) {
@@ -2170,6 +2246,34 @@ func onListenerUnknownMessage(t *trace.Topic, t1 trace.TopicListenerUnknownMessa
 }
 func onListenerCommitQueued(t *trace.Topic, t1 trace.TopicReaderCommitQueuedInfo) {
 	fn := t.OnListenerCommitQueued
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func onListenerMessagesReceived(t *trace.Topic, t1 trace.TopicReaderMessagesReceivedInfo) {
+	fn := t.OnListenerMessagesReceived
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func onListenerMessagesDelivered(t *trace.Topic, t1 trace.TopicReaderMessagesDeliveredInfo) {
+	fn := t.OnListenerMessagesDelivered
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func onListenerCreditBalanceChanged(t *trace.Topic, t1 trace.TopicReaderCreditBalanceChangedInfo) {
+	fn := t.OnListenerCreditBalanceChanged
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func onListenerLocalBufferChanged(t *trace.Topic, t1 trace.TopicReaderLocalBufferChangedInfo) {
+	fn := t.OnListenerLocalBufferChanged
 	if fn == nil {
 		return
 	}
@@ -2886,4 +2990,38 @@ func TopicOnListenerCommitQueued(t *trace.Topic, c *context.Context, readerInfo 
 	p.PartitionSessionID = partitionSessionID
 	p.MessagesCount = messagesCount
 	onListenerCommitQueued(t, p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnListenerMessagesReceived(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, topic string, messagesCount int) {
+	var p trace.TopicReaderMessagesReceivedInfo
+	p.Context = c
+	p.ReaderInfo = readerInfo
+	p.Topic = topic
+	p.MessagesCount = messagesCount
+	onListenerMessagesReceived(t, p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnListenerMessagesDelivered(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, topic string, messagesCount int) {
+	var p trace.TopicReaderMessagesDeliveredInfo
+	p.Context = c
+	p.ReaderInfo = readerInfo
+	p.Topic = topic
+	p.MessagesCount = messagesCount
+	onListenerMessagesDelivered(t, p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnListenerCreditBalanceChanged(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, bytesDelta int) {
+	var p trace.TopicReaderCreditBalanceChangedInfo
+	p.Context = c
+	p.ReaderInfo = readerInfo
+	p.BytesDelta = bytesDelta
+	onListenerCreditBalanceChanged(t, p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnListenerLocalBufferChanged(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, messagesDelta int) {
+	var p trace.TopicReaderLocalBufferChangedInfo
+	p.Context = c
+	p.ReaderInfo = readerInfo
+	p.MessagesDelta = messagesDelta
+	onListenerLocalBufferChanged(t, p)
 }

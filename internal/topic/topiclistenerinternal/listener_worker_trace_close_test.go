@@ -32,17 +32,17 @@ func TestTopicListenerCloseFromWorkerTrace(t *testing.T) {
 			var handler topiclistener.EventHandler = topiclistener.BaseHandler{}
 			switch hook {
 			case "first-credit":
-				tracer.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
+				tracer.OnListenerCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
 					if info.BytesDelta > 0 {
 						closeListener()
 					}
 				}
 			case "messages-delivered":
-				tracer.OnReaderMessagesDelivered = func(trace.TopicReaderMessagesDeliveredInfo) { closeListener() }
+				tracer.OnListenerMessagesDelivered = func(trace.TopicReaderMessagesDeliveredInfo) { closeListener() }
 			case "retirement-credit":
 				sent := make(chan struct{})
 				handler = retireAfterCredit{sent: sent}
-				tracer.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
+				tracer.OnListenerCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
 					if info.BytesDelta < 0 {
 						closeListener()
 					}

@@ -21,7 +21,7 @@ Each queued range counts its half-open span, including gaps. Duplicate submissio
 
 Session errors carry the transport or YDB status name and an error type of `transport_error`, `ydb_error` or `unknown`. Unknown gRPC codes use `Code(n)`, unknown YDB codes use their number and unspecified status uses `unknown`. An idle pull reader can first report a stored terminal stream failure as `stop` on close. This check uses only the default retry policy and excludes context errors. It does not invoke a custom retry callback.
 
-Listener hooks use `TopicListenerStreamEvents`. Reader message, byte and gauge hooks use `TopicReaderMessageEvents`. Reader commit and session-error hooks use `TopicReaderStreamEvents`.
+Listener hooks use `TopicListenerStreamEvents`. Reader message, byte and gauge hooks use `TopicReaderMessageEvents`. Reader commit and session-error hooks use `TopicReaderStreamEvents`. `OnListenerMessagesReceived`, `OnListenerMessagesDelivered`, `OnListenerCreditBalanceChanged`, and `OnListenerLocalBufferChanged` are listener-only; their `OnReader*` counterparts are pull-only. Enabling listener metrics alone does not reserve a pull buffer or trace pull deliveries.
 
 The detail mask is read once, when the topic trace is built: a later change of a live `trace.Detailer` does not affect topic metrics, so a gauge delta and its compensation always follow the same mask. A disabled group installs no hook, and the SDK does no bookkeeping for an absent hook. Pending commits are tracked per reader kind: `OnReaderCommitQueued` enables it for pull readers and `OnListenerCommitQueued` for listeners.
 

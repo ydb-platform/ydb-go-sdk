@@ -16,13 +16,13 @@ func TestStreamListenerLocalBufferEventsKeepOrderDuringClose(t *testing.T) {
 	var observations []int
 	balance := 0
 	reader.tracer = gtrace.Compose(&trace.Topic{
-		OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
+		OnListenerLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
 			if info.MessagesDelta > 0 {
 				reader.finalizeLocalBuffer()
 			}
 		},
 	}, &trace.Topic{
-		OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
+		OnListenerLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
 			balance += info.MessagesDelta
 			observations = append(observations, balance)
 		},
@@ -37,13 +37,13 @@ func TestStreamListenerCreditEventsKeepOrderDuringClose(t *testing.T) {
 	var observations []int
 	balance := 0
 	reader.tracer = gtrace.Compose(&trace.Topic{
-		OnReaderCreditBalanceChanged: func(info trace.TopicReaderCreditBalanceChangedInfo) {
+		OnListenerCreditBalanceChanged: func(info trace.TopicReaderCreditBalanceChangedInfo) {
 			if info.BytesDelta > 0 {
 				reader.finalizeCreditBalance()
 			}
 		},
 	}, &trace.Topic{
-		OnReaderCreditBalanceChanged: func(info trace.TopicReaderCreditBalanceChangedInfo) {
+		OnListenerCreditBalanceChanged: func(info trace.TopicReaderCreditBalanceChangedInfo) {
 			balance += info.BytesDelta
 			observations = append(observations, balance)
 		},

@@ -71,31 +71,7 @@ func topic(config Config) (t trace.Topic) {
 	// Snapshot details when installing the hooks: disabled hooks stay nil, and
 	// a stream's closing gauge delta uses the same mask as its reservation.
 	details := reader.Details()
-	messageEnabled := func(info trace.TopicReaderInfo) bool {
-		return topicMetricEnabled(details, info.Listener, trace.TopicReaderMessageEvents)
-	}
-	if details&(trace.TopicReaderMessageEvents|trace.TopicListenerStreamEvents) != 0 {
-		t.OnReaderMessagesReceived = func(info trace.TopicReaderMessagesReceivedInfo) {
-			if messageEnabled(info.ReaderInfo) {
-				addCounter(vectors.received(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
-			}
-		}
-		t.OnReaderMessagesDelivered = func(info trace.TopicReaderMessagesDeliveredInfo) {
-			if messageEnabled(info.ReaderInfo) {
-				addCounter(vectors.delivered(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
-			}
-		}
-		t.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
-			if messageEnabled(info.ReaderInfo) {
-				addGauge(vectors.credit(streamLabels(info.ReaderInfo)), float64(info.BytesDelta))
-			}
-		}
-		t.OnReaderLocalBufferChanged = func(info trace.TopicReaderLocalBufferChangedInfo) {
-			if messageEnabled(info.ReaderInfo) {
-				addGauge(vectors.local(streamLabels(info.ReaderInfo)), float64(info.MessagesDelta))
-			}
-		}
-	}
+	setMessageHooks(&t, details, vectors)
 
 	streamEnabled := func(info trace.TopicReaderInfo) bool {
 		return topicMetricEnabled(details, info.Listener, trace.TopicReaderStreamEvents)
@@ -122,6 +98,33 @@ func topic(config Config) (t trace.Topic) {
 	setReceivedBytesHooks(&t, details, vectors)
 
 	return t
+}
+
+func setMessageHooks(t *trace.Topic, details trace.Details, vectors topicVectors) {
+	received := func(info trace.TopicReaderMessagesReceivedInfo) {
+		addCounter(vectors.received(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
+	}
+	delivered := func(info trace.TopicReaderMessagesDeliveredInfo) {
+		addCounter(vectors.delivered(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
+	}
+	credit := func(info trace.TopicReaderCreditBalanceChangedInfo) {
+		addGauge(vectors.credit(streamLabels(info.ReaderInfo)), float64(info.BytesDelta))
+	}
+	local := func(info trace.TopicReaderLocalBufferChangedInfo) {
+		addGauge(vectors.local(streamLabels(info.ReaderInfo)), float64(info.MessagesDelta))
+	}
+	if details&trace.TopicReaderMessageEvents != 0 {
+		t.OnReaderMessagesReceived = received
+		t.OnReaderMessagesDelivered = delivered
+		t.OnReaderCreditBalanceChanged = credit
+		t.OnReaderLocalBufferChanged = local
+	}
+	if details&trace.TopicListenerStreamEvents != 0 {
+		t.OnListenerMessagesReceived = received
+		t.OnListenerMessagesDelivered = delivered
+		t.OnListenerCreditBalanceChanged = credit
+		t.OnListenerLocalBufferChanged = local
+	}
 }
 
 // Each reader kind tracks pending commits only when its own queued hook is set.

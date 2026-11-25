@@ -41,7 +41,7 @@ func TestStreamListener_MessagesReceivedTrace(t *testing.T) {
 
 	var events []trace.TopicReaderMessagesReceivedInfo
 	listener.tracer = &trace.Topic{
-		OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
+		OnListenerMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
 			events = append(events, info)
 		},
 	}
@@ -123,7 +123,7 @@ func TestStreamListener_MessagesReceivedTraceOwnsBatchMetadata(t *testing.T) {
 	traceInfoReceived := make(chan struct{})
 	var traceInfo trace.TopicReaderMessagesReceivedInfo
 	listener.tracer = &trace.Topic{
-		OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
+		OnListenerMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
 			// The listener must have copied the metadata before handing the batch
 			// to the worker. Waiting here makes the handoff and user mutation real
 			// without relying on scheduler timing.
@@ -873,7 +873,7 @@ func TestStreamListener_FlushPendingMessagesSendError(t *testing.T) {
 	streamMock := StreamMock(e)
 	creditDeltas := make(chan int, 1)
 	listener.tracer = &trace.Topic{
-		OnReaderCreditBalanceChanged: func(info trace.TopicReaderCreditBalanceChangedInfo) {
+		OnListenerCreditBalanceChanged: func(info trace.TopicReaderCreditBalanceChangedInfo) {
 			creditDeltas <- info.BytesDelta
 		},
 	}

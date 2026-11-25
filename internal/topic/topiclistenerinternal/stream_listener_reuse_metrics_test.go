@@ -25,13 +25,13 @@ func TestStreamListenerMetricsAcrossForcedSessionReplacement(t *testing.T) {
 	received := make(chan int, 4)
 	delivered := make(chan int, 4)
 	listener.tracer = &trace.Topic{
-		OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
+		OnListenerLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
 			buffer <- info.MessagesDelta
 		},
-		OnReaderMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
+		OnListenerMessagesReceived: func(info trace.TopicReaderMessagesReceivedInfo) {
 			received <- info.MessagesCount
 		},
-		OnReaderMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
+		OnListenerMessagesDelivered: func(info trace.TopicReaderMessagesDeliveredInfo) {
 			delivered <- info.MessagesCount
 		},
 	}

@@ -57,8 +57,12 @@ func TestTopicReceivedBytesAndMessagesKeepInitialDetails(t *testing.T) {
 			if tracer.OnListenerReceiveMessage != nil {
 				tracer.OnListenerReceiveMessage(listenerBytesInfo(listener, 256, nil))
 			}
-			tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{ReaderInfo: pull, MessagesCount: 2})
-			tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{ReaderInfo: listener, MessagesCount: 3})
+			if tracer.OnReaderMessagesReceived != nil {
+				tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{ReaderInfo: pull, MessagesCount: 2})
+			}
+			if tracer.OnListenerMessagesReceived != nil {
+				tracer.OnListenerMessagesReceived(trace.TopicReaderMessagesReceivedInfo{ReaderInfo: listener, MessagesCount: 3})
+			}
 			assert.Equal(t, []int64{tc.wantBytes}, cfg.capture.adds["ydb.topic.reader.received.bytes"])
 			assert.Equal(t, []int64{tc.wantMessages}, cfg.capture.adds["ydb.topic.reader.received.messages"])
 		})

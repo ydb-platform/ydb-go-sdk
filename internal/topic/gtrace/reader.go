@@ -30,6 +30,18 @@ func ComposeReader(lhs, rhs *trace.Topic, opts ...TopicComposeOption) *trace.Top
 		t.OnReaderSessionError = nil
 	}
 
+	if lhs.OnListenerMessagesReceived == nil && rhs.OnListenerMessagesReceived == nil {
+		t.OnListenerMessagesReceived = nil
+	}
+	if lhs.OnListenerMessagesDelivered == nil && rhs.OnListenerMessagesDelivered == nil {
+		t.OnListenerMessagesDelivered = nil
+	}
+	if lhs.OnListenerCreditBalanceChanged == nil && rhs.OnListenerCreditBalanceChanged == nil {
+		t.OnListenerCreditBalanceChanged = nil
+	}
+	if lhs.OnListenerLocalBufferChanged == nil && rhs.OnListenerLocalBufferChanged == nil {
+		t.OnListenerLocalBufferChanged = nil
+	}
 	if lhs.OnReaderCommittedNotify == nil && rhs.OnReaderCommittedNotify == nil {
 		t.OnReaderCommittedNotify = nil
 	}

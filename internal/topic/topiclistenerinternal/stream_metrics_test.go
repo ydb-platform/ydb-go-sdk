@@ -32,7 +32,7 @@ func TestStreamListener_CreditBalanceTracksSendAndClose(t *testing.T) {
 		}
 		creditDeltas := make(chan int, 4)
 		listener.tracer = &trace.Topic{
-			OnReaderCreditBalanceChanged: func(info trace.TopicReaderCreditBalanceChangedInfo) {
+			OnListenerCreditBalanceChanged: func(info trace.TopicReaderCreditBalanceChangedInfo) {
 				creditDeltas <- info.BytesDelta
 			},
 		}
@@ -77,7 +77,7 @@ func TestStreamListener_ReceivedBytesUsesProtocolSizeForDroppedBatch(t *testing.
 			cancel()
 		}
 	}
-	listener.tracer.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
+	listener.tracer.OnListenerCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
 		creditDeltas <- info.BytesDelta
 	}
 
@@ -129,7 +129,7 @@ func TestStreamListener_LocalBufferTracksQueueAndHandler(t *testing.T) {
 		localDeltas []int
 	)
 	listener.tracer = &trace.Topic{
-		OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
+		OnListenerLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
 			mu.Lock()
 			localDeltas = append(localDeltas, info.MessagesDelta)
 			mu.Unlock()
@@ -186,7 +186,7 @@ func TestStreamListener_LocalBufferRollbackAfterFinalization(t *testing.T) {
 	}
 	var localDeltas []int
 	listener.tracer = &trace.Topic{
-		OnReaderLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
+		OnListenerLocalBufferChanged: func(info trace.TopicReaderLocalBufferChangedInfo) {
 			localDeltas = append(localDeltas, info.MessagesDelta)
 			if info.MessagesDelta > 0 {
 				worker.messageQueue.Close()
@@ -323,10 +323,10 @@ func TestStreamListener_MetricBalancesArePerStreamForSameReaderName(t *testing.T
 	listener1.tracer = &trace.Topic{}
 	listener1Credits := make(chan int, 4)
 	listener1Locals := make(chan int, 4)
-	listener1.tracer.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
+	listener1.tracer.OnListenerCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
 		listener1Credits <- info.BytesDelta
 	}
-	listener1.tracer.OnReaderLocalBufferChanged = func(info trace.TopicReaderLocalBufferChangedInfo) {
+	listener1.tracer.OnListenerLocalBufferChanged = func(info trace.TopicReaderLocalBufferChangedInfo) {
 		listener1Locals <- info.MessagesDelta
 	}
 
@@ -342,10 +342,10 @@ func TestStreamListener_MetricBalancesArePerStreamForSameReaderName(t *testing.T
 		listener2.tracer = &trace.Topic{}
 		listener2Credits := make(chan int, 4)
 		listener2Locals := make(chan int, 4)
-		listener2.tracer.OnReaderCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
+		listener2.tracer.OnListenerCreditBalanceChanged = func(info trace.TopicReaderCreditBalanceChangedInfo) {
 			listener2Credits <- info.BytesDelta
 		}
-		listener2.tracer.OnReaderLocalBufferChanged = func(info trace.TopicReaderLocalBufferChangedInfo) {
+		listener2.tracer.OnListenerLocalBufferChanged = func(info trace.TopicReaderLocalBufferChangedInfo) {
 			listener2Locals <- info.MessagesDelta
 		}
 
