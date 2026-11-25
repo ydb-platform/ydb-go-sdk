@@ -535,6 +535,14 @@ func TestValueYql(t *testing.T) {
 			literal: `Decimal(".012345678",22,9)`,
 		},
 		{
+			value:   DecimalValueFromBigInt(big.NewInt(-5), 22, 9),
+			literal: `Decimal("-.000000005",22,9)`,
+		},
+		{
+			value:   DecimalValueFromBigInt(big.NewInt(-123456789), 22, 9),
+			literal: `Decimal("-.123456789",22,9)`,
+		},
+		{
 			value:   DyNumberValue("-1234567890123456"),
 			literal: `DyNumber("-1234567890123456")`,
 		},

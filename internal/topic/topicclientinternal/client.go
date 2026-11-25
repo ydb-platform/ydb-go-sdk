@@ -3,9 +3,11 @@ package topicclientinternal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
@@ -254,9 +256,16 @@ func (c *Client) CommitOffset(
 	}
 
 	call := func(ctx context.Context) error {
-		return c.rawClient.CommitOffset(
+		err := c.rawClient.CommitOffset(
 			ctx, c.defaultOperationParams, path, partitionID, consumer, offset, options.ReadSessionID,
 		)
+		if options.ReadSessionID != "" && xerrors.IsOperationError(err, Ydb.StatusIds_SESSION_EXPIRED) {
+			return xerrors.WithStackTrace(xerrors.Unretryable(fmt.Errorf(
+				"%w: %w", topicreadercommon.ErrPublicCommitSessionToExpiredSession, err,
+			)))
+		}
+
+		return err
 	}
 
 	if c.cfg.AutoRetry() {

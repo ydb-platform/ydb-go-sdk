@@ -9,6 +9,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 )
 
 func TestRetryableCode(t *testing.T) {
@@ -70,6 +72,48 @@ func TestUnretryableUnwrap(t *testing.T) {
 	test := errors.New("test")
 	wrapped := Unretryable(test)
 	require.ErrorIs(t, wrapped, test)
+}
+
+func TestUnretryableCheck(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		err  error
+		code int32
+	}{
+		{
+			name: "operation",
+			err:  Operation(WithStatusCode(Ydb.StatusIds_SESSION_EXPIRED)),
+			code: int32(Ydb.StatusIds_SESSION_EXPIRED),
+		},
+		{
+			name: "transport",
+			err:  Transport(grpcStatus.Error(grpcCodes.Unavailable, "unavailable")),
+			code: int32(grpcCodes.Unavailable),
+		},
+		{
+			name: "custom retryable",
+			err:  Retryable(errors.New("retryable")),
+			code: -1,
+		},
+		{
+			name: "ordinary error",
+			err:  errors.New("ordinary"),
+			code: -1,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := fmt.Errorf("outer: %w", Unretryable(fmt.Errorf("inner: %w", tt.err)))
+			code, errType, backoffType := Check(err)
+			require.Equal(t, TypeNonRetryable, errType)
+			require.EqualValues(t, tt.code, code)
+			require.Equal(t, backoff.TypeInstant, backoffType)
+			require.ErrorIs(t, err, tt.err)
+			require.EqualError(t, err, "outer: inner: "+tt.err.Error())
+			var classified Error
+			require.ErrorAs(t, err, &classified)
+			require.Contains(t, classified.Name(), "unretryable/")
+		})
+	}
 }
 
 func TestIsValid(t *testing.T) {
