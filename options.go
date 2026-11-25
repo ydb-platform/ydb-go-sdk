@@ -423,7 +423,8 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 // discovery to close before the next successful discovery call. A positive delay
 // starts when an endpoint first disappears. Connections close when the delay
 // expires or the next successful discovery still omits the endpoint, whichever
-// happens first. A non-positive delay keeps the default discovery-based behavior.
+// happens first. The default delay is 1 minute and 59 seconds. A non-positive
+// delay leaves connection closing to discovery updates.
 func WithRemovedEndpointCloseDelay(delay time.Duration) Option {
 	return func(_ context.Context, d *Driver) error {
 		d.discoveryOptions = append(d.discoveryOptions, discoveryConfig.WithEndpointCloseDelay(delay))

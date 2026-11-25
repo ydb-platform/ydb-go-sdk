@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	DefaultInterval = time.Minute
+	DefaultInterval           = time.Minute
+	defaultEndpointCloseDelay = 2*time.Minute - time.Second
 )
 
 type Config struct {
@@ -32,8 +33,9 @@ type Config struct {
 
 func New(opts ...Option) *Config {
 	c := &Config{
-		interval: DefaultInterval,
-		trace:    &trace.Discovery{},
+		interval:           DefaultInterval,
+		endpointCloseDelay: defaultEndpointCloseDelay,
+		trace:              &trace.Discovery{},
 		addressMutator: func(address string) string {
 			return address
 		},

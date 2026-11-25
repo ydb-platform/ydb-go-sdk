@@ -97,6 +97,7 @@ type Balancer struct {
 	closeMu            sync.Mutex
 	closed             bool
 	pendingClose       *pendingEndpointClose
+	endpointClosures   sync.WaitGroup
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -302,12 +303,18 @@ func (b *Balancer) scheduleEndpointClose(
 	closeCtx := xcontext.ValueOnly(ctx)
 	pending.timer = b.discoveryConfig.Clock().AfterFunc(b.endpointCloseDelay, func() {
 		b.closeMu.Lock()
-		defer b.closeMu.Unlock()
+		if b.pendingClose != pending {
+			b.closeMu.Unlock()
 
-		if b.pendingClose == pending {
-			for _, cc := range b.takePendingEndpointClose() {
-				b.pool.Put(closeCtx, cc)
-			}
+			return
+		}
+		connections := b.takePendingEndpointClose()
+		b.endpointClosures.Add(1)
+		b.closeMu.Unlock()
+
+		defer b.endpointClosures.Done()
+		for _, cc := range connections {
+			b.pool.Put(closeCtx, cc)
 		}
 	})
 	b.pendingClose = pending
@@ -444,6 +451,7 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	if discoveryCC != nil {
 		_ = discoveryCC.Close()
 	}
+	b.endpointClosures.Wait()
 
 	return nil
 }

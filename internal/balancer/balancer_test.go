@@ -2747,8 +2747,8 @@ func connInQuarantine(balancer *Balancer, nodeID uint32) conn.Conn {
 }
 
 // TestBalancerDiscoveryDropClosesGRPC verifies end-to-end that a node removed from
-// ListEndpoints eventually closes its pooled gRPC connection after the quarantine
-// cycle (two discovery rounds after the drop), and Balancer.Close closes the rest.
+// ListEndpoints closes its pooled gRPC connection on the next update when it
+// arrives before the timer, and Balancer.Close closes the rest.
 func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	const (
 		node1 uint32 = 1
@@ -2799,10 +2799,6 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	require.Equal(t, []uint32{node1}, activeNodeIDs(balancer))
 	require.Equal(t, 0, events.closedCount(node2), "gRPC must not close on first discovery after drop")
 
-	quarantined := connInQuarantine(balancer, node2)
-	require.NotNil(t, quarantined, "dropped node must remain in quarantine")
-	require.Same(t, node2Conn, quarantined)
-
 	// Discovery #4: same cluster — quarantine released, dropped node gRPC must close.
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
 	require.Equal(t, []uint32{node1}, activeNodeIDs(balancer))
@@ -2825,6 +2821,78 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	}, time.Second, 10*time.Millisecond, "balancer close must close remaining active connections")
 
 	require.Equal(t, 1, events.closedCount(node2))
+}
+
+func TestBalancerDiscoveryDefaultCloseDelayAfterFullReplacement(t *testing.T) {
+	ctx := t.Context()
+	clock := clockwork.NewFakeClock()
+	server := startDynamicDiscoveryServer(t, []uint32{1, 2})
+	closeStarted := make(chan struct{})
+	closePaused := make(chan struct{})
+	resumeClose := sync.OnceFunc(func() { close(closePaused) })
+	cfg := config.New(
+		config.WithEndpoint(server.endpoint()),
+		config.WithDatabase("/local"),
+		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		config.WithBalancer(userBalancers.RandomChoice()),
+		config.WithTrace(trace.Driver{
+			OnConnClose: func(info trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
+				if info.Endpoint.NodeID() == 1 {
+					close(closeStarted)
+					<-closePaused
+				}
+
+				return nil
+			},
+		}),
+	)
+	pool := conn.NewPool(ctx, cfg)
+	defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
+
+	b, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(time.Hour), discoveryConfig.WithClock(clock))
+	require.NoError(t, err)
+	defer func() {
+		resumeClose()
+		require.NoError(t, b.Close(ctx))
+	}()
+
+	dialWhoAmI(t, b, 1)
+	dialWhoAmI(t, b, 2)
+	old := b.connections().All()
+
+	server.setNodeIDs([]uint32{3, 4})
+	require.NoError(t, b.clusterDiscoveryAttemptWithDial(ctx))
+	require.ElementsMatch(t, []uint32{3, 4}, activeNodeIDs(b))
+	dialWhoAmI(t, b, 3)
+
+	clock.Advance(118 * time.Second)
+	for _, cc := range old {
+		require.Equal(t, state.Online, cc.State())
+	}
+
+	clock.Advance(time.Second)
+	select {
+	case <-closeStarted:
+	case <-time.After(time.Second):
+		t.Fatal("the default timeout did not start closing the old connections")
+	}
+
+	discoveryDone := make(chan error, 1)
+	go func() {
+		discoveryDone <- b.clusterDiscoveryAttemptWithDial(ctx)
+	}()
+	select {
+	case err := <-discoveryDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("closing the old connection blocked discovery")
+	}
+
+	resumeClose()
+	require.Eventually(t, func() bool {
+		return old[0].State() == state.Destroyed && old[1].State() == state.Destroyed
+	}, time.Second, 10*time.Millisecond)
+	require.ElementsMatch(t, []uint32{3, 4}, activeNodeIDs(b))
 }
 
 func TestBalancerDiscoveryEndpointCloseDelayAfterRediscovery(t *testing.T) {
@@ -2942,7 +3010,6 @@ func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
 	// Discovery #3: node 2 disappears but remains referenced by quarantine.
 	server.setNodeIDs([]uint32{node1})
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
-	require.Same(t, node2Conn, connInQuarantine(balancer, node2))
 	require.Equal(t, state.Offline, node2Conn.State())
 	require.Equal(t, 0, events.closedCount(node2))
 
