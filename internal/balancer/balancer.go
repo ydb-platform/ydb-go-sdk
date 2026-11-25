@@ -75,6 +75,7 @@ func (s *streamWrapper) RecvMsg(m any) error {
 type pendingEndpointClose struct {
 	connections []conn.Conn
 	timer       clockwork.Timer
+	deadline    time.Time
 }
 
 type Balancer struct {
@@ -98,7 +99,6 @@ type Balancer struct {
 	closeMu            sync.Mutex
 	closed             bool
 	pendingClose       *pendingEndpointClose
-	endpointClosures   sync.WaitGroup
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -232,7 +232,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 		nearestDC, detectErr := b.localDCDetector(ctx, endpoints)
 		if detectErr != nil {
 			if previous := b.connections(); b.endpointCloseDelay > 0 && previous != nil {
-				b.applyDiscoveredEndpoints(ctx, endpoints, previous.selfLocation)
+				b.applyDiscoveryUpdate(ctx, endpoints, previous.selfLocation, true)
 			}
 
 			return xerrors.WithStackTrace(detectErr)
@@ -262,10 +262,6 @@ func nextState(ctx context.Context, pool interface {
 		pool.Put(ctx, cc)
 	}
 
-	for _, cc := range newActive {
-		cc.Unban(ctx)
-	}
-
 	return active, newActive
 }
 
@@ -282,11 +278,11 @@ func (b *Balancer) takePendingEndpointClose() []conn.Conn {
 }
 
 func (b *Balancer) scheduleEndpointClose(
-	ctx context.Context, quarantine []conn.Conn, priorities []policy.EndpointPriority,
+	ctx context.Context, quarantine []conn.Conn, endpoints []endpoint.Endpoint,
 ) []conn.Conn {
-	discovered := make(map[endpoint.Key]struct{}, len(priorities))
-	for _, priority := range priorities {
-		discovered[priority.Key] = struct{}{}
+	discovered := make(map[endpoint.Key]struct{}, len(endpoints))
+	for _, e := range endpoints {
+		discovered[e.Key()] = struct{}{}
 	}
 	pending := &pendingEndpointClose{}
 	remaining := xslices.Filter(quarantine, func(cc conn.Conn) bool {
@@ -301,34 +297,61 @@ func (b *Balancer) scheduleEndpointClose(
 		return quarantine
 	}
 
-	closeCtx := xcontext.ValueOnly(ctx)
-	pending.timer = b.discoveryConfig.Clock().AfterFunc(b.endpointCloseDelay, func() {
+	clock := b.discoveryConfig.Clock()
+	pending.deadline = clock.Now().Add(b.endpointCloseDelay)
+	pending.timer = clock.AfterFunc(b.endpointCloseDelay, func() {
 		b.closeMu.Lock()
 		if b.pendingClose != pending {
 			b.closeMu.Unlock()
 
 			return
 		}
-		connections := b.takePendingEndpointClose()
-		closing := make([]closer.Closer, 0, len(connections))
-		for _, cc := range connections {
-			if released := b.pool.ReleaseConn(cc); released != nil {
-				closing = append(closing, released)
-			}
-		}
-		b.endpointClosures.Add(len(closing))
+		closing := b.releaseEndpointReferences(b.takePendingEndpointClose())
 		b.closeMu.Unlock()
 
-		for _, cc := range closing {
-			go func() {
-				defer b.endpointClosures.Done()
-				_ = cc.Close(closeCtx)
-			}()
-		}
+		closeEndpointTransports(ctx, closing)
 	})
 	b.pendingClose = pending
 
 	return remaining
+}
+
+func (b *Balancer) mergePendingEndpointClose(quarantine []conn.Conn) ([]conn.Conn, []closer.Closer) {
+	pending := b.pendingClose
+	if pending == nil {
+		return quarantine, nil
+	}
+
+	connections := b.takePendingEndpointClose()
+	if b.discoveryConfig.Clock().Now().Before(pending.deadline) {
+		return slices.Concat(quarantine, connections), nil
+	}
+
+	return quarantine, b.releaseEndpointReferences(connections)
+}
+
+func (b *Balancer) releaseEndpointReferences(connections []conn.Conn) []closer.Closer {
+	closing := make([]closer.Closer, 0, len(connections))
+	for _, cc := range connections {
+		if released := b.pool.ReleaseConn(cc); released != nil {
+			closing = append(closing, released)
+		}
+	}
+
+	return closing
+}
+
+func closeEndpointTransports(ctx context.Context, closing []closer.Closer) {
+	if len(closing) == 0 {
+		return
+	}
+
+	closeCtx := xcontext.ValueOnly(ctx)
+	for _, cc := range closing {
+		go func() {
+			_ = cc.Close(closeCtx)
+		}()
+	}
 }
 
 // releaseStateConns releases connections from state
@@ -354,8 +377,21 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	endpoints []endpoint.Endpoint,
 	selfLocation string,
 ) {
+	b.applyDiscoveryUpdate(ctx, endpoints, selfLocation, false)
+}
+
+func (b *Balancer) applyDiscoveryUpdate(
+	ctx context.Context,
+	endpoints []endpoint.Endpoint,
+	selfLocation string,
+	preserveRoutes bool,
+) {
 	b.closeMu.Lock()
-	defer b.closeMu.Unlock()
+	var closing []closer.Closer
+	defer func() {
+		b.closeMu.Unlock()
+		closeEndpointTransports(ctx, closing)
+	}()
 
 	if b.closed {
 		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
@@ -388,26 +424,60 @@ func (b *Balancer) applyDiscoveredEndpoints(
 		traceEndpointChanges(onDone, active, endpoints, selectedEndpoints, selfLocation)
 	}()
 
-	if b.pendingClose != nil {
-		quarantine = slices.Concat(quarantine, b.takePendingEndpointClose())
-	}
-
-	info := policy.Info{SelfLocation: selfLocation}
-	priorities := b.policy.Prioritize(info, endpoints)
-	selectedEndpoints, selectedPriorities = selectActiveEndpoints(
-		active, quarantine, previousPriorities, endpoints, priorities, b.policy.MaxConnections(), b.random,
+	quarantine, closing = b.mergePendingEndpointClose(quarantine)
+	selectedEndpoints, selectedPriorities = b.selectDiscoveredEndpoints(
+		active, quarantine, previousPriorities, endpoints, selfLocation, preserveRoutes,
 	)
 	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selectedEndpoints)
+	if !preserveRoutes {
+		for _, cc := range connections {
+			cc.Unban(ctx)
+		}
+	}
 	if b.endpointCloseDelay > 0 && len(quarantine) > 0 {
-		quarantine = b.scheduleEndpointClose(ctx, quarantine, priorities)
+		quarantine = b.scheduleEndpointClose(ctx, quarantine, endpoints)
+	}
+
+	b.connectionsState.Store(newConnectionsStateWithPriorities(
+		connections, selectedPriorities, quarantine, nil, selfLocation,
+	))
+}
+
+func (b *Balancer) selectDiscoveredEndpoints(
+	active, quarantine []conn.Conn,
+	previousPriorities []policy.EndpointPriority,
+	endpoints []endpoint.Endpoint,
+	selfLocation string,
+	preserveRoutes bool,
+) ([]endpoint.Endpoint, []policy.EndpointPriority) {
+	if preserveRoutes {
+		present := make(map[endpoint.Key]endpoint.Endpoint, len(endpoints))
+		for _, e := range endpoints {
+			present[e.Key()] = e
+		}
+		b.lastDiscovered = slices.DeleteFunc(b.lastDiscovered, func(e endpoint.Endpoint) bool {
+			return present[e.Key()] == nil
+		})
+		var selected []endpoint.Endpoint
+		var priorities []policy.EndpointPriority
+		for _, priority := range previousPriorities {
+			if e := present[priority.Key]; e != nil {
+				selected = append(selected, e)
+				priorities = append(priorities, priority)
+			}
+		}
+
+		return selected, priorities
 	}
 
 	if b.policy.MaxConnections() > 0 {
 		b.lastDiscovered = append(b.lastDiscovered[:0], endpoints...)
 	}
-	b.connectionsState.Store(newConnectionsStateWithPriorities(
-		connections, selectedPriorities, quarantine, nil, selfLocation,
-	))
+	priorities := b.policy.Prioritize(policy.Info{SelfLocation: selfLocation}, endpoints)
+
+	return selectActiveEndpoints(
+		active, quarantine, previousPriorities, endpoints, priorities, b.policy.MaxConnections(), b.random,
+	)
 }
 
 func traceEndpointChanges(
@@ -469,7 +539,6 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	if discoveryCC != nil {
 		_ = discoveryCC.Close()
 	}
-	b.endpointClosures.Wait()
 
 	return nil
 }

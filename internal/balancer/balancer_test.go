@@ -1754,7 +1754,7 @@ func TestClusterDiscoveryKeepsNearestDCWhenRefreshProbeFails(t *testing.T) {
 	require.NotNil(t, removed)
 
 	probeErr = errors.New("local DC probe failed")
-	endpoints = []endpoint.Endpoint{endpoints[0], endpoints[2]}
+	endpoints = []endpoint.Endpoint{endpoints[0].Copy(endpoint.WithLocation("renamed")), endpoints[2]}
 	require.ErrorIs(t, b.clusterDiscoveryAttempt(ctx, nil), probeErr)
 
 	selected, err := b.nextConn(ctx)
@@ -3035,6 +3035,145 @@ func TestBalancerDiscoveryEndpointCloseDelayAfterRediscovery(t *testing.T) {
 	require.Equal(t, state.Destroyed, replacement.State(), "discovery must still close the connection before the timer")
 }
 
+func TestBalancerRediscoveryDoesNotReuseExpiredConnection(t *testing.T) {
+	const delay = 5 * time.Second
+
+	ctx := t.Context()
+	fired := make(chan func(), 1)
+	clock := &endpointCloseClock{
+		FakeClock: clockwork.NewFakeClock(),
+		fired:     fired,
+	}
+	server := startDynamicDiscoveryServer(t, []uint32{1, 2})
+	cfg := config.New(
+		config.WithEndpoint(server.endpoint()),
+		config.WithDatabase("/local"),
+		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		config.WithBalancer(userBalancers.RandomChoice()),
+	)
+	pool := conn.NewPool(ctx, cfg)
+	defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
+	b, err := New(ctx, cfg, pool,
+		discoveryConfig.WithInterval(time.Hour),
+		discoveryConfig.WithClock(clock),
+		discoveryConfig.WithEndpointCloseDelay(delay),
+	)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, b.Close(ctx)) }()
+
+	streamCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	watch, err := grpc_health_v1.NewHealthClient(b).Watch(
+		endpoint.WithNodeID(conn.WithoutWrapping(streamCtx), 1), &grpc_health_v1.HealthCheckRequest{},
+	)
+	require.NoError(t, err)
+	_, err = watch.Recv()
+	require.NoError(t, err)
+	old := connByNodeID(b, 1)
+	require.NotNil(t, old)
+
+	server.setNodeIDs([]uint32{2})
+	require.NoError(t, b.clusterDiscoveryAttemptWithDial(ctx))
+	clock.Advance(delay)
+	var callback func()
+	select {
+	case callback = <-fired:
+	case <-time.After(time.Second):
+		t.Fatal("the close timer did not fire")
+	}
+
+	server.setNodeIDs([]uint32{1, 2})
+	require.NoError(t, b.clusterDiscoveryAttemptWithDial(ctx))
+	callback()
+
+	replacement := connByNodeID(b, 1)
+	require.NotNil(t, replacement)
+	require.NotSame(t, old, replacement, "rediscovery must not reuse an expired connection")
+	dialWhoAmI(t, b, 1)
+	require.Eventually(t, func() bool {
+		return old.State() == state.Destroyed
+	}, time.Second, 10*time.Millisecond)
+	_, err = watch.Recv()
+	require.Error(t, err, "the expired transport must terminate its active stream")
+	require.NoError(t, streamCtx.Err())
+}
+
+func TestBalancerEndpointCloseHookCanCloseBalancer(t *testing.T) {
+	const delay = 5 * time.Second
+
+	ctx := t.Context()
+	clock := clockwork.NewFakeClock()
+	server := startDynamicDiscoveryServer(t, []uint32{1, 2})
+	closeStarted := make(chan struct{})
+	closeFinished := make(chan struct{})
+	releaseHook := make(chan struct{})
+	var b *Balancer
+	var closeErr error
+	cfg := config.New(
+		config.WithEndpoint(server.endpoint()),
+		config.WithDatabase("/local"),
+		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		config.WithBalancer(userBalancers.RandomChoice()),
+		config.WithTrace(trace.Driver{
+			OnConnClose: func(info trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
+				if info.Endpoint.NodeID() != 1 {
+					return nil
+				}
+
+				return func(trace.DriverConnCloseDoneInfo) {
+					close(closeStarted)
+					go func() {
+						defer close(closeFinished)
+						closeErr = b.Close(ctx)
+					}()
+					select {
+					case <-closeFinished:
+					case <-releaseHook:
+					}
+				}
+			},
+		}),
+	)
+	pool := conn.NewPool(ctx, cfg)
+	defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
+	var err error
+	b, err = New(ctx, cfg, pool,
+		discoveryConfig.WithInterval(time.Hour),
+		discoveryConfig.WithClock(clock),
+		discoveryConfig.WithEndpointCloseDelay(delay),
+	)
+	require.NoError(t, err)
+	defer func() {
+		close(releaseHook)
+		select {
+		case <-closeStarted:
+			select {
+			case <-closeFinished:
+			case <-time.After(time.Second):
+				t.Error("balancer shutdown did not finish after releasing the hook")
+			}
+		default:
+			_ = b.Close(ctx)
+		}
+	}()
+
+	dialWhoAmI(t, b, 1)
+	old := connByNodeID(b, 1)
+	require.NotNil(t, old)
+
+	server.setNodeIDs([]uint32{2})
+	require.NoError(t, b.clusterDiscoveryAttemptWithDial(ctx))
+	clock.Advance(delay)
+
+	select {
+	case <-closeFinished:
+		require.NoError(t, closeErr)
+	case <-time.After(time.Second):
+		t.Fatal("the endpoint close hook could not shut down the balancer")
+	}
+	require.Equal(t, state.Destroyed, old.State())
+}
+
 func TestBalancerStaleEndpointCloseCallback(t *testing.T) {
 	ctx := t.Context()
 	cfg := config.New()
@@ -3232,10 +3371,16 @@ type endpointCloseClock struct {
 	*clockwork.FakeClock
 
 	callback func()
+	fired    chan<- func()
 }
 
 func (c *endpointCloseClock) AfterFunc(delay time.Duration, callback func()) clockwork.Timer {
 	c.callback = callback
+	if c.fired != nil {
+		return c.FakeClock.AfterFunc(delay, func() {
+			c.fired <- callback
+		})
+	}
 
 	return c.FakeClock.AfterFunc(delay, callback)
 }
