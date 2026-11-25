@@ -1,5 +1,12 @@
 * Added experimental `ydb.WithMeter` and `telemetry.Meter` to expose the `ydb.topic.reader.partition_session.count` gauge through an application-owned backend, with `topicoptions.WithReaderName` and `topicoptions.WithListenerReaderName` to set the `reader.name` attribute
 
+## v3.157.4
+* Fixed panic in `decimal.Format` and `decimal.Decimal.String` for a zero value with zero scale
+* Fixed the YQL literal of negative `Decimal` values with an absolute value below 0.1, where the minus sign was written inside the digits (for example `.0000000-5` instead of `-.000000005`)
+
+## v3.157.3
+* Fixed `topic.Client.CommitOffset` retrying commits with an expired non-empty read session ID; it now returns `topicreader.ErrCommitToExpiredSession` while preserving the original operation error, server status, and issues
+
 ## v3.157.2
 * Fixed TopicListener callback ordering across partition sessions and cancellation of buffered reads after a forced partition stop
 
