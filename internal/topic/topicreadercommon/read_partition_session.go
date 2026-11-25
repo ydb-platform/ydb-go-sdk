@@ -25,7 +25,7 @@ type PartitionSession struct {
 	committedOffsetVal       atomic.Int64
 	noMoreMessages           atomic.Bool
 	retired                  atomic.Bool
-	storage                  atomic.Pointer[PartitionSessionStorage]
+	active                   atomic.Pointer[activeSessions]
 }
 
 func NewPartitionSession(
@@ -65,8 +65,8 @@ func (s *PartitionSession) SetContext(ctx context.Context) {
 
 func (s *PartitionSession) Close() {
 	s.retired.Store(true)
-	if storage := s.storage.Swap(nil); storage != nil {
-		storage.dropActive(s)
+	if active := s.active.Swap(nil); active != nil {
+		active.drop(s)
 	}
 	s.ctxCancel()
 }

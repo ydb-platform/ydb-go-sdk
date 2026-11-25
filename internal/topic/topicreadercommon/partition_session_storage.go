@@ -20,7 +20,7 @@ type PartitionSessionStorage struct {
 	sessions map[rawtopicreader.PartitionSessionID]*sessionInfo
 	// active excludes closed and removed sessions, which can still be looked
 	// up by the protocol.
-	active map[rawtopicreader.PartitionSessionID]*PartitionSession
+	active *activeSessions
 
 	removeIndex              int
 	lastCompactedTime        time.Time
@@ -30,7 +30,7 @@ type PartitionSessionStorage struct {
 func (c *PartitionSessionStorage) initNeedLock() {
 	if c.sessions == nil {
 		c.sessions = make(map[rawtopicreader.PartitionSessionID]*sessionInfo)
-		c.active = make(map[rawtopicreader.PartitionSessionID]*PartitionSession)
+		c.active = &activeSessions{sessions: make(map[rawtopicreader.PartitionSessionID]*PartitionSession)}
 		c.lastCompactedTime = time.Now()
 	}
 }
@@ -45,12 +45,7 @@ func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.StreamPartitionSessionID))
 	}
 	c.sessions[session.StreamPartitionSessionID] = &sessionInfo{Session: session}
-	session.storage.Store(c)
-	if session.retired.Load() {
-		session.storage.CompareAndSwap(c, nil)
-	} else {
-		c.active[session.StreamPartitionSessionID] = session
-	}
+	c.active.add(session)
 
 	return nil
 }
@@ -86,7 +81,12 @@ func (c *PartitionSessionStorage) ActiveCountsByTopic() map[string]int64 {
 	defer c.m.RUnlock()
 
 	counts := make(map[string]int64)
-	for _, session := range c.active {
+	if c.active == nil {
+		return counts
+	}
+	c.active.m.Lock()
+	defer c.active.m.Unlock()
+	for _, session := range c.active.sessions {
 		if !session.retired.Load() {
 			counts[session.Topic]++
 		}
@@ -105,8 +105,7 @@ func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (
 	c.removeIndex++
 	if partitionInfo, ok := c.sessions[id]; ok {
 		partitionInfo.RemoveTime = now
-		delete(c.active, id)
-		partitionInfo.Session.storage.CompareAndSwap(c, nil)
+		c.active.drop(partitionInfo.Session)
 
 		return partitionInfo.Session, nil
 	}
@@ -116,13 +115,33 @@ func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (
 	return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: delete undefined partition session with id: %v", id))
 }
 
-func (c *PartitionSessionStorage) dropActive(session *PartitionSession) {
-	c.m.Lock()
-	defer c.m.Unlock()
+// activeSessions is separate from the storage: a session points only here, so a
+// retained message does not keep the removal history of its stream alive.
+type activeSessions struct {
+	m        sync.Mutex
+	sessions map[rawtopicreader.PartitionSessionID]*PartitionSession
+}
 
+func (a *activeSessions) add(session *PartitionSession) {
+	a.m.Lock()
+	defer a.m.Unlock()
+
+	session.active.Store(a)
+	if session.retired.Load() {
+		session.active.CompareAndSwap(a, nil)
+	} else {
+		a.sessions[session.StreamPartitionSessionID] = session
+	}
+}
+
+func (a *activeSessions) drop(session *PartitionSession) {
+	a.m.Lock()
+	defer a.m.Unlock()
+
+	session.active.CompareAndSwap(a, nil)
 	id := session.StreamPartitionSessionID
-	if c.active[id] == session {
-		delete(c.active, id)
+	if a.sessions[id] == session {
+		delete(a.sessions, id)
 	}
 }
 

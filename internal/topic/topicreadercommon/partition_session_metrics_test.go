@@ -2,14 +2,41 @@ package topicreadercommon
 
 import (
 	"context"
+	"runtime"
 	"testing"
 	"time"
+	"weak"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 )
+
+func TestRetainedPartitionSessionDoesNotKeepRemovedSessions(t *testing.T) {
+	// A retained message keeps its session alive after the stream is gone.
+	kept := NewPartitionSession(context.Background(), "topic", 0, 1, "", 0, 0, 0)
+	removed := func() []weak.Pointer[PartitionSession] {
+		storage := &PartitionSessionStorage{}
+		require.NoError(t, storage.Add(kept))
+		pointers := make([]weak.Pointer[PartitionSession], 0, 100)
+		for id := rawtopicreader.PartitionSessionID(1); id <= 100; id++ {
+			session := NewPartitionSession(context.Background(), "topic", int64(id), 1, "", id, int64(id), 0)
+			require.NoError(t, storage.Add(session))
+			_, err := storage.Remove(id)
+			require.NoError(t, err)
+			pointers = append(pointers, weak.Make(session))
+		}
+
+		return pointers
+	}()
+	runtime.GC()
+	runtime.GC()
+	for i, pointer := range removed {
+		require.Nil(t, pointer.Value(), "removed session %d is still reachable from a retained session", i+1)
+	}
+	runtime.KeepAlive(kept)
+}
 
 func TestPartitionSessionActiveCounts(t *testing.T) {
 	storage := &PartitionSessionStorage{}

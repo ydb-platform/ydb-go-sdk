@@ -89,7 +89,8 @@ func TestListenerActiveIndexStaysBoundedAcrossSessionStops(t *testing.T) {
 			}
 			// The fixture's original session is still active. The metric's
 			// scan set must not include the retained protocol lookup history.
-			require.Equal(t, 1, reflect.Indirect(reflect.ValueOf(stream.sessions)).FieldByName("active").Len())
+			active := reflect.Indirect(reflect.ValueOf(stream.sessions)).FieldByName("active").Elem()
+			require.Equal(t, 1, active.FieldByName("sessions").Len())
 		})
 	}
 }
