@@ -403,7 +403,7 @@ func (b *Balancer) applyDiscoveryUpdate(
 		onDone = gtrace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
 			stack.FunctionID(
-				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
+				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveryUpdate"),
 			b.policy.DetectsNearestDC(),
 			b.driverConfig.Database(),
 		)
