@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -37,15 +38,38 @@ func NewEncoder(create PublicCreateEncoderFunc) *Encoder {
 }
 
 func (e *Encoder) EncodeBytes(target io.Writer, data []byte) (int, error) {
+	return e.encode(target, func(enc io.Writer) (int, error) {
+		return enc.Write(data)
+	})
+}
+
+// EncodeFrom compresses the data of source without copying it into an intermediate buffer.
+// The source must write all its data in a single Write, as bytes.Reader and bytes.Buffer do,
+// so the encoder gets the same writes as with EncodeBytes.
+func (e *Encoder) EncodeFrom(target io.Writer, source io.WriterTo) (int, error) {
+	return e.encode(target, func(enc io.Writer) (int, error) {
+		n, err := source.WriteTo(enc)
+		if err == nil && n == 0 {
+			// keep the Write before Close that EncodeBytes does for empty data
+			_, err = enc.Write(nil)
+		}
+
+		return int(n), err
+	})
+}
+
+func (e *Encoder) encode(target io.Writer, write func(enc io.Writer) (int, error)) (int, error) {
 	enc, err := e.newWriter(target)
 	if err != nil {
 		return 0, err
 	}
-	n, err := enc.Write(data)
-	if err == nil {
-		err = enc.Close()
-	}
+	n, err := write(enc)
 	if err != nil {
+		_ = enc.Close()
+
+		return 0, err
+	}
+	if err = enc.Close(); err != nil {
 		return 0, err
 	}
 	if reusable, ok := enc.(PublicResetableWriter); ok {
@@ -100,11 +124,48 @@ func (e *MultiEncoder) AddSharedEncoder(codec rawtopiccommon.Codec, encoder *Enc
 }
 
 func (e *MultiEncoder) Encode(codec rawtopiccommon.Codec, target io.Writer, source io.Reader) (int, error) {
+	switch src := source.(type) {
+	case *strings.Reader:
+		// strings.Reader.WriteTo would convert the whole string to a new []byte
+		// for writers without WriteString, so copy it into a pooled buffer instead.
+		return e.encodeBuffered(codec, target, func(buf *bytes.Buffer) error {
+			buf.Grow(src.Len())
+			_, err := src.WriteTo(buf)
+
+			return err
+		})
+	case *bytes.Reader:
+		return e.encodeFrom(codec, target, src)
+	case *bytes.Buffer:
+		return e.encodeFrom(codec, target, src)
+	default:
+		return e.encodeBuffered(codec, target, func(buf *bytes.Buffer) error {
+			_, err := buf.ReadFrom(src)
+
+			return err
+		})
+	}
+}
+
+func (e *MultiEncoder) encodeFrom(codec rawtopiccommon.Codec, target io.Writer, source io.WriterTo) (int, error) {
+	encoder, ok := e.m[codec]
+	if !ok {
+		return 0, errUnexpectedEncodeCodec(codec)
+	}
+
+	return encoder.EncodeFrom(target, source)
+}
+
+func (e *MultiEncoder) encodeBuffered(
+	codec rawtopiccommon.Codec,
+	target io.Writer,
+	fill func(buf *bytes.Buffer) error,
+) (int, error) {
 	buf := e.bp.GetOrNew()
 	defer e.bp.Put(buf)
 
 	buf.Reset()
-	if _, err := buf.ReadFrom(source); err != nil {
+	if err := fill(buf); err != nil {
 		return 0, err
 	}
 
@@ -116,7 +177,14 @@ func (e *MultiEncoder) EncodeBytes(codec rawtopiccommon.Codec, target io.Writer,
 		return encoder.EncodeBytes(target, data)
 	}
 
-	return 0, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)))
+	return 0, errUnexpectedEncodeCodec(codec)
+}
+
+func errUnexpectedEncodeCodec(codec rawtopiccommon.Codec) error {
+	return xerrors.WithStackTrace(
+		xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)),
+		xerrors.WithSkipDepth(1),
+	)
 }
 
 func (e *MultiEncoder) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {
