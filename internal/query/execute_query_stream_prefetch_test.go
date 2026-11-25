@@ -286,7 +286,7 @@ func BenchmarkExecuteQueryStreamPrefetchCompare(b *testing.B) {
 			d := depth
 			benchmarkRecvDrainLoop(b,
 				func(inner Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient {
-					return wrapExecuteQueryStreamWithAsyncPrefetch(inner, d)
+					return wrapExecuteQueryStreamWithAsyncPrefetch(b.Context(), inner, d)
 				},
 			)
 		})
