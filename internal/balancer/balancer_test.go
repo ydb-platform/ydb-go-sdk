@@ -2965,6 +2965,44 @@ func TestBalancerDiscoveryEndpointCloseDelayAfterRediscovery(t *testing.T) {
 	require.Equal(t, state.Destroyed, replacement.State(), "discovery must still close the connection before the timer")
 }
 
+func TestBalancerStaleEndpointCloseCallback(t *testing.T) {
+	ctx := t.Context()
+	cfg := config.New()
+	pool := conn.NewPool(ctx, cfg)
+	defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
+
+	clock := &endpointCloseClock{FakeClock: clockwork.NewFakeClock()}
+	b := &Balancer{
+		driverConfig:       cfg,
+		discoveryConfig:    discoveryConfig.New(discoveryConfig.WithClock(clock)),
+		policy:             cfg.Balancer(),
+		pool:               pool,
+		endpointCloseDelay: time.Minute,
+	}
+	defer func() { _ = b.Close(ctx) }()
+
+	node1 := endpoint.New("node1:2135", endpoint.WithID(1))
+	node2 := endpoint.New("node2:2135", endpoint.WithID(2))
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{node1, node2}, "")
+	first := connByNodeID(b, 1)
+	second := connByNodeID(b, 2)
+	require.NotNil(t, first)
+	require.NotNil(t, second)
+
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{node2}, "")
+	expiredCallback := clock.callback
+	require.NotNil(t, expiredCallback)
+	b.applyDiscoveredEndpoints(ctx, nil, "")
+	require.Equal(t, state.Destroyed, first.State())
+
+	// Invoke the callback as if it had already started when discovery stopped its timer.
+	expiredCallback()
+	require.NotEqual(t, state.Destroyed, second.State())
+
+	require.NoError(t, b.Close(ctx))
+	require.Equal(t, state.Destroyed, second.State())
+}
+
 func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
 	const (
 		node1 uint32 = 1
@@ -3118,4 +3156,16 @@ func (c *clearElectionContext) Err() error {
 
 func (*clearElectionContext) Value(any) any {
 	return nil
+}
+
+type endpointCloseClock struct {
+	*clockwork.FakeClock
+
+	callback func()
+}
+
+func (c *endpointCloseClock) AfterFunc(delay time.Duration, callback func()) clockwork.Timer {
+	c.callback = callback
+
+	return c.FakeClock.AfterFunc(delay, callback)
 }

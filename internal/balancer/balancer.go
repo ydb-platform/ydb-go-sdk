@@ -376,16 +376,7 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	}
 
 	defer func() {
-		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
-			return cc.Endpoint()
-		}), selectedEndpoints, endpoint.Compare)
-
-		onDone(
-			xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
-			xslices.Transform(added, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
-			xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
-			selfLocation,
-		)
+		traceEndpointChanges(onDone, active, endpoints, selectedEndpoints, selfLocation)
 	}()
 
 	if b.pendingClose != nil {
@@ -408,6 +399,24 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	b.connectionsState.Store(newConnectionsStateWithPriorities(
 		connections, selectedPriorities, quarantine, nil,
 	))
+}
+
+func traceEndpointChanges(
+	onDone func([]trace.EndpointInfo, []trace.EndpointInfo, []trace.EndpointInfo, string),
+	active []conn.Conn,
+	endpoints, selectedEndpoints []endpoint.Endpoint,
+	selfLocation string,
+) {
+	_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
+		return cc.Endpoint()
+	}), selectedEndpoints, endpoint.Compare)
+
+	onDone(
+		xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+		xslices.Transform(added, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+		xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+		selfLocation,
+	)
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
@@ -536,9 +545,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	}
 
 	if policy.SingleConnection() {
-		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
-			endpoint.New(b.driverConfig.Endpoint()),
-		}, "")
+		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{endpoint.New(b.driverConfig.Endpoint())}, "")
 	} else {
 		if err := b.clusterDiscovery(ctx); err != nil {
 			return nil, xerrors.WithStackTrace(err)
