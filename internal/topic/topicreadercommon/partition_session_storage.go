@@ -18,6 +18,9 @@ type PartitionSessionStorage struct {
 	m sync.RWMutex
 
 	sessions map[rawtopicreader.PartitionSessionID]*sessionInfo
+	// active holds the sessions not yet removed, so a metric collection does
+	// not scan the retained removal history.
+	active map[rawtopicreader.PartitionSessionID]*PartitionSession
 
 	removeIndex              int
 	lastCompactedTime        time.Time
@@ -27,6 +30,7 @@ type PartitionSessionStorage struct {
 func (c *PartitionSessionStorage) initNeedLock() {
 	if c.sessions == nil {
 		c.sessions = make(map[rawtopicreader.PartitionSessionID]*sessionInfo)
+		c.active = make(map[rawtopicreader.PartitionSessionID]*PartitionSession)
 		c.lastCompactedTime = time.Now()
 	}
 }
@@ -41,6 +45,7 @@ func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.StreamPartitionSessionID))
 	}
 	c.sessions[session.StreamPartitionSessionID] = &sessionInfo{Session: session}
+	c.active[session.StreamPartitionSessionID] = session
 
 	return nil
 }
@@ -49,8 +54,7 @@ func (c *PartitionSessionStorage) Get(id rawtopicreader.PartitionSessionID) (*Pa
 	c.m.RLock()
 	defer c.m.RUnlock()
 
-	c.initNeedLock()
-
+	// A lookup in a nil map is safe; initializing here would write under RLock.
 	partitionInfo, has := c.sessions[id]
 	if !has || partitionInfo.Session == nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: read undefined partition session with id: %v", id))
@@ -71,16 +75,17 @@ func (c *PartitionSessionStorage) GetAll() []*PartitionSession {
 	return res
 }
 
-// ActiveCountsByTopic excludes retained tombstones and terminal
-// sessions. Reading terminal state avoids racing listener context replacement.
+// ActiveCountsByTopic excludes removed and terminal sessions and visits only
+// the sessions not yet removed. Reading terminal state avoids racing listener
+// context replacement.
 func (c *PartitionSessionStorage) ActiveCountsByTopic() map[string]int64 {
 	c.m.RLock()
 	defer c.m.RUnlock()
 
 	counts := make(map[string]int64)
-	for _, info := range c.sessions {
-		if info.RemoveTime.IsZero() && !info.Session.retired.Load() {
-			counts[info.Session.Topic]++
+	for _, session := range c.active {
+		if !session.retired.Load() {
+			counts[session.Topic]++
 		}
 	}
 
@@ -97,6 +102,7 @@ func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (
 	c.removeIndex++
 	if partitionInfo, ok := c.sessions[id]; ok {
 		partitionInfo.RemoveTime = now
+		delete(c.active, id)
 
 		return partitionInfo.Session, nil
 	}

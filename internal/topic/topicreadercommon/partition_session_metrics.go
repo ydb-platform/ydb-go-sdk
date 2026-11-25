@@ -58,6 +58,9 @@ func RegisterPartitionSessionCount(
 			normalized[metricTopicPath(database, topic)] += count
 		}
 		for topic := range topics {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			observe(normalized[topic], append(attributes, telemetry.Attribute{Key: "topic", Value: topic})...)
 		}
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 )
 
@@ -115,6 +116,61 @@ func TestPartitionSessionCountWithoutConsumer(t *testing.T) {
 	require.Len(t, observations, 1)
 	for _, attr := range observations[0] {
 		require.NotEqual(t, "consumer", attr.Key)
+	}
+}
+
+func TestPartitionSessionCountConcurrentWithFirstLookup(t *testing.T) {
+	storage := &PartitionSessionStorage{}
+	lookupDone := make(chan error, 1)
+	go func() {
+		_, err := storage.Get(1)
+		lookupDone <- err
+	}()
+	require.Empty(t, storage.ActiveCountsByTopic())
+	require.Error(t, <-lookupDone)
+}
+
+func TestPartitionSessionCountStopsOnCancellation(t *testing.T) {
+	var callback telemetry.Int64GaugeCallback
+	_, err := RegisterPartitionSessionCount(
+		ReaderMetricsConfig{Meter: func(_ telemetry.Descriptor, cb telemetry.Int64GaugeCallback) (func() error, error) {
+			callback = cb
+
+			return func() error { return nil }, nil
+		}},
+		"consumer", []*PublicReadSelector{{Path: "first"}, {Path: "second"}, {Path: "third"}},
+		func() (map[string]int64, error) { return map[string]int64{}, nil },
+	)
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	observations := 0
+	err = callback(ctx, func(int64, ...telemetry.Attribute) {
+		observations++
+		cancel()
+	})
+	require.ErrorIs(t, err, context.Canceled)
+	require.Equal(t, 1, observations)
+}
+
+func BenchmarkPartitionSessionActiveCountsWithRetainedSessions(b *testing.B) {
+	const retained = 100000
+	storage := &PartitionSessionStorage{}
+	for id := rawtopicreader.PartitionSessionID(1); id <= retained; id++ {
+		session := NewPartitionSession(context.Background(), "topic", int64(id), 1, "", id, int64(id), 0)
+		require.NoError(b, storage.Add(session))
+		_, err := storage.Remove(id)
+		require.NoError(b, err)
+		session.Close()
+	}
+	active := NewPartitionSession(context.Background(), "topic", 0, 1, "", retained+1, retained+1, 0)
+	b.Cleanup(active.Close)
+	require.NoError(b, storage.Add(active))
+	require.Equal(b, map[string]int64{"topic": 1}, storage.ActiveCountsByTopic())
+
+	b.ResetTimer()
+	for range b.N {
+		storage.ActiveCountsByTopic()
 	}
 }
 
