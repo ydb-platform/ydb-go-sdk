@@ -23,6 +23,9 @@ func ComposeReader(lhs, rhs *trace.Topic, opts ...TopicComposeOption) *trace.Top
 	if lhs.OnReaderMessagesReceived == nil && rhs.OnReaderMessagesReceived == nil {
 		t.OnReaderMessagesReceived = nil
 	}
+	if lhs.OnReaderMessagesDelivered == nil && rhs.OnReaderMessagesDelivered == nil {
+		t.OnReaderMessagesDelivered = nil
+	}
 
 	return t
 }

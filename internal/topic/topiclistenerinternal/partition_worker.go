@@ -372,7 +372,7 @@ func (w *PartitionWorker) callUserHandler(
 		"OnReadMessages",
 		messagesCount,
 	)
-	if msg.Batch != nil && messagesCount > 0 {
+	if msg.Batch != nil && messagesCount > 0 && w.tracer != nil && w.tracer.OnReaderMessagesDelivered != nil {
 		traceCtx := ctx
 		gtrace.TopicOnReaderMessagesDelivered(
 			w.tracer,

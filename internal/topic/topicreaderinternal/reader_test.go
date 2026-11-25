@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
@@ -113,6 +114,22 @@ func TestReader_PopBatchTxMessagesDeliveredTrace(t *testing.T) {
 	_, err = reader.PopBatchTx(context.Background(), transaction)
 	require.ErrorIs(t, err, testErr)
 	require.Len(t, events, 1)
+}
+
+func TestReader_MessagesDeliveredWithoutObserverDoesNotAllocate(t *testing.T) {
+	batch := newTestReaderBatch(t, "/local/topic", 2)
+	for name, tracer := range map[string]*trace.Topic{
+		"empty":          {},
+		"composed empty": gtrace.ComposeReader(&trace.Topic{}, &trace.Topic{}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			reader := &Reader{tracer: tracer}
+			ctx := context.Background()
+			require.Zero(t, testing.AllocsPerRun(100, func() {
+				reader.traceMessagesDelivered(ctx, batch)
+			}))
+		})
+	}
 }
 
 func TestReader_EmptyBatchDoesNotTraceMessagesDelivered(t *testing.T) {

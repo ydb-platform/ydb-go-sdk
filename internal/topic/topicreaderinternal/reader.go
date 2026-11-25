@@ -205,12 +205,15 @@ func (r *Reader) ReadMessageBatch(
 }
 
 func (r *Reader) traceMessagesDelivered(ctx context.Context, batch *topicreadercommon.PublicBatch) {
-	if batch == nil || len(batch.Messages) == 0 {
+	if r.tracer == nil || r.tracer.OnReaderMessagesDelivered == nil || batch == nil || len(batch.Messages) == 0 {
 		return
 	}
+	// The trace takes the context by address: copying it here keeps the
+	// parameter on the stack when nobody observes deliveries.
+	traceCtx := ctx
 	gtrace.TopicOnReaderMessagesDelivered(
 		r.tracer,
-		&ctx,
+		&traceCtx,
 		r.readerInfo,
 		batch.Topic(),
 		len(batch.Messages),
