@@ -11,6 +11,32 @@ func TestCompose(t *testing.T) {
 	tracefuzz.TestCompose(t, Compose, WithTopicPanicCallback)
 }
 
+func TestComposeReaderKeepsAbsentHooksNil(t *testing.T) {
+	composed := ComposeReader(&trace.Topic{}, &trace.Topic{})
+	for name, absent := range map[string]bool{
+		"OnReaderCommitQueued":         composed.OnReaderCommitQueued == nil,
+		"OnListenerCommitQueued":       composed.OnListenerCommitQueued == nil,
+		"OnReaderCreditBalanceChanged": composed.OnReaderCreditBalanceChanged == nil,
+		"OnReaderLocalBufferChanged":   composed.OnReaderLocalBufferChanged == nil,
+		"OnReaderMessagesReceived":     composed.OnReaderMessagesReceived == nil,
+		"OnReaderMessagesDelivered":    composed.OnReaderMessagesDelivered == nil,
+		"OnReaderSessionError":         composed.OnReaderSessionError == nil,
+	} {
+		if !absent {
+			t.Errorf("%s: composing two traces without the hook produced a non-nil hook", name)
+		}
+	}
+
+	called := false
+	withHook := ComposeReader(&trace.Topic{}, &trace.Topic{
+		OnReaderSessionError: func(trace.TopicReaderSessionErrorInfo) { called = true },
+	})
+	withHook.OnReaderSessionError(trace.TopicReaderSessionErrorInfo{})
+	if !called {
+		t.Error("OnReaderSessionError of the right trace was not called")
+	}
+}
+
 func TestHooks(t *testing.T) {
 	tracefuzz.TestHooks[trace.Topic](t,
 		TopicOnReaderStart,
