@@ -943,6 +943,9 @@ func (provider *oauth2TokenExchange) performExchangeTokenRequest(
 	client := http.Client{
 		Transport: http.DefaultTransport,
 		Timeout:   provider.requestTimeout,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
 	now := time.Now()
