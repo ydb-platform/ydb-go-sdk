@@ -63,20 +63,31 @@ func TraceReaderSessionError(
 	retryDecision string,
 	err error,
 ) {
-	if tracer == nil || err == nil {
+	if tracer == nil || tracer.OnReaderSessionError == nil || err == nil {
 		return
 	}
 
 	classification := ClassifySessionError(err)
-	gtrace.TopicOnReaderSessionError(
-		tracer,
-		&ctx,
-		readerInfo,
-		retryDecision,
-		classification.StatusCode,
-		classification.ErrorType,
-		err,
-	)
+	callbackDone := make(chan struct{})
+	go func(traceCtx context.Context) {
+		defer close(callbackDone)
+		gtrace.TopicOnReaderSessionError(
+			tracer,
+			&traceCtx,
+			readerInfo,
+			retryDecision,
+			classification.StatusCode,
+			classification.ErrorType,
+			err,
+		)
+	}(ctx)
+
+	// Close cancels the worker before joining it. Stop waiting on cancellation
+	// so a callback that calls Close does not wait on itself.
+	select {
+	case <-callbackDone:
+	case <-ctx.Done():
+	}
 }
 
 func ydbStatusCodeName(code int32) string {

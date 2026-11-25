@@ -3,6 +3,7 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -161,6 +162,49 @@ func TestTopicListenerReconnectorSessionErrorReportsInitialFailure(t *testing.T)
 	require.Equal(t, "ydb_error", events[0].ErrorType)
 
 	require.NoError(t, reconnector.Close(context.Background(), errors.New("test finished")))
+}
+
+func TestTopicListenerCloseFromStopSessionError(t *testing.T) {
+	var listener *TopicListenerReconnector
+	var stops atomic.Int32
+	ready := make(chan struct{})
+	callbackStarted := make(chan struct{})
+	callbackReturned := make(chan error, 1)
+	connectErr := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED))
+	cfg := NewStreamListenerConfig()
+	cfg.Consumer = "consumer"
+	cfg.Selectors = []*topicreadercommon.PublicReadSelector{{Path: "topic"}}
+	cfg.Tracer = &trace.Topic{
+		OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
+			if info.RetryDecision != "stop" || stops.Add(1) != 1 {
+				return
+			}
+			<-ready
+			close(callbackStarted)
+			callbackReturned <- listener.Close(context.Background(), ErrUserCloseTopic)
+		},
+	}
+
+	var err error
+	listener, err = NewTopicListenerReconnector(&failingTopicClient{err: connectErr}, &cfg, nil)
+	require.NoError(t, err)
+	close(ready)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	select {
+	case <-callbackStarted:
+	case <-ctx.Done():
+		t.Fatal("stop session-error callback did not start")
+	}
+	select {
+	case err := <-callbackReturned:
+		require.NoError(t, err)
+	case <-ctx.Done():
+		t.Fatal("stop session-error callback did not return from listener.Close")
+	}
+	require.ErrorIs(t, listener.WaitInit(ctx), connectErr)
+	require.EqualValues(t, 1, stops.Load())
 }
 
 type failingTopicClient struct {
