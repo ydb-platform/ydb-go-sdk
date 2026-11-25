@@ -373,7 +373,7 @@ func TestCommitMessageTrackerHandlesCoveredRangesAndEqualWatermark(t *testing.T)
 	require.Equal(t, int64(10), tracker.Acknowledge(20))
 }
 
-func TestCommitMessageTrackerRejectsInvalidRangesAndCloses(t *testing.T) {
+func TestCommitMessageTrackerRejectsInvalidRanges(t *testing.T) {
 	tracker := newCommitMessageTracker(0)
 
 	require.Zero(t, tracker.Queue(0, 0))
@@ -381,14 +381,10 @@ func TestCommitMessageTrackerRejectsInvalidRangesAndCloses(t *testing.T) {
 	require.Zero(t, tracker.Acknowledge(0))
 	require.Zero(t, tracker.Acknowledge(1))
 	require.Equal(t, int64(1), tracker.Queue(10, 11))
-	tracker.Close()
-	tracker.Close()
-
-	require.Zero(t, tracker.Queue(10, 12))
-	require.Zero(t, tracker.Acknowledge(12))
+	require.Equal(t, int64(1), tracker.Acknowledge(11))
 }
 
-func TestCommitMessageTrackerConcurrentQueueAcknowledgeClose(t *testing.T) {
+func TestCommitMessageTrackerConcurrentQueueAcknowledge(t *testing.T) {
 	const (
 		workers           = 8
 		messagesPerWorker = 64
@@ -425,40 +421,8 @@ func TestCommitMessageTrackerConcurrentQueueAcknowledgeClose(t *testing.T) {
 	}
 	xtest.WaitGroup(t, &acknowledgeWG)
 
-	var closeWG sync.WaitGroup
-	var lateQueued atomic.Int64
-	var lateAcknowledged atomic.Int64
-	var lateWG sync.WaitGroup
-	lateStart := make(chan struct{})
-	lateWG.Add(workers * 2)
-	for range workers {
-		go func() {
-			defer lateWG.Done()
-			<-lateStart
-			lateQueued.Add(tracker.Queue(1, 2))
-		}()
-	}
-	for range workers {
-		go func() {
-			defer lateWG.Done()
-			<-lateStart
-			lateAcknowledged.Add(tracker.Acknowledge(workers*messagesPerWorker + 2))
-		}()
-	}
-	closeWG.Add(1)
-	go func() {
-		defer closeWG.Done()
-		<-lateStart
-		tracker.Close()
-	}()
-	close(lateStart)
-	xtest.WaitGroup(t, &lateWG)
-	xtest.WaitGroup(t, &closeWG)
-
 	require.Equal(t, int64(workers*messagesPerWorker), acknowledged.Load())
-	require.GreaterOrEqual(t, lateQueued.Load(), int64(0))
-	require.LessOrEqual(t, lateQueued.Load(), int64(workers))
-	require.Zero(t, lateAcknowledged.Load())
+	// Everything up to the watermark is complete: a late duplicate adds nothing.
 	require.Zero(t, tracker.Queue(1, 2))
 	require.Zero(t, tracker.Acknowledge(workers*messagesPerWorker+2))
 }

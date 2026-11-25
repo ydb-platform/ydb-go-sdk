@@ -146,7 +146,7 @@ func (c *Committer) pushCommit(commitRange CommitRange) (commitWaiter, error) {
 	return waiter, resErr
 }
 
-func (c *Committer) pushRequest(request *commitRequest) int {
+func (c *Committer) pushRequest(request *commitRequest) int64 {
 	commitRange := request.commitRange
 	if !c.mode.CommitsEnabled() {
 		request.finishSend(xerrors.WithStackTrace(ErrCommitDisabled))
@@ -183,11 +183,7 @@ func (c *Committer) pushRequest(request *commitRequest) int {
 	default:
 	}
 
-	if messagesCount == 0 {
-		return 0
-	}
-
-	return 1
+	return messagesCount
 }
 
 func (c *Committer) pushCommitsLoop(ctx context.Context) {

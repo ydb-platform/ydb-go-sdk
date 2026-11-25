@@ -29,7 +29,7 @@ func (c *Committer) NewCommitRequest(commitRange CommitRange) *commitRequest {
 }
 
 func (r *commitRequest) start() {
-	var messagesCount int
+	var messagesCount int64
 	r.startOnce.Do(func() {
 		messagesCount = r.committer.pushRequest(r)
 	})
@@ -41,7 +41,7 @@ func (r *commitRequest) start() {
 	if r.commitRange.PartitionSession != nil {
 		traceCtx = r.commitRange.PartitionSession.Context()
 	}
-	TraceCommitQueuedAfterRegistration(traceCtx, r.commitRange, messagesCount)
+	traceCommitQueued(traceCtx, r.commitRange, messagesCount)
 }
 
 // Confirm queues the commit if needed and returns without waiting for its send

@@ -71,14 +71,6 @@ func TraceCommitQueued(ctx context.Context, commitRange CommitRange) {
 	traceCommitQueued(ctx, commitRange, messagesCount)
 }
 
-// TraceCommitQueuedAfterRegistration emits the lazy request's event outside its
-// startOnce. The admission result is a flag, not a protocol offset span.
-func TraceCommitQueuedAfterRegistration(ctx context.Context, commitRange CommitRange, registered int) {
-	if registered != 0 {
-		traceCommitQueued(ctx, commitRange, int64(commitRange.CommitOffsetEnd-commitRange.CommitOffsetStart))
-	}
-}
-
 func traceCommitQueued(ctx context.Context, commitRange CommitRange, messagesCount int64) {
 	session := commitRange.PartitionSession
 	if session == nil || session.commitMetrics == nil {
@@ -117,22 +109,14 @@ func RegisterCommitAcknowledged(session *PartitionSession, exclusiveOffset rawto
 	return session.commitMetrics.tracker.Acknowledge(exclusiveOffset)
 }
 
-// CommitMessageTracker returns the optional tracker owned by the ACK receive path.
-func CommitMessageTracker(session *PartitionSession) *commitMessageTracker {
-	if session == nil || session.commitMetrics == nil {
-		return nil
-	}
-
-	return session.commitMetrics.tracker
-}
-
 // commitMessageTracker tracks accepted commit ranges until the server
 // acknowledges them.
 //
 // The acknowledgement offset is an exclusive upper bound. Each fully covered submission counts once.
 // Queue and Acknowledge are safe to call
 // concurrently. The tracker does not emit metrics; callers use their returned
-// counts for that purpose.
+// counts for that purpose. Pending ranges live as long as the session: an
+// acknowledgement can still arrive after the session context is canceled.
 type commitMessageTracker struct {
 	mu sync.Mutex
 
@@ -140,7 +124,6 @@ type commitMessageTracker struct {
 	// pending is a binary min-heap ordered by end, so an acknowledgement
 	// visits only the ranges it completes, whatever the submission order.
 	pending []commitMetricRange
-	closed  bool
 }
 
 type commitMetricRange struct {
@@ -160,7 +143,7 @@ func (t *commitMessageTracker) Queue(start, end rawtopiccommon.Offset) int64 {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.closed || end <= t.session.CommittedOffset() {
+	if end <= t.session.CommittedOffset() {
 		return 0
 	}
 
@@ -213,20 +196,4 @@ func (t *commitMessageTracker) popPending() {
 		i = child
 	}
 	t.pending = pending
-}
-
-// Close marks the tracker terminal and releases all pending ranges.
-func (t *commitMessageTracker) Close() {
-	if t == nil {
-		return
-	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	if t.closed {
-		return
-	}
-
-	t.closed = true
-	t.pending = nil
 }
