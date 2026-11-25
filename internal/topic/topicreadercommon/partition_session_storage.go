@@ -18,8 +18,8 @@ type PartitionSessionStorage struct {
 	m sync.RWMutex
 
 	sessions map[rawtopicreader.PartitionSessionID]*sessionInfo
-	// active holds the sessions not yet removed, so a metric collection does
-	// not scan the retained removal history.
+	// active excludes closed and removed sessions, which can still be looked
+	// up by the protocol.
 	active map[rawtopicreader.PartitionSessionID]*PartitionSession
 
 	removeIndex              int
@@ -45,7 +45,12 @@ func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.StreamPartitionSessionID))
 	}
 	c.sessions[session.StreamPartitionSessionID] = &sessionInfo{Session: session}
-	c.active[session.StreamPartitionSessionID] = session
+	session.storage.Store(c)
+	if session.retired.Load() {
+		session.storage.CompareAndSwap(c, nil)
+	} else {
+		c.active[session.StreamPartitionSessionID] = session
+	}
 
 	return nil
 }
@@ -75,9 +80,7 @@ func (c *PartitionSessionStorage) GetAll() []*PartitionSession {
 	return res
 }
 
-// ActiveCountsByTopic excludes removed and terminal sessions and visits only
-// the sessions not yet removed. Reading terminal state avoids racing listener
-// context replacement.
+// ActiveCountsByTopic visits the active index, not the retained protocol history.
 func (c *PartitionSessionStorage) ActiveCountsByTopic() map[string]int64 {
 	c.m.RLock()
 	defer c.m.RUnlock()
@@ -103,6 +106,7 @@ func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (
 	if partitionInfo, ok := c.sessions[id]; ok {
 		partitionInfo.RemoveTime = now
 		delete(c.active, id)
+		partitionInfo.Session.storage.CompareAndSwap(c, nil)
 
 		return partitionInfo.Session, nil
 	}
@@ -110,6 +114,16 @@ func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (
 	c.compactionNeedLock(now)
 
 	return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: delete undefined partition session with id: %v", id))
+}
+
+func (c *PartitionSessionStorage) dropActive(session *PartitionSession) {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	id := session.StreamPartitionSessionID
+	if c.active[id] == session {
+		delete(c.active, id)
+	}
 }
 
 func (c *PartitionSessionStorage) compactionNeedLock(now time.Time) {

@@ -3,6 +3,7 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/rekby/fixenv"
@@ -41,6 +42,56 @@ func TestListenerMetricRegistrationFailureDoesNotConnect(t *testing.T) {
 	listener, err := NewTopicListenerReconnector(nil, &cfg, nil)
 	require.ErrorIs(t, err, failure)
 	require.Nil(t, listener)
+}
+
+func TestListenerActiveIndexStaysBoundedAcrossSessionStops(t *testing.T) {
+	for _, graceful := range []bool{true, false} {
+		t.Run(map[bool]string{true: "graceful", false: "forced"}[graceful], func(t *testing.T) {
+			e := fixenv.New(t)
+			ctx := sf.Context(e)
+			stream := StreamListener(e)
+			t.Cleanup(func() { require.NoError(t, stream.Close(xtest.Context(t), ErrUserCloseTopic)) })
+			const cycles = 50
+			starts := make(chan *PublicEventStartPartitionSession, 1)
+			stops := make(chan *PublicEventStopPartitionSession, 1)
+			handler := EventHandlerMock(e)
+			handler.EXPECT().OnStartPartitionSessionRequest(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, event *PublicEventStartPartitionSession) error {
+					starts <- event
+
+					return nil
+				}).Times(cycles)
+			handler.EXPECT().OnStopPartitionSessionRequest(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, event *PublicEventStopPartitionSession) error {
+					stops <- event
+
+					return nil
+				}).Times(cycles)
+
+			for i := range cycles {
+				start := createTestStartPartitionRequest()
+				id := rawtopicreader.PartitionSessionID(1000 + i)
+				start.PartitionSession.PartitionSessionID = id
+				start.PartitionSession.Path = "topic"
+				require.NoError(t, stream.routeMessage(ctx, start))
+				xtest.Receive(t, starts, "start request").Confirm()
+				xtest.Receive(t, stream.hasNewMessagesToSend, "start acknowledgement")
+				require.Equal(t, int64(1), stream.sessions.ActiveCountsByTopic()["topic"])
+
+				require.NoError(t, stream.routeMessage(ctx, &rawtopicreader.StopPartitionSessionRequest{
+					PartitionSessionID: id, Graceful: graceful,
+				}))
+				xtest.Receive(t, stops, "stop request").Confirm()
+				if graceful {
+					xtest.Receive(t, stream.hasNewMessagesToSend, "stop acknowledgement")
+				}
+				require.Zero(t, stream.sessions.ActiveCountsByTopic()["topic"])
+			}
+			// The fixture's original session is still active. The metric's
+			// scan set must not include the retained protocol lookup history.
+			require.Equal(t, 1, reflect.Indirect(reflect.ValueOf(stream.sessions)).FieldByName("active").Len())
+		})
+	}
 }
 
 func TestListenerPartitionSessionCountAfterProtocolStop(t *testing.T) {
