@@ -47,7 +47,7 @@ func TestStreamResultNextResultSet_CtxErrorDoesNotCancelExecuteStream(t *testing
 		require.EqualValues(t, 0, onCloseCalls.Load(),
 			"nextResultSet must not run executeCancel on per-call ctx error",
 		)
-		require.NoError(t, r.lastErr)
+		require.NoError(t, r.lastErr.Get())
 	})
 }
 

@@ -56,6 +56,14 @@ func WithExecuteQuery(f func(context.Context) error) ServerOption {
 	}
 }
 
+// WithExecuteQueryParts sends the supplied Query Service response parts instead
+// of the built-in query results.
+func WithExecuteQueryParts(parts ...*Ydb_Query.ExecuteQueryResponsePart) ServerOption {
+	return func(m *server) {
+		m.executeQueryParts = parts
+	}
+}
+
 // server is a local gRPC mock (Discovery + Table + Query).
 type server struct {
 	listener   net.Listener
@@ -85,6 +93,7 @@ type server struct {
 	// send to simulate network latency between stream parts in benchmarks.
 	executeQueryPartDelay time.Duration
 	executeQuery          func(context.Context) error
+	executeQueryParts     []*Ydb_Query.ExecuteQueryResponsePart
 
 	// bulkUpsertFailFirst is the number of initial BulkUpsert calls that return
 	// bulkUpsertFailStatus before succeeding.
@@ -236,7 +245,9 @@ func (m *tableSrv) DeleteSession(
 	_ context.Context,
 	_ *Ydb_Table.DeleteSessionRequest,
 ) (*Ydb_Table.DeleteSessionResponse, error) {
-	return &Ydb_Table.DeleteSessionResponse{}, nil
+	return &Ydb_Table.DeleteSessionResponse{
+		Operation: &Ydb_Operations.Operation{Ready: true, Status: Ydb.StatusIds_SUCCESS},
+	}, nil
 }
 
 func (m *tableSrv) KeepAlive(
@@ -364,6 +375,15 @@ func (m *querySrv) ExecuteQuery(
 		if err := m.mock.executeQuery(stream.Context()); err != nil {
 			return err
 		}
+	}
+	if m.mock.executeQueryParts != nil {
+		for _, part := range m.mock.executeQueryParts {
+			if err := stream.Send(part); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 
 	if isCommitQuery(req) && m.mock.executeQueryBehavior != executeQueryBehaviorDefault {

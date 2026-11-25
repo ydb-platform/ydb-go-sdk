@@ -817,6 +817,9 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, cfg *config.Config) (
 	defer onDone()
 
 	client := Ydb_Query_V1.NewQueryServiceClient(cc)
+	if cfg.ProtoWireDecoding() {
+		client = WireQueryClient(client)
+	}
 
 	return newWithQueryServiceClient(ctx, client, cc, cfg)
 }
@@ -849,6 +852,7 @@ func newWithQueryServiceClient(ctx context.Context,
 
 			s, err := createSession(ctx, client,
 				WithConn(cc),
+				withProtoWireDecoding(cfg.ProtoWireDecoding()),
 				WithDeleteTimeout(cfg.SessionDeleteTimeout()),
 				WithPoolName(cfg.PoolName()),
 				WithRegisterCloseCancel(c.registerCloseCancel),

@@ -23,6 +23,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -42,9 +43,10 @@ type (
 	}
 	streamResult struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
-		lastErr        error
+		lastErr        xsync.Value[error]
 		onClose        func()
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
+		lastWirePart   *wirePart
 		resultSetIndex int64
 		trace          *trace.Query
 		statsCallback  func(queryStats stats.QueryStats)
@@ -223,7 +225,7 @@ func newResult(
 		return nil, xerrors.WithStackTrace(r.notifyNextPartErr(ctx, err))
 	}
 
-	part, err := r.nextPart(ctx)
+	part, wire, err := r.nextPart(ctx)
 	if err != nil {
 		if xerrors.Is(err, io.EOF) {
 			return nil, io.EOF
@@ -232,19 +234,31 @@ func newResult(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	r.lastPart = part
+	r.lastPart, r.lastWirePart = part, wire
 
 	return &r, nil
 }
 
+func (r *streamResult) rememberError(ctx context.Context, err error) {
+	if err == nil || ctx.Err() != nil {
+		return
+	}
+	r.lastErr.Change(func(previous error) error {
+		// Close and iteration can observe the terminal RPC error and EOF concurrently.
+		if previous != nil && errors.Is(err, io.EOF) {
+			return previous
+		}
+
+		return err
+	})
+}
+
 //nolint:funlen // Keep response-part lifetime and stream error handling in one place.
 func (r *streamResult) nextPart(ctx context.Context) (
-	part *Ydb_Query.ExecuteQueryResponsePart, finishErr error,
+	part *Ydb_Query.ExecuteQueryResponsePart, wire *wirePart, finishErr error,
 ) {
 	defer func() {
-		if finishErr != nil && ctx.Err() == nil {
-			r.lastErr = finishErr
-		}
+		r.rememberError(ctx, finishErr)
 	}()
 
 	if r.trace != nil {
@@ -259,11 +273,11 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		_ = r.notifyNextPartErr(ctx, ctxErr)
 
-		return nil, ctxErr
+		return nil, nil, ctxErr
 	}
 
-	if r.lastErr != nil {
-		return nil, r.lastErr
+	if err := r.lastErr.Get(); err != nil {
+		return nil, nil, err
 	}
 
 	// Forward ctx cancellation to the gRPC stream context so a Recv blocked
@@ -282,7 +296,7 @@ func (r *streamResult) nextPart(ctx context.Context) (
 	if !r.retainArrowBatches {
 		r.releaseArrowBatches()
 	}
-	part, err := nextPart(r.stream)
+	part, wire, err := recvQueryPart(r.stream)
 	if part != nil {
 		issues := part.GetIssues()
 		if r.issuesCallback != nil && len(issues) > 0 {
@@ -293,10 +307,10 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		err = r.notifyNextPartErr(ctx, err)
 
 		if xerrors.Is(err, io.EOF) {
-			return nil, io.EOF
+			return nil, nil, io.EOF
 		}
 
-		return nil, xerrors.WithStackTrace(err)
+		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
 	if txMeta := part.GetTxMeta(); txMeta != nil {
@@ -309,13 +323,13 @@ func (r *streamResult) nextPart(ctx context.Context) (
 		r.statsCallback(stats.FromQueryStats(part.GetExecStats()))
 	}
 
-	return part, nil
+	return part, wire, nil
 }
 
 func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 	part *Ydb_Query.ExecuteQueryResponsePart, err error,
 ) {
-	part, err = stream.Recv()
+	part, _, err = recvQueryPart(stream)
 	if err != nil {
 		if xerrors.Is(err, io.EOF) {
 			return nil, io.EOF
@@ -327,13 +341,20 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (
 	return part, nil
 }
 
+func (r *streamResult) canSkipDrain() bool {
+	if prefetch, ok := r.stream.(*asyncPrefetchExecuteQueryStream); ok {
+		// Transport completion can leave statistics or an error in the prefetch queue.
+		return prefetch.terminalRead.Load() || prefetch.executeCtx.Err() != nil
+	}
+
+	return r.stream != nil && r.stream.Context().Err() != nil
+}
+
 func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	defer r.onClose()
 	defer r.releaseArrowBatches()
 
-	if r.stream != nil && r.stream.Context().Err() != nil {
-		// Stream already torn down (EOF, per-call ctx cancel, or prior Close).
-		// onClose runs via defer; nothing left to drain.
+	if r.canSkipDrain() {
 		return nil
 	}
 
@@ -360,7 +381,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 			return r.notifyNextPartErr(ctx, ctxErr)
 		}
 
-		_, err := r.nextPart(ctx)
+		_, _, err := r.nextPart(ctx)
 		if err != nil {
 			if xerrors.Is(err, io.EOF) {
 				return nil
@@ -377,9 +398,7 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 
 func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishErr error) {
 	defer func() {
-		if finishErr != nil && ctx.Err() == nil {
-			r.lastErr = finishErr
-		}
+		r.rememberError(ctx, finishErr)
 	}()
 
 	nextResultSetIndex := r.resultSetIndex + 1
@@ -393,13 +412,15 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishE
 			rs := newResultSet(r.nextPartFunc(ctx, nextResultSetIndex), r.lastPart)
 			rs.notifyError = r.notifyNextPartErr
 			rs.decodeArrow = r.decodeArrowBatches
+			rs.wirePart = r.lastWirePart
+			rs.wireSource = r
 
 			return rs, nil
 		}
 		if r.stream == nil {
 			return nil, io.EOF
 		}
-		part, err := r.nextPart(ctx)
+		part, wire, err := r.nextPart(ctx)
 		if err != nil {
 			if xerrors.Is(err, io.EOF) {
 				return nil, io.EOF
@@ -417,7 +438,7 @@ func (r *streamResult) nextResultSet(ctx context.Context) (_ *resultSet, finishE
 				part.GetResultSetIndex(), r.resultSetIndex, errWrongNextResultSetIndex,
 			))
 		}
-		r.lastPart = part
+		r.lastPart, r.lastWirePart = part, wire
 		r.resultSetIndex = part.GetResultSetIndex()
 	}
 }
@@ -434,7 +455,7 @@ func (r *streamResult) nextPartFunc(
 		if r.stream == nil {
 			return nil, io.EOF
 		}
-		part, err := r.nextPart(ctx)
+		part, wire, err := r.nextPart(ctx)
 		if err != nil {
 			if xerrors.Is(err, io.EOF) {
 				return nil, io.EOF
@@ -442,7 +463,7 @@ func (r *streamResult) nextPartFunc(
 
 			return nil, xerrors.WithStackTrace(err)
 		}
-		r.lastPart = part
+		r.lastPart, r.lastWirePart = part, wire
 		if part.GetResultSetIndex() > nextResultSetIndex {
 			return nil, xerrors.WithStackTrace(fmt.Errorf(
 				"result set (index=%d) receive part (index=%d) for next result set: %w (%w)",
@@ -565,6 +586,10 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 					rs.rows = append(rs.rows, &data.rows[i])
 				}
 			}
+		} else if r.lastWirePart != nil {
+			for i := 0; i < r.lastWirePart.RowCount(); i++ {
+				rs.rows = append(rs.rows, r.lastWirePart.row(i, rs.columns))
+			}
 		} else {
 			for i := range r.lastPart.GetResultSet().GetRows() {
 				rs.rows = append(rs.rows, NewRow(rs.columns, r.lastPart.GetResultSet().GetRows()[i]))
@@ -573,7 +598,7 @@ func resultToMaterializedResult(ctx context.Context, r *streamResult) (result.Re
 		resultSetByIndex[curIndex] = rs
 
 		var err error
-		r.lastPart, err = r.nextPart(ctx)
+		r.lastPart, r.lastWirePart, err = r.nextPart(ctx)
 		if err != nil {
 			if xerrors.Is(err, io.EOF) {
 				break
