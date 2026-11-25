@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,11 +11,19 @@ import (
 
 func TestTopicLegacyVectorLabels(t *testing.T)     { checkTopicVectorLabels(t, false) }
 func TestTopicDescriptorVectorLabels(t *testing.T) { checkTopicVectorLabels(t, true) }
+
 func checkTopicVectorLabels(t *testing.T, descriptors bool) {
+	validLegacyLabel := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 	cache := make(map[string][]string)
 	var consumer string
 	var registrations int
 	bind := func(path string, names []string) func(map[string]string) {
+		t.Helper()
+		if !descriptors {
+			for _, name := range names {
+				require.Regexp(t, validLegacyLabel, name, "%s: invalid legacy label %q", path, name)
+			}
+		}
 		registrations++
 		if _, ok := cache[path]; !ok {
 			cache[path] = names

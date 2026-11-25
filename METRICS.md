@@ -2,7 +2,7 @@
 
 Readers and listeners share eight instruments. All carry `endpoint`, `database` and `reader.name`. The endpoint is the configured authority and the database is the normalized path. Use `topicoptions.WithReaderName` for pull readers and `topicoptions.WithListenerReaderName` for listeners. Omitted or empty reader and listener names become `default`. Readers with identical labels share a series.
 
-Each instrument declares one label schema. Without a consumer, legacy registries receive `consumer=""` so their fixed-label vectors can bind the series. The contract form (no `consumer` key) requires a descriptor-aware registry: `With` may receive a subset of the declared names, and an omitted name means the attribute is absent.
+Descriptor-aware registries receive the dotted label names `reader.name` and `error.type` shown here. Legacy registries receive `reader_name` and `error_type` instead. Without a consumer, legacy registries receive `consumer=""` so their fixed-label vectors can bind the series. The contract form (no `consumer` key) requires a descriptor-aware registry: `With` may receive a subset of the declared names, and an omitted name means the attribute is absent.
 
 | Instrument | Unit | Additional labels | What it measures |
 | --- | --- | --- | --- |

@@ -71,7 +71,9 @@ func TestTopicReaderMetricDescriptorsAndLegacyNames(t *testing.T) {
 		require.Equal(t, metric.kind, descriptorRegistry.kinds[metric.name], metric.name)
 		require.Equal(t, metric.labels, descriptorRegistry.labelNames[metric.name], metric.name)
 		require.Equal(t, metric.kind, legacyRegistry.kinds[metric.legacyName], metric.legacyName)
-		require.Equal(t, metric.labels, legacyRegistry.labelNames[metric.legacyName], metric.legacyName)
+		legacyLabels := strings.NewReplacer("reader.name", "reader_name", "error.type", "error_type").
+			Replace(strings.Join(metric.labels, ","))
+		require.Equal(t, legacyLabels, strings.Join(legacyRegistry.labelNames[metric.legacyName], ","), metric.legacyName)
 	}
 	require.Len(t, capture.units, len(expected))
 	require.NotContains(t, legacyRegistry.kinds, "custom.topic.reader.credit_balance.bytes")
@@ -292,20 +294,20 @@ func TestTopicReaderCountersSupportLegacyCounterConfig(t *testing.T) {
 
 	require.Len(t, registry.values, 1)
 	require.Equal(t, float64(0), registry.value("custom.topic.reader.received.messages", map[string]string{
-		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
+		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader_name": "reader",
 	}))
 	require.Equal(t, float64(0), registry.value("custom.topic.reader.received.bytes", map[string]string{
-		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",
+		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader_name": "reader",
 	}))
 	require.Equal(t, float64(0), registry.value("custom.topic.reader.commit.queued", map[string]string{
-		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
+		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader_name": "reader",
 	}))
 	require.Equal(t, float64(0), registry.value("custom.topic.reader.commit.acknowledged", map[string]string{
-		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader.name": "reader",
+		"endpoint": "node", "database": "/db", "topic": "/topic", "consumer": "consumer", "reader_name": "reader",
 	}))
 	require.Equal(t, float64(1), registry.value("custom.topic.reader.session.errors", map[string]string{
-		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",
-		"retry_decision": "retry", "status_code": "UNAVAILABLE", "error.type": "transport_error",
+		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader_name": "reader",
+		"retry_decision": "retry", "status_code": "UNAVAILABLE", "error_type": "transport_error",
 	}))
 }
 
@@ -375,10 +377,10 @@ func TestTopicReaderGaugesApplyDeltasWithoutSet(t *testing.T) {
 	require.Equal(t, []float64{100, -40}, capture.adds["topic.reader.credit_balance_bytes"])
 	require.Empty(t, capture.sets)
 	require.Equal(t, float64(3), registry.value("topic.reader.local_buffer.messages", map[string]string{
-		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",
+		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader_name": "reader",
 	}))
 	require.Equal(t, float64(60), registry.value("topic.reader.credit_balance_bytes", map[string]string{
-		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader.name": "reader",
+		"endpoint": "node", "database": "/db", "consumer": "consumer", "reader_name": "reader",
 	}))
 }
 

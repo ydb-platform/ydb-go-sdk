@@ -1,6 +1,10 @@
 package metrics
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/trace"
+import (
+	"strings"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+)
 
 var (
 	topicMessageLabels      = []string{endpointLabel, databaseLabel, "topic", consumerLabel, readerNameLabel}
@@ -26,7 +30,7 @@ func registerTopicVectors(reader Config) topicVectors {
 			return descriptorBinding(registry.CounterVecWithDescriptor(topicMetricName(scope, name), unit, labels...).With)
 		}
 
-		return reader.WithSystem(scope).CounterVec(name, labels...).With
+		return legacyTopicBinding(reader.WithSystem(scope).CounterVec(name, legacyTopicLabelNames(labels)...).With)
 	}
 	gauge := func(scope, name, unit string, labels []string) topicBinding[Gauge] {
 		if registry, ok := reader.(RegistryWithGaugeDescriptors); ok {
@@ -37,7 +41,7 @@ func registerTopicVectors(reader Config) topicVectors {
 			config = reader.WithSystem(scope)
 		}
 
-		return config.GaugeVec(name, labels...).With
+		return legacyTopicBinding(config.GaugeVec(name, legacyTopicLabelNames(labels)...).With)
 	}
 
 	return topicVectors{
@@ -165,6 +169,32 @@ func descriptorBinding[T any](bind topicBinding[T]) topicBinding[T] {
 	return func(labels map[string]string) T {
 		if labels[consumerLabel] == "" {
 			delete(labels, consumerLabel)
+		}
+
+		return bind(labels)
+	}
+}
+
+func legacyTopicLabel(name string) string {
+	return strings.ReplaceAll(name, ".", "_")
+}
+
+func legacyTopicLabelNames(names []string) []string {
+	legacy := make([]string, len(names))
+	for i, name := range names {
+		legacy[i] = legacyTopicLabel(name)
+	}
+
+	return legacy
+}
+
+func legacyTopicBinding[T any](bind topicBinding[T]) topicBinding[T] {
+	return func(labels map[string]string) T {
+		for name, value := range labels {
+			if legacy := legacyTopicLabel(name); legacy != name {
+				delete(labels, name)
+				labels[legacy] = value
+			}
 		}
 
 		return bind(labels)
