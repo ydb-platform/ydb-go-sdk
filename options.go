@@ -419,7 +419,7 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	}
 }
 
-// WithRemovedEndpointCloseDelay allows connections to endpoints removed from
+// WithGrpcChannelShutdownTimeout allows connections to endpoints removed from
 // discovery to close before the next discovery update. A positive delay starts
 // when an update removes an endpoint. The balancer releases its pool reference
 // when the delay expires or the next update is applied, whichever happens first.
@@ -429,9 +429,9 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 //
 // The default delay is 1 minute and 59 seconds. A non-positive delay leaves
 // connection closing to discovery updates.
-func WithRemovedEndpointCloseDelay(delay time.Duration) Option {
+func WithGrpcChannelShutdownTimeout(timeout time.Duration) Option {
 	return func(_ context.Context, d *Driver) error {
-		d.discoveryOptions = append(d.discoveryOptions, discoveryConfig.WithEndpointCloseDelay(delay))
+		d.discoveryOptions = append(d.discoveryOptions, discoveryConfig.WithEndpointCloseDelay(timeout))
 
 		return nil
 	}

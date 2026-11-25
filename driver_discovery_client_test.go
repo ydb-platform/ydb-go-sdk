@@ -96,10 +96,10 @@ func TestDriverDiscoveryInitFailsWhenPoolClosed(t *testing.T) {
 	require.ErrorIs(t, err, conn.ErrClosedPool)
 }
 
-func TestWithRemovedEndpointCloseDelay(t *testing.T) {
+func TestWithGrpcChannelShutdownTimeout(t *testing.T) {
 	for _, delay := range []time.Duration{5 * time.Second, 0, -time.Second} {
 		t.Run(delay.String(), func(t *testing.T) {
-			d, err := driverFromOptions(t.Context(), WithRemovedEndpointCloseDelay(delay))
+			d, err := driverFromOptions(t.Context(), WithGrpcChannelShutdownTimeout(delay))
 			require.NoError(t, err)
 
 			require.Equal(t, delay, discoveryConfig.New(d.discoveryOptions...).EndpointCloseDelay())
