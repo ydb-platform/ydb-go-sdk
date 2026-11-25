@@ -223,6 +223,26 @@ func TestFromWireRejectsMalformedRepeatedMessages(t *testing.T) {
 	}
 }
 
+func TestFromWirePreservesNamedVariantOrderInList(t *testing.T) {
+	variant := types.NewVariantStruct(
+		types.StructField{Name: "quantity", T: types.Int32},
+		types.StructField{Name: "description", T: types.Text},
+	)
+	listType := types.NewList(variant)
+	list := &Ydb.Value{Items: []*Ydb.Value{
+		{Value: &Ydb.Value_NestedValue{NestedValue: ToYDB(Int32Value(42)).GetValue()}},
+		{VariantIndex: 1, Value: &Ydb.Value_NestedValue{NestedValue: ToYDB(TextValue("apples")).GetValue()}},
+	}}
+	want := FromYDB(listType.ToYDB(), list)
+	got, err := FromWire(listType, marshalWireFragments(t, list))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Yql() != want.Yql() {
+		t.Fatalf("FromWire() = %s, want %s", got.Yql(), want.Yql())
+	}
+}
+
 func TestFromWireVariantRequiresNestedValue(t *testing.T) {
 	empty := &Ydb.Value{Value: &Ydb.Value_NestedValue{NestedValue: new(Ydb.Value)}}
 	scalar := ToYDB(Int32Value(42)).GetValue()

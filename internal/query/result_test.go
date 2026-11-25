@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,6 +20,59 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestProtobufResultSetAllocations(t *testing.T) {
+	ctx := t.Context()
+	r := &streamResult{lastPart: &Ydb_Query.ExecuteQueryResponsePart{ResultSet: &Ydb.ResultSet{}}}
+	allocs := testing.AllocsPerRun(100, func() {
+		r.resultSetIndex = -1
+		rs, err := r.nextResultSet(ctx)
+		if err != nil || rs.Index() != 0 {
+			t.Fatalf("nextResultSet() = %v, %v", rs, err)
+		}
+	})
+	if allocs > 4 {
+		t.Fatalf("protobuf result set allocated %.0f objects, want at most 4", allocs)
+	}
+}
+
+func TestCloseDrainsWhileNextRowReceives(t *testing.T) {
+	ctx := t.Context()
+	entered := make(chan struct{}, 2)
+	release := make(chan struct{})
+	var reads atomic.Int32
+	stream := &testExecuteQueryStream{ctx: ctx, recv: func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+		switch reads.Add(1) {
+		case 1:
+			return testSingleRowStreamPart(), nil
+		case 2, 3:
+			entered <- struct{}{}
+			<-release
+
+			return testSingleRowStreamPart(), nil
+		default:
+			return nil, io.EOF
+		}
+	}}
+	r, err := newResult(ctx, stream)
+	require.NoError(t, err)
+	rs, err := r.NextResultSet(ctx)
+	require.NoError(t, err)
+	_, err = rs.NextRow(ctx)
+	require.NoError(t, err)
+
+	finished := make(chan error, 2)
+	go func() {
+		_, err := rs.NextRow(ctx)
+		finished <- err
+	}()
+	<-entered
+	go func() { finished <- r.Close(ctx) }()
+	<-entered
+	close(release)
+	require.NoError(t, <-finished)
+	require.NoError(t, <-finished)
+}
 
 func TestResultNextResultSet(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {

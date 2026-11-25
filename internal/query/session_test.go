@@ -150,7 +150,7 @@ func TestSessionClosedOnQueryError(t *testing.T) {
 
 			r, err := s.execute(t.Context(), "SELECT 1", options.ExecuteSettings(), options.ResultSetsTypeOrdered)
 			require.NoError(t, err)
-			_, err = r.nextPart(t.Context())
+			_, _, err = r.nextPart(t.Context())
 			require.Error(t, err)
 			poolTrace(queryTrace, "/local").OnCloseItem(s, "pool_graceful_shutdown")
 
@@ -197,7 +197,7 @@ func TestSessionClosedIgnoresUnrelatedYDBError(t *testing.T) {
 
 	r, err := s.execute(t.Context(), "SELECT 1", options.ExecuteSettings(), options.ResultSetsTypeOrdered)
 	require.NoError(t, err)
-	_, err = r.nextPart(t.Context())
+	_, _, err = r.nextPart(t.Context())
 	require.Error(t, err)
 	require.Empty(t, events)
 	require.True(t, s.IsAlive())
@@ -243,7 +243,7 @@ func TestSessionClosedIgnoresEOFAfterContextCancellation(t *testing.T) {
 
 	r, err := s.execute(t.Context(), "SELECT 1", options.ExecuteSettings(), options.ResultSetsTypeOrdered)
 	require.NoError(t, err)
-	_, err = r.nextPart(ctx)
+	_, _, err = r.nextPart(ctx)
 	require.ErrorIs(t, err, io.EOF)
 	require.Empty(t, events)
 	require.True(t, s.IsAlive())

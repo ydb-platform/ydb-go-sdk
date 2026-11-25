@@ -2,6 +2,8 @@ package query
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"sync/atomic"
 	"testing"
@@ -117,6 +119,51 @@ func TestStreamResult_CloseDrainsExecStatsAfterPerCallCtxCancel(t *testing.T) {
 		require.True(t, gotStats.Load(),
 			"Close with fresh ctx must drain ExecStats after per-call ctx cancel")
 	})
+}
+
+func TestCloseDrainsPrefetchedStatsAndTerminalError(t *testing.T) {
+	for _, readToEnd := range []bool{false, true} {
+		t.Run(fmt.Sprintf("readToEnd=%t", readToEnd), func(t *testing.T) {
+			executeCtx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			transport, finish := context.WithCancel(executeCtx)
+			defer finish()
+			terminal := errors.New("terminal query error")
+			var next int
+			inner := &testExecuteQueryStream{ctx: transport, recv: func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+				next++
+				switch next {
+				case 1:
+					return testEmptyStreamPart(), nil
+				case 2:
+					return &Ydb_Query.ExecuteQueryResponsePart{
+						ExecStats: &Ydb_TableStats.QueryStats{TotalDurationUs: 123},
+					}, nil
+				default:
+					finish()
+
+					return nil, terminal
+				}
+			}}
+			stream := wrapExecuteQueryStreamWithAsyncPrefetch(executeCtx, inner, 2)
+			var duration time.Duration
+			r, err := newResult(executeCtx, stream, withStreamResultOnClose(cancel),
+				withStreamResultStatsCallback(func(s stats.QueryStats) { duration = s.TotalDuration() }))
+			require.NoError(t, err)
+			<-transport.Done()
+			if readToEnd {
+				_, _, err = r.nextPart(t.Context())
+				require.NoError(t, err)
+				_, _, err = r.nextPart(t.Context())
+				require.ErrorIs(t, err, terminal)
+				require.NoError(t, r.Close(t.Context()), "iteration already delivered the terminal error")
+			} else {
+				require.ErrorIs(t, r.Close(t.Context()), terminal)
+			}
+			require.Equal(t, 123*time.Microsecond, duration)
+			require.NoError(t, r.Close(t.Context()))
+		})
+	}
 }
 
 // TestStreamResult_CloseIsIdempotentViaStreamContext ensures repeated Close after drain

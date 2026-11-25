@@ -37,7 +37,7 @@ type (
 		columns             []*Ydb.Column
 		currentPart         *Ydb_Query.ExecuteQueryResponsePart
 		wirePart            *wirePart
-		nextWirePart        func() *wirePart
+		wireSource          *streamResult
 		rowIndex            int
 		ended               atomic.Bool
 		mustBeLastResultSet bool
@@ -207,8 +207,8 @@ func (rs *resultSet) nextRow(ctx context.Context) (query.Row, error) {
 			}
 			rs.rowIndex = 0
 			rs.currentPart = part
-			if rs.nextWirePart != nil {
-				rs.wirePart = rs.nextWirePart()
+			if rs.wireSource != nil {
+				rs.wirePart = rs.wireSource.lastWirePart
 			}
 			rs.arrowBatches = nil
 			rs.arrowDecoded = false

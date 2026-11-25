@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"slices"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wirevalue"
@@ -140,7 +141,10 @@ func variantStructFromWire(t *types.VariantStruct, cell wirevalue.Cell) (Value, 
 		return nil, err
 	}
 
-	return VariantValueStruct(v, field.Name, t.Struct), nil
+	// VariantValueStruct sorts its fields. Keep the wire indexes in the shared column type.
+	fields := slices.Clone(t.Struct.Fields())
+
+	return VariantValueStruct(v, field.Name, types.NewStruct(fields...)), nil
 }
 
 func wireTerminalNull(cell wirevalue.Cell) bool {

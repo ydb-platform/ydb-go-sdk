@@ -1,8 +1,11 @@
 package query
 
 import (
+	"cmp"
+	"context"
 	"fmt"
 	"io"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -22,10 +25,14 @@ type executeQueryPartRecv struct {
 type asyncPrefetchExecuteQueryStream struct {
 	Ydb_Query_V1.QueryService_ExecuteQueryClient
 
-	ch chan executeQueryPartRecv
+	executeCtx   context.Context //nolint:containedctx
+	ch           chan executeQueryPartRecv
+	cancelErr    error // Published by closing ch.
+	terminalRead atomic.Bool
 }
 
 func wrapExecuteQueryStreamWithAsyncPrefetch(
+	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
 	prefetch int,
 ) Ydb_Query_V1.QueryService_ExecuteQueryClient {
@@ -34,6 +41,7 @@ func wrapExecuteQueryStreamWithAsyncPrefetch(
 	}
 	s := &asyncPrefetchExecuteQueryStream{
 		QueryService_ExecuteQueryClient: stream,
+		executeCtx:                      ctx,
 		ch:                              make(chan executeQueryPartRecv, prefetch),
 	}
 
@@ -44,14 +52,17 @@ func wrapExecuteQueryStreamWithAsyncPrefetch(
 
 func (p *asyncPrefetchExecuteQueryStream) pump() {
 	defer close(p.ch)
-	ctx := p.QueryService_ExecuteQueryClient.Context()
 	for {
 		part, wire, err := recvQueryPart(p.QueryService_ExecuteQueryClient)
 		item := executeQueryPartRecv{part: part, wire: wire, err: err}
 
+		// A read-ahead interceptor can finish the transport before returning its last part.
+		// Only cancellation of the query execution may abandon a pending delivery.
 		select {
 		case p.ch <- item:
-		case <-ctx.Done():
+		case <-p.executeCtx.Done():
+			p.cancelErr = p.executeCtx.Err()
+
 			return
 		}
 
@@ -89,7 +100,11 @@ func (p *asyncPrefetchExecuteQueryStream) RecvPart() (
 ) {
 	item, ok := <-p.ch
 	if !ok {
-		return nil, nil, io.EOF
+		return nil, nil, cmp.Or(p.cancelErr, io.EOF)
+	}
+
+	if item.err != nil {
+		p.terminalRead.Store(true)
 	}
 
 	return item.part, item.wire, item.err

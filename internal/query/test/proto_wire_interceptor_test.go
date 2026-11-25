@@ -122,7 +122,9 @@ func TestQueryProtoWireInterceptorBuffersNextPart(t *testing.T) {
 	parts := interceptedQueryParts()
 	second := proto.CloneOf(parts[0])
 	second.ResultSet.Rows[0].Items[0].Value = &Ydb.Value_Int32Value{Int32Value: 43}
-	server := mock.Server(t, mock.WithExecuteQueryParts(parts[0], second, parts[1]))
+	third := proto.CloneOf(second)
+	third.ResultSet.Rows[0].Items[0].Value = &Ydb.Value_Int32Value{Int32Value: 44}
+	server := mock.Server(t, mock.WithExecuteQueryParts(parts[0], second, third))
 	intercept := func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn,
 		method string, streamer grpc.Streamer, opts ...grpc.CallOption,
 	) (grpc.ClientStream, error) {
@@ -134,28 +136,30 @@ func TestQueryProtoWireInterceptorBuffersNextPart(t *testing.T) {
 		return &bufferNextPartStream{ClientStream: stream}, nil
 	}
 	for _, wire := range []bool{false, true} {
-		t.Run(fmt.Sprintf("wire=%t", wire), func(t *testing.T) {
-			db, err := ydb.Open(t.Context(), server.ConnString(), ydb.WithAnonymousCredentials(),
-				ydb.WithQueryProtoWireDecoding(wire),
-				ydb.With(config.WithGrpcOptions(grpc.WithChainStreamInterceptor(intercept))),
-			)
-			require.NoError(t, err)
-			t.Cleanup(func() { require.NoError(t, db.Close(t.Context())) })
-			result, err := db.Query().Query(t.Context(), "SELECT value")
-			require.NoError(t, err)
-			t.Cleanup(func() { require.NoError(t, result.Close(t.Context())) })
-			rs, err := result.NextResultSet(t.Context())
-			require.NoError(t, err)
-			for _, want := range []int32{42, 43} {
-				row, err := rs.NextRow(t.Context())
+		for _, prefetch := range []int{0, 2} {
+			t.Run(fmt.Sprintf("wire=%t/prefetch=%d", wire, prefetch), func(t *testing.T) {
+				db, err := ydb.Open(t.Context(), server.ConnString(), ydb.WithAnonymousCredentials(),
+					ydb.WithQueryProtoWireDecoding(wire),
+					ydb.With(config.WithGrpcOptions(grpc.WithChainStreamInterceptor(intercept))),
+				)
 				require.NoError(t, err)
-				var got int32
-				require.NoError(t, row.Scan(&got))
-				require.Equal(t, want, got)
-			}
-			_, err = rs.NextRow(t.Context())
-			require.ErrorIs(t, err, io.EOF)
-		})
+				t.Cleanup(func() { require.NoError(t, db.Close(t.Context())) })
+				result, err := db.Query().Query(t.Context(), "SELECT value", query.WithResponsePartPrefetch(prefetch))
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, result.Close(t.Context())) })
+				rs, err := result.NextResultSet(t.Context())
+				require.NoError(t, err)
+				for _, want := range []int32{42, 43, 44} {
+					row, err := rs.NextRow(t.Context())
+					require.NoError(t, err)
+					var got int32
+					require.NoError(t, row.Scan(&got))
+					require.Equal(t, want, got)
+				}
+				_, err = rs.NextRow(t.Context())
+				require.ErrorIs(t, err, io.EOF)
+			})
+		}
 	}
 }
 

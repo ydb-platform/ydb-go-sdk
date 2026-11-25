@@ -192,7 +192,7 @@ func TestExecuteQueryUsesWireRowsAcrossParts(t *testing.T) {
 			client := WireQueryClient(Ydb_Query_V1.NewQueryServiceClient(conn))
 			stream, err := client.ExecuteQuery(t.Context(), &Ydb_Query.ExecuteQueryRequest{})
 			require.NoError(t, err)
-			stream = wrapExecuteQueryStreamWithAsyncPrefetch(stream, prefetch)
+			stream = wrapExecuteQueryStreamWithAsyncPrefetch(t.Context(), stream, prefetch)
 			part, err := stream.Recv()
 			require.NoError(t, err)
 			require.Len(t, part.GetResultSet().GetRows(), 1)
@@ -446,6 +446,34 @@ func TestQueryWireScanRejectsVariantWithoutNestedValue(t *testing.T) {
 	var choice value.Value
 	require.ErrorContains(t, row.Scan(&choice), "nested_value")
 	require.Nil(t, choice)
+}
+
+func TestQueryRowPreservesNamedVariantAcrossScans(t *testing.T) {
+	variant := types.NewVariantStruct(
+		types.StructField{Name: "quantity", T: types.Int32},
+		types.StructField{Name: "description", T: types.Text},
+	)
+	cell := &Ydb.Value{Value: &Ydb.Value_NestedValue{NestedValue: value.ToYDB(value.Int32Value(42)).GetValue()}}
+	conn := newWireResultConn(t, &optionalWireResultServer{
+		columns: []*Ydb.Column{{Name: "choice", Type: variant.ToYDB()}},
+		rows:    []*Ydb.Value{{Items: []*Ydb.Value{cell}}},
+	})
+	want := value.FromYDB(variant.ToYDB(), cell)
+	for _, wire := range []bool{false, true} {
+		t.Run(fmt.Sprintf("wire=%t", wire), func(t *testing.T) {
+			ctx := t.Context()
+			client, err := New(ctx, conn, config.New(config.WithProtoWireDecoding(wire)))
+			require.NoError(t, err)
+			defer client.Close(ctx)
+
+			row, err := client.QueryRow(ctx, "SELECT choice")
+			require.NoError(t, err)
+			require.Equal(t, want.Yql(), row.Values()[0].Yql())
+			var got value.Value
+			require.NoError(t, row.Scan(&got))
+			require.Equal(t, want.Yql(), got.Yql())
+		})
+	}
 }
 
 func TestQueryMergesRepeatedNestedValueMessages(t *testing.T) {
