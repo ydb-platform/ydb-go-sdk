@@ -519,6 +519,21 @@ func TestFormat(t *testing.T) {
 			expected:  "0",
 		},
 		{
+			name:      "zero with zero scale",
+			x:         big.NewInt(0),
+			precision: 22,
+			scale:     0,
+			expected:  "0",
+		},
+		{
+			name:              "zero with zero scale and trimmed zeros",
+			x:                 big.NewInt(0),
+			precision:         22,
+			scale:             0,
+			trimTrailingZeros: true,
+			expected:          "0",
+		},
+		{
 			name:      "zero precision returns nan",
 			x:         big.NewInt(123),
 			precision: 0,

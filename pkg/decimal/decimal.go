@@ -329,7 +329,8 @@ func Format(x *big.Int, precision, scale uint32, trimTrailingZeros bool) string 
 		pos--
 		bts[pos] = '.'
 	}
-	if bts[pos] == '.' {
+	// pos == len(bts): zero with zero scale, no digit was written
+	if pos == len(bts) || bts[pos] == '.' {
 		pos--
 		bts[pos] = '0'
 	}
