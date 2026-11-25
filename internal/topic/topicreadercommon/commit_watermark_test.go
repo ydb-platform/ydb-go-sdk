@@ -43,6 +43,32 @@ func TestCommitMessageTrackerScatteredSubmissions(t *testing.T) {
 	require.Empty(t, tracker.pending)
 }
 
+func TestCommitMessageTrackerReleasesStorageOfClosedSession(t *testing.T) {
+	const ranges = 1000
+	names := map[bool]string{true: "close then acknowledge", false: "acknowledge then close"}
+	for _, closeFirst := range []bool{true, false} {
+		t.Run(names[closeFirst], func(t *testing.T) {
+			session := newCommitMetricsTestSession(t, &trace.Topic{
+				OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {},
+			})
+			for i := range rawtopiccommon.Offset(ranges) {
+				require.EqualValues(t, 1, RegisterCommitQueued(CommitRange{
+					PartitionSession: session, CommitOffsetStart: i, CommitOffsetEnd: i + 1,
+				}))
+			}
+			if closeFirst {
+				session.Close()
+			}
+			// The final acknowledgement still counts after close.
+			require.EqualValues(t, ranges, RegisterCommitAcknowledged(session, ranges))
+			if !closeFirst {
+				session.Close()
+			}
+			require.Nil(t, session.commitMetrics.tracker.pending)
+		})
+	}
+}
+
 func TestCommitMessageTrackerWideSpans(t *testing.T) {
 	var queued []trace.TopicReaderCommitQueuedInfo
 	session := newCommitMetricsTestSession(t, &trace.Topic{

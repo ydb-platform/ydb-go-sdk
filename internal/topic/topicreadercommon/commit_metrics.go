@@ -125,6 +125,7 @@ func RegisterCommitAcknowledged(session *PartitionSession, exclusiveOffset rawto
 // concurrently. The tracker does not emit metrics; callers use their returned
 // counts for that purpose. Pending ranges live as long as the session: an
 // acknowledgement can still arrive after the session context is canceled.
+// Once the session is closed and nothing is pending, the storage is released.
 type commitMessageTracker struct {
 	mu sync.Mutex
 
@@ -132,6 +133,7 @@ type commitMessageTracker struct {
 	// pending is a binary min-heap ordered by end, so an acknowledgement
 	// visits only the ranges it completes, whatever the submission order.
 	pending []commitMetricRange
+	retired bool
 }
 
 type commitMetricRange struct {
@@ -181,9 +183,24 @@ func (t *commitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset
 		t.popPending()
 	}
 
+	if t.retired && len(t.pending) == 0 {
+		t.pending = nil
+	}
+
 	t.session.SetCommittedOffsetForward(exclusiveOffset)
 
 	return acknowledged
+}
+
+// retire releases the storage of a closed session as soon as nothing is pending.
+func (t *commitMessageTracker) retire() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.retired = true
+	if len(t.pending) == 0 {
+		t.pending = nil
+	}
 }
 
 // popPending removes the pending range with the smallest end.
