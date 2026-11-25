@@ -2747,8 +2747,8 @@ func connInQuarantine(balancer *Balancer, nodeID uint32) conn.Conn {
 }
 
 // TestBalancerDiscoveryDropClosesGRPC verifies end-to-end that a node removed from
-// ListEndpoints closes its pooled gRPC connection on the next update when it
-// arrives before the timer, and Balancer.Close closes the rest.
+// ListEndpoints closes its pooled gRPC connection on the next update when the
+// timer is disabled, and Balancer.Close closes the rest.
 func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	const (
 		node1 uint32 = 1
@@ -2758,6 +2758,7 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	ctx := t.Context()
 	server := startDynamicDiscoveryServer(t, []uint32{node1, node2})
 	events := newConnLifeEvents()
+	clock := &endpointCloseClock{FakeClock: clockwork.NewFakeClock()}
 
 	cfg := config.New(
 		config.WithEndpoint(server.endpoint()),
@@ -2772,8 +2773,13 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 		require.NoError(t, pool.RemoveRef(ctx))
 	}()
 
-	balancer, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
+	balancer, err := New(ctx, cfg, pool,
+		discoveryConfig.WithInterval(time.Hour),
+		discoveryConfig.WithClock(clock),
+		discoveryConfig.WithEndpointCloseDelay(-time.Second),
+	)
 	require.NoError(t, err)
+	defer func() { _ = balancer.Close(ctx) }()
 
 	require.ElementsMatch(t, []uint32{node1, node2}, activeNodeIDs(balancer))
 
@@ -2798,6 +2804,7 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
 	require.Equal(t, []uint32{node1}, activeNodeIDs(balancer))
 	require.Equal(t, 0, events.closedCount(node2), "gRPC must not close on first discovery after drop")
+	require.Nil(t, clock.callback, "a negative delay must disable the close timer")
 
 	// Discovery #4: same cluster — quarantine released, dropped node gRPC must close.
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))

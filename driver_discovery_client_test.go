@@ -97,7 +97,7 @@ func TestDriverDiscoveryInitFailsWhenPoolClosed(t *testing.T) {
 }
 
 func TestWithRemovedEndpointCloseDelay(t *testing.T) {
-	for _, delay := range []time.Duration{5 * time.Second, 0} {
+	for _, delay := range []time.Duration{5 * time.Second, 0, -time.Second} {
 		t.Run(delay.String(), func(t *testing.T) {
 			d, err := driverFromOptions(t.Context(), WithRemovedEndpointCloseDelay(delay))
 			require.NoError(t, err)
