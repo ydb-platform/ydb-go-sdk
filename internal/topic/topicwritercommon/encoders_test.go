@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 	"testing"
 
@@ -492,41 +493,51 @@ func TestMultiEncoderEncodeUnsupportedCodec(t *testing.T) {
 	}
 }
 
-type writerToOnly struct {
-	data []byte
+type capturingEncoder struct {
+	written *[][]byte
 }
 
-func (w writerToOnly) Read([]byte) (int, error) {
-	return 0, errors.New("the source must be written with WriteTo, not copied with Read")
+func (c capturingEncoder) Write(p []byte) (int, error) {
+	*c.written = append(*c.written, p)
+
+	return len(p), nil
 }
 
-func (w writerToOnly) WriteTo(target io.Writer) (int64, error) {
-	n, err := target.Write(w.data)
-
-	return int64(n), err
+func (c capturingEncoder) Close() error {
+	return nil
 }
 
-func TestMultiEncoderEncodeWriterToWithoutCopy(t *testing.T) {
-	encoder := NewMultiEncoder()
+func TestMultiEncoderEncodeBytesSourcesWithoutCopy(t *testing.T) {
 	data := encodeTestPayload(1000)
-	for _, codec := range []rawtopiccommon.Codec{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip} {
-		var want, got bytes.Buffer
-		_, err := encoder.EncodeBytes(codec, &want, data)
-		require.NoError(t, err)
-
-		n, err := encoder.Encode(codec, &got, writerToOnly{data: data})
-		require.NoError(t, err)
-		require.Equal(t, len(data), n)
-		require.Equal(t, want.Bytes(), got.Bytes())
+	for name, source := range map[string]io.Reader{
+		"bytes.Reader": bytes.NewReader(data),
+		"bytes.Buffer": bytes.NewBuffer(data),
+	} {
+		t.Run(name, func(t *testing.T) {
+			var written [][]byte
+			encoder := NewMultiEncoder()
+			encoder.AddEncoder(rawtopiccommon.CodecLzop, func(io.Writer) (io.WriteCloser, error) {
+				return capturingEncoder{written: &written}, nil
+			})
+			n, err := encoder.Encode(rawtopiccommon.CodecLzop, &bytes.Buffer{}, source)
+			require.NoError(t, err)
+			require.Equal(t, len(data), n)
+			require.Len(t, written, 1)
+			require.Same(t, &data[0], &written[0][0], "the encoder must get the source's own bytes")
+		})
 	}
 }
 
 type recordingEncoder struct {
-	calls *[]string
+	calls    *[]string
+	writeErr error
 }
 
 func (r recordingEncoder) Write(p []byte) (int, error) {
 	*r.calls = append(*r.calls, "write")
+	if r.writeErr != nil {
+		return 0, r.writeErr
+	}
 
 	return len(p), nil
 }
@@ -538,40 +549,33 @@ func (r recordingEncoder) Close() error {
 }
 
 func newRecordingMultiEncoder(calls *[]string) *MultiEncoder {
+	return newFailingRecordingMultiEncoder(calls, nil)
+}
+
+func newFailingRecordingMultiEncoder(calls *[]string, writeErr error) *MultiEncoder {
 	encoder := NewMultiEncoder()
 	encoder.AddEncoder(rawtopiccommon.CodecLzop, func(io.Writer) (io.WriteCloser, error) {
 		*calls = append(*calls, "create")
 
-		return recordingEncoder{calls: calls}, nil
+		return recordingEncoder{calls: calls, writeErr: writeErr}, nil
 	})
 
 	return encoder
 }
 
-type failingWriterTo struct{}
-
-func (failingWriterTo) Read([]byte) (int, error) {
-	return 0, errors.New("read")
-}
-
-func (failingWriterTo) WriteTo(io.Writer) (int64, error) {
-	return 0, errors.New("source failed")
-}
-
-func TestMultiEncoderEncodeClosesEncoderOnSourceError(t *testing.T) {
-	var calls []string
-	_, err := newRecordingMultiEncoder(&calls).Encode(rawtopiccommon.CodecLzop, &bytes.Buffer{}, failingWriterTo{})
-	require.EqualError(t, err, "source failed")
-	created, closed := 0, 0
-	for _, call := range calls {
-		switch call {
-		case "create":
-			created++
-		case "close":
-			closed++
-		}
+func TestMultiEncoderEncodeClosesEncoderOnWriteError(t *testing.T) {
+	for name, source := range map[string]func() io.Reader{
+		"bytes.Reader": func() io.Reader { return bytes.NewReader([]byte("payload")) },
+		"io.Reader":    func() io.Reader { return readerOnly{bytes.NewReader([]byte("payload"))} },
+	} {
+		t.Run(name, func(t *testing.T) {
+			var calls []string
+			encoder := newFailingRecordingMultiEncoder(&calls, errors.New("encoder failed"))
+			_, err := encoder.Encode(rawtopiccommon.CodecLzop, &bytes.Buffer{}, source())
+			require.EqualError(t, err, "encoder failed")
+			require.Equal(t, []string{"create", "write", "close"}, calls)
+		})
 	}
-	require.Equal(t, created, closed, "every created encoder is closed: %v", calls)
 }
 
 func TestMultiEncoderEncodeEmptyDataWritesBeforeClose(t *testing.T) {
@@ -586,6 +590,27 @@ func TestMultiEncoderEncodeEmptyDataWritesBeforeClose(t *testing.T) {
 			n, err := newRecordingMultiEncoder(&calls).Encode(rawtopiccommon.CodecLzop, &bytes.Buffer{}, source)
 			require.NoError(t, err)
 			require.Zero(t, n)
+			require.Equal(t, []string{"create", "write", "close"}, calls)
+		})
+	}
+}
+
+func TestMultiEncoderEncodeWritesOncePerMessage(t *testing.T) {
+	for name, source := range map[string]func() io.Reader{
+		"bytes.Reader":         func() io.Reader { return bytes.NewReader([]byte("payload")) },
+		"bytes.Buffer":         func() io.Reader { return bytes.NewBufferString("payload") },
+		"strings.Reader":       func() io.Reader { return strings.NewReader("payload") },
+		"net.Buffers":          func() io.Reader { return &net.Buffers{[]byte("pay"), []byte("load")} },
+		"net.Buffers with nil": func() io.Reader { return &net.Buffers{nil} },
+		"io.MultiReader": func() io.Reader {
+			return io.MultiReader(strings.NewReader("pay"), strings.NewReader("load"))
+		},
+		"io.NopCloser of string": func() io.Reader { return io.NopCloser(strings.NewReader("payload")) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			var calls []string
+			_, err := newRecordingMultiEncoder(&calls).Encode(rawtopiccommon.CodecLzop, &bytes.Buffer{}, source())
+			require.NoError(t, err)
 			require.Equal(t, []string{"create", "write", "close"}, calls)
 		})
 	}

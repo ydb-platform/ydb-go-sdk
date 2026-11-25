@@ -44,6 +44,8 @@ func (e *Encoder) EncodeBytes(target io.Writer, data []byte) (int, error) {
 }
 
 // EncodeFrom compresses the data of source without copying it into an intermediate buffer.
+// The source must write all its data in a single Write, as bytes.Reader and bytes.Buffer do,
+// so the encoder gets the same writes as with EncodeBytes.
 func (e *Encoder) EncodeFrom(target io.Writer, source io.WriterTo) (int, error) {
 	return e.encode(target, func(enc io.Writer) (int, error) {
 		n, err := source.WriteTo(enc)
@@ -132,13 +134,10 @@ func (e *MultiEncoder) Encode(codec rawtopiccommon.Codec, target io.Writer, sour
 
 			return err
 		})
-	case io.WriterTo:
-		encoder, ok := e.m[codec]
-		if !ok {
-			return 0, errUnexpectedEncodeCodec(codec)
-		}
-
-		return encoder.EncodeFrom(target, src)
+	case *bytes.Reader:
+		return e.encodeFrom(codec, target, src)
+	case *bytes.Buffer:
+		return e.encodeFrom(codec, target, src)
 	default:
 		return e.encodeBuffered(codec, target, func(buf *bytes.Buffer) error {
 			_, err := buf.ReadFrom(src)
@@ -146,6 +145,15 @@ func (e *MultiEncoder) Encode(codec rawtopiccommon.Codec, target io.Writer, sour
 			return err
 		})
 	}
+}
+
+func (e *MultiEncoder) encodeFrom(codec rawtopiccommon.Codec, target io.Writer, source io.WriterTo) (int, error) {
+	encoder, ok := e.m[codec]
+	if !ok {
+		return 0, errUnexpectedEncodeCodec(codec)
+	}
+
+	return encoder.EncodeFrom(target, source)
 }
 
 func (e *MultiEncoder) encodeBuffered(
