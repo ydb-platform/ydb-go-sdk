@@ -86,6 +86,7 @@ func TestDisabledTopicMetricsDoNotEnableTracking(t *testing.T) {
 	require.Nil(t, tracer.OnReaderLocalBufferChanged)
 	require.Nil(t, tracer.OnReaderCreditBalanceChanged)
 	require.Nil(t, tracer.OnReaderCommitQueued)
+	require.Nil(t, tracer.OnListenerCommitQueued)
 	require.Nil(t, tracer.OnReaderCommittedNotify)
 	require.Nil(t, tracer.OnReaderSessionError)
 }
@@ -110,12 +111,15 @@ func TestTopicReaderMetricsHonorDetailsGroups(t *testing.T) {
 	require.Nil(t, streamEvents.OnReaderLocalBufferChanged)
 	require.Nil(t, streamEvents.OnReaderCreditBalanceChanged)
 	require.NotNil(t, streamEvents.OnReaderCommitQueued)
+	require.Nil(t, streamEvents.OnListenerCommitQueued)
 	require.NotNil(t, streamEvents.OnReaderCommittedNotify)
 	require.NotNil(t, streamEvents.OnReaderSessionError)
 
 	listenerEvents := topic(recordingConfig{registry: newRecordingRegistry(), details: trace.TopicListenerStreamEvents})
 	require.Nil(t, listenerEvents.OnReaderReceiveDataResponse)
 	require.NotNil(t, listenerEvents.OnListenerReceiveMessage)
+	require.Nil(t, listenerEvents.OnReaderCommitQueued)
+	require.NotNil(t, listenerEvents.OnListenerCommitQueued)
 	require.NotNil(t, listenerEvents.OnReaderCommittedNotify)
 }
 
@@ -417,9 +421,12 @@ func TestTopicMetricsSeparateReaderAndListenerDetails(t *testing.T) {
 				tracer.OnReaderCreditBalanceChanged(trace.TopicReaderCreditBalanceChangedInfo{
 					ReaderInfo: readerInfo, BytesDelta: count,
 				})
-				tracer.OnReaderCommitQueued(trace.TopicReaderCommitQueuedInfo{
-					ReaderInfo: readerInfo, MessagesCount: int64(count),
-				})
+				queued := trace.TopicReaderCommitQueuedInfo{ReaderInfo: readerInfo, MessagesCount: int64(count)}
+				if listener && tracer.OnListenerCommitQueued != nil {
+					tracer.OnListenerCommitQueued(queued)
+				} else if !listener && tracer.OnReaderCommitQueued != nil {
+					tracer.OnReaderCommitQueued(queued)
+				}
 				tracer.OnReaderCommittedNotify(trace.TopicReaderCommittedNotifyInfo{
 					ReaderInfo: readerInfo, MessagesCount: int64(count),
 				})

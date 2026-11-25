@@ -11,6 +11,9 @@ func ComposeReader(lhs, rhs *trace.Topic, opts ...TopicComposeOption) *trace.Top
 	if lhs.OnReaderCommitQueued == nil && rhs.OnReaderCommitQueued == nil {
 		t.OnReaderCommitQueued = nil
 	}
+	if lhs.OnListenerCommitQueued == nil && rhs.OnListenerCommitQueued == nil {
+		t.OnListenerCommitQueued = nil
+	}
 	if lhs.OnReaderCreditBalanceChanged == nil && rhs.OnReaderCreditBalanceChanged == nil {
 		t.OnReaderCreditBalanceChanged = nil
 	}

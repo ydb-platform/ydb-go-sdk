@@ -16,8 +16,8 @@ type partitionSessionCommitMetrics struct {
 }
 
 // SetupCommitMetrics enables commit range trace events and acknowledgement
-// tracking for the partition session when queued-commit tracing is enabled. It
-// must be called before messages are delivered.
+// tracking for the partition session when queued-commit tracing is enabled for
+// its reader kind. It must be called before messages are delivered.
 func (s *PartitionSession) SetupCommitMetrics(tracer *trace.Topic, readerInfo ReaderInfo) {
 	if s == nil || tracer == nil {
 		return
@@ -25,7 +25,11 @@ func (s *PartitionSession) SetupCommitMetrics(tracer *trace.Topic, readerInfo Re
 	if s.ctx != nil && s.ctx.Err() != nil {
 		return
 	}
-	if tracer.OnReaderCommitQueued == nil {
+	queued := tracer.OnReaderCommitQueued
+	if readerInfo.Listener {
+		queued = tracer.OnListenerCommitQueued
+	}
+	if queued == nil {
 		return
 	}
 	if s.commitMetrics != nil {
@@ -82,7 +86,11 @@ func traceCommitQueued(ctx context.Context, commitRange CommitRange, messagesCou
 		return
 	}
 
-	gtrace.TopicOnReaderCommitQueued(
+	emit := gtrace.TopicOnReaderCommitQueued
+	if metrics.readerInfo.Listener {
+		emit = gtrace.TopicOnListenerCommitQueued
+	}
+	emit(
 		metrics.tracer,
 		&ctx,
 		metrics.readerInfo,

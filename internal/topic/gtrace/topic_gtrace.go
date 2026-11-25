@@ -1529,6 +1529,25 @@ func Compose(lhs *trace.Topic, rhs *trace.Topic, opts ...TopicComposeOption) *tr
 			}
 		}
 	}
+	{
+		h1 := lhs.OnListenerCommitQueued
+		h2 := rhs.OnListenerCommitQueued
+		ret.OnListenerCommitQueued = func(t trace.TopicReaderCommitQueuedInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
+		}
+	}
 	return &ret
 }
 func onReaderStart(t *trace.Topic, info trace.TopicReaderStartInfo) {
@@ -2144,6 +2163,13 @@ func onListenerSendDataRequest(t *trace.Topic, t1 trace.TopicListenerSendDataReq
 }
 func onListenerUnknownMessage(t *trace.Topic, t1 trace.TopicListenerUnknownMessageInfo) {
 	fn := t.OnListenerUnknownMessage
+	if fn == nil {
+		return
+	}
+	fn(t1)
+}
+func onListenerCommitQueued(t *trace.Topic, t1 trace.TopicReaderCommitQueuedInfo) {
+	fn := t.OnListenerCommitQueued
 	if fn == nil {
 		return
 	}
@@ -2849,4 +2875,15 @@ func TopicOnListenerUnknownMessage(t *trace.Topic, c *context.Context, listenerI
 	p.MessageType = messageType
 	p.Error = e
 	onListenerUnknownMessage(t, p)
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TopicOnListenerCommitQueued(t *trace.Topic, c *context.Context, readerInfo trace.TopicReaderInfo, topic string, partitionID int64, partitionSessionID int64, messagesCount int64) {
+	var p trace.TopicReaderCommitQueuedInfo
+	p.Context = c
+	p.ReaderInfo = readerInfo
+	p.Topic = topic
+	p.PartitionID = partitionID
+	p.PartitionSessionID = partitionSessionID
+	p.MessagesCount = messagesCount
+	onListenerCommitQueued(t, p)
 }

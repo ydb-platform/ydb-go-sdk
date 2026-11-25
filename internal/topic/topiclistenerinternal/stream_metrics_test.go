@@ -479,13 +479,14 @@ func setupListenerCommitMetrics(
 			Database:   "/db",
 			Consumer:   "consumer",
 			ReaderName: "reader",
+			Listener:   true,
 		},
 	}
 	queued = make(chan int64, 4)
 	acknowledged = make(chan int64, 4)
 	notifications = make(chan int64, 8)
 	listener.tracer = &trace.Topic{
-		OnReaderCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
+		OnListenerCommitQueued: func(info trace.TopicReaderCommitQueuedInfo) {
 			queued <- info.MessagesCount
 		},
 		OnReaderCommittedNotify: func(info trace.TopicReaderCommittedNotifyInfo) {

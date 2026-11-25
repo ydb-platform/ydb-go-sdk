@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -60,6 +61,32 @@ func TestTopicReceivedBytesAndMessagesKeepInitialDetails(t *testing.T) {
 			tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{ReaderInfo: listener, MessagesCount: 3})
 			assert.Equal(t, []int64{tc.wantBytes}, cfg.capture.adds["ydb.topic.reader.received.bytes"])
 			assert.Equal(t, []int64{tc.wantMessages}, cfg.capture.adds["ydb.topic.reader.received.messages"])
+		})
+	}
+}
+
+func TestTopicCommitTrackingFollowsReaderKind(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		details        trace.Details
+		listener, want bool
+	}{
+		{"pull_reader_with_reader_details", trace.TopicReaderStreamEvents, false, true},
+		{"pull_reader_with_listener_details", trace.TopicListenerStreamEvents, false, false},
+		{"listener_with_reader_details", trace.TopicReaderStreamEvents, true, false},
+		{"listener_with_listener_details", trace.TopicListenerStreamEvents, true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			details := tc.details
+			tracer := topic(newMutableTopicConfig(&details))
+			session := topicreadercommon.NewPartitionSession(context.Background(), "topic", 1, 1, "", 2, 3, 0)
+			defer session.Close()
+			session.SetupCommitMetrics(&tracer, trace.TopicReaderInfo{Listener: tc.listener})
+			commitRange := topicreadercommon.CommitRange{
+				PartitionSession: session, CommitOffsetStart: 7, CommitOffsetEnd: 8,
+			}
+			assert.Equal(t, tc.want, topicreadercommon.RegisterCommitQueued(commitRange) == 1, "range admitted")
+			assert.Equal(t, tc.want, topicreadercommon.RegisterCommitAcknowledged(session, 8) == 1, "span tracked")
 		})
 	}
 }

@@ -115,6 +115,36 @@ func TestSetupCommitMetricsRequiresQueuedTrace(t *testing.T) {
 	require.Nil(t, closedSession.commitMetrics)
 }
 
+func TestSetupCommitMetricsFollowsReaderKind(t *testing.T) {
+	queued := func(trace.TopicReaderCommitQueuedInfo) {}
+	for _, test := range []struct {
+		name     string
+		tracer   trace.Topic
+		listener bool
+		tracked  bool
+	}{
+		{name: "pull reader with its hook", tracer: trace.Topic{OnReaderCommitQueued: queued}, tracked: true},
+		{name: "pull reader with the listener hook", tracer: trace.Topic{OnListenerCommitQueued: queued}},
+		{name: "listener with the pull reader hook", tracer: trace.Topic{OnReaderCommitQueued: queued}, listener: true},
+		{
+			name:   "listener with its hook",
+			tracer: trace.Topic{OnListenerCommitQueued: queued}, listener: true, tracked: true,
+		},
+		{
+			name:     "listener with a composed empty trace",
+			tracer:   *gtrace.ComposeReader(&trace.Topic{OnReaderCommitQueued: queued}, &trace.Topic{}),
+			listener: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			session := NewPartitionSession(context.Background(), "topic", 1, 1, "", 2, 3, 0)
+			defer session.Close()
+			session.SetupCommitMetrics(&test.tracer, ReaderInfo{Listener: test.listener})
+			require.Equal(t, test.tracked, session.commitMetrics != nil)
+		})
+	}
+}
+
 func TestPublicMessageBuilderPreservesCommitRangeBoundaries(t *testing.T) {
 	session := newCommitMetricsTestSession(t, &trace.Topic{
 		OnReaderCommitQueued: func(trace.TopicReaderCommitQueuedInfo) {},

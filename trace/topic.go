@@ -63,8 +63,8 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderCommittedNotify func(TopicReaderCommittedNotifyInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		// Setting this callback enables commit message counting for OnReaderCommittedNotify.
-		// If it is unset, OnReaderCommittedNotify.MessagesCount is zero.
+		// Setting this callback enables commit message counting for a pull reader's OnReaderCommittedNotify.
+		// If it is unset, OnReaderCommittedNotify.MessagesCount is zero. Listeners use OnListenerCommitQueued.
 		OnReaderCommitQueued func(TopicReaderCommitQueuedInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		// Reports the reconnect decision, which can first become known during Close.
@@ -220,6 +220,10 @@ type (
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnListenerUnknownMessage func(TopicListenerUnknownMessageInfo)
+
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// Setting this callback enables commit message counting for a listener's OnReaderCommittedNotify.
+		OnListenerCommitQueued func(TopicReaderCommitQueuedInfo)
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -307,7 +311,8 @@ type (
 		PartitionID        int64
 		PartitionSessionID int64
 		CommittedOffset    int64
-		// MessagesCount is zero when commit tracking is disabled by leaving OnReaderCommitQueued unset.
+		// MessagesCount is zero when commit tracking is disabled by leaving the queued-commit callback
+		// of the reader kind unset: OnReaderCommitQueued or OnListenerCommitQueued.
 		MessagesCount int64
 	}
 

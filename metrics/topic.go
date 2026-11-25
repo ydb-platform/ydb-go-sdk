@@ -97,11 +97,6 @@ func topic(config Config) (t trace.Topic) {
 		return topicMetricEnabled(details, info.Listener, trace.TopicReaderStreamEvents)
 	}
 	if details&(trace.TopicReaderStreamEvents|trace.TopicListenerStreamEvents) != 0 {
-		t.OnReaderCommitQueued = func(info trace.TopicReaderCommitQueuedInfo) {
-			if streamEnabled(info.ReaderInfo) {
-				addCounter(vectors.queued(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
-			}
-		}
 		t.OnReaderCommittedNotify = func(info trace.TopicReaderCommittedNotifyInfo) {
 			if streamEnabled(info.ReaderInfo) && info.MessagesCount > 0 {
 				labels := messageLabels(info.ReaderInfo, info.Topic)
@@ -119,9 +114,23 @@ func topic(config Config) (t trace.Topic) {
 			vectors.errors(labels).Inc()
 		}
 	}
+	setCommitQueuedHooks(&t, details, vectors)
 	setReceivedBytesHooks(&t, details, vectors)
 
 	return t
+}
+
+// Each reader kind tracks pending commits only when its own queued hook is set.
+func setCommitQueuedHooks(t *trace.Topic, details trace.Details, vectors topicVectors) {
+	queued := func(info trace.TopicReaderCommitQueuedInfo) {
+		addCounter(vectors.queued(messageLabels(info.ReaderInfo, info.Topic)), info.MessagesCount)
+	}
+	if details&trace.TopicReaderStreamEvents != 0 {
+		t.OnReaderCommitQueued = queued
+	}
+	if details&trace.TopicListenerStreamEvents != 0 {
+		t.OnListenerCommitQueued = queued
+	}
 }
 
 func setReceivedBytesHooks(t *trace.Topic, details trace.Details, vectors topicVectors) {
