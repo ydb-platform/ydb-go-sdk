@@ -18,6 +18,33 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+func TestReaderSessionErrorPanicPreservesInitError(t *testing.T) {
+	connectErr := status.Error(codes.PermissionDenied, "access denied")
+	called := make(chan struct{})
+	internalReader, err := topicreaderinternal.NewReader(nil,
+		func(context.Context, int64, *trace.Topic) (topicreadercommon.RawTopicReaderStream, error) {
+			return nil, connectErr
+		}, "consumer", []topicreadercommon.PublicReadSelector{{Path: "/topic"}},
+		topicoptions.WithReaderTrace(trace.Topic{
+			OnReaderSessionError: func(trace.TopicReaderSessionErrorInfo) {
+				close(called)
+				panic("session error observer")
+			},
+		}),
+	)
+	require.NoError(t, err)
+	reader := topicreader.NewReader(internalReader)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	select {
+	case <-called:
+	case <-ctx.Done():
+		t.Fatal("session-error callback did not run")
+	}
+	require.ErrorIs(t, reader.WaitInit(ctx), connectErr)
+	require.NoError(t, reader.Close(ctx))
+}
+
 func TestReaderCloseFromTerminalSessionError(t *testing.T) {
 	var reader *topicreader.Reader
 	var stops atomic.Int32
