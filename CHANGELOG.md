@@ -1,3 +1,4 @@
+## v3.157.5
 * Removed the copy of `topicwriter.Message.Data` into an intermediate growing buffer before compression: `bytes.Reader` and `bytes.Buffer` data is written straight into the compressor, a `strings.Reader` is copied into a presized pooled buffer
 ## v3.157.4
 * Fixed panic in `decimal.Format` and `decimal.Decimal.String` for a zero value with zero scale
