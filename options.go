@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
+	internalConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
@@ -29,7 +30,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -856,13 +856,9 @@ func WithTraceDiscovery(t trace.Discovery) Option {
 
 // WithTraceTopic adds configured topic tracer to Driver
 func WithTraceTopic(t trace.Topic) Option { //nolint:gocritic
-	return func(ctx context.Context, d *Driver) error {
-		d.topicOptions = append(d.topicOptions,
-			topicoptions.WithTrace(t),
-		)
-
-		return nil
-	}
+	return With(func(c *config.Config) {
+		internalConfig.AddTopicTraces(&c.Common, internalConfig.TopicTraces{Reader: &t, Listener: &t, Writer: &t})
+	})
 }
 
 // WithTraceDatabaseSQL adds configured database/sql tracer to Driver

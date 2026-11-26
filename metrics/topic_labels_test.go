@@ -50,19 +50,19 @@ func checkTopicVectorLabels(t *testing.T, descriptors bool) {
 		{Consumer: "consumer", ReaderName: "reader"}, {ReaderName: "reader"}, {},
 	} {
 		consumer = info.Consumer
-		exerciseTopicLabels(tracer, info)
+		exerciseTopicLabels(tracer.Reader, info)
+		tracer.Listener.OnListenerReceiveMessage(listenerBytesInfo(info, 1, nil))
 	}
 	require.Len(t, cache, 8)
 	require.Equal(t, 8, registrations)
 }
 
-func exerciseTopicLabels(tracer trace.Topic, readerInfo trace.TopicReaderInfo) {
+func exerciseTopicLabels(tracer *trace.Topic, readerInfo trace.TopicReaderInfo) {
 	tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
 		ReaderInfo: readerInfo,
 		Topic:      "/topic", MessagesCount: 1,
 	})
 	tracer.OnReaderReceiveDataResponse(readerBytesInfo(readerInfo, 1))
-	tracer.OnListenerReceiveMessage(listenerBytesInfo(readerInfo, 1, nil))
 	tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{
 		ReaderInfo: readerInfo, Topic: "/topic", MessagesCount: 1,
 	})

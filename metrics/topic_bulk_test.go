@@ -13,7 +13,7 @@ func TestTopicBulkCountersUseFloatAdd(t *testing.T) {
 		recordingConfig: recordingConfig{registry: newRecordingRegistry(), details: trace.DetailsAll},
 		counters:        make(map[string]*floatCounter),
 	}
-	tracer := topic(cfg)
+	tracer := topic(cfg).Reader
 	tracer.OnReaderReceiveDataResponse(readerBytesInfo(trace.TopicReaderInfo{}, 128))
 	tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{Topic: "topic", MessagesCount: 5})
 	tracer.OnReaderMessagesDelivered(trace.TopicReaderMessagesDeliveredInfo{MessagesCount: 4})

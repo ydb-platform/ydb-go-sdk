@@ -21,12 +21,20 @@ type Option func(c *Config)
 
 func PublicWithTrace(t trace.Topic) Option { //nolint:gocritic
 	return func(c *Config) {
-		var opts []gtrace.TopicComposeOption
-		if cb := c.PanicCallback(); cb != nil {
-			opts = append(opts, gtrace.WithTopicPanicCallback(cb))
-		}
-		c.Trace = gtrace.ComposeReader(c.Trace, &t, opts...)
+		c.Trace = c.ComposeTrace(c.Trace, &t)
 	}
+}
+
+func (c *Config) ComposeTrace(base, extra *trace.Topic) *trace.Topic {
+	if extra == nil {
+		return base
+	}
+	var opts []gtrace.TopicComposeOption
+	if cb := c.PanicCallback(); cb != nil {
+		opts = append(opts, gtrace.WithTopicPanicCallback(cb))
+	}
+
+	return gtrace.ComposeReader(base, extra, opts...)
 }
 
 func PublicWithOperationTimeout(operationTimeout time.Duration) Option {

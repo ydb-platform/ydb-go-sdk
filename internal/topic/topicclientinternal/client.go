@@ -34,27 +34,37 @@ import (
 var errUnsupportedTransactionType = xerrors.Wrap(errors.New("ydb: unsuppotred transaction type. Use transaction from Driver().Query().DoTx(...)")) //nolint:lll
 
 type Client struct {
-	cfg                    topic.Config
-	cred                   credentials.Credentials
-	defaultOperationParams rawydb.OperationParams
-	rawClient              rawtopic.Client
+	readerTrace, listenerTrace *trace.Topic
+	cfg                        topic.Config
+	cred                       credentials.Credentials
+	defaultOperationParams     rawydb.OperationParams
+	rawClient                  rawtopic.Client
 }
 
 func New(
 	ctx context.Context,
 	conn grpc.ClientConnInterface,
 	cred credentials.Credentials,
+	traces []config.TopicTraces,
 	opts ...topicoptions.TopicOption,
 ) *Client {
 	rawClient := rawtopic.NewClient(Ydb_Topic_V1.NewTopicServiceClient(conn))
 
 	cfg := newTopicConfig(opts...)
+	reader, listener := cfg.Trace, cfg.Trace
+	for _, t := range traces {
+		reader = cfg.ComposeTrace(reader, t.Reader)
+		listener = cfg.ComposeTrace(listener, t.Listener)
+		cfg.Trace = cfg.ComposeTrace(cfg.Trace, t.Writer)
+	}
 
 	var defaultOperationParams rawydb.OperationParams
 	topic.OperationParamsFromConfig(&defaultOperationParams, &cfg.Common)
 
 	return &Client{
 		cfg:                    cfg,
+		readerTrace:            reader,
+		listenerTrace:          listener,
 		cred:                   cred,
 		defaultOperationParams: defaultOperationParams,
 		rawClient:              rawClient,
@@ -318,7 +328,7 @@ func (c *Client) StartListener(
 ) (*topiclistener.TopicListener, error) {
 	cfg := topiclistenerinternal.NewStreamListenerConfig()
 	cfg.ReaderInfo = c.readerInfo(consumer)
-	cfg.Tracer = c.cfg.Trace
+	cfg.Tracer = c.listenerTrace
 	cfg.Selectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))
 	for i := range readSelectors {
 		cfg.Selectors[i] = readSelectors[i].Clone()
@@ -360,7 +370,7 @@ func (c *Client) StartReader(
 		topicoptions.WithCommonConfig(c.cfg.Common),
 		topicreaderinternal.WithCredentials(c.cred),
 		topicreaderinternal.WithReaderInfo(c.readerInfo(consumer)),
-		topicreaderinternal.WithTrace(c.cfg.Trace),
+		topicreaderinternal.WithTrace(c.readerTrace),
 		topicoptions.WithReaderStartTimeout(topic.DefaultStartTimeout),
 	}
 	opts = append(defaultOpts, opts...)

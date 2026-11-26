@@ -10,7 +10,20 @@ import (
 
 var defaultRetryBudget = budget.Limited(-1)
 
+type TopicTraces struct {
+	Reader, Listener, Writer *trace.Topic
+}
+
+func AddTopicTraces(c *Common, traces TopicTraces) {
+	c.topicTraces = append(c.topicTraces, traces)
+}
+
+func GetTopicTraces(c *Common) []TopicTraces {
+	return c.topicTraces
+}
+
 type Common struct {
+	topicTraces          []TopicTraces
 	operationTimeout     time.Duration
 	operationCancelAfter time.Duration
 	disableAutoRetry     bool

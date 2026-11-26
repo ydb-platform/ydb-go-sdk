@@ -14,7 +14,7 @@ import (
 func TestTopicGaugeCloseAfterDetailsChange(t *testing.T) {
 	details := trace.TopicReaderMessageEvents
 	cfg := newMutableTopicConfig(&details)
-	tracer := topic(cfg)
+	tracer := topic(cfg).Reader
 	var local, credit topicreadercommon.MetricBalance
 	emitLocal := func(n int) {
 		tracer.OnReaderLocalBufferChanged(trace.TopicReaderLocalBufferChangedInfo{MessagesDelta: n})
@@ -51,17 +51,16 @@ func TestTopicReceivedBytesAndMessagesKeepInitialDetails(t *testing.T) {
 			details = tc.after
 
 			pull, listener := trace.TopicReaderInfo{}, trace.TopicReaderInfo{Listener: true}
-			if tracer.OnReaderReceiveDataResponse != nil {
-				tracer.OnReaderReceiveDataResponse(readerBytesInfo(pull, 128))
+			if tracer.Reader != nil {
+				tracer.Reader.OnReaderReceiveDataResponse(readerBytesInfo(pull, 128))
+
+				tracer.Reader.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{ReaderInfo: pull, MessagesCount: 2})
 			}
-			if tracer.OnListenerReceiveMessage != nil {
-				tracer.OnListenerReceiveMessage(listenerBytesInfo(listener, 256, nil))
-			}
-			if tracer.OnReaderMessagesReceived != nil {
-				tracer.OnReaderMessagesReceived(trace.TopicReaderMessagesReceivedInfo{ReaderInfo: pull, MessagesCount: 2})
-			}
-			if tracer.OnListenerMessagesReceived != nil {
-				tracer.OnListenerMessagesReceived(trace.TopicReaderMessagesReceivedInfo{ReaderInfo: listener, MessagesCount: 3})
+			if tracer.Listener != nil {
+				tracer.Listener.OnListenerReceiveMessage(listenerBytesInfo(listener, 256, nil))
+				tracer.Listener.OnListenerMessagesReceived(trace.TopicReaderMessagesReceivedInfo{
+					ReaderInfo: listener, MessagesCount: 3,
+				})
 			}
 			assert.Equal(t, []int64{tc.wantBytes}, cfg.capture.adds["ydb.topic.reader.received.bytes"])
 			assert.Equal(t, []int64{tc.wantMessages}, cfg.capture.adds["ydb.topic.reader.received.messages"])
@@ -82,10 +81,14 @@ func TestTopicCommitTrackingFollowsReaderKind(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			details := tc.details
-			tracer := topic(newMutableTopicConfig(&details))
+			traces := topic(newMutableTopicConfig(&details))
+			tracer := traces.Reader
+			if tc.listener {
+				tracer = traces.Listener
+			}
 			session := topicreadercommon.NewPartitionSession(context.Background(), "topic", 1, 1, "", 2, 3, 0)
 			defer session.Close()
-			session.SetupCommitMetrics(&tracer, trace.TopicReaderInfo{Listener: tc.listener})
+			session.SetupCommitMetrics(tracer, trace.TopicReaderInfo{Listener: tc.listener})
 			commitRange := topicreadercommon.CommitRange{
 				PartitionSession: session, CommitOffsetStart: 7, CommitOffsetEnd: 8,
 			}

@@ -3,6 +3,7 @@ package metrics
 import (
 	"strings"
 
+	internalConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -65,28 +66,34 @@ func topicMetricName(scope, name string) string {
 	return prefix + scope + "." + name
 }
 
-func topic(config Config) (t trace.Topic) {
+func topic(config Config) internalConfig.TopicTraces {
 	reader := config.WithSystem("topic").WithSystem("reader")
 	vectors := registerTopicVectors(reader)
 	// Snapshot details when installing the hooks: disabled hooks stay nil, and
 	// a stream's closing gauge delta uses the same mask as its reservation.
 	details := reader.Details()
-	setMessageHooks(&t, details, vectors)
 
-	streamEnabled := func(info trace.TopicReaderInfo) bool {
-		return topicMetricEnabled(details, info.Listener, trace.TopicReaderStreamEvents)
+	return internalConfig.TopicTraces{
+		Reader:   topicTrace(details&(trace.TopicReaderMessageEvents|trace.TopicReaderStreamEvents), vectors),
+		Listener: topicTrace(details&trace.TopicListenerStreamEvents, vectors),
 	}
+}
+
+func topicTrace(details trace.Details, vectors topicVectors) *trace.Topic {
+	if details == 0 {
+		return nil
+	}
+	t := &trace.Topic{}
+	setMessageHooks(t, details, vectors)
+
 	if details&(trace.TopicReaderStreamEvents|trace.TopicListenerStreamEvents) != 0 {
 		t.OnReaderCommittedNotify = func(info trace.TopicReaderCommittedNotifyInfo) {
-			if streamEnabled(info.ReaderInfo) && info.MessagesCount > 0 {
+			if info.MessagesCount > 0 {
 				labels := messageLabels(info.ReaderInfo, info.Topic)
 				addCounter(vectors.acknowledged(labels), info.MessagesCount)
 			}
 		}
 		t.OnReaderSessionError = func(info trace.TopicReaderSessionErrorInfo) {
-			if !streamEnabled(info.ReaderInfo) {
-				return
-			}
 			labels := streamLabels(info.ReaderInfo)
 			labels["retry_decision"] = info.RetryDecision
 			labels["status_code"] = info.StatusCode
@@ -94,8 +101,8 @@ func topic(config Config) (t trace.Topic) {
 			vectors.errors(labels).Inc()
 		}
 	}
-	setCommitQueuedHooks(&t, details, vectors)
-	setReceivedBytesHooks(&t, details, vectors)
+	setCommitQueuedHooks(t, details, vectors)
+	setReceivedBytesHooks(t, details, vectors)
 
 	return t
 }
@@ -239,13 +246,4 @@ func addGauge(gauge Gauge, delta float64) {
 		return
 	}
 	gauge.Add(delta)
-}
-
-// Listener stream events carry the shared reader metrics for the listener API.
-func topicMetricEnabled(details trace.Details, listener bool, readerEvents trace.Details) bool {
-	if listener {
-		return details&trace.TopicListenerStreamEvents != 0
-	}
-
-	return details&readerEvents != 0
 }

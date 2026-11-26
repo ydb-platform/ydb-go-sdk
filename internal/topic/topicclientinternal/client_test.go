@@ -112,7 +112,7 @@ func TestCommitOffsetErrors(t *testing.T) {
 					return nil
 				}).AnyTimes()
 
-			client := New(ctx, conn, nil, func(cfg *topic.Config) {
+			client := New(ctx, conn, nil, nil, func(cfg *topic.Config) {
 				config.SetAutoRetry(&cfg.Common, !tt.noRetry)
 			})
 			err := client.CommitOffset(ctx, "topic", 0, "consumer", 1, tt.opts...)
