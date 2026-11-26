@@ -114,12 +114,17 @@ func (r *gaugeRegistry) tryAttach(
 	entry.callbacks[callback] = struct{}{}
 	entry.mu.Unlock()
 	if entry.registration == nil {
+		registered := false
+		defer func() {
+			if !registered {
+				entry.remove(callback)
+				r.retire(key, entry)
+			}
+		}()
 		if err := register(entry); err != nil {
-			entry.remove(callback)
-			r.retire(key, entry)
-
 			return nil, err
 		}
+		registered = true
 	}
 
 	return entry, nil
@@ -145,10 +150,9 @@ func (r *gaugeRegistry) detach(
 	}
 	// Keep the entry reserved until OTel stops using it. Collection may
 	// still run while Unregister waits, so it must not take lifecycle.
-	err := entry.registration.Unregister()
-	r.retire(key, entry)
+	defer r.retire(key, entry)
 
-	return err
+	return entry.registration.Unregister()
 }
 
 type gaugeRegistration struct {
