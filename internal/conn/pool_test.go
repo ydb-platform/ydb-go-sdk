@@ -369,6 +369,43 @@ func TestPool_PutAfterRediscovery(t *testing.T) {
 	require.False(t, clock.lastTimer.Stop(), "pool shutdown must stop the pending timer")
 }
 
+func TestPool_PutAfterImmediate(t *testing.T) {
+	for _, timeout := range []time.Duration{0, -time.Second} {
+		t.Run(timeout.String(), func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			cfg := &mockConfig{driverTrace: &trace.Driver{
+				OnConnClose: func(trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
+					<-ctx.Done()
+
+					return nil
+				},
+			}}
+			pool := NewPool(ctx, cfg)
+			t.Cleanup(func() { require.NoError(t, pool.RemoveRef(t.Context())) })
+
+			key := endpoint.New("removed:2135")
+			old := pool.Get(key)
+			released := make(chan struct{})
+			go func() {
+				pool.PutAfter(ctx, old, timeout)
+				close(released)
+			}()
+			select {
+			case <-released:
+			case <-time.After(time.Second):
+				t.Fatal("releasing the connection waited for OnConnClose")
+			}
+
+			require.NotSame(t, old, pool.Get(key))
+			cancel()
+			require.Eventually(t, func() bool {
+				return old.State() == state.Destroyed
+			}, time.Second, time.Millisecond)
+		})
+	}
+}
+
 type heldCloseClock struct {
 	*clockwork.FakeClock
 

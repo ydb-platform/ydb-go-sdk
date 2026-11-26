@@ -422,8 +422,8 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 // WithGrpcChannelShutdownTimeout sets how long the pool keeps a connection
 // after discovery removes its endpoint and the last pool reference is released.
 // The pool can reuse the connection if the endpoint returns before the timeout.
-// The default is 1 minute and 59 seconds. A non-positive timeout leaves
-// reference release to the next successful discovery update.
+// The default is 1 minute and 59 seconds. A non-positive timeout closes the
+// connection immediately after its last reference is released.
 func WithGrpcChannelShutdownTimeout(timeout time.Duration) Option {
 	return func(_ context.Context, d *Driver) error {
 		d.discoveryOptions = append(d.discoveryOptions, discoveryConfig.WithGrpcChannelShutdownTimeout(timeout))

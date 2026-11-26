@@ -384,8 +384,9 @@ func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem
 	defer func() { _ = pool.RemoveRef(ctx) }()
 
 	b := &Balancer{
-		driverConfig: cfg,
-		pool:         pool,
+		driverConfig:               cfg,
+		pool:                       pool,
+		grpcChannelShutdownTimeout: -time.Second,
 	}
 
 	e1 := endpoint.New("e1.example:2135", endpoint.WithID(1))
@@ -415,10 +416,10 @@ func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem
 	require.Equal(t, e2.Key(), selected.Endpoint().Key())
 
 	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1}, "")
-	require.NotNil(t, connInQuarantine(b, 2), "filtered-out conn must stay in quarantine until released")
-
-	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1}, "")
-	require.Nil(t, connInQuarantine(b, 2), "filtered-out conn must be released after quarantine cycle")
+	require.Nil(t, connInQuarantine(b, 2))
+	require.Eventually(t, func() bool {
+		return selected.State() == state.Destroyed
+	}, time.Second, 10*time.Millisecond, "a negative timeout must close the connection after one discovery update")
 }
 
 func TestApplyDiscoveredEndpointsClosedPool(t *testing.T) {
@@ -2859,6 +2860,7 @@ func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
 
 	balancer, err := New(ctx, cfg, pool, discoveryConfig.WithGrpcChannelShutdownTimeout(0))
 	require.NoError(t, err)
+	defer func() { require.NoError(t, balancer.Close(ctx)) }()
 
 	dialWhoAmI(t, balancer, node2)
 	node2Conn := connByNodeID(balancer, node2)
@@ -2874,22 +2876,14 @@ func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
 	require.Same(t, node2Conn, connByNodeID(balancer, node2))
 	require.Equal(t, state.Offline, node2Conn.State())
 
-	// Discovery #3: node 2 disappears but remains referenced by quarantine.
 	server.setNodeIDs([]uint32{node1})
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
-	require.Same(t, node2Conn, connInQuarantine(balancer, node2))
-	require.Equal(t, state.Offline, node2Conn.State())
-	require.Equal(t, 0, events.closedCount(node2))
-
-	// Discovery #4: release quarantine and destroy the already parked wrapper.
-	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
+	require.Nil(t, connInQuarantine(balancer, node2))
 	require.Eventually(t, func() bool {
 		return node2Conn.State() == state.Destroyed && events.closedCount(node2) == 1
 	}, time.Second, 10*time.Millisecond, "Discovery removal must destroy a parked connection")
 	require.Equal(t, 1, events.parkedCount(node2))
 	require.Equal(t, 1, events.dialedCount(node2))
-
-	require.NoError(t, balancer.Close(ctx))
 }
 
 func TestBalancerConnectionTTLParksTransportsAfterNetworkLoss(t *testing.T) {

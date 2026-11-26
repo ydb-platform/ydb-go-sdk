@@ -258,7 +258,7 @@ func nextState(ctx context.Context, pool interface {
 func (b *Balancer) retireRemovedEndpoints(
 	ctx context.Context, priorities []policy.EndpointPriority, active, quarantine []conn.Conn,
 ) ([]conn.Conn, []conn.Conn) {
-	if b.grpcChannelShutdownTimeout <= 0 || len(active)+len(quarantine) == 0 {
+	if len(active)+len(quarantine) == 0 {
 		return active, quarantine
 	}
 

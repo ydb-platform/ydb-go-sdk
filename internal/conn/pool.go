@@ -105,50 +105,53 @@ func (p *Pool) get(e endpoint.Endpoint) *connValue {
 // Put decrements the connection use count. When the count reaches zero, the gRPC
 // connection is closed and the entry is removed from the pool.
 func (p *Pool) Put(ctx context.Context, c Conn) {
-	p.PutAfter(ctx, c, 0)
-}
-
-// PutAfter releases a reference immediately and delays closing an unused connection.
-func (p *Pool) PutAfter(ctx context.Context, c Conn, timeout time.Duration) {
-	cc, ok := c.(*conn)
-	if !ok || cc == nil {
-		return
-	}
-
-	if !p.tryPut(ctx, cc, timeout) {
+	if cc := p.releaseConn(ctx, c, 0); cc != nil {
 		_ = cc.Close(ctx)
 	}
 }
 
-func (p *Pool) tryPut(ctx context.Context, c *conn, timeout time.Duration) bool {
+// PutAfter releases a reference and closes the connection asynchronously if it
+// has no remaining references. A non-positive timeout skips the delay.
+func (p *Pool) PutAfter(ctx context.Context, c Conn, timeout time.Duration) {
+	if cc := p.releaseConn(ctx, c, timeout); cc != nil {
+		go func() { _ = cc.Close(xcontext.ValueOnly(ctx)) }()
+	}
+}
+
+func (p *Pool) releaseConn(ctx context.Context, connection Conn, timeout time.Duration) *conn {
+	c, ok := connection.(*conn)
+	if !ok || c == nil {
+		return nil
+	}
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	if p.closed.Load() || p.conns == nil {
-		return false
+		return c
 	}
 
 	key := c.endpoint.Key()
 
 	value, ok := p.conns[key]
 	if !ok || value == nil || value.cc != c {
-		return false
+		return c
 	}
 
 	value.useCount--
 	if value.useCount > 0 {
-		return true
+		return nil
 	}
 
 	value.cancelRetirement()
 	if timeout <= 0 {
 		delete(p.conns, key)
 
-		return false
+		return c
 	}
 	p.scheduleRetirement(ctx, key, value, timeout)
 
-	return true
+	return nil
 }
 
 func (v *connValue) cancelRetirement() *connRetirement {
