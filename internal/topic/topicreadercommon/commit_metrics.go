@@ -2,6 +2,7 @@ package topicreadercommon
 
 import (
 	"context"
+	"math/rand/v2"
 	"sort"
 	"sync"
 
@@ -137,7 +138,6 @@ type commitMessageTracker struct {
 	total      int64
 	// pending indexes ends below the last ordered end.
 	pending *commitRangeNode
-	random  uint64
 }
 
 type commitMetricRange struct {
@@ -170,15 +170,9 @@ func (t *commitMessageTracker) Queue(start, end rawtopiccommon.Offset) int64 {
 	} else if last := t.ordered[len(t.ordered)-1]; end >= last.end {
 		t.ordered = append(t.ordered, commitMetricRange{end: end, count: last.count + count})
 	} else {
-		// Xorshift64 priorities keep the index balanced in expectation without
-		// taking a random source lock or affecting the ordered path.
-		if t.random == 0 {
-			t.random = 1
-		}
-		t.random ^= t.random << 13
-		t.random ^= t.random >> 7
-		t.random ^= t.random << 17
-		t.pending = t.pending.insert(commitMetricRange{end: end, count: count}, t.random)
+		// Priorities must be unpredictable: a known sequence lets an admission
+		// order degrade the treap into a list. The runtime source takes no lock.
+		t.pending = t.pending.insert(commitMetricRange{end: end, count: count}, rand.Uint64())
 	}
 
 	return count
