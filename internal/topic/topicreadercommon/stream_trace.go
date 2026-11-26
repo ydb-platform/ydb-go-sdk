@@ -8,22 +8,39 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type streamTraceQueue struct {
-	work   *xsync.UnboundedChan[func()]
-	mu     sync.Mutex
-	closed bool
+type StreamTraceQueue struct {
+	work         *xsync.UnboundedChan[func()]
+	mu           sync.Mutex
+	closed       bool
+	observesACKs bool
 }
 
-func (q *streamTraceQueue) close() {
+func (q *StreamTraceQueue) Close() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.closed = true
 	q.work.Close()
 }
 
+// WaitForACKs bounds queued ACKs to one wire response. An observer may call
+// Close, so the receive loop must stop waiting when shutdown joins it.
+func (q *StreamTraceQueue) WaitForACKs(stop <-chan struct{}) bool {
+	if !q.observesACKs {
+		return true
+	}
+	done := make(chan struct{})
+	q.work.Send(func() { close(done) })
+	select {
+	case <-done:
+		return true
+	case <-stop:
+		return false
+	}
+}
+
 // Each hook owns its keys. Queue a callback only on the first update to a key;
 // later updates accumulate there until the consumer takes it, even across other keys.
-func coalesceTrace[K comparable, V any](q *streamTraceQueue, observe func(V), sum func(V, V) V) func(K, V) {
+func coalesceTrace[K comparable, V any](q *StreamTraceQueue, observe func(V), sum func(V, V) V) func(K, V) {
 	pending := make(map[K]V)
 
 	return func(key K, latest V) {
@@ -72,7 +89,7 @@ func workerHooks(t *trace.Topic, listener bool) streamHooks {
 
 // StreamTrace installs a single consumer for coalesced worker hooks of this stream.
 // Closing the queue never joins the consumer: an observer may itself be calling Close.
-func StreamTrace(t *trace.Topic, info ReaderInfo, onPanic func(error)) (*trace.Topic, func()) {
+func StreamTrace(t *trace.Topic, info ReaderInfo, onPanic func(error)) (*trace.Topic, *StreamTraceQueue) {
 	if t == nil {
 		return nil, nil
 	}
@@ -80,7 +97,7 @@ func StreamTrace(t *trace.Topic, info ReaderInfo, onPanic func(error)) (*trace.T
 	if *h.credit == nil && *h.local == nil && *h.received == nil && t.OnReaderCommittedNotify == nil {
 		return t, nil
 	}
-	q := &streamTraceQueue{work: xsync.NewUnboundedChan[func()]()}
+	q := &StreamTraceQueue{work: xsync.NewUnboundedChan[func()]()}
 	wrapped := *t
 	h = workerHooks(&wrapped, info.Listener)
 	if fn := *h.credit; fn != nil {
@@ -114,20 +131,14 @@ func StreamTrace(t *trace.Topic, info ReaderInfo, onPanic func(error)) (*trace.T
 		*h.received = func(i trace.TopicReaderMessagesReceivedInfo) { send(i.Topic, i) }
 	}
 	if fn := t.OnReaderCommittedNotify; fn != nil {
-		send := coalesceTrace[int64](q, fn, func(
-			a, b trace.TopicReaderCommittedNotifyInfo,
-		) trace.TopicReaderCommittedNotifyInfo {
-			a.MessagesCount += b.MessagesCount
-
-			return a
-		})
+		q.observesACKs = true
 		wrapped.OnReaderCommittedNotify = func(i trace.TopicReaderCommittedNotifyInfo) {
-			send(i.PartitionSessionID, i)
+			q.work.Send(func() { fn(i) })
 		}
 	}
 	go drainStreamTrace(q.work, onPanic)
 
-	return &wrapped, q.close
+	return &wrapped, q
 }
 
 func drainStreamTrace(q *xsync.UnboundedChan[func()], onPanic func(error)) {

@@ -58,7 +58,7 @@ type topicStreamReaderImpl struct {
 	readConnectionID string
 	readerID         int64
 
-	closeTrace         func()
+	traceQueue         *topicreadercommon.StreamTraceQueue
 	creditBalance      topicreadercommon.MetricBalance
 	localBufferBalance topicreadercommon.MetricBalance
 
@@ -143,8 +143,8 @@ func newTopicStreamReader(
 	}
 	reader.startTrace()
 	if err = reader.startBackgroundWorkers(); err != nil {
-		if reader.closeTrace != nil {
-			reader.closeTrace()
+		if reader.traceQueue != nil {
+			reader.traceQueue.Close()
 		}
 
 		return nil, err
@@ -193,7 +193,7 @@ func newTopicStreamReaderStopped(
 }
 
 func (r *topicStreamReaderImpl) startTrace() {
-	r.cfg.Trace, r.closeTrace = topicreadercommon.StreamTrace(r.cfg.Trace, r.cfg.ReaderInfo, func(err error) {
+	r.cfg.Trace, r.traceQueue = topicreadercommon.StreamTrace(r.cfg.Trace, r.cfg.ReaderInfo, func(err error) {
 		_ = r.CloseWithError(context.Background(), xerrors.WithStackTrace(err))
 	})
 }
@@ -412,7 +412,7 @@ func (r *topicStreamReaderImpl) releaseLocalBufferForBatch(batch *topicreadercom
 	if batch == nil || len(batch.Messages) == 0 {
 		return
 	}
-	if r.closeTrace != nil && r.cfg.Trace.OnReaderLocalBufferChanged != nil {
+	if r.traceQueue != nil && r.cfg.Trace.OnReaderLocalBufferChanged != nil {
 		// Application reads aren't joined by backgroundWorkers. Finish their last
 		// enqueue before shutdown seals the FIFO.
 		r.m.RLock()
@@ -758,6 +758,9 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 
 				return
 			}
+			if r.traceQueue != nil && !r.traceQueue.WaitForACKs(r.backgroundWorkers.StopDone()) {
+				return
+			}
 
 		case *rawtopicreader.UpdateTokenResponse:
 			r.onUpdateTokenResponse(m)
@@ -997,7 +1000,7 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 }
 
 func (r *topicStreamReaderImpl) joinAndFinalize(ctx context.Context, reason error) error {
-	if r.closeTrace == nil {
+	if r.traceQueue == nil {
 		err := r.backgroundWorkers.Close(ctx, reason)
 		r.finalizeCreditBalance()
 		r.finalizeLocalBuffer()
@@ -1010,7 +1013,7 @@ func (r *topicStreamReaderImpl) joinAndFinalize(ctx context.Context, reason erro
 	go func() {
 		err := r.backgroundWorkers.Close(context.WithoutCancel(ctx), reason)
 		r.finalizeCreditBalance()
-		r.m.WithLock(func() { r.finalizeLocalBuffer(); r.closeTrace() })
+		r.m.WithLock(func() { r.finalizeLocalBuffer(); r.traceQueue.Close() })
 		stopped <- err
 	}()
 	select {

@@ -16,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -280,6 +281,22 @@ func TestStreamListener_CommitMetricsRegisterBeforeSend(t *testing.T) {
 		listenerMetricNoDelta(t, queued)
 		listenerMetricNoDelta(t, acknowledged)
 	})
+}
+
+func TestStreamListenerCloseFromACKObserver(t *testing.T) {
+	e := fixenv.New(t)
+	listener := StreamListener(e)
+	session := PartitionSession(e)
+	listener.cfg.ReaderInfo.Listener = true
+	closed := make(chan error, 1)
+	listener.tracer, listener.traceQueue = topicreadercommon.StreamTrace(&trace.Topic{
+		OnReaderCommittedNotify: func(trace.TopicReaderCommittedNotifyInfo) {
+			closed <- listener.Close(sf.Context(e), errors.New("close from ACK observer"))
+		},
+	}, listener.cfg.ReaderInfo, nil)
+	StreamMock(e).EXPECT().Recv().Return(listenerMetricCommitResponse(session, rawydb.StatusSuccess, 5), nil)
+	listener.background.Start("receive", listener.receiveMessagesLoop)
+	require.NoError(t, xtest.Receive(t, closed, "listener.Close from ACK observer"))
 }
 
 func TestStreamListener_CommitNotifyWithoutQueuedTracing(t *testing.T) {

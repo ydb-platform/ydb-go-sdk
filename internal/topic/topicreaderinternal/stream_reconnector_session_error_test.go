@@ -338,12 +338,19 @@ func TestReaderReconnectorCloseReportsStoredRawStreamError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			events := make(chan trace.TopicReaderSessionErrorInfo, 4)
 			reentrantClose := make(chan error, 1)
+			release := make(chan struct{})
+			defer close(release)
 			e := newTopicReaderTestEnv(t)
 			var reader *Reader
 			e.reader.cfg.Trace = &trace.Topic{
 				OnReaderSessionError: func(info trace.TopicReaderSessionErrorInfo) {
 					events <- info
 					if tt.wantEvent {
+						select {
+						case <-(*info.Context).Done():
+						case <-release:
+							return
+						}
 						reentrantClose <- reader.Close(context.Background())
 					}
 				},

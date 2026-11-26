@@ -1,6 +1,7 @@
 package topicreaderinternal
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -12,6 +13,38 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestTopicReaderCompletesACKTraceBeforeReceivingNextResponse(t *testing.T) {
+	e := newTopicReaderTestEnv(t)
+	var offset atomic.Int64
+	e.reader.cfg.Trace = &trace.Topic{
+		OnReaderCommittedNotify: func(info trace.TopicReaderCommittedNotifyInfo) {
+			offset.Store(info.CommittedOffset)
+		},
+	}
+	e.reader.startTrace()
+	e.Start()
+	observed := make(chan int64, 1)
+	for want := int64(21); want < 121; want++ {
+		e.SendFromServerAndSetNextCallback(readerMetricCommitResponse(&e, want), func() { observed <- offset.Load() })
+		require.Equal(t, want, xtest.Receive(t, observed, "ACK offset when reading the next response"))
+	}
+}
+
+func TestTopicReaderCloseFromACKObserver(t *testing.T) {
+	e := newTopicReaderTestEnv(t)
+	reader := newMetricsReader(&e)
+	closed := make(chan error, 1)
+	e.reader.cfg.Trace = &trace.Topic{
+		OnReaderCommittedNotify: func(trace.TopicReaderCommittedNotifyInfo) {
+			closed <- reader.Close(e.ctx)
+		},
+	}
+	e.reader.startTrace()
+	e.Start()
+	e.SendFromServer(readerMetricCommitResponse(&e, 21))
+	require.NoError(t, xtest.Receive(t, closed, "Reader.Close from ACK observer"))
+}
 
 func TestTopicReaderFinalCommitAcknowledgement(t *testing.T) {
 	for _, path := range []string{"reader close", "graceful partition stop"} {
@@ -25,6 +58,7 @@ func TestTopicReaderFinalCommitAcknowledgement(t *testing.T) {
 					received <- info.MessagesCount
 				},
 			}
+			e.reader.startTrace()
 			e.partitionSession.SetupCommitMetrics(e.reader.cfg.Trace, e.reader.cfg.ReaderInfo)
 			require.NoError(t, e.reader.startBackgroundWorkers())
 			reader := newMetricsReader(&e)

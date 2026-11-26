@@ -15,7 +15,9 @@ Descriptor-aware registries receive the dotted label names `reader.name` and `er
 | `ydb.topic.reader.local_buffer.messages` | `{message}` | — | Messages currently held across all topics of the reader |
 | `ydb.topic.reader.credit_balance_bytes` | `By` | — | Bytes requested successfully minus bytes received |
 
-The first six instruments are cumulative counters. The two gauges apply signed deltas and compensate the outstanding balance on close. While a stream trace observer falls behind, pending gauge deltas are summed per gauge and received message counts per topic. Pending ACK notifications for the same partition session are combined: `MessagesCount` is their sum, and the committed offset and other fields come from the latest notification. Coalescing preserves totals, not one callback per update.
+The six counters are cumulative. The two gauges apply signed deltas. Closing a stream removes its remaining balance. When an observer falls behind, the SDK sums pending deltas per gauge and received message counts per topic.
+
+Each acknowledged offset keeps its partition session and message count. The receive loop waits for the current response's observers before reading the next response. An ACK observer can close the reader or listener, but waiting for a later ACK on the same stream would block the receive loop.
 
 Each queued range counts its half-open span, including gaps. Duplicate submissions count separately. Ranges ending at or below the committed watermark are excluded from both counters. An acknowledgement completes every fully covered pending range, regardless of admission order. Equal and backward acknowledgements add zero. Repeated submissions still pending when the watermark advances each count their full span.
 

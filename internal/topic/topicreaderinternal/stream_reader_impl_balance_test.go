@@ -32,7 +32,7 @@ func BenchmarkReaderCreditWithObserver(b *testing.B) {
 	reader := topicStreamReaderImpl{cfg: newTopicStreamReaderConfig(), ctx: context.Background()}
 	reader.cfg.Trace.OnReaderCreditBalanceChanged = func(trace.TopicReaderCreditBalanceChangedInfo) {}
 	reader.startTrace()
-	defer reader.closeTrace()
+	defer reader.traceQueue.Close()
 	b.ReportAllocs()
 	for b.Loop() {
 		reader.changeCreditBalance(1)

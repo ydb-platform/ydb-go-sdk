@@ -563,8 +563,14 @@ func (r *readerReconnector) stopFromLoop(ctx context.Context, reason error) {
 }
 
 func (r *readerReconnector) traceSessionStop(ctx context.Context, err error) {
-	if suppressReaderSessionError(ctx, err) ||
-		!r.stopSessionErrorReported.CompareAndSwap(false, true) {
+	if suppressReaderSessionError(ctx, err) {
+		return
+	}
+	r.reportSessionStop(ctx, err)
+}
+
+func (r *readerReconnector) reportSessionStop(ctx context.Context, err error) {
+	if !r.stopSessionErrorReported.CompareAndSwap(false, true) {
 		return
 	}
 
@@ -578,11 +584,7 @@ func (r *readerReconnector) traceStoredStreamStop(ctx context.Context, err error
 		r.isRetriableError(err) {
 		return
 	}
-	if ctx != nil {
-		ctx = xcontext.ValueOnly(ctx)
-	}
-
-	r.traceSessionStop(ctx, err)
+	r.reportSessionStop(ctx, err)
 }
 
 func (r *readerReconnector) traceSessionStopAfterRead(

@@ -55,7 +55,7 @@ type streamListener struct {
 
 	freeBytes chan int
 
-	closeTrace         func()
+	traceQueue         *topicreadercommon.StreamTraceQueue
 	creditBalance      topicreadercommon.MetricBalance
 	localBufferBalance topicreadercommon.MetricBalance
 	closing            atomic.Bool
@@ -122,7 +122,7 @@ func newStreamListener(
 		},
 	)
 
-	res.tracer, res.closeTrace = topicreadercommon.StreamTrace(res.tracer, config.ReaderInfo, res.closeOnTracePanic)
+	res.tracer, res.traceQueue = topicreadercommon.StreamTrace(res.tracer, config.ReaderInfo, res.closeOnTracePanic)
 	res.startBackground()
 	select {
 	case res.freeBytes <- config.BufferSize:
@@ -175,8 +175,8 @@ func (l *streamListener) finishClose(cleanupCtx context.Context, reason error, d
 	l.workerCloseWG.Wait()
 	l.finalizeCreditBalance()
 	l.finalizeLocalBuffer()
-	if l.closeTrace != nil {
-		l.closeTrace()
+	if l.traceQueue != nil {
+		l.traceQueue.Close()
 	}
 
 	if l.syncCommitter != nil {
@@ -517,7 +517,12 @@ func (l *streamListener) routeMessage(ctx context.Context, mess rawtopicreader.S
 	case *rawtopicreader.ReadResponse:
 		return l.splitAndRouteReadResponse(m)
 	case *rawtopicreader.CommitOffsetResponse:
-		return l.onCommitResponse(m)
+		err := l.onCommitResponse(m)
+		if err == nil && l.traceQueue != nil {
+			l.traceQueue.WaitForACKs(l.background.Done())
+		}
+
+		return err
 	default:
 		// Ignore unknown message types
 		return nil
