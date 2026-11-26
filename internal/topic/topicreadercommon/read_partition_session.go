@@ -65,7 +65,7 @@ func (s *PartitionSession) SetContext(ctx context.Context) {
 
 func (s *PartitionSession) Close() {
 	s.retired.Store(true)
-	if active := s.active.Swap(nil); active != nil {
+	if active := s.active.Load(); active != nil {
 		active.drop(s)
 	}
 	s.ctxCancel()

@@ -2,6 +2,7 @@ package topicreadercommon
 
 import (
 	"fmt"
+	"maps"
 	"sync"
 	"time"
 
@@ -32,7 +33,10 @@ func (c *PartitionSessionStorage) initNeedLock() {
 	if c.sessions == nil {
 		c.sessions = make(map[rawtopicreader.PartitionSessionID]*sessionInfo)
 		if !c.activeReleased {
-			c.active = &activeSessions{sessions: make(map[rawtopicreader.PartitionSessionID]*PartitionSession)}
+			c.active = &activeSessions{
+				sessions: make(map[rawtopicreader.PartitionSessionID]*PartitionSession),
+				counts:   make(map[string]int64),
+			}
 		}
 		c.lastCompactedTime = time.Now()
 	}
@@ -94,24 +98,20 @@ func (c *PartitionSessionStorage) GetAll() []*PartitionSession {
 	return res
 }
 
-// ActiveCountsByTopic visits the active index, not the retained protocol history.
 func (c *PartitionSessionStorage) ActiveCountsByTopic() map[string]int64 {
+	active := c.activeIndex()
+	if active == nil {
+		return make(map[string]int64)
+	}
+
+	return active.snapshot()
+}
+
+func (c *PartitionSessionStorage) activeIndex() *activeSessions {
 	c.m.RLock()
 	defer c.m.RUnlock()
 
-	counts := make(map[string]int64)
-	if c.active == nil {
-		return counts
-	}
-	c.active.m.Lock()
-	defer c.active.m.Unlock()
-	for _, session := range c.active.sessions {
-		if !session.retired.Load() {
-			counts[session.Topic]++
-		}
-	}
-
-	return counts
+	return c.active
 }
 
 func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (*PartitionSession, error) {
@@ -141,6 +141,17 @@ func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (
 type activeSessions struct {
 	m        sync.Mutex
 	sessions map[rawtopicreader.PartitionSessionID]*PartitionSession
+	counts   map[string]int64
+}
+
+func (a *activeSessions) snapshot() map[string]int64 {
+	a.m.Lock()
+	defer a.m.Unlock()
+
+	counts := make(map[string]int64, len(a.counts))
+	maps.Copy(counts, a.counts)
+
+	return counts
 }
 
 func (a *activeSessions) release() {
@@ -148,6 +159,7 @@ func (a *activeSessions) release() {
 	defer a.m.Unlock()
 
 	a.sessions = nil
+	a.counts = nil
 }
 
 func (a *activeSessions) add(session *PartitionSession) {
@@ -159,6 +171,7 @@ func (a *activeSessions) add(session *PartitionSession) {
 		session.active.CompareAndSwap(a, nil)
 	} else {
 		a.sessions[session.StreamPartitionSessionID] = session
+		a.counts[session.Topic]++
 	}
 }
 
@@ -166,11 +179,17 @@ func (a *activeSessions) drop(session *PartitionSession) {
 	a.m.Lock()
 	defer a.m.Unlock()
 
-	session.active.CompareAndSwap(a, nil)
 	id := session.StreamPartitionSessionID
 	if a.sessions[id] == session {
 		delete(a.sessions, id)
+		topic := session.Topic
+		if a.counts[topic] == 1 {
+			delete(a.counts, topic)
+		} else {
+			a.counts[topic]--
+		}
 	}
+	session.active.CompareAndSwap(a, nil)
 }
 
 func (c *PartitionSessionStorage) compactionNeedLock(now time.Time) {
