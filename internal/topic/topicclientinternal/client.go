@@ -71,6 +71,7 @@ func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
 			opt(&c)
 		}
 	}
+	config.SetPanicCallback(&c.Metrics.Common, c.PanicCallback())
 
 	return c
 }

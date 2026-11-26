@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+	internalConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
@@ -640,6 +641,7 @@ func (d *Driver) connect(ctx context.Context) error {
 			append(
 				// prepend common params from root config
 				[]topicoptions.TopicOption{
+					func(c *internalTopic.Config) { internalConfig.SetPanicCallback(&c.Common, d.config.PanicCallback()) },
 					topicoptions.WithOperationTimeout(d.config.OperationTimeout()),
 					topicoptions.WithOperationCancelAfter(d.config.OperationCancelAfter()),
 					internalTopic.WithGrpcMessageSize(d.config.GrpcMaxMessageSize()),

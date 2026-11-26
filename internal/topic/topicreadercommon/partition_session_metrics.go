@@ -7,12 +7,15 @@ import (
 	"slices"
 	"sync/atomic"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 )
 
 var errNilMetricUnregister = errors.New("ydb: telemetry Meter returned a nil unregister function")
 
 type ReaderMetricsConfig struct {
+	config.Common
+
 	Meter    telemetry.Meter
 	Endpoint string
 	Database string
@@ -45,7 +48,7 @@ func RegisterPartitionSessionCount(
 	// Every observation appends its topic, so spare capacity must not be shared.
 	attributes = slices.Clip(attributes)
 
-	return registerGauge(cfg.Meter, telemetry.Descriptor{
+	return registerGauge(cfg, telemetry.Descriptor{
 		Name:        "ydb.topic.reader.partition_session.count",
 		Unit:        "{session}",
 		Description: "Number of SDK-owned active topic partition sessions.",
@@ -73,10 +76,10 @@ func RegisterPartitionSessionCount(
 }
 
 func registerGauge(
-	meter telemetry.Meter, desc telemetry.Descriptor, collect telemetry.Int64GaugeCallback,
+	cfg ReaderMetricsConfig, desc telemetry.Descriptor, collect telemetry.Int64GaugeCallback,
 ) (func(), error) {
 	var closed atomic.Bool
-	unregister, err := meter(desc, func(ctx context.Context, observe func(int64, ...telemetry.Attribute)) error {
+	unregister, err := cfg.Meter(desc, func(ctx context.Context, observe func(int64, ...telemetry.Attribute)) error {
 		if closed.Load() {
 			return nil
 		}
@@ -92,10 +95,19 @@ func registerGauge(
 		return nil, errNilMetricUnregister
 	}
 
+	panicCallback := cfg.PanicCallback()
+
 	return func() {
 		if closed.CompareAndSwap(false, true) {
 			// A collecting backend may wait for Close before it unlocks unregister.
 			go func() {
+				if panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							panicCallback(e)
+						}
+					}()
+				}
 				_ = unregister() // Deferred cleanup errors are reported by the backend.
 			}()
 		}
