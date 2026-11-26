@@ -64,9 +64,6 @@ func (s *PartitionSession) SetContext(ctx context.Context) {
 
 func (s *PartitionSession) Close() {
 	s.ctxCancel()
-	if s.commitMetrics != nil {
-		s.commitMetrics.tracker.retire()
-	}
 }
 
 func (s *PartitionSession) CommittedOffset() rawtopiccommon.Offset {

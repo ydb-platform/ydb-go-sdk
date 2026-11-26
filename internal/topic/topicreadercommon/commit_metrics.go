@@ -2,6 +2,7 @@ package topicreadercommon
 
 import (
 	"context"
+	"sort"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -123,17 +124,18 @@ func RegisterCommitAcknowledged(session *PartitionSession, exclusiveOffset rawto
 // The acknowledgement offset is an exclusive upper bound. Each fully covered submission counts once.
 // Queue and Acknowledge are safe to call
 // concurrently. The tracker does not emit metrics; callers use their returned
-// counts for that purpose. Pending ranges live as long as the session: an
-// acknowledgement can still arrive after the session context is canceled.
-// Once the session is closed and nothing is pending, the storage is released.
+// counts for that purpose. An acknowledgement can still arrive after the
+// session context is canceled. A full acknowledgement releases all storage.
 type commitMessageTracker struct {
 	mu sync.Mutex
 
 	session *PartitionSession
-	// pending is a binary min-heap ordered by end, so an acknowledgement
-	// visits only the ranges it completes, whatever the submission order.
+	// ordered stores non-decreasing ends and their cumulative counts.
+	ordered    []commitMetricRange
+	prefixBase int64 // cumulative count before ordered[0]
+	total      int64
+	// pending is a min-heap for ends below the last ordered end.
 	pending []commitMetricRange
-	retired bool
 }
 
 type commitMetricRange struct {
@@ -157,14 +159,21 @@ func (t *commitMessageTracker) Queue(start, end rawtopiccommon.Offset) int64 {
 		return 0
 	}
 
-	t.pending = append(t.pending, commitMetricRange{end: end, count: count})
-	for i := len(t.pending) - 1; i > 0; {
-		parent := (i - 1) / 2
-		if t.pending[parent].end <= t.pending[i].end {
-			break
+	t.total += count
+	if len(t.ordered) == 0 {
+		t.ordered = append(t.ordered, commitMetricRange{end: end, count: count})
+	} else if last := t.ordered[len(t.ordered)-1]; end >= last.end {
+		t.ordered = append(t.ordered, commitMetricRange{end: end, count: last.count + count})
+	} else {
+		t.pending = append(t.pending, commitMetricRange{end: end, count: count})
+		for i := len(t.pending) - 1; i > 0; {
+			parent := (i - 1) / 2
+			if t.pending[parent].end <= t.pending[i].end {
+				break
+			}
+			t.pending[parent], t.pending[i] = t.pending[i], t.pending[parent]
+			i = parent
 		}
-		t.pending[parent], t.pending[i] = t.pending[i], t.pending[parent]
-		i = parent
 	}
 
 	return count
@@ -177,30 +186,39 @@ func (t *commitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	t.session.SetCommittedOffsetForward(exclusiveOffset)
+	if len(t.ordered) == 0 {
+		return 0
+	}
+	// The last ordered end is also the maximum across both structures.
+	if exclusiveOffset >= t.ordered[len(t.ordered)-1].end {
+		acknowledged := t.total
+		t.ordered, t.pending = nil, nil
+		t.prefixBase, t.total = 0, 0
+
+		return acknowledged
+	}
+
 	var acknowledged int64
+	if exclusiveOffset >= t.ordered[0].end {
+		firstUncovered := sort.Search(len(t.ordered), func(i int) bool {
+			return t.ordered[i].end > exclusiveOffset
+		})
+		prefix := t.ordered[firstUncovered-1].count
+		acknowledged = prefix - t.prefixBase
+		t.prefixBase = prefix
+		t.ordered = t.ordered[firstUncovered:]
+	}
 	for len(t.pending) > 0 && t.pending[0].end <= exclusiveOffset {
 		acknowledged += t.pending[0].count
 		t.popPending()
 	}
-
-	if t.retired && len(t.pending) == 0 {
-		t.pending = nil
-	}
-
-	t.session.SetCommittedOffsetForward(exclusiveOffset)
-
-	return acknowledged
-}
-
-// retire releases the storage of a closed session as soon as nothing is pending.
-func (t *commitMessageTracker) retire() {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	t.retired = true
 	if len(t.pending) == 0 {
 		t.pending = nil
 	}
+	t.total -= acknowledged
+
+	return acknowledged
 }
 
 // popPending removes the pending range with the smallest end.
