@@ -3,6 +3,7 @@ package topicreadercommon
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -13,6 +14,11 @@ type StreamTraceQueue struct {
 	mu           sync.Mutex
 	closed       bool
 	observesACKs bool
+	// ackQueued tells the receive loop that the current response queued an ACK.
+	ackQueued atomic.Bool
+	// One reusable marker per stream keeps the barrier allocation-free.
+	ackDone    chan struct{}
+	signalACKs func()
 }
 
 func (q *StreamTraceQueue) Close() {
@@ -24,14 +30,14 @@ func (q *StreamTraceQueue) Close() {
 
 // WaitForACKs bounds queued ACKs to one wire response. An observer may call
 // Close, so the receive loop must stop waiting when shutdown joins it.
+// A response that queued no ACK does not wait.
 func (q *StreamTraceQueue) WaitForACKs(stop <-chan struct{}) bool {
-	if !q.observesACKs {
+	if !q.observesACKs || !q.ackQueued.Swap(false) {
 		return true
 	}
-	done := make(chan struct{})
-	q.work.Send(func() { close(done) })
+	q.work.Send(q.signalACKs)
 	select {
-	case <-done:
+	case <-q.ackDone:
 		return true
 	case <-stop:
 		return false
@@ -132,7 +138,16 @@ func StreamTrace(t *trace.Topic, info ReaderInfo, onPanic func(error)) (*trace.T
 	}
 	if fn := t.OnReaderCommittedNotify; fn != nil {
 		q.observesACKs = true
+		q.ackDone = make(chan struct{}, 1)
+		q.signalACKs = func() {
+			// A marker that runs after shutdown left the wait must not block the consumer.
+			select {
+			case q.ackDone <- struct{}{}:
+			default:
+			}
+		}
 		wrapped.OnReaderCommittedNotify = func(i trace.TopicReaderCommittedNotifyInfo) {
+			q.ackQueued.Store(true)
 			q.work.Send(func() { fn(i) })
 		}
 	}
