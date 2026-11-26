@@ -129,7 +129,7 @@ func (c *conn) transitionState(next state.State) (state.State, bool) {
 func (c *conn) traceStateChange(ctx context.Context, previous, next state.State) {
 	gtrace.DriverOnConnStateChange(
 		c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).setState"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).traceStateChange"),
 		c.Endpoint(), previous,
 	)(next)
 }
