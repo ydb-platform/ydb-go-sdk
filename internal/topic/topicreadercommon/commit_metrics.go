@@ -183,9 +183,9 @@ func (t *commitMessageTracker) Queue(start, end rawtopiccommon.Offset) int64 {
 	return count
 }
 
-// Acknowledge advances the exclusive committed offset and returns the sum of
-// all pending ranges fully covered by it. Equal and backward
-// acknowledgements cannot complete any new range.
+// Acknowledge advances the committed watermark and counts pending ordinary
+// ranges newly covered by this stream ACK. A transaction may already have
+// advanced the watermark without completing those ranges.
 func (t *commitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset) int64 {
 	t.mu.Lock()
 	defer t.mu.Unlock()

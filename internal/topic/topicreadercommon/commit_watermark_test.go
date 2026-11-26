@@ -3,6 +3,7 @@ package topicreadercommon
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,6 +12,23 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestStreamCommitAcknowledgementCountsOrdinaryRangeAtTransactionWatermark(t *testing.T) {
+	for _, ack := range []rawtopiccommon.Offset{11, 12} {
+		t.Run(fmt.Sprint(ack), func(t *testing.T) {
+			tracker := newCommitMessageTracker(10)
+			require.EqualValues(t, 1, tracker.Queue(10, 11))
+
+			// Transaction success advances the watermark without acknowledging ordinary ranges.
+			tracker.session.SetCommittedOffsetForward(12)
+			count := tracker.Acknowledge(ack)
+			t.Logf("transaction watermark=12 stream ACK=%d acknowledged=%d", ack, count)
+			require.EqualValues(t, 1, count)
+			require.EqualValues(t, 12, tracker.session.CommittedOffset())
+			require.Zero(t, tracker.Acknowledge(ack))
+		})
+	}
+}
 
 func TestCommitMessageTrackerInterleavedSubmissions(t *testing.T) {
 	tracker := newCommitMessageTracker(0)
