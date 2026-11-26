@@ -1270,6 +1270,7 @@ func TestPool_CloseConnsForFailedResolveSkipsAlreadyClosed(t *testing.T) {
 	require.NotPanics(t, func() {
 		pool.closeConnsForFailedResolve(ctx, target)
 	})
+	require.ErrorIs(t, cc.Invoke(ctx, "/test", nil, nil), errClosedConnection)
 }
 
 func TestPool_OnResolveDriverTrace(t *testing.T) {

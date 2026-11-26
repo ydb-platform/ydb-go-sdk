@@ -23,6 +23,15 @@ func TestCancelsGuard(t *testing.T) {
 }
 
 func TestCancelsGuardSeal(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		g := NewCancelsGuard()
+		select {
+		case <-g.Seal():
+		default:
+			t.Fatal("a sealed empty guard did not signal immediately")
+		}
+	})
+
 	for _, force := range []bool{false, true} {
 		g := NewCancelsGuard()
 		ctx, cancel := g.WithCancel(t.Context())

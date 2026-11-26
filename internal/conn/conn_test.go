@@ -703,6 +703,8 @@ func TestConnCloseDrainsStreams(t *testing.T) {
 					t.Fatal("Close returned with a live stream")
 				default:
 				}
+				require.NoError(t, c.Close(closeCtx))
+				require.NoError(t, streamCtx.Err())
 				if tc.outcome == "finished" {
 					finish(nil)
 				} else {
@@ -724,6 +726,89 @@ func TestConnCloseDrainsStreams(t *testing.T) {
 				require.ErrorIs(t, streamCtx.Err(), context.Canceled)
 			}
 		})
+	}
+}
+
+func TestConnShutdownStartsBeforeRPCReachesTransport(t *testing.T) {
+	for _, stream := range []bool{false, true} {
+		t.Run(fmt.Sprint(stream), func(t *testing.T) {
+			ctx := t.Context()
+			driverTrace := &trace.Driver{}
+			c := newConn(endpoint.New("test"), &mockConfig{driverTrace: driverTrace})
+			if stream {
+				driverTrace.OnConnNewStream = func(trace.DriverConnNewStreamStartInfo) func(trace.DriverConnNewStreamDoneInfo) {
+					require.NoError(t, c.Close(ctx))
+
+					return nil
+				}
+				_, err := c.NewStream(ctx, &grpc.StreamDesc{}, "/test")
+				require.ErrorIs(t, err, errConnectionUnderShutdown)
+			} else {
+				driverTrace.OnConnInvoke = func(trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
+					require.NoError(t, c.Close(ctx))
+
+					return nil
+				}
+				require.ErrorIs(t, c.Invoke(ctx, "/test", nil, nil), errConnectionUnderShutdown)
+			}
+			require.Zero(t, c.InFlight())
+		})
+	}
+}
+
+func TestConnShutdownStartsBeforeDialRegistersCancel(t *testing.T) {
+	ctx := xtest.Context(t)
+	closed := make(chan error, 1)
+	driverTrace := &trace.Driver{}
+	c := newConn(endpoint.New("test"), &mockConfig{driverTrace: driverTrace})
+	driverTrace.OnConnDial = func(trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
+		go func() { closed <- c.Close(ctx) }()
+		require.Eventually(t, c.shuttingDown.Load, time.Second, time.Millisecond)
+
+		return nil
+	}
+
+	require.ErrorIs(t, c.Invoke(ctx, "/test", nil, nil), errConnectionUnderShutdown)
+	select {
+	case err := <-closed:
+		require.NoError(t, err)
+	case <-ctx.Done():
+		t.Fatal("Close did not return")
+	}
+}
+
+func TestConnShutdownStartsWhileRPCWaitsForTransport(t *testing.T) {
+	ctx := xtest.Context(t)
+	c := newConn(endpoint.New("test"), &mockConfig{})
+	invoked, closed := make(chan error, 1), make(chan error, 1)
+	func() {
+		c.mtx.RLock()
+		defer c.mtx.RUnlock()
+		go func() { invoked <- c.Invoke(ctx, "/test", nil, nil) }()
+
+		// A second reader is rejected once Invoke is waiting for the write lock.
+		require.Eventually(t, func() bool {
+			if !c.mtx.TryRLock() {
+				return true
+			}
+			c.mtx.RUnlock()
+
+			return false
+		}, time.Second, time.Millisecond)
+		go func() { closed <- c.Close(ctx) }()
+		require.Eventually(t, c.shuttingDown.Load, time.Second, time.Millisecond)
+	}()
+	select {
+	case err := <-invoked:
+		require.ErrorIs(t, err, errConnectionUnderShutdown)
+	case <-ctx.Done():
+		t.Fatal("Invoke did not return")
+	}
+	select {
+	case err := <-closed:
+		require.NoError(t, err)
+	case <-ctx.Done():
+		t.Fatal("Close did not return")
 	}
 }
 
