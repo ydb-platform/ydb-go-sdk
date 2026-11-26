@@ -113,6 +113,7 @@ func StreamTrace(t *trace.Topic, info ReaderInfo, onPanic func(error)) (*trace.T
 		return t, nil
 	}
 	q := &StreamTraceQueue{}
+	onPanic = firstPanicOnly(onPanic)
 	wrapped := *t
 	h = workerHooks(&wrapped, info.Listener)
 	if *h.credit != nil || *h.local != nil || *h.received != nil {
@@ -173,6 +174,20 @@ func (q *StreamTraceQueue) startACKLane(
 	return func(i trace.TopicReaderCommittedNotifyInfo) {
 		q.ackQueued.Store(true)
 		q.acks.Send(func() { observe(i) })
+	}
+}
+
+// firstPanicOnly retires the stream once even when both lanes panic.
+func firstPanicOnly(onPanic func(error)) func(error) {
+	if onPanic == nil {
+		return nil
+	}
+	var reported atomic.Bool
+
+	return func(err error) {
+		if reported.CompareAndSwap(false, true) {
+			onPanic(err)
+		}
 	}
 }
 
