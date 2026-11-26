@@ -84,6 +84,7 @@ func TestQueryStrictSerializableCommitTimestamp(t *testing.T) {
 		result, err := session.Query(ctx,
 			fmt.Sprintf("UPSERT INTO `%s` (id, val) VALUES (3, \"stream\")", tablePath),
 			query.WithTxControl(query.StrictSerializableReadWriteTxControl(query.CommitTx())),
+			query.WithResponsePartPrefetch(2),
 		)
 		if err != nil {
 			return err

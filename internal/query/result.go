@@ -379,9 +379,11 @@ func (r *streamResult) Close(ctx context.Context) (finalErr error) {
 	defer r.releaseArrowBatches()
 
 	if r.stream != nil && r.stream.Context().Err() != nil {
-		// Stream already torn down (EOF, per-call ctx cancel, or prior Close).
-		// onClose runs via defer; nothing left to drain.
-		return nil
+		// A prefetched stream can still hold response parts and its terminal
+		// status after the transport context ends.
+		if _, prefetched := r.stream.(*asyncPrefetchExecuteQueryStream); !prefetched || r.lastErr != nil {
+			return nil
+		}
 	}
 
 	if r.closeTimeout > 0 {

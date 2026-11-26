@@ -19,7 +19,6 @@ const (
 type Config struct {
 	config.Common
 
-	database         string
 	databaseIdentity *querytimestamp.Identity
 
 	poolLimit             int
@@ -41,10 +40,6 @@ type Config struct {
 	trace *trace.Query
 }
 
-func (c *Config) Database() string {
-	return c.database
-}
-
 func (c *Config) DatabaseIdentity() *querytimestamp.Identity {
 	return c.databaseIdentity
 }
@@ -60,7 +55,6 @@ func New(opts ...Option) *Config {
 			opt(c)
 		}
 	}
-	c.databaseIdentity = querytimestamp.NewIdentity(c.database)
 
 	return c
 }

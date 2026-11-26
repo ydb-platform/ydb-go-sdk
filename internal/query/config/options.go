@@ -6,6 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/arrow"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/gtrace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/querytimestamp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -13,7 +14,7 @@ type Option func(*Config)
 
 func WithDatabase(database string) Option {
 	return func(c *Config) {
-		c.database = database
+		c.databaseIdentity = querytimestamp.NewIdentity(database)
 	}
 }
 

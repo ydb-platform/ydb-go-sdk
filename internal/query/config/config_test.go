@@ -41,9 +41,9 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("DatabaseIdentity", func(t *testing.T) {
-		first := New(WithDatabase("/local"))
-		second := New(WithDatabase("/local"))
-		require.Equal(t, "/local", first.Database())
+		option := WithDatabase("/local")
+		first := New(option)
+		second := New(option)
 		require.NotNil(t, first.DatabaseIdentity())
 		require.NotSame(t, first.DatabaseIdentity(), second.DatabaseIdentity())
 	})

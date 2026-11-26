@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -12,6 +14,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
+	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
@@ -55,6 +61,70 @@ func TestPublicExecuteCommitTimestampCallback(t *testing.T) {
 	require.Equal(t, uint64(11), got[0].PlanStep())
 	require.Equal(t, "/db", got[0].Database())
 	require.Equal(t, got[0], provider.CommitTimestamp())
+}
+
+func TestCloseOfPrefetchedCommitStream(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		status codes.Code
+	}{
+		{"successful commit", codes.OK},
+		{"transport error", codes.Unavailable},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+
+			listener := bufconn.Listen(1 << 20)
+			server := grpc.NewServer()
+			Ydb_Query_V1.RegisterQueryServiceServer(server, &prefetchedCommitServer{code: tt.status})
+			go func() { _ = server.Serve(listener) }()
+			t.Cleanup(server.Stop)
+
+			conn, err := grpc.NewClient("passthrough:///prefetched-commit",
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+				grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+					return listener.DialContext(ctx)
+				}),
+			)
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = conn.Close() })
+
+			session := newTestSessionWithClient("s", Ydb_Query_V1.NewQueryServiceClient(conn), false)
+			session.databaseIdentity = querytimestamp.NewIdentity("/local")
+			var timestamps []*query.VirtualTimestamp
+			result, err := session.Query(ctx, "UPSERT INTO t ...",
+				query.WithTxControl(query.StrictSerializableReadWriteTxControl(query.CommitTx())),
+				query.WithResponsePartPrefetch(2),
+				query.WithCommitTimestamp(func(timestamp *query.VirtualTimestamp) {
+					timestamps = append(timestamps, timestamp)
+				}),
+			)
+			require.NoError(t, err)
+
+			stream := result.(*streamResult)
+			select {
+			case <-stream.stream.Context().Done():
+			case <-ctx.Done():
+				t.Fatal("prefetch did not finish before Close")
+			}
+
+			err = result.Close(ctx)
+			require.Equal(t, tt.status, status.Code(err))
+			if tt.status != codes.OK {
+				require.Nil(t, stream.CommitTimestamp())
+				require.Empty(t, timestamps)
+
+				return
+			}
+
+			require.NotNil(t, stream.CommitTimestamp())
+			require.Equal(t, uint64(11), stream.CommitTimestamp().PlanStep())
+			require.Equal(t, uint64(12), stream.CommitTimestamp().TxID())
+			require.NoError(t, result.Close(ctx))
+			require.Equal(t, []*query.VirtualTimestamp{stream.CommitTimestamp()}, timestamps)
+		})
+	}
 }
 
 func TestMaterializedResultRetainsCommitTimestamp(t *testing.T) {
@@ -227,4 +297,27 @@ func TestExecuteQueryCommitTimestampFromTrailingPart(t *testing.T) {
 			}
 		})
 	}
+}
+
+type prefetchedCommitServer struct {
+	Ydb_Query_V1.UnimplementedQueryServiceServer
+
+	code codes.Code
+}
+
+func (s *prefetchedCommitServer) ExecuteQuery(
+	_ *Ydb_Query.ExecuteQueryRequest,
+	stream Ydb_Query_V1.QueryService_ExecuteQueryServer,
+) error {
+	if err := stream.Send(&Ydb_Query.ExecuteQueryResponsePart{Status: Ydb.StatusIds_SUCCESS}); err != nil {
+		return err
+	}
+	if err := stream.Send(&Ydb_Query.ExecuteQueryResponsePart{
+		Status:          Ydb.StatusIds_SUCCESS,
+		CommitTimestamp: &Ydb.VirtualTimestamp{PlanStep: 11, TxId: 12},
+	}); err != nil {
+		return err
+	}
+
+	return status.Error(s.code, "test stream ended with a transport error")
 }

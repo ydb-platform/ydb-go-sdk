@@ -141,6 +141,37 @@ func TestWrapExecuteQueryStreamWithPrefetchZeroPassthrough(t *testing.T) {
 	require.Equal(t, inner, same)
 }
 
+func TestAsyncPrefetchReportsCancellationWithFullBuffer(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	var reads int64
+	inner := &testExecuteQueryStream{
+		ctx: ctx,
+		recv: func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+			reads++
+			if reads == 2 {
+				cancel()
+			}
+
+			return partWithIndex(reads), nil
+		},
+	}
+	stream := &asyncPrefetchExecuteQueryStream{
+		QueryService_ExecuteQueryClient: inner,
+		ch:                              make(chan *Ydb_Query.ExecuteQueryResponsePart, 1),
+	}
+	// Run the producer to completion before freeing any space in its buffer.
+	stream.pump()
+
+	part, err := stream.Recv()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), part.GetResultSetIndex())
+	_, err = stream.Recv()
+	require.ErrorIs(t, err, context.Canceled)
+}
+
 func benchmarkRecvDrainLoop(b *testing.B,
 	wrap func(Ydb_Query_V1.QueryService_ExecuteQueryClient) Ydb_Query_V1.QueryService_ExecuteQueryClient,
 ) {
@@ -176,6 +207,11 @@ func benchmarkRecvDrainLoop(b *testing.B,
 			time.Sleep(workBetween)
 		}
 	}
+}
+
+type executeQueryPartRecv struct {
+	part *Ydb_Query.ExecuteQueryResponsePart
+	err  error
 }
 
 type executeQueryOneSlotAheadMiddleware struct {
