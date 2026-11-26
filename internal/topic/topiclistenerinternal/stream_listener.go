@@ -56,7 +56,6 @@ type streamListener struct {
 	freeBytes chan int
 
 	traceQueue         *topicreadercommon.StreamTraceQueue
-	finishCommits      func()
 	creditBalance      topicreadercommon.MetricBalance
 	localBufferBalance topicreadercommon.MetricBalance
 	closing            atomic.Bool
@@ -170,8 +169,8 @@ func (l *streamListener) finishClose(cleanupCtx context.Context, reason error, d
 		!errors.Is(err, background.ErrAlreadyClosed) {
 		resErrors = append(resErrors, err)
 	}
-	if l.finishCommits != nil {
-		l.finishCommits()
+	if l.sessions != nil {
+		l.sessions.ReleasePendingCommits()
 	}
 
 	// Canceling the listener also stops each partition worker. Its callback
@@ -187,6 +186,12 @@ func (l *streamListener) finishClose(cleanupCtx context.Context, reason error, d
 		if err := l.syncCommitter.Close(cleanupCtx, reason); err != nil &&
 			!errors.Is(err, background.ErrAlreadyClosed) {
 			resErrors = append(resErrors, err)
+		}
+	}
+
+	if l.sessions != nil {
+		for _, session := range l.sessions.GetAll() {
+			session.Close()
 		}
 	}
 
@@ -543,7 +548,7 @@ func (l *streamListener) handleStartPartition(
 		m.CommittedOffset,
 	)
 	session.SetupCommitMetrics(l.tracer, l.cfg.ReaderInfo)
-	if err := l.sessions.Add(session, &l.finishCommits); err != nil {
+	if err := l.sessions.Add(session); err != nil {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to add partition session: %w", err)))
 	}
 

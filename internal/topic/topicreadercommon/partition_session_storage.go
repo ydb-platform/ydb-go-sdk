@@ -32,9 +32,9 @@ func (c *PartitionSessionStorage) initNeedLock() {
 	}
 }
 
-// Add stores a partition session. When supplied, finishCommits receives a
-// stream cleanup callback on the first addition with commit tracking enabled.
-func (c *PartitionSessionStorage) Add(session *PartitionSession, finishCommits ...*func()) error {
+// Add stores a partition session and attaches its commit tracker, if any, to
+// the set of trackers that ReleasePendingCommits clears.
+func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 	c.m.Lock()
 	defer c.m.Unlock()
 
@@ -43,16 +43,30 @@ func (c *PartitionSessionStorage) Add(session *PartitionSession, finishCommits .
 	if _, ok := c.sessions[session.StreamPartitionSessionID]; ok {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.StreamPartitionSessionID))
 	}
-	if len(finishCommits) != 0 && session.commitMetrics != nil {
-		if c.commits == nil {
-			c.commits = &pendingCommitTrackers{}
-			*finishCommits[0] = c.commits.close
-		}
-		session.commitMetrics.tracker.owner = c.commits
+	if session.commitMetrics != nil {
+		session.commitMetrics.tracker.owner = c.pendingCommitsNeedLock()
 	}
 	c.sessions[session.StreamPartitionSessionID] = &sessionInfo{Session: session}
 
 	return nil
+}
+
+// ReleasePendingCommits drops the pending commit ranges of every session once
+// the stream can no longer receive acknowledgements. Later submissions are not tracked.
+func (c *PartitionSessionStorage) ReleasePendingCommits() {
+	c.m.Lock()
+	commits := c.pendingCommitsNeedLock()
+	c.m.Unlock()
+
+	commits.close()
+}
+
+func (c *PartitionSessionStorage) pendingCommitsNeedLock() *pendingCommitTrackers {
+	if c.commits == nil {
+		c.commits = &pendingCommitTrackers{}
+	}
+
+	return c.commits
 }
 
 func (c *PartitionSessionStorage) Get(id rawtopicreader.PartitionSessionID) (*PartitionSession, error) {
@@ -67,6 +81,18 @@ func (c *PartitionSessionStorage) Get(id rawtopicreader.PartitionSessionID) (*Pa
 	}
 
 	return partitionInfo.Session, nil
+}
+
+func (c *PartitionSessionStorage) GetAll() []*PartitionSession {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	res := make([]*PartitionSession, 0, len(c.sessions))
+	for _, s := range c.sessions {
+		res = append(res, s.Session)
+	}
+
+	return res
 }
 
 func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (*PartitionSession, error) {
