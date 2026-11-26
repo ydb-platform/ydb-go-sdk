@@ -14,12 +14,13 @@ import (
 
 // Cell views one encoded YDB Value. Its bytes may alias the response part.
 type Cell struct {
-	raw     []byte
-	bytes   []byte
-	number  uint64
-	high128 uint64
-	variant uint32
-	kind    protowire.Number
+	raw      []byte
+	bytes    []byte
+	number   uint64
+	high128  uint64
+	variant  uint32
+	kind     uint16
+	messages uint16
 }
 
 // Parse reads a cell, normalizing repeated message fields when necessary.
@@ -27,6 +28,10 @@ func Parse(data []byte) (Cell, error) {
 	cell := Cell{raw: data}
 	f := fields{data: data}
 	for f.next() {
+		if f.kind == protowire.BytesType &&
+			(f.number == ValueNestedField || f.number == ValueItemsField || f.number == ValuePairsField) {
+			cell.messages |= 1 << f.number
+		}
 		switch {
 		case f.number == ValueVariantIndexField && f.kind == ValueVariantIndexWireType:
 			v, _ := protowire.ConsumeVarint(f.value)
@@ -34,7 +39,7 @@ func Parse(data []byte) (Cell, error) {
 		case f.number == ValueHigh128Field && f.kind == ValueHigh128WireType:
 			cell.high128, _ = protowire.ConsumeFixed64(f.value)
 		case scalarField(f.number, f.kind):
-			if cell.kind == ValueNestedField {
+			if cell.Kind() == ValueNestedField {
 				// Protobuf validates the prior nested message even when the next
 				// oneof arm replaces it, and merges consecutive nested messages.
 				merged, err := normalizeMessage(data, new(Ydb.Value))
@@ -44,7 +49,7 @@ func Parse(data []byte) (Cell, error) {
 
 				return Parse(merged)
 			}
-			cell.kind = f.number
+			cell.kind = uint16(f.number)
 			switch f.kind {
 			case protowire.VarintType:
 				cell.number, _ = protowire.ConsumeVarint(f.value)
@@ -63,6 +68,19 @@ func Parse(data []byte) (Cell, error) {
 	}
 
 	return cell, f.err
+}
+
+// HasMessages reports whether the cell contains known message fields.
+func (c Cell) HasMessages() bool { return c.messages != 0 }
+
+// ValidateUnused checks known message fields that a consumer will not traverse.
+// A scalar consumer passes zero; a composite consumer passes its message field.
+func (c Cell) ValidateUnused(used protowire.Number) error {
+	if c.messages&^(1<<used) == 0 {
+		return nil
+	}
+
+	return proto.Unmarshal(c.raw, new(Ydb.Value))
 }
 
 func normalizeMessage(data []byte, message proto.Message) ([]byte, error) {
@@ -90,11 +108,11 @@ func scalarField(number protowire.Number, kind protowire.Type) bool {
 }
 
 // Kind returns the field containing the scalar or nested value.
-func (c Cell) Kind() protowire.Number { return c.kind }
+func (c Cell) Kind() protowire.Number { return protowire.Number(c.kind) }
 
 // Number returns the requested numeric field, or zero if that oneof arm is unset.
 func (c Cell) Number(field protowire.Number) uint64 {
-	if c.kind != field {
+	if c.Kind() != field {
 		return 0
 	}
 
@@ -104,7 +122,7 @@ func (c Cell) Number(field protowire.Number) uint64 {
 // BytesFor returns the requested bytes or text field without copying,
 // or nil if that oneof arm is unset.
 func (c Cell) BytesFor(field protowire.Number) []byte {
-	if c.kind != field {
+	if c.Kind() != field {
 		return nil
 	}
 
@@ -134,7 +152,10 @@ func (c Cell) VariantIndex() uint32 { return c.variant }
 
 // Nested parses the nested_value field if it is the active oneof arm.
 func (c Cell) Nested() (Cell, error) {
-	if c.kind != ValueNestedField {
+	if err := c.ValidateUnused(ValueNestedField); err != nil {
+		return Cell{}, err
+	}
+	if c.Kind() != ValueNestedField {
 		return Cell{}, errors.New("missing nested_value")
 	}
 
@@ -142,10 +163,14 @@ func (c Cell) Nested() (Cell, error) {
 }
 
 // Items iterates list, tuple, or struct members without allocating a slice.
-func (c Cell) Items() Items { return Items{fields: fields{data: c.raw}} }
+func (c Cell) Items() Items {
+	return Items{fields: fields{data: c.raw, err: c.ValidateUnused(ValueItemsField)}}
+}
 
 // Pairs iterates dictionary or set entries without allocating a slice.
-func (c Cell) Pairs() Pairs { return Pairs{fields: fields{data: c.raw}} }
+func (c Cell) Pairs() Pairs {
+	return Pairs{fields: fields{data: c.raw, err: c.ValidateUnused(ValuePairsField)}}
+}
 
 type fields struct {
 	data   []byte

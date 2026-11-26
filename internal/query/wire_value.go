@@ -235,7 +235,7 @@ func scanWireValueDestination(columnType *Ydb.Type, decodedType types.Type, cell
 	if err != nil {
 		return err
 	}
-	if scanWireValueCell(columnType, parsed, dst) {
+	if !parsed.HasMessages() && scanWireValueCell(columnType, parsed, dst) {
 		return nil
 	}
 	v, err := value.FromCell(decodedType, parsed)

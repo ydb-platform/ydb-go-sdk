@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
@@ -176,6 +177,77 @@ func TestFromWireMergesRepeatedPairMessages(t *testing.T) {
 			}
 			if !bytes.Equal(data, original) {
 				t.Fatal("FromWire modified the response bytes")
+			}
+		})
+	}
+}
+
+func TestFromWireValidatesEveryKnownMessage(t *testing.T) {
+	malformed := new(Ydb.Value)
+	malformed.ProtoReflect().SetUnknown([]byte{0xff})
+	for name, original := range wireTestValues() {
+		for field, extra := range map[string]*Ydb.Value{
+			"nested": {Value: &Ydb.Value_NestedValue{NestedValue: malformed}},
+			"items":  {Items: []*Ydb.Value{malformed}},
+			"pairs":  {Pairs: []*Ydb.ValuePair{{Key: malformed}}},
+		} {
+			t.Run(name+"/"+field, func(t *testing.T) {
+				data := marshalWireFragments(t, ToYDB(original).GetValue(), extra)
+				if err := proto.Unmarshal(data, new(Ydb.Value)); err == nil {
+					t.Fatal("protobuf accepted the malformed fixture")
+				}
+				got, err := FromWire(original.Type(), data)
+				if err == nil {
+					t.Fatalf("FromWire accepted a malformed %s message as %v", field, got)
+				}
+			})
+		}
+	}
+}
+
+func TestFromWireValidatesUnusedSetPayload(t *testing.T) {
+	malformed := new(Ydb.Value)
+	malformed.ProtoReflect().SetUnknown([]byte{0xff})
+	data := marshalWireFragments(t, &Ydb.Value{Pairs: []*Ydb.ValuePair{{
+		Key:     ToYDB(TextValue("key")).GetValue(),
+		Payload: &Ydb.Value{Value: &Ydb.Value_NestedValue{NestedValue: malformed}},
+	}}})
+	if err := proto.Unmarshal(data, new(Ydb.Value)); err == nil {
+		t.Fatal("protobuf accepted the malformed fixture")
+	}
+	got, err := FromWire(types.NewSet(types.Text), data)
+	if err == nil {
+		t.Fatalf("FromWire accepted a set with a malformed payload as %v", got)
+	}
+}
+
+func TestFromWireAllowsValidUnusedMessages(t *testing.T) {
+	opaque := new(Ydb.Value)
+	opaque.ProtoReflect().SetUnknown(protowire.AppendBytes(
+		protowire.AppendTag(nil, 200, protowire.BytesType), []byte{0xff},
+	))
+	for name, extra := range map[string]*Ydb.Value{
+		"nested": {Value: &Ydb.Value_NestedValue{NestedValue: ToYDB(TextValue("ignored")).GetValue()}},
+		"items":  {Items: []*Ydb.Value{ToYDB(TextValue("ignored")).GetValue()}},
+		"pairs": {Pairs: []*Ydb.ValuePair{{
+			Key: ToYDB(TextValue("key")).GetValue(), Payload: ToYDB(ListValue(Int32Value(1))).GetValue(),
+		}}},
+		"unknown bytes":             opaque,
+		"nested with unknown bytes": {Value: &Ydb.Value_NestedValue{NestedValue: opaque}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			data := marshalWireFragments(t, ToYDB(Int32Value(42)).GetValue(), extra)
+			var normal Ydb.Value
+			if err := proto.Unmarshal(data, &normal); err != nil {
+				t.Fatal(err)
+			}
+			got, err := FromWire(types.Int32, data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := FromYDB(types.Int32.ToYDB(), &normal)
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("FromWire() = %v, want %v", got, want)
 			}
 		})
 	}

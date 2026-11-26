@@ -1,3 +1,5 @@
+* Fixed direct Query Service protobuf wire decoding accepting malformed known message fields that are unused by the scanned column type
+
 ## v3.158.0
 * Fixed Query Service response prefetch losing the final row or terminal error when a gRPC interceptor reads ahead, including delivery of buffered statistics on close
 * Added experimental `ydb.WithQueryProtoWireDecoding(bool)` to opt into direct protobuf wire decoding of native and `database/sql` Query Service `FORMAT_VALUE` rows, reducing allocations and using lazy cell and column-name indexes for linear-time wide-row scans while preserving protobuf response metadata for gRPC stream interceptors
