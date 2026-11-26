@@ -82,6 +82,7 @@ type topicStreamReaderConfig struct {
 	CommitMode                      topicreadercommon.PublicCommitMode
 	Decoders                        *topicreadercommon.MultiDecoder
 	EnableSplitMergeSupport         bool
+	trackActiveSessions             bool
 }
 
 func newTopicStreamReaderConfig() topicStreamReaderConfig {
@@ -929,7 +930,7 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequest(m *rawtopicreader
 		clientSessionCounter.Add(1),
 		m.CommittedOffset,
 	)
-	if err := r.sessionController.Add(session); err != nil {
+	if err := r.sessionController.Add(session, r.cfg.trackActiveSessions); err != nil {
 		return err
 	}
 

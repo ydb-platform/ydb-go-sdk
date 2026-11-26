@@ -32,17 +32,12 @@ type PartitionSessionStorage struct {
 func (c *PartitionSessionStorage) initNeedLock() {
 	if c.sessions == nil {
 		c.sessions = make(map[rawtopicreader.PartitionSessionID]*sessionInfo)
-		if !c.activeReleased {
-			c.active = &activeSessions{
-				sessions: make(map[rawtopicreader.PartitionSessionID]*PartitionSession),
-				counts:   make(map[string]int64),
-			}
-		}
 		c.lastCompactedTime = time.Now()
 	}
 }
 
-func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
+// Add records a protocol session. Metered streams opt into active tracking on assignment.
+func (c *PartitionSessionStorage) Add(session *PartitionSession, trackActive ...bool) error {
 	c.m.Lock()
 	defer c.m.Unlock()
 
@@ -52,10 +47,14 @@ func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.StreamPartitionSessionID))
 	}
 	c.sessions[session.StreamPartitionSessionID] = &sessionInfo{Session: session}
+	if c.active == nil && !c.activeReleased && len(trackActive) != 0 && trackActive[0] {
+		c.active = &activeSessions{
+			sessions: make(map[rawtopicreader.PartitionSessionID]*PartitionSession),
+			counts:   make(map[string]int64),
+		}
+	}
 	if c.active != nil {
 		c.active.add(session)
-	} else {
-		session.active.Store(nil)
 	}
 
 	return nil

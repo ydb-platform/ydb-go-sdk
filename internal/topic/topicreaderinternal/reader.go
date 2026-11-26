@@ -89,6 +89,7 @@ func NewReader(
 	}
 
 	readerID := topicreadercommon.NextReaderID()
+	cfg.trackActiveSessions = cfg.Metrics.Meter != nil
 
 	readerConnector := func(ctx context.Context) (batchedStreamReader, error) {
 		stream, err := connector(ctx, readerID, cfg.Trace)
