@@ -17,13 +17,16 @@ const (
 type PartitionSessionStorage struct {
 	m sync.RWMutex
 
-	sessions map[rawtopicreader.PartitionSessionID]*sessionInfo
-	commits  *pendingCommitTrackers
+	sessions        map[rawtopicreader.PartitionSessionID]*sessionInfo
+	commits         *pendingCommitTrackers
+	commitsReleased bool
 
 	removeIndex              int
 	lastCompactedTime        time.Time
 	lastCompactedRemoveIndex int
 }
+
+var releasedPendingCommits = pendingCommitTrackers{closed: true}
 
 func (c *PartitionSessionStorage) initNeedLock() {
 	if c.sessions == nil {
@@ -54,14 +57,23 @@ func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 // ReleasePendingCommits drops the pending commit ranges of every session once
 // the stream can no longer receive acknowledgements. Later submissions are not tracked.
 func (c *PartitionSessionStorage) ReleasePendingCommits() {
-	c.m.Lock()
-	commits := c.pendingCommitsNeedLock()
-	c.m.Unlock()
+	if commits := c.markCommitsReleased(); commits != nil {
+		commits.close()
+	}
+}
 
-	commits.close()
+func (c *PartitionSessionStorage) markCommitsReleased() *pendingCommitTrackers {
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.commitsReleased = true
+
+	return c.commits
 }
 
 func (c *PartitionSessionStorage) pendingCommitsNeedLock() *pendingCommitTrackers {
+	if c.commitsReleased {
+		return &releasedPendingCommits
+	}
 	if c.commits == nil {
 		c.commits = &pendingCommitTrackers{}
 	}
