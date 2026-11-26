@@ -1766,6 +1766,18 @@ func TestClusterDiscoveryKeepsNearestDCWhenRefreshProbeFails(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return removed.State() == state.Destroyed
 	}, time.Second, 10*time.Millisecond)
+
+	reannounced, failedProbe := endpoints, probeErr
+	endpoints, probeErr = nil, ErrNoEndpoints
+	require.ErrorIs(t, b.clusterDiscoveryAttempt(ctx, nil), ErrNoEndpoints)
+	require.Empty(t, activeNodeIDs(b))
+	clock.Advance(time.Second)
+
+	endpoints, probeErr = reannounced, failedProbe
+	require.ErrorIs(t, b.clusterDiscoveryAttempt(ctx, nil), failedProbe)
+	selected, err = b.nextConn(ctx)
+	require.NoError(t, err)
+	require.Same(t, surviving, selected)
 }
 
 func TestPolicyUsesFreshDiscoveryEndpointBeforePoolGet(t *testing.T) {
@@ -3004,48 +3016,72 @@ func TestBalancerDiscoveryEndpointCloseDelayAfterRediscovery(t *testing.T) {
 	require.ErrorIs(t, b.clusterDiscoveryAttemptWithDial(ctx), ErrNoEndpoints)
 	require.NotEqual(t, state.Destroyed, replacement.State())
 	require.ErrorIs(t, b.clusterDiscoveryAttemptWithDial(ctx), ErrNoEndpoints)
-	require.Equal(t, state.Destroyed, replacement.State(), "discovery must still close the connection before the timer")
+	require.Eventually(t, func() bool {
+		return replacement.State() == state.Destroyed
+	}, time.Second, 10*time.Millisecond, "discovery must still close the connection before the timer")
 }
 
 func TestBalancerRediscoveryDoesNotReuseExpiredConnection(t *testing.T) {
 	const delay = 5 * time.Second
 
-	ctx := t.Context()
-	fired := make(chan func(), 1)
-	clock := &endpointCloseClock{
-		FakeClock: clockwork.NewFakeClock(),
-		fired:     fired,
+	for _, tc := range []struct {
+		name            string
+		duringSelection time.Duration
+	}{
+		{name: "before selection"},
+		{name: "during selection", duringSelection: time.Nanosecond},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+			fired := make(chan func(), 1)
+			clock := &endpointCloseClock{FakeClock: clockwork.NewFakeClock(), fired: fired}
+			var advanceOnSelection time.Duration
+			prefer := userBalancers.Prefer(userBalancers.RandomChoice(), func(userBalancers.Endpoint) bool {
+				if advanceOnSelection > 0 {
+					clock.Advance(advanceOnSelection)
+				}
+
+				return true
+			})
+			b := newCloseTestBalancer(t, config.New(config.WithBalancer(prefer)), clock, delay)
+			defer func() { require.NoError(t, b.Close(ctx)) }()
+
+			endpoints := []endpoint.Endpoint{endpoint.New("node1:2135", endpoint.WithID(1))}
+			b.applyDiscoveredEndpoints(ctx, endpoints, "")
+			old := connByNodeID(b, 1)
+			require.NotNil(t, old)
+
+			b.applyDiscoveredEndpoints(ctx, nil, "")
+			clock.Advance(delay - tc.duringSelection)
+			advanceOnSelection = tc.duringSelection
+			b.applyDiscoveredEndpoints(ctx, endpoints, "")
+
+			replacement := connByNodeID(b, 1)
+			require.NotNil(t, replacement)
+			require.NotSame(t, old, replacement, "rediscovery must not reuse an expired connection")
+			select {
+			case callback := <-fired:
+				callback()
+			case <-time.After(time.Second):
+				t.Fatal("the close timer did not fire")
+			}
+			require.Eventually(t, func() bool {
+				return old.State() == state.Destroyed
+			}, time.Second, 10*time.Millisecond)
+			require.NotEqual(t, state.Destroyed, replacement.State())
+		})
 	}
-	b := newCloseTestBalancer(t, config.New(), clock, delay)
-	defer func() { require.NoError(t, b.Close(ctx)) }()
-
-	endpoints := []endpoint.Endpoint{endpoint.New("node1:2135", endpoint.WithID(1))}
-	b.applyDiscoveredEndpoints(ctx, endpoints, "")
-	old := connByNodeID(b, 1)
-	require.NotNil(t, old)
-
-	b.applyDiscoveredEndpoints(ctx, nil, "")
-	clock.Advance(delay)
-	var callback func()
-	select {
-	case callback = <-fired:
-	case <-time.After(time.Second):
-		t.Fatal("the close timer did not fire")
-	}
-
-	b.applyDiscoveredEndpoints(ctx, endpoints, "")
-	callback()
-
-	replacement := connByNodeID(b, 1)
-	require.NotNil(t, replacement)
-	require.NotSame(t, old, replacement, "rediscovery must not reuse an expired connection")
-	require.Eventually(t, func() bool {
-		return old.State() == state.Destroyed
-	}, time.Second, 10*time.Millisecond)
-	require.NotEqual(t, state.Destroyed, replacement.State())
 }
 
 func TestBalancerEndpointCloseHookCanCloseBalancer(t *testing.T) {
+	for _, trigger := range []string{"timer", "failed discovery"} {
+		t.Run(trigger, func(t *testing.T) {
+			testBalancerEndpointCloseHookCanCloseBalancer(t, trigger == "failed discovery")
+		})
+	}
+}
+
+func testBalancerEndpointCloseHookCanCloseBalancer(t *testing.T, failedDiscovery bool) {
 	const delay = 5 * time.Second
 
 	ctx := t.Context()
@@ -3055,7 +3091,8 @@ func TestBalancerEndpointCloseHookCanCloseBalancer(t *testing.T) {
 	releaseHook := make(chan struct{})
 	var b *Balancer
 	var closeErr error
-	cfg := config.New(config.WithTrace(trace.Driver{
+	nearest := config.WithBalancer(userBalancers.PreferNearestDCWithFallBack(userBalancers.RandomChoice()))
+	cfg := config.New(nearest, config.WithTrace(trace.Driver{
 		OnConnClose: func(trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
 			return func(trace.DriverConnCloseDoneInfo) {
 				close(closeStarted)
@@ -3090,8 +3127,27 @@ func TestBalancerEndpointCloseHookCanCloseBalancer(t *testing.T) {
 	old := connByNodeID(b, 1)
 	require.NotNil(t, old)
 
-	b.applyDiscoveredEndpoints(ctx, nil, "")
-	clock.Advance(delay)
+	if failedDiscovery {
+		probeErr := errors.New("locality probe failed")
+		b.discover = func(context.Context, *grpc.ClientConn) ([]endpoint.Endpoint, string, error) {
+			return nil, "", nil
+		}
+		b.localDCDetector = func(context.Context, []endpoint.Endpoint) (string, error) {
+			return "", probeErr
+		}
+		require.ErrorIs(t, b.clusterDiscoveryAttempt(ctx, nil), probeErr)
+		refreshDone := make(chan error, 1)
+		go func() { refreshDone <- b.clusterDiscoveryAttempt(ctx, nil) }()
+		select {
+		case err := <-refreshDone:
+			require.ErrorIs(t, err, probeErr)
+		case <-time.After(time.Second):
+			t.Fatal("the close hook blocked the failed discovery refresh")
+		}
+	} else {
+		b.applyDiscoveredEndpoints(ctx, nil, "")
+		clock.Advance(delay)
+	}
 
 	select {
 	case <-closeFinished:
@@ -3120,7 +3176,9 @@ func TestBalancerStaleEndpointCloseCallback(t *testing.T) {
 	expiredCallback := clock.callback
 	require.NotNil(t, expiredCallback)
 	b.applyDiscoveredEndpoints(ctx, nil, "")
-	require.Equal(t, state.Destroyed, first.State())
+	require.Eventually(t, func() bool {
+		return first.State() == state.Destroyed
+	}, time.Second, 10*time.Millisecond)
 
 	// Invoke the callback as if it had already started when discovery stopped its timer.
 	expiredCallback()

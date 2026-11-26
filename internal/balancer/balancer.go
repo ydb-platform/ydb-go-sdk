@@ -316,18 +316,12 @@ func (b *Balancer) scheduleEndpointClose(
 	return remaining
 }
 
-func (b *Balancer) mergePendingEndpointClose(quarantine []conn.Conn) ([]conn.Conn, []closer.Closer) {
-	pending := b.pendingClose
-	if pending == nil {
-		return quarantine, nil
+func (b *Balancer) releaseExpiredEndpoints() []closer.Closer {
+	if pending := b.pendingClose; pending != nil && !b.discoveryConfig.Clock().Now().Before(pending.deadline) {
+		return b.releaseEndpointReferences(b.takePendingEndpointClose())
 	}
 
-	connections := b.takePendingEndpointClose()
-	if b.discoveryConfig.Clock().Now().Before(pending.deadline) {
-		return slices.Concat(quarantine, connections), nil
-	}
-
-	return quarantine, b.releaseEndpointReferences(connections)
+	return nil
 }
 
 func (b *Balancer) releaseEndpointReferences(connections []conn.Conn) []closer.Closer {
@@ -407,14 +401,13 @@ func (b *Balancer) applyDiscoveryUpdate(
 			b.policy.DetectsNearestDC(),
 			b.driverConfig.Database(),
 		)
-		state              = b.connectionsState.Load()
 		active             []conn.Conn
 		quarantine         []conn.Conn
 		selectedEndpoints  []endpoint.Endpoint
 		selectedPriorities []policy.EndpointPriority
 		previousPriorities []policy.EndpointPriority
 	)
-	if state != nil {
+	if state := b.connectionsState.Load(); state != nil {
 		active = state.All()
 		quarantine = state.quarantine
 		previousPriorities = state.elector.priorities
@@ -424,11 +417,12 @@ func (b *Balancer) applyDiscoveryUpdate(
 		traceEndpointChanges(onDone, active, endpoints, selectedEndpoints, selfLocation)
 	}()
 
-	quarantine, closing = b.mergePendingEndpointClose(quarantine)
 	selectedEndpoints, selectedPriorities = b.selectDiscoveredEndpoints(
 		active, quarantine, previousPriorities, endpoints, selfLocation, preserveRoutes,
 	)
+	closing = b.releaseExpiredEndpoints()
 	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selectedEndpoints)
+	closing = append(closing, b.releaseEndpointReferences(b.takePendingEndpointClose())...)
 	if !preserveRoutes {
 		for _, cc := range connections {
 			cc.Unban(ctx)
@@ -459,21 +453,22 @@ func (b *Balancer) selectDiscoveredEndpoints(
 			return present[e.Key()] == nil
 		})
 		var selected []endpoint.Endpoint
-		var priorities []policy.EndpointPriority
 		for _, priority := range previousPriorities {
 			if e := present[priority.Key]; e != nil {
 				selected = append(selected, e)
-				priorities = append(priorities, priority)
 			}
 		}
 
-		return selected, priorities
+		return selected, previousPriorities
 	}
 
 	if b.policy.MaxConnections() > 0 {
 		b.lastDiscovered = append(b.lastDiscovered[:0], endpoints...)
 	}
 	priorities := b.policy.Prioritize(policy.Info{SelfLocation: selfLocation}, endpoints)
+	if pending := b.pendingClose; pending != nil && b.discoveryConfig.Clock().Now().Before(pending.deadline) {
+		quarantine = slices.Concat(quarantine, pending.connections)
+	}
 
 	return selectActiveEndpoints(
 		active, quarantine, previousPriorities, endpoints, priorities, b.policy.MaxConnections(), b.random,
