@@ -283,7 +283,11 @@ func WithReaderGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOpti
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithReaderTrace(t trace.Topic) ReaderOption { //nolint:gocritic
 	return func(cfg *topicreaderinternal.ReaderConfig) {
-		cfg.Trace = gtrace.ComposeReader(cfg.Trace, &t)
+		var opts []gtrace.TopicComposeOption
+		if cb := cfg.PanicCallback(); cb != nil {
+			opts = append(opts, gtrace.WithTopicPanicCallback(cb))
+		}
+		cfg.Trace = gtrace.ComposeReader(cfg.Trace, &t, opts...)
 	}
 }
 

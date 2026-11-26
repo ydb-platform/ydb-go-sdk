@@ -194,7 +194,11 @@ func WithWaitAckOnWrite(val bool) PublicWriterOption {
 
 func WithTrace(tracer *trace.Topic) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
-		cfg.Tracer = gtrace.Compose(cfg.Tracer, tracer)
+		var opts []gtrace.TopicComposeOption
+		if cb := cfg.Common.PanicCallback(); cb != nil {
+			opts = append(opts, gtrace.WithTopicPanicCallback(cb))
+		}
+		cfg.Tracer = gtrace.Compose(cfg.Tracer, tracer, opts...)
 	}
 }
 
