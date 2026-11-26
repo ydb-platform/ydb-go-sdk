@@ -17,7 +17,7 @@ Descriptor-aware registries receive the dotted label names `reader.name` and `er
 
 The six counters are cumulative. The two gauges apply signed deltas. Closing a stream removes its remaining balance. When an observer falls behind, the SDK sums pending deltas per gauge and received message counts per topic.
 
-Each acknowledged offset keeps its partition session and message count. The receive loop waits for the current response's observers before reading the next response. An ACK observer can close the reader or listener, but waiting for a later ACK on the same stream would block the receive loop.
+Each acknowledged offset keeps its partition session and message count. ACK observers run in their own queue, and the receive loop waits for the current response's ACK observers before reading the next response; other observers do not delay it. An ACK observer can close the reader or listener, but waiting for a later ACK on the same stream would block the receive loop.
 
 Each queued range counts its half-open span, including gaps. Duplicate submissions count separately. Ranges ending at or below the committed watermark at submission are excluded from both counters. A stream acknowledgement counts the full span of each pending ordinary range it newly covers, regardless of admission order. It adds zero if it covers no new pending ranges. A successful transaction can advance the watermark without completing ordinary ranges, so a later stream acknowledgement at or below that watermark can still count them once.
 

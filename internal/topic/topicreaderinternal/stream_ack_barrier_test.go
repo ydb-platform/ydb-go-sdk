@@ -8,9 +8,16 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestEmptyCommitResponseDoesNotWaitForCreditObserver(t *testing.T) {
-	for _, subscribed := range []bool{false, true} {
-		t.Run(map[bool]string{false: "credit-only", true: "credit-and-ack"}[subscribed], func(t *testing.T) {
+func TestCommitResponseDoesNotWaitForCreditObserver(t *testing.T) {
+	for _, tc := range []struct {
+		name                  string
+		subscribed, hasOffset bool
+	}{
+		{name: "credit-only"},
+		{name: "credit-and-ack-empty", subscribed: true},
+		{name: "credit-and-ack-nonempty", subscribed: true, hasOffset: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			e := newTopicReaderTestEnv(t)
 			started, release := make(chan struct{}), make(chan struct{})
 			e.reader.cfg.Trace = &trace.Topic{
@@ -21,7 +28,7 @@ func TestEmptyCommitResponseDoesNotWaitForCreditObserver(t *testing.T) {
 					}
 				},
 			}
-			if subscribed {
+			if tc.subscribed {
 				e.reader.cfg.Trace.OnReaderCommittedNotify = func(trace.TopicReaderCommittedNotifyInfo) {}
 			}
 			e.reader.startTrace()
@@ -30,7 +37,11 @@ func TestEmptyCommitResponseDoesNotWaitForCreditObserver(t *testing.T) {
 			xtest.WaitChannelClosed(t, started)
 			e.Start()
 			received := make(chan struct{})
-			e.SendFromServerAndSetNextCallback(&rawtopicreader.CommitOffsetResponse{}, func() { close(received) })
+			response := &rawtopicreader.CommitOffsetResponse{}
+			if tc.hasOffset {
+				response = readerMetricCommitResponse(&e, 21)
+			}
+			e.SendFromServerAndSetNextCallback(response, func() { close(received) })
 			xtest.WaitChannelClosed(t, received)
 		})
 	}

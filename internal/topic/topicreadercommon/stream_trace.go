@@ -10,10 +10,12 @@ import (
 )
 
 type StreamTraceQueue struct {
-	work         *xsync.UnboundedChan[func()]
-	mu           sync.Mutex
-	closed       bool
-	observesACKs bool
+	work *xsync.UnboundedChan[func()]
+	// acks is a separate lane, so the receive loop never waits for
+	// unrelated worker observers queued in work.
+	acks   *xsync.UnboundedChan[func()]
+	mu     sync.Mutex
+	closed bool
 	// ackQueued tells the receive loop that the current response queued an ACK.
 	ackQueued atomic.Bool
 	// One reusable marker per stream keeps the barrier allocation-free.
@@ -25,17 +27,23 @@ func (q *StreamTraceQueue) Close() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.closed = true
-	q.work.Close()
+	if q.work != nil {
+		q.work.Close()
+	}
+	if q.acks != nil {
+		q.acks.Close()
+	}
 }
 
-// WaitForACKs bounds queued ACKs to one wire response. An observer may call
-// Close, so the receive loop must stop waiting when shutdown joins it.
-// A response that queued no ACK does not wait.
+// WaitForACKs bounds queued ACKs to one wire response. It waits only for ACK
+// observers, never for other worker observers. An observer may call Close, so
+// the receive loop must stop waiting when shutdown joins it. A response that
+// queued no ACK does not wait.
 func (q *StreamTraceQueue) WaitForACKs(stop <-chan struct{}) bool {
-	if !q.observesACKs || !q.ackQueued.Swap(false) {
+	if q.acks == nil || !q.ackQueued.Swap(false) {
 		return true
 	}
-	q.work.Send(q.signalACKs)
+	q.acks.Send(q.signalACKs)
 	select {
 	case <-q.ackDone:
 		return true
@@ -93,8 +101,9 @@ func workerHooks(t *trace.Topic, listener bool) streamHooks {
 	}
 }
 
-// StreamTrace installs a single consumer for coalesced worker hooks of this stream.
-// Closing the queue never joins the consumer: an observer may itself be calling Close.
+// StreamTrace installs one consumer for coalesced worker hooks of this stream and
+// another for ACK hooks. Closing the queue never joins a consumer: an observer
+// may itself be calling Close.
 func StreamTrace(t *trace.Topic, info ReaderInfo, onPanic func(error)) (*trace.Topic, *StreamTraceQueue) {
 	if t == nil {
 		return nil, nil
@@ -103,9 +112,13 @@ func StreamTrace(t *trace.Topic, info ReaderInfo, onPanic func(error)) (*trace.T
 	if *h.credit == nil && *h.local == nil && *h.received == nil && t.OnReaderCommittedNotify == nil {
 		return t, nil
 	}
-	q := &StreamTraceQueue{work: xsync.NewUnboundedChan[func()]()}
+	q := &StreamTraceQueue{}
 	wrapped := *t
 	h = workerHooks(&wrapped, info.Listener)
+	if *h.credit != nil || *h.local != nil || *h.received != nil {
+		q.work = xsync.NewUnboundedChan[func()]()
+		go drainStreamTrace(q.work, onPanic)
+	}
 	if fn := *h.credit; fn != nil {
 		send := coalesceTrace[int](q, fn, func(
 			a, b trace.TopicReaderCreditBalanceChangedInfo,
@@ -137,23 +150,30 @@ func StreamTrace(t *trace.Topic, info ReaderInfo, onPanic func(error)) (*trace.T
 		*h.received = func(i trace.TopicReaderMessagesReceivedInfo) { send(i.Topic, i) }
 	}
 	if fn := t.OnReaderCommittedNotify; fn != nil {
-		q.observesACKs = true
-		q.ackDone = make(chan struct{}, 1)
-		q.signalACKs = func() {
-			// A marker that runs after shutdown left the wait must not block the consumer.
-			select {
-			case q.ackDone <- struct{}{}:
-			default:
-			}
-		}
-		wrapped.OnReaderCommittedNotify = func(i trace.TopicReaderCommittedNotifyInfo) {
-			q.ackQueued.Store(true)
-			q.work.Send(func() { fn(i) })
-		}
+		wrapped.OnReaderCommittedNotify = q.startACKLane(fn, onPanic)
 	}
-	go drainStreamTrace(q.work, onPanic)
 
 	return &wrapped, q
+}
+
+func (q *StreamTraceQueue) startACKLane(
+	observe func(trace.TopicReaderCommittedNotifyInfo), onPanic func(error),
+) func(trace.TopicReaderCommittedNotifyInfo) {
+	q.acks = xsync.NewUnboundedChan[func()]()
+	q.ackDone = make(chan struct{}, 1)
+	q.signalACKs = func() {
+		// A marker that runs after shutdown left the wait must not block the consumer.
+		select {
+		case q.ackDone <- struct{}{}:
+		default:
+		}
+	}
+	go drainStreamTrace(q.acks, onPanic)
+
+	return func(i trace.TopicReaderCommittedNotifyInfo) {
+		q.ackQueued.Store(true)
+		q.acks.Send(func() { observe(i) })
+	}
 }
 
 func drainStreamTrace(q *xsync.UnboundedChan[func()], onPanic func(error)) {
