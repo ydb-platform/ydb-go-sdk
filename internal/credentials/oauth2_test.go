@@ -14,11 +14,13 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
@@ -160,6 +162,35 @@ func TestOauth2TokenExchangeRejectsRedirects(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func TestOauth2TokenExchangeRejectsRedirectsBeforeReadingBody(t *testing.T) {
+	for _, status := range []int{
+		http.StatusMultipleChoices,
+		http.StatusMovedPermanently,
+		http.StatusFound,
+		http.StatusSeeOther,
+		http.StatusNotModified,
+		http.StatusTemporaryRedirect,
+		http.StatusPermanentRedirect,
+	} {
+		for _, retryAllErrors := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%d/retryAllErrors=%t", status, retryAllErrors), func(t *testing.T) {
+				response := &http.Response{
+					StatusCode: status,
+					Status:     strconv.Itoa(status) + " " + http.StatusText(status),
+					Body: io.NopCloser(iotest.ErrReader(
+						errors.New("redirect body must not be read"),
+					)),
+				}
+				provider := &oauth2TokenExchange{}
+				_, err := provider.processTokenExchangeResponse(response, time.Now(), retryAllErrors)
+				require.ErrorIs(t, err, errCouldNotExchangeToken)
+				require.ErrorContains(t, err, response.Status)
+				require.Equal(t, retryAllErrors, xerrors.IsRetryableError(err))
+			})
+		}
 	}
 }
 
@@ -400,6 +431,11 @@ func TestReturnsOldTokenWhileUpdating(t *testing.T) {
 		WithFixedSubjectToken("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt"),
 	)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.Eventually(t, func() bool {
+			return !client.updating.Load()
+		}, 10*time.Second, 10*time.Millisecond)
+	})
 
 	token, err := client.Token(ctx)
 	t1 := time.Now()

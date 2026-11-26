@@ -766,6 +766,13 @@ func (provider *oauth2TokenExchange) processTokenExchangeResponse(
 	now time.Time,
 	retryAllErrors bool,
 ) (*tokenResponse, error) {
+	// Reject redirects before reading a potentially large or stalled response body.
+	if result.StatusCode >= http.StatusMultipleChoices && result.StatusCode < http.StatusBadRequest {
+		return nil, makeError(result,
+			fmt.Errorf("%w: %s", errCouldNotExchangeToken, result.Status),
+			retryAllErrors)
+	}
+
 	data, err := readResponseBody(result)
 	if err != nil {
 		return nil, err
