@@ -135,8 +135,9 @@ type commitMessageTracker struct {
 	ordered    []commitMetricRange
 	prefixBase int64 // cumulative count before ordered[0]
 	total      int64
-	// pending is a min-heap for ends below the last ordered end.
-	pending []commitMetricRange
+	// pending indexes ends below the last ordered end.
+	pending *commitRangeNode
+	random  uint64
 }
 
 type commitMetricRange struct {
@@ -169,15 +170,15 @@ func (t *commitMessageTracker) Queue(start, end rawtopiccommon.Offset) int64 {
 	} else if last := t.ordered[len(t.ordered)-1]; end >= last.end {
 		t.ordered = append(t.ordered, commitMetricRange{end: end, count: last.count + count})
 	} else {
-		t.pending = append(t.pending, commitMetricRange{end: end, count: count})
-		for i := len(t.pending) - 1; i > 0; {
-			parent := (i - 1) / 2
-			if t.pending[parent].end <= t.pending[i].end {
-				break
-			}
-			t.pending[parent], t.pending[i] = t.pending[i], t.pending[parent]
-			i = parent
+		// Xorshift64 priorities keep the index balanced in expectation without
+		// taking a random source lock or affecting the ordered path.
+		if t.random == 0 {
+			t.random = 1
 		}
+		t.random ^= t.random << 13
+		t.random ^= t.random >> 7
+		t.random ^= t.random << 17
+		t.pending = t.pending.insert(commitMetricRange{end: end, count: count}, t.random)
 	}
 
 	return count
@@ -215,13 +216,9 @@ func (t *commitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset
 		t.prefixBase = prefix
 		t.ordered = t.ordered[firstUncovered:]
 	}
-	for len(t.pending) > 0 && t.pending[0].end <= exclusiveOffset {
-		acknowledged += t.pending[0].count
-		t.popPending()
-	}
-	if len(t.pending) == 0 {
-		t.pending = nil
-	}
+	var covered int64
+	t.pending, covered = t.pending.removeThrough(exclusiveOffset)
+	acknowledged += covered
 	t.total -= acknowledged
 
 	return acknowledged
@@ -236,24 +233,4 @@ func (t *commitMessageTracker) discard() {
 func (t *commitMessageTracker) clear() {
 	t.ordered, t.pending = nil, nil
 	t.prefixBase, t.total = 0, 0
-}
-
-// popPending removes the pending range with the smallest end.
-func (t *commitMessageTracker) popPending() {
-	pending := t.pending
-	last := len(pending) - 1
-	pending[0] = pending[last]
-	pending = pending[:last]
-	for i := 0; ; {
-		child := 2*i + 1
-		if child+1 < last && pending[child+1].end < pending[child].end {
-			child++
-		}
-		if child >= last || pending[i].end <= pending[child].end {
-			break
-		}
-		pending[i], pending[child] = pending[child], pending[i]
-		i = child
-	}
-	t.pending = pending
 }

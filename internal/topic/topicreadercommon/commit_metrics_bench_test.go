@@ -52,6 +52,49 @@ func BenchmarkCommitMessageTrackerIncrementalAck(b *testing.B) {
 	}
 }
 
+func BenchmarkCommitAdversarialPartialAcknowledgement(b *testing.B) {
+	const n rawtopiccommon.Offset = 100_000
+	b.ReportAllocs()
+	for range b.N {
+		b.StopTimer()
+		tracker := newCommitMessageTracker(0)
+		tracker.Queue(n+1, n+2)
+		for end := n; end > 0; end-- {
+			tracker.Queue(end-1, end)
+		}
+		b.StartTimer()
+		got := tracker.Acknowledge(n)
+		b.StopTimer()
+		require.EqualValues(b, n, got)
+		require.EqualValues(b, 1, tracker.Acknowledge(n+2))
+	}
+}
+
+func BenchmarkCommitTrackerQueue(b *testing.B) {
+	b.Run("in_order", func(b *testing.B) {
+		tracker := newCommitMessageTracker(0)
+		tracker.Queue(0, 1)
+		tracker.Queue(1, 2)
+		b.ReportAllocs()
+		for b.Loop() {
+			// Measure Queue with spare ordered capacity, excluding slice growth.
+			tracker.Queue(1, 2)
+			tracker.ordered = tracker.ordered[:1]
+			tracker.total = 1
+		}
+	})
+	b.Run("out_of_order", func(b *testing.B) {
+		tracker := newCommitMessageTracker(0)
+		tracker.Queue(2, 3)
+		b.ReportAllocs()
+		for b.Loop() {
+			tracker.Queue(0, 1)
+			tracker.pending = nil
+			tracker.total = 1
+		}
+	})
+}
+
 func newCommitMessageTracker(offset rawtopiccommon.Offset) *commitMessageTracker {
 	session := &PartitionSession{}
 	session.SetInitialCommitOffset(offset)

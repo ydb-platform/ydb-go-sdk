@@ -19,6 +19,15 @@ func TestCommitMessageTrackerMatchesRangeScan(t *testing.T) {
 	watermark, highest := rawtopiccommon.Offset(10), rawtopiccommon.Offset(10)
 	var pending []span
 	var last span
+	queue := func(r span, step int) {
+		var count int64
+		if r.end > watermark && r.end > r.start {
+			count = int64(r.end - r.start)
+			pending = append(pending, r)
+			highest = max(highest, r.end)
+		}
+		require.Equal(t, count, tracker.Queue(r.start, r.end), "step %d, span %v", step, r)
+	}
 	acknowledge := func(offset rawtopiccommon.Offset, step int) {
 		var count int64
 		watermark = max(watermark, offset)
@@ -54,13 +63,21 @@ func TestCommitMessageTrackerMatchesRangeScan(t *testing.T) {
 			end := highest + rawtopiccommon.Offset(random.IntN(4))
 			last = span{start: end - rawtopiccommon.Offset(random.IntN(12)), end: end}
 		}
-		var count int64
-		if last.end > watermark && last.end > last.start {
-			count = int64(last.end - last.start)
-			pending = append(pending, last)
-			highest = max(highest, last.end)
-		}
-		require.Equal(t, count, tracker.Queue(last.start, last.end), "step %d, span %v", step, last)
+		queue(last, step)
 	}
 	acknowledge(highest, steps)
+
+	// Keep the ordered sentinel and a higher out-of-order node pending through
+	// the first split; the second split covers only the out-of-order index.
+	sentinel := highest + 4096
+	queue(span{sentinel - 1, sentinel}, steps+1)
+	for end := sentinel - 1; end > watermark; end-- {
+		queue(span{end - 1, end}, steps+1)
+		if end%8 == 0 {
+			queue(span{end - 3, end}, steps+1)
+		}
+	}
+	acknowledge(sentinel-2, steps+2)
+	acknowledge(sentinel-1, steps+3)
+	acknowledge(sentinel, steps+4)
 }
