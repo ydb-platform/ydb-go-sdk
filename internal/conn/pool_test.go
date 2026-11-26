@@ -23,10 +23,11 @@ import (
 
 // mockConfig implements the Config interface for testing
 type mockConfig struct {
-	dialTimeout   time.Duration
-	connectionTTL time.Duration
-	driverTrace   *trace.Driver
-	grpcDialOpts  []grpc.DialOption
+	dialTimeout     time.Duration
+	shutdownTimeout time.Duration
+	connectionTTL   time.Duration
+	driverTrace     *trace.Driver
+	grpcDialOpts    []grpc.DialOption
 }
 
 func (m *mockConfig) DialTimeout() time.Duration {
@@ -35,6 +36,10 @@ func (m *mockConfig) DialTimeout() time.Duration {
 
 func (m *mockConfig) ConnectionTTL() time.Duration {
 	return m.connectionTTL
+}
+
+func (m *mockConfig) GrpcChannelShutdownTimeout() time.Duration {
+	return m.shutdownTimeout
 }
 
 func (m *mockConfig) Trace() *trace.Driver {
@@ -301,125 +306,6 @@ func TestPool_ConfigMethods(t *testing.T) {
 	})
 }
 
-func TestPool_PutAfter(t *testing.T) {
-	const timeout = 10 * time.Second
-
-	ctx := t.Context()
-	clock := clockwork.NewFakeClock()
-	pool := NewPool(ctx, &mockConfig{}, func(p *Pool) { p.clock = clock })
-	t.Cleanup(func() { require.NoError(t, pool.RemoveRef(ctx)) })
-
-	first := pool.Get(endpoint.New("first:2135"))
-	require.Same(t, first, pool.Get(first.Endpoint()))
-	pool.PutAfter(ctx, first, timeout)
-	clock.Advance(timeout)
-	require.Equal(t, state.Created, first.State())
-
-	pool.PutAfter(ctx, first, timeout)
-	clock.Advance(timeout / 2)
-	second := pool.Get(endpoint.New("second:2135"))
-	pool.PutAfter(ctx, second, timeout)
-
-	clock.Advance(timeout / 2)
-	require.Eventually(t, func() bool {
-		return first.State() == state.Destroyed
-	}, time.Second, time.Millisecond)
-	require.Equal(t, state.Created, second.State())
-
-	clock.Advance(timeout / 2)
-	require.Eventually(t, func() bool {
-		return second.State() == state.Destroyed
-	}, time.Second, time.Millisecond)
-}
-
-func TestPool_PutAfterRediscovery(t *testing.T) {
-	const timeout = 10 * time.Second
-
-	ctx := t.Context()
-	clock := &heldCloseClock{FakeClock: clockwork.NewFakeClock()}
-	pool := NewPool(ctx, &mockConfig{}, func(p *Pool) { p.clock = clock })
-	t.Cleanup(func() { require.NoError(t, pool.RemoveRef(ctx)) })
-
-	e := endpoint.New("returning:2135")
-	old := pool.Get(e)
-	pool.PutAfter(ctx, old, timeout)
-	clock.Advance(timeout / 2)
-	require.Same(t, old, pool.Get(e))
-
-	pool.PutAfter(ctx, old, timeout)
-	require.Len(t, clock.callbacks, 2)
-	clock.callbacks[0]()
-	require.Equal(t, state.Created, old.State())
-
-	clock.Advance(timeout)
-	replacement := pool.Get(e)
-	require.NotNil(t, replacement)
-	require.NotSame(t, old, replacement)
-	require.Eventually(t, func() bool {
-		return old.State() == state.Destroyed
-	}, time.Second, time.Millisecond)
-	clock.callbacks[1]()
-	require.Equal(t, state.Created, replacement.State())
-	require.True(t, testPoolHasConn(pool, e.Key()))
-
-	pool.PutAfter(ctx, replacement, timeout)
-	require.Len(t, clock.callbacks, 3)
-	require.NoError(t, pool.RemoveRef(ctx))
-	require.Equal(t, state.Destroyed, replacement.State())
-	require.False(t, clock.lastTimer.Stop(), "pool shutdown must stop the pending timer")
-}
-
-func TestPool_PutAfterImmediate(t *testing.T) {
-	for _, timeout := range []time.Duration{0, -time.Second} {
-		t.Run(timeout.String(), func(t *testing.T) {
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
-			cfg := &mockConfig{driverTrace: &trace.Driver{
-				OnConnClose: func(trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
-					<-ctx.Done()
-
-					return nil
-				},
-			}}
-			pool := NewPool(ctx, cfg)
-			t.Cleanup(func() { require.NoError(t, pool.RemoveRef(t.Context())) })
-
-			key := endpoint.New("removed:2135")
-			old := pool.Get(key)
-			released := make(chan struct{})
-			go func() {
-				pool.PutAfter(ctx, old, timeout)
-				close(released)
-			}()
-			select {
-			case <-released:
-			case <-time.After(time.Second):
-				t.Fatal("releasing the connection waited for OnConnClose")
-			}
-
-			require.NotSame(t, old, pool.Get(key))
-			cancel()
-			require.Eventually(t, func() bool {
-				return old.State() == state.Destroyed
-			}, time.Second, time.Millisecond)
-		})
-	}
-}
-
-type heldCloseClock struct {
-	*clockwork.FakeClock
-
-	callbacks []func()
-	lastTimer clockwork.Timer
-}
-
-func (c *heldCloseClock) AfterFunc(delay time.Duration, callback func()) clockwork.Timer {
-	c.callbacks = append(c.callbacks, callback)
-	c.lastTimer = c.FakeClock.AfterFunc(delay, func() {})
-
-	return c.lastTimer
-}
-
 func TestPool_ConnectionTTL(t *testing.T) {
 	t.Run("DoesNotTraceNoOpParking", func(t *testing.T) {
 		var parkEvents atomic.Int64
@@ -529,7 +415,7 @@ func TestPool_ConnectionTTL(t *testing.T) {
 
 		pool.Put(ctx, cc)
 
-		require.Equal(t, state.Destroyed, cc.State())
+		require.Eventually(t, func() bool { return cc.State() == state.Destroyed }, time.Second, time.Millisecond)
 		require.False(t, testPoolHasConn(pool, e.Key()))
 	})
 }
@@ -787,7 +673,7 @@ func TestPool_GetPut(t *testing.T) {
 			t.Fatal("deadlock: Put blocked while conn.Close waits for pool mutex")
 		}
 
-		require.True(t, lockFreeDuringClose.Load(),
+		require.Eventually(t, lockFreeDuringClose.Load, time.Second, time.Millisecond,
 			"pool mutex must be released before conn.Close invokes remove",
 		)
 		require.False(t, testPoolHasConn(pool, e.Key()))
@@ -1164,6 +1050,72 @@ func TestPool_RemoveRefSetsClosedUnderMutex(t *testing.T) {
 	wg.Wait()
 
 	require.True(t, pool.closed.Load())
+}
+
+func TestPool_RemoveRefCancelsAndWaitsForReleasedConnection(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	closeStarted := make(chan struct{})
+	closeContinue := make(chan struct{})
+	resumeClose := sync.OnceFunc(func() { close(closeContinue) })
+	defer resumeClose()
+	pool := NewPool(ctx, &mockConfig{
+		shutdownTimeout: time.Hour,
+		driverTrace: &trace.Driver{
+			OnConnClose: func(trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
+				close(closeStarted)
+				select {
+				case <-closeContinue:
+				case <-ctx.Done():
+				}
+
+				return nil
+			},
+		},
+	})
+	require.NoError(t, pool.AddRef(ctx))
+
+	cc := pool.Get(endpoint.New("draining:2135")).(*conn)
+	streamCtx, finishStream := cc.childStreams.WithCancel(ctx)
+	defer finishStream()
+	putDone := make(chan struct{})
+	go func() {
+		pool.Put(ctx, cc)
+		close(putDone)
+	}()
+	select {
+	case <-putDone:
+	case <-ctx.Done():
+		t.Fatal("put waited for the stream to finish")
+	}
+	require.Zero(t, testPoolConnsLen(pool))
+	require.Eventually(t, cc.shuttingDown.Load, time.Second, time.Millisecond)
+	require.NoError(t, pool.RemoveRef(ctx))
+	require.NoError(t, streamCtx.Err())
+
+	released := make(chan error, 1)
+	go func() { released <- pool.RemoveRef(ctx) }()
+	select {
+	case <-closeStarted:
+	case <-ctx.Done():
+		t.Fatal("final pool release did not cancel the connection drain")
+	}
+	require.ErrorIs(t, streamCtx.Err(), context.Canceled)
+	select {
+	case err := <-released:
+		t.Fatalf("pool returned before the connection closed: %v", err)
+	case <-time.After(10 * time.Millisecond):
+	}
+
+	resumeClose()
+	select {
+	case err := <-released:
+		require.NoError(t, err)
+	case <-ctx.Done():
+		t.Fatal("pool release did not finish after the connection closed")
+	}
+	require.Equal(t, state.Destroyed, cc.State())
 }
 
 func TestPool_PutIgnoresInvalidConn(t *testing.T) {

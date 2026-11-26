@@ -544,7 +544,8 @@ func TestConnCountsRPCWhileLazyDialIsWaiting(t *testing.T) {
 				t.Fatal("dial did not start")
 			}
 			require.EqualValues(t, 1, load.InFlight())
-			cancel()
+			require.NoError(t, c.Close(ctx))
+			require.NoError(t, ctx.Err())
 			require.ErrorIs(t, <-result, context.Canceled)
 			require.Zero(t, load.InFlight())
 		})
@@ -556,7 +557,9 @@ func TestConnStreamCreationErrorReleasesLoadOnce(t *testing.T) {
 		t.Run(fmt.Sprint(callback), func(t *testing.T) {
 			c := newConn(endpoint.New("test"), &mockConfig{})
 			load := requireInFlightCounter(t, c)
-			c.grpcConn = &inFlightTransport{newStream: func(opts []grpc.CallOption) (grpc.ClientStream, error) {
+			c.grpcConn = &inFlightTransport{newStream: func(
+				_ context.Context, opts []grpc.CallOption,
+			) (grpc.ClientStream, error) {
 				require.EqualValues(t, 1, load.InFlight())
 				if callback {
 					for _, opt := range opts {
@@ -638,6 +641,86 @@ func TestConnStreamRemainsInflightUntilRPCFinishes(t *testing.T) {
 	}
 }
 
+func TestConnCloseDrainsStreams(t *testing.T) {
+	for _, tc := range []struct {
+		outcome string
+		timeout time.Duration
+	}{
+		{"idle", time.Minute},
+		{"finished", time.Minute},
+		{"canceled", time.Minute},
+		{"timeout", 20 * time.Millisecond},
+		{"zero", 0},
+		{"negative", -time.Second},
+	} {
+		t.Run(tc.outcome, func(t *testing.T) {
+			ctx, stop := context.WithTimeout(t.Context(), 5*time.Second)
+			defer stop()
+			closeCtx, cancelClose := context.WithCancel(ctx)
+			defer cancelClose()
+
+			c := newConn(endpoint.New("test"), &mockConfig{shutdownTimeout: tc.timeout})
+			c.grpcConn = &mockGrpcConn{}
+			var streamCtx context.Context
+			var finish func(error)
+			if tc.outcome != "idle" {
+				c.grpcConn = &inFlightTransport{
+					invoke: func(context.Context) error { return nil },
+					newStream: func(ctx context.Context, opts []grpc.CallOption) (grpc.ClientStream, error) {
+						streamCtx = ctx
+						for _, opt := range opts {
+							if onFinish, ok := opt.(grpc.OnFinishCallOption); ok {
+								finish = onFinish.OnFinish
+							}
+						}
+
+						return mock.NewMockClientStream(gomock.NewController(t)), nil
+					},
+				}
+				_, err := c.NewStream(ctx, &grpc.StreamDesc{}, "/test")
+				require.NoError(t, err)
+				require.NotNil(t, finish)
+			}
+
+			closed := make(chan error, 1)
+			start := time.Now()
+			go func() { closed <- c.Close(closeCtx) }()
+			if tc.outcome == "finished" || tc.outcome == "canceled" {
+				require.Eventually(t, func() bool {
+					return errors.Is(c.Invoke(ctx, "/test", nil, nil), errConnectionUnderShutdown)
+				}, time.Second, time.Millisecond)
+				_, err := c.NewStream(ctx, &grpc.StreamDesc{}, "/test")
+				require.ErrorIs(t, err, errConnectionUnderShutdown)
+				require.NoError(t, streamCtx.Err())
+				select {
+				case <-closed:
+					t.Fatal("Close returned with a live stream")
+				default:
+				}
+				if tc.outcome == "finished" {
+					finish(nil)
+				} else {
+					cancelClose()
+				}
+			}
+			select {
+			case err := <-closed:
+				require.NoError(t, err)
+			case <-ctx.Done():
+				t.Fatal("Close did not return")
+			}
+			require.NoError(t, ctx.Err())
+
+			if tc.outcome == "timeout" {
+				require.GreaterOrEqual(t, time.Since(start), tc.timeout)
+			}
+			if streamCtx != nil {
+				require.ErrorIs(t, streamCtx.Err(), context.Canceled)
+			}
+		})
+	}
+}
+
 func TestConnDialFailureReleasesLoad(t *testing.T) {
 	c := newConn(endpoint.New("test"), &mockConfig{})
 	load := requireInFlightCounter(t, c)
@@ -701,7 +784,7 @@ type inFlightTransport struct {
 	mockGrpcConn
 
 	invoke    func(context.Context) error
-	newStream func([]grpc.CallOption) (grpc.ClientStream, error)
+	newStream func(context.Context, []grpc.CallOption) (grpc.ClientStream, error)
 }
 
 func (c *inFlightTransport) Invoke(ctx context.Context, _ string, _, _ any, _ ...grpc.CallOption) error {
@@ -709,9 +792,9 @@ func (c *inFlightTransport) Invoke(ctx context.Context, _ string, _, _ any, _ ..
 }
 
 func (c *inFlightTransport) NewStream(
-	_ context.Context, _ *grpc.StreamDesc, _ string, opts ...grpc.CallOption,
+	ctx context.Context, _ *grpc.StreamDesc, _ string, opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
-	return c.newStream(opts)
+	return c.newStream(ctx, opts)
 }
 
 type inFlightTestService struct {

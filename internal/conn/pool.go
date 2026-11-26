@@ -23,14 +23,8 @@ import (
 
 type (
 	connValue struct {
-		cc         *conn
-		useCount   int64
-		retirement *connRetirement
-	}
-	connRetirement struct {
-		deadline time.Time
-		timer    clockwork.Timer
-		close    func()
+		cc       *conn
+		useCount int64
 	}
 	Pool struct {
 		config      Config
@@ -42,6 +36,9 @@ type (
 		usages int64
 		conns  map[endpoint.Key]*connValue
 		closed atomic.Bool
+
+		closeContexts *xcontext.CancelsGuard
+		closing       sync.WaitGroup
 	}
 )
 
@@ -49,6 +46,10 @@ var ErrClosedPool = xerrors.Wrap(fmt.Errorf("pool closed early"))
 
 func (p *Pool) DialTimeout() time.Duration {
 	return p.config.DialTimeout()
+}
+
+func (p *Pool) GrpcChannelShutdownTimeout() time.Duration {
+	return p.config.GrpcChannelShutdownTimeout()
 }
 
 func (p *Pool) Trace() *trace.Driver {
@@ -83,14 +84,10 @@ func (p *Pool) get(e endpoint.Endpoint) *connValue {
 
 	key := e.Key()
 
-	if value := p.conns[key]; value != nil {
-		if retirement := value.cancelRetirement(); retirement != nil && !p.clock.Now().Before(retirement.deadline) {
-			go retirement.close()
-		} else {
-			value.cc.lastClusterAnnouncement.Store(time.Now().Unix())
+	if value, ok := p.conns[key]; ok {
+		value.cc.lastClusterAnnouncement.Store(time.Now().Unix())
 
-			return value
-		}
+		return value
 	}
 
 	value := &connValue{
@@ -102,87 +99,43 @@ func (p *Pool) get(e endpoint.Endpoint) *connValue {
 	return value
 }
 
-// Put decrements the connection use count. When the count reaches zero, the gRPC
-// connection is closed and the entry is removed from the pool.
+// Put releases a connection reference. The final release removes the entry
+// from the pool and starts closing the connection in the background.
 func (p *Pool) Put(ctx context.Context, c Conn) {
-	if cc := p.releaseConn(ctx, c, 0); cc != nil {
-		_ = cc.Close(ctx)
+	cc, ok := c.(*conn)
+	if !ok || cc == nil {
+		return
+	}
+
+	closeCtx, cancel := p.releaseConn(ctx, cc)
+	if cancel != nil {
+		go func() {
+			defer p.closing.Done()
+			defer cancel()
+			_ = cc.Close(closeCtx)
+		}()
 	}
 }
 
-// PutAfter releases a reference and closes the connection asynchronously if it
-// has no remaining references. A non-positive timeout skips the delay.
-func (p *Pool) PutAfter(ctx context.Context, c Conn, timeout time.Duration) {
-	if cc := p.releaseConn(ctx, c, timeout); cc != nil {
-		go func() { _ = cc.Close(xcontext.ValueOnly(ctx)) }()
-	}
-}
-
-func (p *Pool) releaseConn(ctx context.Context, connection Conn, timeout time.Duration) *conn {
-	c, ok := connection.(*conn)
-	if !ok || c == nil {
-		return nil
-	}
-
+func (p *Pool) releaseConn(ctx context.Context, c *conn) (context.Context, context.CancelFunc) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.closed.Load() || p.conns == nil {
-		return c
-	}
-
 	key := c.endpoint.Key()
-
-	value, ok := p.conns[key]
-	if !ok || value == nil || value.cc != c {
-		return c
+	value := p.conns[key]
+	if value == nil || value.cc != c {
+		return nil, nil
 	}
 
 	value.useCount--
 	if value.useCount > 0 {
-		return nil
+		return nil, nil
 	}
 
-	value.cancelRetirement()
-	if timeout <= 0 {
-		delete(p.conns, key)
+	delete(p.conns, key)
+	p.closing.Add(1)
 
-		return c
-	}
-	p.scheduleRetirement(ctx, key, value, timeout)
-
-	return nil
-}
-
-func (v *connValue) cancelRetirement() *connRetirement {
-	retirement := v.retirement
-	if retirement != nil {
-		v.retirement = nil
-		retirement.timer.Stop()
-	}
-
-	return retirement
-}
-
-func (p *Pool) scheduleRetirement(ctx context.Context, key endpoint.Key, value *connValue, timeout time.Duration) {
-	closeCtx := xcontext.ValueOnly(ctx)
-	retirement := &connRetirement{
-		deadline: p.clock.Now().Add(timeout),
-		close:    func() { _ = value.cc.Close(closeCtx) },
-	}
-	retirement.timer = p.clock.AfterFunc(timeout, func() {
-		p.mu.Lock()
-		if value.retirement != retirement {
-			p.mu.Unlock()
-
-			return
-		}
-		value.retirement = nil
-		delete(p.conns, key)
-		p.mu.Unlock()
-		retirement.close()
-	})
-	value.retirement = retirement
+	return p.closeContexts.WithCancel(xcontext.ValueOnly(ctx))
 }
 
 func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
@@ -223,9 +176,11 @@ func (p *Pool) RemoveRef(ctx context.Context) (finalErr error) {
 	}()
 
 	toClose := p.release()
-	if len(toClose) == 0 {
+	if toClose == nil {
 		return nil
 	}
+	p.closeContexts.Cancel()
+	defer p.closing.Wait()
 
 	var (
 		issues   []error
@@ -270,7 +225,6 @@ func (p *Pool) release() []closer.Closer {
 
 	toClose := make([]closer.Closer, 0, len(p.conns))
 	for _, value := range p.conns {
-		value.cancelRetirement()
 		toClose = append(toClose, value.cc)
 	}
 
@@ -316,7 +270,7 @@ func (p *Pool) closeConnsForFailedResolve(ctx context.Context, target string) {
 	closeCtx := xcontext.ValueOnly(ctx)
 	for _, cc := range toClose {
 		cc.mtx.Lock()
-		if !cc.closed {
+		if !cc.closed && !cc.shuttingDown.Load() {
 			cc.close(closeCtx)
 		}
 		cc.mtx.Unlock()
@@ -404,12 +358,13 @@ func NewPool(ctx context.Context, config Config, opts ...poolOption) *Pool {
 	defer onDone()
 
 	p := &Pool{
-		usages:      1,
-		config:      config,
-		dialOptions: config.GrpcDialOptions(),
-		clock:       clockwork.NewRealClock(),
-		done:        make(chan struct{}),
-		conns:       make(map[endpoint.Key]*connValue),
+		usages:        1,
+		config:        config,
+		dialOptions:   config.GrpcDialOptions(),
+		clock:         clockwork.NewRealClock(),
+		done:          make(chan struct{}),
+		conns:         make(map[endpoint.Key]*connValue),
+		closeContexts: xcontext.NewCancelsGuard(),
 	}
 
 	for _, opt := range opts {

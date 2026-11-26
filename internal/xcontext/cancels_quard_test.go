@@ -21,3 +21,32 @@ func TestCancelsGuard(t *testing.T) {
 	g.Cancel()
 	require.Error(t, ctx.Err())
 }
+
+func TestCancelsGuardSeal(t *testing.T) {
+	for _, force := range []bool{false, true} {
+		g := NewCancelsGuard()
+		ctx, cancel := g.WithCancel(t.Context())
+		drained := g.Seal()
+		_, rejected := g.WithCancel(t.Context())
+		require.Nil(t, rejected)
+		select {
+		case <-drained:
+			t.Fatal("a sealed guard still has an active context")
+		default:
+		}
+
+		if force {
+			g.Cancel()
+		} else {
+			cancel()
+		}
+		require.ErrorIs(t, ctx.Err(), context.Canceled)
+		select {
+		case <-drained:
+		default:
+			t.Fatal("a sealed guard did not signal when empty")
+		}
+		cancel()
+		g.Cancel()
+	}
+}

@@ -1,16 +1,9 @@
 package conn
 
-import (
-	"time"
-
-	"google.golang.org/grpc"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-)
+import "time"
 
 type Config interface {
-	DialTimeout() time.Duration
+	connConfig
+
 	ConnectionTTL() time.Duration
-	Trace() *trace.Driver
-	GrpcDialOptions() []grpc.DialOption
 }

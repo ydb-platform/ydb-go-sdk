@@ -86,8 +86,6 @@ type Balancer struct {
 	random           xrand.Rand
 	lastDiscovered   []endpoint.Endpoint
 
-	grpcChannelShutdownTimeout time.Duration
-
 	closeMu sync.Mutex
 	closed  bool
 }
@@ -255,7 +253,7 @@ func nextState(ctx context.Context, pool interface {
 	return active, newActive
 }
 
-func (b *Balancer) retireRemovedEndpoints(
+func (b *Balancer) releaseRemovedEndpoints(
 	ctx context.Context, priorities []policy.EndpointPriority, active, quarantine []conn.Conn,
 ) ([]conn.Conn, []conn.Conn) {
 	if len(active)+len(quarantine) == 0 {
@@ -266,11 +264,11 @@ func (b *Balancer) retireRemovedEndpoints(
 	for _, priority := range priorities {
 		discovered[priority.Key] = struct{}{}
 	}
-	keep := func(cc conn.Conn) bool {
-		if _, ok := discovered[cc.Endpoint().Key()]; ok {
+	keep := func(c conn.Conn) bool {
+		if _, ok := discovered[c.Endpoint().Key()]; ok {
 			return true
 		}
-		b.pool.PutAfter(ctx, cc, b.grpcChannelShutdownTimeout)
+		b.pool.Put(ctx, c)
 
 		return false
 	}
@@ -348,7 +346,7 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	selectedEndpoints, selectedPriorities = selectActiveEndpoints(
 		active, quarantine, previousPriorities, endpoints, priorities, b.policy.MaxConnections(), b.random,
 	)
-	nextQuarantine, quarantine := b.retireRemovedEndpoints(ctx, priorities, active, quarantine)
+	nextQuarantine, quarantine := b.releaseRemovedEndpoints(ctx, priorities, active, quarantine)
 	quarantine, connections := nextState(ctx, b.pool, quarantine, nextQuarantine, selectedEndpoints)
 
 	if b.policy.MaxConnections() > 0 {
@@ -464,7 +462,6 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		)...),
 		localDCDetector: detectLocalDC,
 	}
-	b.grpcChannelShutdownTimeout = b.discoveryConfig.GrpcChannelShutdownTimeout()
 	defer func(created *Balancer) {
 		if finalErr != nil {
 			_ = created.Close(context.WithoutCancel(ctx))
@@ -480,7 +477,9 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	}
 
 	if policy.SingleConnection() {
-		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{endpoint.New(b.driverConfig.Endpoint())}, "")
+		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
+			endpoint.New(b.driverConfig.Endpoint()),
+		}, "")
 	} else {
 		if err := b.clusterDiscovery(ctx); err != nil {
 			return nil, xerrors.WithStackTrace(err)

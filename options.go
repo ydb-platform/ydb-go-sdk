@@ -419,14 +419,13 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	}
 }
 
-// WithGrpcChannelShutdownTimeout sets how long the pool keeps a connection
-// after discovery removes its endpoint and the last pool reference is released.
-// The pool can reuse the connection if the endpoint returns before the timeout.
-// The default is 1 minute and 59 seconds. A non-positive timeout closes the
-// connection immediately after its last reference is released.
+// WithGrpcChannelShutdownTimeout sets how long a gRPC connection waits for
+// existing streams to finish after shutdown starts. New RPCs are rejected
+// during shutdown. The default is 1 minute and 59 seconds. A non-positive
+// timeout cancels existing streams immediately.
 func WithGrpcChannelShutdownTimeout(timeout time.Duration) Option {
 	return func(_ context.Context, d *Driver) error {
-		d.discoveryOptions = append(d.discoveryOptions, discoveryConfig.WithGrpcChannelShutdownTimeout(timeout))
+		d.options = append(d.options, config.WithGrpcChannelShutdownTimeout(timeout))
 
 		return nil
 	}
@@ -456,7 +455,8 @@ func WithDefaultIdempotent(idempotent bool) Option {
 	}
 }
 
-// WithTraceDriver appends trace.Driver into driver traces
+// WithTraceDriver appends trace.Driver into driver traces.
+// Connection-close callbacks must not synchronously close the driver.
 func WithTraceDriver(t trace.Driver) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.options = append(d.options, config.WithTrace(t))

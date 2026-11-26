@@ -22,6 +22,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
@@ -50,6 +52,10 @@ type poolRegisteredConn struct {
 	grpc.ClientConnInterface
 
 	inner conn.Conn
+}
+
+func (c *poolRegisteredConn) Close(ctx context.Context) error {
+	return c.inner.Close(ctx)
 }
 
 func (c *poolRegisteredConn) Ban(ctx context.Context) {
@@ -384,9 +390,8 @@ func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem
 	defer func() { _ = pool.RemoveRef(ctx) }()
 
 	b := &Balancer{
-		driverConfig:               cfg,
-		pool:                       pool,
-		grpcChannelShutdownTimeout: -time.Second,
+		driverConfig: cfg,
+		pool:         pool,
 	}
 
 	e1 := endpoint.New("e1.example:2135", endpoint.WithID(1))
@@ -417,9 +422,7 @@ func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem
 
 	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1}, "")
 	require.Nil(t, connInQuarantine(b, 2))
-	require.Eventually(t, func() bool {
-		return selected.State() == state.Destroyed
-	}, time.Second, 10*time.Millisecond, "a negative timeout must close the connection after one discovery update")
+	require.Eventually(t, func() bool { return selected.State() == state.Destroyed }, time.Second, 10*time.Millisecond)
 }
 
 func TestApplyDiscoveredEndpointsClosedPool(t *testing.T) {
@@ -2567,6 +2570,7 @@ func startDynamicDiscoveryServer(tb testing.TB, nodeIDs []uint32) *dynamicDiscov
 
 	statsHandler := &serverConnStats{active: &server.activeConns}
 	server.grpcServer = grpc.NewServer(grpc.StatsHandler(statsHandler))
+	grpc_health_v1.RegisterHealthServer(server.grpcServer, health.NewServer())
 
 	Ydb_Discovery_V1.RegisterDiscoveryServiceServer(
 		server.grpcServer,
@@ -2743,15 +2747,12 @@ func connInQuarantine(balancer *Balancer, nodeID uint32) conn.Conn {
 	return nil
 }
 
-// TestBalancerDiscoveryDropClosesGRPC verifies end-to-end that a node removed from
-// ListEndpoints closes its pooled gRPC connection after the configured timeout,
-// including connections already in quarantine when their endpoints disappear.
+// TestBalancerDiscoveryDropClosesGRPC verifies that an existing stream can
+// finish after discovery removes its endpoint.
 func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	const (
-		node1   uint32 = 1
-		node2   uint32 = 2
-		node3   uint32 = 3
-		timeout        = 2 * time.Second
+		node1 uint32 = 1
+		node2 uint32 = 2
 	)
 
 	ctx := t.Context()
@@ -2763,11 +2764,8 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 		config.WithDatabase("/local"),
 		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
 		config.WithTrace(*events.driverTrace()),
-		config.WithBalancer(userBalancers.WithMaxConnections(
-			userBalancers.PreferWithFallback(userBalancers.RandomChoice(), func(e userBalancers.Endpoint) bool {
-				return e.NodeID() != node2
-			}), 2,
-		)),
+		config.WithGrpcChannelShutdownTimeout(time.Minute),
+		config.WithBalancer(userBalancers.RandomChoice()),
 	)
 
 	pool := conn.NewPool(ctx, cfg)
@@ -2775,11 +2773,8 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 		require.NoError(t, pool.RemoveRef(ctx))
 	}()
 
-	balancer, err := New(ctx, cfg, pool,
-		discoveryConfig.WithInterval(time.Hour), discoveryConfig.WithGrpcChannelShutdownTimeout(timeout),
-	)
+	balancer, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
 	require.NoError(t, err)
-	defer func() { _ = balancer.Close(ctx) }()
 
 	require.ElementsMatch(t, []uint32{node1, node2}, activeNodeIDs(balancer))
 
@@ -2794,28 +2789,35 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	require.NotNil(t, node2Conn)
 	require.Equal(t, state.Online, node2Conn.State())
 
-	server.setNodeIDs([]uint32{node1, node2, node3})
-	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
-	require.ElementsMatch(t, []uint32{node1, node3}, activeNodeIDs(balancer))
-	require.Same(t, node2Conn, connInQuarantine(balancer, node2))
-	dialWhoAmI(t, balancer, node3)
-	node3Conn := connByNodeID(balancer, node3)
-	require.NotNil(t, node3Conn)
+	streamCtx, cancelStream := context.WithCancel(endpoint.WithNodeID(ctx, node2))
+	defer cancelStream()
+	watch, err := grpc_health_v1.NewHealthClient(balancer).Watch(streamCtx, &grpc_health_v1.HealthCheckRequest{})
+	require.NoError(t, err)
+	_, err = watch.Recv()
+	require.NoError(t, err)
 
-	server.setNodeIDs([]uint32{node1, node3})
+	// Discovery #2: same cluster — quarantine cycle, refs increment.
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
-	require.Nil(t, connInQuarantine(balancer, node2))
+	require.ElementsMatch(t, []uint32{node1, node2}, activeNodeIDs(balancer))
+	require.Equal(t, 0, events.closedCount(node2))
+
+	// Discovery #3: node 2 disappears while the existing stream remains open.
 	server.setNodeIDs([]uint32{node1})
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
+	require.Equal(t, []uint32{node1}, activeNodeIDs(balancer))
+	require.Nil(t, connInQuarantine(balancer, node2))
+
+	// Discovery #4: the stream still runs through another applied response.
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
 	require.Equal(t, []uint32{node1}, activeNodeIDs(balancer))
 	require.Equal(t, state.Online, node2Conn.State())
-	require.Equal(t, state.Online, node3Conn.State())
+	require.Equal(t, 0, events.closedCount(node2))
+
+	cancelStream()
 
 	require.Eventually(t, func() bool {
-		return events.closedCount(node2) == 1 && node2Conn.State() == state.Destroyed &&
-			events.closedCount(node3) == 1 && node3Conn.State() == state.Destroyed
-	}, 2*timeout, 10*time.Millisecond)
+		return events.closedCount(node2) == 1 && node2Conn.State() == state.Destroyed
+	}, time.Second, 10*time.Millisecond, "node removed from discovery must close gRPC connection")
 
 	require.Equal(t, 0, events.closedCount(node1))
 
@@ -2858,9 +2860,8 @@ func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
 		require.NoError(t, pool.RemoveRef(ctx))
 	}()
 
-	balancer, err := New(ctx, cfg, pool, discoveryConfig.WithGrpcChannelShutdownTimeout(0))
+	balancer, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
 	require.NoError(t, err)
-	defer func() { require.NoError(t, balancer.Close(ctx)) }()
 
 	dialWhoAmI(t, balancer, node2)
 	node2Conn := connByNodeID(balancer, node2)
@@ -2876,6 +2877,7 @@ func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
 	require.Same(t, node2Conn, connByNodeID(balancer, node2))
 	require.Equal(t, state.Offline, node2Conn.State())
 
+	// Discovery #3: node 2 disappears, releasing its parked connection.
 	server.setNodeIDs([]uint32{node1})
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
 	require.Nil(t, connInQuarantine(balancer, node2))
@@ -2884,6 +2886,8 @@ func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
 	}, time.Second, 10*time.Millisecond, "Discovery removal must destroy a parked connection")
 	require.Equal(t, 1, events.parkedCount(node2))
 	require.Equal(t, 1, events.dialedCount(node2))
+
+	require.NoError(t, balancer.Close(ctx))
 }
 
 func TestBalancerConnectionTTLParksTransportsAfterNetworkLoss(t *testing.T) {
@@ -2955,9 +2959,15 @@ func TestBalancerConnectionTTLParksTransportsAfterNetworkLoss(t *testing.T) {
 	)
 	require.NoError(t, balancer.Close(ctx))
 
-	for _, nodeID := range nodeIDs {
-		require.Equal(t, 1, events.closedCount(nodeID))
-	}
+	require.Eventually(t, func() bool {
+		for _, nodeID := range nodeIDs {
+			if events.closedCount(nodeID) != 1 {
+				return false
+			}
+		}
+
+		return true
+	}, time.Second, 10*time.Millisecond)
 }
 
 type clearElectionContext struct {

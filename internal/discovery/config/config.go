@@ -12,8 +12,7 @@ import (
 )
 
 const (
-	DefaultInterval                   = time.Minute
-	defaultGrpcChannelShutdownTimeout = 2*time.Minute - time.Second
+	DefaultInterval = time.Minute
 )
 
 type Config struct {
@@ -26,16 +25,14 @@ type Config struct {
 	addressMutator func(address string) string
 	clock          clockwork.Clock
 
-	interval                   time.Duration
-	grpcChannelShutdownTimeout time.Duration
-	trace                      *trace.Discovery
+	interval time.Duration
+	trace    *trace.Discovery
 }
 
 func New(opts ...Option) *Config {
 	c := &Config{
-		interval:                   DefaultInterval,
-		grpcChannelShutdownTimeout: defaultGrpcChannelShutdownTimeout,
-		trace:                      &trace.Discovery{},
+		interval: DefaultInterval,
+		trace:    &trace.Discovery{},
 		addressMutator: func(address string) string {
 			return address
 		},
@@ -64,10 +61,6 @@ func (c *Config) Clock() clockwork.Clock {
 
 func (c *Config) Interval() time.Duration {
 	return c.interval
-}
-
-func (c *Config) GrpcChannelShutdownTimeout() time.Duration {
-	return c.grpcChannelShutdownTimeout
 }
 
 func (c *Config) Endpoint() string {
@@ -165,11 +158,5 @@ func WithInterval(interval time.Duration) Option {
 		default:
 			c.interval = interval
 		}
-	}
-}
-
-func WithGrpcChannelShutdownTimeout(timeout time.Duration) Option {
-	return func(c *Config) {
-		c.grpcChannelShutdownTimeout = timeout
 	}
 }

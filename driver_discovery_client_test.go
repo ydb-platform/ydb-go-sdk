@@ -101,5 +101,5 @@ func TestWithGrpcChannelShutdownTimeout(t *testing.T) {
 
 	var d Driver
 	require.NoError(t, WithGrpcChannelShutdownTimeout(timeout)(t.Context(), &d))
-	require.Equal(t, timeout, discoveryConfig.New(d.discoveryOptions...).GrpcChannelShutdownTimeout())
+	require.Equal(t, timeout, config.New(d.options...).GrpcChannelShutdownTimeout())
 }

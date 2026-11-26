@@ -34,11 +34,14 @@ var (
 
 	// errClosedConnection specified error when connection are closed early
 	errClosedConnection = xerrors.Wrap(fmt.Errorf("connection closed early"))
+
+	errConnectionUnderShutdown = xerrors.Wrap(fmt.Errorf("connection under shutdown"))
 )
 
 type Conn interface {
 	grpc.ClientConnInterface
 
+	Close(ctx context.Context) error
 	Endpoint() endpoint.Endpoint
 	State() state.State
 	InFlight() int64
@@ -50,6 +53,7 @@ type (
 	connConfig interface {
 		Trace() *trace.Driver
 		DialTimeout() time.Duration
+		GrpcChannelShutdownTimeout() time.Duration
 		GrpcDialOptions() []grpc.DialOption
 	}
 	grpcClientConnInterface interface {
@@ -65,6 +69,8 @@ type (
 		done                    chan struct{}
 		endpoint                endpoint.Endpoint // ro access
 		closed                  bool
+		shuttingDown            atomic.Bool
+		cancelDial              atomic.Pointer[context.CancelFunc]
 		state                   atomic.Uint32
 		inFlight                atomic.Int64
 		lastClusterAnnouncement atomic.Int64
@@ -153,13 +159,19 @@ func (c *conn) InFlight() int64 {
 }
 
 func (c *conn) realConn(ctx context.Context) (cc grpcClientConnInterface, err error) {
-	if c.isClosed() {
-		return nil, xerrors.WithStackTrace(errClosedConnection)
+	if c.shuttingDown.Load() {
+		return nil, xerrors.WithStackTrace(errConnectionUnderShutdown)
 	}
 
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
+	if c.shuttingDown.Load() {
+		return nil, xerrors.WithStackTrace(errConnectionUnderShutdown)
+	}
+	if c.closed {
+		return nil, xerrors.WithStackTrace(errClosedConnection)
+	}
 	if c.grpcConn != nil {
 		return c.grpcConn, nil
 	}
@@ -181,6 +193,16 @@ func (c *conn) dial(ctx context.Context) (cc grpcClientConnInterface, err error)
 	defer func() {
 		onDone(err)
 	}()
+
+	ctx, cancelDial := context.WithCancel(ctx)
+	c.cancelDial.Store(&cancelDial)
+	defer func() {
+		c.cancelDial.Store(nil)
+		cancelDial()
+	}()
+	if c.shuttingDown.Load() {
+		return nil, xerrors.WithStackTrace(errConnectionUnderShutdown)
+	}
 
 	if dialTimeout := c.config.DialTimeout(); dialTimeout > 0 {
 		var cancel context.CancelFunc
@@ -253,6 +275,22 @@ func (c *conn) isClosed() bool {
 }
 
 func (c *conn) Close(ctx context.Context) (err error) {
+	if !c.shuttingDown.CompareAndSwap(false, true) {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, c.config.GrpcChannelShutdownTimeout())
+	defer cancel()
+
+	if cancelDial := c.cancelDial.Load(); cancelDial != nil {
+		(*cancelDial)()
+	}
+
+	select {
+	case <-c.childStreams.Seal():
+	case <-ctx.Done():
+	}
+	c.childStreams.Cancel()
+
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
@@ -403,6 +441,10 @@ func (c *conn) Invoke(
 	res any,
 	opts ...grpc.CallOption,
 ) (err error) {
+	if c.shuttingDown.Load() {
+		return xerrors.WithStackTrace(errConnectionUnderShutdown)
+	}
+
 	c.inFlight.Add(1)
 	defer c.inFlight.Add(-1)
 
@@ -451,6 +493,10 @@ func (c *conn) NewStream(
 	method string,
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, finalErr error) {
+	if c.shuttingDown.Load() {
+		return nil, xerrors.WithStackTrace(errConnectionUnderShutdown)
+	}
+
 	c.inFlight.Add(1)
 	stopInFlight := sync.OnceFunc(func() { c.inFlight.Add(-1) })
 	defer func() {
@@ -475,11 +521,6 @@ func (c *conn) NewStream(
 		onDone(finalErr, c.State())
 	}()
 
-	cc, err := c.realConn(ctx)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
 	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -488,11 +529,19 @@ func (c *conn) NewStream(
 	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
 	grpcCtx, cancel := c.childStreams.WithCancel(ctx)
+	if cancel == nil {
+		return nil, xerrors.WithStackTrace(errConnectionUnderShutdown)
+	}
 	defer func() {
 		if finalErr != nil {
 			cancel()
 		}
 	}()
+
+	cc, err := c.realConn(grpcCtx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
 	s := &grpcClientStream{
 		parentConn: c,
@@ -558,11 +607,6 @@ func newConn(e endpoint.Endpoint, config connConfig, opts ...option) *conn {
 		config:       config,
 		done:         make(chan struct{}),
 		childStreams: xcontext.NewCancelsGuard(),
-		onClose: []func(*conn){
-			func(c *conn) {
-				c.childStreams.Cancel()
-			},
-		},
 	}
 
 	c.state.Store(uint32(state.Created))
