@@ -78,19 +78,23 @@ func RegisterPartitionSessionCount(
 func registerGauge(
 	cfg ReaderMetricsConfig, desc telemetry.Descriptor, collect telemetry.Int64GaugeCallback,
 ) (func(), error) {
-	var closed atomic.Bool
+	var collector atomic.Pointer[telemetry.Int64GaugeCallback]
+	collector.Store(&collect)
 	unregister, err := cfg.Meter(desc, func(ctx context.Context, observe func(int64, ...telemetry.Attribute)) error {
-		if closed.Load() {
+		current := collector.Load()
+		if current == nil {
 			return nil
 		}
 
-		return collect(ctx, observe)
+		return (*current)(ctx, observe)
 	})
 	if err != nil {
+		collector.Store(nil)
+
 		return nil, err
 	}
 	if unregister == nil {
-		closed.Store(true)
+		collector.Store(nil)
 
 		return nil, errNilMetricUnregister
 	}
@@ -98,7 +102,7 @@ func registerGauge(
 	panicCallback := cfg.PanicCallback()
 
 	return func() {
-		if closed.CompareAndSwap(false, true) {
+		if collector.Swap(nil) != nil {
 			// A collecting backend may wait for Close before it unlocks unregister.
 			go func() {
 				if panicCallback != nil {
