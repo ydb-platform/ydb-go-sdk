@@ -32,9 +32,6 @@ var (
 	// errOperationNotReady specified error when operation is not ready
 	errOperationNotReady = xerrors.Wrap(fmt.Errorf("operation is not ready yet"))
 
-	// errClosedConnection specified error when connection are closed early
-	errClosedConnection = xerrors.Wrap(fmt.Errorf("connection closed early"))
-
 	errConnectionUnderShutdown = xerrors.Retryable(xerrors.Wrap(fmt.Errorf("connection under shutdown")))
 )
 
@@ -67,8 +64,6 @@ type (
 		grpcConn                grpcClientConnInterface
 		done                    chan struct{}
 		endpoint                endpoint.Endpoint // ro access
-		closed                  bool
-		shuttingDown            atomic.Bool
 		cancelDial              atomic.Pointer[context.CancelFunc]
 		state                   atomic.Uint32
 		inFlight                atomic.Int64
@@ -110,15 +105,33 @@ func SetState(ctx context.Context, c Conn, s state.State) state.State {
 }
 
 func (c *conn) setState(ctx context.Context, s state.State) state.State {
-	if state := state.State(c.state.Swap(uint32(s))); state != s {
-		gtrace.DriverOnConnStateChange(
-			c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).setState"),
-			c.Endpoint(), state,
-		)(s)
+	previous, changed := c.transitionState(s)
+	if !changed {
+		return previous
 	}
+	c.traceStateChange(ctx, previous, s)
 
 	return s
+}
+
+func (c *conn) transitionState(next state.State) (state.State, bool) {
+	for {
+		previous := c.State()
+		if previous == next || previous.IsClosing() && next != state.Destroyed {
+			return previous, false
+		}
+		if c.state.CompareAndSwap(uint32(previous), uint32(next)) {
+			return previous, true
+		}
+	}
+}
+
+func (c *conn) traceStateChange(ctx context.Context, previous, next state.State) {
+	gtrace.DriverOnConnStateChange(
+		c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).setState"),
+		c.Endpoint(), previous,
+	)(next)
 }
 
 func (c *conn) unban(ctx context.Context) state.State {
@@ -132,9 +145,7 @@ func (c *conn) unban(ctx context.Context) state.State {
 		newState = state.Offline
 	}
 
-	c.setState(ctx, newState)
-
-	return newState
+	return c.setState(ctx, newState)
 }
 
 func (c *conn) Unban(ctx context.Context) {
@@ -158,18 +169,15 @@ func (c *conn) InFlight() int64 {
 }
 
 func (c *conn) realConn(ctx context.Context) (cc grpcClientConnInterface, err error) {
-	if c.shuttingDown.Load() {
+	if c.State().IsClosing() {
 		return nil, xerrors.WithStackTrace(errConnectionUnderShutdown)
 	}
 
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
-	if c.shuttingDown.Load() {
+	if c.State().IsClosing() {
 		return nil, xerrors.WithStackTrace(errConnectionUnderShutdown)
-	}
-	if c.closed {
-		return nil, xerrors.WithStackTrace(errClosedConnection)
 	}
 	if c.grpcConn != nil {
 		return c.grpcConn, nil
@@ -180,10 +188,6 @@ func (c *conn) realConn(ctx context.Context) (cc grpcClientConnInterface, err er
 
 // c.mtx must be locked
 func (c *conn) dial(ctx context.Context) (cc grpcClientConnInterface, err error) {
-	if c.closed {
-		return nil, xerrors.WithStackTrace(errClosedConnection)
-	}
-
 	onDone := gtrace.DriverOnConnDial(
 		c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).dial"),
@@ -199,7 +203,7 @@ func (c *conn) dial(ctx context.Context) (cc grpcClientConnInterface, err error)
 		c.cancelDial.Store(nil)
 		cancelDial()
 	}()
-	if c.shuttingDown.Load() {
+	if c.State().IsClosing() {
 		return nil, xerrors.WithStackTrace(errConnectionUnderShutdown)
 	}
 
@@ -266,15 +270,9 @@ func (c *conn) close(ctx context.Context) (err error) {
 	return xerrors.WithStackTrace(err)
 }
 
-func (c *conn) isClosed() bool {
-	c.mtx.RLock()
-	defer c.mtx.RUnlock()
-
-	return c.closed
-}
-
 func (c *conn) Close(ctx context.Context) (err error) {
-	if !c.shuttingDown.CompareAndSwap(false, true) {
+	previous, changed := c.transitionState(state.UnderShutdown)
+	if !changed {
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(ctx, c.config.GrpcChannelShutdownTimeout())
@@ -293,18 +291,13 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
-	if c.closed {
-		return nil
-	}
-
+	c.traceStateChange(ctx, previous, state.UnderShutdown)
 	onDone := gtrace.DriverOnConnClose(
 		c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).Close"),
 		c.Endpoint(),
 	)
 	defer func() {
-		c.closed = true
-
 		c.setState(ctx, state.Destroyed)
 
 		for _, onClose := range c.onClose {
@@ -440,7 +433,7 @@ func (c *conn) Invoke(
 	res any,
 	opts ...grpc.CallOption,
 ) (err error) {
-	if c.shuttingDown.Load() {
+	if c.State().IsClosing() {
 		return xerrors.WithStackTrace(errConnectionUnderShutdown)
 	}
 
@@ -492,7 +485,7 @@ func (c *conn) NewStream(
 	method string,
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, finalErr error) {
-	if c.shuttingDown.Load() {
+	if c.State().IsClosing() {
 		return nil, xerrors.WithStackTrace(errConnectionUnderShutdown)
 	}
 

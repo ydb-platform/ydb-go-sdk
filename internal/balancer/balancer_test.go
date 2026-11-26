@@ -2806,7 +2806,7 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	// Discovery #4: the stream still runs through another applied response.
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
 	require.Equal(t, []uint32{node1}, activeNodeIDs(balancer))
-	require.Equal(t, state.Online, node2Conn.State())
+	require.Eventually(t, func() bool { return node2Conn.State() == state.UnderShutdown }, time.Second, time.Millisecond)
 	require.Equal(t, 0, events.closedCount(node2))
 
 	cancelStream()

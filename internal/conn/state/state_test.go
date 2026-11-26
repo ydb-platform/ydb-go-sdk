@@ -38,6 +38,11 @@ func TestState_String(t *testing.T) {
 			expected: "destroyed",
 		},
 		{
+			name:     "UnderShutdown",
+			state:    UnderShutdown,
+			expected: "under_shutdown",
+		},
+		{
 			name:     "Unknown",
 			state:    Unknown,
 			expected: "unknown",
@@ -106,6 +111,7 @@ func TestState_IsValid(t *testing.T) {
 		name     string
 		state    State
 		expected bool
+		closing  bool
 	}{
 		{
 			name:     "Online is valid",
@@ -136,6 +142,12 @@ func TestState_IsValid(t *testing.T) {
 			name:     "Destroyed is not valid",
 			state:    Destroyed,
 			expected: false,
+			closing:  true,
+		},
+		{
+			name:    "UnderShutdown is not valid",
+			state:   UnderShutdown,
+			closing: true,
 		},
 		{
 			name:     "Invalid value is not valid",
@@ -147,6 +159,7 @@ func TestState_IsValid(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.expected, tt.state.IsValid())
+			require.Equal(t, tt.closing, tt.state.IsClosing())
 		})
 	}
 }

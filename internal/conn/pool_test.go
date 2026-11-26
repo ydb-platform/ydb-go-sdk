@@ -756,7 +756,7 @@ func TestPool_GetPut(t *testing.T) {
 				for range iterations {
 					c := pool.Get(e)
 					require.NotNil(t, c)
-					require.False(t, c.(*conn).isClosed())
+					require.False(t, c.State().IsClosing())
 					pool.Put(ctx, c)
 				}
 			}()
@@ -880,7 +880,7 @@ func TestPool_GetPut(t *testing.T) {
 		got := pool.Get(e)
 		require.NotNil(t, got)
 		require.NotSame(t, cc, got)
-		require.False(t, got.(*conn).isClosed())
+		require.False(t, got.State().IsClosing())
 
 		close(closeContinue)
 
@@ -971,7 +971,7 @@ func TestPool_GetPut(t *testing.T) {
 						if c == nil {
 							continue
 						}
-						if c.(*conn).isClosed() {
+						if c.State().IsClosing() {
 							closedConns.Add(1)
 						}
 						pool.Put(ctx, c)
@@ -1090,7 +1090,9 @@ func TestPool_RemoveRefCancelsAndWaitsForReleasedConnection(t *testing.T) {
 		t.Fatal("put waited for the stream to finish")
 	}
 	require.Zero(t, testPoolConnsLen(pool))
-	require.Eventually(t, cc.shuttingDown.Load, time.Second, time.Millisecond)
+	require.Eventually(t, func() bool {
+		return cc.State() == state.UnderShutdown
+	}, time.Second, time.Millisecond)
 	require.NoError(t, pool.RemoveRef(ctx))
 	require.NoError(t, streamCtx.Err())
 
@@ -1259,9 +1261,7 @@ func TestPool_CloseConnsForFailedResolveSkipsAlreadyClosed(t *testing.T) {
 	target := "localhost:2135"
 	e := endpoint.New(target)
 	cc := newConn(e, pool)
-	cc.mtx.Lock()
-	cc.closed = true
-	cc.mtx.Unlock()
+	require.NoError(t, cc.Close(ctx))
 
 	pool.mu.Lock()
 	pool.conns[e.Key()] = &connValue{cc: cc}
@@ -1270,7 +1270,7 @@ func TestPool_CloseConnsForFailedResolveSkipsAlreadyClosed(t *testing.T) {
 	require.NotPanics(t, func() {
 		pool.closeConnsForFailedResolve(ctx, target)
 	})
-	require.ErrorIs(t, cc.Invoke(ctx, "/test", nil, nil), errClosedConnection)
+	require.ErrorIs(t, cc.Invoke(ctx, "/test", nil, nil), errConnectionUnderShutdown)
 }
 
 func TestPool_OnResolveDriverTrace(t *testing.T) {

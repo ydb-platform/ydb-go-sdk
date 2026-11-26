@@ -312,7 +312,7 @@ func TestConn_StaleClosedCheckMustNotRedial(t *testing.T) {
 
 	// Reproduce the two phases of realConn around c.mtx.Lock: its first
 	// closed check succeeds, then Close wins the race before dialing starts.
-	require.False(t, c.isClosed())
+	require.Equal(t, state.Created, c.State())
 	require.NoError(t, c.Close(ctx))
 
 	c.mtx.Lock()
@@ -322,7 +322,7 @@ func TestConn_StaleClosedCheckMustNotRedial(t *testing.T) {
 		t.Cleanup(func() { _ = cc.Close() })
 	}
 
-	require.ErrorIs(t, err, errClosedConnection)
+	require.ErrorIs(t, err, errConnectionUnderShutdown)
 	require.Nil(t, cc)
 	require.Nil(t, c.grpcConn)
 }
@@ -687,8 +687,12 @@ func TestConnCloseDrainsStreams(t *testing.T) {
 			go func() { closed <- c.Close(closeCtx) }()
 			if tc.outcome == "finished" || tc.outcome == "canceled" {
 				require.Eventually(t, func() bool {
-					return errors.Is(c.Invoke(ctx, "/test", nil, nil), errConnectionUnderShutdown)
+					return c.State() == state.UnderShutdown
 				}, time.Second, time.Millisecond)
+				c.Ban(ctx)
+				c.Unban(ctx)
+				require.Equal(t, state.UnderShutdown, c.State())
+
 				invokeErr := c.Invoke(ctx, "/test", nil, nil)
 				_, streamErr := c.NewStream(ctx, &grpc.StreamDesc{}, "/test")
 				for _, err := range []error{invokeErr, streamErr} {
@@ -718,6 +722,11 @@ func TestConnCloseDrainsStreams(t *testing.T) {
 				t.Fatal("Close did not return")
 			}
 			require.NoError(t, ctx.Err())
+
+			require.Equal(t, state.Destroyed, c.State())
+			c.Ban(ctx)
+			c.Unban(ctx)
+			require.Equal(t, state.Destroyed, c.State())
 
 			if tc.outcome == "timeout" {
 				require.GreaterOrEqual(t, time.Since(start), tc.timeout)
@@ -763,18 +772,15 @@ func TestConnShutdownStartsBeforeDialRegistersCancel(t *testing.T) {
 	c := newConn(endpoint.New("test"), &mockConfig{driverTrace: driverTrace})
 	driverTrace.OnConnDial = func(trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
 		go func() { closed <- c.Close(ctx) }()
-		require.Eventually(t, c.shuttingDown.Load, time.Second, time.Millisecond)
+		require.Eventually(t, func() bool {
+			return c.State() == state.UnderShutdown
+		}, time.Second, time.Millisecond)
 
 		return nil
 	}
 
 	require.ErrorIs(t, c.Invoke(ctx, "/test", nil, nil), errConnectionUnderShutdown)
-	select {
-	case err := <-closed:
-		require.NoError(t, err)
-	case <-ctx.Done():
-		t.Fatal("Close did not return")
-	}
+	require.NoError(t, xtest.Receive(t, closed, "Close to return"))
 }
 
 func TestConnShutdownStartsWhileRPCWaitsForTransport(t *testing.T) {
@@ -796,20 +802,12 @@ func TestConnShutdownStartsWhileRPCWaitsForTransport(t *testing.T) {
 			return false
 		}, time.Second, time.Millisecond)
 		go func() { closed <- c.Close(ctx) }()
-		require.Eventually(t, c.shuttingDown.Load, time.Second, time.Millisecond)
+		require.Eventually(t, func() bool {
+			return c.State() == state.UnderShutdown
+		}, time.Second, time.Millisecond)
 	}()
-	select {
-	case err := <-invoked:
-		require.ErrorIs(t, err, errConnectionUnderShutdown)
-	case <-ctx.Done():
-		t.Fatal("Invoke did not return")
-	}
-	select {
-	case err := <-closed:
-		require.NoError(t, err)
-	case <-ctx.Done():
-		t.Fatal("Close did not return")
-	}
+	require.ErrorIs(t, xtest.Receive(t, invoked, "Invoke to return"), errConnectionUnderShutdown)
+	require.NoError(t, xtest.Receive(t, closed, "Close to return"))
 }
 
 func TestConnDialFailureReleasesLoad(t *testing.T) {

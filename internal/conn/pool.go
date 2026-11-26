@@ -270,7 +270,7 @@ func (p *Pool) closeConnsForFailedResolve(ctx context.Context, target string) {
 	closeCtx := xcontext.ValueOnly(ctx)
 	for _, cc := range toClose {
 		cc.mtx.Lock()
-		if !cc.closed && !cc.shuttingDown.Load() {
+		if !cc.State().IsClosing() {
 			cc.close(closeCtx)
 		}
 		cc.mtx.Unlock()
