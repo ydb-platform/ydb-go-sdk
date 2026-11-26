@@ -2743,12 +2743,14 @@ func connInQuarantine(balancer *Balancer, nodeID uint32) conn.Conn {
 }
 
 // TestBalancerDiscoveryDropClosesGRPC verifies end-to-end that a node removed from
-// ListEndpoints eventually closes its pooled gRPC connection after the quarantine
-// cycle (two discovery rounds after the drop), and Balancer.Close closes the rest.
+// ListEndpoints closes its pooled gRPC connection after the configured timeout,
+// including connections already in quarantine when their endpoints disappear.
 func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	const (
-		node1 uint32 = 1
-		node2 uint32 = 2
+		node1   uint32 = 1
+		node2   uint32 = 2
+		node3   uint32 = 3
+		timeout        = 2 * time.Second
 	)
 
 	ctx := t.Context()
@@ -2760,7 +2762,11 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 		config.WithDatabase("/local"),
 		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
 		config.WithTrace(*events.driverTrace()),
-		config.WithBalancer(userBalancers.RandomChoice()),
+		config.WithBalancer(userBalancers.WithMaxConnections(
+			userBalancers.PreferWithFallback(userBalancers.RandomChoice(), func(e userBalancers.Endpoint) bool {
+				return e.NodeID() != node2
+			}), 2,
+		)),
 	)
 
 	pool := conn.NewPool(ctx, cfg)
@@ -2768,8 +2774,11 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 		require.NoError(t, pool.RemoveRef(ctx))
 	}()
 
-	balancer, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
+	balancer, err := New(ctx, cfg, pool,
+		discoveryConfig.WithInterval(time.Hour), discoveryConfig.WithGrpcChannelShutdownTimeout(timeout),
+	)
 	require.NoError(t, err)
+	defer func() { _ = balancer.Close(ctx) }()
 
 	require.ElementsMatch(t, []uint32{node1, node2}, activeNodeIDs(balancer))
 
@@ -2784,28 +2793,28 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	require.NotNil(t, node2Conn)
 	require.Equal(t, state.Online, node2Conn.State())
 
-	// Discovery #2: same cluster — quarantine cycle, refs increment.
+	server.setNodeIDs([]uint32{node1, node2, node3})
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
-	require.ElementsMatch(t, []uint32{node1, node2}, activeNodeIDs(balancer))
-	require.Equal(t, 0, events.closedCount(node2))
+	require.ElementsMatch(t, []uint32{node1, node3}, activeNodeIDs(balancer))
+	require.Same(t, node2Conn, connInQuarantine(balancer, node2))
+	dialWhoAmI(t, balancer, node3)
+	node3Conn := connByNodeID(balancer, node3)
+	require.NotNil(t, node3Conn)
 
-	// Discovery #3: node 2 disappears — moved to quarantine, gRPC still alive.
+	server.setNodeIDs([]uint32{node1, node3})
+	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
+	require.Nil(t, connInQuarantine(balancer, node2))
 	server.setNodeIDs([]uint32{node1})
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
-	require.Equal(t, []uint32{node1}, activeNodeIDs(balancer))
-	require.Equal(t, 0, events.closedCount(node2), "gRPC must not close on first discovery after drop")
-
-	quarantined := connInQuarantine(balancer, node2)
-	require.NotNil(t, quarantined, "dropped node must remain in quarantine")
-	require.Same(t, node2Conn, quarantined)
-
-	// Discovery #4: same cluster — quarantine released, dropped node gRPC must close.
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
 	require.Equal(t, []uint32{node1}, activeNodeIDs(balancer))
+	require.Equal(t, state.Online, node2Conn.State())
+	require.Equal(t, state.Online, node3Conn.State())
 
 	require.Eventually(t, func() bool {
-		return events.closedCount(node2) == 1 && node2Conn.State() == state.Destroyed
-	}, time.Second, 10*time.Millisecond, "node removed from discovery must close gRPC connection")
+		return events.closedCount(node2) == 1 && node2Conn.State() == state.Destroyed &&
+			events.closedCount(node3) == 1 && node3Conn.State() == state.Destroyed
+	}, 2*timeout, 10*time.Millisecond)
 
 	require.Equal(t, 0, events.closedCount(node1))
 
@@ -2848,7 +2857,7 @@ func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
 		require.NoError(t, pool.RemoveRef(ctx))
 	}()
 
-	balancer, err := New(ctx, cfg, pool, discoveryConfig.WithInterval(0))
+	balancer, err := New(ctx, cfg, pool, discoveryConfig.WithGrpcChannelShutdownTimeout(0))
 	require.NoError(t, err)
 
 	dialWhoAmI(t, balancer, node2)

@@ -1,3 +1,5 @@
+* Added `ydb.WithGrpcChannelShutdownTimeout` to configure how long unused connections to removed discovery endpoints are kept. The default is 1 minute and 59 seconds.
+
 ## v3.158.1
 * Fixed OAuth2 token exchange following redirects and potentially disclosing subject and actor tokens; redirecting token endpoints must be configured with their final URL
 

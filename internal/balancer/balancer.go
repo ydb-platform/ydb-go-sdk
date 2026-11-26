@@ -86,6 +86,8 @@ type Balancer struct {
 	random           xrand.Rand
 	lastDiscovered   []endpoint.Endpoint
 
+	grpcChannelShutdownTimeout time.Duration
+
 	closeMu sync.Mutex
 	closed  bool
 }
@@ -253,6 +255,29 @@ func nextState(ctx context.Context, pool interface {
 	return active, newActive
 }
 
+func (b *Balancer) retireRemovedEndpoints(
+	ctx context.Context, priorities []policy.EndpointPriority, active, quarantine []conn.Conn,
+) ([]conn.Conn, []conn.Conn) {
+	if b.grpcChannelShutdownTimeout <= 0 || len(active)+len(quarantine) == 0 {
+		return active, quarantine
+	}
+
+	discovered := make(map[endpoint.Key]struct{}, len(priorities))
+	for _, priority := range priorities {
+		discovered[priority.Key] = struct{}{}
+	}
+	keep := func(cc conn.Conn) bool {
+		if _, ok := discovered[cc.Endpoint().Key()]; ok {
+			return true
+		}
+		b.pool.PutAfter(ctx, cc, b.grpcChannelShutdownTimeout)
+
+		return false
+	}
+
+	return xslices.Filter(active, keep), xslices.Filter(quarantine, keep)
+}
+
 // releaseStateConns releases connections from state
 //
 // quarantine refs were acquired in discovery round N-1,
@@ -293,14 +318,13 @@ func (b *Balancer) applyDiscoveredEndpoints(
 			b.policy.DetectsNearestDC(),
 			b.driverConfig.Database(),
 		)
-		state              = b.connectionsState.Load()
 		active             []conn.Conn
 		quarantine         []conn.Conn
 		selectedEndpoints  []endpoint.Endpoint
 		selectedPriorities []policy.EndpointPriority
 		previousPriorities []policy.EndpointPriority
 	)
-	if state != nil {
+	if state := b.connectionsState.Load(); state != nil {
 		active = state.All()
 		quarantine = state.quarantine
 		previousPriorities = state.elector.priorities
@@ -324,7 +348,8 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	selectedEndpoints, selectedPriorities = selectActiveEndpoints(
 		active, quarantine, previousPriorities, endpoints, priorities, b.policy.MaxConnections(), b.random,
 	)
-	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selectedEndpoints)
+	nextQuarantine, quarantine := b.retireRemovedEndpoints(ctx, priorities, active, quarantine)
+	quarantine, connections := nextState(ctx, b.pool, quarantine, nextQuarantine, selectedEndpoints)
 
 	if b.policy.MaxConnections() > 0 {
 		b.lastDiscovered = append(b.lastDiscovered[:0], endpoints...)
@@ -439,6 +464,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		)...),
 		localDCDetector: detectLocalDC,
 	}
+	b.grpcChannelShutdownTimeout = b.discoveryConfig.GrpcChannelShutdownTimeout()
 	defer func(created *Balancer) {
 		if finalErr != nil {
 			_ = created.Close(context.WithoutCancel(ctx))
@@ -454,9 +480,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	}
 
 	if policy.SingleConnection() {
-		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
-			endpoint.New(b.driverConfig.Endpoint()),
-		}, "")
+		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{endpoint.New(b.driverConfig.Endpoint())}, "")
 	} else {
 		if err := b.clusterDiscovery(ctx); err != nil {
 			return nil, xerrors.WithStackTrace(err)

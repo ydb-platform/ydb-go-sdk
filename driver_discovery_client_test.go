@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -93,4 +94,12 @@ func TestDriverDiscoveryInitFailsWhenPoolClosed(t *testing.T) {
 	_, err = d.discovery.Get()
 	require.Error(t, err)
 	require.ErrorIs(t, err, conn.ErrClosedPool)
+}
+
+func TestWithGrpcChannelShutdownTimeout(t *testing.T) {
+	const timeout = 5 * time.Second
+
+	var d Driver
+	require.NoError(t, WithGrpcChannelShutdownTimeout(timeout)(t.Context(), &d))
+	require.Equal(t, timeout, discoveryConfig.New(d.discoveryOptions...).GrpcChannelShutdownTimeout())
 }

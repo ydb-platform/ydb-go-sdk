@@ -301,6 +301,88 @@ func TestPool_ConfigMethods(t *testing.T) {
 	})
 }
 
+func TestPool_PutAfter(t *testing.T) {
+	const timeout = 10 * time.Second
+
+	ctx := t.Context()
+	clock := clockwork.NewFakeClock()
+	pool := NewPool(ctx, &mockConfig{}, func(p *Pool) { p.clock = clock })
+	t.Cleanup(func() { require.NoError(t, pool.RemoveRef(ctx)) })
+
+	first := pool.Get(endpoint.New("first:2135"))
+	require.Same(t, first, pool.Get(first.Endpoint()))
+	pool.PutAfter(ctx, first, timeout)
+	clock.Advance(timeout)
+	require.Equal(t, state.Created, first.State())
+
+	pool.PutAfter(ctx, first, timeout)
+	clock.Advance(timeout / 2)
+	second := pool.Get(endpoint.New("second:2135"))
+	pool.PutAfter(ctx, second, timeout)
+
+	clock.Advance(timeout / 2)
+	require.Eventually(t, func() bool {
+		return first.State() == state.Destroyed
+	}, time.Second, time.Millisecond)
+	require.Equal(t, state.Created, second.State())
+
+	clock.Advance(timeout / 2)
+	require.Eventually(t, func() bool {
+		return second.State() == state.Destroyed
+	}, time.Second, time.Millisecond)
+}
+
+func TestPool_PutAfterRediscovery(t *testing.T) {
+	const timeout = 10 * time.Second
+
+	ctx := t.Context()
+	clock := &heldCloseClock{FakeClock: clockwork.NewFakeClock()}
+	pool := NewPool(ctx, &mockConfig{}, func(p *Pool) { p.clock = clock })
+	t.Cleanup(func() { require.NoError(t, pool.RemoveRef(ctx)) })
+
+	e := endpoint.New("returning:2135")
+	old := pool.Get(e)
+	pool.PutAfter(ctx, old, timeout)
+	clock.Advance(timeout / 2)
+	require.Same(t, old, pool.Get(e))
+
+	pool.PutAfter(ctx, old, timeout)
+	require.Len(t, clock.callbacks, 2)
+	clock.callbacks[0]()
+	require.Equal(t, state.Created, old.State())
+
+	clock.Advance(timeout)
+	replacement := pool.Get(e)
+	require.NotNil(t, replacement)
+	require.NotSame(t, old, replacement)
+	require.Eventually(t, func() bool {
+		return old.State() == state.Destroyed
+	}, time.Second, time.Millisecond)
+	clock.callbacks[1]()
+	require.Equal(t, state.Created, replacement.State())
+	require.True(t, testPoolHasConn(pool, e.Key()))
+
+	pool.PutAfter(ctx, replacement, timeout)
+	require.Len(t, clock.callbacks, 3)
+	require.NoError(t, pool.RemoveRef(ctx))
+	require.Equal(t, state.Destroyed, replacement.State())
+	require.False(t, clock.lastTimer.Stop(), "pool shutdown must stop the pending timer")
+}
+
+type heldCloseClock struct {
+	*clockwork.FakeClock
+
+	callbacks []func()
+	lastTimer clockwork.Timer
+}
+
+func (c *heldCloseClock) AfterFunc(delay time.Duration, callback func()) clockwork.Timer {
+	c.callbacks = append(c.callbacks, callback)
+	c.lastTimer = c.FakeClock.AfterFunc(delay, func() {})
+
+	return c.lastTimer
+}
+
 func TestPool_ConnectionTTL(t *testing.T) {
 	t.Run("DoesNotTraceNoOpParking", func(t *testing.T) {
 		var parkEvents atomic.Int64
