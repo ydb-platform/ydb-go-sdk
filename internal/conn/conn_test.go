@@ -681,6 +681,12 @@ func TestConnCloseDrainsStreams(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, finish)
 			}
+			var finishLast context.CancelFunc
+			if tc.outcome == "finished" {
+				_, finishLast = c.addChildStream(ctx)
+				require.NotNil(t, finishLast)
+				defer finishLast()
+			}
 
 			closed := make(chan error, 1)
 			start := time.Now()
@@ -711,6 +717,12 @@ func TestConnCloseDrainsStreams(t *testing.T) {
 				require.NoError(t, streamCtx.Err())
 				if tc.outcome == "finished" {
 					finish(nil)
+					select {
+					case <-c.streamsDone:
+						t.Fatal("Close was signaled before the last stream finished")
+					default:
+					}
+					finishLast()
 				} else {
 					cancelClose()
 				}

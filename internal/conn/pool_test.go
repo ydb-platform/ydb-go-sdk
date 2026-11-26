@@ -1077,7 +1077,7 @@ func TestPool_RemoveRefCancelsAndWaitsForReleasedConnection(t *testing.T) {
 	require.NoError(t, pool.AddRef(ctx))
 
 	cc := pool.Get(endpoint.New("draining:2135")).(*conn)
-	streamCtx, finishStream := cc.childStreams.WithCancel(ctx)
+	streamCtx, finishStream := cc.addChildStream(ctx)
 	defer finishStream()
 	putDone := make(chan struct{})
 	go func() {

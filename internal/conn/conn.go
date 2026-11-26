@@ -62,15 +62,17 @@ type (
 		mtx                     sync.RWMutex
 		config                  connConfig // ro access
 		grpcConn                grpcClientConnInterface
-		done                    chan struct{}
 		endpoint                endpoint.Endpoint // ro access
 		cancelDial              atomic.Pointer[context.CancelFunc]
 		state                   atomic.Uint32
 		inFlight                atomic.Int64
 		lastClusterAnnouncement atomic.Int64
-		childStreams            *xcontext.CancelsGuard
 		usage                   *usageTracker
 		onClose                 []func(*conn)
+
+		streamsMu    sync.Mutex
+		childStreams map[*context.CancelFunc]struct{}
+		streamsDone  chan struct{}
 	}
 )
 
@@ -282,11 +284,15 @@ func (c *conn) Close(ctx context.Context) (err error) {
 		(*cancelDial)()
 	}
 
-	select {
-	case <-c.childStreams.Seal():
-	case <-ctx.Done():
+	if c.hasChildStreams() {
+		select {
+		case <-c.streamsDone:
+		case <-ctx.Done():
+		}
 	}
-	c.childStreams.Cancel()
+	for cancelStream := range c.takeChildStreams() {
+		(*cancelStream)()
+	}
 
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
@@ -317,6 +323,45 @@ func (c *conn) Close(ctx context.Context) (err error) {
 		xerrors.WithAddress(c.Address()),
 		xerrors.WithNodeID(c.NodeID()),
 	))
+}
+
+func (c *conn) addChildStream(ctx context.Context) (context.Context, context.CancelFunc) {
+	c.streamsMu.Lock()
+	defer c.streamsMu.Unlock()
+	if c.State().IsClosing() {
+		return nil, nil
+	}
+
+	streamCtx, cancel := xcontext.WithCancel(ctx)
+	c.childStreams[&cancel] = struct{}{}
+
+	return streamCtx, func() {
+		cancel()
+		c.streamsMu.Lock()
+		defer c.streamsMu.Unlock()
+		if _, ok := c.childStreams[&cancel]; ok {
+			delete(c.childStreams, &cancel)
+			if len(c.childStreams) == 0 && c.State().IsClosing() {
+				close(c.streamsDone)
+			}
+		}
+	}
+}
+
+func (c *conn) hasChildStreams() bool {
+	c.streamsMu.Lock()
+	defer c.streamsMu.Unlock()
+
+	return len(c.childStreams) != 0
+}
+
+func (c *conn) takeChildStreams() map[*context.CancelFunc]struct{} {
+	c.streamsMu.Lock()
+	defer c.streamsMu.Unlock()
+	streams := c.childStreams
+	c.childStreams = nil
+
+	return streams
 }
 
 func replyWrapper(reply any) (opID string, issues []trace.Issue) {
@@ -520,7 +565,7 @@ func (c *conn) NewStream(
 
 	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
-	grpcCtx, cancel := c.childStreams.WithCancel(ctx)
+	grpcCtx, cancel := c.addChildStream(ctx)
 	if cancel == nil {
 		return nil, xerrors.WithStackTrace(errConnectionUnderShutdown)
 	}
@@ -597,8 +642,8 @@ func newConn(e endpoint.Endpoint, config connConfig, opts ...option) *conn {
 	c := &conn{
 		endpoint:     e,
 		config:       config,
-		done:         make(chan struct{}),
-		childStreams: xcontext.NewCancelsGuard(),
+		childStreams: make(map[*context.CancelFunc]struct{}),
+		streamsDone:  make(chan struct{}),
 	}
 
 	c.state.Store(uint32(state.Created))

@@ -29,7 +29,7 @@ type previousEndpointState struct {
 // bucket. Known unusable endpoints are selected only when no usable endpoint
 // can fill the remaining slots.
 func selectActiveEndpoints(
-	previous, quarantine []conn.Conn,
+	previous []conn.Conn,
 	previousPriorities []policy.EndpointPriority,
 	endpoints []endpoint.Endpoint,
 	priorities []policy.EndpointPriority,
@@ -38,7 +38,7 @@ func selectActiveEndpoints(
 	if maxConnections <= 0 {
 		return endpoints, priorities
 	}
-	previousStates := collectPreviousEndpointStates(previous, quarantine, previousPriorities)
+	previousStates := collectPreviousEndpointStates(previous, previousPriorities)
 
 	candidates := make([]activeEndpointCandidate, 0, len(endpoints))
 	for i, candidate := range endpoints {
@@ -73,15 +73,10 @@ func selectActiveEndpoints(
 }
 
 func collectPreviousEndpointStates(
-	previous, quarantine []conn.Conn,
+	previous []conn.Conn,
 	previousPriorities []policy.EndpointPriority,
 ) map[endpoint.Key]previousEndpointState {
-	states := make(map[endpoint.Key]previousEndpointState, len(previous)+len(quarantine))
-	for _, connection := range quarantine {
-		if connection != nil {
-			states[connection.Endpoint().Key()] = previousEndpointState{state: connection.State()}
-		}
-	}
+	states := make(map[endpoint.Key]previousEndpointState, len(previous))
 	for _, connection := range previous {
 		if connection != nil {
 			states[connection.Endpoint().Key()] = previousEndpointState{state: connection.State()}
