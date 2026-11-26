@@ -851,6 +851,7 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 	if !isFirstClose {
 		return nil
 	}
+	r.sessionController.ReleaseActiveIndex()
 
 	closeErr = r.committer.Close(ctx, reason)
 

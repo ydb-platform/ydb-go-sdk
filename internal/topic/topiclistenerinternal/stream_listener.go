@@ -150,6 +150,9 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 // and internal workers stop. After all resources are closed, finishClose records the
 // final error and closes done so concurrent Close and WaitStop calls can proceed.
 func (l *streamListener) finishClose(cleanupCtx context.Context, reason error, done empty.Chan, workersToClose int) {
+	if l.sessions != nil {
+		l.sessions.ReleaseActiveIndex()
+	}
 	logCtx := cleanupCtx
 	closeDone := gtrace.TopicOnListenerClose(l.tracer, &logCtx, l.listenerID, l.sessionID, reason)
 

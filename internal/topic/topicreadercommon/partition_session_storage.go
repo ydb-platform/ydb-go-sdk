@@ -20,7 +20,8 @@ type PartitionSessionStorage struct {
 	sessions map[rawtopicreader.PartitionSessionID]*sessionInfo
 	// active excludes closed and removed sessions, which can still be looked
 	// up by the protocol.
-	active *activeSessions
+	active         *activeSessions
+	activeReleased bool
 
 	removeIndex              int
 	lastCompactedTime        time.Time
@@ -30,7 +31,9 @@ type PartitionSessionStorage struct {
 func (c *PartitionSessionStorage) initNeedLock() {
 	if c.sessions == nil {
 		c.sessions = make(map[rawtopicreader.PartitionSessionID]*sessionInfo)
-		c.active = &activeSessions{sessions: make(map[rawtopicreader.PartitionSessionID]*PartitionSession)}
+		if !c.activeReleased {
+			c.active = &activeSessions{sessions: make(map[rawtopicreader.PartitionSessionID]*PartitionSession)}
+		}
 		c.lastCompactedTime = time.Now()
 	}
 }
@@ -45,9 +48,25 @@ func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.StreamPartitionSessionID))
 	}
 	c.sessions[session.StreamPartitionSessionID] = &sessionInfo{Session: session}
-	c.active.add(session)
+	if c.active != nil {
+		c.active.add(session)
+	} else {
+		session.active.Store(nil)
+	}
 
 	return nil
+}
+
+// ReleaseActiveIndex stops active tracking without changing protocol lookups.
+func (c *PartitionSessionStorage) ReleaseActiveIndex() {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	c.activeReleased = true
+	if c.active != nil {
+		c.active.release()
+		c.active = nil
+	}
 }
 
 func (c *PartitionSessionStorage) Get(id rawtopicreader.PartitionSessionID) (*PartitionSession, error) {
@@ -105,7 +124,9 @@ func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (
 	c.removeIndex++
 	if partitionInfo, ok := c.sessions[id]; ok {
 		partitionInfo.RemoveTime = now
-		c.active.drop(partitionInfo.Session)
+		if c.active != nil {
+			c.active.drop(partitionInfo.Session)
+		}
 
 		return partitionInfo.Session, nil
 	}
@@ -120,6 +141,13 @@ func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (
 type activeSessions struct {
 	m        sync.Mutex
 	sessions map[rawtopicreader.PartitionSessionID]*PartitionSession
+}
+
+func (a *activeSessions) release() {
+	a.m.Lock()
+	defer a.m.Unlock()
+
+	a.sessions = nil
 }
 
 func (a *activeSessions) add(session *PartitionSession) {
