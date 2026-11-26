@@ -18,6 +18,7 @@ type PartitionSessionStorage struct {
 	m sync.RWMutex
 
 	sessions map[rawtopicreader.PartitionSessionID]*sessionInfo
+	commits  *pendingCommitTrackers
 
 	removeIndex              int
 	lastCompactedTime        time.Time
@@ -31,7 +32,9 @@ func (c *PartitionSessionStorage) initNeedLock() {
 	}
 }
 
-func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
+// Add stores a partition session. When supplied, finishCommits receives a
+// stream cleanup callback on the first addition with commit tracking enabled.
+func (c *PartitionSessionStorage) Add(session *PartitionSession, finishCommits ...*func()) error {
 	c.m.Lock()
 	defer c.m.Unlock()
 
@@ -39,6 +42,13 @@ func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 
 	if _, ok := c.sessions[session.StreamPartitionSessionID]; ok {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.StreamPartitionSessionID))
+	}
+	if len(finishCommits) != 0 && session.commitMetrics != nil {
+		if c.commits == nil {
+			c.commits = &pendingCommitTrackers{}
+			*finishCommits[0] = c.commits.close
+		}
+		session.commitMetrics.tracker.owner = c.commits
 	}
 	c.sessions[session.StreamPartitionSessionID] = &sessionInfo{Session: session}
 
@@ -57,18 +67,6 @@ func (c *PartitionSessionStorage) Get(id rawtopicreader.PartitionSessionID) (*Pa
 	}
 
 	return partitionInfo.Session, nil
-}
-
-func (c *PartitionSessionStorage) GetAll() []*PartitionSession {
-	c.m.Lock()
-	defer c.m.Unlock()
-
-	res := make([]*PartitionSession, 0, len(c.sessions))
-	for _, s := range c.sessions {
-		res = append(res, s.Session)
-	}
-
-	return res
 }
 
 func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (*PartitionSession, error) {

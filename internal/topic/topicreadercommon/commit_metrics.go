@@ -130,6 +130,7 @@ type commitMessageTracker struct {
 	mu sync.Mutex
 
 	session *PartitionSession
+	owner   *pendingCommitTrackers
 	// ordered stores non-decreasing ends and their cumulative counts.
 	ordered    []commitMetricRange
 	prefixBase int64 // cumulative count before ordered[0]
@@ -156,6 +157,9 @@ func (t *commitMessageTracker) Queue(start, end rawtopiccommon.Offset) int64 {
 	defer t.mu.Unlock()
 
 	if end <= t.session.CommittedOffset() {
+		return 0
+	}
+	if len(t.ordered) == 0 && t.owner != nil && !t.owner.add(t) {
 		return 0
 	}
 
@@ -193,8 +197,10 @@ func (t *commitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset
 	// The last ordered end is also the maximum across both structures.
 	if exclusiveOffset >= t.ordered[len(t.ordered)-1].end {
 		acknowledged := t.total
-		t.ordered, t.pending = nil, nil
-		t.prefixBase, t.total = 0, 0
+		t.clear()
+		if t.owner != nil {
+			t.owner.remove(t)
+		}
 
 		return acknowledged
 	}
@@ -219,6 +225,17 @@ func (t *commitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset
 	t.total -= acknowledged
 
 	return acknowledged
+}
+
+func (t *commitMessageTracker) discard() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.clear()
+}
+
+func (t *commitMessageTracker) clear() {
+	t.ordered, t.pending = nil, nil
+	t.prefixBase, t.total = 0, 0
 }
 
 // popPending removes the pending range with the smallest end.

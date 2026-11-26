@@ -39,9 +39,11 @@ func TestCommitMessageTrackerMatchesRangeScan(t *testing.T) {
 		switch random.IntN(8) {
 		case 0:
 			acknowledge(watermark+rawtopiccommon.Offset(random.IntN(int(highest-watermark)+1)), step)
+
 			continue
 		case 1:
 			acknowledge(watermark-rawtopiccommon.Offset(random.IntN(4)), step)
+
 			continue
 		case 2:
 			// Submit the previous span again, whether it is still pending or already covered.

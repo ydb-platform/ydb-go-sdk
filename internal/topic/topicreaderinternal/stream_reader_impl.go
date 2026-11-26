@@ -59,6 +59,7 @@ type topicStreamReaderImpl struct {
 	readerID         int64
 
 	traceQueue         *topicreadercommon.StreamTraceQueue
+	finishCommits      func()
 	creditBalance      topicreadercommon.MetricBalance
 	localBufferBalance topicreadercommon.MetricBalance
 
@@ -714,6 +715,11 @@ func (r *topicStreamReaderImpl) getRestBufferBytes() int {
 func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 	ctx, cancel := xcontext.WithCancel(ctx)
 	defer cancel()
+	defer func() {
+		if r.finishCommits != nil {
+			r.finishCommits()
+		}
+	}()
 
 	for {
 		serverMessage, err := r.stream.Recv()
@@ -1081,7 +1087,7 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequest(m *rawtopicreader
 		m.CommittedOffset,
 	)
 	session.SetupCommitMetrics(r.cfg.Trace, r.cfg.ReaderInfo)
-	if err := r.sessionController.Add(session); err != nil {
+	if err := r.sessionController.Add(session, &r.finishCommits); err != nil {
 		return err
 	}
 
