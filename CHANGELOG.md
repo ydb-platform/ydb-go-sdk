@@ -1,4 +1,5 @@
-* Added `ydb.WithGrpcChannelShutdownTimeout` to close connections to endpoints removed by discovery, with a default timeout of 1 minute and 59 seconds. A non-positive timeout leaves connection closing to discovery updates.
+## v3.158.1
+* Fixed OAuth2 token exchange following redirects and potentially disclosing subject and actor tokens; redirecting token endpoints must be configured with their final URL
 
 ## v3.158.0
 * Fixed Query Service response prefetch losing the final row or terminal error when a gRPC interceptor reads ahead, including delivery of buffered statistics on close

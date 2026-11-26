@@ -128,7 +128,7 @@ func newConnectionsStateWithPolicyAndRand(
 	}
 
 	return newConnectionsStateWithPriorities(
-		connections, policy.Prioritize(info, endpoints), quarantine, rand, info.SelfLocation,
+		connections, policy.Prioritize(info, endpoints), quarantine, rand,
 	)
 }
 

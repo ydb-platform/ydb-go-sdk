@@ -4,12 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -17,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
@@ -72,12 +69,6 @@ func (s *streamWrapper) RecvMsg(m any) error {
 	return err
 }
 
-type pendingEndpointClose struct {
-	connections []conn.Conn
-	timer       clockwork.Timer
-	deadline    time.Time
-}
-
 type Balancer struct {
 	driverConfig      *config.Config
 	policy            policy.Policy
@@ -95,10 +86,8 @@ type Balancer struct {
 	random           xrand.Rand
 	lastDiscovered   []endpoint.Endpoint
 
-	endpointCloseDelay time.Duration
-	closeMu            sync.Mutex
-	closed             bool
-	pendingClose       *pendingEndpointClose
+	closeMu sync.Mutex
+	closed  bool
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -229,15 +218,10 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 	}
 
 	if b.policy.DetectsNearestDC() {
-		nearestDC, detectErr := b.localDCDetector(ctx, endpoints)
-		if detectErr != nil {
-			if previous := b.connections(); b.endpointCloseDelay > 0 && previous != nil {
-				b.applyDiscoveryUpdate(ctx, endpoints, previous.selfLocation, true)
-			}
-
-			return xerrors.WithStackTrace(detectErr)
+		location, err = b.localDCDetector(ctx, endpoints)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
 		}
-		location = nearestDC
 	}
 	b.applyDiscoveredEndpoints(ctx, endpoints, location)
 
@@ -262,90 +246,11 @@ func nextState(ctx context.Context, pool interface {
 		pool.Put(ctx, cc)
 	}
 
+	for _, cc := range newActive {
+		cc.Unban(ctx)
+	}
+
 	return active, newActive
-}
-
-// takePendingEndpointClose transfers the queued pool references with closeMu held.
-func (b *Balancer) takePendingEndpointClose() []conn.Conn {
-	pending := b.pendingClose
-	if pending == nil {
-		return nil
-	}
-	b.pendingClose = nil
-	pending.timer.Stop()
-
-	return pending.connections
-}
-
-func (b *Balancer) scheduleEndpointClose(
-	ctx context.Context, quarantine []conn.Conn, endpoints []endpoint.Endpoint,
-) []conn.Conn {
-	discovered := make(map[endpoint.Key]struct{}, len(endpoints))
-	for _, e := range endpoints {
-		discovered[e.Key()] = struct{}{}
-	}
-	pending := &pendingEndpointClose{}
-	remaining := xslices.Filter(quarantine, func(cc conn.Conn) bool {
-		if _, ok := discovered[cc.Endpoint().Key()]; ok {
-			return true
-		}
-		pending.connections = append(pending.connections, cc)
-
-		return false
-	})
-	if len(pending.connections) == 0 {
-		return quarantine
-	}
-
-	clock := b.discoveryConfig.Clock()
-	pending.deadline = clock.Now().Add(b.endpointCloseDelay)
-	pending.timer = clock.AfterFunc(b.endpointCloseDelay, func() {
-		b.closeMu.Lock()
-		if b.pendingClose != pending {
-			b.closeMu.Unlock()
-
-			return
-		}
-		closing := b.releaseEndpointReferences(b.takePendingEndpointClose())
-		b.closeMu.Unlock()
-
-		closeEndpointTransports(ctx, closing)
-	})
-	b.pendingClose = pending
-
-	return remaining
-}
-
-func (b *Balancer) releaseExpiredEndpoints() []closer.Closer {
-	if pending := b.pendingClose; pending != nil && !b.discoveryConfig.Clock().Now().Before(pending.deadline) {
-		return b.releaseEndpointReferences(b.takePendingEndpointClose())
-	}
-
-	return nil
-}
-
-func (b *Balancer) releaseEndpointReferences(connections []conn.Conn) []closer.Closer {
-	closing := make([]closer.Closer, 0, len(connections))
-	for _, cc := range connections {
-		if released := b.pool.ReleaseConn(cc); released != nil {
-			closing = append(closing, released)
-		}
-	}
-
-	return closing
-}
-
-func closeEndpointTransports(ctx context.Context, closing []closer.Closer) {
-	if len(closing) == 0 {
-		return
-	}
-
-	closeCtx := xcontext.ValueOnly(ctx)
-	for _, cc := range closing {
-		go func() {
-			_ = cc.Close(closeCtx)
-		}()
-	}
 }
 
 // releaseStateConns releases connections from state
@@ -371,21 +276,8 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	endpoints []endpoint.Endpoint,
 	selfLocation string,
 ) {
-	b.applyDiscoveryUpdate(ctx, endpoints, selfLocation, false)
-}
-
-func (b *Balancer) applyDiscoveryUpdate(
-	ctx context.Context,
-	endpoints []endpoint.Endpoint,
-	selfLocation string,
-	preserveRoutes bool,
-) {
 	b.closeMu.Lock()
-	var closing []closer.Closer
-	defer func() {
-		b.closeMu.Unlock()
-		closeEndpointTransports(ctx, closing)
-	}()
+	defer b.closeMu.Unlock()
 
 	if b.closed {
 		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
@@ -397,100 +289,49 @@ func (b *Balancer) applyDiscoveryUpdate(
 		onDone = gtrace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
 			stack.FunctionID(
-				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveryUpdate"),
+				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
 			b.policy.DetectsNearestDC(),
 			b.driverConfig.Database(),
 		)
+		state              = b.connectionsState.Load()
 		active             []conn.Conn
 		quarantine         []conn.Conn
 		selectedEndpoints  []endpoint.Endpoint
 		selectedPriorities []policy.EndpointPriority
 		previousPriorities []policy.EndpointPriority
 	)
-	if state := b.connectionsState.Load(); state != nil {
+	if state != nil {
 		active = state.All()
 		quarantine = state.quarantine
 		previousPriorities = state.elector.priorities
 	}
 
 	defer func() {
-		traceEndpointChanges(onDone, active, endpoints, selectedEndpoints, selfLocation)
+		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
+			return cc.Endpoint()
+		}), selectedEndpoints, endpoint.Compare)
+
+		onDone(
+			xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+			xslices.Transform(added, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+			xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+			selfLocation,
+		)
 	}()
 
-	selectedEndpoints, selectedPriorities = b.selectDiscoveredEndpoints(
-		active, quarantine, previousPriorities, endpoints, selfLocation, preserveRoutes,
+	info := policy.Info{SelfLocation: selfLocation}
+	priorities := b.policy.Prioritize(info, endpoints)
+	selectedEndpoints, selectedPriorities = selectActiveEndpoints(
+		active, quarantine, previousPriorities, endpoints, priorities, b.policy.MaxConnections(), b.random,
 	)
-	closing = b.releaseExpiredEndpoints()
 	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selectedEndpoints)
-	closing = append(closing, b.releaseEndpointReferences(b.takePendingEndpointClose())...)
-	if !preserveRoutes {
-		for _, cc := range connections {
-			cc.Unban(ctx)
-		}
-	}
-	if b.endpointCloseDelay > 0 && len(quarantine) > 0 {
-		quarantine = b.scheduleEndpointClose(ctx, quarantine, endpoints)
-	}
-
-	b.connectionsState.Store(newConnectionsStateWithPriorities(
-		connections, selectedPriorities, quarantine, nil, selfLocation,
-	))
-}
-
-func (b *Balancer) selectDiscoveredEndpoints(
-	active, quarantine []conn.Conn,
-	previousPriorities []policy.EndpointPriority,
-	endpoints []endpoint.Endpoint,
-	selfLocation string,
-	preserveRoutes bool,
-) ([]endpoint.Endpoint, []policy.EndpointPriority) {
-	if preserveRoutes {
-		present := make(map[endpoint.Key]endpoint.Endpoint, len(endpoints))
-		for _, e := range endpoints {
-			present[e.Key()] = e
-		}
-		b.lastDiscovered = slices.DeleteFunc(b.lastDiscovered, func(e endpoint.Endpoint) bool {
-			return present[e.Key()] == nil
-		})
-		var selected []endpoint.Endpoint
-		for _, priority := range previousPriorities {
-			if e := present[priority.Key]; e != nil {
-				selected = append(selected, e)
-			}
-		}
-
-		return selected, previousPriorities
-	}
 
 	if b.policy.MaxConnections() > 0 {
 		b.lastDiscovered = append(b.lastDiscovered[:0], endpoints...)
 	}
-	priorities := b.policy.Prioritize(policy.Info{SelfLocation: selfLocation}, endpoints)
-	if pending := b.pendingClose; pending != nil && b.discoveryConfig.Clock().Now().Before(pending.deadline) {
-		quarantine = slices.Concat(quarantine, pending.connections)
-	}
-
-	return selectActiveEndpoints(
-		active, quarantine, previousPriorities, endpoints, priorities, b.policy.MaxConnections(), b.random,
-	)
-}
-
-func traceEndpointChanges(
-	onDone func([]trace.EndpointInfo, []trace.EndpointInfo, []trace.EndpointInfo, string),
-	active []conn.Conn,
-	endpoints, selectedEndpoints []endpoint.Endpoint,
-	selfLocation string,
-) {
-	_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
-		return cc.Endpoint()
-	}), selectedEndpoints, endpoint.Compare)
-
-	onDone(
-		xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
-		xslices.Transform(added, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
-		xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
-		selfLocation,
-	)
+	b.connectionsState.Store(newConnectionsStateWithPriorities(
+		connections, selectedPriorities, quarantine, nil,
+	))
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
@@ -505,7 +346,6 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	b.lastDiscovered = nil
 
 	oldState := b.connectionsState.Swap(nil)
-	pendingClose := b.takePendingEndpointClose()
 
 	discoveryRepeater := b.discoveryRepeater
 	b.discoveryRepeater = nil
@@ -527,9 +367,6 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	}
 
 	b.releaseStateConns(ctx, oldState)
-	for _, cc := range pendingClose {
-		b.pool.Put(ctx, cc)
-	}
 
 	if discoveryCC != nil {
 		_ = discoveryCC.Close()
@@ -602,7 +439,6 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		)...),
 		localDCDetector: detectLocalDC,
 	}
-	b.endpointCloseDelay = b.discoveryConfig.EndpointCloseDelay()
 	defer func(created *Balancer) {
 		if finalErr != nil {
 			_ = created.Close(context.WithoutCancel(ctx))
@@ -618,7 +454,9 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	}
 
 	if policy.SingleConnection() {
-		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{endpoint.New(b.driverConfig.Endpoint())}, "")
+		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
+			endpoint.New(b.driverConfig.Endpoint()),
+		}, "")
 	} else {
 		if err := b.clusterDiscovery(ctx); err != nil {
 			return nil, xerrors.WithStackTrace(err)
@@ -893,7 +731,7 @@ func (b *Balancer) tryAddPinnedConnection(nodeID uint32) (connection, rejected c
 		Excluded: true,
 	})
 	b.connectionsState.Store(newConnectionsStateWithPriorities(
-		connections, priorities, current.quarantine, current.elector.rand, current.selfLocation,
+		connections, priorities, current.quarantine, current.elector.rand,
 	))
 
 	return connection, nil
