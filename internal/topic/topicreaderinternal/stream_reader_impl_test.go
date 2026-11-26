@@ -1217,7 +1217,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 		testClientSessionID,
 		testSessionComitted,
 	)
-	require.NoError(t, reader.sessionController.Add(session, cfg.trackActiveSessions))
+	require.NoError(t, reader.sessionController.Add(session))
 
 	env := streamEnv{
 		TopicClient:                topicClientMock,

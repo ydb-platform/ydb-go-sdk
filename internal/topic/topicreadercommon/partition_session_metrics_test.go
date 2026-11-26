@@ -18,11 +18,12 @@ func TestRetainedPartitionSessionDoesNotKeepRemovedSessions(t *testing.T) {
 	kept := NewPartitionSession(context.Background(), "topic", 0, 1, "", 0, 0, 0)
 	removed := func() []weak.Pointer[PartitionSession] {
 		storage := &PartitionSessionStorage{}
-		require.NoError(t, storage.Add(kept, true))
+		storage.TrackActive()
+		require.NoError(t, storage.Add(kept))
 		pointers := make([]weak.Pointer[PartitionSession], 0, 100)
 		for id := rawtopicreader.PartitionSessionID(1); id <= 100; id++ {
 			session := NewPartitionSession(context.Background(), "topic", int64(id), 1, "", id, int64(id), 0)
-			require.NoError(t, storage.Add(session, true))
+			require.NoError(t, storage.Add(session))
 			_, err := storage.Remove(id)
 			require.NoError(t, err)
 			pointers = append(pointers, weak.Make(session))
@@ -40,12 +41,13 @@ func TestRetainedPartitionSessionDoesNotKeepRemovedSessions(t *testing.T) {
 
 func TestPartitionSessionActiveCounts(t *testing.T) {
 	storage := &PartitionSessionStorage{}
+	storage.TrackActive()
 	first := NewPartitionSession(context.Background(), "topic", 1, 1, "", 1, 1, 0)
 	second := NewPartitionSession(context.Background(), "topic", 2, 1, "", 2, 2, 0)
 	t.Cleanup(first.Close)
 	t.Cleanup(second.Close)
-	require.NoError(t, storage.Add(first, true))
-	require.NoError(t, storage.Add(second, true))
+	require.NoError(t, storage.Add(first))
+	require.NoError(t, storage.Add(second))
 	require.Equal(t, map[string]int64{"topic": 2}, storage.ActiveCountsByTopic())
 	first.SetNoMoreMessages()
 	require.Equal(t, int64(2), storage.ActiveCountsByTopic()["topic"])
@@ -66,6 +68,7 @@ func TestPartitionSessionCountSource(t *testing.T) {
 		return func() error { return nil }, nil
 	}
 	storage := &PartitionSessionStorage{}
+	storage.TrackActive()
 	selectors := []*PublicReadSelector{{Path: "topic"}, {Path: "/Root/db/topic"}, {Path: "empty"}}
 	_, err := RegisterPartitionSessionCount(
 		ReaderMetricsConfig{Meter: meter, Database: "//Root/db/"},
@@ -76,7 +79,7 @@ func TestPartitionSessionCountSource(t *testing.T) {
 	require.NoError(t, err)
 	session := NewPartitionSession(ctx, "/Root/db/topic", 1, 1, "", 1, 1, 0)
 	t.Cleanup(session.Close)
-	require.NoError(t, storage.Add(session, true))
+	require.NoError(t, storage.Add(session))
 	values := make(map[string]int64)
 	require.NoError(t, callback(ctx, func(value int64, attributes ...telemetry.Attribute) {
 		require.Contains(t, attributes, telemetry.Attribute{Key: "reader.name", Value: "default"})
@@ -102,8 +105,9 @@ func TestPartitionSessionCountDuringContextReplacement(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	storage := &PartitionSessionStorage{}
+	storage.TrackActive()
 	session := NewPartitionSession(ctx, "topic", 1, 1, "", 1, 1, 0)
-	require.NoError(t, storage.Add(session, true))
+	require.NoError(t, storage.Add(session))
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -148,6 +152,7 @@ func TestPartitionSessionCountWithoutConsumer(t *testing.T) {
 
 func TestPartitionSessionCountConcurrentWithFirstLookup(t *testing.T) {
 	storage := &PartitionSessionStorage{}
+	storage.TrackActive()
 	lookupDone := make(chan error, 1)
 	go func() {
 		_, err := storage.Get(1)
@@ -183,16 +188,17 @@ func TestPartitionSessionCountStopsOnCancellation(t *testing.T) {
 func BenchmarkPartitionSessionActiveCountsWithRetainedSessions(b *testing.B) {
 	const retained = 100000
 	storage := &PartitionSessionStorage{}
+	storage.TrackActive()
 	for id := rawtopicreader.PartitionSessionID(1); id <= retained; id++ {
 		session := NewPartitionSession(context.Background(), "topic", int64(id), 1, "", id, int64(id), 0)
-		require.NoError(b, storage.Add(session, true))
+		require.NoError(b, storage.Add(session))
 		_, err := storage.Remove(id)
 		require.NoError(b, err)
 		session.Close()
 	}
 	active := NewPartitionSession(context.Background(), "topic", 0, 1, "", retained+1, retained+1, 0)
 	b.Cleanup(active.Close)
-	require.NoError(b, storage.Add(active, true))
+	require.NoError(b, storage.Add(active))
 	require.Equal(b, map[string]int64{"topic": 1}, storage.ActiveCountsByTopic())
 
 	b.ResetTimer()

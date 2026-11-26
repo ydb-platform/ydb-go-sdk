@@ -28,7 +28,6 @@ func listenerAndHandler(e fixenv.Env) listenerAndHandlerPair {
 
 		listener := &streamListener{}
 		listener.initVars(&atomic.Int64{})
-		listener.trackActiveSessions = true
 		listener.stream = StreamMock(e)
 		listener.streamClose = func(cause error) {}
 		listener.handler = handler
@@ -71,7 +70,8 @@ type listenerAndHandlerPair struct {
 func PartitionStorage(e fixenv.Env) *topicreadercommon.PartitionSessionStorage {
 	f := func() (*fixenv.GenericResult[*topicreadercommon.PartitionSessionStorage], error) {
 		storage := &topicreadercommon.PartitionSessionStorage{}
-		if err := storage.Add(PartitionSession(e), true); err != nil {
+		storage.TrackActive()
+		if err := storage.Add(PartitionSession(e)); err != nil {
 			return nil, err
 		}
 

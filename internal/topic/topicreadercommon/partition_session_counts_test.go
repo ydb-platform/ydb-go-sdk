@@ -11,6 +11,7 @@ import (
 
 func TestActiveCountsIgnoreRepeatedPartitionSessionTransitions(t *testing.T) {
 	var storage PartitionSessionStorage
+	storage.TrackActive()
 	graceful := NewPartitionSession(t.Context(), "topic", 1, 1, "", 1, 1, 0)
 	forced := NewPartitionSession(t.Context(), "topic", 2, 1, "", 2, 2, 0)
 	other := NewPartitionSession(t.Context(), "other", 3, 1, "", 3, 3, 0)
@@ -20,11 +21,11 @@ func TestActiveCountsIgnoreRepeatedPartitionSessionTransitions(t *testing.T) {
 	t.Cleanup(forced.Close)
 	closed.Close()
 
-	require.NoError(t, storage.Add(graceful, true))
-	require.NoError(t, storage.Add(forced, true))
-	require.NoError(t, storage.Add(other, true))
-	require.NoError(t, storage.Add(closed, true))
-	require.Error(t, storage.Add(graceful, true))
+	require.NoError(t, storage.Add(graceful))
+	require.NoError(t, storage.Add(forced))
+	require.NoError(t, storage.Add(other))
+	require.NoError(t, storage.Add(closed))
+	require.Error(t, storage.Add(graceful))
 	want := map[string]int64{"topic": 2, "other": 1}
 	require.Equal(t, want, storage.ActiveCountsByTopic())
 
@@ -54,10 +55,11 @@ func BenchmarkActiveCountsByTopic(b *testing.B) {
 	for _, partitions := range []int{1, 100000} {
 		b.Run(strconv.Itoa(partitions), func(b *testing.B) {
 			var storage PartitionSessionStorage
+			storage.TrackActive()
 			for i := range partitions {
 				id := rawtopicreader.PartitionSessionID(i)
 				session := NewPartitionSession(b.Context(), "topic", int64(i), 1, "", id, 0, 0)
-				require.NoError(b, storage.Add(session, true))
+				require.NoError(b, storage.Add(session))
 			}
 			b.ReportAllocs()
 			for b.Loop() {

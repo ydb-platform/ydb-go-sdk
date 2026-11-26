@@ -171,6 +171,9 @@ func newTopicStreamReaderStopped(
 		rawMessagesFromBuffer: make(chan rawtopicreader.ServerMessage, 1),
 	}
 
+	if cfg.trackActiveSessions {
+		res.sessionController.TrackActive()
+	}
 	res.backgroundWorkers = *background.NewWorker(stopPump, "topic-reader-stream-background")
 
 	res.committer = topicreadercommon.NewCommitterStopped(cfg.Trace, labeledContext, cfg.CommitMode, res.send)
@@ -930,7 +933,7 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequest(m *rawtopicreader
 		clientSessionCounter.Add(1),
 		m.CommittedOffset,
 	)
-	if err := r.sessionController.Add(session, r.cfg.trackActiveSessions); err != nil {
+	if err := r.sessionController.Add(session); err != nil {
 		return err
 	}
 

@@ -46,10 +46,9 @@ type streamListener struct {
 	sessionID   string
 	listenerID  string
 
-	background          background.Worker
-	sessions            *topicreadercommon.PartitionSessionStorage
-	trackActiveSessions bool
-	sessionIDCounter    *atomic.Int64
+	background       background.Worker
+	sessions         *topicreadercommon.PartitionSessionStorage
+	sessionIDCounter *atomic.Int64
 
 	hasNewMessagesToSend empty.Chan
 	syncCommitter        *topicreadercommon.Committer
@@ -226,7 +225,9 @@ func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	if l.cfg == nil {
 		l.cfg = &StreamListenerConfig{}
 	}
-	l.trackActiveSessions = l.cfg.Metrics.Meter != nil
+	if l.cfg.Metrics.Meter != nil {
+		l.sessions.TrackActive()
+	}
 }
 
 func (l *streamListener) initStream(ctx context.Context, client TopicClient) error {
@@ -457,7 +458,7 @@ func (l *streamListener) handleStartPartition(
 		l.sessionIDCounter.Add(1),
 		m.CommittedOffset,
 	)
-	if err := l.sessions.Add(session, l.trackActiveSessions); err != nil {
+	if err := l.sessions.Add(session); err != nil {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to add partition session: %w", err)))
 	}
 

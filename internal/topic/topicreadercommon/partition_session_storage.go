@@ -22,6 +22,7 @@ type PartitionSessionStorage struct {
 	// active excludes closed and removed sessions, which can still be looked
 	// up by the protocol.
 	active         *activeSessions
+	trackActive    bool
 	activeReleased bool
 
 	removeIndex              int
@@ -36,8 +37,16 @@ func (c *PartitionSessionStorage) initNeedLock() {
 	}
 }
 
-// Add records a protocol session. Metered streams opt into active tracking on assignment.
-func (c *PartitionSessionStorage) Add(session *PartitionSession, trackActive ...bool) error {
+// TrackActive makes later assignments maintain the active index used by gauges.
+// Streams without a meter never call it, so assignment allocates no index.
+func (c *PartitionSessionStorage) TrackActive() {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	c.trackActive = true
+}
+
+func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 	c.m.Lock()
 	defer c.m.Unlock()
 
@@ -47,7 +56,7 @@ func (c *PartitionSessionStorage) Add(session *PartitionSession, trackActive ...
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.StreamPartitionSessionID))
 	}
 	c.sessions[session.StreamPartitionSessionID] = &sessionInfo{Session: session}
-	if c.active == nil && !c.activeReleased && len(trackActive) != 0 && trackActive[0] {
+	if c.active == nil && c.trackActive && !c.activeReleased {
 		c.active = &activeSessions{
 			sessions: make(map[rawtopicreader.PartitionSessionID]*PartitionSession),
 			counts:   make(map[string]int64),
