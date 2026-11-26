@@ -689,8 +689,14 @@ func TestConnCloseDrainsStreams(t *testing.T) {
 				require.Eventually(t, func() bool {
 					return errors.Is(c.Invoke(ctx, "/test", nil, nil), errConnectionUnderShutdown)
 				}, time.Second, time.Millisecond)
-				_, err := c.NewStream(ctx, &grpc.StreamDesc{}, "/test")
-				require.ErrorIs(t, err, errConnectionUnderShutdown)
+				invokeErr := c.Invoke(ctx, "/test", nil, nil)
+				_, streamErr := c.NewStream(ctx, &grpc.StreamDesc{}, "/test")
+				for _, err := range []error{invokeErr, streamErr} {
+					require.ErrorIs(t, err, errConnectionUnderShutdown)
+					_, errType, _ := xerrors.Check(err)
+					require.Equal(t, xerrors.TypeRetryable, errType)
+					require.True(t, xerrors.IsYdb(err))
+				}
 				require.NoError(t, streamCtx.Err())
 				select {
 				case <-closed:

@@ -35,13 +35,12 @@ var (
 	// errClosedConnection specified error when connection are closed early
 	errClosedConnection = xerrors.Wrap(fmt.Errorf("connection closed early"))
 
-	errConnectionUnderShutdown = xerrors.Wrap(fmt.Errorf("connection under shutdown"))
+	errConnectionUnderShutdown = xerrors.Retryable(xerrors.Wrap(fmt.Errorf("connection under shutdown")))
 )
 
 type Conn interface {
 	grpc.ClientConnInterface
 
-	Close(ctx context.Context) error
 	Endpoint() endpoint.Endpoint
 	State() state.State
 	InFlight() int64

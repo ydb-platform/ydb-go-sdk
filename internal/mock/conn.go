@@ -25,10 +25,6 @@ type Conn struct {
 	MetadataField endpoint.Metadata
 }
 
-func (c *Conn) Close(context.Context) error {
-	return nil
-}
-
 func (c *Conn) Endpoint() endpoint.Endpoint {
 	return &Endpoint{
 		AddrField:     c.AddrField,

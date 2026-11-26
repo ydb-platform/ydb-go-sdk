@@ -54,10 +54,6 @@ type poolRegisteredConn struct {
 	inner conn.Conn
 }
 
-func (c *poolRegisteredConn) Close(ctx context.Context) error {
-	return c.inner.Close(ctx)
-}
-
 func (c *poolRegisteredConn) Ban(ctx context.Context) {
 	c.inner.Ban(ctx)
 }
