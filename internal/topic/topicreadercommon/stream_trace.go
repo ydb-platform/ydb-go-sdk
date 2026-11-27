@@ -55,7 +55,9 @@ func (q *StreamTraceQueue) WaitForACKs(stop <-chan struct{}) bool {
 // Each hook owns its keys. Queue a callback only on the first update to a key;
 // later updates accumulate there until the consumer takes it, even across other keys.
 func coalesceTrace[K comparable, V any](q *StreamTraceQueue, observe func(V), sum func(V, V) V) func(K, V) {
-	pending := make(map[K]V)
+	const largeBacklog = 64
+	var pending map[K]V
+	var peakReached bool
 
 	return func(key K, latest V) {
 		q.mu.Lock()
@@ -68,11 +70,19 @@ func coalesceTrace[K comparable, V any](q *StreamTraceQueue, observe func(V), su
 
 			return
 		}
+		if pending == nil {
+			pending = make(map[K]V)
+		}
 		pending[key] = latest
+		peakReached = peakReached || len(pending) >= largeBacklog
 		q.work.Send(func() {
 			q.mu.Lock()
 			event := pending[key]
 			delete(pending, key)
+			if peakReached && len(pending) == 0 {
+				pending = nil
+				peakReached = false
+			}
 			q.mu.Unlock()
 			observe(event)
 		})
