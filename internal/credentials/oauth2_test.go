@@ -14,11 +14,13 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	xtest "github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
@@ -96,6 +98,119 @@ type Oauth2TokenExchangeTestParams struct {
 	ExpectedToken     string
 	ExpectedError     error
 	ExpectedErrorPart string
+}
+
+func TestOauth2TokenExchangeRejectsRedirects(t *testing.T) {
+	for _, destination := range []string{"HTTP", "HTTPS", "same-origin"} {
+		t.Run(destination, func(t *testing.T) {
+			for _, status := range []int{
+				http.StatusMovedPermanently,
+				http.StatusFound,
+				http.StatusSeeOther,
+				http.StatusTemporaryRedirect,
+				http.StatusPermanentRedirect,
+			} {
+				t.Run(strconv.Itoa(status), func(t *testing.T) {
+					var redirectedRequests atomic.Int64
+					collector := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						redirectedRequests.Add(1)
+						WriteResponse(w, http.StatusOK,
+							`{"access_token":"fake-ticket","token_type":"Bearer","expires_in":3600}`, "application/json")
+					})
+					var redirectURL string
+					mux := http.NewServeMux()
+					mux.Handle("/collect", collector)
+					mux.HandleFunc("/exchange", func(w http.ResponseWriter, r *http.Request) {
+						http.Redirect(w, r, redirectURL, status)
+					})
+					endpoint := httptest.NewTLSServer(mux)
+					t.Cleanup(endpoint.Close)
+					transport := endpoint.Client().Transport.(*http.Transport).Clone()
+					t.Cleanup(transport.CloseIdleConnections)
+
+					switch destination {
+					case "HTTP":
+						target := httptest.NewServer(collector)
+						t.Cleanup(target.Close)
+						redirectURL = target.URL
+					case "HTTPS":
+						target := httptest.NewTLSServer(collector)
+						t.Cleanup(target.Close)
+						transport.TLSClientConfig.RootCAs.AddCert(target.Certificate())
+						redirectURL = target.URL
+					case "same-origin":
+						redirectURL = endpoint.URL + "/collect"
+					}
+
+					originalTransport := http.DefaultTransport
+					http.DefaultTransport = transport
+					t.Cleanup(func() { http.DefaultTransport = originalTransport })
+
+					client, err := NewOauth2TokenExchangeCredentials(
+						WithTokenEndpoint(endpoint.URL+"/exchange"),
+						WithFixedSubjectToken("fake-subject", "urn:ietf:params:oauth:token-type:access_token"),
+						WithFixedActorToken("fake-actor", "urn:ietf:params:oauth:token-type:access_token"),
+						WithSyncExchangeTimeout(time.Second),
+					)
+					require.NoError(t, err)
+
+					token, err := client.Token(xtest.Context(t))
+					require.ErrorIs(t, err, errCouldNotExchangeToken)
+					require.ErrorContains(t, err, strconv.Itoa(status)+" "+http.StatusText(status))
+					require.Empty(t, token)
+					require.Zero(t, redirectedRequests.Load())
+				})
+			}
+		})
+	}
+}
+
+func TestOauth2TokenExchangeRejectsRedirectsBeforeReadingBody(t *testing.T) {
+	for _, status := range []int{
+		http.StatusMultipleChoices,
+		http.StatusMovedPermanently,
+		http.StatusFound,
+		http.StatusSeeOther,
+		http.StatusNotModified,
+		http.StatusTemporaryRedirect,
+		http.StatusPermanentRedirect,
+	} {
+		for _, retryAllErrors := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%d/retryAllErrors=%t", status, retryAllErrors), func(t *testing.T) {
+				response := &http.Response{
+					StatusCode: status,
+					Status:     strconv.Itoa(status) + " " + http.StatusText(status),
+					Body: io.NopCloser(iotest.ErrReader(
+						errors.New("redirect body must not be read"),
+					)),
+				}
+				provider := &oauth2TokenExchange{}
+				_, err := provider.processTokenExchangeResponse(response, time.Now(), retryAllErrors)
+				require.ErrorIs(t, err, errCouldNotExchangeToken)
+				require.ErrorContains(t, err, response.Status)
+				require.Equal(t, retryAllErrors, xerrors.IsRetryableError(err))
+			})
+		}
+	}
+}
+
+func TestOauth2TokenExchangeCachesToken(t *testing.T) {
+	var requests atomic.Int64
+	endpoint := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		WriteResponse(w, http.StatusOK,
+			`{"access_token":"fake-ticket","token_type":"Bearer","expires_in":3600}`, "application/json")
+	}))
+	t.Cleanup(endpoint.Close)
+	client, err := NewOauth2TokenExchangeCredentials(WithTokenEndpoint(endpoint.URL))
+	require.NoError(t, err)
+
+	for range 2 {
+		token, err := client.Token(xtest.Context(t))
+		require.NoError(t, err)
+		require.Equal(t, "Bearer fake-ticket", token)
+	}
+	require.EqualValues(t, 1, requests.Load())
 }
 
 func TestOauth2TokenExchange(t *testing.T) {
@@ -316,6 +431,11 @@ func TestReturnsOldTokenWhileUpdating(t *testing.T) {
 		WithFixedSubjectToken("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt"),
 	)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.Eventually(t, func() bool {
+			return !client.updating.Load()
+		}, 10*time.Second, 10*time.Millisecond)
+	})
 
 	token, err := client.Token(ctx)
 	t1 := time.Now()
