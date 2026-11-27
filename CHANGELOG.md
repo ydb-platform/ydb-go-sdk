@@ -1,6 +1,9 @@
 * Fixed `ydb.WithPanicCallback` not being notified when hooks installed through `topicoptions.WithReaderTrace` or `topicoptions.WithWriterTrace` panic.
 * Added topic reader and listener metrics for message flow, session errors, commit progress, and buffers, with `topicoptions.WithListenerReaderName` for listener identity. See [METRICS.md](METRICS.md).
 
+## v3.158.1
+* Fixed OAuth2 token exchange following redirects and potentially disclosing subject and actor tokens; redirecting token endpoints must be configured with their final URL
+
 ## v3.158.0
 * Fixed Query Service response prefetch losing the final row or terminal error when a gRPC interceptor reads ahead, including delivery of buffered statistics on close
 * Added experimental `ydb.WithQueryProtoWireDecoding(bool)` to opt into direct protobuf wire decoding of native and `database/sql` Query Service `FORMAT_VALUE` rows, reducing allocations and using lazy cell and column-name indexes for linear-time wide-row scans while preserving protobuf response metadata for gRPC stream interceptors
