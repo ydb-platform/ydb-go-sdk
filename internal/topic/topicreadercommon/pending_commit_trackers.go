@@ -6,7 +6,7 @@ import "sync"
 // stream. Partition retirement alone cannot drop them: final ACKs may arrive.
 type pendingCommitTrackers struct {
 	mu     sync.Mutex
-	live   map[*commitMessageTracker]struct{}
+	head   *commitMessageTracker
 	closed bool
 }
 
@@ -17,10 +17,12 @@ func (p *pendingCommitTrackers) add(t *commitMessageTracker) bool {
 	if p.closed {
 		return false
 	}
-	if p.live == nil {
-		p.live = make(map[*commitMessageTracker]struct{})
+	if p.head != nil {
+		p.head.prev = t
 	}
-	p.live[t] = struct{}{}
+	t.next = p.head
+	t.linked = true
+	p.head = t
 
 	return true
 }
@@ -28,24 +30,40 @@ func (p *pendingCommitTrackers) add(t *commitMessageTracker) bool {
 func (p *pendingCommitTrackers) remove(t *commitMessageTracker) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	delete(p.live, t)
+
+	// Once closed, only close can access the detached links.
+	if p.closed || !t.linked {
+		return
+	}
+	if t.prev == nil {
+		p.head = t.next
+	} else {
+		t.prev.next = t.next
+	}
+	if t.next != nil {
+		t.next.prev = t.prev
+	}
+	t.prev, t.next, t.linked = nil, nil, false
 }
 
 func (p *pendingCommitTrackers) close() {
 	// Queue and Acknowledge take the tracker mutex before the set mutex.
 	// Detach the set before touching any individual tracker.
-	for t := range p.detach() {
+	for t := p.detach(); t != nil; {
+		next := t.next
+		t.prev, t.next, t.linked = nil, nil, false
 		t.discard()
+		t = next
 	}
 }
 
-func (p *pendingCommitTrackers) detach() map[*commitMessageTracker]struct{} {
+func (p *pendingCommitTrackers) detach() *commitMessageTracker {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	live := p.live
+	head := p.head
 	p.closed = true
-	p.live = nil
+	p.head = nil
 
-	return live
+	return head
 }

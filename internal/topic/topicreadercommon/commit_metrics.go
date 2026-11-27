@@ -135,6 +135,10 @@ type commitMessageTracker struct {
 	total   int64
 	// pending indexes ends below the last ordered end.
 	pending *commitRangeNode
+
+	// Protected by the owner's mutex until close detaches the list.
+	prev, next *commitMessageTracker
+	linked     bool
 }
 
 type commitMetricRange struct {
