@@ -167,7 +167,9 @@ func (t *commitMessageTracker) Queue(start, end rawtopiccommon.Offset) int64 {
 	t.total += count
 	if len(t.ordered) == 0 {
 		t.ordered = append(t.ordered, commitMetricRange{end: end, count: count})
-	} else if last := t.ordered[len(t.ordered)-1]; end >= last.end {
+	} else if last := &t.ordered[len(t.ordered)-1]; end == last.end {
+		last.count += count
+	} else if end > last.end {
 		t.ordered = append(t.ordered, commitMetricRange{end: end, count: last.count + count})
 	} else {
 		// Priorities must be unpredictable: a known sequence lets an admission
