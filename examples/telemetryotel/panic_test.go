@@ -62,7 +62,7 @@ func TestMeterRegistersFreshGaugeAfterBackendPanic(t *testing.T) {
 				t.Error("panicking backend operation still pins the removed collector")
 			}
 
-			remove, err := Meter(backend)(desc, func(_ context.Context, observe func(int64, ...telemetry.Attribute)) error {
+			remove, err := meter(desc, func(_ context.Context, observe func(int64, ...telemetry.Attribute)) error {
 				observe(7)
 
 				return nil

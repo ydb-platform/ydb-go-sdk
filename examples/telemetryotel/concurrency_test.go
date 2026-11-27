@@ -29,12 +29,13 @@ func TestMeterRegistersWhileAnotherMeterIsStalled(t *testing.T) {
 
 func TestMeterSharesGaugeAcrossConcurrentRegistrations(t *testing.T) {
 	backend := newGatedMeter()
+	adapter := Meter(backend)
 	release := sync.OnceFunc(func() { close(backend.resume) })
 	defer release()
 
-	waitFirst := startGaugeRegistration(t, Meter(backend), 3)
+	waitFirst := startGaugeRegistration(t, adapter, 3)
 	awaitSignal(t, backend.entered, "first registration did not reach the backend")
-	waitSecond := startGaugeRegistration(t, Meter(backend), 7)
+	waitSecond := startGaugeRegistration(t, adapter, 7)
 
 	release()
 	waitFirst()

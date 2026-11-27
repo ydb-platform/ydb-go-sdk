@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"reflect"
 	"slices"
 	"sync"
 
@@ -16,34 +15,30 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
-type gaugeKey struct {
-	meter metric.Meter
-	name  string
-}
-
 type gaugeRegistry struct {
 	mu     sync.Mutex
-	gauges map[gaugeKey]*gaugeRegistration
+	gauges map[string]*gaugeRegistration
 }
-
-var sharedGauges = gaugeRegistry{gauges: make(map[gaugeKey]*gaugeRegistration)}
 
 var errGaugeRetired = errors.New("OTel gauge entry retired")
 
-// Meter connects SDK gauge registration directly to an OTel meter. Adapters
-// wrapping the same comparable meter (including SDK meters) share registrations.
-// For a non-comparable meter implementation, share the returned adapter instead.
+// Meter connects SDK gauge registration directly to an OTel meter. Create one
+// adapter per instrumentation scope and pass ydb.WithMeter(adapter) to each
+// driver whose gauges should be summed together:
+//
+//	adapter := telemetryotel.Meter(otel.Meter("ydb"))
+//	first, err := ydb.Open(ctx, firstDSN, ydb.WithMeter(adapter))
+//	// Handle err before opening the second driver.
+//	second, err := ydb.Open(ctx, secondDSN, ydb.WithMeter(adapter))
+//
+// Separate adapters register separate callbacks even on the same OTel meter.
+// The OTel SDK keeps the last observation in collection order for each matching
+// instrument and attribute set; it does not sum observations across callbacks.
 func Meter(meter metric.Meter) telemetry.Meter {
-	registry := &sharedGauges
-	identity := meter
-	if !reflect.ValueOf(meter).Comparable() {
-		registry = &gaugeRegistry{gauges: make(map[gaugeKey]*gaugeRegistration)}
-		identity = nil
-	}
+	registry := &gaugeRegistry{gauges: make(map[string]*gaugeRegistration)}
 
 	return func(desc telemetry.Descriptor, callback telemetry.Int64GaugeCallback) (func() error, error) {
-		key := gaugeKey{meter: identity, name: desc.Name}
-		entry, err := registry.attach(key, &callback, func(entry *gaugeRegistration) error {
+		entry, err := registry.attach(desc.Name, &callback, func(entry *gaugeRegistration) error {
 			gauge, err := meter.Int64ObservableGauge(desc.Name,
 				metric.WithDescription(desc.Description), metric.WithUnit(desc.Unit))
 			if err != nil {
@@ -63,7 +58,7 @@ func Meter(meter metric.Meter) telemetry.Meter {
 		}
 
 		return sync.OnceValue(func() error {
-			if err := registry.detach(key, entry, &callback); err != nil {
+			if err := registry.detach(desc.Name, entry, &callback); err != nil {
 				err = fmt.Errorf("unregister OTel gauge %q: %w", desc.Name, err)
 				otel.Handle(err)
 
@@ -75,24 +70,24 @@ func Meter(meter metric.Meter) telemetry.Meter {
 	}
 }
 
-func (r *gaugeRegistry) reserve(key gaugeKey) *gaugeRegistration {
+func (r *gaugeRegistry) reserve(name string) *gaugeRegistration {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	entry := r.gauges[key]
+	entry := r.gauges[name]
 	if entry == nil {
 		entry = &gaugeRegistration{callbacks: make(map[*telemetry.Int64GaugeCallback]struct{})}
-		r.gauges[key] = entry
+		r.gauges[name] = entry
 	}
 
 	return entry
 }
 
 func (r *gaugeRegistry) attach(
-	key gaugeKey, callback *telemetry.Int64GaugeCallback, register func(*gaugeRegistration) error,
+	name string, callback *telemetry.Int64GaugeCallback, register func(*gaugeRegistration) error,
 ) (*gaugeRegistration, error) {
 	for {
-		entry, err := r.tryAttach(key, callback, register)
+		entry, err := r.tryAttach(name, callback, register)
 		if !errors.Is(err, errGaugeRetired) {
 			return entry, err
 		}
@@ -100,9 +95,9 @@ func (r *gaugeRegistry) attach(
 }
 
 func (r *gaugeRegistry) tryAttach(
-	key gaugeKey, callback *telemetry.Int64GaugeCallback, register func(*gaugeRegistration) error,
+	name string, callback *telemetry.Int64GaugeCallback, register func(*gaugeRegistration) error,
 ) (*gaugeRegistration, error) {
-	entry := r.reserve(key)
+	entry := r.reserve(name)
 	entry.lifecycle.Lock()
 	defer entry.lifecycle.Unlock()
 
@@ -118,7 +113,7 @@ func (r *gaugeRegistry) tryAttach(
 		defer func() {
 			if !registered {
 				entry.remove(callback)
-				r.retire(key, entry)
+				r.retire(name, entry)
 			}
 		}()
 		if err := register(entry); err != nil {
@@ -131,16 +126,16 @@ func (r *gaugeRegistry) tryAttach(
 }
 
 // retire is called with the entry's lifecycle lock held.
-func (r *gaugeRegistry) retire(key gaugeKey, entry *gaugeRegistration) {
+func (r *gaugeRegistry) retire(name string, entry *gaugeRegistration) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	entry.retired = true
-	delete(r.gauges, key)
+	delete(r.gauges, name)
 }
 
 func (r *gaugeRegistry) detach(
-	key gaugeKey, entry *gaugeRegistration, callback *telemetry.Int64GaugeCallback,
+	name string, entry *gaugeRegistration, callback *telemetry.Int64GaugeCallback,
 ) error {
 	entry.lifecycle.Lock()
 	defer entry.lifecycle.Unlock()
@@ -150,7 +145,7 @@ func (r *gaugeRegistry) detach(
 	}
 	// Keep the entry reserved until OTel stops using it. Collection may
 	// still run while Unregister waits, so it must not take lifecycle.
-	defer r.retire(key, entry)
+	defer r.retire(name, entry)
 
 	return entry.registration.Unregister()
 }
