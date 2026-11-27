@@ -57,7 +57,7 @@ func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 	}
 	c.sessions[session.StreamPartitionSessionID] = &sessionInfo{Session: session}
 	if c.active == nil && c.trackActive && !c.activeReleased {
-		c.active = &activeSessions{counts: make(map[string]int64)}
+		c.active = &activeSessions{}
 	}
 	if c.active != nil {
 		c.active.add(session)
@@ -146,7 +146,13 @@ func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (
 type activeSessions struct {
 	m      sync.Mutex
 	counts map[string]int64
+	// peak is the largest size of counts since it was last right-sized.
+	peak     int
+	released bool
 }
+
+// A map smaller than this is never worth replacing.
+const activeCountsShrinkMin = 64
 
 func (a *activeSessions) snapshot() map[string]int64 {
 	a.m.Lock()
@@ -154,6 +160,13 @@ func (a *activeSessions) snapshot() map[string]int64 {
 
 	counts := make(map[string]int64, len(a.counts))
 	maps.Copy(counts, a.counts)
+	if a.peak >= activeCountsShrinkMin && len(counts)*4 <= a.peak {
+		// A Go map keeps its peak storage, and walking a sparse one costs as
+		// much as the peak. A scrape pays that walk anyway, so it right-sizes
+		// the map here; removals on the receive path stay constant-time.
+		a.counts = maps.Clone(counts)
+		a.peak = len(counts)
+	}
 
 	return counts
 }
@@ -163,6 +176,7 @@ func (a *activeSessions) release() {
 	defer a.m.Unlock()
 
 	a.counts = nil
+	a.released = true
 }
 
 func (a *activeSessions) add(session *PartitionSession) {
@@ -175,19 +189,27 @@ func (a *activeSessions) add(session *PartitionSession) {
 
 		return
 	}
+	if a.counts == nil {
+		a.counts = make(map[string]int64)
+	}
 	a.counts[session.Topic]++
+	a.peak = max(a.peak, len(a.counts))
 }
 
 func (a *activeSessions) drop(session *PartitionSession) {
 	a.m.Lock()
 	defer a.m.Unlock()
 
-	if !session.active.CompareAndSwap(a, nil) || a.counts == nil {
+	if !session.active.CompareAndSwap(a, nil) || a.released {
 		return
 	}
 	topic := session.Topic
 	if a.counts[topic] == 1 {
 		delete(a.counts, topic)
+		if len(a.counts) == 0 && a.peak >= activeCountsShrinkMin {
+			// Dropping an empty map is constant-time; snapshot handles a sparse one.
+			a.counts, a.peak = nil, 0
+		}
 	} else {
 		a.counts[topic]--
 	}
