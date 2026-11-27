@@ -272,17 +272,29 @@ func (c *conn) close(ctx context.Context) (err error) {
 	return xerrors.WithStackTrace(err)
 }
 
-func (c *conn) Close(ctx context.Context) (err error) {
-	previous, changed := c.transitionState(state.UnderShutdown)
+func (c *conn) Close(ctx context.Context) error {
+	previous, changed := c.startShutdown()
 	if !changed {
 		return nil
 	}
+
+	return c.finishShutdown(ctx, previous)
+}
+
+func (c *conn) startShutdown() (state.State, bool) {
+	previous, changed := c.transitionState(state.UnderShutdown)
+	if changed {
+		if cancelDial := c.cancelDial.Load(); cancelDial != nil {
+			(*cancelDial)()
+		}
+	}
+
+	return previous, changed
+}
+
+func (c *conn) finishShutdown(ctx context.Context, previous state.State) (err error) {
 	ctx, cancel := context.WithTimeout(ctx, c.config.GrpcChannelShutdownTimeout())
 	defer cancel()
-
-	if cancelDial := c.cancelDial.Load(); cancelDial != nil {
-		(*cancelDial)()
-	}
 
 	if c.hasChildStreams() {
 		select {
@@ -300,7 +312,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	c.traceStateChange(ctx, previous, state.UnderShutdown)
 	onDone := gtrace.DriverOnConnClose(
 		c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).Close"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*conn).finishShutdown"),
 		c.Endpoint(),
 	)
 	defer func() {

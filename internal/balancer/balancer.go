@@ -228,6 +228,49 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 	return nil
 }
 
+func nextState(ctx context.Context, pool interface {
+	Get(e endpoint.Endpoint) conn.Conn
+	Put(ctx context.Context, cc conn.Conn)
+}, quarantine []conn.Conn, active []conn.Conn, endpoints []endpoint.Endpoint) (
+	newQuarantine []conn.Conn,
+	newActive []conn.Conn,
+) {
+	newActive = xslices.Filter(
+		xslices.Transform(endpoints, func(e endpoint.Endpoint) conn.Conn {
+			return pool.Get(e)
+		}),
+		func(cc conn.Conn) bool { return cc != nil },
+	)
+
+	for _, cc := range quarantine {
+		pool.Put(ctx, cc)
+	}
+
+	for _, cc := range newActive {
+		cc.Unban(ctx)
+	}
+
+	return active, newActive
+}
+
+// releaseStateConns releases connections from state
+//
+// quarantine refs were acquired in discovery round N-1,
+// all refs in round N — each Put matches its own Get.
+func (b *Balancer) releaseStateConns(ctx context.Context, state *connectionsState) {
+	if state == nil {
+		return
+	}
+
+	for _, c := range state.quarantine {
+		b.pool.Put(ctx, c)
+	}
+
+	for _, cc := range state.all {
+		b.pool.Put(ctx, cc)
+	}
+}
+
 func (b *Balancer) applyDiscoveredEndpoints(
 	ctx context.Context,
 	endpoints []endpoint.Endpoint,
@@ -237,54 +280,58 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	defer b.closeMu.Unlock()
 
 	if b.closed {
+		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
+
 		return
 	}
 
-	onDone := gtrace.DriverOnBalancerUpdate(
-		b.driverConfig.Trace(), &ctx,
-		stack.FunctionID(
-			"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
-		b.policy.DetectsNearestDC(), b.driverConfig.Database(),
+	var (
+		onDone = gtrace.DriverOnBalancerUpdate(
+			b.driverConfig.Trace(), &ctx,
+			stack.FunctionID(
+				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
+			b.policy.DetectsNearestDC(),
+			b.driverConfig.Database(),
+		)
+		state              = b.connectionsState.Load()
+		active             []conn.Conn
+		quarantine         []conn.Conn
+		selectedEndpoints  []endpoint.Endpoint
+		selectedPriorities []policy.EndpointPriority
+		previousPriorities []policy.EndpointPriority
 	)
-	var active []conn.Conn
-	var previousElection *endpointElector
-	if previous := b.connectionsState.Load(); previous != nil {
-		active, previousElection = previous.all, previous.elector
+	if state != nil {
+		active = state.All()
+		quarantine = state.quarantine
+		previousPriorities = state.elector.priorities
 	}
 
-	var selected []endpoint.Endpoint
 	defer func() {
-		_, added, dropped := xslices.Diff(xslices.Transform(active, conn.Conn.Endpoint), selected, endpoint.Compare)
-		endpointInfo := func(e endpoint.Endpoint) trace.EndpointInfo { return e }
+		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
+			return cc.Endpoint()
+		}), selectedEndpoints, endpoint.Compare)
+
 		onDone(
-			xslices.Transform(endpoints, endpointInfo),
-			xslices.Transform(added, endpointInfo),
-			xslices.Transform(dropped, endpointInfo),
+			xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+			xslices.Transform(added, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+			xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
 			selfLocation,
 		)
 	}()
 
-	maxConnections := b.policy.MaxConnections()
-	selected, priorities := selectActiveEndpoints(
-		previousElection, endpoints, b.policy.Prioritize(policy.Info{SelfLocation: selfLocation}, endpoints),
-		maxConnections, b.random,
+	info := policy.Info{SelfLocation: selfLocation}
+	priorities := b.policy.Prioritize(info, endpoints)
+	selectedEndpoints, selectedPriorities = selectActiveEndpoints(
+		active, quarantine, previousPriorities, endpoints, priorities, b.policy.MaxConnections(), b.random,
 	)
-	connections := make([]conn.Conn, 0, len(selected))
-	for _, e := range selected {
-		if cc := b.pool.Get(e); cc != nil {
-			connections = append(connections, cc)
-		}
-	}
-	for _, cc := range connections {
-		cc.Unban(ctx)
-	}
-	if maxConnections > 0 {
+	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selectedEndpoints)
+
+	if b.policy.MaxConnections() > 0 {
 		b.lastDiscovered = append(b.lastDiscovered[:0], endpoints...)
 	}
-	b.connectionsState.Store(newConnectionsStateWithPriorities(connections, priorities, nil))
-	for _, cc := range active {
-		b.pool.Put(ctx, cc)
-	}
+	b.connectionsState.Store(newConnectionsStateWithPriorities(
+		connections, selectedPriorities, quarantine, nil,
+	))
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
@@ -319,11 +366,7 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		discoveryRepeater.Stop()
 	}
 
-	if oldState != nil {
-		for _, cc := range oldState.all {
-			b.pool.Put(ctx, cc)
-		}
-	}
+	b.releaseStateConns(ctx, oldState)
 
 	if discoveryCC != nil {
 		_ = discoveryCC.Close()
@@ -687,7 +730,9 @@ func (b *Balancer) tryAddPinnedConnection(nodeID uint32) (connection, rejected c
 		Key:      discovered.Key(),
 		Excluded: true,
 	})
-	b.connectionsState.Store(newConnectionsStateWithPriorities(connections, priorities, current.elector.rand))
+	b.connectionsState.Store(newConnectionsStateWithPriorities(
+		connections, priorities, current.quarantine, current.elector.rand,
+	))
 
 	return connection, nil
 }

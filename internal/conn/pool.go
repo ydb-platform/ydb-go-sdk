@@ -99,8 +99,8 @@ func (p *Pool) get(e endpoint.Endpoint) *connValue {
 	return value
 }
 
-// Put releases a connection reference. The final release removes the entry
-// from the pool and starts closing the connection in the background.
+// Put releases a connection reference. The final release closes an idle
+// connection immediately and drains active streams in the background.
 func (p *Pool) Put(ctx context.Context, c Conn) {
 	cc, ok := c.(*conn)
 	if !ok || cc == nil {
@@ -108,13 +108,23 @@ func (p *Pool) Put(ctx context.Context, c Conn) {
 	}
 
 	closeCtx, cancel := p.releaseConn(ctx, cc)
-	if cancel != nil {
-		go func() {
-			defer p.closing.Done()
-			defer cancel()
-			_ = cc.Close(closeCtx)
-		}()
+	if cancel == nil {
+		return
 	}
+	previous, changed := cc.startShutdown()
+	closeConn := func() {
+		defer p.closing.Done()
+		defer cancel()
+		if changed {
+			_ = cc.finishShutdown(closeCtx, previous)
+		}
+	}
+	if changed && cc.hasChildStreams() {
+		go closeConn()
+
+		return
+	}
+	closeConn()
 }
 
 func (p *Pool) releaseConn(ctx context.Context, c *conn) (context.Context, context.CancelFunc) {

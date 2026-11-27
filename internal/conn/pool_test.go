@@ -415,7 +415,7 @@ func TestPool_ConnectionTTL(t *testing.T) {
 
 		pool.Put(ctx, cc)
 
-		require.Eventually(t, func() bool { return cc.State() == state.Destroyed }, time.Second, time.Millisecond)
+		require.Equal(t, state.Destroyed, cc.State())
 		require.False(t, testPoolHasConn(pool, e.Key()))
 	})
 }
@@ -673,7 +673,7 @@ func TestPool_GetPut(t *testing.T) {
 			t.Fatal("deadlock: Put blocked while conn.Close waits for pool mutex")
 		}
 
-		require.Eventually(t, lockFreeDuringClose.Load, time.Second, time.Millisecond,
+		require.True(t, lockFreeDuringClose.Load(),
 			"pool mutex must be released before conn.Close invokes remove",
 		)
 		require.False(t, testPoolHasConn(pool, e.Key()))
@@ -1090,9 +1090,7 @@ func TestPool_RemoveRefCancelsAndWaitsForReleasedConnection(t *testing.T) {
 		t.Fatal("put waited for the stream to finish")
 	}
 	require.Zero(t, testPoolConnsLen(pool))
-	require.Eventually(t, func() bool {
-		return cc.State() == state.UnderShutdown
-	}, time.Second, time.Millisecond)
+	require.Equal(t, state.UnderShutdown, cc.State())
 	require.NoError(t, pool.RemoveRef(ctx))
 	require.NoError(t, streamCtx.Err())
 
