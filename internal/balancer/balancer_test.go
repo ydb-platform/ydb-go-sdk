@@ -22,6 +22,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
@@ -139,7 +141,7 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 		pool:         pool,
 	}
 
-	initial := newConnectionsState(nil, nil, policy.Info{}, nil)
+	initial := newConnectionsState(nil, nil, policy.Info{})
 	b.connectionsState.Store(initial)
 
 	e1 := endpoint.New("e1.example:2135", endpoint.WithIPV6([]string{"2001:db8::1"}), endpoint.WithID(1))
@@ -157,6 +159,7 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	require.Equal(t, e1.NodeID(), all[0].Endpoint().NodeID())
 	require.Equal(t, e2.Address(), all[1].Endpoint().Address())
 	require.Equal(t, e2.NodeID(), all[1].Endpoint().NodeID())
+	removed, retained := all[0], all[1]
 
 	// partially replace endpoints
 	e3 := endpoint.New("e3.example:2135", endpoint.WithIPV6([]string{"2001:db8::3"}), endpoint.WithID(1))
@@ -170,6 +173,15 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	require.Equal(t, e2.NodeID(), all[0].Endpoint().NodeID())
 	require.Equal(t, e3.Address(), all[1].Endpoint().Address())
 	require.Equal(t, e3.NodeID(), all[1].Endpoint().NodeID())
+	require.Same(t, retained, all[0])
+	require.Equal(t, state.Destroyed, removed.State())
+
+	e4 := endpoint.New("e4.example:2135", endpoint.WithID(4))
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e4}, "")
+	require.Equal(t, []uint32{4}, activeNodeIDs(b))
+	for _, cc := range all {
+		require.Equal(t, state.Destroyed, cc.State())
+	}
 }
 
 func TestApplyDiscoveredEndpointsMaxConnections(t *testing.T) {
@@ -259,10 +271,11 @@ func TestMaxConnectionsWithNodeIDSoftLimit(t *testing.T) {
 	require.Equal(t, state.Banned, pinned.State(), "a pinned request must not revive a banned connection")
 
 	b.applyDiscoveredEndpoints(ctx, endpoints, "")
+	require.Equal(t, state.Destroyed, pinned.State())
 	selected, err = b.nextConn(strictPin)
-	require.ErrorIs(t, err, ErrNoEndpoints)
-	require.Nil(t, selected)
-	require.Equal(t, state.Banned, pinned.State(), "a quarantined connection must not be revived either")
+	require.NoError(t, err)
+	require.NotSame(t, pinned, selected)
+	require.Equal(t, uint32(2), selected.Endpoint().NodeID())
 }
 
 func TestWithNodeIDCountsRPC(t *testing.T) {
@@ -339,7 +352,7 @@ func TestTryAddPinnedConnectionDefensivePaths(t *testing.T) {
 		existing := userBalancerConn(1, "node", state.Online)
 		b := &Balancer{}
 		b.connectionsState.Store(newConnectionsStateWithPolicy(
-			[]conn.Conn{existing}, policy.Policy{}, policy.Info{}, nil,
+			[]conn.Conn{existing}, policy.Policy{}, policy.Info{},
 		))
 
 		connection, rejected := b.tryAddPinnedConnection(1)
@@ -350,7 +363,7 @@ func TestTryAddPinnedConnectionDefensivePaths(t *testing.T) {
 	t.Run("node absent from discovery", func(t *testing.T) {
 		b := &Balancer{}
 		b.connectionsState.Store(newConnectionsStateWithPolicy(
-			nil, policy.Policy{}, policy.Info{}, nil,
+			nil, policy.Policy{}, policy.Info{},
 		))
 
 		connection, rejected := b.tryAddPinnedConnection(1)
@@ -367,7 +380,7 @@ func TestTryAddPinnedConnectionDefensivePaths(t *testing.T) {
 			lastDiscovered: []endpoint.Endpoint{endpoint.New("node", endpoint.WithID(1))},
 		}
 		b.connectionsState.Store(newConnectionsStateWithPolicy(
-			nil, policy.Policy{}, policy.Info{}, nil,
+			nil, policy.Policy{}, policy.Info{},
 		))
 
 		connection, rejected := b.tryAddPinnedConnection(1)
@@ -415,10 +428,7 @@ func TestApplyDiscoveredEndpointsKeepsFilteredConnectionsUntilDiscoveryDropsThem
 	require.Equal(t, e2.Key(), selected.Endpoint().Key())
 
 	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1}, "")
-	require.NotNil(t, connInQuarantine(b, 2), "filtered-out conn must stay in quarantine until released")
-
-	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e1}, "")
-	require.Nil(t, connInQuarantine(b, 2), "filtered-out conn must be released after quarantine cycle")
+	require.Equal(t, state.Destroyed, selected.State())
 }
 
 func TestApplyDiscoveredEndpointsClosedPool(t *testing.T) {
@@ -436,6 +446,7 @@ func TestApplyDiscoveredEndpointsClosedPool(t *testing.T) {
 			endpoint.New("node:2135", endpoint.WithID(1)),
 		}, "")
 	})
+	require.Empty(t, b.connections().All())
 }
 
 func TestBalancer_Close(t *testing.T) {
@@ -459,7 +470,6 @@ func TestBalancer_Close(t *testing.T) {
 			[]conn.Conn{cc},
 			nil,
 			policy.Info{},
-			nil,
 		))
 
 		require.NoError(t, b.Close(ctx))
@@ -480,7 +490,7 @@ func TestBalancer_Close(t *testing.T) {
 			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
-			nil, policy.Info{}, nil,
+			nil, policy.Info{},
 		))
 
 		var wg sync.WaitGroup
@@ -521,7 +531,7 @@ func TestBalancer_Close(t *testing.T) {
 			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
-			nil, policy.Info{}, nil,
+			nil, policy.Info{},
 		))
 
 		closeStarted := make(chan struct{})
@@ -551,7 +561,7 @@ func TestBalancer_Close(t *testing.T) {
 			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
-			nil, policy.Info{}, nil,
+			nil, policy.Info{},
 		))
 
 		stopCalled := make(chan struct{})
@@ -598,7 +608,7 @@ func TestBalancer_Close(t *testing.T) {
 			pool:         pool,
 		}
 		b.connectionsState.Store(newConnectionsState(nil,
-			nil, policy.Info{}, nil,
+			nil, policy.Info{},
 		))
 		b.cc.Store(cc)
 
@@ -620,7 +630,6 @@ func TestBalancer_Close(t *testing.T) {
 			nil,
 			nil,
 			policy.Info{},
-			nil,
 		))
 
 		_, err := b.nextConn(ctx)
@@ -639,15 +648,14 @@ func TestBalancer_Close(t *testing.T) {
 		b := &Balancer{
 			driverConfig: cfg,
 			pool:         pool,
-			closed:       true,
 		}
 		b.connectionsState.Store(newConnectionsState(
 			[]conn.Conn{c},
 			nil,
 			policy.Info{},
-			nil,
 		))
 
+		require.NoError(t, b.Close(ctx))
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e}, "")
 		require.Nil(t, b.connectionsState.Load())
 
@@ -685,7 +693,6 @@ func TestBalancer_CloseRacesWithNextConnRepeater(t *testing.T) {
 		[]conn.Conn{baseConn},
 		nil,
 		policy.Info{},
-		nil,
 	)
 	connections.all[0] = blockingConn
 	connections.elector.connections[baseConn.Endpoint().Key()] = blockingConn
@@ -752,7 +759,6 @@ func TestBalancer_CloseWhileDiscoveryDialInFlight(t *testing.T) {
 		nil,
 		nil,
 		policy.Info{},
-		nil,
 	))
 
 	type discoveryConnResult struct {
@@ -894,10 +900,20 @@ func TestNew(t *testing.T) {
 	t.Run("default policy", func(t *testing.T) {
 		ctx := t.Context()
 		srv := startDynamicDiscoveryServer(t, []uint32{1})
+		var discoveryAttempts atomic.Int32
 		cfg := config.New(
 			config.WithEndpoint(srv.endpoint()),
 			config.WithDatabase("/local"),
 			config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+			config.WithTrace(trace.Driver{
+				OnBalancerClusterDiscoveryAttempt: func(trace.DriverBalancerClusterDiscoveryAttemptStartInfo) func(
+					trace.DriverBalancerClusterDiscoveryAttemptDoneInfo,
+				) {
+					discoveryAttempts.Add(1)
+
+					return nil
+				},
+			}),
 		)
 		pool := conn.NewPool(ctx, cfg)
 		defer func() { require.NoError(t, pool.RemoveRef(ctx)) }()
@@ -905,6 +921,7 @@ func TestNew(t *testing.T) {
 		b, err := New(ctx, cfg, pool)
 		require.NoError(t, err)
 		require.Equal(t, "Priority", b.policy.String())
+		require.EqualValues(t, 1, discoveryAttempts.Load())
 		require.Empty(t, b.lastDiscovered)
 		require.Nil(t, b.random)
 		require.NoError(t, b.Close(ctx))
@@ -1004,7 +1021,7 @@ func TestBalancerForcesDiscoveryWhenMostConnectionsAreBanned(t *testing.T) {
 		}},
 	}
 	balancer.connectionsState.Store(newConnectionsStateWithPolicy(
-		[]conn.Conn{preferred, firstFallback, secondFallback}, p, policy.Info{}, nil,
+		[]conn.Conn{preferred, firstFallback, secondFallback}, p, policy.Info{},
 	))
 
 	balancer.ban(ctx, preferred, errors.New("preferred unavailable"))
@@ -1031,7 +1048,7 @@ func TestSingleConnectionPolicyDoesNotBanItsOnlyConnection(t *testing.T) {
 		policy:       policy.SingleConn(),
 	}
 	balancer.connectionsState.Store(newConnectionsStateWithPolicy(
-		[]conn.Conn{connection}, balancer.policy, policy.Info{}, nil,
+		[]conn.Conn{connection}, balancer.policy, policy.Info{},
 	))
 
 	balancer.ban(t.Context(), connection, errors.New("temporary failure"))
@@ -1093,7 +1110,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 				driverConfig: cfg,
 				pool:         pool,
 			}
-			s := newConnectionsState([]conn.Conn{cc1}, nil, policy.Info{}, nil)
+			s := newConnectionsState([]conn.Conn{cc1}, nil, policy.Info{})
 			b.connectionsState.Store(s)
 
 			nodeCtx := endpoint.WithNodeID(ctx, e1.NodeID())
@@ -1142,7 +1159,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{})
 		b.connectionsState.Store(s)
 
 		err := b.Invoke(endpoint.WithNodeID(ctx, cc1.NodeIDField), "/test.Service/Method", nil, nil)
@@ -1181,7 +1198,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1}, nil, policy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1}, nil, policy.Info{})
 		b.connectionsState.Store(s)
 
 		err := b.Invoke(ctx, "/test.Service/Method", nil, nil)
@@ -1222,7 +1239,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{})
 		b.connectionsState.Store(s)
 
 		// Call Invoke targeting cc1 with OVERLOADED tagged in context — wrapCall must ban cc1.
@@ -1272,7 +1289,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1}, nil, policy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1}, nil, policy.Info{})
 		b.connectionsState.Store(s)
 
 		// Context only bans on OVERLOADED — a NOT_FOUND error must not ban.
@@ -1318,7 +1335,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{})
 		b.connectionsState.Store(s)
 
 		invokeCtx := BanOnSessionCreate(endpoint.WithNodeID(ctx, cc1.NodeIDField))
@@ -1366,7 +1383,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{})
 		b.connectionsState.Store(s)
 
 		invokeCtx := BanOnSessionCreate(endpoint.WithNodeID(ctx, cc1.NodeIDField))
@@ -1410,7 +1427,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{})
 		b.connectionsState.Store(s)
 
 		// Sequentially pessimize cc1 then cc2 via the normal Invoke+BanOnOperationError flow.
@@ -1462,7 +1479,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{})
 		b.connectionsState.Store(s)
 
 		streamCtx := BanOnOperationError(
@@ -1515,7 +1532,7 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			driverConfig: cfg,
 			pool:         pool,
 		}
-		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{}, nil)
+		s := newConnectionsState([]conn.Conn{cc1, cc2}, nil, policy.Info{})
 		b.connectionsState.Store(s)
 
 		streamCtx := BanOnOperationError(
@@ -1537,138 +1554,6 @@ func TestPessimizationOnOverloaded(t *testing.T) {
 			require.Equal(t, cc2.AddrField, c.Endpoint().Address())
 		}
 	})
-}
-
-type countingPool struct {
-	counts map[endpoint.Key]int
-	conns  map[endpoint.Key]conn.Conn
-}
-
-func newCountingPool() *countingPool {
-	return &countingPool{
-		counts: make(map[endpoint.Key]int),
-		conns:  make(map[endpoint.Key]conn.Conn),
-	}
-}
-
-func (p *countingPool) Get(e endpoint.Endpoint) conn.Conn {
-	key := e.Key()
-	c, ok := p.conns[key]
-	if !ok {
-		c = &mock.Conn{
-			AddrField:   e.Address(),
-			NodeIDField: e.NodeID(),
-		}
-		p.conns[key] = c
-	}
-	p.counts[key]++
-
-	return c
-}
-
-func (p *countingPool) Put(ctx context.Context, cc conn.Conn) {
-	p.counts[cc.Endpoint().Key()]--
-}
-
-func (p *countingPool) count(key endpoint.Key) int {
-	return p.counts[key]
-}
-
-func requireConnKeys(t *testing.T, expected []endpoint.Endpoint, actual []conn.Conn) {
-	t.Helper()
-
-	require.Len(t, actual, len(expected))
-	for i, e := range expected {
-		require.Equal(t, e.Key(), actual[i].Endpoint().Key())
-	}
-}
-
-func TestNextState(t *testing.T) {
-	var (
-		ctx        = t.Context()
-		pool       = newCountingPool()
-		quarantine []conn.Conn
-		active     []conn.Conn
-
-		a = endpoint.New("node-a:2135", endpoint.WithID(1))
-		b = endpoint.New("node-b:2135", endpoint.WithID(2))
-		c = endpoint.New("node-c:2135", endpoint.WithID(3))
-	)
-
-	// Discovery #1: [a, b, c] — first acquire, nothing to release from quarantine.
-	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b, c})
-	require.Empty(t, quarantine)
-	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, active)
-	require.Equal(t, 1, pool.count(a.Key()))
-	require.Equal(t, 1, pool.count(b.Key()))
-	require.Equal(t, 1, pool.count(c.Key()))
-
-	connA, connB, connC := active[0], active[1], active[2]
-
-	// Discovery #2: same set — previous active moves to quarantine, Get bumps refs again.
-	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b, c})
-	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, quarantine)
-	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, active)
-	require.Same(t, connA, quarantine[0])
-	require.Same(t, connB, quarantine[1])
-	require.Same(t, connC, quarantine[2])
-	require.Equal(t, 2, pool.count(a.Key()))
-	require.Equal(t, 2, pool.count(b.Key()))
-	require.Equal(t, 2, pool.count(c.Key()))
-
-	// Discovery #3: drop c — release quarantine, c stays referenced only from new quarantine.
-	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b})
-	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, quarantine)
-	requireConnKeys(t, []endpoint.Endpoint{a, b}, active)
-	require.Equal(t, 2, pool.count(a.Key()))
-	require.Equal(t, 2, pool.count(b.Key()))
-	require.Equal(t, 1, pool.count(c.Key()))
-
-	// Discovery #4: same [a, b] — release full quarantine; c ref drops to zero.
-	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b})
-	requireConnKeys(t, []endpoint.Endpoint{a, b}, quarantine)
-	requireConnKeys(t, []endpoint.Endpoint{a, b}, active)
-	require.Equal(t, 2, pool.count(a.Key()))
-	require.Equal(t, 2, pool.count(b.Key()))
-	require.Equal(t, 0, pool.count(c.Key()))
-
-	// Discovery #5: c returns — new Get for c, a/b keep elevated refs.
-	quarantine, active = nextState(ctx, pool, quarantine, active, []endpoint.Endpoint{a, b, c})
-	requireConnKeys(t, []endpoint.Endpoint{a, b}, quarantine)
-	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, active)
-	require.Equal(t, 2, pool.count(a.Key()))
-	require.Equal(t, 2, pool.count(b.Key()))
-	require.Equal(t, 1, pool.count(c.Key()))
-	require.Same(t, connC, active[2])
-
-	// Discovery #6: cluster empty — active set moves to quarantine, one ref each.
-	quarantine, active = nextState(ctx, pool, quarantine, active, nil)
-	requireConnKeys(t, []endpoint.Endpoint{a, b, c}, quarantine)
-	require.Empty(t, active)
-	require.Equal(t, 1, pool.count(a.Key()))
-	require.Equal(t, 1, pool.count(b.Key()))
-	require.Equal(t, 1, pool.count(c.Key()))
-
-	// Discovery #7: still empty — release quarantine, all refs reach zero.
-	quarantine, active = nextState(ctx, pool, quarantine, active, nil)
-	require.Empty(t, quarantine)
-	require.Empty(t, active)
-	require.Equal(t, 0, pool.count(a.Key()))
-	require.Equal(t, 0, pool.count(b.Key()))
-	require.Equal(t, 0, pool.count(c.Key()))
-}
-
-func TestNextStateClosedPool(t *testing.T) {
-	ctx := context.Background()
-	pool := conn.NewPool(ctx, config.New())
-	require.NoError(t, pool.RemoveRef(ctx))
-
-	newQuarantine, newActive := nextState(ctx, pool, nil, nil, []endpoint.Endpoint{
-		endpoint.New("node:2135", endpoint.WithID(1)),
-	})
-
-	require.Empty(t, newQuarantine)
-	require.Empty(t, newActive)
 }
 
 func TestNewReturnsDiscoveryStartError(t *testing.T) {
@@ -1806,7 +1691,7 @@ func TestNextAvailableConnContinuesWithLatestSnapshot(t *testing.T) {
 		StateField:  state.Online,
 	}
 	next := newConnectionsStateWithPolicy(
-		[]conn.Conn{replacement}, policy.Policy{}, policy.Info{}, nil,
+		[]conn.Conn{replacement}, policy.Policy{}, policy.Info{},
 	)
 	balancer := &Balancer{}
 	staleBase := &mock.Conn{
@@ -1820,7 +1705,7 @@ func TestNextAvailableConnContinuesWithLatestSnapshot(t *testing.T) {
 		nextState: next,
 	}
 	previous := newConnectionsStateWithPolicy(
-		[]conn.Conn{stale}, policy.Policy{}, policy.Info{}, nil,
+		[]conn.Conn{stale}, policy.Policy{}, policy.Info{},
 	)
 	balancer.connectionsState.Store(previous)
 	stale.armed = true
@@ -1855,7 +1740,7 @@ func TestNextAvailableConnExtendsAttemptsForLargerSnapshot(t *testing.T) {
 	}
 	next := newConnectionsStateWithPolicyAndRand(
 		[]conn.Conn{firstUnavailable, secondUnavailable, available},
-		policy.Policy{}, policy.Info{}, nil, userAPITestRand{},
+		policy.Policy{}, policy.Info{}, userAPITestRand{},
 	)
 	balancer := &Balancer{}
 	stale := &snapshotSwappingConn{
@@ -1864,7 +1749,7 @@ func TestNextAvailableConnExtendsAttemptsForLargerSnapshot(t *testing.T) {
 		nextState: next,
 	}
 	previous := newConnectionsStateWithPolicy(
-		[]conn.Conn{stale}, policy.Policy{}, policy.Info{}, nil,
+		[]conn.Conn{stale}, policy.Policy{}, policy.Info{},
 	)
 	balancer.connectionsState.Store(previous)
 	stale.armed = true
@@ -1888,7 +1773,7 @@ func TestNextAvailableConnStopsWhenBalancerClosesDuringSelection(t *testing.T) {
 		balancer: balancer,
 	}
 	previous := newConnectionsStateWithPolicy(
-		[]conn.Conn{stale}, policy.Policy{}, policy.Info{}, nil,
+		[]conn.Conn{stale}, policy.Policy{}, policy.Info{},
 	)
 	balancer.connectionsState.Store(previous)
 	stale.armed = true
@@ -1901,7 +1786,7 @@ func TestNextAvailableConnStopsWhenBalancerClosesDuringSelection(t *testing.T) {
 }
 
 func TestNextAvailableConnStopsWhenElectionSnapshotIsEmpty(t *testing.T) {
-	connections := newConnectionsStateWithPriorities(nil, nil, nil, nil)
+	connections := newConnectionsStateWithPriorities(nil, nil, nil)
 	balancer := &Balancer{}
 	balancer.connectionsState.Store(connections)
 
@@ -1914,7 +1799,7 @@ func TestNextAvailableConnStopsWhenElectionSnapshotIsEmpty(t *testing.T) {
 func TestNextAvailableConnStopsWhenElectionSnapshotBecomesEmpty(t *testing.T) {
 	connection := &mock.Conn{AddrField: "available:2135", StateField: state.Online}
 	connections := newConnectionsStateWithPolicy(
-		[]conn.Conn{connection}, policy.Policy{}, policy.Info{}, nil,
+		[]conn.Conn{connection}, policy.Policy{}, policy.Info{},
 	)
 	balancer := &Balancer{}
 	balancer.connectionsState.Store(connections)
@@ -1932,7 +1817,6 @@ func TestNextConnReturnsNoEndpointsWhenElectionSnapshotIsEmpty(t *testing.T) {
 		[]conn.Conn{connection},
 		[]policy.EndpointPriority{{Key: connection.Endpoint().Key()}},
 		nil,
-		nil,
 	)
 	balancer := &Balancer{driverConfig: config.New()}
 	balancer.connectionsState.Store(connections)
@@ -1947,7 +1831,7 @@ func TestNextConnReturnsNoEndpointsWhenElectionSnapshotIsEmpty(t *testing.T) {
 func TestNextAvailableConnStopsWhenContextIsCanceled(t *testing.T) {
 	connection := &mock.Conn{AddrField: "available:2135", StateField: state.Online}
 	connections := newConnectionsStateWithPolicy(
-		[]conn.Conn{connection}, policy.Policy{}, policy.Info{}, nil,
+		[]conn.Conn{connection}, policy.Policy{}, policy.Info{},
 	)
 	balancer := &Balancer{}
 	balancer.connectionsState.Store(connections)
@@ -1964,7 +1848,7 @@ func TestNextConnReturnsCanceledContext(t *testing.T) {
 	connection := &mock.Conn{AddrField: "available:2135", StateField: state.Online}
 	balancer := &Balancer{driverConfig: config.New()}
 	balancer.connectionsState.Store(newConnectionsStateWithPolicy(
-		[]conn.Conn{connection}, policy.Policy{}, policy.Info{}, nil,
+		[]conn.Conn{connection}, policy.Policy{}, policy.Info{},
 	))
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -1979,7 +1863,7 @@ func TestNextConnReturnsContextCanceledDuringSelection(t *testing.T) {
 	connection := &mock.Conn{AddrField: "available:2135", StateField: state.Online}
 	balancer := &Balancer{driverConfig: config.New()}
 	balancer.connectionsState.Store(newConnectionsStateWithPolicy(
-		[]conn.Conn{connection}, policy.Policy{}, policy.Info{}, nil,
+		[]conn.Conn{connection}, policy.Policy{}, policy.Info{},
 	))
 	ctx := &cancelAfterFirstCheckContext{}
 
@@ -2286,7 +2170,6 @@ func userConfiguredBalancer(option config.Option, connections []conn.Conn, selfL
 		connections,
 		balancer.policy,
 		policy.Info{SelfLocation: selfLocation},
-		nil,
 	))
 
 	return balancer
@@ -2566,6 +2449,7 @@ func startDynamicDiscoveryServer(tb testing.TB, nodeIDs []uint32) *dynamicDiscov
 
 	statsHandler := &serverConnStats{active: &server.activeConns}
 	server.grpcServer = grpc.NewServer(grpc.StatsHandler(statsHandler))
+	grpc_health_v1.RegisterHealthServer(server.grpcServer, health.NewServer())
 
 	Ydb_Discovery_V1.RegisterDiscoveryServiceServer(
 		server.grpcServer,
@@ -2730,21 +2614,8 @@ func activeNodeIDs(balancer *Balancer) []uint32 {
 	return ids
 }
 
-func connInQuarantine(balancer *Balancer, nodeID uint32) conn.Conn {
-	if balancerState := balancer.connectionsState.Load(); balancerState != nil {
-		for _, connection := range balancerState.quarantine {
-			if connection.Endpoint().NodeID() == nodeID {
-				return connection
-			}
-		}
-	}
-
-	return nil
-}
-
-// TestBalancerDiscoveryDropClosesGRPC verifies end-to-end that a node removed from
-// ListEndpoints eventually closes its pooled gRPC connection after the quarantine
-// cycle (two discovery rounds after the drop), and Balancer.Close closes the rest.
+// TestBalancerDiscoveryDropClosesGRPC verifies that a returning endpoint gets
+// a new connection while the removed connection drains its existing stream.
 func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	const (
 		node1 uint32 = 1
@@ -2760,6 +2631,7 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 		config.WithDatabase("/local"),
 		config.WithGrpcOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
 		config.WithTrace(*events.driverTrace()),
+		config.WithGrpcChannelShutdownTimeout(time.Minute),
 		config.WithBalancer(userBalancers.RandomChoice()),
 	)
 
@@ -2784,43 +2656,57 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	require.NotNil(t, node2Conn)
 	require.Equal(t, state.Online, node2Conn.State())
 
-	// Discovery #2: same cluster — quarantine cycle, refs increment.
+	streamCtx, cancelStream := context.WithCancel(endpoint.WithNodeID(ctx, node2))
+	defer cancelStream()
+	watch, err := grpc_health_v1.NewHealthClient(balancer).Watch(streamCtx, &grpc_health_v1.HealthCheckRequest{})
+	require.NoError(t, err)
+	_, err = watch.Recv()
+	require.NoError(t, err)
+
+	// Discovery #2: keep both endpoints.
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
 	require.ElementsMatch(t, []uint32{node1, node2}, activeNodeIDs(balancer))
 	require.Equal(t, 0, events.closedCount(node2))
 
-	// Discovery #3: node 2 disappears — moved to quarantine, gRPC still alive.
+	// Discovery #3: node 2 disappears while the existing stream remains open.
 	server.setNodeIDs([]uint32{node1})
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
 	require.Equal(t, []uint32{node1}, activeNodeIDs(balancer))
-	require.Equal(t, 0, events.closedCount(node2), "gRPC must not close on first discovery after drop")
+	require.Equal(t, state.UnderShutdown, node2Conn.State())
 
-	quarantined := connInQuarantine(balancer, node2)
-	require.NotNil(t, quarantined, "dropped node must remain in quarantine")
-	require.Same(t, node2Conn, quarantined)
-
-	// Discovery #4: same cluster — quarantine released, dropped node gRPC must close.
+	// Discovery #4: node 2 returns before the old connection closes.
+	server.setNodeIDs([]uint32{node1, node2})
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
-	require.Equal(t, []uint32{node1}, activeNodeIDs(balancer))
+	require.ElementsMatch(t, []uint32{node1, node2}, activeNodeIDs(balancer))
+	returned := connByNodeID(balancer, node2)
+	require.NotNil(t, returned)
+	require.NotSame(t, node2Conn, returned)
+	require.Equal(t, node2Conn.Endpoint().Key(), returned.Endpoint().Key())
+	dialWhoAmI(t, balancer, node2)
+	require.Equal(t, 2, events.dialedCount(node2))
+	require.Equal(t, state.UnderShutdown, node2Conn.State())
+	require.Equal(t, 0, events.closedCount(node2))
+
+	cancelStream()
 
 	require.Eventually(t, func() bool {
 		return events.closedCount(node2) == 1 && node2Conn.State() == state.Destroyed
 	}, time.Second, 10*time.Millisecond, "node removed from discovery must close gRPC connection")
+	require.Equal(t, state.Online, returned.State())
 
 	require.Equal(t, 0, events.closedCount(node1))
 
-	// Balancer.Close: release active + quarantine, remaining pooled conns must close.
+	// Balancer.Close releases the active connections.
 	node1Conn := connByNodeID(balancer, node1)
 	require.NotNil(t, node1Conn)
 	require.Equal(t, 0, events.closedCount(node1))
 
 	require.NoError(t, balancer.Close(ctx))
 
-	require.Eventually(t, func() bool {
-		return events.closedCount(node1) == 1 && node1Conn.State() == state.Destroyed
-	}, time.Second, 10*time.Millisecond, "balancer close must close remaining active connections")
-
-	require.Equal(t, 1, events.closedCount(node2))
+	require.Equal(t, state.Destroyed, node1Conn.State())
+	require.Equal(t, state.Destroyed, returned.State())
+	require.Equal(t, 1, events.closedCount(node1))
+	require.Equal(t, 2, events.closedCount(node2))
 }
 
 func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
@@ -2860,23 +2746,16 @@ func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
 	}, time.Second, 10*time.Millisecond, "connection TTL must park the node transport")
 	require.Equal(t, 0, events.closedCount(node2), "parking must preserve the pooled wrapper")
 
-	// Discovery #2: keep both nodes and establish the quarantine generation.
+	// Discovery #2: keep both nodes.
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
 	require.Same(t, node2Conn, connByNodeID(balancer, node2))
 	require.Equal(t, state.Offline, node2Conn.State())
 
-	// Discovery #3: node 2 disappears but remains referenced by quarantine.
+	// Discovery #3: node 2 disappears, releasing its parked connection.
 	server.setNodeIDs([]uint32{node1})
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
-	require.Same(t, node2Conn, connInQuarantine(balancer, node2))
-	require.Equal(t, state.Offline, node2Conn.State())
-	require.Equal(t, 0, events.closedCount(node2))
-
-	// Discovery #4: release quarantine and destroy the already parked wrapper.
-	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
-	require.Eventually(t, func() bool {
-		return node2Conn.State() == state.Destroyed && events.closedCount(node2) == 1
-	}, time.Second, 10*time.Millisecond, "Discovery removal must destroy a parked connection")
+	require.Equal(t, state.Destroyed, node2Conn.State())
+	require.Equal(t, 1, events.closedCount(node2))
 	require.Equal(t, 1, events.parkedCount(node2))
 	require.Equal(t, 1, events.dialedCount(node2))
 

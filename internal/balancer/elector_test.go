@@ -219,18 +219,18 @@ func TestEndpointElectorForcesDiscoveryOnceAfterMostRecordsAreBanned(t *testing.
 	first := electorConnection("first", 1, state.Online)
 	second := electorConnection("second", 2, state.Online)
 	third := electorConnection("third", 3, state.Online)
-	fallback := electorConnection("fallback", 4, state.Online)
+	destroyed := electorConnection("destroyed", 4, state.Destroyed)
 	elector := newEndpointElector([]policy.EndpointPriority{
 		{Key: first.Endpoint().Key()},
 		{Key: second.Endpoint().Key(), Priority: 1},
 		{Key: third.Endpoint().Key(), Priority: 1},
-		{Key: fallback.Endpoint().Key(), Priority: 1},
-	}, connectionMap(first, second, third, fallback), &electorRand{})
+		{Key: destroyed.Endpoint().Key(), Priority: 1},
+	}, connectionMap(first, second, third, destroyed), &electorRand{})
 
 	first.Ban(t.Context())
 	require.False(t, elector.Refresh(), "one unavailable best-bucket endpoint is only 25% of all records")
 	second.Ban(t.Context())
-	require.False(t, elector.Refresh(), "exactly 50% banned must not force discovery")
+	require.False(t, elector.Refresh(), "the destroyed record still counts toward the threshold")
 	third.Ban(t.Context())
 	require.True(t, elector.Refresh(), "more than 50% banned must force discovery")
 	require.False(t, elector.Refresh(), "remaining above the threshold must not force discovery repeatedly")

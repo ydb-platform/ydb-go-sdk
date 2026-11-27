@@ -291,14 +291,8 @@ func driver(adapter Adapter) trace.Driver { //nolint:gocyclo,funlen
 			if adapter.Details()&trace.DriverBalancerEvents == 0 {
 				return nil
 			}
-			// Driver bootstrap fires the trace event from two places:
-			//   - clusterDiscoveryAttemptWithDial (outer, also responsible
-			//     for opening the gRPC connection)
-			//   - clusterDiscoveryAttempt (inner, called from the outer one)
-			// We only want a single ydb.Driver.Initialize span, and only on
-			// the very first init — periodic discovery refreshes triggered
-			// by the repeater come with EventTick / EventForce and must not
-			// produce a span.
+			// Periodic discovery refreshes carry EventTick or EventForce.
+			// Only bootstrap produces a ydb.Driver.Initialize span.
 			isOuter := strings.HasSuffix(safeCall(info.Call), "clusterDiscoveryAttemptWithDial")
 			isInit := repeater.EventType(safeContextPtr(info.Context)) == repeater.EventInit
 			if !isOuter || !isInit {

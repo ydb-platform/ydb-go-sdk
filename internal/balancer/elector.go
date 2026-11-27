@@ -15,8 +15,7 @@ type electionSnapshot struct {
 	connections    []conn.Conn
 	allowBanned    bool
 	candidateCount int
-	bannedCount    int
-	recordCount    int
+	majorityBanned bool
 }
 
 // endpointElector combines immutable policy priorities with connection health snapshots.
@@ -28,6 +27,7 @@ type endpointElector struct {
 	snapshot atomic.Pointer[electionSnapshot]
 }
 
+// newEndpointElector takes ownership of priorities and connections.
 func newEndpointElector(
 	priorities []policy.EndpointPriority,
 	connections map[endpoint.Key]conn.Conn,
@@ -37,7 +37,7 @@ func newEndpointElector(
 		rand = xrand.New(xrand.WithLock())
 	}
 	elector := &endpointElector{
-		priorities:  append([]policy.EndpointPriority(nil), priorities...),
+		priorities:  priorities,
 		connections: connections,
 		rand:        rand,
 	}
@@ -97,6 +97,7 @@ func (e *endpointElector) Refresh() (forceDiscovery bool) {
 	}
 	banned := make([]conn.Conn, 0, len(e.priorities))
 	minimumHealthyPriority := uint64(math.MaxUint64)
+	recordCount := 0
 	for _, candidate := range e.priorities {
 		if candidate.Excluded {
 			continue
@@ -105,7 +106,7 @@ func (e *endpointElector) Refresh() (forceDiscovery bool) {
 		if connection == nil {
 			continue
 		}
-		snapshot.recordCount++
+		recordCount++
 		connectionState := connection.State()
 		switch {
 		case isConnectionStateUsable(connectionState, false):
@@ -119,7 +120,6 @@ func (e *endpointElector) Refresh() (forceDiscovery bool) {
 			}
 		case connectionState == state.Banned:
 			snapshot.candidateCount++
-			snapshot.bannedCount++
 			banned = append(banned, connection)
 		default:
 			// Unknown and destroyed connections are intentionally excluded from election.
@@ -130,13 +130,10 @@ func (e *endpointElector) Refresh() (forceDiscovery bool) {
 		snapshot.allowBanned = true
 	}
 
+	snapshot.majorityBanned = len(banned) > recordCount/2
 	e.snapshot.Store(snapshot)
 
-	return !pessimizationThresholdExceeded(previous) && pessimizationThresholdExceeded(snapshot)
-}
-
-func pessimizationThresholdExceeded(snapshot *electionSnapshot) bool {
-	return snapshot != nil && snapshot.recordCount > 0 && snapshot.bannedCount > snapshot.recordCount/2
+	return snapshot.majorityBanned && (previous == nil || !previous.majorityBanned)
 }
 
 func isConnectionStateUsable(connectionState state.State, allowBanned bool) bool {
