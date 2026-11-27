@@ -228,16 +228,6 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 	return nil
 }
 
-func (b *Balancer) releaseStateConns(ctx context.Context, state *connectionsState) {
-	if state == nil {
-		return
-	}
-
-	for _, cc := range state.all {
-		b.pool.Put(ctx, cc)
-	}
-}
-
 func (b *Balancer) applyDiscoveredEndpoints(
 	ctx context.Context,
 	endpoints []endpoint.Endpoint,
@@ -247,8 +237,6 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	defer b.closeMu.Unlock()
 
 	if b.closed {
-		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
-
 		return
 	}
 
@@ -293,8 +281,10 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	if maxConnections > 0 {
 		b.lastDiscovered = append(b.lastDiscovered[:0], endpoints...)
 	}
-	next := newConnectionsStateWithPriorities(connections, priorities, nil)
-	b.releaseStateConns(ctx, b.connectionsState.Swap(next))
+	b.connectionsState.Store(newConnectionsStateWithPriorities(connections, priorities, nil))
+	for _, cc := range active {
+		b.pool.Put(ctx, cc)
+	}
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
@@ -329,7 +319,11 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		discoveryRepeater.Stop()
 	}
 
-	b.releaseStateConns(ctx, oldState)
+	if oldState != nil {
+		for _, cc := range oldState.all {
+			b.pool.Put(ctx, cc)
+		}
+	}
 
 	if discoveryCC != nil {
 		_ = discoveryCC.Close()

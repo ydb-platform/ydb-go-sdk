@@ -648,7 +648,6 @@ func TestBalancer_Close(t *testing.T) {
 		b := &Balancer{
 			driverConfig: cfg,
 			pool:         pool,
-			closed:       true,
 		}
 		b.connectionsState.Store(newConnectionsState(
 			[]conn.Conn{c},
@@ -656,6 +655,7 @@ func TestBalancer_Close(t *testing.T) {
 			policy.Info{},
 		))
 
+		require.NoError(t, b.Close(ctx))
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e}, "")
 		require.Nil(t, b.connectionsState.Load())
 
