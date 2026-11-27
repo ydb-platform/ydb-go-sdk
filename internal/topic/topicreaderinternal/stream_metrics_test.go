@@ -472,7 +472,13 @@ func newReaderCommitMetricsTest(t *testing.T) *readerCommitMetricsTest {
 
 			return nil
 		})
-	e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: 50}).Return(nil)
+	creditSent := make(empty.Chan)
+	e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: 50}).
+		DoAndReturn(func(_ rawtopicreader.ClientMessage) error {
+			close(creditSent)
+
+			return nil
+		})
 	e.Start()
 	reader := newMetricsReader(&e)
 	readResult := make(chan readerBatchResult, 1)
@@ -486,6 +492,13 @@ func newReaderCommitMetricsTest(t *testing.T) *readerCommitMetricsTest {
 		t.Fatal("timed out waiting for start partition session response")
 	}
 	e.SendFromServer(readerMetricResponseWithOffsets(&e, 50, 20, 24))
+	// Reading the batch and sending its credit run independently. Finish both
+	// before the caller can close the reader or tear down the mock stream.
+	select {
+	case <-creditSent:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for the 50-byte read request")
+	}
 	select {
 	case result := <-readResult:
 		require.NoError(t, result.err)
