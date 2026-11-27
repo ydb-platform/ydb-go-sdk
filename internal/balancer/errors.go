@@ -16,34 +16,21 @@ var sessionCreateBanOperationCodes = []Ydb.StatusIds_StatusCode{
 	Ydb.StatusIds_UNAVAILABLE,
 }
 
-var (
-	allCodes = map[grpcCodes.Code]struct{}{
-		grpcCodes.OK:                 {},
-		grpcCodes.Canceled:           {},
-		grpcCodes.Unknown:            {},
-		grpcCodes.InvalidArgument:    {},
-		grpcCodes.DeadlineExceeded:   {},
-		grpcCodes.NotFound:           {},
-		grpcCodes.AlreadyExists:      {},
-		grpcCodes.PermissionDenied:   {},
-		grpcCodes.ResourceExhausted:  {},
-		grpcCodes.FailedPrecondition: {},
-		grpcCodes.Aborted:            {},
-		grpcCodes.OutOfRange:         {},
-		grpcCodes.Unimplemented:      {},
-		grpcCodes.Internal:           {},
-		grpcCodes.Unavailable:        {},
-		grpcCodes.DataLoss:           {},
-		grpcCodes.Unauthenticated:    {},
-	}
-	goodCodes = []grpcCodes.Code{
-		grpcCodes.ResourceExhausted,
-		grpcCodes.OutOfRange,
-		grpcCodes.OK,
-		grpcCodes.Canceled,
-	}
-	badCodes = xslices.Subtract(xslices.Keys(allCodes), goodCodes)
-)
+var badCodes = []grpcCodes.Code{
+	grpcCodes.Unknown,
+	grpcCodes.InvalidArgument,
+	grpcCodes.DeadlineExceeded,
+	grpcCodes.NotFound,
+	grpcCodes.AlreadyExists,
+	grpcCodes.PermissionDenied,
+	grpcCodes.FailedPrecondition,
+	grpcCodes.Aborted,
+	grpcCodes.Unimplemented,
+	grpcCodes.Internal,
+	grpcCodes.Unavailable,
+	grpcCodes.DataLoss,
+	grpcCodes.Unauthenticated,
+}
 
 type (
 	ctxBanOnOperationError          struct{}

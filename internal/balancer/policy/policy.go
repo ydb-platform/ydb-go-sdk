@@ -29,14 +29,6 @@ type preference struct {
 	allowFallback bool
 }
 
-type preferenceDecision uint8
-
-const (
-	preferencePreferred preferenceDecision = iota
-	preferenceFallback
-	preferenceExcluded
-)
-
 // Policy is an immutable endpoint priority pipeline.
 type Policy struct {
 	preferences      []preference
@@ -139,33 +131,20 @@ func applyPreference(
 	index int,
 ) {
 	for i, candidate := range endpoints {
-		if priorities[i].Excluded {
+		if priorities[i].Excluded || preference.match(info, candidate) {
 			continue
 		}
-
-		switch preference.decide(info, candidate) {
-		case preferencePreferred:
-		case preferenceFallback:
-			if index >= 64 {
-				priorities[i].Priority = math.MaxUint64
-			} else {
-				priorities[i].Priority |= uint64(1) << index
-			}
-		case preferenceExcluded:
+		if !preference.allowFallback {
 			priorities[i].Excluded = true
+
+			continue
+		}
+		if index >= 64 {
+			priorities[i].Priority = math.MaxUint64
+		} else {
+			priorities[i].Priority |= uint64(1) << index
 		}
 	}
-}
-
-func (p preference) decide(info Info, candidate endpoint.Info) preferenceDecision {
-	if p.match(info, candidate) {
-		return preferencePreferred
-	}
-	if p.allowFallback {
-		return preferenceFallback
-	}
-
-	return preferenceExcluded
 }
 
 // SingleConnection reports whether the balancer must use only the configured entrypoint.

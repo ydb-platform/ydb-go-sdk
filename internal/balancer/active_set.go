@@ -6,7 +6,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
@@ -18,19 +17,13 @@ type activeEndpointCandidate struct {
 	usable   bool
 }
 
-type previousEndpointState struct {
-	state  state.State
-	sticky bool
-}
-
 // selectActiveEndpoints applies the connection limit after policy priorities
 // have been calculated and before connection wrappers are acquired from the
 // pool. Existing usable endpoints are preferred within the same priority
 // bucket. Known unusable endpoints are selected only when no usable endpoint
 // can fill the remaining slots.
 func selectActiveEndpoints(
-	previous, quarantine []conn.Conn,
-	previousPriorities []policy.EndpointPriority,
+	previous *endpointElector,
 	endpoints []endpoint.Endpoint,
 	priorities []policy.EndpointPriority,
 	maxConnections int, random xrand.Rand,
@@ -38,22 +31,34 @@ func selectActiveEndpoints(
 	if maxConnections <= 0 {
 		return endpoints, priorities
 	}
-	previousStates := collectPreviousEndpointStates(previous, quarantine, previousPriorities)
+	var previousConnections map[endpoint.Key]conn.Conn
+	var previousPrimary map[endpoint.Key]struct{}
+	if previous != nil {
+		previousConnections = previous.connections
+		previousPrimary = make(map[endpoint.Key]struct{}, len(previous.priorities))
+		for _, priority := range previous.priorities {
+			if !priority.Excluded {
+				previousPrimary[priority.Key] = struct{}{}
+			}
+		}
+	}
 
 	candidates := make([]activeEndpointCandidate, 0, len(endpoints))
 	for i, candidate := range endpoints {
-		key := candidate.Key()
 		priority := priorities[i]
 		if priority.Excluded {
 			continue
 		}
 
-		previousState, known := previousStates[key]
+		key := candidate.Key()
+		connection := previousConnections[key]
+		usable := connection == nil || isConnectionStateUsable(connection.State(), false)
+		_, wasPrimary := previousPrimary[key]
 		candidates = append(candidates, activeEndpointCandidate{
 			endpoint: candidate,
 			priority: priority,
-			sticky:   previousState.sticky,
-			usable:   !known || isConnectionStateUsable(previousState.state, false),
+			sticky:   connection != nil && usable && wasPrimary,
+			usable:   usable,
 		})
 	}
 	random.Shuffle(len(candidates), func(i, j int) {
@@ -70,33 +75,6 @@ func selectActiveEndpoints(
 	}
 
 	return selectedEndpoints, selectedPriorities
-}
-
-func collectPreviousEndpointStates(
-	previous, quarantine []conn.Conn,
-	previousPriorities []policy.EndpointPriority,
-) map[endpoint.Key]previousEndpointState {
-	states := make(map[endpoint.Key]previousEndpointState, len(previous)+len(quarantine))
-	for _, connection := range quarantine {
-		if connection != nil {
-			states[connection.Endpoint().Key()] = previousEndpointState{state: connection.State()}
-		}
-	}
-	for _, connection := range previous {
-		if connection != nil {
-			states[connection.Endpoint().Key()] = previousEndpointState{state: connection.State()}
-		}
-	}
-	for _, priority := range previousPriorities {
-		previousState, ok := states[priority.Key]
-		if !ok || priority.Excluded || !isConnectionStateUsable(previousState.state, false) {
-			continue
-		}
-		previousState.sticky = true
-		states[priority.Key] = previousState
-	}
-
-	return states
 }
 
 func compareActiveEndpointCandidates(lhs, rhs activeEndpointCandidate) int {

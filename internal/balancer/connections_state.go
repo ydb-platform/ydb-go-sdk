@@ -1,7 +1,6 @@
 package balancer
 
 import (
-	"context"
 	"slices"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/policy"
@@ -14,28 +13,31 @@ type connectionsState struct {
 	connByNodeID map[uint32]conn.Conn
 	elector      *endpointElector
 
-	all        []conn.Conn
-	quarantine []conn.Conn
+	all []conn.Conn
 }
 
+// newConnectionsStateWithPriorities takes ownership of the connection and priority slices.
 func newConnectionsStateWithPriorities(
 	connections []conn.Conn,
 	priorities []policy.EndpointPriority,
-	quarantine []conn.Conn,
 	rand xrand.Rand,
 ) *connectionsState {
 	connectionsByKey := make(map[endpoint.Key]conn.Conn, len(connections))
+	var connectionsByNodeID map[uint32]conn.Conn
+	if len(connections) > 0 {
+		connectionsByNodeID = make(map[uint32]conn.Conn, len(connections))
+	}
 	for _, connection := range connections {
-		connectionsByKey[connection.Endpoint().Key()] = connection
+		e := connection.Endpoint()
+		connectionsByKey[e.Key()] = connection
+		connectionsByNodeID[e.NodeID()] = connection
 	}
-	result := &connectionsState{
-		connByNodeID: connsToNodeIDMap(connections),
-		all:          append([]conn.Conn(nil), connections...),
-		quarantine:   quarantine,
-	}
-	result.elector = newEndpointElector(priorities, connectionsByKey, rand)
 
-	return result
+	return &connectionsState{
+		connByNodeID: connectionsByNodeID,
+		elector:      newEndpointElector(priorities, connectionsByKey, rand),
+		all:          connections,
+	}
 }
 
 func (s *connectionsState) All() []conn.Conn {
@@ -46,25 +48,11 @@ func (s *connectionsState) All() []conn.Conn {
 	return slices.Clone(s.all)
 }
 
-func (s *connectionsState) preferConnection(ctx context.Context) conn.Conn {
-	if nodeID, hasPreferredEndpoint := endpoint.ContextNodeID(ctx); hasPreferredEndpoint {
-		connection := s.connByNodeID[nodeID]
-		if connection != nil && isConnectionStateUsable(connection.State(), false) {
-			return connection
-		}
+func (s *connectionsState) preferConnection(nodeID uint32) conn.Conn {
+	connection := s.connByNodeID[nodeID]
+	if connection != nil && isConnectionStateUsable(connection.State(), false) {
+		return connection
 	}
 
 	return nil
-}
-
-func connsToNodeIDMap(connections []conn.Conn) map[uint32]conn.Conn {
-	if len(connections) == 0 {
-		return nil
-	}
-	nodes := make(map[uint32]conn.Conn, len(connections))
-	for _, connection := range connections {
-		nodes[connection.Endpoint().NodeID()] = connection
-	}
-
-	return nodes
 }

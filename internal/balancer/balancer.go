@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -72,7 +73,6 @@ func (s *streamWrapper) RecvMsg(m any) error {
 type Balancer struct {
 	driverConfig      *config.Config
 	policy            policy.Policy
-	discoveryConfig   *discoveryConfig.Config
 	pool              *conn.Pool
 	discoveryRepeater repeater.Repeater
 
@@ -199,19 +199,7 @@ func (b *Balancer) clusterDiscoveryAttemptWithDial(ctx context.Context) (finalEr
 	return nil
 }
 
-func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientConn) (finalErr error) {
-	onDone := gtrace.DriverOnBalancerClusterDiscoveryAttempt(
-		b.driverConfig.Trace(), &ctx,
-		stack.FunctionID(
-			"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).clusterDiscoveryAttempt",
-		),
-		b.address,
-		b.driverConfig.Database(),
-	)
-	defer func() {
-		onDone(finalErr)
-	}()
-
+func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientConn) error {
 	endpoints, location, err := b.discover(ctx, cc)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -228,49 +216,6 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context, cc *grpc.ClientC
 	return nil
 }
 
-func nextState(ctx context.Context, pool interface {
-	Get(e endpoint.Endpoint) conn.Conn
-	Put(ctx context.Context, cc conn.Conn)
-}, quarantine []conn.Conn, active []conn.Conn, endpoints []endpoint.Endpoint) (
-	newQuarantine []conn.Conn,
-	newActive []conn.Conn,
-) {
-	newActive = xslices.Filter(
-		xslices.Transform(endpoints, func(e endpoint.Endpoint) conn.Conn {
-			return pool.Get(e)
-		}),
-		func(cc conn.Conn) bool { return cc != nil },
-	)
-
-	for _, cc := range quarantine {
-		pool.Put(ctx, cc)
-	}
-
-	for _, cc := range newActive {
-		cc.Unban(ctx)
-	}
-
-	return active, newActive
-}
-
-// releaseStateConns releases connections from state
-//
-// quarantine refs were acquired in discovery round N-1,
-// all refs in round N — each Put matches its own Get.
-func (b *Balancer) releaseStateConns(ctx context.Context, state *connectionsState) {
-	if state == nil {
-		return
-	}
-
-	for _, c := range state.quarantine {
-		b.pool.Put(ctx, c)
-	}
-
-	for _, cc := range state.all {
-		b.pool.Put(ctx, cc)
-	}
-}
-
 func (b *Balancer) applyDiscoveredEndpoints(
 	ctx context.Context,
 	endpoints []endpoint.Endpoint,
@@ -280,58 +225,54 @@ func (b *Balancer) applyDiscoveredEndpoints(
 	defer b.closeMu.Unlock()
 
 	if b.closed {
-		b.releaseStateConns(ctx, b.connectionsState.Swap(nil))
-
 		return
 	}
 
-	var (
-		onDone = gtrace.DriverOnBalancerUpdate(
-			b.driverConfig.Trace(), &ctx,
-			stack.FunctionID(
-				"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
-			b.policy.DetectsNearestDC(),
-			b.driverConfig.Database(),
-		)
-		state              = b.connectionsState.Load()
-		active             []conn.Conn
-		quarantine         []conn.Conn
-		selectedEndpoints  []endpoint.Endpoint
-		selectedPriorities []policy.EndpointPriority
-		previousPriorities []policy.EndpointPriority
+	onDone := gtrace.DriverOnBalancerUpdate(
+		b.driverConfig.Trace(), &ctx,
+		stack.FunctionID(
+			"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
+		b.policy.DetectsNearestDC(), b.driverConfig.Database(),
 	)
-	if state != nil {
-		active = state.All()
-		quarantine = state.quarantine
-		previousPriorities = state.elector.priorities
+	var active []conn.Conn
+	var previousElection *endpointElector
+	if previous := b.connectionsState.Load(); previous != nil {
+		active, previousElection = previous.all, previous.elector
 	}
 
+	var selected []endpoint.Endpoint
 	defer func() {
-		_, added, dropped := xslices.Diff(xslices.Transform(active, func(cc conn.Conn) endpoint.Endpoint {
-			return cc.Endpoint()
-		}), selectedEndpoints, endpoint.Compare)
-
+		_, added, dropped := xslices.Diff(xslices.Transform(active, conn.Conn.Endpoint), selected, endpoint.Compare)
+		endpointInfo := func(e endpoint.Endpoint) trace.EndpointInfo { return e }
 		onDone(
-			xslices.Transform(endpoints, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
-			xslices.Transform(added, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
-			xslices.Transform(dropped, func(e endpoint.Endpoint) trace.EndpointInfo { return e }),
+			xslices.Transform(endpoints, endpointInfo),
+			xslices.Transform(added, endpointInfo),
+			xslices.Transform(dropped, endpointInfo),
 			selfLocation,
 		)
 	}()
 
-	info := policy.Info{SelfLocation: selfLocation}
-	priorities := b.policy.Prioritize(info, endpoints)
-	selectedEndpoints, selectedPriorities = selectActiveEndpoints(
-		active, quarantine, previousPriorities, endpoints, priorities, b.policy.MaxConnections(), b.random,
+	maxConnections := b.policy.MaxConnections()
+	selected, priorities := selectActiveEndpoints(
+		previousElection, endpoints, b.policy.Prioritize(policy.Info{SelfLocation: selfLocation}, endpoints),
+		maxConnections, b.random,
 	)
-	quarantine, connections := nextState(ctx, b.pool, quarantine, active, selectedEndpoints)
-
-	if b.policy.MaxConnections() > 0 {
+	connections := make([]conn.Conn, 0, len(selected))
+	for _, e := range selected {
+		if cc := b.pool.Get(e); cc != nil {
+			connections = append(connections, cc)
+		}
+	}
+	for _, cc := range connections {
+		cc.Unban(ctx)
+	}
+	if maxConnections > 0 {
 		b.lastDiscovered = append(b.lastDiscovered[:0], endpoints...)
 	}
-	b.connectionsState.Store(newConnectionsStateWithPriorities(
-		connections, selectedPriorities, quarantine, nil,
-	))
+	b.connectionsState.Store(newConnectionsStateWithPriorities(connections, priorities, nil))
+	for _, cc := range active {
+		b.pool.Put(ctx, cc)
+	}
 }
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
@@ -366,7 +307,11 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		discoveryRepeater.Stop()
 	}
 
-	b.releaseStateConns(ctx, oldState)
+	if oldState != nil {
+		for _, cc := range oldState.all {
+			b.pool.Put(ctx, cc)
+		}
+	}
 
 	if discoveryCC != nil {
 		_ = discoveryCC.Close()
@@ -426,19 +371,19 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 	}()
 
 	b = &Balancer{
-		driverConfig: driverConfig,
-		policy:       policy,
-		pool:         pool,
-		address:      "ydb:///" + driverConfig.Endpoint(),
-		discoveryConfig: discoveryConfig.New(append(opts,
-			discoveryConfig.With(driverConfig.Common),
-			discoveryConfig.WithEndpoint(driverConfig.Endpoint()),
-			discoveryConfig.WithDatabase(driverConfig.Database()),
-			discoveryConfig.WithSecure(driverConfig.Secure()),
-			discoveryConfig.WithMeta(driverConfig.Meta()),
-		)...),
+		driverConfig:    driverConfig,
+		policy:          policy,
+		pool:            pool,
+		address:         "ydb:///" + driverConfig.Endpoint(),
 		localDCDetector: detectLocalDC,
 	}
+	discoveryCfg := discoveryConfig.New(append(opts,
+		discoveryConfig.With(driverConfig.Common),
+		discoveryConfig.WithEndpoint(driverConfig.Endpoint()),
+		discoveryConfig.WithDatabase(driverConfig.Database()),
+		discoveryConfig.WithSecure(driverConfig.Secure()),
+		discoveryConfig.WithMeta(driverConfig.Meta()),
+	)...)
 	defer func(created *Balancer) {
 		if finalErr != nil {
 			_ = created.Close(context.WithoutCancel(ctx))
@@ -448,8 +393,8 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 		b.random = xrand.New(xrand.WithSeed(time.Now().UnixNano()))
 	}
 
-	b.discover = makeDiscoveryFunc(b.driverConfig, b.discoveryConfig)
-	if !policy.SingleConnection() && b.discoveryConfig.Interval() <= 0 {
+	b.discover = makeDiscoveryFunc(b.driverConfig, discoveryCfg)
+	if !policy.SingleConnection() && discoveryCfg.Interval() <= 0 {
 		return nil, xerrors.WithStackTrace(errPeriodicDiscoveryDisabled)
 	}
 
@@ -462,7 +407,7 @@ func New(ctx context.Context, driverConfig *config.Config, pool *conn.Pool, opts
 			return nil, xerrors.WithStackTrace(err)
 		}
 		b.discoveryRepeater = repeater.New(xcontext.ValueOnly(ctx),
-			b.discoveryConfig.Interval(), b.clusterDiscoveryAttemptWithDial,
+			discoveryCfg.Interval(), b.clusterDiscoveryAttemptWithDial,
 			repeater.WithName("discovery"),
 			repeater.WithTrace(b.driverConfig.Trace()),
 		)
@@ -551,18 +496,13 @@ func (b *Balancer) connections() *connectionsState {
 }
 
 func (b *Balancer) forceDiscovery() {
-	discoveryRepeater := b.currentDiscoveryRepeater()
+	b.closeMu.Lock()
+	discoveryRepeater := b.discoveryRepeater
+	b.closeMu.Unlock()
 
 	if discoveryRepeater != nil {
 		discoveryRepeater.Force()
 	}
-}
-
-func (b *Balancer) currentDiscoveryRepeater() repeater.Repeater {
-	b.closeMu.Lock()
-	defer b.closeMu.Unlock()
-
-	return b.discoveryRepeater
 }
 
 func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
@@ -589,10 +529,13 @@ func (b *Balancer) nextConn(ctx context.Context) (c conn.Conn, err error) {
 	}
 
 	if nodeID, ok := endpoint.ContextNodeID(ctx); ok {
-		var handled bool
-		c, handled, err = b.pinnedConnection(ctx, state, nodeID)
-		if handled {
-			return c, err
+		if c = b.pinnedConnection(ctx, state, nodeID); c != nil {
+			return c, nil
+		}
+		if !endpoint.ContextFallback(ctx) {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("%w: pinned node %d is not available", ErrNoEndpoints, nodeID),
+			)
 		}
 	}
 	if state.elector.CandidateCount() == 0 {
@@ -616,26 +559,20 @@ func (b *Balancer) pinnedConnection(
 	ctx context.Context,
 	current *connectionsState,
 	nodeID uint32,
-) (connection conn.Conn, handled bool, err error) {
-	if connection := current.preferConnection(ctx); connection != nil {
-		return connection, true, nil
+) conn.Conn {
+	if connection := current.preferConnection(nodeID); connection != nil {
+		return connection
 	}
 	if b.policy.MaxConnections() > 0 {
 		connection, rejected := b.tryAddPinnedConnection(nodeID)
 		if rejected != nil {
 			b.pool.Put(ctx, rejected)
 		}
-		if connection != nil {
-			return connection, true, nil
-		}
-	}
-	if !endpoint.ContextFallback(ctx) {
-		return nil, true, xerrors.WithStackTrace(
-			fmt.Errorf("%w: pinned node %d is not available", ErrNoEndpoints, nodeID),
-		)
+
+		return connection
 	}
 
-	return nil, false, nil
+	return nil
 }
 
 func (b *Balancer) nextAvailableConn(ctx context.Context, state *connectionsState) (conn.Conn, int) {
@@ -724,15 +661,12 @@ func (b *Balancer) tryAddPinnedConnection(nodeID uint32) (connection, rejected c
 		return nil, connection
 	}
 
-	connections := append(current.All(), connection)
-	priorities := append([]policy.EndpointPriority(nil), current.elector.priorities...)
-	priorities = append(priorities, policy.EndpointPriority{
+	connections := slices.Concat(current.all, []conn.Conn{connection})
+	priorities := slices.Concat(current.elector.priorities, []policy.EndpointPriority{{
 		Key:      discovered.Key(),
 		Excluded: true,
-	})
-	b.connectionsState.Store(newConnectionsStateWithPriorities(
-		connections, priorities, current.quarantine, current.elector.rand,
-	))
+	}})
+	b.connectionsState.Store(newConnectionsStateWithPriorities(connections, priorities, current.elector.rand))
 
 	return connection, nil
 }

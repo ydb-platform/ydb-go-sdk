@@ -1,3 +1,4 @@
+* Removed the discovery quarantine so connections to removed endpoints begin shutting down on the first successful discovery update that omits them. Each discovery attempt emits one trace event.
 * Added `ydb.WithGrpcChannelShutdownTimeout` to configure how long gRPC connections wait for existing streams during shutdown. The default is 1 minute and 59 seconds.
 
 ## v3.158.1
