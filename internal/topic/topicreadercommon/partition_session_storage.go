@@ -57,10 +57,7 @@ func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 	}
 	c.sessions[session.StreamPartitionSessionID] = &sessionInfo{Session: session}
 	if c.active == nil && c.trackActive && !c.activeReleased {
-		c.active = &activeSessions{
-			sessions: make(map[rawtopicreader.PartitionSessionID]*PartitionSession),
-			counts:   make(map[string]int64),
-		}
+		c.active = &activeSessions{counts: make(map[string]int64)}
 	}
 	if c.active != nil {
 		c.active.add(session)
@@ -147,9 +144,8 @@ func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (
 // activeSessions is separate from the storage: a session points only here, so a
 // retained message does not keep the removal history of its stream alive.
 type activeSessions struct {
-	m        sync.Mutex
-	sessions map[rawtopicreader.PartitionSessionID]*PartitionSession
-	counts   map[string]int64
+	m      sync.Mutex
+	counts map[string]int64
 }
 
 func (a *activeSessions) snapshot() map[string]int64 {
@@ -166,7 +162,6 @@ func (a *activeSessions) release() {
 	a.m.Lock()
 	defer a.m.Unlock()
 
-	a.sessions = nil
 	a.counts = nil
 }
 
@@ -177,27 +172,25 @@ func (a *activeSessions) add(session *PartitionSession) {
 	session.active.Store(a)
 	if session.retired.Load() {
 		session.active.CompareAndSwap(a, nil)
-	} else {
-		a.sessions[session.StreamPartitionSessionID] = session
-		a.counts[session.Topic]++
+
+		return
 	}
+	a.counts[session.Topic]++
 }
 
 func (a *activeSessions) drop(session *PartitionSession) {
 	a.m.Lock()
 	defer a.m.Unlock()
 
-	id := session.StreamPartitionSessionID
-	if a.sessions[id] == session {
-		delete(a.sessions, id)
-		topic := session.Topic
-		if a.counts[topic] == 1 {
-			delete(a.counts, topic)
-		} else {
-			a.counts[topic]--
-		}
+	if !session.active.CompareAndSwap(a, nil) || a.counts == nil {
+		return
 	}
-	session.active.CompareAndSwap(a, nil)
+	topic := session.Topic
+	if a.counts[topic] == 1 {
+		delete(a.counts, topic)
+	} else {
+		a.counts[topic]--
+	}
 }
 
 func (c *PartitionSessionStorage) compactionNeedLock(now time.Time) {

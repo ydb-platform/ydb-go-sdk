@@ -3,7 +3,6 @@ package topiclistenerinternal
 import (
 	"context"
 	"errors"
-	"reflect"
 	"testing"
 
 	"github.com/rekby/fixenv"
@@ -87,10 +86,11 @@ func TestListenerActiveIndexStaysBoundedAcrossSessionStops(t *testing.T) {
 				}
 				require.Zero(t, stream.sessions.ActiveCountsByTopic()["topic"])
 			}
-			// The fixture's original session is still active. The metric's
-			// scan set must not include the retained protocol lookup history.
-			active := reflect.Indirect(reflect.ValueOf(stream.sessions)).FieldByName("active").Elem()
-			require.Equal(t, 1, active.FieldByName("sessions").Len())
+			// Only the fixture's original session is still active.
+			reconnector := &TopicListenerReconnector{streamListener: stream}
+			counts, err := reconnector.PartitionSessionCounts()
+			require.NoError(t, err)
+			require.Equal(t, map[string]int64{"": 1}, counts)
 		})
 	}
 }

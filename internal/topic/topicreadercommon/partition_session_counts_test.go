@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/xtest"
 )
 
 func TestActiveCountsIgnoreRepeatedPartitionSessionTransitions(t *testing.T) {
@@ -49,6 +50,32 @@ func TestActiveCountsIgnoreRepeatedPartitionSessionTransitions(t *testing.T) {
 	storage.ReleaseActiveIndex()
 	require.Empty(t, storage.ActiveCountsByTopic())
 	require.Len(t, storage.GetAll(), 4, "release leaves commit lookups intact")
+}
+
+func TestActiveCountsDecrementOnceWhenCloseAndRemoveRace(t *testing.T) {
+	var storage PartitionSessionStorage
+	storage.TrackActive()
+	kept := NewPartitionSession(t.Context(), "topic", 0, 1, "", 0, 0, 0)
+	t.Cleanup(kept.Close)
+	require.NoError(t, storage.Add(kept))
+
+	for i := range 32 {
+		id := rawtopicreader.PartitionSessionID(i + 1)
+		session := NewPartitionSession(t.Context(), "topic", int64(id), 1, "", id, int64(id), 0)
+		require.NoError(t, storage.Add(session))
+
+		start := make(chan struct{})
+		removed := make(chan error, 1)
+		go func() {
+			<-start
+			_, err := storage.Remove(id)
+			removed <- err
+		}()
+		close(start)
+		session.Close()
+		require.NoError(t, xtest.Receive(t, removed, "concurrent partition session removal"))
+		require.Equal(t, map[string]int64{"topic": 1}, storage.ActiveCountsByTopic())
+	}
 }
 
 func BenchmarkActiveCountsByTopic(b *testing.B) {
