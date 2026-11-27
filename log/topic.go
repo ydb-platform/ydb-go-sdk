@@ -207,19 +207,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
 			}
 		}
 	}
-	t.OnReaderCommittedNotify = func(info trace.TopicReaderCommittedNotifyInfo) {
-		if d.Details()&trace.TopicReaderStreamEvents == 0 {
-			return
-		}
-		ctx := withFromPtr(info.Context, TRACE, "ydb", "topic", "reader", "committed", "notify")
-		l.Log(ctx, "topic reader received commit ack",
-			kv.String("reader_connection_id", info.ReaderConnectionID),
-			kv.String("topic", info.Topic),
-			kv.Int64("partition_id", info.PartitionID),
-			kv.Int64("partition_session_id", info.PartitionSessionID),
-			kv.Int64("committed_offset", info.CommittedOffset),
-		)
-	}
+	t.OnReaderCommittedNotify = topicCommitACKHook(l, d)
 	t.OnReaderClose = func(info trace.TopicReaderCloseStartInfo) func(doneInfo trace.TopicReaderCloseDoneInfo) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil

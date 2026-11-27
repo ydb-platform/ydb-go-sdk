@@ -629,19 +629,20 @@ func (l *streamListener) onCommitResponse(msg *rawtopicreader.CommitOffsetRespon
 		// Notify the syncCommitter about the commit
 		l.syncCommitter.OnCommitNotify(session, commit.CommittedOffset)
 
-		// Emit trace event - use partition context instead of background
-		logCtx := session.Context()
-		gtrace.TopicOnReaderCommittedNotify(
-			l.tracer,
-			&logCtx,
-			l.cfg.ReaderInfo,
-			l.listenerID,
-			session.Topic,
-			session.PartitionID,
-			session.StreamPartitionSessionID.ToInt64(),
-			commit.CommittedOffset.ToInt64(),
-			messagesCount,
-		)
+		if l.tracer != nil && l.tracer.OnReaderCommittedNotify != nil {
+			logCtx := session.Context()
+			gtrace.TopicOnReaderCommittedNotify(
+				l.tracer,
+				&logCtx,
+				l.cfg.ReaderInfo,
+				l.listenerID,
+				session.Topic,
+				session.PartitionID,
+				session.StreamPartitionSessionID.ToInt64(),
+				commit.CommittedOffset.ToInt64(),
+				messagesCount,
+			)
+		}
 	}
 
 	return nil

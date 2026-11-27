@@ -2,13 +2,38 @@ package topicreadercommon
 
 import (
 	"context"
+	"io"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+func TestStreamTraceSkipsQueueWithDisabledTopicLogging(t *testing.T) {
+	logTrace := log.Topic(log.Default(io.Discard), trace.Details(0))
+	cfg := topic.Config{}
+	composed := cfg.ComposeTrace(&trace.Topic{}, &logTrace)
+
+	for _, tc := range []struct {
+		name     string
+		listener bool
+	}{
+		{name: "pull reader"},
+		{name: "listener", listener: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, queue := StreamTrace(composed, ReaderInfo{Listener: tc.listener}, nil)
+			if queue != nil {
+				t.Cleanup(queue.Close)
+			}
+			require.Nil(t, queue)
+		})
+	}
+}
 
 func TestStreamTraceKeepsEachACKOffset(t *testing.T) {
 	started, release := make(chan struct{}), make(chan struct{})

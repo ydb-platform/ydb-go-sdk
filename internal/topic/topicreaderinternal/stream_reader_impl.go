@@ -1034,18 +1034,20 @@ func (r *topicStreamReaderImpl) onCommitResponse(msg *rawtopicreader.CommitOffse
 		}
 		messagesCount := topicreadercommon.RegisterCommitAcknowledged(partition, commit.CommittedOffset)
 
-		logCtx := r.cfg.BaseContext
-		gtrace.TopicOnReaderCommittedNotify(
-			r.cfg.Trace,
-			&logCtx,
-			r.cfg.ReaderInfo,
-			r.readConnectionID,
-			partition.Topic,
-			partition.PartitionID,
-			partition.StreamPartitionSessionID.ToInt64(),
-			commit.CommittedOffset.ToInt64(),
-			messagesCount,
-		)
+		if r.cfg.Trace != nil && r.cfg.Trace.OnReaderCommittedNotify != nil {
+			logCtx := r.cfg.BaseContext
+			gtrace.TopicOnReaderCommittedNotify(
+				r.cfg.Trace,
+				&logCtx,
+				r.cfg.ReaderInfo,
+				r.readConnectionID,
+				partition.Topic,
+				partition.PartitionID,
+				partition.StreamPartitionSessionID.ToInt64(),
+				commit.CommittedOffset.ToInt64(),
+				messagesCount,
+			)
+		}
 
 		r.committer.OnCommitNotify(partition, commit.CommittedOffset)
 	}
