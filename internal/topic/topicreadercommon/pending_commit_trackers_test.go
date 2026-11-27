@@ -32,8 +32,6 @@ func TestPendingCommitTrackersReleaseHeapAfterFinalACKs(t *testing.T) {
 			}
 		}
 	}
-	trackers = nil
-
 	retained := commitTrackerLiveHeap() - before
 	runtime.KeepAlive(owner)
 	t.Logf("retained after %d final ACKs: %d bytes", burst, retained)

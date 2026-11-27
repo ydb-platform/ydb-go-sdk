@@ -42,8 +42,6 @@ func TestStreamTraceReleasesPendingHeapAfterDrain(t *testing.T) {
 				}
 				send(key, event{count: 1, payload: payload})
 			}
-			payload = nil
-
 			q.Close()
 			q.work.Range(func(f func()) { f() })
 

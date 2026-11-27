@@ -137,21 +137,36 @@ func (c *UnboundedChan[T]) DrainBuffered() []T {
 // Range consumes the FIFO until closed and drained. Its single consumer swaps
 // batches under the mutex and invokes callbacks without holding the queue lock.
 func (c *UnboundedChan[T]) Range(yield func(T)) {
+	const reuseLimit = 1024
 	var batch []T
 	for {
 		c.mutex.Lock()
-		batch, c.buffer = c.buffer, batch[:0]
 		closed := c.closed
+		switch {
+		case closed:
+			batch, c.buffer = c.buffer, nil
+		case len(c.buffer) != 0:
+			batch, c.buffer = c.buffer, batch[:0]
+		default:
+			// Keep only one small buffer when idle.
+			if cap(batch) > cap(c.buffer) {
+				c.buffer = batch[:0]
+			}
+			batch = nil
+		}
 		c.mutex.Unlock()
 		for _, msg := range batch {
 			yield(msg)
 		}
-		clear(batch)
-		if closed {
+		switch {
+		case closed:
 			return
-		}
-		if len(batch) == 0 {
+		case len(batch) == 0:
 			<-c.signal
+		case cap(batch) > reuseLimit:
+			batch = nil
+		default:
+			clear(batch)
 		}
 	}
 }
