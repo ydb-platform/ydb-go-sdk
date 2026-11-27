@@ -17,6 +17,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+const defaultGrpcChannelShutdownTimeout = 2*time.Minute - time.Second
+
 // Config contains driver configuration.
 type Config struct {
 	config.Common
@@ -34,6 +36,8 @@ type Config struct {
 	credentials        credentials.Credentials
 	tlsConfig          *tls.Config
 	meta               *meta.Meta
+
+	grpcChannelShutdownTimeout time.Duration
 
 	excludeGRPCCodesForPessimization []grpcCodes.Code
 }
@@ -79,6 +83,10 @@ func (c *Config) Meta() *meta.Meta {
 // If ConnectionTTL is zero, connections are not parked.
 func (c *Config) ConnectionTTL() time.Duration {
 	return c.connectionTTL
+}
+
+func (c *Config) GrpcChannelShutdownTimeout() time.Duration {
+	return c.grpcChannelShutdownTimeout
 }
 
 // Secure is a flag for secure connection
@@ -225,6 +233,12 @@ func WithUserAgent(userAgent string) Option {
 func WithConnectionTTL(ttl time.Duration) Option {
 	return func(c *Config) {
 		c.connectionTTL = ttl
+	}
+}
+
+func WithGrpcChannelShutdownTimeout(timeout time.Duration) Option {
+	return func(c *Config) {
+		c.grpcChannelShutdownTimeout = timeout
 	}
 }
 

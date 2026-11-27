@@ -37,7 +37,7 @@ func (c *conn) park(ctx context.Context) (err error) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
-	if c.closed || c.grpcConn == nil {
+	if c.State().IsClosing() || c.grpcConn == nil {
 		return nil
 	}
 

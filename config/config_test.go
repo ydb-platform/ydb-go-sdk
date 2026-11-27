@@ -2,6 +2,7 @@ package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -13,4 +14,9 @@ func TestWithBalancer(t *testing.T) {
 	cfg := New(WithBalancer(balancer))
 
 	require.Equal(t, balancer.String(), cfg.Balancer().String())
+}
+
+func TestGrpcChannelShutdownTimeout(t *testing.T) {
+	require.Equal(t, 119*time.Second, New().GrpcChannelShutdownTimeout())
+	require.Equal(t, time.Second, New(WithGrpcChannelShutdownTimeout(time.Second)).GrpcChannelShutdownTimeout())
 }

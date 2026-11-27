@@ -121,10 +121,10 @@ func (s *grpcClientStream) SendMsg(m any) (err error) {
 }
 
 func (s *grpcClientStream) finish(err error) {
+	s.grpcCancel()
 	gtrace.DriverOnConnStreamFinish(s.parentConn.config.Trace(), s.requestCtx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/v3/internal/conn.(*grpcClientStream).finish"), err,
 	)
-	s.grpcCancel()
 }
 
 func (s *grpcClientStream) RecvMsg(m any) (err error) {

@@ -112,5 +112,7 @@ func defaultConfig() (c *Config) {
 		dialTimeout:        DefaultDialTimeout,
 		trace:              &trace.Driver{},
 		grpcMaxMessageSize: DefaultGRPCMsgSize,
+
+		grpcChannelShutdownTimeout: defaultGrpcChannelShutdownTimeout,
 	}
 }

@@ -23,10 +23,11 @@ import (
 
 // mockConfig implements the Config interface for testing
 type mockConfig struct {
-	dialTimeout   time.Duration
-	connectionTTL time.Duration
-	driverTrace   *trace.Driver
-	grpcDialOpts  []grpc.DialOption
+	dialTimeout     time.Duration
+	shutdownTimeout time.Duration
+	connectionTTL   time.Duration
+	driverTrace     *trace.Driver
+	grpcDialOpts    []grpc.DialOption
 }
 
 func (m *mockConfig) DialTimeout() time.Duration {
@@ -35,6 +36,10 @@ func (m *mockConfig) DialTimeout() time.Duration {
 
 func (m *mockConfig) ConnectionTTL() time.Duration {
 	return m.connectionTTL
+}
+
+func (m *mockConfig) GrpcChannelShutdownTimeout() time.Duration {
+	return m.shutdownTimeout
 }
 
 func (m *mockConfig) Trace() *trace.Driver {
@@ -751,7 +756,7 @@ func TestPool_GetPut(t *testing.T) {
 				for range iterations {
 					c := pool.Get(e)
 					require.NotNil(t, c)
-					require.False(t, c.(*conn).isClosed())
+					require.False(t, c.State().IsClosing())
 					pool.Put(ctx, c)
 				}
 			}()
@@ -875,7 +880,7 @@ func TestPool_GetPut(t *testing.T) {
 		got := pool.Get(e)
 		require.NotNil(t, got)
 		require.NotSame(t, cc, got)
-		require.False(t, got.(*conn).isClosed())
+		require.False(t, got.State().IsClosing())
 
 		close(closeContinue)
 
@@ -966,7 +971,7 @@ func TestPool_GetPut(t *testing.T) {
 						if c == nil {
 							continue
 						}
-						if c.(*conn).isClosed() {
+						if c.State().IsClosing() {
 							closedConns.Add(1)
 						}
 						pool.Put(ctx, c)
@@ -1045,6 +1050,72 @@ func TestPool_RemoveRefSetsClosedUnderMutex(t *testing.T) {
 	wg.Wait()
 
 	require.True(t, pool.closed.Load())
+}
+
+func TestPool_RemoveRefCancelsAndWaitsForReleasedConnection(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	closeStarted := make(chan struct{})
+	closeContinue := make(chan struct{})
+	resumeClose := sync.OnceFunc(func() { close(closeContinue) })
+	defer resumeClose()
+	pool := NewPool(ctx, &mockConfig{
+		shutdownTimeout: time.Hour,
+		driverTrace: &trace.Driver{
+			OnConnClose: func(trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
+				close(closeStarted)
+				select {
+				case <-closeContinue:
+				case <-ctx.Done():
+				}
+
+				return nil
+			},
+		},
+	})
+	require.NoError(t, pool.AddRef(ctx))
+
+	cc := pool.Get(endpoint.New("draining:2135")).(*conn)
+	streamCtx, finishStream := cc.addChildStream(ctx)
+	defer finishStream()
+	putDone := make(chan struct{})
+	go func() {
+		pool.Put(ctx, cc)
+		close(putDone)
+	}()
+	select {
+	case <-putDone:
+	case <-ctx.Done():
+		t.Fatal("put waited for the stream to finish")
+	}
+	require.Zero(t, testPoolConnsLen(pool))
+	require.Equal(t, state.UnderShutdown, cc.State())
+	require.NoError(t, pool.RemoveRef(ctx))
+	require.NoError(t, streamCtx.Err())
+
+	released := make(chan error, 1)
+	go func() { released <- pool.RemoveRef(ctx) }()
+	select {
+	case <-closeStarted:
+	case <-ctx.Done():
+		t.Fatal("final pool release did not cancel the connection drain")
+	}
+	require.ErrorIs(t, streamCtx.Err(), context.Canceled)
+	select {
+	case err := <-released:
+		t.Fatalf("pool returned before the connection closed: %v", err)
+	case <-time.After(10 * time.Millisecond):
+	}
+
+	resumeClose()
+	select {
+	case err := <-released:
+		require.NoError(t, err)
+	case <-ctx.Done():
+		t.Fatal("pool release did not finish after the connection closed")
+	}
+	require.Equal(t, state.Destroyed, cc.State())
 }
 
 func TestPool_PutIgnoresInvalidConn(t *testing.T) {
@@ -1188,9 +1259,7 @@ func TestPool_CloseConnsForFailedResolveSkipsAlreadyClosed(t *testing.T) {
 	target := "localhost:2135"
 	e := endpoint.New(target)
 	cc := newConn(e, pool)
-	cc.mtx.Lock()
-	cc.closed = true
-	cc.mtx.Unlock()
+	require.NoError(t, cc.Close(ctx))
 
 	pool.mu.Lock()
 	pool.conns[e.Key()] = &connValue{cc: cc}
@@ -1199,6 +1268,7 @@ func TestPool_CloseConnsForFailedResolveSkipsAlreadyClosed(t *testing.T) {
 	require.NotPanics(t, func() {
 		pool.closeConnsForFailedResolve(ctx, target)
 	})
+	require.ErrorIs(t, cc.Invoke(ctx, "/test", nil, nil), errConnectionUnderShutdown)
 }
 
 func TestPool_OnResolveDriverTrace(t *testing.T) {

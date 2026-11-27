@@ -9,6 +9,7 @@ const (
 	Banned
 	Offline
 	Destroyed
+	UnderShutdown
 )
 
 func (s State) Code() int {
@@ -27,9 +28,15 @@ func (s State) String() string {
 		return "offline"
 	case Destroyed:
 		return "destroyed"
+	case UnderShutdown:
+		return "under_shutdown"
 	default:
 		return "unknown"
 	}
+}
+
+func (s State) IsClosing() bool {
+	return s == UnderShutdown || s == Destroyed
 }
 
 func (s State) IsValid() bool {

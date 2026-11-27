@@ -312,7 +312,7 @@ func TestConn_StaleClosedCheckMustNotRedial(t *testing.T) {
 
 	// Reproduce the two phases of realConn around c.mtx.Lock: its first
 	// closed check succeeds, then Close wins the race before dialing starts.
-	require.False(t, c.isClosed())
+	require.Equal(t, state.Created, c.State())
 	require.NoError(t, c.Close(ctx))
 
 	c.mtx.Lock()
@@ -322,7 +322,7 @@ func TestConn_StaleClosedCheckMustNotRedial(t *testing.T) {
 		t.Cleanup(func() { _ = cc.Close() })
 	}
 
-	require.ErrorIs(t, err, errClosedConnection)
+	require.ErrorIs(t, err, errConnectionUnderShutdown)
 	require.Nil(t, cc)
 	require.Nil(t, c.grpcConn)
 }
@@ -544,7 +544,8 @@ func TestConnCountsRPCWhileLazyDialIsWaiting(t *testing.T) {
 				t.Fatal("dial did not start")
 			}
 			require.EqualValues(t, 1, load.InFlight())
-			cancel()
+			require.NoError(t, c.Close(ctx))
+			require.NoError(t, ctx.Err())
 			require.ErrorIs(t, <-result, context.Canceled)
 			require.Zero(t, load.InFlight())
 		})
@@ -556,7 +557,9 @@ func TestConnStreamCreationErrorReleasesLoadOnce(t *testing.T) {
 		t.Run(fmt.Sprint(callback), func(t *testing.T) {
 			c := newConn(endpoint.New("test"), &mockConfig{})
 			load := requireInFlightCounter(t, c)
-			c.grpcConn = &inFlightTransport{newStream: func(opts []grpc.CallOption) (grpc.ClientStream, error) {
+			c.grpcConn = &inFlightTransport{newStream: func(
+				_ context.Context, opts []grpc.CallOption,
+			) (grpc.ClientStream, error) {
 				require.EqualValues(t, 1, load.InFlight())
 				if callback {
 					for _, opt := range opts {
@@ -638,6 +641,187 @@ func TestConnStreamRemainsInflightUntilRPCFinishes(t *testing.T) {
 	}
 }
 
+func TestConnCloseDrainsStreams(t *testing.T) {
+	for _, tc := range []struct {
+		outcome string
+		timeout time.Duration
+	}{
+		{"idle", time.Minute},
+		{"finished", time.Minute},
+		{"canceled", time.Minute},
+		{"timeout", 20 * time.Millisecond},
+		{"zero", 0},
+		{"negative", -time.Second},
+	} {
+		t.Run(tc.outcome, func(t *testing.T) {
+			ctx, stop := context.WithTimeout(t.Context(), 5*time.Second)
+			defer stop()
+			closeCtx, cancelClose := context.WithCancel(ctx)
+			defer cancelClose()
+
+			c := newConn(endpoint.New("test"), &mockConfig{shutdownTimeout: tc.timeout})
+			c.grpcConn = &mockGrpcConn{}
+			var streamCtx context.Context
+			var finish func(error)
+			if tc.outcome != "idle" {
+				c.grpcConn = &inFlightTransport{
+					invoke: func(context.Context) error { return nil },
+					newStream: func(ctx context.Context, opts []grpc.CallOption) (grpc.ClientStream, error) {
+						streamCtx = ctx
+						for _, opt := range opts {
+							if onFinish, ok := opt.(grpc.OnFinishCallOption); ok {
+								finish = onFinish.OnFinish
+							}
+						}
+
+						return mock.NewMockClientStream(gomock.NewController(t)), nil
+					},
+				}
+				_, err := c.NewStream(ctx, &grpc.StreamDesc{}, "/test")
+				require.NoError(t, err)
+				require.NotNil(t, finish)
+			}
+			var finishLast context.CancelFunc
+			if tc.outcome == "finished" {
+				_, finishLast = c.addChildStream(ctx)
+				require.NotNil(t, finishLast)
+				defer finishLast()
+			}
+
+			closed := make(chan error, 1)
+			start := time.Now()
+			go func() { closed <- c.Close(closeCtx) }()
+			if tc.outcome == "finished" || tc.outcome == "canceled" {
+				require.Eventually(t, func() bool {
+					return c.State() == state.UnderShutdown
+				}, time.Second, time.Millisecond)
+				c.Ban(ctx)
+				c.Unban(ctx)
+				require.Equal(t, state.UnderShutdown, c.State())
+
+				invokeErr := c.Invoke(ctx, "/test", nil, nil)
+				_, streamErr := c.NewStream(ctx, &grpc.StreamDesc{}, "/test")
+				for _, err := range []error{invokeErr, streamErr} {
+					require.ErrorIs(t, err, errConnectionUnderShutdown)
+					_, errType, _ := xerrors.Check(err)
+					require.Equal(t, xerrors.TypeRetryable, errType)
+					require.True(t, xerrors.IsYdb(err))
+				}
+				require.NoError(t, streamCtx.Err())
+				select {
+				case <-closed:
+					t.Fatal("Close returned with a live stream")
+				default:
+				}
+				require.NoError(t, c.Close(closeCtx))
+				require.NoError(t, streamCtx.Err())
+				if tc.outcome == "finished" {
+					finish(nil)
+					select {
+					case <-c.streamsDone:
+						t.Fatal("Close was signaled before the last stream finished")
+					default:
+					}
+					finishLast()
+				} else {
+					cancelClose()
+				}
+			}
+			select {
+			case err := <-closed:
+				require.NoError(t, err)
+			case <-ctx.Done():
+				t.Fatal("Close did not return")
+			}
+			require.NoError(t, ctx.Err())
+
+			require.Equal(t, state.Destroyed, c.State())
+			c.Ban(ctx)
+			c.Unban(ctx)
+			require.Equal(t, state.Destroyed, c.State())
+
+			if tc.outcome == "timeout" {
+				require.GreaterOrEqual(t, time.Since(start), tc.timeout)
+			}
+			if streamCtx != nil {
+				require.ErrorIs(t, streamCtx.Err(), context.Canceled)
+			}
+		})
+	}
+}
+
+func TestConnShutdownStartsBeforeRPCReachesTransport(t *testing.T) {
+	for _, stream := range []bool{false, true} {
+		t.Run(fmt.Sprint(stream), func(t *testing.T) {
+			ctx := t.Context()
+			driverTrace := &trace.Driver{}
+			c := newConn(endpoint.New("test"), &mockConfig{driverTrace: driverTrace})
+			if stream {
+				driverTrace.OnConnNewStream = func(trace.DriverConnNewStreamStartInfo) func(trace.DriverConnNewStreamDoneInfo) {
+					require.NoError(t, c.Close(ctx))
+
+					return nil
+				}
+				_, err := c.NewStream(ctx, &grpc.StreamDesc{}, "/test")
+				require.ErrorIs(t, err, errConnectionUnderShutdown)
+			} else {
+				driverTrace.OnConnInvoke = func(trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
+					require.NoError(t, c.Close(ctx))
+
+					return nil
+				}
+				require.ErrorIs(t, c.Invoke(ctx, "/test", nil, nil), errConnectionUnderShutdown)
+			}
+			require.Zero(t, c.InFlight())
+		})
+	}
+}
+
+func TestConnShutdownStartsBeforeDialRegistersCancel(t *testing.T) {
+	ctx := xtest.Context(t)
+	closed := make(chan error, 1)
+	driverTrace := &trace.Driver{}
+	c := newConn(endpoint.New("test"), &mockConfig{driverTrace: driverTrace})
+	driverTrace.OnConnDial = func(trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
+		go func() { closed <- c.Close(ctx) }()
+		require.Eventually(t, func() bool {
+			return c.State() == state.UnderShutdown
+		}, time.Second, time.Millisecond)
+
+		return nil
+	}
+
+	require.ErrorIs(t, c.Invoke(ctx, "/test", nil, nil), errConnectionUnderShutdown)
+	require.NoError(t, xtest.Receive(t, closed, "Close to return"))
+}
+
+func TestConnShutdownStartsWhileRPCWaitsForTransport(t *testing.T) {
+	ctx := xtest.Context(t)
+	c := newConn(endpoint.New("test"), &mockConfig{})
+	invoked, closed := make(chan error, 1), make(chan error, 1)
+	func() {
+		c.mtx.RLock()
+		defer c.mtx.RUnlock()
+		go func() { invoked <- c.Invoke(ctx, "/test", nil, nil) }()
+
+		// A second reader is rejected once Invoke is waiting for the write lock.
+		require.Eventually(t, func() bool {
+			if !c.mtx.TryRLock() {
+				return true
+			}
+			c.mtx.RUnlock()
+
+			return false
+		}, time.Second, time.Millisecond)
+		go func() { closed <- c.Close(ctx) }()
+		require.Eventually(t, func() bool {
+			return c.State() == state.UnderShutdown
+		}, time.Second, time.Millisecond)
+	}()
+	require.ErrorIs(t, xtest.Receive(t, invoked, "Invoke to return"), errConnectionUnderShutdown)
+	require.NoError(t, xtest.Receive(t, closed, "Close to return"))
+}
+
 func TestConnDialFailureReleasesLoad(t *testing.T) {
 	c := newConn(endpoint.New("test"), &mockConfig{})
 	load := requireInFlightCounter(t, c)
@@ -701,7 +885,7 @@ type inFlightTransport struct {
 	mockGrpcConn
 
 	invoke    func(context.Context) error
-	newStream func([]grpc.CallOption) (grpc.ClientStream, error)
+	newStream func(context.Context, []grpc.CallOption) (grpc.ClientStream, error)
 }
 
 func (c *inFlightTransport) Invoke(ctx context.Context, _ string, _, _ any, _ ...grpc.CallOption) error {
@@ -709,9 +893,9 @@ func (c *inFlightTransport) Invoke(ctx context.Context, _ string, _, _ any, _ ..
 }
 
 func (c *inFlightTransport) NewStream(
-	_ context.Context, _ *grpc.StreamDesc, _ string, opts ...grpc.CallOption,
+	ctx context.Context, _ *grpc.StreamDesc, _ string, opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
-	return c.newStream(opts)
+	return c.newStream(ctx, opts)
 }
 
 type inFlightTestService struct {

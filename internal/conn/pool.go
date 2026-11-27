@@ -36,6 +36,9 @@ type (
 		usages int64
 		conns  map[endpoint.Key]*connValue
 		closed atomic.Bool
+
+		closeContexts *xcontext.CancelsGuard
+		closing       sync.WaitGroup
 	}
 )
 
@@ -43,6 +46,10 @@ var ErrClosedPool = xerrors.Wrap(fmt.Errorf("pool closed early"))
 
 func (p *Pool) DialTimeout() time.Duration {
 	return p.config.DialTimeout()
+}
+
+func (p *Pool) GrpcChannelShutdownTimeout() time.Duration {
+	return p.config.GrpcChannelShutdownTimeout()
 }
 
 func (p *Pool) Trace() *trace.Driver {
@@ -92,42 +99,53 @@ func (p *Pool) get(e endpoint.Endpoint) *connValue {
 	return value
 }
 
-// Put decrements the connection use count. When the count reaches zero, the gRPC
-// connection is closed and the entry is removed from the pool.
+// Put releases a connection reference. The final release closes an idle
+// connection immediately and drains active streams in the background.
 func (p *Pool) Put(ctx context.Context, c Conn) {
 	cc, ok := c.(*conn)
 	if !ok || cc == nil {
 		return
 	}
 
-	if !p.tryPut(cc) {
-		_ = cc.Close(ctx)
+	closeCtx, cancel := p.releaseConn(ctx, cc)
+	if cancel == nil {
+		return
 	}
+	previous, changed := cc.startShutdown()
+	closeConn := func() {
+		defer p.closing.Done()
+		defer cancel()
+		if changed {
+			_ = cc.finishShutdown(closeCtx, previous)
+		}
+	}
+	if changed && cc.hasChildStreams() {
+		go closeConn()
+
+		return
+	}
+	closeConn()
 }
 
-func (p *Pool) tryPut(c *conn) bool {
+func (p *Pool) releaseConn(ctx context.Context, c *conn) (context.Context, context.CancelFunc) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.closed.Load() || p.conns == nil {
-		return false
-	}
-
 	key := c.endpoint.Key()
-
-	value, ok := p.conns[key]
-	if !ok || value == nil || value.cc != c {
-		return false
+	value := p.conns[key]
+	if value == nil || value.cc != c {
+		return nil, nil
 	}
 
 	value.useCount--
-	if value.useCount <= 0 {
-		delete(p.conns, key)
-
-		return false
+	if value.useCount > 0 {
+		return nil, nil
 	}
 
-	return true
+	delete(p.conns, key)
+	p.closing.Add(1)
+
+	return p.closeContexts.WithCancel(xcontext.ValueOnly(ctx))
 }
 
 func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
@@ -168,9 +186,11 @@ func (p *Pool) RemoveRef(ctx context.Context) (finalErr error) {
 	}()
 
 	toClose := p.release()
-	if len(toClose) == 0 {
+	if toClose == nil {
 		return nil
 	}
+	p.closeContexts.Cancel()
+	defer p.closing.Wait()
 
 	var (
 		issues   []error
@@ -260,7 +280,7 @@ func (p *Pool) closeConnsForFailedResolve(ctx context.Context, target string) {
 	closeCtx := xcontext.ValueOnly(ctx)
 	for _, cc := range toClose {
 		cc.mtx.Lock()
-		if !cc.closed {
+		if !cc.State().IsClosing() {
 			cc.close(closeCtx)
 		}
 		cc.mtx.Unlock()
@@ -348,12 +368,13 @@ func NewPool(ctx context.Context, config Config, opts ...poolOption) *Pool {
 	defer onDone()
 
 	p := &Pool{
-		usages:      1,
-		config:      config,
-		dialOptions: config.GrpcDialOptions(),
-		clock:       clockwork.NewRealClock(),
-		done:        make(chan struct{}),
-		conns:       make(map[endpoint.Key]*connValue),
+		usages:        1,
+		config:        config,
+		dialOptions:   config.GrpcDialOptions(),
+		clock:         clockwork.NewRealClock(),
+		done:          make(chan struct{}),
+		conns:         make(map[endpoint.Key]*connValue),
+		closeContexts: xcontext.NewCancelsGuard(),
 	}
 
 	for _, opt := range opts {

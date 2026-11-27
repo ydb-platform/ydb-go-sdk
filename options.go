@@ -419,6 +419,18 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	}
 }
 
+// WithGrpcChannelShutdownTimeout sets how long a gRPC connection waits for
+// existing streams to finish after shutdown starts. New RPCs are rejected
+// during shutdown. The default is 1 minute and 59 seconds. A non-positive
+// timeout cancels existing streams immediately.
+func WithGrpcChannelShutdownTimeout(timeout time.Duration) Option {
+	return func(_ context.Context, d *Driver) error {
+		d.options = append(d.options, config.WithGrpcChannelShutdownTimeout(timeout))
+
+		return nil
+	}
+}
+
 // WithRetryBudget sets retry budget for all calls of all retryers.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
@@ -443,7 +455,8 @@ func WithDefaultIdempotent(idempotent bool) Option {
 	}
 }
 
-// WithTraceDriver appends trace.Driver into driver traces
+// WithTraceDriver appends trace.Driver into driver traces.
+// Connection-close callbacks must not synchronously close the driver.
 func WithTraceDriver(t trace.Driver) Option { //nolint:gocritic
 	return func(ctx context.Context, d *Driver) error {
 		d.options = append(d.options, config.WithTrace(t))
