@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+	internalConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
@@ -95,8 +96,7 @@ type (
 		ratelimiter        *xsync.Once[*internalRatelimiter.Client]
 		ratelimiterOptions []ratelimiterConfig.Option
 
-		topic        *xsync.Once[*topicclientinternal.Client]
-		topicOptions []topicoptions.TopicOption
+		topic *xsync.Once[*topicclientinternal.Client]
 
 		databaseSQLOptions []xsql.Option
 
@@ -628,15 +628,13 @@ func (d *Driver) connect(ctx context.Context) error {
 		return topicclientinternal.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
 			d.config.Credentials(),
-			append(
-				// prepend common params from root config
-				[]topicoptions.TopicOption{
-					topicoptions.WithOperationTimeout(d.config.OperationTimeout()),
-					topicoptions.WithOperationCancelAfter(d.config.OperationCancelAfter()),
-					internalTopic.WithGrpcMessageSize(d.config.GrpcMaxMessageSize()),
-				},
-				d.topicOptions...,
-			)...,
+			internalConfig.GetTopicTraces(&d.config.Common),
+			func(c *internalTopic.Config) { internalConfig.SetPanicCallback(&c.Common, d.config.PanicCallback()) },
+			topicoptions.WithOperationTimeout(d.config.OperationTimeout()),
+			topicoptions.WithOperationCancelAfter(d.config.OperationCancelAfter()),
+			internalTopic.WithEndpoint(d.Endpoint()),
+			internalTopic.WithDatabase(d.Name()),
+			internalTopic.WithGrpcMessageSize(d.config.GrpcMaxMessageSize()),
 		), nil
 	})
 

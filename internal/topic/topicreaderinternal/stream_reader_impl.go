@@ -58,6 +58,10 @@ type topicStreamReaderImpl struct {
 	readConnectionID string
 	readerID         int64
 
+	traceQueue         *topicreadercommon.StreamTraceQueue
+	creditBalance      topicreadercommon.MetricBalance
+	localBufferBalance topicreadercommon.MetricBalance
+
 	m       xsync.RWMutex
 	err     error
 	started bool
@@ -67,13 +71,14 @@ type topicStreamReaderImpl struct {
 }
 
 type topicStreamReaderConfig struct {
+	topicreadercommon.ReaderInfo
+
 	CommitterBatchTimeLag           time.Duration
 	CommitterBatchCounterTrigger    int
 	BaseContext                     context.Context //nolint:containedctx
 	BufferSizeProtoBytes            int
 	Cred                            credentials.Credentials
 	CredUpdateInterval              time.Duration
-	Consumer                        string
 	ReadWithoutConsumer             bool
 	ReadSelectors                   []*topicreadercommon.PublicReadSelector
 	Trace                           *trace.Topic
@@ -136,7 +141,12 @@ func newTopicStreamReader(
 	if err = reader.initSession(); err != nil {
 		return nil, err
 	}
+	reader.startTrace()
 	if err = reader.startBackgroundWorkers(); err != nil {
+		if reader.traceQueue != nil {
+			reader.traceQueue.Close()
+		}
+
 		return nil, err
 	}
 
@@ -182,8 +192,23 @@ func newTopicStreamReaderStopped(
 	return res
 }
 
+func (r *topicStreamReaderImpl) startTrace() {
+	r.cfg.Trace, r.traceQueue = topicreadercommon.StreamTrace(r.cfg.Trace, r.cfg.ReaderInfo, func(err error) {
+		_ = r.CloseWithError(context.Background(), xerrors.WithStackTrace(err))
+	})
+}
+
 func (r *topicStreamReaderImpl) ReadSessionID() string {
 	return r.readConnectionID
+}
+
+func (r *topicStreamReaderImpl) streamError() error {
+	var err error
+	r.m.WithRLock(func() {
+		err = r.err
+	})
+
+	return err
 }
 
 func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
@@ -222,11 +247,11 @@ func (r *topicStreamReaderImpl) PopMessagesBatchTx(
 		return nil, err
 	}
 
-	if err = r.commitWithTransaction(ctx, tx, batch); err == nil {
-		return batch, nil
+	if err = r.commitWithTransaction(ctx, tx, batch); err != nil {
+		return nil, err
 	}
 
-	return nil, err
+	return batch, nil
 }
 
 // commitWithTransaction prepares a batch of messages to be committed within a YDB transaction.
@@ -376,10 +401,24 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 	defer func() {
 		if err == nil {
 			r.freeBufferFromMessages(batch)
+			r.releaseLocalBufferForBatch(batch)
 		}
 	}()
 
 	return r.consumeMessagesUntilBatch(ctx, opts)
+}
+
+func (r *topicStreamReaderImpl) releaseLocalBufferForBatch(batch *topicreadercommon.PublicBatch) {
+	if batch == nil || len(batch.Messages) == 0 {
+		return
+	}
+	if r.traceQueue != nil && r.cfg.Trace.OnReaderLocalBufferChanged != nil {
+		// Application reads aren't joined by backgroundWorkers. Finish their last
+		// enqueue before shutdown seals the FIFO.
+		r.m.RLock()
+		defer r.m.RUnlock()
+	}
+	r.releaseLocalBuffer(len(batch.Messages))
 }
 
 func (r *topicStreamReaderImpl) consumeMessagesUntilBatch(
@@ -675,6 +714,7 @@ func (r *topicStreamReaderImpl) getRestBufferBytes() int {
 func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 	ctx, cancel := xcontext.WithCancel(ctx)
 	defer cancel()
+	defer r.sessionController.ReleasePendingCommits()
 
 	for {
 		serverMessage, err := r.stream.Recv()
@@ -717,6 +757,9 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 			if err = r.onCommitResponse(m); err != nil {
 				_ = r.CloseWithError(ctx, err)
 
+				return
+			}
+			if r.traceQueue != nil && !r.traceQueue.WaitForACKs(r.backgroundWorkers.StopDone()) {
 				return
 			}
 
@@ -773,6 +816,7 @@ func (r *topicStreamReaderImpl) dataRequestLoop(ctx context.Context) {
 			if err := r.sendDataRequest(sum); err != nil {
 				return
 			}
+			r.changeCreditBalance(sum)
 		}
 	}
 }
@@ -792,6 +836,55 @@ func (r *topicStreamReaderImpl) freeBufferFromMessages(batch *topicreadercommon.
 	}
 }
 
+func (r *topicStreamReaderImpl) changeCreditBalance(delta int) {
+	if r.cfg.Trace != nil && r.cfg.Trace.OnReaderCreditBalanceChanged != nil {
+		r.creditBalance.Change(delta, r.traceCreditDelta)
+	}
+}
+
+func (r *topicStreamReaderImpl) finalizeCreditBalance() {
+	if r.cfg.Trace != nil && r.cfg.Trace.OnReaderCreditBalanceChanged != nil {
+		r.creditBalance.Finalize(r.traceCreditDelta)
+	}
+}
+
+func (r *topicStreamReaderImpl) traceCreditDelta(delta int) {
+	logCtx := r.cfg.BaseContext
+	gtrace.TopicOnReaderCreditBalanceChanged(
+		r.cfg.Trace, &logCtx,
+		r.cfg.ReaderInfo, delta,
+	)
+}
+
+func (r *topicStreamReaderImpl) traceLocalBufferDelta(delta int) {
+	traceCtx := r.cfg.BaseContext
+	gtrace.TopicOnReaderLocalBufferChanged(
+		r.cfg.Trace, &traceCtx, r.cfg.ReaderInfo, delta,
+	)
+}
+
+func (r *topicStreamReaderImpl) reserveLocalBuffer(messagesCount int) bool {
+	if messagesCount <= 0 || r.cfg.Trace == nil || r.cfg.Trace.OnReaderLocalBufferChanged == nil {
+		return false
+	}
+
+	return r.localBufferBalance.ChangeBuffer(messagesCount, r.traceLocalBufferDelta)
+}
+
+func (r *topicStreamReaderImpl) releaseLocalBuffer(messagesCount int) {
+	if messagesCount <= 0 || r.cfg.Trace == nil || r.cfg.Trace.OnReaderLocalBufferChanged == nil {
+		return
+	}
+
+	r.localBufferBalance.ChangeBuffer(-messagesCount, r.traceLocalBufferDelta)
+}
+
+func (r *topicStreamReaderImpl) finalizeLocalBuffer() {
+	if r.cfg.Trace != nil && r.cfg.Trace.OnReaderLocalBufferChanged != nil {
+		r.localBufferBalance.Finalize(r.traceLocalBufferDelta)
+	}
+}
+
 func (r *topicStreamReaderImpl) updateTokenLoop(ctx context.Context) {
 	ticker := time.NewTicker(r.cfg.CredUpdateInterval)
 	defer ticker.Stop()
@@ -808,13 +901,32 @@ func (r *topicStreamReaderImpl) updateTokenLoop(ctx context.Context) {
 }
 
 func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse) (err error) {
+	logCtx := r.cfg.BaseContext
+	r.changeCreditBalance(-msg.BytesSize)
+
 	resCapacity := r.addRestBufferBytes(-msg.BytesSize)
 
-	logCtx := r.cfg.BaseContext
-	onDone := gtrace.TopicOnReaderReceiveDataResponse(r.cfg.Trace, &logCtx, r.readConnectionID, resCapacity, msg)
-	defer func() {
-		onDone(err)
-	}()
+	onDone := gtrace.TopicOnReaderReceiveDataResponse(
+		r.cfg.Trace,
+		&logCtx,
+		r.cfg.ReaderInfo,
+		r.readConnectionID,
+		resCapacity,
+		msg,
+	)
+	defer func() { onDone(err) }()
+
+	observeReceipt := r.cfg.Trace != nil && r.cfg.Trace.OnReaderMessagesReceived != nil
+	var accepted map[string]int
+	if observeReceipt {
+		accepted = make(map[string]int)
+		defer func() {
+			for topic, count := range accepted {
+				ctx := r.cfg.BaseContext
+				gtrace.TopicOnReaderMessagesReceived(r.cfg.Trace, &ctx, r.cfg.ReaderInfo, topic, count)
+			}
+		}()
+	}
 
 	batches, err2 := topicreadercommon.ReadRawBatchesToPublicBatches(msg, &r.sessionController, r.cfg.Decoders)
 	if err2 != nil {
@@ -822,8 +934,23 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 	}
 
 	for i := range batches {
+		var topic string
+		if observeReceipt {
+			topic = batches[i].Topic()
+		}
+		messagesCount := len(batches[i].Messages)
+
+		reserved := r.reserveLocalBuffer(messagesCount)
 		if err := r.batcher.PushBatches(batches[i]); err != nil {
+			if reserved {
+				r.releaseLocalBuffer(messagesCount)
+			}
+
 			return err
+		}
+
+		if observeReceipt {
+			accepted[topic] += messagesCount
 		}
 	}
 
@@ -851,7 +978,6 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 	if !isFirstClose {
 		return nil
 	}
-
 	closeErr = r.committer.Close(ctx, reason)
 
 	batcherErr := r.batcher.Close(reason)
@@ -866,12 +992,37 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 	}
 
 	// close background workers after r.stream.CloseSend
-	bgCloseErr := r.backgroundWorkers.Close(ctx, reason)
+	bgCloseErr := r.joinAndFinalize(ctx, reason)
 	if closeErr == nil {
 		closeErr = bgCloseErr
 	}
 
 	return closeErr
+}
+
+func (r *topicStreamReaderImpl) joinAndFinalize(ctx context.Context, reason error) error {
+	if r.traceQueue == nil {
+		err := r.backgroundWorkers.Close(ctx, reason)
+		r.finalizeCreditBalance()
+		r.finalizeLocalBuffer()
+
+		return err
+	}
+	// Close may be initiated by a receive worker with its own canceled context.
+	// Join elsewhere before sealing the FIFO so its last submissions aren't lost.
+	stopped := make(chan error, 1)
+	go func() {
+		err := r.backgroundWorkers.Close(context.WithoutCancel(ctx), reason)
+		r.finalizeCreditBalance()
+		r.m.WithLock(func() { r.finalizeLocalBuffer(); r.traceQueue.Close() })
+		stopped <- err
+	}()
+	select {
+	case err := <-stopped:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (r *topicStreamReaderImpl) onCommitResponse(msg *rawtopicreader.CommitOffsetResponse) error {
@@ -881,18 +1032,22 @@ func (r *topicStreamReaderImpl) onCommitResponse(msg *rawtopicreader.CommitOffse
 		if err != nil {
 			return fmt.Errorf("ydb: can't found session on commit response: %w", err)
 		}
-		partition.SetCommittedOffsetForward(commit.CommittedOffset)
+		messagesCount := topicreadercommon.RegisterCommitAcknowledged(partition, commit.CommittedOffset)
 
-		logCtx := r.cfg.BaseContext
-		gtrace.TopicOnReaderCommittedNotify(
-			r.cfg.Trace,
-			&logCtx,
-			r.readConnectionID,
-			partition.Topic,
-			partition.PartitionID,
-			partition.StreamPartitionSessionID.ToInt64(),
-			commit.CommittedOffset.ToInt64(),
-		)
+		if r.cfg.Trace != nil && r.cfg.Trace.OnReaderCommittedNotify != nil {
+			logCtx := r.cfg.BaseContext
+			gtrace.TopicOnReaderCommittedNotify(
+				r.cfg.Trace,
+				&logCtx,
+				r.cfg.ReaderInfo,
+				r.readConnectionID,
+				partition.Topic,
+				partition.PartitionID,
+				partition.StreamPartitionSessionID.ToInt64(),
+				commit.CommittedOffset.ToInt64(),
+				messagesCount,
+			)
+		}
 
 		r.committer.OnCommitNotify(partition, commit.CommittedOffset)
 	}
@@ -928,6 +1083,7 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequest(m *rawtopicreader
 		clientSessionCounter.Add(1),
 		m.CommittedOffset,
 	)
+	session.SetupCommitMetrics(r.cfg.Trace, r.cfg.ReaderInfo)
 	if err := r.sessionController.Add(session); err != nil {
 		return err
 	}

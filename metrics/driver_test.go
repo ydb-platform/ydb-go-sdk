@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -138,9 +139,16 @@ func (r *recordingRegistry) register(path, kind string, labelNames []string) {
 func (r *recordingRegistry) key(path string, labels map[string]string) string {
 	parts := make([]string, 0, len(r.labelNames[path])+1)
 	parts = append(parts, path)
-	for _, name := range r.labelNames[path] {
-		parts = append(parts, name+"="+labels[name])
+	if labels == nil {
+		for _, name := range r.labelNames[path] {
+			parts = append(parts, name+"=")
+		}
+	} else {
+		for name, value := range labels {
+			parts = append(parts, name+"="+value)
+		}
 	}
+	sort.Strings(parts[1:])
 
 	return strings.Join(parts, ",")
 }

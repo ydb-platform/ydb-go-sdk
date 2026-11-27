@@ -24,6 +24,7 @@ type PartitionSession struct {
 	lastReceivedOffsetEndVal atomic.Int64
 	committedOffsetVal       atomic.Int64
 	noMoreMessages           atomic.Bool
+	commitMetrics            *partitionSessionCommitMetrics
 }
 
 func NewPartitionSession(

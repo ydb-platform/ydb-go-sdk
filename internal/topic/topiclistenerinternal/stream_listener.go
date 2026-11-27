@@ -55,10 +55,13 @@ type streamListener struct {
 
 	freeBytes chan int
 
-	closing      atomic.Bool
-	tracer       *trace.Topic
-	shutdownDone empty.Chan
-	shutdownErr  error
+	traceQueue         *topicreadercommon.StreamTraceQueue
+	creditBalance      topicreadercommon.MetricBalance
+	localBufferBalance topicreadercommon.MetricBalance
+	closing            atomic.Bool
+	tracer             *trace.Topic
+	shutdownDone       empty.Chan
+	shutdownErr        error
 
 	m              xsync.Mutex
 	workers        map[partitionKey]*PartitionWorker
@@ -86,8 +89,7 @@ func newStreamListener(
 		background:       *background.NewWorker(xcontext.ValueOnly(connectionCtx), "topic reader stream listener"),
 		sessionIDCounter: sessionIDCounter,
 		listenerID:       listenerID,
-
-		tracer: config.Tracer,
+		tracer:           config.Tracer,
 	}
 
 	res.initVars(sessionIDCounter)
@@ -120,6 +122,7 @@ func newStreamListener(
 		},
 	)
 
+	res.tracer, res.traceQueue = topicreadercommon.StreamTrace(res.tracer, config.ReaderInfo, res.closeOnTracePanic)
 	res.startBackground()
 	select {
 	case res.freeBytes <- config.BufferSize:
@@ -127,6 +130,10 @@ func newStreamListener(
 	}
 
 	return res, nil
+}
+
+func (l *streamListener) closeOnTracePanic(err error) {
+	l.goClose(l.background.Context(), xerrors.WithStackTrace(err))
 }
 
 func (l *streamListener) Close(ctx context.Context, reason error) error {
@@ -162,10 +169,18 @@ func (l *streamListener) finishClose(cleanupCtx context.Context, reason error, d
 		!errors.Is(err, background.ErrAlreadyClosed) {
 		resErrors = append(resErrors, err)
 	}
+	if l.sessions != nil {
+		l.sessions.ReleasePendingCommits()
+	}
 
 	// Canceling the listener also stops each partition worker. Its callback
 	// closes the worker asynchronously, because it may run in the worker itself.
 	l.workerCloseWG.Wait()
+	l.finalizeCreditBalance()
+	l.finalizeLocalBuffer()
+	if l.traceQueue != nil {
+		l.traceQueue.Close()
+	}
 
 	if l.syncCommitter != nil {
 		if err := l.syncCommitter.Close(cleanupCtx, reason); err != nil &&
@@ -204,6 +219,17 @@ func (l *streamListener) goClose(ctx context.Context, reason error) empty.Chan {
 
 		return l.shutdownDone
 	})
+}
+
+func suppressListenerSessionError(ctx context.Context, err error) bool {
+	if err == nil {
+		return true
+	}
+	if ctx != nil && errors.Is(ctx.Err(), context.Canceled) {
+		return true
+	}
+
+	return xerrors.Is(err, ErrUserCloseTopic, errTopicListenerClosed, errPartitionQueueClosed)
 }
 
 func (l *streamListener) startBackground() {
@@ -336,6 +362,9 @@ func (l *streamListener) flushPendingMessages(ctx context.Context) {
 
 			return
 		}
+		if readRequest, ok := m.(*rawtopicreader.ReadRequest); ok {
+			l.changeCreditBalance(readRequest.BytesSize)
+		}
 
 		// Trace successful send
 		l.traceMessageSend(&logCtx, messageType, nil)
@@ -382,7 +411,16 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 				return
 			}
 
-			gtrace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, "", 0, err)
+			gtrace.TopicOnListenerReceiveMessage(
+				l.tracer,
+				&logCtx,
+				l.cfg.ReaderInfo,
+				l.listenerID,
+				l.sessionID,
+				"",
+				0,
+				err,
+			)
 			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
 			l.goClose(ctx, xerrors.WithStackTrace(xerrors.Wrap(
 				fmt.Errorf("ydb: failed read message from the stream in the topic reader listener: %w", err),
@@ -395,14 +433,66 @@ func (l *streamListener) receiveMessagesLoop(ctx context.Context) {
 		bytesSize := 0
 		if mess, ok := mess.(*rawtopicreader.ReadResponse); ok {
 			bytesSize = mess.BytesSize
+			l.changeCreditBalance(-bytesSize)
 		}
 
-		gtrace.TopicOnListenerReceiveMessage(l.tracer, &logCtx, l.listenerID, l.sessionID, messageType, bytesSize, nil)
+		gtrace.TopicOnListenerReceiveMessage(
+			l.tracer,
+			&logCtx,
+			l.cfg.ReaderInfo,
+			l.listenerID,
+			l.sessionID,
+			messageType,
+			bytesSize,
+			nil,
+		)
 
 		if err := l.routeMessage(ctx, mess); err != nil {
 			gtrace.TopicOnListenerError(l.tracer, &logCtx, l.listenerID, l.sessionID, err)
 			l.goClose(ctx, err)
 		}
+	}
+}
+
+func (l *streamListener) changeCreditBalance(delta int) {
+	if l.tracer != nil && l.tracer.OnListenerCreditBalanceChanged != nil {
+		l.creditBalance.Change(delta, l.traceCreditDelta)
+	}
+}
+
+func (l *streamListener) finalizeCreditBalance() {
+	if l.tracer != nil && l.tracer.OnListenerCreditBalanceChanged != nil {
+		l.creditBalance.Finalize(l.traceCreditDelta)
+	}
+}
+
+func (l *streamListener) traceCreditDelta(delta int) {
+	logCtx := l.background.Context()
+	gtrace.TopicOnListenerCreditBalanceChanged(
+		l.tracer, &logCtx,
+		l.cfg.ReaderInfo, delta,
+	)
+}
+
+func (l *streamListener) traceLocalBufferDelta(delta int) {
+	traceCtx := l.background.Context()
+	gtrace.TopicOnListenerLocalBufferChanged(
+		l.tracer, &traceCtx, l.cfg.ReaderInfo, delta,
+	)
+}
+
+// changeLocalBuffer reports whether a positive delta reserved messages.
+func (l *streamListener) changeLocalBuffer(delta int) bool {
+	if l.tracer == nil || l.tracer.OnListenerLocalBufferChanged == nil {
+		return false
+	}
+
+	return l.localBufferBalance.ChangeBuffer(delta, l.traceLocalBufferDelta)
+}
+
+func (l *streamListener) finalizeLocalBuffer() {
+	if l.tracer != nil && l.tracer.OnListenerLocalBufferChanged != nil {
+		l.localBufferBalance.Finalize(l.traceLocalBufferDelta)
 	}
 }
 
@@ -430,7 +520,12 @@ func (l *streamListener) routeMessage(ctx context.Context, mess rawtopicreader.S
 	case *rawtopicreader.ReadResponse:
 		return l.splitAndRouteReadResponse(m)
 	case *rawtopicreader.CommitOffsetResponse:
-		return l.onCommitResponse(m)
+		err := l.onCommitResponse(m)
+		if err == nil && l.traceQueue != nil {
+			l.traceQueue.WaitForACKs(l.background.Done())
+		}
+
+		return err
 	default:
 		// Ignore unknown message types
 		return nil
@@ -452,6 +547,7 @@ func (l *streamListener) handleStartPartition(
 		l.sessionIDCounter.Add(1),
 		m.CommittedOffset,
 	)
+	session.SetupCommitMetrics(l.tracer, l.cfg.ReaderInfo)
 	if err := l.sessions.Add(session); err != nil {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to add partition session: %w", err)))
 	}
@@ -479,16 +575,36 @@ func (l *streamListener) splitAndRouteReadResponse(m *rawtopicreader.ReadRespons
 			"ydb: failed to convert raw batches to public batches: %w", err)))
 	}
 
+	observeReceipt := l.tracer != nil && l.tracer.OnListenerMessagesReceived != nil
 	// Route each batch to its partition worker
 	for _, batch := range batches {
 		partitionSession := topicreadercommon.BatchGetPartitionSession(batch)
+		var topic string
+		var messagesCount int
+		if observeReceipt {
+			topic = batch.Topic()
+			messagesCount = len(batch.Messages)
+		}
+		accepted := false
 		routed := l.routeToWorker(partitionSession, func(worker *PartitionWorker) {
-			worker.AddMessagesBatch(m.ServerMessageMetadata, batch)
+			accepted = worker.AddMessagesBatch(m.ServerMessageMetadata, batch)
 		})
 		if !routed {
 			// Worker missing: batch is dropped but buffer was already charged above.
 			// Return credit here; routeToWorker stays non-fatal for protocol mismatch.
 			l.ReadBufferRelease(batchReadBufferSize(batch))
+
+			continue
+		}
+		if observeReceipt && accepted {
+			traceCtx := l.background.Context()
+			gtrace.TopicOnListenerMessagesReceived(
+				l.tracer,
+				&traceCtx,
+				l.cfg.ReaderInfo,
+				topic,
+				messagesCount,
+			)
 		}
 	}
 
@@ -508,22 +624,25 @@ func (l *streamListener) onCommitResponse(msg *rawtopicreader.CommitOffsetRespon
 		}
 
 		// Update committed offset in the session
-		session.SetCommittedOffsetForward(commit.CommittedOffset)
+		messagesCount := topicreadercommon.RegisterCommitAcknowledged(session, commit.CommittedOffset)
 
 		// Notify the syncCommitter about the commit
 		l.syncCommitter.OnCommitNotify(session, commit.CommittedOffset)
 
-		// Emit trace event - use partition context instead of background
-		logCtx := session.Context()
-		gtrace.TopicOnReaderCommittedNotify(
-			l.tracer,
-			&logCtx,
-			l.listenerID,
-			session.Topic,
-			session.PartitionID,
-			session.StreamPartitionSessionID.ToInt64(),
-			commit.CommittedOffset.ToInt64(),
-		)
+		if l.tracer != nil && l.tracer.OnReaderCommittedNotify != nil {
+			logCtx := session.Context()
+			gtrace.TopicOnReaderCommittedNotify(
+				l.tracer,
+				&logCtx,
+				l.cfg.ReaderInfo,
+				l.listenerID,
+				session.Topic,
+				session.PartitionID,
+				session.StreamPartitionSessionID.ToInt64(),
+				commit.CommittedOffset.ToInt64(),
+				messagesCount,
+			)
+		}
 	}
 
 	return nil
@@ -680,6 +799,8 @@ func (l *streamListener) createWorkerForPartition(session *topicreadercommon.Par
 			l.tracer,
 			l.listenerID,
 		)
+		worker.onLocalBufferDelta = l.changeLocalBuffer
+		worker.readerInfo = l.cfg.ReaderInfo
 		l.workers[key] = worker
 		l.workerCloseWG.Add(1)
 		worker.Start(l.background.Context())

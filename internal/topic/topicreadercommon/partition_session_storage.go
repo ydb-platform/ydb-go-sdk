@@ -17,12 +17,16 @@ const (
 type PartitionSessionStorage struct {
 	m sync.RWMutex
 
-	sessions map[rawtopicreader.PartitionSessionID]*sessionInfo
+	sessions        map[rawtopicreader.PartitionSessionID]*sessionInfo
+	commits         *pendingCommitTrackers
+	commitsReleased bool
 
 	removeIndex              int
 	lastCompactedTime        time.Time
 	lastCompactedRemoveIndex int
 }
+
+var releasedPendingCommits = pendingCommitTrackers{closed: true}
 
 func (c *PartitionSessionStorage) initNeedLock() {
 	if c.sessions == nil {
@@ -31,6 +35,8 @@ func (c *PartitionSessionStorage) initNeedLock() {
 	}
 }
 
+// Add stores a partition session and attaches its commit tracker, if any, to
+// the set of trackers that ReleasePendingCommits clears.
 func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -40,9 +46,39 @@ func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 	if _, ok := c.sessions[session.StreamPartitionSessionID]; ok {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.StreamPartitionSessionID))
 	}
+	if session.commitMetrics != nil {
+		session.commitMetrics.tracker.owner = c.pendingCommitsNeedLock()
+	}
 	c.sessions[session.StreamPartitionSessionID] = &sessionInfo{Session: session}
 
 	return nil
+}
+
+// ReleasePendingCommits drops the pending commit ranges of every session once
+// the stream can no longer receive acknowledgements. Later submissions are not tracked.
+func (c *PartitionSessionStorage) ReleasePendingCommits() {
+	if commits := c.markCommitsReleased(); commits != nil {
+		commits.close()
+	}
+}
+
+func (c *PartitionSessionStorage) markCommitsReleased() *pendingCommitTrackers {
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.commitsReleased = true
+
+	return c.commits
+}
+
+func (c *PartitionSessionStorage) pendingCommitsNeedLock() *pendingCommitTrackers {
+	if c.commitsReleased {
+		return &releasedPendingCommits
+	}
+	if c.commits == nil {
+		c.commits = &pendingCommitTrackers{}
+	}
+
+	return c.commits
 }
 
 func (c *PartitionSessionStorage) Get(id rawtopicreader.PartitionSessionID) (*PartitionSession, error) {

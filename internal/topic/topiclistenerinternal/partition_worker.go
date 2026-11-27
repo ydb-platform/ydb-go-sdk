@@ -77,12 +77,14 @@ type PartitionWorker struct {
 		CommitHandler
 	}
 	readBufferReleaser ReadBufferReleaser
+	onLocalBufferDelta func(delta int) bool
 	userHandler        EventHandler
 	onStopped          WorkerStoppedCallback
 
 	// Tracing and logging fields
 	tracer     *trace.Topic
 	listenerID string
+	readerInfo topicreadercommon.ReaderInfo
 
 	messageQueue *xsync.UnboundedChan[unifiedMessage]
 	bgWorker     *background.Worker
@@ -141,8 +143,17 @@ func (w *PartitionWorker) Start(ctx context.Context) {
 }
 
 // AddUnifiedMessage adds a unified message to the processing queue
-func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) {
-	// Merge adjacent batches from the same server message without reordering control messages.
+func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) bool {
+	var localBufferMessages int
+	if msg.BatchMessage != nil && msg.BatchMessage.Batch != nil {
+		localBufferMessages = len(msg.BatchMessage.Batch.Messages)
+	}
+
+	reserved := false
+	if msg.BatchMessage != nil {
+		reserved = w.changeLocalBuffer(localBufferMessages)
+	}
+
 	accepted := w.messageQueue.SendWithMerge(msg, func(last, next unifiedMessage) (unifiedMessage, bool) {
 		if last.BatchMessage == nil || next.BatchMessage == nil ||
 			!last.BatchMessage.ServerMessageMetadata.Equals(&next.BatchMessage.ServerMessageMetadata) {
@@ -160,8 +171,13 @@ func (w *PartitionWorker) AddUnifiedMessage(msg unifiedMessage) {
 		}}, true
 	})
 	if !accepted {
+		if reserved {
+			w.changeLocalBuffer(-localBufferMessages)
+		}
 		w.freeBatchCredit(msg)
 	}
+
+	return accepted
 }
 
 // AddRawServerMessage sends a raw server message
@@ -176,8 +192,8 @@ func (w *PartitionWorker) AddRawServerMessage(
 func (w *PartitionWorker) AddMessagesBatch(
 	metadata rawtopiccommon.ServerMessageMetadata,
 	batch *topicreadercommon.PublicBatch,
-) {
-	w.AddUnifiedMessage(unifiedMessage{
+) bool {
+	return w.AddUnifiedMessage(unifiedMessage{
 		BatchMessage: &batchMessage{
 			ServerMessageMetadata: metadata,
 			Batch:                 batch,
@@ -265,7 +281,7 @@ func (w *PartitionWorker) receiveMessagesLoop(ctx context.Context) {
 // processUnifiedMessage handles a single unified message by routing to appropriate processor
 func (w *PartitionWorker) processUnifiedMessage(ctx context.Context, msg unifiedMessage) error {
 	if err := ctx.Err(); err != nil {
-		w.freeBatchCredit(msg)
+		w.releaseQueuedBatch(msg)
 
 		return err
 	}
@@ -283,7 +299,7 @@ func (w *PartitionWorker) processUnifiedMessage(ctx context.Context, msg unified
 	case msg.BatchMessage != nil:
 		select {
 		case <-session.Context().Done():
-			w.freeBatchCredit(msg)
+			w.releaseQueuedBatch(msg)
 
 			return nil
 		default:
@@ -356,6 +372,16 @@ func (w *PartitionWorker) callUserHandler(
 		"OnReadMessages",
 		messagesCount,
 	)
+	if msg.Batch != nil && messagesCount > 0 && w.tracer != nil && w.tracer.OnListenerMessagesDelivered != nil {
+		traceCtx := ctx
+		gtrace.TopicOnListenerMessagesDelivered(
+			w.tracer,
+			&traceCtx,
+			w.readerInfo,
+			session.Topic,
+			messagesCount,
+		)
+	}
 
 	if err := w.userHandler.OnReadMessages(ctx, event); err != nil {
 		handlerErr := xerrors.WithStackTrace(err)
@@ -394,6 +420,7 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 	// Credit is tied to read/processing, not commit (protocol separates these; same as reader).
 	batchSize := batchReadBufferSize(msg.Batch)
 	defer w.readBufferReleaser.ReadBufferRelease(batchSize)
+	w.changeLocalBuffer(-messagesCount)
 
 	// Check for errors in the metadata
 	if err := w.validateBatchMetadata(msg); err != nil {
@@ -418,8 +445,19 @@ func (w *PartitionWorker) processBatchMessage(ctx context.Context, msg *batchMes
 // partition queue. In-flight batch is freed by processBatchMessage defer, not here.
 func (w *PartitionWorker) freeBufferedBatchCredits() {
 	for _, msg := range w.messageQueue.DrainBuffered() {
-		w.freeBatchCredit(msg)
+		w.releaseQueuedBatch(msg)
 	}
+}
+
+func (w *PartitionWorker) releaseQueuedBatch(msg unifiedMessage) {
+	if msg.BatchMessage == nil {
+		return
+	}
+	batch := msg.BatchMessage.Batch
+	if batch != nil {
+		w.changeLocalBuffer(-len(batch.Messages))
+	}
+	w.freeBatchCredit(msg)
 }
 
 func (w *PartitionWorker) closeQueueAndFreeBufferedBatchCredits() {
@@ -432,6 +470,10 @@ func (w *PartitionWorker) freeBatchCredit(msg unifiedMessage) {
 	if msg.BatchMessage != nil {
 		w.readBufferReleaser.ReadBufferRelease(batchReadBufferSize(msg.BatchMessage.Batch))
 	}
+}
+
+func (w *PartitionWorker) changeLocalBuffer(delta int) bool {
+	return delta != 0 && w.onLocalBufferDelta != nil && w.onLocalBufferDelta(delta)
 }
 
 // handleStartPartitionRequest processes StartPartitionSessionRequest

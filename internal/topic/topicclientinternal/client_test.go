@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -111,7 +112,7 @@ func TestCommitOffsetErrors(t *testing.T) {
 					return nil
 				}).AnyTimes()
 
-			client := New(ctx, conn, nil, func(cfg *topic.Config) {
+			client := New(ctx, conn, nil, nil, func(cfg *topic.Config) {
 				config.SetAutoRetry(&cfg.Common, !tt.noRetry)
 			})
 			err := client.CommitOffset(ctx, "topic", 0, "consumer", 1, tt.opts...)
@@ -132,4 +133,19 @@ func TestCommitOffsetErrors(t *testing.T) {
 			require.Equal(t, tt.wantRetry, retry.Check(err).MustRetry(true))
 		})
 	}
+}
+
+func TestReaderInfoNormalizesConfiguredDatabase(t *testing.T) {
+	for _, database := range []string{"/local", "/local//", "/local/./", "/local/child/..", "local/"} {
+		t.Run(database, func(t *testing.T) {
+			client := &Client{cfg: newTopicConfig(
+				topic.WithEndpoint("node:2135"), topic.WithDatabase(database),
+			)}
+			require.Equal(t, topicreadercommon.ReaderInfo{
+				Endpoint: "node:2135", Database: "/local", Consumer: "consumer",
+			}, client.readerInfo("consumer"))
+			require.Equal(t, database, client.cfg.Database, "connection configuration must be preserved")
+		})
+	}
+	require.Empty(t, (&Client{}).readerInfo("").Database)
 }

@@ -1,0 +1,34 @@
+# Topic reader and listener metrics
+
+Readers and listeners share eight instruments. All carry `endpoint`, `database` and `reader.name`. The endpoint is the configured authority and the database is the normalized path. Use `topicoptions.WithReaderName` for pull readers and `topicoptions.WithListenerReaderName` for listeners. Omitted or empty reader and listener names become `default`. Readers with identical labels share a series.
+
+Descriptor-aware registries receive the dotted label names `reader.name` and `error.type` shown here. Legacy registries receive `reader_name` and `error_type` instead. Without a consumer, legacy registries receive `consumer=""` so their fixed-label vectors can bind the series. The contract form (no `consumer` key) requires a descriptor-aware registry: `With` may receive a subset of the declared names, and an omitted name means the attribute is absent.
+
+| Instrument | Unit | Additional labels | What it measures |
+| --- | --- | --- | --- |
+| `ydb.topic.reader.received.messages` | `{message}` | topic | Messages accepted from the stream |
+| `ydb.topic.reader.delivered.messages` | `{message}` | topic | Messages handed to the application |
+| `ydb.topic.reader.received.bytes` | `By` | — | Protocol size of each read response, including discarded data |
+| `ydb.topic.reader.session.errors` | `{error}` | retry_decision, status_code, error.type | Retry and stop decisions for failed sessions |
+| `ydb.topic.reader.commit.queued` | `{message}` | topic | Sum of accepted non-transactional commit spans |
+| `ydb.topic.reader.commit.acknowledged` | `{message}` | topic | Sum of completed queued spans |
+| `ydb.topic.reader.local_buffer.messages` | `{message}` | — | Messages currently held across all topics of the reader |
+| `ydb.topic.reader.credit_balance_bytes` | `By` | — | Bytes requested successfully minus bytes received |
+
+The six counters are cumulative. The two gauges apply signed deltas. Closing a stream removes its remaining balance. When an observer falls behind, the SDK sums pending deltas per gauge and received message counts per topic.
+
+Each acknowledged offset keeps its partition session and message count. ACK observers run in their own queue, and the receive loop waits for the current response's ACK observers before reading the next response; other observers do not delay it. An ACK observer can close the reader or listener, but waiting for a later ACK on the same stream would block the receive loop.
+
+Each queued range counts its half-open span, including gaps. Duplicate submissions count separately. Ranges ending at or below the committed watermark at submission are excluded from both counters. A stream acknowledgement counts the full span of each pending ordinary range it newly covers, regardless of admission order. It adds zero if it covers no new pending ranges. A successful transaction can advance the watermark without completing ordinary ranges, so a later stream acknowledgement at or below that watermark can still count them once.
+
+Session errors carry the transport or YDB status name and an error type of `transport_error`, `ydb_error` or `unknown`. Unknown gRPC codes use `Code(n)`, unknown YDB codes use their number and unspecified status uses `unknown`. An idle pull reader can first report a stored terminal stream failure as `stop` on close. This check uses only the default retry policy and excludes context errors. It does not invoke a custom retry callback.
+
+Listener hooks use `TopicListenerStreamEvents`. Reader message, byte and gauge hooks use `TopicReaderMessageEvents`. Reader commit and session-error hooks use `TopicReaderStreamEvents`. `OnListenerMessagesReceived`, `OnListenerMessagesDelivered`, `OnListenerCreditBalanceChanged`, and `OnListenerLocalBufferChanged` are listener-only; their `OnReader*` counterparts are pull-only. Enabling listener metrics alone does not reserve a pull buffer or trace pull deliveries.
+
+`OnListenerMessagesDelivered` runs on the partition worker immediately before `OnReadMessages`. As in the handler itself, a blocking `Close` cannot finish joining that worker until the callback returns.
+
+The detail mask is read once, when the topic trace is built: a later change of a live `trace.Detailer` does not affect topic metrics, so a gauge delta and its compensation always follow the same mask. A disabled group installs no hook, and the SDK does no bookkeeping for an absent hook. Pending commits are tracked per reader kind: `OnReaderCommitQueued` enables it for pull readers and `OnListenerCommitQueued` for listeners.
+
+Descriptor-aware registries receive the canonical names and units above. Legacy registries build names with `WithSystem` and choose their separator. Their vector API has no unit parameter. The five bulk counters (received messages, delivered messages, received bytes, queued commits and acknowledged commits) use one `Add(int64)` per positive update, or one `Add(float64)` if that is the available method. The released Prometheus adapter v2.1.2 exposes `Add(float64)`. An Inc-only counter receives no bulk updates, even when the delta is one: publishing only singleton batches would undercount. `session.errors` always calls `Inc()` once per decision.
+
+The `ydb-go-sdk-otel` v0.11.1 counter implements only `Inc()`; it needs `Add(int64)` before these five bulk counters produce data there. The adapter must also implement the descriptor interfaces to export canonical names and units on a real Meter without renaming legacy metrics.

@@ -12,6 +12,8 @@ type Config struct {
 	config.Common
 
 	Trace              *trace.Topic
+	Endpoint           string
+	Database           string
 	MaxGrpcMessageSize int
 }
 
@@ -19,12 +21,20 @@ type Option func(c *Config)
 
 func PublicWithTrace(t trace.Topic) Option { //nolint:gocritic
 	return func(c *Config) {
-		var opts []gtrace.TopicComposeOption
-		if cb := c.PanicCallback(); cb != nil {
-			opts = append(opts, gtrace.WithTopicPanicCallback(cb))
-		}
-		c.Trace = gtrace.Compose(c.Trace, &t, opts...)
+		c.Trace = c.ComposeTrace(c.Trace, &t)
 	}
+}
+
+func (c *Config) ComposeTrace(base, extra *trace.Topic) *trace.Topic {
+	if extra == nil {
+		return base
+	}
+	var opts []gtrace.TopicComposeOption
+	if cb := c.PanicCallback(); cb != nil {
+		opts = append(opts, gtrace.WithTopicPanicCallback(cb))
+	}
+
+	return gtrace.ComposeReader(base, extra, opts...)
 }
 
 func PublicWithOperationTimeout(operationTimeout time.Duration) Option {
@@ -42,5 +52,17 @@ func PublicWithOperationCancelAfter(operationCancelAfter time.Duration) Option {
 func WithGrpcMessageSize(sizeBytes int) Option {
 	return func(c *Config) {
 		c.MaxGrpcMessageSize = sizeBytes
+	}
+}
+
+func WithDatabase(database string) Option {
+	return func(c *Config) {
+		c.Database = database
+	}
+}
+
+func WithEndpoint(endpoint string) Option {
+	return func(c *Config) {
+		c.Endpoint = endpoint
 	}
 }

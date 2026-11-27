@@ -502,7 +502,9 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 		}
 
 		// write skipped
-		reconnector.fireReconnectOnRetryableError(stream, xerrors.Retryable(errors.New("test")))
+		reconnector.fireReconnectOnRetryableError(
+			stream, xerrors.Retryable(errors.New("test")),
+		)
 		res := <-reconnector.reconnectFromBadStream
 		require.Nil(t, res.oldReader)
 	})

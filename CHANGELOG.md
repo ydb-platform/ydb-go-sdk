@@ -1,3 +1,6 @@
+* Fixed `ydb.WithPanicCallback` not being notified when hooks installed through `topicoptions.WithReaderTrace` or `topicoptions.WithWriterTrace` panic.
+* Added topic reader and listener metrics for message flow, session errors, commit progress, and buffers, with `topicoptions.WithListenerReaderName` for listener identity. See [METRICS.md](METRICS.md).
+
 ## v3.158.1
 * Fixed OAuth2 token exchange following redirects and potentially disclosing subject and actor tokens; redirecting token endpoints must be configured with their final URL
 

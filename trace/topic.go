@@ -7,6 +7,18 @@ import (
 )
 
 type (
+	// TopicReaderInfo contains attributes shared by topic reader and listener events.
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderInfo struct {
+		Endpoint string
+		Database string
+		Consumer string
+		// ReaderName is finalized by the reader or listener constructor.
+		ReaderName string
+		// Listener identifies events from StartListener.
+		Listener bool
+	}
+
 	// Topic specified trace of topic reader client activity.
 	// gtrace:gen
 	// gtrace:out internal/topic/gtrace
@@ -51,10 +63,18 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderCommittedNotify func(TopicReaderCommittedNotifyInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// Setting this callback enables commit message counting for a pull reader's OnReaderCommittedNotify.
+		// If it is unset, OnReaderCommittedNotify.MessagesCount is zero. Listeners use OnListenerCommitQueued.
+		OnReaderCommitQueued func(TopicReaderCommitQueuedInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// Reports the reconnect decision, which can first become known during Close.
+		OnReaderSessionError func(TopicReaderSessionErrorInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderClose func(TopicReaderCloseStartInfo) func(TopicReaderCloseDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderInit func(TopicReaderInitStartInfo) func(TopicReaderInitDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// Reports a raw stream failure before retry admission or a terminal decision.
 		OnReaderError func(TopicReaderErrorInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderUpdateToken func(
@@ -108,6 +128,15 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderReceiveDataResponse func(TopicReaderReceiveDataResponseStartInfo) func(TopicReaderReceiveDataResponseDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// Reports messages accepted by a pull buffer, grouped by topic.
+		OnReaderMessagesReceived func(TopicReaderMessagesReceivedInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderMessagesDelivered func(TopicReaderMessagesDeliveredInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderLocalBufferChanged func(TopicReaderLocalBufferChangedInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReaderCreditBalanceChanged func(TopicReaderCreditBalanceChangedInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderReadMessages func(TopicReaderReadMessagesStartInfo) func(TopicReaderReadMessagesDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderUnknownGrpcMessage func(OnReadUnknownGrpcMessageInfo)
@@ -155,6 +184,7 @@ type (
 		OnListenerInit func(TopicListenerInitStartInfo) func(TopicListenerInitDoneInfo)
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// Reports a wire receive before routing; a response can feed several workers or none.
 		OnListenerReceiveMessage func(TopicListenerReceiveMessageInfo)
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -190,6 +220,19 @@ type (
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnListenerUnknownMessage func(TopicListenerUnknownMessageInfo)
+
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		// Setting this callback enables commit message counting for a listener's OnReaderCommittedNotify.
+		OnListenerCommitQueued func(TopicReaderCommitQueuedInfo)
+
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnListenerMessagesReceived func(TopicReaderMessagesReceivedInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnListenerMessagesDelivered func(TopicReaderMessagesDeliveredInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnListenerCreditBalanceChanged func(TopicReaderCreditBalanceChangedInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnListenerLocalBufferChanged func(TopicReaderLocalBufferChangedInfo)
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -271,11 +314,15 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderCommittedNotifyInfo struct {
 		Context            *context.Context
+		ReaderInfo         TopicReaderInfo
 		ReaderConnectionID string
 		Topic              string
 		PartitionID        int64
 		PartitionSessionID int64
 		CommittedOffset    int64
+		// MessagesCount is zero when commit tracking is disabled by leaving the queued-commit callback
+		// of the reader kind unset: OnReaderCommitQueued or OnListenerCommitQueued.
+		MessagesCount int64
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -296,6 +343,7 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderReceiveDataResponseStartInfo struct {
 		Context                     *context.Context
+		ReaderInfo                  TopicReaderInfo
 		ReaderConnectionID          string
 		LocalBufferSizeAfterReceive int
 		DataResponse                TopicReaderDataResponseInfo
@@ -310,6 +358,56 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderReceiveDataResponseDoneInfo struct {
 		Error error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderMessagesReceivedInfo struct {
+		Context       *context.Context
+		ReaderInfo    TopicReaderInfo
+		Topic         string
+		MessagesCount int
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderMessagesDeliveredInfo struct {
+		Context       *context.Context
+		ReaderInfo    TopicReaderInfo
+		Topic         string
+		MessagesCount int
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderLocalBufferChangedInfo struct {
+		Context       *context.Context
+		ReaderInfo    TopicReaderInfo
+		MessagesDelta int
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderCreditBalanceChangedInfo struct {
+		Context    *context.Context
+		ReaderInfo TopicReaderInfo
+		BytesDelta int
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderSessionErrorInfo struct {
+		Context       *context.Context
+		ReaderInfo    TopicReaderInfo
+		RetryDecision string
+		StatusCode    string
+		ErrorType     string
+		Error         error
+	}
+
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicReaderCommitQueuedInfo struct {
+		Context            *context.Context
+		ReaderInfo         TopicReaderInfo
+		Topic              string
+		PartitionID        int64
+		PartitionSessionID int64
+		MessagesCount      int64
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -723,6 +821,7 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicListenerReceiveMessageInfo struct {
 		Context     *context.Context
+		ReaderInfo  TopicReaderInfo
 		ListenerID  string
 		SessionID   string
 		MessageType string

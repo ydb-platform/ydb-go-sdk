@@ -1,6 +1,9 @@
 package metrics
 
-// Counter counts value
+// Counter counts values.
+//
+// Implementations may additionally expose Add(int64) or Add(float64) for batched
+// increments; Add is an optional capability and is not part of this interface.
 type Counter interface {
 	Inc()
 }

@@ -3,6 +3,7 @@ package metrics
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	configPkg "github.com/ydb-platform/ydb-go-sdk/v3/config"
+	internalConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/observability"
 )
 
@@ -12,11 +13,14 @@ func WithTraces(config Config) ydb.Option {
 	}
 	config = config.WithSystem("ydb")
 
+	topicMetrics := topic(config)
+
 	return ydb.MergeOptions(
 		ydb.With(configPkg.WithBuildInfo(observability.MetricsChainName, observability.MetricsChainVersion)),
 		ydb.WithTraceDriver(driver(config)),
 		ydb.WithTraceTable(table(config)),
 		ydb.WithTraceQuery(query(config)),
+		ydb.With(func(c *configPkg.Config) { internalConfig.AddTopicTraces(&c.Common, topicMetrics) }),
 		ydb.WithTraceScripting(scripting(config)),
 		ydb.WithTraceScheme(scheme(config)),
 		ydb.WithTraceCoordination(coordination(config)),

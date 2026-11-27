@@ -13,4 +13,7 @@ const (
 	operationLabel       = "label"
 	retryLabel           = "retry_label"
 	queryModeLabel       = "query_mode"
+	consumerLabel        = "consumer"
+	databaseLabel        = "database"
+	readerNameLabel      = "reader.name"
 )

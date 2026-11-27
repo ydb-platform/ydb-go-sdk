@@ -47,6 +47,8 @@ func (b *batcher) Close(err error) error {
 	}
 
 	b.closed = true
+	b.messages = nil
+	b.sessionsForFlush = nil
 	b.closeErr = err
 	close(b.closeChan)
 
