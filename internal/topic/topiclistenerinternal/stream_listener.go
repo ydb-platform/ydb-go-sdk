@@ -150,6 +150,9 @@ func (l *streamListener) Close(ctx context.Context, reason error) error {
 // and internal workers stop. After all resources are closed, finishClose records the
 // final error and closes done so concurrent Close and WaitStop calls can proceed.
 func (l *streamListener) finishClose(cleanupCtx context.Context, reason error, done empty.Chan, workersToClose int) {
+	if l.sessions != nil {
+		l.sessions.ReleaseActiveIndex()
+	}
 	logCtx := cleanupCtx
 	closeDone := gtrace.TopicOnListenerClose(l.tracer, &logCtx, l.listenerID, l.sessionID, reason)
 
@@ -221,6 +224,9 @@ func (l *streamListener) initVars(sessionIDCounter *atomic.Int64) {
 	l.workers = make(map[partitionKey]*PartitionWorker)
 	if l.cfg == nil {
 		l.cfg = &StreamListenerConfig{}
+	}
+	if l.cfg.Metrics.Meter != nil {
+		l.sessions.TrackActive()
 	}
 }
 

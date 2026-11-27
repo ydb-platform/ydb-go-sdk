@@ -38,6 +38,7 @@ type Reader struct {
 	defaultBatchConfig ReadMessageBatchOptions
 	tracer             *trace.Topic
 	readerID           int64
+	closeMetric        *func()
 }
 
 func (r *Reader) TopicOnReaderStart(consumer string, err error) {
@@ -88,6 +89,7 @@ func NewReader(
 	}
 
 	readerID := topicreadercommon.NextReaderID()
+	cfg.trackActiveSessions = cfg.Metrics.Meter != nil
 
 	readerConnector := func(ctx context.Context) (batchedStreamReader, error) {
 		stream, err := connector(ctx, readerID, cfg.Trace)
@@ -114,6 +116,18 @@ func NewReader(
 		readerID:           readerID,
 	}
 
+	if cfg.Metrics.Meter != nil {
+		registration, err := topicreadercommon.RegisterPartitionSessionCount(
+			cfg.Metrics, consumer, cfg.ReadSelectors, reader.PartitionSessionCounts,
+		)
+		if err != nil {
+			return Reader{}, xerrors.WithStackTrace(err)
+		}
+		// Keep the public Reader comparable.
+		res.closeMetric = &registration
+	}
+	reader.start()
+
 	return res, nil
 }
 
@@ -138,6 +152,10 @@ func (r *Reader) Tracer() *trace.Topic {
 }
 
 func (r *Reader) Close(ctx context.Context) error {
+	if r.closeMetric != nil {
+		(*r.closeMetric)()
+	}
+
 	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
 }
 
@@ -261,6 +279,7 @@ type ReaderConfig struct {
 
 	RetrySettings      topic.RetrySettings
 	DefaultBatchConfig ReadMessageBatchOptions
+	Metrics            topicreadercommon.ReaderMetricsConfig
 }
 
 type PublicReaderOption func(cfg *ReaderConfig)

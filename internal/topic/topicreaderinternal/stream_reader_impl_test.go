@@ -1196,6 +1196,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	cfg.BaseContext = ctx
 	cfg.BufferSizeProtoBytes = initialBufferSizeBytes
 	cfg.CommitterBatchTimeLag = 0
+	cfg.trackActiveSessions = true
 
 	topicClientMock := NewMockTopicClient(mc)
 	reader := newTopicStreamReaderStopped(topicClientMock, topicreadercommon.NextReaderID(), stream, cfg)

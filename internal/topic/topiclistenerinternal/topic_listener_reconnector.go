@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
@@ -38,6 +39,7 @@ type TopicListenerReconnector struct {
 	streamListener *streamListener
 	streamCloseErr error
 	stopErr        error
+	closeMetric    func()
 }
 
 func NewTopicListenerReconnector(
@@ -53,6 +55,15 @@ func NewTopicListenerReconnector(
 		stopped:             make(empty.Chan),
 	}
 
+	if streamConfig.Metrics.Meter != nil {
+		registration, err := topicreadercommon.RegisterPartitionSessionCount(
+			streamConfig.Metrics, streamConfig.Consumer, streamConfig.Selectors, res.PartitionSessionCounts,
+		)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		res.closeMetric = registration
+	}
 	res.background.Start("connection", res.run)
 
 	return res, nil
@@ -74,6 +85,9 @@ func (lr *TopicListenerReconnector) Close(ctx context.Context, reason error) err
 		return errTopicListenerClosed
 	}
 	var closeErrors []error
+	if lr.closeMetric != nil {
+		lr.closeMetric()
+	}
 	err := lr.background.Close(ctx, reason)
 	if !errors.Is(err, background.ErrAlreadyClosed) {
 		closeErrors = append(closeErrors, err)

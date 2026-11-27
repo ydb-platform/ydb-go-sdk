@@ -2,6 +2,7 @@ package topicreadercommon
 
 import (
 	"fmt"
+	"maps"
 	"sync"
 	"time"
 
@@ -18,6 +19,11 @@ type PartitionSessionStorage struct {
 	m sync.RWMutex
 
 	sessions map[rawtopicreader.PartitionSessionID]*sessionInfo
+	// active excludes closed and removed sessions, which can still be looked
+	// up by the protocol.
+	active         *activeSessions
+	trackActive    bool
+	activeReleased bool
 
 	removeIndex              int
 	lastCompactedTime        time.Time
@@ -31,6 +37,15 @@ func (c *PartitionSessionStorage) initNeedLock() {
 	}
 }
 
+// TrackActive makes later assignments maintain the active index used by gauges.
+// Streams without a meter never call it, so assignment allocates no index.
+func (c *PartitionSessionStorage) TrackActive() {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	c.trackActive = true
+}
+
 func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 	c.m.Lock()
 	defer c.m.Unlock()
@@ -41,16 +56,33 @@ func (c *PartitionSessionStorage) Add(session *PartitionSession) error {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.StreamPartitionSessionID))
 	}
 	c.sessions[session.StreamPartitionSessionID] = &sessionInfo{Session: session}
+	if c.active == nil && c.trackActive && !c.activeReleased {
+		c.active = &activeSessions{}
+	}
+	if c.active != nil {
+		c.active.add(session)
+	}
 
 	return nil
+}
+
+// ReleaseActiveIndex stops active tracking without changing protocol lookups.
+func (c *PartitionSessionStorage) ReleaseActiveIndex() {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	c.activeReleased = true
+	if c.active != nil {
+		c.active.release()
+		c.active = nil
+	}
 }
 
 func (c *PartitionSessionStorage) Get(id rawtopicreader.PartitionSessionID) (*PartitionSession, error) {
 	c.m.RLock()
 	defer c.m.RUnlock()
 
-	c.initNeedLock()
-
+	// A lookup in a nil map is safe; initializing here would write under RLock.
 	partitionInfo, has := c.sessions[id]
 	if !has || partitionInfo.Session == nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: read undefined partition session with id: %v", id))
@@ -71,6 +103,22 @@ func (c *PartitionSessionStorage) GetAll() []*PartitionSession {
 	return res
 }
 
+func (c *PartitionSessionStorage) ActiveCountsByTopic() map[string]int64 {
+	active := c.activeIndex()
+	if active == nil {
+		return make(map[string]int64)
+	}
+
+	return active.snapshot()
+}
+
+func (c *PartitionSessionStorage) activeIndex() *activeSessions {
+	c.m.RLock()
+	defer c.m.RUnlock()
+
+	return c.active
+}
+
 func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (*PartitionSession, error) {
 	now := time.Now()
 	c.m.Lock()
@@ -81,6 +129,9 @@ func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (
 	c.removeIndex++
 	if partitionInfo, ok := c.sessions[id]; ok {
 		partitionInfo.RemoveTime = now
+		if c.active != nil {
+			c.active.drop(partitionInfo.Session)
+		}
 
 		return partitionInfo.Session, nil
 	}
@@ -88,6 +139,80 @@ func (c *PartitionSessionStorage) Remove(id rawtopicreader.PartitionSessionID) (
 	c.compactionNeedLock(now)
 
 	return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: delete undefined partition session with id: %v", id))
+}
+
+// activeSessions is separate from the storage: a session points only here, so a
+// retained message does not keep the removal history of its stream alive.
+type activeSessions struct {
+	m      sync.Mutex
+	counts map[string]int64
+	// peak is the largest size of counts since it was last right-sized.
+	peak     int
+	released bool
+}
+
+// A map smaller than this is never worth replacing.
+const activeCountsShrinkMin = 64
+
+func (a *activeSessions) snapshot() map[string]int64 {
+	a.m.Lock()
+	defer a.m.Unlock()
+
+	counts := make(map[string]int64, len(a.counts))
+	maps.Copy(counts, a.counts)
+	if a.peak >= activeCountsShrinkMin && len(counts)*4 <= a.peak {
+		// A Go map keeps its peak storage, and walking a sparse one costs as
+		// much as the peak. A scrape pays that walk anyway, so it right-sizes
+		// the map here; removals on the receive path stay constant-time.
+		a.counts = maps.Clone(counts)
+		a.peak = len(counts)
+	}
+
+	return counts
+}
+
+func (a *activeSessions) release() {
+	a.m.Lock()
+	defer a.m.Unlock()
+
+	a.counts = nil
+	a.released = true
+}
+
+func (a *activeSessions) add(session *PartitionSession) {
+	a.m.Lock()
+	defer a.m.Unlock()
+
+	session.active.Store(a)
+	if session.retired.Load() {
+		session.active.CompareAndSwap(a, nil)
+
+		return
+	}
+	if a.counts == nil {
+		a.counts = make(map[string]int64)
+	}
+	a.counts[session.Topic]++
+	a.peak = max(a.peak, len(a.counts))
+}
+
+func (a *activeSessions) drop(session *PartitionSession) {
+	a.m.Lock()
+	defer a.m.Unlock()
+
+	if !session.active.CompareAndSwap(a, nil) || a.released {
+		return
+	}
+	topic := session.Topic
+	if a.counts[topic] == 1 {
+		delete(a.counts, topic)
+		if len(a.counts) == 0 && a.peak >= activeCountsShrinkMin {
+			// Dropping an empty map is constant-time; snapshot handles a sparse one.
+			a.counts, a.peak = nil, 0
+		}
+	} else {
+		a.counts[topic]--
+	}
 }
 
 func (c *PartitionSessionStorage) compactionNeedLock(now time.Time) {

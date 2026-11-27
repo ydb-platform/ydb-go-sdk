@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+	internalConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/gtrace"
 	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
@@ -38,6 +39,7 @@ import (
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	internalTopic "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreadercommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
@@ -49,6 +51,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -97,6 +100,7 @@ type (
 
 		topic        *xsync.Once[*topicclientinternal.Client]
 		topicOptions []topicoptions.TopicOption
+		meter        telemetry.Meter
 
 		databaseSQLOptions []xsql.Option
 
@@ -625,15 +629,23 @@ func (d *Driver) connect(ctx context.Context) error {
 	})
 
 	d.topic = xsync.OnceValue(func() (*topicclientinternal.Client, error) {
+		metrics := topicreadercommon.ReaderMetricsConfig{
+			Meter:    d.meter,
+			Endpoint: d.Endpoint(),
+			Database: d.Name(),
+		}
+
 		return topicclientinternal.New(xcontext.ValueOnly(ctx),
 			d.metaBalancer,
 			d.config.Credentials(),
 			append(
 				// prepend common params from root config
 				[]topicoptions.TopicOption{
+					func(c *internalTopic.Config) { internalConfig.SetPanicCallback(&c.Common, d.config.PanicCallback()) },
 					topicoptions.WithOperationTimeout(d.config.OperationTimeout()),
 					topicoptions.WithOperationCancelAfter(d.config.OperationCancelAfter()),
 					internalTopic.WithGrpcMessageSize(d.config.GrpcMaxMessageSize()),
+					internalTopic.WithMetrics(metrics),
 				},
 				d.topicOptions...,
 			)...,

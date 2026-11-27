@@ -10,10 +10,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/observability"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
+	"github.com/ydb-platform/ydb-go-sdk/v3/telemetry"
 )
 
 func TestWithObservabilityBuildInfoChains(t *testing.T) {
-	require.Equal(t, "0.2.0", observability.MetricsChainVersion)
+	require.Equal(t, "0.3.0", observability.MetricsChainVersion)
 
 	for _, tt := range []struct {
 		name              string
@@ -69,6 +70,48 @@ func TestWithObservabilityBuildInfoChains(t *testing.T) {
 			discoveryCtx, err := d.config.Meta().DiscoveryContext(context.Background())
 			require.NoError(t, err)
 
+			discoveryMD, has := metadata.FromOutgoingContext(discoveryCtx)
+			require.True(t, has)
+			require.Equal(t, []string{tt.expectedDiscovery}, discoveryMD.Get("x-ydb-sdk-build-info"))
+		})
+	}
+}
+
+func TestWithMeterBuildInfoChain(t *testing.T) {
+	meter := func(telemetry.Descriptor, telemetry.Int64GaugeCallback) (func() error, error) {
+		return func() error { return nil }, nil
+	}
+
+	for _, tt := range []struct {
+		name              string
+		opts              []Option
+		expectedDiscovery string
+	}{
+		{
+			name:              "configured meter",
+			opts:              []Option{WithMeter(meter)},
+			expectedDiscovery: version.FullVersion + ";ydb-sdk-metrics/0.3.0",
+		},
+		{
+			name:              "meter disabled by a later option",
+			opts:              []Option{WithMeter(meter), WithMeter(nil)},
+			expectedDiscovery: version.FullVersion,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			d, err := driverFromOptions(ctx, tt.opts...)
+			require.NoError(t, err)
+			t.Cleanup(d.ctxCancel)
+
+			regularCtx, err := d.config.Meta().Context(ctx)
+			require.NoError(t, err)
+			regularMD, has := metadata.FromOutgoingContext(regularCtx)
+			require.True(t, has)
+			require.Equal(t, []string{version.FullVersion}, regularMD.Get("x-ydb-sdk-build-info"))
+
+			discoveryCtx, err := d.config.Meta().DiscoveryContext(ctx)
+			require.NoError(t, err)
 			discoveryMD, has := metadata.FromOutgoingContext(discoveryCtx)
 			require.True(t, has)
 			require.Equal(t, []string{tt.expectedDiscovery}, discoveryMD.Get("x-ydb-sdk-build-info"))

@@ -70,6 +70,7 @@ type listenerAndHandlerPair struct {
 func PartitionStorage(e fixenv.Env) *topicreadercommon.PartitionSessionStorage {
 	f := func() (*fixenv.GenericResult[*topicreadercommon.PartitionSessionStorage], error) {
 		storage := &topicreadercommon.PartitionSessionStorage{}
+		storage.TrackActive()
 		if err := storage.Add(PartitionSession(e)); err != nil {
 			return nil, err
 		}

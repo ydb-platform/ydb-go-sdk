@@ -82,6 +82,7 @@ type topicStreamReaderConfig struct {
 	CommitMode                      topicreadercommon.PublicCommitMode
 	Decoders                        *topicreadercommon.MultiDecoder
 	EnableSplitMergeSupport         bool
+	trackActiveSessions             bool
 }
 
 func newTopicStreamReaderConfig() topicStreamReaderConfig {
@@ -170,6 +171,9 @@ func newTopicStreamReaderStopped(
 		rawMessagesFromBuffer: make(chan rawtopicreader.ServerMessage, 1),
 	}
 
+	if cfg.trackActiveSessions {
+		res.sessionController.TrackActive()
+	}
 	res.backgroundWorkers = *background.NewWorker(stopPump, "topic-reader-stream-background")
 
 	res.committer = topicreadercommon.NewCommitterStopped(cfg.Trace, labeledContext, cfg.CommitMode, res.send)
@@ -851,6 +855,7 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 	if !isFirstClose {
 		return nil
 	}
+	r.sessionController.ReleaseActiveIndex()
 
 	closeErr = r.committer.Close(ctx, reason)
 

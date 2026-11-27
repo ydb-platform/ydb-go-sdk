@@ -1,3 +1,5 @@
+* Added experimental `ydb.WithMeter` and `telemetry.Meter` to expose the `ydb.topic.reader.partition_session.count` gauge through an application-owned backend, with `topicoptions.WithReaderName` and `topicoptions.WithListenerReaderName` to set the `reader.name` attribute
+
 ## v3.158.1
 * Fixed OAuth2 token exchange following redirects and potentially disclosing subject and actor tokens; redirecting token endpoints must be configured with their final URL
 

@@ -71,6 +71,7 @@ func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
 			opt(&c)
 		}
 	}
+	config.SetPanicCallback(&c.Metrics.Common, c.PanicCallback())
 
 	return c
 }
@@ -319,6 +320,7 @@ func (c *Client) StartListener(
 
 	cfg.Consumer = consumer
 	cfg.Tracer = c.cfg.Trace // Set tracer from client config
+	cfg.Metrics = c.cfg.Metrics
 
 	cfg.Selectors = make([]*topicreadercommon.PublicReadSelector, len(readSelectors))
 	for i := range readSelectors {
@@ -358,6 +360,9 @@ func (c *Client) StartReader(
 	}
 
 	defaultOpts := []topicoptions.ReaderOption{
+		func(cfg *topicreaderinternal.ReaderConfig) {
+			cfg.Metrics = c.cfg.Metrics
+		},
 		topicoptions.WithCommonConfig(c.cfg.Common),
 		topicreaderinternal.WithCredentials(c.cred),
 		topicreaderinternal.WithTrace(c.cfg.Trace),
