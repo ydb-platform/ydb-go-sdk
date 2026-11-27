@@ -35,7 +35,7 @@ var errGaugeRetired = errors.New("OTel gauge entry retired")
 // The OTel SDK keeps the last observation in collection order for each matching
 // instrument and attribute set; it does not sum observations across callbacks.
 func Meter(meter metric.Meter) telemetry.Meter {
-	registry := &gaugeRegistry{gauges: make(map[string]*gaugeRegistration)}
+	registry := &gaugeRegistry{}
 
 	return func(desc telemetry.Descriptor, callback telemetry.Int64GaugeCallback) (func() error, error) {
 		entry, err := registry.attach(desc.Name, &callback, func(entry *gaugeRegistration) error {
@@ -74,6 +74,9 @@ func (r *gaugeRegistry) reserve(name string) *gaugeRegistration {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if r.gauges == nil {
+		r.gauges = make(map[string]*gaugeRegistration)
+	}
 	entry := r.gauges[name]
 	if entry == nil {
 		entry = &gaugeRegistration{callbacks: make(map[*telemetry.Int64GaugeCallback]struct{})}
@@ -132,6 +135,9 @@ func (r *gaugeRegistry) retire(name string, entry *gaugeRegistration) {
 
 	entry.retired = true
 	delete(r.gauges, name)
+	if len(r.gauges) == 0 {
+		r.gauges = nil
+	}
 }
 
 func (r *gaugeRegistry) detach(
