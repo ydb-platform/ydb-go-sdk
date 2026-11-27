@@ -175,6 +175,13 @@ func TestApplyDiscoveredEndpoints(t *testing.T) {
 	require.Equal(t, e3.NodeID(), all[1].Endpoint().NodeID())
 	require.Same(t, retained, all[0])
 	require.Eventually(t, func() bool { return removed.State() == state.Destroyed }, time.Second, time.Millisecond)
+
+	e4 := endpoint.New("e4.example:2135", endpoint.WithID(4))
+	b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{e4}, "")
+	require.Equal(t, []uint32{4}, activeNodeIDs(b))
+	for _, cc := range all {
+		require.Eventually(t, func() bool { return cc.State() == state.Destroyed }, time.Second, time.Millisecond)
+	}
 }
 
 func TestApplyDiscoveredEndpointsMaxConnections(t *testing.T) {
@@ -2596,8 +2603,8 @@ func activeNodeIDs(balancer *Balancer) []uint32 {
 	return ids
 }
 
-// TestBalancerDiscoveryDropClosesGRPC verifies that an existing stream can
-// finish after discovery removes its endpoint.
+// TestBalancerDiscoveryDropClosesGRPC verifies that a returning endpoint gets
+// a new connection while the removed connection drains its existing stream.
 func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	const (
 		node1 uint32 = 1
@@ -2656,9 +2663,17 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	require.Equal(t, []uint32{node1}, activeNodeIDs(balancer))
 	require.Eventually(t, func() bool { return node2Conn.State() == state.UnderShutdown }, time.Second, time.Millisecond)
 
-	// Discovery #4: the stream still runs through another applied response.
+	// Discovery #4: node 2 returns before the old connection closes.
+	server.setNodeIDs([]uint32{node1, node2})
 	require.NoError(t, balancer.clusterDiscoveryAttemptWithDial(ctx))
-	require.Equal(t, []uint32{node1}, activeNodeIDs(balancer))
+	require.ElementsMatch(t, []uint32{node1, node2}, activeNodeIDs(balancer))
+	returned := connByNodeID(balancer, node2)
+	require.NotNil(t, returned)
+	require.NotSame(t, node2Conn, returned)
+	require.Equal(t, node2Conn.Endpoint().Key(), returned.Endpoint().Key())
+	dialWhoAmI(t, balancer, node2)
+	require.Equal(t, 2, events.dialedCount(node2))
+	require.Equal(t, state.UnderShutdown, node2Conn.State())
 	require.Equal(t, 0, events.closedCount(node2))
 
 	cancelStream()
@@ -2666,10 +2681,11 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return events.closedCount(node2) == 1 && node2Conn.State() == state.Destroyed
 	}, time.Second, 10*time.Millisecond, "node removed from discovery must close gRPC connection")
+	require.Equal(t, state.Online, returned.State())
 
 	require.Equal(t, 0, events.closedCount(node1))
 
-	// Balancer.Close releases the remaining pooled connection.
+	// Balancer.Close releases the active connections.
 	node1Conn := connByNodeID(balancer, node1)
 	require.NotNil(t, node1Conn)
 	require.Equal(t, 0, events.closedCount(node1))
@@ -2679,8 +2695,9 @@ func TestBalancerDiscoveryDropClosesGRPC(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return events.closedCount(node1) == 1 && node1Conn.State() == state.Destroyed
 	}, time.Second, 10*time.Millisecond, "balancer close must close remaining active connections")
-
-	require.Equal(t, 1, events.closedCount(node2))
+	require.Eventually(t, func() bool {
+		return events.closedCount(node2) == 2 && returned.State() == state.Destroyed
+	}, time.Second, 10*time.Millisecond, "balancer close must close the returned connection")
 }
 
 func TestBalancerDiscoveryDropDestroysParkedConnection(t *testing.T) {
