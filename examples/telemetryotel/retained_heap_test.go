@@ -34,7 +34,9 @@ func TestMeterBoundsRetainedHeapAfterAllGaugeNamesRetire(t *testing.T) {
 	}
 }
 
-func registerGauge(t *testing.T, adapter telemetry.Meter, name string, callback telemetry.Int64GaugeCallback) func() error {
+func registerGauge(
+	t *testing.T, adapter telemetry.Meter, name string, callback telemetry.Int64GaugeCallback,
+) func() error {
 	t.Helper()
 	stop, err := adapter(telemetry.Descriptor{Name: name}, callback)
 	if err != nil {

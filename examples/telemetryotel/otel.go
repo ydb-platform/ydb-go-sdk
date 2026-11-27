@@ -110,6 +110,7 @@ func (r *gaugeRegistry) tryAttach(
 	}
 	entry.mu.Lock()
 	entry.callbacks[callback] = struct{}{}
+	entry.callbackPeak = max(entry.callbackPeak, len(entry.callbacks))
 	entry.mu.Unlock()
 	if entry.registration == nil {
 		registered := false
@@ -163,8 +164,9 @@ type gaugeRegistration struct {
 	registration metric.Registration
 
 	// Collection takes only this mutex, not the registration lifecycle mutex.
-	mu        sync.Mutex
-	callbacks map[*telemetry.Int64GaugeCallback]struct{}
+	mu           sync.Mutex
+	callbacks    map[*telemetry.Int64GaugeCallback]struct{}
+	callbackPeak int
 }
 
 func (g *gaugeRegistration) remove(callback *telemetry.Int64GaugeCallback) bool {
@@ -172,8 +174,16 @@ func (g *gaugeRegistration) remove(callback *telemetry.Int64GaugeCallback) bool 
 	defer g.mu.Unlock()
 
 	delete(g.callbacks, callback)
+	size := len(g.callbacks)
+	if g.callbackPeak >= 64 && size <= g.callbackPeak/4 {
+		// The intervening removals pay for the copy: amortized O(1) per removal.
+		callbacks := make(map[*telemetry.Int64GaugeCallback]struct{}, size)
+		maps.Copy(callbacks, g.callbacks)
+		g.callbacks = callbacks
+		g.callbackPeak = size
+	}
 
-	return len(g.callbacks) == 0
+	return size == 0
 }
 
 func (g *gaugeRegistration) snapshot() []*telemetry.Int64GaugeCallback {
