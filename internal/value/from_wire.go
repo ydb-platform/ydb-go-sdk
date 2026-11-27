@@ -22,10 +22,22 @@ func FromWire(t types.Type, data []byte) (Value, error) {
 }
 
 // FromCell converts an already parsed cell using the column's SDK type.
+//
+//nolint:funlen // Keep decoding and skipped-message validation together.
 func FromCell(t types.Type, cell wirevalue.Cell) (Value, error) {
 	if cell.Kind() == wirevalue.ValueNullField {
 		if v, ok := nullFromWire(t); ok {
+			if err := cell.ValidateUnused(0); err != nil {
+				return nil, err
+			}
+
 			return v, nil
+		}
+	}
+	switch t.(type) {
+	case types.Primitive, *types.Decimal, types.Void, types.Null, types.EmptyList, types.EmptyDict, *types.PgType:
+		if err := cell.ValidateUnused(0); err != nil {
+			return nil, err
 		}
 	}
 	switch t := t.(type) {
@@ -230,6 +242,9 @@ func setFromWire(t *types.Set, cell wirevalue.Cell) (Value, error) {
 	values := make([]Value, 0)
 	pairs := cell.Pairs()
 	for pairs.Next() {
+		if err := pairs.Payload().ValidateUnused(0); err != nil {
+			return nil, err
+		}
 		v, err := FromCell(t.ItemType(), pairs.Key())
 		if err != nil {
 			return nil, err

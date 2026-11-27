@@ -1,3 +1,5 @@
+* Fixed direct Query Service protobuf wire decoding accepting malformed known message fields that are unused by the scanned column type
+
 ## v3.158.1
 * Fixed OAuth2 token exchange following redirects and potentially disclosing subject and actor tokens; redirecting token endpoints must be configured with their final URL
 
