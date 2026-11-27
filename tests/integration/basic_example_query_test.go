@@ -37,7 +37,7 @@ func TestBasicExampleQuery(t *testing.T) { //nolint:gocyclo
 
 	folder := t.Name()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 42*time.Second)
 	defer cancel()
 
 	var totalConsumedUnits atomic.Uint64
