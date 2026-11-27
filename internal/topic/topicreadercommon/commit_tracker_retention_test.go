@@ -23,6 +23,42 @@ func TestCommitMessageTrackerRetainsBoundedHeapForDuplicateEnds(t *testing.T) {
 	require.Less(t, retained, int64(256<<10))
 }
 
+func TestCommitMessageTrackerReleasesCoveredOrderedRangesAfterPartialAck(t *testing.T) {
+	const (
+		burst rawtopiccommon.Offset = 500_000
+		top   rawtopiccommon.Offset = burst + 2
+		slack                       = 256 << 10
+	)
+	for _, tc := range []struct {
+		name string
+		ack  rawtopiccommon.Offset
+	}{
+		{name: "one_survivor", ack: burst},
+		{name: "half_survive", ack: burst / 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tracker := newCommitMessageTracker(0)
+			before := commitTrackerLiveHeap()
+
+			for end := rawtopiccommon.Offset(1); end <= burst; end++ {
+				tracker.Queue(end-1, end)
+			}
+			tracker.Queue(top-1, top)
+			require.EqualValues(t, tc.ack, tracker.Acknowledge(tc.ack))
+
+			retained := commitTrackerLiveHeap() - before
+			survivors := int64(burst - tc.ack + 1)
+			require.Equal(t, survivors, tracker.Acknowledge(top))
+			t.Logf("extra live heap with %d pending ranges: %d bytes", survivors, retained)
+			limit := int64(slack)
+			if survivors > 1 {
+				limit += 16 * survivors * 3 / 2
+			}
+			require.Less(t, retained, limit)
+		})
+	}
+}
+
 func TestCommitMessageTrackerReleasesCoveredBurstDuringPartialProgress(t *testing.T) {
 	const (
 		burst  rawtopiccommon.Offset = 500_000

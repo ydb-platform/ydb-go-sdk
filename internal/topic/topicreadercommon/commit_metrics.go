@@ -3,7 +3,6 @@ package topicreadercommon
 import (
 	"context"
 	"math/rand/v2"
-	"sort"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -132,10 +131,8 @@ type commitMessageTracker struct {
 
 	session *PartitionSession
 	owner   *pendingCommitTrackers
-	// ordered stores non-decreasing ends and their cumulative counts.
-	ordered    []commitMetricRange
-	prefixBase int64 // cumulative count before ordered[0]
-	total      int64
+	ordered orderedCommitRanges
+	total   int64
 	// pending indexes ends below the last ordered end.
 	pending *commitRangeNode
 }
@@ -160,18 +157,12 @@ func (t *commitMessageTracker) Queue(start, end rawtopiccommon.Offset) int64 {
 	if end <= t.session.CommittedOffset() {
 		return 0
 	}
-	if len(t.ordered) == 0 && t.owner != nil && !t.owner.add(t) {
+	if len(t.ordered.chunks) == 0 && t.owner != nil && !t.owner.add(t) {
 		return 0
 	}
 
 	t.total += count
-	if len(t.ordered) == 0 {
-		t.ordered = append(t.ordered, commitMetricRange{end: end, count: count})
-	} else if last := &t.ordered[len(t.ordered)-1]; end == last.end {
-		last.count += count
-	} else if end > last.end {
-		t.ordered = append(t.ordered, commitMetricRange{end: end, count: last.count + count})
-	} else {
+	if !t.ordered.queue(commitMetricRange{end: end, count: count}) {
 		// Priorities must be unpredictable: a known sequence lets an admission
 		// order degrade the treap into a list. The runtime source takes no lock.
 		t.pending = t.pending.insert(commitMetricRange{end: end, count: count}, rand.Uint64())
@@ -188,11 +179,12 @@ func (t *commitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset
 	defer t.mu.Unlock()
 
 	t.session.SetCommittedOffsetForward(exclusiveOffset)
-	if len(t.ordered) == 0 {
+	chunks := t.ordered.chunks
+	if len(chunks) == 0 {
 		return 0
 	}
 	// The last ordered end is also the maximum across both structures.
-	if exclusiveOffset >= t.ordered[len(t.ordered)-1].end {
+	if exclusiveOffset >= lastCommitRange(chunks[len(chunks)-1]).end {
 		acknowledged := t.total
 		t.clear()
 		if t.owner != nil {
@@ -202,16 +194,7 @@ func (t *commitMessageTracker) Acknowledge(exclusiveOffset rawtopiccommon.Offset
 		return acknowledged
 	}
 
-	var acknowledged int64
-	if exclusiveOffset >= t.ordered[0].end {
-		firstUncovered := sort.Search(len(t.ordered), func(i int) bool {
-			return t.ordered[i].end > exclusiveOffset
-		})
-		prefix := t.ordered[firstUncovered-1].count
-		acknowledged = prefix - t.prefixBase
-		t.prefixBase = prefix
-		t.ordered = t.ordered[firstUncovered:]
-	}
+	acknowledged := t.ordered.removeThrough(exclusiveOffset)
 	var covered int64
 	t.pending, covered = t.pending.removeThrough(exclusiveOffset)
 	acknowledged += covered
@@ -227,6 +210,7 @@ func (t *commitMessageTracker) discard() {
 }
 
 func (t *commitMessageTracker) clear() {
-	t.ordered, t.pending = nil, nil
-	t.prefixBase, t.total = 0, 0
+	t.ordered = orderedCommitRanges{}
+	t.pending = nil
+	t.total = 0
 }

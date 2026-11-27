@@ -77,9 +77,9 @@ func BenchmarkCommitTrackerQueue(b *testing.B) {
 		tracker.Queue(1, 2)
 		b.ReportAllocs()
 		for b.Loop() {
-			// Measure Queue with spare ordered capacity, excluding slice growth.
+			// Measure Queue with spare capacity in the tail chunk, excluding growth.
 			tracker.Queue(1, 2)
-			tracker.ordered = tracker.ordered[:1]
+			tracker.ordered.chunks[0] = tracker.ordered.chunks[0][:1]
 			tracker.total = 1
 		}
 	})
@@ -93,6 +93,43 @@ func BenchmarkCommitTrackerQueue(b *testing.B) {
 			tracker.total = 1
 		}
 	})
+}
+
+func BenchmarkCommitOrderedPartialAcknowledgement(b *testing.B) {
+	const pending rawtopiccommon.Offset = 500_000
+	for _, survivors := range []rawtopiccommon.Offset{1, 1_000, 250_000} {
+		b.Run(fmt.Sprintf("survivors=%d", survivors), func(b *testing.B) {
+			ack := pending - survivors
+			b.ReportAllocs()
+			for range b.N {
+				b.StopTimer()
+				tracker := newCommitMessageTracker(0)
+				for i := range pending {
+					tracker.Queue(i, i+1)
+				}
+				b.StartTimer()
+				got := tracker.Acknowledge(ack)
+				b.StopTimer()
+				require.EqualValues(b, ack, got)
+				require.EqualValues(b, survivors, tracker.Acknowledge(pending))
+			}
+		})
+	}
+}
+
+func BenchmarkCommitOrderedQueueAmortized(b *testing.B) {
+	const batch rawtopiccommon.Offset = 500_000
+	tracker := newCommitMessageTracker(0)
+	var i rawtopiccommon.Offset
+	b.ReportAllocs()
+	for b.Loop() {
+		if i == batch {
+			tracker.clear()
+			i = 0
+		}
+		tracker.Queue(i, i+1)
+		i++
+	}
 }
 
 func newCommitMessageTracker(offset rawtopiccommon.Offset) *commitMessageTracker {

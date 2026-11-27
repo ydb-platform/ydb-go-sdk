@@ -80,4 +80,30 @@ func TestCommitMessageTrackerMatchesRangeScan(t *testing.T) {
 	acknowledge(sentinel-2, steps+2)
 	acknowledge(sentinel-1, steps+3)
 	acknowledge(sentinel, steps+4)
+
+	// Cross multiple ordered chunks, starting with adjacent duplicates at
+	// each boundary and then resubmitting older ends through the treap.
+	base := watermark
+	const chunk = 512
+	for i := rawtopiccommon.Offset(1); i <= 4*chunk; i++ {
+		end := base + i
+		queue(span{end - 1, end}, steps+5)
+		if i%chunk == 0 || i%chunk == 1 {
+			queue(span{end - 3, end}, steps+5)
+		}
+		if i > 1 && i%chunk == 1 {
+			queue(span{end - 5, end - 1}, steps+5)
+		}
+	}
+	for _, offset := range []rawtopiccommon.Offset{
+		chunk - 1, chunk, chunk + 1, 2 * chunk, 3*chunk + 1,
+	} {
+		acknowledge(base+offset, steps+6)
+	}
+	for i := rawtopiccommon.Offset(4*chunk + 1); i <= 5*chunk+1; i++ {
+		end := base + i
+		queue(span{end - 2, end}, steps+7)
+	}
+	acknowledge(base+5*chunk, steps+8)
+	acknowledge(highest, steps+9)
 }
